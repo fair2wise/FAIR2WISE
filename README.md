@@ -1,14 +1,48 @@
 # From FAIR to WISE: Creating Knowledge Graphs from Research Papers
 
+## Getting Started
+
+Clone and/or fork this repository.
+
+```bash
+git clone https://github.com/fair2wise/FAIRtoWISE-FORUM-AI
+```
+
+Install project requirements:
+
+```bash
+cd FAIRtoWISE-FORUM-AI
+pip install -r requirements.txt
+```
+
 ## LinkML "Core Model" Schema
 
 An example of a core model for organic photovoltaics can be found in [storage/schema/matkg_schema.yaml](storage/schema/matkg_schema.yaml). You can use this as a starting point for defining a new schema for a different niche topic. The concept extraction uses this schema in the LLM call to help keep the results structured and relevant. 
 
 ## LLM Backend
 
-The code in this repository is configured to allow users to pass LLM calls to [Ollama](https://ollama.com/) running locally, or, using [CBORG](https://cborg.lbl.gov/). 
+The code in this repository is configured to allow users to pass LLM calls to [Ollama](https://ollama.com/) running locally, or, using [CBORG](https://cborg.lbl.gov/). The `extract_terms.py` module allows you to choose which backend to use, and the API url. For CBORG, you will need your access key in your environment.
 
 ## [Concept Extraction](app/modules/extract_terms.py)
+
+### Getting started
+
+`extract_terms.py` implements a high-performance, schema-aware terminology extraction engine that processes scientific PDFs and produces structured, ontology-aligned JSON output.
+It integrates:
+
+⚙️ Ollama or CBORG (OpenAI-compatible) LLM backends
+📘 LinkML schema enforcement via SchemaHelper
+🧪 Chemical formula validation & repair
+🧬 ChEBI enrichment
+📏 Physical property extraction + normalization
+⚡ Full parallel page-level processing
+🔧 Robust logging, retries, and thread-safe saving
+
+This module is designed for large corpora, high throughput, and strict schema alignment for downstream knowledge-graph construction.
+
+
+
+### Implementation Details
 
 The term extraction system employs parallel page-level processing through Python’s ThreadPoolExecutor, processing PDF pages concurrently with up to 50 workers to balance throughput with LLM latency. To ensure resilience against crashes during long-running extraction jobs, extracted terms and properties are persisted after every page via a lock-guarded \_save\_terms\_threadsafe method, providing thread-safe incremental saving that allows the system to resume from interruptions.
 
@@ -34,6 +68,98 @@ The module provides a configurable command-line interface enabling direct JSON t
 
 ## [KG-RAG LLM Chat](app/modules/kg_rag_ollama_api.py)
 
+### CLI Chat
+
+Interactive mode lets you manually ask scientific or KG-grounded questions and receive answers directly in the console.
+
+**Basic usage**
+```bash
+python kg_rag_ollama.py
+```
+
+The prompt will appear:
+```bash
+Ask (exit to quit):
+```
+🎯 **Ask a one-shot question without entering the REPL**
+
+```bash
+python kg_rag_ollama.py --question "What is the role of P3HT crystallinity in OPV performance?"
+```
+
+This performs:
+
+- Semantic search over the KG
+- BFS node expansion
+- PDF snippet grounding
+- RAG answer generation
+- And exits after producing the final answer.
+
+**Running Competency Question Evaluation**
+To evaluate your KG-RAG vs baseline model:
+
+```
+python kg_rag_ollama.py --competency
+```
+
+This runs the full competency question set defined in:
+
+```
+storage/competency_questions/thomas_f.txt
+```
+
+Results are saved incrementally to:
+```
+storage/competency_questions/competency_results_qwen3_235b_580papers.json
+```
+
+### Open WebUI
+
+You can use Open WebUI to chat with the KG-RAG LLM.
+
+[Open WebUI Installation instructions](https://docs.openwebui.com/)
+
+```bash
+open-webui serve
+```
+
+To connect with the `kg_rag_ollama.py` FastAPI server, there are a few settings to tweak in OpenWebUI:
+
+- Go to `Admin Settings` -> `Connections` -> `Ollama API`
+- Update the url to `http://localhost:11435`
+
+**Start the server**
+```
+python kg_rag_ollama.py --api
+```
+This launches FastAPI on:
+```
+http://0.0.0.0:11435
+```
+
+### Run with a specific KG
+
+The script accepts --graph to load a specific KG JSON file instead of the default.
+
+Example (CLI mode)
+```bash
+python kg_rag_ollama.py --graph storage/kg/my_custom_kg.json
+```
+Example (one-shot)
+```bash
+python kg_rag_ollama.py \
+    --graph storage/kg/opv_expert_graph.json \
+    --question "How does annealing influence phase separation in P3HT:PCBM?"
+```
+Example (FastAPI server with a specific KG)
+```bash
+python kg_rag_ollama.py \
+    --graph storage/kg/opv_expert_graph.json \
+    --api
+```
+
+### Implementation Details
+
 The knowledge graph retrieval-augmented generation system implements a hybrid retrieval strategy that combines semantic search using SentenceTransformer embeddings with a FAISS IVF-Flat index alongside weighted graph expansion through breadth-first search. This dual approach ensures retrieval balances vector similarity with relational structure, leveraging both the semantic understanding from embeddings and the structural knowledge encoded in graph relationships.
 
 Evidence-aware ranking forms the core of result prioritization, where nodes are scored through a weighted combination of semantic similarity, graph depth, lexical overlap, and evidence count. This multi-factor scoring produces more interpretable and grounded answers by considering not just relevance but also the strength of supporting evidence. For each selected node, the system builds structured context blocks that include knowledge graph triples, chemical formulas, descriptions, and up to three PDF snippets with page-level caching for speed, all controlled by a configurable character budget to prevent context overflow.
@@ -47,8 +173,8 @@ FastAPI integration provides a proxy server for OpenWebUI, exposing endpoints in
 The system demonstrates GPU-aware optimization by auto-detecting CUDA devices and performing warm-up routines for faster inference, with graceful fallback to CPU if GPU embedding or FAISS indexing fails. Robust PDF caching through LRU mechanisms supports fast repeated lookups when the same papers are cited across multiple questions, significantly reducing latency for document-heavy queries. All key parameters—including model choice, graph file, context budgets, BFS hops, and penalties—can be overridden via environment variables, simplifying deployment across different HPC environments and enabling rapid experimentation without code changes.
 
 
-This template includes common configuration and settings for ALS Computing projects.
 
+## Project Structure
 <!-- TREE START -->
 <pre>
 .
