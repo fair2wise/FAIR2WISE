@@ -395,6 +395,8 @@ class LLMTermExtractor:
         self.schema_helper = SchemaHelper(schema_path=schema_path)
         self.terms_dict: Dict[str, Dict[str, Any]] = {}
         self._bk_terms: Dict[str, str] = {}  # display_text → key
+        self.xray_code_snippets: List[Dict[str, Any]] = []
+        self._xray_seen: set = set()  # dedup keys for code snippets
 
         # If no chat_client provided, use OllamaChatClient by default
         self.chat_client = chat_client or OllamaChatClient(
@@ -431,9 +433,15 @@ class LLMTermExtractor:
                         key = term["term"].strip().lower()
                         self.terms_dict[key] = term
                         self._bk_terms[term["term"]] = key
+                    for snip in prev.get("xray_code_snippets", []):
+                        self.xray_code_snippets.append(snip)
+                        self._xray_seen.add(self._xray_snippet_key(snip))
                     loaded_meta = prev.get("metadata", {})
                     self.metadata.update(loaded_meta)
-                logger.info(f"Loaded {len(self.terms_dict)} existing terms from {self.output_file}")
+                logger.info(
+                    f"Loaded {len(self.terms_dict)} existing terms and "
+                    f"{len(self.xray_code_snippets)} xray code snippets from {self.output_file}"
+                )
             except Exception as e:
                 logger.warning(f"Could not load previous terms: {e}")
 
@@ -470,6 +478,33 @@ class LLMTermExtractor:
             except json.JSONDecodeError:
                 continue
         return {"terms": []}
+
+    @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
+    def extract_xray_json_from_text(self, text: str) -> Dict[str, Any]:
+        """
+        Extract largest JSON object containing "snippets". Return {"snippets": []} if none.
+        """
+        pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
+        matches = list(re.finditer(pattern, text))
+        matches.sort(key=lambda m: -len(m.group(0)))
+        for m in matches:
+            snippet = m.group(0)
+            try:
+                obj = json.loads(snippet)
+                if isinstance(obj, dict) and "snippets" in obj:
+                    return obj
+            except json.JSONDecodeError:
+                continue
+        return {"snippets": []}
+
+    @staticmethod
+    def _xray_snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
+        """Dedup key for an x-ray code snippet (source_paper, page, code body)."""
+        return (
+            str(snip.get("source_paper", "")),
+            str(snip.get("page", "")),
+            (snip.get("code_snippet") or "").strip(),
+        )
 
     def _looks_like_formula(self, s: str) -> bool:
         """Heuristic: uppercase‐lowercase blocks + digits → formula."""
@@ -726,12 +761,191 @@ INSTRUCTIONS:
                     if "properties" not in t:
                         t["properties"] = []
                     terms_out.append(t)
-                out = {"metadata": self.metadata, "terms": terms_out}
+                out = {
+                    "metadata": self.metadata,
+                    "terms": terms_out,
+                    "xray_code_snippets": self.xray_code_snippets,
+                }
                 with open(self.output_file, "w") as fh:
                     json.dump(out, fh, indent=2)
                 logger.debug(f"Saved {len(self.terms_dict)} terms to {self.output_file}")
             except Exception as e:
                 logger.error(f"Failed to save terms: {e}")
+
+    def _save_xray_snippets_threadsafe(self) -> None:
+        """Acquire lock and write JSON to disk (terms + xray code snippets)."""
+        with self._save_lock:
+            try:
+                terms_out = []
+                for t in self.terms_dict.values():
+                    if "properties" not in t:
+                        t["properties"] = []
+                    terms_out.append(t)
+                out = {
+                    "metadata": self.metadata,
+                    "terms": terms_out,
+                    "xray_code_snippets": self.xray_code_snippets,
+                }
+                with open(self.output_file, "w") as fh:
+                    json.dump(out, fh, indent=2)
+                logger.debug(
+                    f"Saved {len(self.xray_code_snippets)} xray code snippets to {self.output_file}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to save xray code snippets: {e}")
+
+    def _prepare_xray_code_prompt(self, page_text: str) -> str:
+        """
+        Build a prompt asking the LLM to extract code blocks related to
+        x-ray scattering peak-finding/analysis (SAXS, WAXS, GIWAXS, GISAXS).
+        """
+        max_len = 8000
+        text = page_text[-max_len:] if len(page_text) > max_len else page_text
+
+        few_shot = r"""
+### EXAMPLE
+Input:
+CONTENT:
+"GIWAXS data were reduced and the lamellar peak at q = 0.38 A^-1 (d = 16.5 A)
+located with the following Python routine:
+    from scipy.signal import find_peaks
+    peaks, _ = find_peaks(intensity, height=0.1)
+    q_peaks = q[peaks]
+The (010) pi-pi stacking peak appeared near q = 1.7 A^-1."
+
+Output:
+{
+  "snippets": [
+    {
+      "scattering_technique": "GIWAXS",
+      "peak_positions": ["q = 0.38 A^-1", "q = 1.7 A^-1"],
+      "d_spacing": ["d = 16.5 A"],
+      "peak_assignments": ["(100) lamellar peak", "(010) pi-pi stacking"],
+      "code_snippet": "from scipy.signal import find_peaks\npeaks, _ = find_peaks(intensity, height=0.1)\nq_peaks = q[peaks]",
+      "code_language": "python",
+      "code_description": "Finds scattering peaks in the intensity vs q profile using scipy."
+    }
+  ]
+}
+### END-EXAMPLE
+"""
+
+        template = r"""
+=== X-RAY SCATTERING CODE EXTRACTION TASK ===
+Identify any CODE BLOCKS in the content below that relate to x-ray scattering
+peak-finding or scattering data analysis (SAXS, WAXS, GIWAXS, GISAXS).
+Code may appear as monospaced blocks, algorithm listings, or inline code in
+figures/captions.
+
+CONTENT:
+{text}
+
+INSTRUCTIONS:
+1. Only extract code related to x-ray scattering peak analysis. Ignore unrelated code.
+2. Copy the code verbatim into "code_snippet".
+3. If no relevant code is present, return {{"snippets": []}}.
+4. Output JSON exactly in this structure:
+
+{{
+  "snippets": [
+    {{
+      "scattering_technique": "one of SAXS, WAXS, GIWAXS, GISAXS or null",
+      "peak_positions": ["observed peak positions e.g. q = 0.38 A^-1"],
+      "d_spacing": ["d-spacing values e.g. d = 16.5 A"],
+      "peak_assignments": ["crystallographic assignments e.g. (100) lamellar peak"],
+      "code_snippet": "verbatim code block",
+      "code_language": "programming language e.g. python or matlab",
+      "code_description": "plain-English description of what the code does"
+    }}
+  ]
+}}
+"""
+        return f"{template.format(text=text)}\n{few_shot}"
+
+    @retry_on_exception((Exception,), retries=2, delay_seconds=1.0)
+    def extract_xray_code_snippets(
+        self,
+        page_text: str,
+        client: ChatClient,
+        schema_helper: SchemaHelper,
+        *,
+        source_paper: str = "",
+        page: int = 0,
+    ) -> List[Dict]:
+        """
+        Prompt the LLM to identify code blocks in `page_text` related to x-ray
+        scattering peak analysis (SAXS, WAXS, GIWAXS, GISAXS).
+
+        Returns a list of dicts with keys: scattering_technique, peak_positions,
+        d_spacing, peak_assignments, code_snippet, code_language, code_description,
+        page, source_paper. Returns an empty list if no relevant code is found.
+        """
+        if not page_text or len(page_text.split()) < 20:
+            return []
+
+        prompt = self._prepare_xray_code_prompt(page_text)
+        try:
+            response = client.chat(prompt, temperature=self.temperature, timeout=240)
+        except Exception as e:
+            logger.error(f"LLM failed for xray code extraction ({source_paper} page {page}): {e}")
+            return []
+
+        try:
+            data = self.extract_xray_json_from_text(response)
+        except Exception as e:
+            logger.error(f"JSON parsing failed for xray code extraction ({source_paper} page {page}): {e}")
+            return []
+
+        results: List[Dict] = []
+        for snip in data.get("snippets", []):
+            if not isinstance(snip, dict):
+                continue
+            code = (snip.get("code_snippet") or "").strip()
+            if not code:
+                continue
+            results.append({
+                "scattering_technique": snip.get("scattering_technique"),
+                "peak_positions": snip.get("peak_positions", []) or [],
+                "d_spacing": snip.get("d_spacing", []) or [],
+                "peak_assignments": snip.get("peak_assignments", []) or [],
+                "code_snippet": code,
+                "code_language": snip.get("code_language"),
+                "code_description": snip.get("code_description"),
+                "page": page,
+                "source_paper": source_paper,
+            })
+
+        if results:
+            logger.info(
+                f"Extracted {len(results)} xray code snippet(s) from {source_paper} page {page}"
+            )
+        return results
+
+    def _collect_xray_code_snippets(self, page_text: str, filename: str, page_num: int) -> bool:
+        """
+        Run xray code-snippet extraction for one page, dedup into
+        `self.xray_code_snippets`, and save (thread-safe). Returns True if new
+        snippets were added.
+        """
+        snippets = self.extract_xray_code_snippets(
+            page_text,
+            self.chat_client,
+            self.schema_helper,
+            source_paper=filename,
+            page=page_num + 1,
+        )
+        updated = False
+        for snip in snippets:
+            key = self._xray_snippet_key(snip)
+            if key in self._xray_seen:
+                continue
+            self._xray_seen.add(key)
+            self.xray_code_snippets.append(snip)
+            updated = True
+
+        if updated:
+            self._save_xray_snippets_threadsafe()
+        return updated
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
     def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int) -> bool:
@@ -788,7 +1002,9 @@ INSTRUCTIONS:
             logger.info(f"No terms found on {filename} page {page_num+1}.")
             # Even if no new terms, we may still want to extract properties if existing materials appear
             new_or_updated = self._extract_and_attach_properties(raw_text)
-            return new_or_updated
+            # Additive: scan for x-ray scattering code snippets regardless of terms
+            xray_updated = self._collect_xray_code_snippets(raw_text, filename, page_num)
+            return new_or_updated or xray_updated
 
         added_or_updated = False
         page_terms: List[str] = []
@@ -923,10 +1139,13 @@ INSTRUCTIONS:
         # 5) After terms are merged, extract + normalize properties for all known materials on this page
         prop_updated = self._extract_and_attach_properties(raw_text)
 
+        # 6) Additive: scan page for x-ray scattering peak-finding code snippets
+        xray_updated = self._collect_xray_code_snippets(raw_text, filename, page_num)
+
         if added_or_updated or prop_updated:
             self._save_terms_threadsafe()
 
-        return added_or_updated or prop_updated
+        return added_or_updated or prop_updated or xray_updated
 
     def _extract_and_attach_properties(self, full_text: str) -> bool:
         """

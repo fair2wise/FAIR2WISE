@@ -173,6 +173,23 @@ classes:
         description: A unique identifier for this experimental technique
         required: true
 
+  XRayScatteringAnalysis:
+    is_a: ExperimentalTechnique
+    description: An x-ray scattering technique used to characterize material structure (e.g., SAXS, WAXS, GIWAXS, GISAXS)
+    slots:
+      - scattering_technique
+      - peak_positions
+      - d_spacing
+      - peak_assignments
+      - code_snippet
+      - code_language
+      - code_description
+    slot_usage:
+      technique_type:
+        string_serialization: "xray_scattering"
+    annotations:
+      owl: Class
+
   Association:
     description: A typed association between a subject entity and an object entity
     comments:
@@ -554,5 +571,64 @@ slots:
     range: string
     required: false
     slot_uri: matkg:measured_property
+    annotations:
+      owl: AnnotationAssertion
+
+  scattering_technique:
+    description: The specific x-ray scattering technique used (one of SAXS, WAXS, GIWAXS, GISAXS)
+    range: string
+    required: false
+    slot_uri: matkg:scattering_technique
+    annotations:
+      owl: AnnotationAssertion
+
+  peak_positions:
+    description: Observed scattering peak positions (e.g., "q = 0.38 Å⁻¹")
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:peak_positions
+    annotations:
+      owl: AnnotationAssertion
+
+  d_spacing:
+    description: d-spacing values derived from scattering peaks (e.g., "d = 16.5 Å")
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:d_spacing
+    annotations:
+      owl: AnnotationAssertion
+
+  peak_assignments:
+    description: Crystallographic assignments of scattering peaks (e.g., "(100) lamellar peak", "(010) π-π stacking")
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:peak_assignments
+    annotations:
+      owl: AnnotationAssertion
+
+  code_snippet:
+    description: A verbatim code block extracted from the paper related to peak-finding or scattering data analysis
+    range: string
+    required: false
+    slot_uri: matkg:code_snippet
+    annotations:
+      owl: AnnotationAssertion
+
+  code_language:
+    description: Programming language of the code snippet (e.g., "python", "matlab")
+    range: string
+    required: false
+    slot_uri: matkg:code_language
+    annotations:
+      owl: AnnotationAssertion
+
+  code_description:
+    description: Plain-English description of what the code snippet does
+    range: string
+    required: false
+    slot_uri: matkg:code_description
     annotations:
       owl: AnnotationAssertion
