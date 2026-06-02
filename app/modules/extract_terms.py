@@ -29,7 +29,7 @@ from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormali
 # ----------------------------------------
 # LLM Client Setup
 # ----------------------------------------
-load_dotenv()
+load_dotenv(override=True)
 
 
 class ChatClient(ABC):

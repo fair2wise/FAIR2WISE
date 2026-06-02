@@ -1,0 +1,13 @@
+.git
+.env
+.venv
+.venv-open-webui
+.cache
+.pytest_cache
+__pycache__
+*.py[cod]
+.DS_Store
+.agents
+.codex
+skills-lock.json
+storage/knowledge_gaps

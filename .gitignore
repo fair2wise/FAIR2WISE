@@ -102,7 +102,11 @@ celerybeat-schedule
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
+.venv/
+.venv-*/
 env/
 venv/
 ENV/
@@ -139,3 +143,19 @@ priv_key.pem
 sfapi_training.json
 
 *.obo
+
+# Codex / local agent config
+.agents/
+.codex/
+skills-lock.json
+
+# Local run/cache artifacts
+.cache/
+storage/knowledge_gaps/
+
+# Local generated/reference notes
+HANDOFF.md
+instructions.md
+ref.md
+schema.md
+.webui_secret_key
