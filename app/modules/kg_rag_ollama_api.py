@@ -4,6 +4,9 @@ kg_rag_ollama.py
 """
 from __future__ import annotations
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import argparse
 import asyncio
 import json
