@@ -610,7 +610,7 @@ slots:
       owl: AnnotationAssertion
 
   code_snippet:
-    description: A verbatim code block extracted from the paper related to peak-finding or scattering data analysis
+    description: A verbatim code block implementing a peak-finding algorithm or scattering data analysis, including general math/science library usage (e.g. scipy, numpy, pyFAI, SASView) applicable to peak detection — technique name not required
     range: string
     required: false
     slot_uri: matkg:code_snippet

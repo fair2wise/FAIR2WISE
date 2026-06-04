@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from abc import ABC, abstractmethod
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 from dotenv import load_dotenv
@@ -18,6 +19,9 @@ import fitz  # this is exactly the same as PyMuPDF
 from linkml_runtime.utils.schemaview import SchemaView
 import openai
 from rapidfuzz import process, fuzz  # still used by SchemaHelper for class/slot matching
+
+# Allow `python3 app/modules/extract_terms.py ...` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from modules.agents.chebi import ChebiOboLookup
 from modules.agents.chem_checker import ChemicalFormulaValidator
@@ -57,7 +61,7 @@ class OllamaChatClient(ChatClient):
 class CBorgChatClient(ChatClient):
     """
     OpenAI-compatible CBORG client (https://api.cborg.lbl.gov).
-    Use model names like: "google/gemini-flash", "lbl/cborg-chat:latest", etc.
+    Use model names like: "lbl/cborg-chat", "lbl/cborg-deepthought", etc.
     Env: CBORG_API_KEY, CBORG_BASE_URL (defaults to https://api.cborg.lbl.gov)
     """
     def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
@@ -365,7 +369,8 @@ class LLMTermExtractor:
         context_length: int = 50,
         schema_path: str = "matkg_schema.yaml",
         max_workers: int = 50,
-        chat_client: ChatClient | None = None
+        chat_client: ChatClient | None = None,
+        chebi_obo_path: str | None = None,
     ):
         """
         Args:
@@ -377,6 +382,7 @@ class LLMTermExtractor:
             context_length: Tokens of context snippet.
             schema_path: Path to LinkML schema.
             max_workers: Parallel workers for pages.
+            chebi_obo_path: Optional ChEBI OBO path for chemical enrichment.
         """
         self.model_name = model_name
         self.ollama_base_url = ollama_base_url.rstrip("/")
@@ -389,7 +395,6 @@ class LLMTermExtractor:
         mp_api_key = os.environ.get("MP_API_KEY", "")
         if not mp_api_key:
             logger.warning("MP_API_KEY not set; formula validation may be incomplete.")
-            mp_api_key = "JziDvAj2FWxzonCe2hketK1yz4bKHRlA"
         self.formula_checker = ChemicalFormulaValidator(api_key=mp_api_key)
 
         self.schema_helper = SchemaHelper(schema_path=schema_path)
@@ -408,8 +413,9 @@ class LLMTermExtractor:
         self.prop_normalizer = PropertyNormalizer()
 
         # Attempt to load ChEBI ontology
+        chebi_obo_path = chebi_obo_path or os.environ.get("CHEBI_OBO_PATH") or "storage/ontologies/chebi.obo"
         try:
-            self.chebi_lookup = ChebiOboLookup("storage/ontologies/chebi.obo")
+            self.chebi_lookup = ChebiOboLookup(chebi_obo_path)
         except Exception as e:
             logger.error(f"Failed to load ChEBI ontology: {e}")
             self.chebi_lookup = None
@@ -832,18 +838,47 @@ Output:
 
         template = r"""
 === X-RAY SCATTERING CODE EXTRACTION TASK ===
-Identify any CODE BLOCKS in the content below that relate to x-ray scattering
-peak-finding or scattering data analysis (SAXS, WAXS, GIWAXS, GISAXS).
-Code may appear as monospaced blocks, algorithm listings, or inline code in
-figures/captions.
+Identify any CODE BLOCKS in the content below that relate to:
+- x-ray scattering data analysis (SAXS, WAXS, GIWAXS, GISAXS)
+- peak-finding or peak detection in 1D/2D scattering profiles
+- scattering data reduction, azimuthal integration, or calibration
+- tools commonly used for the above (scipy.signal, pyFAI, SASView, etc.)
+
+IMPORTANT: Do NOT require SAXS/WAXS/GIWAXS/GISAXS to be named. As long as a code
+block has a clear code application to peak-finding, specifically when relating to
+a math/science library, extract it. This is the primary rule — technique names
+are optional and irrelevant to the extraction decision.
+
+Any code that does any of the following is fair game:
+- Detects, locates, finds, or identifies peaks in a signal
+- Filters, ranks, scores, or selects peaks by height, prominence, width, or distance
+- Smooths or preprocesses a signal before peak detection
+- Uses wavelet transforms, CWT, or convolution for peak detection
+- Integrates, reduces, or calibrates scattering data
+- Uses scipy.signal, pyFAI, SASView, or any peak-finding library
+
+PYTHON CODE: Comb over every Python code block with extra care. If it is Python
+and has a clear code application to peak-finding via a math/science library — extract it. Do not
+skip any Python snippet when in doubt.
+
+DESCRIPTION CHECK: If unsure whether a code block qualifies, read its surrounding
+description or docstring. If the description mentions peaks, signals, maxima,
+local maxima, detection, prominence, or filtering — extract the code.
+
+Set scattering_technique to null if SAXS/WAXS/GIWAXS/GISAXS is not explicitly
+stated. Do not leave out a snippet just because the technique is unnamed.
+Code may appear as monospaced blocks, algorithm listings, or inline code.
 
 CONTENT:
 {text}
 
 INSTRUCTIONS:
-1. Only extract code related to x-ray scattering peak analysis. Ignore unrelated code.
+1. Extract ALL code that has a clear code application to peak-finding, specifically
+   when relating to a math/science library (e.g. scipy, numpy, pyFAI, SASView).
+   Check the code AND its surrounding description before deciding to skip.
+   When in doubt, extract it.
 2. Copy the code verbatim into "code_snippet".
-3. If no relevant code is present, return {{"snippets": []}}.
+3. Only return {{"snippets": []}} if the page contains zero code whatsoever.
 4. Output JSON exactly in this structure:
 
 {{
@@ -1303,6 +1338,7 @@ def run_extraction(
     cborg_base: Optional[str] = None,
     cborg_api_key: Optional[str] = None,
     schema_path: Path | str = "storage/schema/matkg_schema.yaml",
+    chebi_obo_path: Path | str | None = None,
     temperature: float = 0.0,
     context_length: int = 50,
     max_workers: int = 4,
@@ -1313,9 +1349,13 @@ def run_extraction(
     Args:
         pdf_dir: Directory containing input PDFs.
         output_json: Path where extracted terms JSON will be written.
-        model: Ollama model name (e.g. "gemma3:27b").
+        model: Backend model name.
+        backend: LLM backend ("cborg", "cborg-openai", or "ollama").
         ollama_url: Base URL for Ollama server.
+        cborg_base: Base URL for CBORG/OpenAI-compatible backend.
+        cborg_api_key: API key for CBORG/OpenAI-compatible backend.
         schema_path: LinkML schema path used for validation.
+        chebi_obo_path: Optional ChEBI OBO path for chemical enrichment.
         temperature: Sampling temperature for the LLM.
         context_length: Max tokens to keep in context snippets.
         max_workers: Page-level parallelism.
@@ -1354,6 +1394,7 @@ def run_extraction(
         schema_path=str(schema_path),
         max_workers=max_workers,
         chat_client=chat,
+        chebi_obo_path=str(chebi_obo_path) if chebi_obo_path else None,
     )
 
     result = extractor.process_directory()
@@ -1362,21 +1403,101 @@ def run_extraction(
     return result
 
 
-if __name__ == "__main__":
-    extractor = LLMTermExtractor(
-        model_name="qwen3:235b",  # "mistral-small3.1:latest",
-        ollama_base_url="http://localhost:11434",
-        temperature=0.0,
-        data_dir="./polymer_papers",
-        output_file="./storage/terminology/extracted_terms_aug21.json",
-        context_length=50,
-        schema_path="./storage/schema/matkg_schema.yaml",
-        max_workers=4,
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Extract schema-aligned terms from PDFs into extracted_terms JSON."
     )
-    result = extractor.process_directory()
+    parser.add_argument(
+        "--pdf-dir",
+        type=Path,
+        default=Path("polymer_papers"),
+        help="Directory containing PDFs to process.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("storage/terminology/extracted_terms.json"),
+        help="Output extracted terms JSON path.",
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["cborg", "cborg-openai", "ollama"],
+        default=os.environ.get("EXTRACT_TERMS_BACKEND", "cborg"),
+        help="LLM backend to use.",
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("EXTRACT_TERMS_MODEL", "lbl/cborg-chat"),
+        help="Backend model name.",
+    )
+    parser.add_argument(
+        "--ollama-url",
+        "--ollama-base-url",
+        default=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
+        help="Ollama base URL, used only with --backend ollama.",
+    )
+    parser.add_argument(
+        "--cborg-base",
+        default=os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov"),
+        help="CBORG/OpenAI-compatible base URL.",
+    )
+    parser.add_argument(
+        "--cborg-api-key",
+        default=os.environ.get("CBORG_API_KEY"),
+        help="CBORG API key. Defaults to CBORG_API_KEY from environment.",
+    )
+    parser.add_argument(
+        "--schema-path",
+        type=Path,
+        default=Path("storage/schema/matkg_schema.yaml"),
+        help="LinkML schema path.",
+    )
+    parser.add_argument(
+        "--chebi-obo",
+        type=Path,
+        default=os.environ.get("CHEBI_OBO_PATH"),
+        help="Optional ChEBI OBO path. Defaults to CHEBI_OBO_PATH or storage/ontologies/chebi.obo.",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="LLM sampling temperature.",
+    )
+    parser.add_argument(
+        "--context-length",
+        type=int,
+        default=50,
+        help="Max tokens/chunks to keep in context snippets.",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=4,
+        help="Page-level worker count.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    result = run_extraction(
+        args.pdf_dir,
+        args.output,
+        model=args.model,
+        backend=args.backend,
+        ollama_url=args.ollama_url,
+        cborg_base=args.cborg_base,
+        cborg_api_key=args.cborg_api_key,
+        schema_path=args.schema_path,
+        chebi_obo_path=args.chebi_obo,
+        temperature=args.temperature,
+        context_length=args.context_length,
+        max_workers=args.max_workers,
+    )
     if result.get("status") == "error":
         print(f"✗ Error: {result.get('message')}")
-        print(f"  Expected directory: {extractor.data_dir}")
+        print(f"  Expected directory: {args.pdf_dir}")
         print(f"  Current working directory: {os.getcwd()}")
         print(f"  Available directories: {[d for d in os.listdir('.') if os.path.isdir(d)]}")
     else:

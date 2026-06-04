@@ -34,15 +34,6 @@ cd FAIRtoWISE-FORUM-AI
 pip3 install -r requirements.txt
 ```
 
-Runtime packages required by application code (not yet in `requirements.txt`) can be installed directly:
-
-```bash
-pip3 install aiohttp arxiv colorama faiss-cpu fastapi linkml-runtime \
-             mp-api numpy obonet openai pyalex pymatgen PyMuPDF \
-             python-dotenv PyYAML rapidfuzz rdflib requests \
-             sentence-transformers torch uvicorn
-```
-
 ### 3. Configure environment
 
 Copy the example env file and fill in your credentials:
@@ -130,6 +121,39 @@ curl -L https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo \
 
 ### Run extraction (CBORG, default)
 
+Run the extractor directly on any PDF folder:
+
+```bash
+python3 app/modules/extract_terms.py \
+  --pdf-dir polymer_papers \
+  --output storage/terminology/extracted_terms.json
+```
+
+Defaults:
+- `--backend cborg`
+- `--model lbl/cborg-chat`
+- `--max-workers 4`
+- optional ChEBI path from `--chebi-obo`, `CHEBI_OBO_PATH`, or `storage/ontologies/chebi.obo`
+
+Target one specific PDF by copying it into a small folder first:
+
+```bash
+mkdir -p /tmp/pyfai_docs_only
+cp polymer_papers/PYFAI_DOCS.pdf /tmp/pyfai_docs_only/
+
+python3 app/modules/extract_terms.py \
+  --pdf-dir /tmp/pyfai_docs_only \
+  --output storage/terminology/extracted_terms_pyfai_docs.json
+```
+
+Show all extraction options:
+
+```bash
+python3 app/modules/extract_terms.py --help
+```
+
+Run the checkpoint evaluation pipeline:
+
 ```bash
 python3 app/run_pipeline_cborg.py
 ```
@@ -156,7 +180,7 @@ python3 app/run_pipeline_cborg.py --models google/gemini-flash-lite
 
 ### Implementation details
 
-- Pages processed in parallel with up to 50 workers
+- Pages processed in parallel with configurable workers (`--max-workers`, default `4`)
 - Terms saved after every page (crash-safe)
 - `SchemaHelper` fuzzy-matches LLM output to LinkML classes/slots
 - `ChemicalFormulaValidator` validates and LLM-repairs invalid formulas
@@ -173,16 +197,16 @@ Converts the extracted terms JSON into a MatKG-compatible JSON graph with `thing
 
 ```bash
 python3 app/modules/json2kg.py \
-  --input storage/terminology/extracted_terms_<run>.json \
-  --output storage/kg/matkg_<run>.json
+  storage/terminology/extracted_terms_<run>.json \
+  storage/kg/matkg_<run>.json
 ```
 
 With verbose output:
 
 ```bash
 python3 app/modules/json2kg.py \
-  --input storage/terminology/extracted_terms_<run>.json \
-  --output storage/kg/matkg_<run>.json \
+  storage/terminology/extracted_terms_<run>.json \
+  storage/kg/matkg_<run>.json \
   --verbose
 ```
 

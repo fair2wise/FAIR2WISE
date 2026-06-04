@@ -48,11 +48,50 @@ def ensure_list(val: Any) -> List[Any]:
     return val if isinstance(val, list) else [val]
 
 
+def make_xray_node(snip: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build an XRayScatteringAnalysis node from an xray_code_snippets entry.
+
+    Node ID is derived from source_paper + page + scattering_technique so each
+    unique extraction gets its own node.
+    """
+    technique = snip.get("scattering_technique") or "XRayScattering"
+    paper = snip.get("source_paper", "unknown")
+    page = snip.get("page", 0)
+    raw_id = f"{technique}_{paper}_p{page}"
+    node_id = make_id(raw_id)
+    name = f"{technique} analysis ({paper} p.{page})"
+
+    return {
+        "id": node_id,
+        "name": name,
+        "category": "XRayScatteringAnalysis",
+        "type": "matkg:XRayScatteringAnalysis",
+        "description": snip.get("code_description") or "",
+        "pages": [page] if page else [],
+        "source_papers": [paper] if paper else [],
+        "context_snippets": [],
+        "formula": "",
+        "formula_validation": {},
+        "properties": [],
+        # XRayScatteringAnalysis-specific slots
+        "scattering_technique": snip.get("scattering_technique"),
+        "peak_positions": ensure_list(snip.get("peak_positions")),
+        "d_spacing": ensure_list(snip.get("d_spacing")),
+        "peak_assignments": ensure_list(snip.get("peak_assignments")),
+        "code_snippet": snip.get("code_snippet"),
+        "code_language": snip.get("code_language"),
+        "code_description": snip.get("code_description"),
+    }
+
+
 def build_graph(
-    raw_terms: Iterable[Dict[str, Any]]
+    raw_terms: Iterable[Dict[str, Any]],
+    xray_code_snippets: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Build a MatKG-compatible graph from raw term records.
+    Build a MatKG-compatible graph from raw term records and (optionally)
+    xray_code_snippets produced by the x-ray scattering extraction pass.
 
     Returns a dict with keys:
       - "things": list of node dicts
@@ -61,6 +100,12 @@ def build_graph(
     nodes: Dict[str, Dict[str, Any]] = {}
     edges: List[Dict[str, Any]] = []
     seen: Set[Tuple[str, str, str]] = set()
+
+    # Add XRayScatteringAnalysis nodes from code snippet extraction
+    for snip in (xray_code_snippets or []):
+        node = make_xray_node(snip)
+        if node["id"] not in nodes:
+            nodes[node["id"]] = node
 
     for term in raw_terms:
         name = term.get("term") or term.get("name") or "UNKNOWN"
@@ -135,7 +180,8 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any
         data = json.load(f)
 
     terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-    graph = build_graph(terms)
+    xray_snippets = data.get("xray_code_snippets", []) if isinstance(data, dict) else []
+    graph = build_graph(terms, xray_code_snippets=xray_snippets)
 
     output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
     return graph
@@ -171,11 +217,15 @@ def main() -> None:
         with args.input_json.open("r", encoding="utf-8") as f:
             data = json.load(f)
         terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-        graph = build_graph(terms)
+        xray_snippets = data.get("xray_code_snippets", []) if isinstance(data, dict) else []
+        graph = build_graph(terms, xray_code_snippets=xray_snippets)
         args.output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         logging.info(
-            "Wrote %d nodes and %d edges → %s",
-            len(graph["things"]), len(graph["associations"]), args.output_json
+            "Wrote %d nodes (%d xray) and %d edges → %s",
+            len(graph["things"]),
+            sum(1 for n in graph["things"] if n.get("category") == "XRayScatteringAnalysis"),
+            len(graph["associations"]),
+            args.output_json,
         )
     except Exception as e:
         logging.error("Failed: %s", e)
@@ -227,14 +277,36 @@ def test_build_graph_minimal(tmp_path):
     assert edge["has_evidence"] is None
 
 
-def test_cli(tmp_path, capsys):
+def test_xray_code_snippet_node():
+    """XRayScatteringAnalysis nodes are built from xray_code_snippets."""
+    snips = [{
+        "scattering_technique": "GIWAXS",
+        "peak_positions": ["q = 0.38 A^-1"],
+        "d_spacing": ["d = 16.5 A"],
+        "peak_assignments": ["(100) lamellar peak"],
+        "code_snippet": "peaks, _ = find_peaks(intensity)",
+        "code_language": "python",
+        "code_description": "Finds peaks in intensity profile.",
+        "page": 3,
+        "source_paper": "test_paper.pdf",
+    }]
+    graph = build_graph([], xray_code_snippets=snips)
+    assert len(graph["things"]) == 1
+    node = graph["things"][0]
+    assert node["category"] == "XRayScatteringAnalysis"
+    assert node["scattering_technique"] == "GIWAXS"
+    assert node["code_snippet"] == "peaks, _ = find_peaks(intensity)"
+    assert node["peak_positions"] == ["q = 0.38 A^-1"]
+
+
+def test_cli(tmp_path):
     in_json = tmp_path / "in.json"
     out_json = tmp_path / "out.json"
     data = {"terms": [{"term": "X"}]}
     in_json.write_text(json.dumps(data))
     sys.argv = ["json2kg.py", str(in_json), str(out_json)]
     main()
-    captured = capsys.readouterr()
-    assert "Wrote 1 nodes and 0 edges" in captured.out
     out = json.loads(out_json.read_text())
     assert "things" in out and "associations" in out
+    assert len(out["things"]) == 1
+    assert out["things"][0]["id"] == "matkg:X"

@@ -1,6 +1,6 @@
 # HANDOFF
 
-Date: 2026-06-02
+Date: 2026-06-03
 Repo: `/Users/mateo/Desktop/f2wlocal`
 Mode: caveman terse
 
@@ -9,6 +9,8 @@ Mode: caveman terse
 ## User Goal
 
 Make KG-RAG CLI chat use CBORG like term extraction. Do not hardwire chat to Ollama. Make CBORG default. Fix dependency/env/runtime issues blocking CLI chat. Keep Open WebUI pointed at KG-RAG on `11435`.
+
+Latest user goal: collect SAXS/WAXS/GISAXS/GIWAXS algorithm/code resources as PDFs, extract terms/snippets from those PDFs, and create new KG JSON outputs.
 
 ---
 
@@ -93,6 +95,71 @@ Repo reference document renamed `ref.md` → `docs.md`. All references in `HANDO
 
 All changes committed to `main`. Push blocked by missing GitHub auth (HTTPS remote, no PAT/SSH configured). Commit is ready — just needs auth to push.
 
+### 11. Algorithm/resource PDFs added
+
+New PDFs in `polymer_papers/`:
+
+| File | Purpose |
+|---|---|
+| `polymer_papers/2111.08645.pdf` | ArXiv paper from `resources.txt`: "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering". Downloaded from listed arXiv URL. |
+| `polymer_papers/resources_code_snippets.pdf` | Generated PDF from repo-local `resources_code_snippets.md`; contains algorithm/code snippets from resources/libs listed in `resources.txt` plus maintained docs for scattering/peak workflows. |
+| `polymer_papers/scipy_docs.pdf` | Generated PDF compiling SciPy 1D peak-finding algorithms and snippets: `find_peaks`, `find_peaks_cwt`, `peak_prominences`, `peak_widths`, `argrelextrema`, `argrelmax`, `argrelmin`. |
+
+Also added:
+
+| File | Purpose |
+|---|---|
+| `resources_code_snippets.md` | Markdown source used to generate `resources_code_snippets.pdf`. |
+
+Blocked downloads:
+- IUCr GISAXS CNN page from `resources.txt` returned HTTP 403.
+- ScienceDirect peak-detection page from `resources.txt` returned HTTP 403.
+- User clarified: only use information from `resources.txt`; do not use outside mirrors.
+
+### 12. Targeted extraction outputs
+
+Successful/partial extraction files:
+
+| File | Status |
+|---|---|
+| `storage/terminology/extracted_terms_resources_saxs_algorithms_20260603_181341.json` | Successful for `2111.08645.pdf`: 11 terms, 5/6 pages yielded terms. `resources_code_snippets.pdf` did not complete before user interruption. |
+| `storage/terminology/extracted_terms_resources_code_snippets_20260603_182046.json` | Partial/ongoing at interruption: page 1 yielded 1 `xray_code_snippets` item; page 2 was running when interrupted. |
+| `storage/terminology/extracted_terms_resources_saxs_algorithms_20260603_181120.json` | Failed sandbox run: CBORG connection errors, 0 terms. Ignore/delete later if desired. |
+| `storage/kg/matkg_resources_saxs_algorithms_20260603_181120.json` | Empty KG from failed sandbox run. Ignore/delete later if desired. |
+
+Terms confirmed from `2111.08645.pdf` include:
+- Small angle X-ray scattering (SAXS)
+- Wide angle X-ray scattering (WAXS)
+- SCAN
+- SASView
+- Debye-Anderson-Brumberger (DAB) Model
+- Polymer Excluded Volume model
+- Teubner-Strey model
+- Random Forest
+- XGBoost
+
+### 13. Runtime fix made during extraction
+
+`app/modules/agents/chebi.py` changed so missing optional `storage/ontologies/chebi.obo` raises `FileNotFoundError` instead of calling `sys.exit(1)`.
+
+Reason: `extract_terms.py` already catches exceptions and disables ChEBI lookup, but `sys.exit(1)` killed extraction before fallback.
+
+### 14. README KG command fixed
+
+README had wrong `json2kg.py` CLI:
+
+```bash
+python3 app/modules/json2kg.py --input INPUT --output OUTPUT
+```
+
+Actual CLI uses positional args:
+
+```bash
+python3 app/modules/json2kg.py INPUT OUTPUT
+```
+
+README now reflects actual `app/modules/json2kg.py` parser.
+
 ---
 
 ## Current State
@@ -143,6 +210,7 @@ Untracked (not committed, not ignored):
 | 2 | ChEBI `.obo` missing | Low — enrichment silently disabled; download ~500MB if needed |
 | 3 | Test coverage shallow | Low — `_tests/` only has dummy `add()` test |
 | 4 | GitHub push blocked | Medium — needs PAT or SSH key configured |
+| 5 | Ctrl+C on API server throws error | Low — `KeyboardInterrupt` not caught in `--api` path; wrap `uvicorn.run()` in `try/except KeyboardInterrupt: sys.exit(0)` |
 
 ---
 
@@ -187,6 +255,49 @@ Term extraction pipeline:
 python3 app/run_pipeline_cborg.py
 ```
 
+Extract terms from all PDFs in `polymer_papers/` into one combined JSON:
+
+```bash
+cd /Users/mateo/Desktop/f2wlocal && python3 -c 'from pathlib import Path; import os, sys; from dotenv import load_dotenv; sys.path.insert(0, str(Path("app").resolve())); load_dotenv(dotenv_path=Path(".env"), override=True); from modules.extract_terms import run_extraction; print(run_extraction(Path("polymer_papers"), Path("storage/terminology/extracted_terms_all_pdfs.json"), model=os.environ.get("KG_RAG_CBORG_MODEL") or "lbl/cborg-chat", backend="cborg", cborg_base=os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov", cborg_api_key=os.environ.get("CBORG_API_KEY"), schema_path="storage/schema/matkg_schema.yaml", temperature=0.0, context_length=80, max_workers=1))'
+```
+
+Create KG from combined extraction JSON:
+
+```bash
+python3 app/modules/json2kg.py \
+  storage/terminology/extracted_terms_all_pdfs.json \
+  storage/kg/matkg_all_pdfs.json
+```
+
+Create KG from latest extraction JSON:
+
+```bash
+TERMS=$(ls -t storage/terminology/extracted_terms_*.json | head -1)
+KG="storage/kg/matkg_manual.json"
+python3 app/modules/json2kg.py "$TERMS" "$KG"
+```
+
+Check extraction success:
+
+```bash
+python3 - <<'PY'
+import json
+data = json.load(open("storage/terminology/extracted_terms_all_pdfs.json"))
+print("terms:", len(data.get("terms", [])))
+print("xray_code_snippets:", len(data.get("xray_code_snippets", [])))
+print("processed_files:", data.get("metadata", {}).get("processed_files"))
+print("processed_pages_total:", data.get("metadata", {}).get("processed_pages_total"))
+print("processed_pages_with_terms:", data.get("metadata", {}).get("processed_pages_with_terms"))
+PY
+```
+
+Use new KG in KG-RAG:
+
+```bash
+KG_RAG_GRAPH=storage/kg/matkg_all_pdfs.json python3 app/modules/kg_rag_api.py \
+  --question "What peak finding algorithms are available for SAXS or WAXS data?"
+```
+
 ---
 
 ## Restart Services (if terminals closed)
@@ -214,10 +325,11 @@ curl http://localhost:11435/api/tags
 |---|---|
 | `app/modules/kg_rag_api.py` | `load_dotenv(override=True)`, model default fixed, code default fixed |
 | `app/modules/extract_terms.py` | `load_dotenv(override=True)` |
+| `app/modules/agents/chebi.py` | Missing optional ChEBI OBO now raises catchable `FileNotFoundError` instead of exiting extraction |
 | `app/run_pipeline_cborg.py` | Bad import fixed, `load_dotenv(override=True)` |
 | `scripts/analyze_kgs.py` | Duplicate body removed |
 | `requirements.txt` | All runtime deps added with version floors |
-| `README.md` | Full rewrite — comprehensive setup, CLI/env tables, Docker, ChEBI |
+| `README.md` | Full rewrite — comprehensive setup, CLI/env tables, Docker, ChEBI; later fixed `json2kg.py` CLI docs to positional args |
 | `Dockerfile` | Model name, base URL, CTX_CHARS, python3, storage/ontologies |
 | `.env` | CBORG_BASE_URL and KG_RAG_CBORG_MODEL corrected |
 | `scripts/.env.example` | Model name fixed, KG_RAG_CTX_CHARS added |
@@ -225,3 +337,7 @@ curl http://localhost:11435/api/tags
 | `.gitignore` | Added `.webui_secret_key` |
 | `.dockerignore` | New file |
 | `docs.md` | New file (renamed from ref.md) |
+| `resources_code_snippets.md` | New markdown source for algorithm/code-snippet PDF |
+| `polymer_papers/2111.08645.pdf` | New SAXS ML paper from `resources.txt` |
+| `polymer_papers/resources_code_snippets.pdf` | New generated snippets PDF for extraction/KG |
+| `polymer_papers/scipy_docs.pdf` | New generated SciPy peak-finding docs PDF for extraction/KG |
