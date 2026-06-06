@@ -2,7 +2,7 @@ id: https://w3id.org/matkg
 name: matkg
 description: Materials Knowledge Graph Schema
 license: MIT
-version: 0.1.0
+version: 0.2.0
 
 prefixes:
   matkg: https://w3id.org/matkg/
@@ -45,6 +45,18 @@ classes:
       - type
       - description
       - provided_by
+      - publication_year
+      - paper_title
+      - authors
+      - institutions
+      - doi
+      - journal
+      - volume
+      - issue
+      - pages_range
+      - abstract_text
+      - keywords
+      - has_code_snippet
     annotations:
       owl: Class
 
@@ -60,7 +72,7 @@ classes:
         required: true
     annotations:
       owl: Class
-        
+
   ConjugatedPolymer:
     is_a: Material
     description: A conjugated polymer used in organic electronics
@@ -115,7 +127,7 @@ classes:
     slot_usage:
       device_type:
         string_serialization: "photovoltaic_cell"
-        
+
   OFET:
     is_a: Device
     description: Organic Field-Effect Transistor - a transistor that uses an organic semiconductor in its channel
@@ -168,10 +180,30 @@ classes:
     slots:
       - measured_property
       - technique_type
+      - scattering_technique
+      - peak_positions
+      - d_spacing
+      - peak_assignments
     slot_usage:
       id:
         description: A unique identifier for this experimental technique
         required: true
+
+  CodeSnippet:
+    is_a: Thing
+    description: A reusable code block extracted from a publication, implementing an algorithm or data analysis routine
+    slots:
+      - code_snippet
+      - code_language
+      - code_description
+      - function_name
+      - code_domain
+    slot_usage:
+      id:
+        description: A unique identifier for this code snippet
+        required: true
+    annotations:
+      owl: Class
 
   Association:
     description: A typed association between a subject entity and an object entity
@@ -202,7 +234,6 @@ classes:
         description: The property of the material
         required: true
 
-
   DeviceContainsMaterial:
     is_a: Association
     description: Association between a device and the materials it contains
@@ -215,7 +246,6 @@ classes:
         range: Material
         description: The material contained in the device
         required: true
-    
 
   MaterialProcessedBy:
     is_a: Association
@@ -229,8 +259,7 @@ classes:
         range: ProcessingMethod
         description: The processing method applied to the material
         required: true
-    
-        
+
   PropertyMeasuredBy:
     is_a: Association
     description: Association between a property and the technique used to measure it
@@ -243,7 +272,6 @@ classes:
         range: ExperimentalTechnique
         description: The technique used to measure the property
         required: true
-    
 
 slots:
 
@@ -253,8 +281,6 @@ slots:
     required: true
     inlined_as_list: true
     multivalued: true
-    #annotations:
-    #  owl: AnnotationAssertion
 
   associations:
     description: A collection of associations
@@ -262,8 +288,6 @@ slots:
     required: true
     inlined_as_list: true
     multivalued: true
-    #annotations:
-    #  owl: AnnotationAssertion
 
   id:
     identifier: true
@@ -271,6 +295,7 @@ slots:
     required: true
     range: uriorcurie
     slot_uri: rdf:ID
+
   name:
     description: A human-readable name for an entity
     range: string
@@ -283,8 +308,6 @@ slots:
     description: The category or type of an entity
     range: uriorcurie
     is_a: type
-    #annotations:
-    #  owl: SubClassOf
 
   type:
     description: The type or class of an entity
@@ -293,7 +316,7 @@ slots:
     slot_uri: rdf:type
     annotations:
       owl.fstring: "SubClassOf({id} {V})"
-    
+
   description:
     description: A human-readable description of an entity
     range: string
@@ -301,6 +324,7 @@ slots:
     slot_uri: dcterms:description
     annotations:
       owl: AnnotationAssertion
+
   formula:
     description: Chemical formula of a material or chemical entity
     range: string
@@ -315,14 +339,14 @@ slots:
     required: false
     annotations:
       owl: AnnotationAssertion
-  
+
   property_type:
     description: The type or category of property (e.g., mechanical, thermal, electrical)
     range: string
     required: false
     annotations:
       owl: AnnotationAssertion
-  
+
   unit:
     description: The unit of measurement for a quantifiable property
     range: string
@@ -330,14 +354,14 @@ slots:
     slot_uri: qudt:unit
     annotations:
       owl: AnnotationAssertion
-  
+
   quantifiable:
     description: Whether the property can be quantified numerically
     range: boolean
     required: false
     annotations:
       owl: AnnotationAssertion
-  
+
   subject:
     description: The subject or source entity in an association
     range: Thing
@@ -346,7 +370,6 @@ slots:
     annotations:
       owl: ObjectSomeValuesFrom
 
-  
   predicate:
     description: The predicate or relationship type of an association
     range: uriorcurie
@@ -354,7 +377,7 @@ slots:
     designates_type: true
     annotations:
       owl.fstring: "SubClassOf({id} {V})"
-  
+
   object:
     description: The object or target entity in an association
     range: Thing
@@ -370,7 +393,98 @@ slots:
     slot_uri: pav:providedBy
     annotations:
       owl: AnnotationAssertion
-  
+
+  publication_year:
+    description: The year the source paper was published (e.g., 2023)
+    range: integer
+    required: false
+    slot_uri: dcterms:date
+    annotations:
+      owl: AnnotationAssertion
+
+  paper_title:
+    description: Full title of the source publication
+    range: string
+    required: false
+    slot_uri: dcterms:title
+    annotations:
+      owl: AnnotationAssertion
+
+  authors:
+    description: List of authors of the source publication
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: dcterms:creator
+    annotations:
+      owl: AnnotationAssertion
+
+  institutions:
+    description: Affiliated institutions or organizations of the authors
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: schema:affiliation
+    annotations:
+      owl: AnnotationAssertion
+
+  doi:
+    description: Digital Object Identifier of the source publication
+    range: string
+    required: false
+    slot_uri: dcterms:identifier
+    annotations:
+      owl: AnnotationAssertion
+
+  journal:
+    description: Name of the journal or conference where the paper was published
+    range: string
+    required: false
+    slot_uri: dcterms:isPartOf
+    annotations:
+      owl: AnnotationAssertion
+
+  volume:
+    description: Volume number of the journal issue
+    range: string
+    required: false
+    slot_uri: schema:volumeNumber
+    annotations:
+      owl: AnnotationAssertion
+
+  issue:
+    description: Issue number of the journal volume
+    range: string
+    required: false
+    slot_uri: schema:issueNumber
+    annotations:
+      owl: AnnotationAssertion
+
+  pages_range:
+    description: Page range of the article within the journal
+    range: string
+    required: false
+    slot_uri: schema:pagination
+    annotations:
+      owl: AnnotationAssertion
+
+  abstract_text:
+    description: Abstract of the source publication
+    range: string
+    required: false
+    slot_uri: dcterms:abstract
+    annotations:
+      owl: AnnotationAssertion
+
+  keywords:
+    description: Author-supplied or indexed keywords for the source publication
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: dcterms:subject
+    annotations:
+      owl: AnnotationAssertion
+
   has_evidence:
     description: Evidence supporting the association
     range: string
@@ -378,7 +492,7 @@ slots:
     slot_uri: dcterms:source
     annotations:
       owl: AnnotationAssertion
-    
+
   material_type:
     description: The type or category of material
     range: string
@@ -386,7 +500,7 @@ slots:
     slot_uri: matkg:material_type
     annotations:
       owl: AnnotationAssertion
-    
+
   backbone_structure:
     description: The main chain structure of a polymer
     range: string
@@ -394,7 +508,7 @@ slots:
     slot_uri: matkg:backbone_structure
     annotations:
       owl: AnnotationAssertion
-    
+
   side_chain_structure:
     description: The side chain structure of a polymer
     range: string
@@ -402,7 +516,7 @@ slots:
     slot_uri: matkg:side_chain_structure
     annotations:
       owl: AnnotationAssertion
-    
+
   monomer_units:
     description: The monomer units that make up a polymer
     range: string
@@ -410,7 +524,7 @@ slots:
     slot_uri: matkg:monomer_units
     annotations:
       owl: AnnotationAssertion
-    
+
   regioregularity:
     description: The measure of the structural regularity of a polymer
     range: float
@@ -418,7 +532,7 @@ slots:
     slot_uri: matkg:regioregularity
     annotations:
       owl: AnnotationAssertion
-    
+
   channel_material:
     description: The semiconductor material used in the channel of a transistor
     range: string
@@ -426,7 +540,7 @@ slots:
     slot_uri: matkg:channel_material
     annotations:
       owl: AnnotationAssertion
-    
+
   channel_length:
     description: The length of the transistor channel in micrometers
     range: float
@@ -434,7 +548,7 @@ slots:
     slot_uri: matkg:channel_length
     annotations:
       owl: AnnotationAssertion
-    
+
   channel_width:
     description: The width of the transistor channel in micrometers
     range: float
@@ -442,31 +556,31 @@ slots:
     slot_uri: matkg:channel_width
     annotations:
       owl: AnnotationAssertion
-    
+
   gate_dielectric:
-    description: The insulating material used between the gate and channel
+    description: The insulating material between gate and channel
     range: string
     required: false
     slot_uri: matkg:gate_dielectric
     annotations:
       owl: AnnotationAssertion
-    
+
   threshold_voltage:
-    description: The minimum gate-to-source voltage needed to create a conducting path
+    description: Minimum gate-to-source voltage for conducting path
     range: float
     required: false
     slot_uri: matkg:threshold_voltage
     annotations:
       owl: AnnotationAssertion
-    
+
   on_off_ratio:
-    description: The ratio of the current in the on-state to the current in the off-state
+    description: Ratio of on-state to off-state current
     range: float
     required: false
     slot_uri: matkg:on_off_ratio
     annotations:
       owl: AnnotationAssertion
-    
+
   device_type:
     description: The type or category of device
     range: string
@@ -474,7 +588,7 @@ slots:
     slot_uri: matkg:device_type
     annotations:
       owl: AnnotationAssertion
-    
+
   architecture:
     description: The structural design or layout of a device
     range: string
@@ -482,49 +596,47 @@ slots:
     slot_uri: matkg:architecture
     annotations:
       owl: AnnotationAssertion
-    
+
   power_conversion_efficiency:
-    description: The efficiency of converting input power to output power (%)
+    description: Efficiency of converting input power to output power (%)
     range: float
     required: false
     slot_uri: matkg:power_conversion_efficiency
     annotations:
       owl: AnnotationAssertion
-    
+
   active_area:
-    description: The active area of a device in square centimeters
+    description: Active area of a device in square centimeters
     range: float
     required: false
     slot_uri: matkg:active_area
     annotations:
       owl: AnnotationAssertion
-    
+
   substrate:
-    description: The base material on which a device is fabricated
+    description: Base material on which a device is fabricated
     range: string
     required: false
     slot_uri: matkg:substrate
     annotations:
       owl: AnnotationAssertion
-    
+
   electrode_material:
-    description: The material used for electrodes in a device
+    description: Material used for electrodes in a device
     range: string
     required: false
     slot_uri: matkg:electrode_material
     annotations:
       owl: AnnotationAssertion
-    
+
   energy_level:
-    description: Energy level of a material (HOMO, LUMO, work function, etc.) in eV
+    description: Energy level (HOMO, LUMO, work function, etc.) in eV
     range: float
     required: false
     slot_uri: matkg:energy_level
     annotations:
       owl: AnnotationAssertion
-    
 
-    
   process_parameters:
     description: Parameters and conditions of a processing method
     range: string
@@ -532,15 +644,15 @@ slots:
     slot_uri: matkg:process_parameters
     annotations:
       owl: AnnotationAssertion
-  
+
   method_type:
-    description: The type or category of processing method (e.g., deposition, post-deposition treatment)
+    description: The type or category of processing method
     range: string
     required: false
     slot_uri: matkg:method_type
     annotations:
       owl: AnnotationAssertion
-  
+
   technique_type:
     description: The type or category of experimental technique
     range: string
@@ -548,7 +660,7 @@ slots:
     slot_uri: matkg:technique_type
     annotations:
       owl: AnnotationAssertion
-    
+
   measured_property:
     description: The property being measured by an experimental technique
     range: string
@@ -556,3 +668,87 @@ slots:
     slot_uri: matkg:measured_property
     annotations:
       owl: AnnotationAssertion
+
+  scattering_technique:
+    description: Specific scattering technique (SAXS, WAXS, GIWAXS, GISAXS)
+    range: string
+    required: false
+    slot_uri: matkg:scattering_technique
+    annotations:
+      owl: AnnotationAssertion
+
+  peak_positions:
+    description: Observed scattering peak positions (e.g., "q = 0.38 A^-1")
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:peak_positions
+    annotations:
+      owl: AnnotationAssertion
+
+  d_spacing:
+    description: d-spacing values derived from scattering peaks
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:d_spacing
+    annotations:
+      owl: AnnotationAssertion
+
+  peak_assignments:
+    description: Crystallographic assignments of scattering peaks
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:peak_assignments
+    annotations:
+      owl: AnnotationAssertion
+
+  function_name:
+    description: Name of the primary function or class in a code snippet
+    range: string
+    required: false
+    slot_uri: matkg:function_name
+    annotations:
+      owl: AnnotationAssertion
+
+  code_snippet:
+    description: Verbatim code block implementing an algorithm or analysis routine
+    range: string
+    required: false
+    slot_uri: matkg:code_snippet
+    annotations:
+      owl: AnnotationAssertion
+
+  code_language:
+    description: Programming language of the code snippet
+    range: string
+    required: false
+    slot_uri: matkg:code_language
+    annotations:
+      owl: AnnotationAssertion
+
+  code_description:
+    description: Plain-English description of what the code snippet does
+    range: string
+    required: false
+    slot_uri: matkg:code_description
+    annotations:
+      owl: AnnotationAssertion
+
+  code_domain:
+    description: Scientific domain of the code snippet (e.g., xray, md_simulation, dft, ml)
+    range: string
+    required: false
+    slot_uri: matkg:code_domain
+    annotations:
+      owl: AnnotationAssertion
+
+  has_code_snippet:
+    description: A code snippet related to this entity
+    range: CodeSnippet
+    required: false
+    multivalued: true
+    slot_uri: matkg:has_code_snippet
+    annotations:
+      owl: ObjectSomeValuesFrom

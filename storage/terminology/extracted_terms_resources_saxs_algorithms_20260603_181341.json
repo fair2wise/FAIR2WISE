@@ -1,0 +1,353 @@
+{
+  "metadata": {
+    "extraction_date": "2026-06-03T18:13:41.256249Z",
+    "processed_files": 1,
+    "processed_pages_total": 9,
+    "processed_pages_with_terms": 5,
+    "version": "2.1"
+  },
+  "terms": [
+    {
+      "term": "Small angle X-ray scattering (SAXS)",
+      "definition": "An x-ray scattering technique used to examine nanostructures by measuring the intensity of scattered X-rays at small angles, probing structures from several nanometers to several hundred nanometers.",
+      "category": "XRayScatteringAnalysis",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [
+        {
+          "relation": "scattering_technique",
+          "related_term": "SAXS",
+          "verified": true
+        },
+        {
+          "relation": "measured_property",
+          "related_term": "nanostructure shape",
+          "verified": true
+        }
+      ],
+      "pages": [
+        1,
+        2,
+        3,
+        5,
+        6
+      ],
+      "source_papers": [
+        "2111.08645.pdf",
+        "2111.08645.pdf",
+        "2111.08645.pdf",
+        "2111.08645.pdf",
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering Piotr Tomaszewski, Shun Yu, Markus Borg and Jerk R\u00a8onnols RISE Research Institutes of Sweden, Lund and Stockholm, Sweden Email: {piotr.tomaszewski, shun.yu, markus.borg, jerk.ronnols}@ri.se Abstract\u2014Small angle X-ray scattering (SAXS) is extensively used in materials science as a way of examining nanostructures.",
+          "source_paper": "2111.08645.pdf",
+          "page": 1
+        },
+        {
+          "text": "On our data set, our classi\ufb01cation models outperform previous work reported in the literature and the accuracy \ufb01gures we obtain make them highly relevant to users analyzing SAXS data.",
+          "source_paper": "2111.08645.pdf",
+          "page": 2
+        },
+        {
+          "text": "Thus, SAXS data could be generated via theoretical simulation to meet requirements on large data sets.",
+          "source_paper": "2111.08645.pdf",
+          "page": 3
+        },
+        {
+          "text": "Some- what contradictory, sphere-like shapes is probably one of the most recognizable models in the SAXS textbook [27].",
+          "source_paper": "2111.08645.pdf",
+          "page": 5
+        },
+        {
+          "text": "CONCLUSIONS The purpose of this study was to investigate the applicability of ML to assist SAXS analysts in the task of model selection.",
+          "source_paper": "2111.08645.pdf",
+          "page": 6
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "Wide angle X-ray scattering (WAXS)",
+      "definition": "An x-ray scattering technique sensitive to the local atomic structure of materials.",
+      "category": "XRayScatteringAnalysis",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [
+        {
+          "relation": "scattering_technique",
+          "related_term": "WAXS",
+          "verified": true
+        }
+      ],
+      "pages": [
+        1
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "small angle X-ray scattering (SAXS) and wide angle X-ray scattering (WAXS).",
+          "source_paper": "2111.08645.pdf",
+          "page": 1
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "nanomaterials",
+      "definition": "Materials with designed structures at the nanoscale that can demonstrate unique properties not possible through conventional material design.",
+      "category": "Material",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        1
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "Richard Feynman [1], efforts to control materials structure have been focused on the nanoscale \u2013 this is now widely known as nanomaterials.",
+          "source_paper": "2111.08645.pdf",
+          "page": 1
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "SCAN",
+      "definition": "SCattering Ai aNalysis, an open-source tool designed to facilitate model selection and classification of SAXS data using machine learning algorithms.",
+      "category": "ExperimentalTechnique",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [
+        {
+          "relation": "measured_property",
+          "related_term": "SAXS",
+          "verified": true
+        }
+      ],
+      "pages": [
+        2,
+        6
+      ],
+      "source_papers": [
+        "2111.08645.pdf",
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "As a part of this study, we have produced an open- source scattering analysis tool called SCAN.",
+          "source_paper": "2111.08645.pdf",
+          "page": 2
+        },
+        {
+          "text": "In the course of the study, we have developed an open-source tool called SCAN that made it possible for us to create and evaluate eleven ML classi\ufb01ers trained and evaluated on our scattering data.",
+          "source_paper": "2111.08645.pdf",
+          "page": 6
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "nanostructure shape",
+      "definition": "The geometric arrangement and morphology of materials at the nanometer scale, identified through scattering data analysis.",
+      "category": "MaterialProperty",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        2
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "The output is another CSV \ufb01le, where each input item is annotated with a predicted nanostructure shape and a corresponding probability (con\ufb01dence) for each selected ML classi\ufb01er.",
+          "source_paper": "2111.08645.pdf",
+          "page": 2
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "SASView",
+      "definition": "Software used for the simulation and analysis of small-angle scattering data.",
+      "category": "ExperimentalTechnique",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        3,
+        6
+      ],
+      "source_papers": [
+        "2111.08645.pdf",
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "METHOD This section \ufb01rst presents how we generated representative data using the SASView [22].",
+          "source_paper": "2111.08645.pdf",
+          "page": 3
+        },
+        {
+          "text": "ACKNOWLEDGMENT This initiative received \ufb01nancial support through three in- ternal RISE initiatives, i.e., \u201cMachine Learning and Materials Design\u201d, \u201dSODA - Software & Data Intensive Applications\u201d and \u201cMLOps by RISE.\u201d This work bene\ufb01ted from the use of the SasView application, originally developed under NSF award DMR-0520547.",
+          "source_paper": "2111.08645.pdf",
+          "page": 6
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "Debye-Anderson-Brumberger (DAB) Model",
+      "definition": "A statistical model used in scattering analysis for systems without defined shapes.",
+      "category": "ExperimentalTechnique",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        3
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "For statistical models, which are common for systems without de\ufb01ned shapes, three models were selected: Debye-Anderson-Brumberger (DAB) Model [23], Polymer Excluded Volume model [24] and Teubner-Strey model of microemulsions [25].",
+          "source_paper": "2111.08645.pdf",
+          "page": 3
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "Polymer Excluded Volume model",
+      "definition": "A statistical model used to simulate scattering data for polymer systems.",
+      "category": "ExperimentalTechnique",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        3
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "For statistical models, which are common for systems without de\ufb01ned shapes, three models were selected: Debye-Anderson-Brumberger (DAB) Model [23], Polymer Excluded Volume model [24] and Teubner-Strey model of microemulsions [25].",
+          "source_paper": "2111.08645.pdf",
+          "page": 3
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "Teubner-Strey model",
+      "definition": "A statistical model used for the analysis of microemulsions in scattering experiments.",
+      "category": "ExperimentalTechnique",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        3
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "IV. METHOD This section \ufb01rst presents how we generated representative data using the SASView [22]. Second, we present how we trained and evaluated classi\ufb01cation models. A. Data Generation As aforementioned, ideal scattering intensity is a result of the FT of the electron density distribution inside materials. Thus, SAXS data could be generated via theoretical simulation to meet requirements on large data sets. Here, we use sasmodel module from the SASView software [22], which has been used in previous work [5],",
+          "source_paper": "2111.08645.pdf",
+          "page": 3
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "Random Forest",
+      "definition": "A machine learning classifier used in the SCAN tool to identify SAXS models with high accuracy.",
+      "category": "Thing",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        6
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "Random Forest and XGBoost are the most promising classi\ufb01ers, deeming the accuracy from 89% to as high as 95.9%, depending on whether the PCA has been applied.",
+          "source_paper": "2111.08645.pdf",
+          "page": 6
+        }
+      ],
+      "properties": []
+    },
+    {
+      "term": "XGBoost",
+      "definition": "A scalable tree boosting machine learning system used as a classifier for SAXS model selection.",
+      "category": "Thing",
+      "formula": null,
+      "formula_validation": {
+        "status": "missing"
+      },
+      "relations": [],
+      "pages": [
+        6
+      ],
+      "source_papers": [
+        "2111.08645.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "Random Forest and XGBoost are the most promising classi\ufb01ers, deeming the accuracy from 89% to as high as 95.9%, depending on whether the PCA has been applied.",
+          "source_paper": "2111.08645.pdf",
+          "page": 6
+        }
+      ],
+      "properties": []
+    }
+  ],
+  "xray_code_snippets": [
+    {
+      "scattering_technique": "SAXS, WAXS, GISAXS, GIWAXS",
+      "peak_positions": [],
+      "d_spacing": [],
+      "peak_assignments": [],
+      "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef detect_1d_peaks(q, intensity, *, prominence=0.05, min_distance=5):\n    y = np.asarray(intensity, dtype=float)\n    y = np.nan_to_num(y, nan=np.nanmedian(y))\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    baseline = np.percentile(y_smooth, 10)\n    y_corrected = y_smooth - baseline\n    peaks, props = find_peaks(\n        y_corrected,\n        prominence=prominence * np.nanmax(y_corrected),\n        distance=min_distance,\n    )\n    widths = peak_widths(y_corrected, peaks, rel_height=0.5)\n    return [\n        {\n            \"q\": float(q[idx]),\n            \"intensity\": float(y_corrected[idx]),\n            \"prominence\": float(props[\"prominences\"][i]),\n            \"fwhm_samples\": float(widths[0][i]),\n        }\n        for i, idx in enumerate(peaks)\n    ]",
+      "code_language": "python",
+      "code_description": "Performs 1D peak detection on reduced x-ray scattering data (intensity vs q) using Savitzky-Golay smoothing, baseline correction, and SciPy's find_peaks.",
+      "page": 1,
+      "source_paper": "resources_code_snippets.pdf"
+    }
+  ]
+}

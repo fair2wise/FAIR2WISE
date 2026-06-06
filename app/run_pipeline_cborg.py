@@ -20,7 +20,7 @@ import shutil
 import tempfile
 import os
 
-from modules.extract_terms_cborg import run_extraction
+from modules.extract_terms import run_extraction
 from modules.json2kg import convert_terms_to_graph
 
 # -----------------------------------------------------------------------------

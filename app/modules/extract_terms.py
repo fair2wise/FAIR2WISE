@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from abc import ABC, abstractmethod
+import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 from dotenv import load_dotenv
@@ -19,6 +20,9 @@ from linkml_runtime.utils.schemaview import SchemaView
 import openai
 from rapidfuzz import process, fuzz  # still used by SchemaHelper for class/slot matching
 
+# Allow `python3 app/modules/extract_terms.py ...` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from modules.agents.chebi import ChebiOboLookup
 from modules.agents.chem_checker import ChemicalFormulaValidator
 from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
@@ -33,16 +37,24 @@ load_dotenv()
 
 
 class ChatClient(ABC):
+    """Abstract base class for synchronous LLM chat clients used by term extraction."""
+
     @abstractmethod
-    def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str: ...
+    def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        """Send a prompt and return the LLM response text."""
+        ...
 
 
 class OllamaChatClient(ChatClient):
+    """Synchronous Ollama chat client for local LLM inference."""
+
     def __init__(self, model: str, base_url: str):
+        """Initialize with model name and Ollama base URL."""
         self.model = model
         self.base = base_url.rstrip("/")
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        """Send a prompt to Ollama and return the response text."""
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -57,10 +69,11 @@ class OllamaChatClient(ChatClient):
 class CBorgChatClient(ChatClient):
     """
     OpenAI-compatible CBORG client (https://api.cborg.lbl.gov).
-    Use model names like: "google/gemini-flash", "lbl/cborg-chat:latest", etc.
+    Use model names like: "lbl/cborg-chat", "lbl/cborg-deepthought", etc.
     Env: CBORG_API_KEY, CBORG_BASE_URL (defaults to https://api.cborg.lbl.gov)
     """
     def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
+        """Initialize with CBORG model, API key, and base URL."""
         self.model = model
         self.client = openai.OpenAI(
             api_key=api_key or os.environ.get("CBORG_API_KEY"),
@@ -68,6 +81,7 @@ class CBorgChatClient(ChatClient):
         )
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        """Send a prompt to CBORG and return the response text."""
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -85,6 +99,7 @@ def make_chat_client(
     cborg_base: Optional[str] = None,
     cborg_api_key: Optional[str] = None,
 ) -> ChatClient:
+    """Instantiate the appropriate synchronous chat client for the given backend."""
     b = (backend or "ollama").lower()
     if b == "ollama":
         return OllamaChatClient(model=model, base_url=ollama_url)
@@ -99,6 +114,8 @@ def make_chat_client(
 
 
 class _AnsiColorFormatter(logging.Formatter):
+    """Log formatter that adds ANSI colour codes based on log level."""
+
     _COLORS = {
         "DEBUG": "\033[36m",    # cyan
         "INFO": "\033[32m",     # green
@@ -109,6 +126,7 @@ class _AnsiColorFormatter(logging.Formatter):
     _RESET = "\033[0m"
 
     def format(self, record):
+        """Format log record with colour-coded level and message."""
         level = record.levelname
         color = self._COLORS.get(level)
         if color:
@@ -145,8 +163,10 @@ def retry_on_exception(
     Sleeps `delay_seconds * 2^attempt` between attempts.
     """
     def decorator(fn):
+        """Wrap function with retry logic."""
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+            """Execute fn with retry on specified exceptions."""
             last_exc = None
             for attempt in range(retries + 1):
                 try:
@@ -365,7 +385,8 @@ class LLMTermExtractor:
         context_length: int = 50,
         schema_path: str = "matkg_schema.yaml",
         max_workers: int = 50,
-        chat_client: ChatClient | None = None
+        chat_client: ChatClient | None = None,
+        chebi_obo_path: str | None = None,
     ):
         """
         Args:
@@ -377,6 +398,7 @@ class LLMTermExtractor:
             context_length: Tokens of context snippet.
             schema_path: Path to LinkML schema.
             max_workers: Parallel workers for pages.
+            chebi_obo_path: Optional ChEBI OBO path for chemical enrichment.
         """
         self.model_name = model_name
         self.ollama_base_url = ollama_base_url.rstrip("/")
@@ -389,12 +411,13 @@ class LLMTermExtractor:
         mp_api_key = os.environ.get("MP_API_KEY", "")
         if not mp_api_key:
             logger.warning("MP_API_KEY not set; formula validation may be incomplete.")
-            mp_api_key = "JziDvAj2FWxzonCe2hketK1yz4bKHRlA"
         self.formula_checker = ChemicalFormulaValidator(api_key=mp_api_key)
 
         self.schema_helper = SchemaHelper(schema_path=schema_path)
         self.terms_dict: Dict[str, Dict[str, Any]] = {}
         self._bk_terms: Dict[str, str] = {}  # display_text → key
+        self.code_snippets: List[Dict[str, Any]] = []
+        self._snippet_seen: set = set()  # dedup keys for code snippets
 
         # If no chat_client provided, use OllamaChatClient by default
         self.chat_client = chat_client or OllamaChatClient(
@@ -406,8 +429,9 @@ class LLMTermExtractor:
         self.prop_normalizer = PropertyNormalizer()
 
         # Attempt to load ChEBI ontology
+        chebi_obo_path = chebi_obo_path or os.environ.get("CHEBI_OBO_PATH") or "storage/ontologies/chebi.obo"
         try:
-            self.chebi_lookup = ChebiOboLookup("storage/ontologies/chebi.obo")
+            self.chebi_lookup = ChebiOboLookup(chebi_obo_path)
         except Exception as e:
             logger.error(f"Failed to load ChEBI ontology: {e}")
             self.chebi_lookup = None
@@ -431,14 +455,21 @@ class LLMTermExtractor:
                         key = term["term"].strip().lower()
                         self.terms_dict[key] = term
                         self._bk_terms[term["term"]] = key
+                    for snip in prev.get("code_snippets", prev.get("xray_code_snippets", [])):
+                        self.code_snippets.append(snip)
+                        self._snippet_seen.add(self._snippet_key(snip))
                     loaded_meta = prev.get("metadata", {})
                     self.metadata.update(loaded_meta)
-                logger.info(f"Loaded {len(self.terms_dict)} existing terms from {self.output_file}")
+                logger.info(
+                    f"Loaded {len(self.terms_dict)} existing terms and "
+                    f"{len(self.code_snippets)} code snippets from {self.output_file}"
+                )
             except Exception as e:
                 logger.warning(f"Could not load previous terms: {e}")
 
     @retry_on_exception((Exception,), retries=2, delay_seconds=2.0)
     def call_llm(self, prompt: str, timeout: int = 240) -> str:
+        """Call the configured chat client with retry logic."""
         return self.chat_client.chat(prompt, temperature=self.temperature, timeout=timeout)
 
     # def call_ollama(self, prompt: str, timeout: int = 240) -> str:
@@ -470,6 +501,33 @@ class LLMTermExtractor:
             except json.JSONDecodeError:
                 continue
         return {"terms": []}
+
+    @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
+    def extract_json_from_text(self, text: str) -> Dict[str, Any]:
+        """
+        Extract largest JSON object containing "snippets". Return {"snippets": []} if none.
+        """
+        pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
+        matches = list(re.finditer(pattern, text))
+        matches.sort(key=lambda m: -len(m.group(0)))
+        for m in matches:
+            snippet = m.group(0)
+            try:
+                obj = json.loads(snippet)
+                if isinstance(obj, dict) and "snippets" in obj:
+                    return obj
+            except json.JSONDecodeError:
+                continue
+        return {"snippets": []}
+
+    @staticmethod
+    def _snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
+        """Dedup key for a code snippet (source_paper, page, code body)."""
+        return (
+            str(snip.get("source_paper", "")),
+            str(snip.get("page", "")),
+            (snip.get("code_snippet") or "").strip(),
+        )
 
     def _looks_like_formula(self, s: str) -> bool:
         """Heuristic: uppercase‐lowercase blocks + digits → formula."""
@@ -641,11 +699,8 @@ as "{term}"?  If none match, respond with `None`.
 
     def _prepare_prompt(self, schema_ctx: str, filename: str, page_num: int, text: str) -> str:
         """
-        Build prompt with:
-          - Schema context (no 'description'/'category' relations)
-          - Few‐shot example
-          - Truncated page text (~last 8000 chars)
-          - JSON template
+        Build terms extraction prompt. Extracts materials-science entities and
+        publication metadata. Code extraction is handled separately by regex.
         """
         max_len = 8000
         page_text = text[-max_len:] if len(text) > max_len else text
@@ -654,7 +709,8 @@ as "{term}"?  If none match, respond with `None`.
 ### EXAMPLE
 Input:
 CONTENT:
-"Poly(3-hexylthiophene) (P3HT) is a conjugated polymer used in organic photovoltaics."
+"Poly(3-hexylthiophene) (P3HT) is a conjugated polymer used in organic photovoltaics.
+Published: March 2021. DOI: 10.1021/jacs.1c00001. Authors: Smith J, Lee K."
 
 Output:
 {
@@ -662,8 +718,12 @@ Output:
     {
       "term": "Poly(3-hexylthiophene) (P3HT)",
       "definition": "A conjugated polymer used in organic photovoltaics.",
-      "category": "Polymer",
+      "category": "ConjugatedPolymer",
       "formula": "C10H14S",
+      "publication_year": 2021,
+      "paper_title": "Machine Learning for Organic Photovoltaics",
+      "authors": ["Smith J", "Lee K"],
+      "doi": "10.1021/jacs.1c00001",
       "relations": [
         {
           "relation": "has_application",
@@ -689,17 +749,33 @@ CONTENT:
 {text}
 
 INSTRUCTIONS:
-1. Extract key materials-science terms + their relations using ONLY schema slots.
-2. Do NOT output relations named 'description' or 'category'.
-3. Output JSON exactly in this structure:
+1. Extract ALL key materials-science entities from this page: materials, chemical
+   entities, experimental techniques, processing methods, devices, and properties.
+   Use ONLY schema entity types and relation names.
+2. Do NOT extract code snippets — code is handled separately. Do NOT output
+   relations named 'description' or 'category'.
+3. On EVERY term, stamp publication metadata found anywhere on this page
+   (headers, footers, copyright lines, citation blocks):
+   - "publication_year": integer year (e.g. 2023). Required — always extract if present.
+   - "paper_title": full title of the paper this page is from.
+   - "authors": list of author names in "Surname Initial" format (e.g. ["Smith J", "Lee K"]).
+   - "doi": DOI string if present (e.g. "10.1021/jacs.3c00001").
+   - "journal": journal name if present.
+   Publication metadata should be the SAME on all terms from the same page.
+4. Output JSON exactly:
 
 {{
   "terms": [
     {{
       "term": "exact term from text",
-      "definition": "brief but rich technical definition",
+      "definition": "brief technical definition",
       "category": "exact_entity_type_from_schema",
       "formula": "valid chemical formula or null",
+      "publication_year": 2023,
+      "paper_title": "Full paper title or null",
+      "authors": ["Surname I", "..."],
+      "doi": "10.xxxx/xxxxx or null",
+      "journal": "Journal name or null",
       "relations": [
         {{
           "relation": "exact_predicate_name_from_schema",
@@ -726,15 +802,229 @@ INSTRUCTIONS:
                     if "properties" not in t:
                         t["properties"] = []
                     terms_out.append(t)
-                out = {"metadata": self.metadata, "terms": terms_out}
+                out = {
+                    "metadata": self.metadata,
+                    "terms": terms_out,
+                    "code_snippets": self.code_snippets,
+                }
                 with open(self.output_file, "w") as fh:
                     json.dump(out, fh, indent=2)
                 logger.debug(f"Saved {len(self.terms_dict)} terms to {self.output_file}")
             except Exception as e:
                 logger.error(f"Failed to save terms: {e}")
 
+    def _save_snippets_threadsafe(self) -> None:
+        """Acquire lock and write JSON to disk (terms + code snippets)."""
+        with self._save_lock:
+            try:
+                terms_out = []
+                for t in self.terms_dict.values():
+                    if "properties" not in t:
+                        t["properties"] = []
+                    terms_out.append(t)
+                out = {
+                    "metadata": self.metadata,
+                    "terms": terms_out,
+                    "code_snippets": self.code_snippets,
+                }
+                with open(self.output_file, "w") as fh:
+                    json.dump(out, fh, indent=2)
+                logger.debug(
+                    f"Saved {len(self.code_snippets)} code snippets to {self.output_file}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to save code snippets: {e}")
+
+    def _prepare_code_snippet_prompt(self, page_text: str) -> str:
+        """
+        Prompt for scientific CONTEXT around code snippets.
+        Code bodies are extracted by regex — not by LLM.
+        Returns JSON with "snippets" keyed by function_name → domain metadata.
+        """
+        max_len = 6000
+        text = page_text[-max_len:] if len(page_text) > max_len else page_text
+
+        return f"""=== CODE SNIPPET CONTEXT EXTRACTION ===
+This page may contain scientific analysis code (e.g. scattering, spectroscopy, simulation).
+Extract domain metadata for any code functions mentioned or used on this page.
+Do NOT extract code bodies — only the surrounding scientific context.
+
+CONTENT:
+{text}
+
+For each function name or code block referenced on this page, extract:
+- "function_name": the Python/MATLAB function name, or null
+- "scattering_technique": one of SAXS, WAXS, GIWAXS, GISAXS, or null if not scattering-related
+- "peak_positions": list of observed peak positions mentioned on the page, or []
+- "d_spacing": list of d-spacing values mentioned on the page, or []
+- "peak_assignments": list of crystallographic assignments mentioned on the page, or []
+- "authors": authors of the library/code, or []
+- "code_description": one-sentence plain-English description of what the function does
+
+Return {{"snippets": []}} if page has no scientific analysis or code references.
+
+Output JSON:
+{{
+  "snippets": [
+    {{
+      "function_name": "function name or null",
+      "scattering_technique": "SAXS/WAXS/GIWAXS/GISAXS or null",
+      "peak_positions": [],
+      "d_spacing": [],
+      "peak_assignments": [],
+      "authors": [],
+      "code_description": "what this function does"
+    }}
+  ]
+}}"""
+
+    def extract_code_snippets(
+        self,
+        page_text: str,
+        client: ChatClient,
+        schema_helper: SchemaHelper,
+        *,
+        source_paper: str = "",
+        page: int = 0,
+    ) -> List[Dict]:
+        """
+        Extract code snippets from a page.
+
+        Strategy:
+          1. Regex extracts ALL named code blocks (def/class/function) deterministically.
+          2. LLM extracts scattering context (technique, peaks, d-spacing, description,
+             authors) keyed by function_name — enriches regex results.
+          3. Merge: regex provides code body, LLM provides scientific context.
+
+        Returns list of snippet dicts. Empty list if no code found.
+        """
+        if not page_text or len(page_text.split()) < 20:
+            return []
+
+        # ── Step 1: Regex extracts all named code blocks ──────────────────────
+        named_block_re = re.compile(
+            r"((?:(?:import|from|library|require|using)\s+\S[^\n]*\n)*"  # optional leading imports
+            r"(?:def|class|function|func)\s+(\w+)\s*[\(\[{]"             # named block keyword
+            r"[^\n]*\n"                                                    # rest of header
+            r"(?:[ \t]+[^\n]+\n){1,})",                                   # ≥1 indented body lines
+            re.MULTILINE,
+        )
+
+        regex_results: List[Dict] = []
+        seen_fn_names: set = set()
+        seen_bodies: set = set()
+
+        for dm in named_block_re.finditer(page_text):
+            fn_name = dm.group(2)
+            code_body = dm.group(1).rstrip()
+            if fn_name.lower() in seen_fn_names or code_body.strip() in seen_bodies:
+                continue
+            seen_fn_names.add(fn_name.lower())
+            seen_bodies.add(code_body.strip())
+
+            lang = "python"
+            if re.search(r"\bfunction\b", code_body) and not re.search(r"\bdef\b", code_body):
+                lang = "matlab" if re.search(r"\bend\b", code_body) else "r"
+
+            regex_results.append({
+                "scattering_technique": None,
+                "peak_positions": [],
+                "d_spacing": [],
+                "peak_assignments": [],
+                "function_name": fn_name,
+                "authors": [],
+                "code_snippet": code_body,
+                "code_language": lang,
+                "code_description": f"{fn_name}: extracted from {source_paper} p.{page}",
+                "page": page,
+                "source_paper": source_paper,
+            })
+            logger.debug(f"Regex extracted '{fn_name}' from {source_paper} page {page}")
+
+        # ── Step 2: LLM extracts scattering context (no code bodies) ──────────
+        prompt = self._prepare_code_snippet_prompt(page_text)
+        llm_context: Dict[str, Dict] = {}  # function_name.lower() → context dict
+        try:
+            response = client.chat(prompt, temperature=self.temperature, timeout=120)
+            data = self.extract_json_from_text(response)
+            for snip in data.get("snippets", []):
+                if not isinstance(snip, dict):
+                    continue
+                fn = (snip.get("function_name") or "").strip().lower()
+                if fn:
+                    llm_context[fn] = snip
+                else:
+                    # no function name — attach to any unmatched regex result
+                    llm_context["__anonymous__"] = snip
+        except Exception as e:
+            logger.warning(f"LLM context extraction failed ({source_paper} p.{page}): {e} — using regex only")
+
+        # ── Step 3: Merge regex code + LLM context ────────────────────────────
+        results: List[Dict] = []
+        for r in regex_results:
+            fn_key = (r["function_name"] or "").lower()
+            ctx = llm_context.get(fn_key) or llm_context.get("__anonymous__") or {}
+            r["scattering_technique"] = ctx.get("scattering_technique") or None
+            r["peak_positions"]  = ctx.get("peak_positions")  or []
+            r["d_spacing"]       = ctx.get("d_spacing")       or []
+            r["peak_assignments"]= ctx.get("peak_assignments")or []
+            r["authors"]         = ctx.get("authors")         or []
+            if ctx.get("code_description"):
+                r["code_description"] = ctx["code_description"]
+            results.append(r)
+
+        if results:
+            logger.info(f"Extracted {len(results)} snippet(s) from {source_paper} page {page} "
+                        f"({len(regex_results)} regex, {len(llm_context)} LLM context matches)")
+        return results
+
+    def _collect_code_snippets(
+        self,
+        page_text: str,
+        filename: str,
+        page_num: int,
+        pub_meta: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Run code-snippet extraction for one page, dedup into
+        `self.code_snippets`, and save (thread-safe). Returns True if new
+        snippets were added.
+        """
+        snippets = self.extract_code_snippets(
+            page_text,
+            self.chat_client,
+            self.schema_helper,
+            source_paper=filename,
+            page=page_num + 1,
+        )
+        _pm = pub_meta or {}
+        updated = False
+        for snip in snippets:
+            # Stamp pub metadata onto snippet — authors from pub_meta only if
+            # LLM didn't attribute to a library author
+            if not snip.get("paper_title"):
+                snip["paper_title"] = _pm.get("paper_title")
+            if not snip.get("doi"):
+                snip["doi"] = _pm.get("doi")
+            # pub_meta authors = paper authors; keep separate from library authors
+            if not snip.get("paper_authors"):
+                snip["paper_authors"] = _pm.get("authors") or []
+            # stamp publication_year so recency boost fires in score_prp
+            if not snip.get("publication_year"):
+                snip["publication_year"] = _pm.get("publication_year")
+            key = self._snippet_key(snip)
+            if key in self._snippet_seen:
+                continue
+            self._snippet_seen.add(key)
+            self.code_snippets.append(snip)
+            updated = True
+
+        if updated:
+            self._save_snippets_threadsafe()
+        return updated
+
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
-    def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int) -> bool:
+    def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int, pub_year: Optional[int] = None, pub_meta: Optional[Dict[str, Any]] = None) -> bool:
         """
         Process one page:
         - Extract text
@@ -788,7 +1078,28 @@ INSTRUCTIONS:
             logger.info(f"No terms found on {filename} page {page_num+1}.")
             # Even if no new terms, we may still want to extract properties if existing materials appear
             new_or_updated = self._extract_and_attach_properties(raw_text)
-            return new_or_updated
+            # Additive: scan for x-ray scattering code snippets regardless of terms
+            snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
+            return new_or_updated or snippets_updated
+
+        # Harvest pub metadata from LLM term responses — fill gaps in pub_meta
+        # LLM now stamps paper_title/authors/doi/journal on every term it extracts.
+        # Use first term that has any of these fields to enrich pub_meta for the page.
+        _pm_enriched = dict(pub_meta or {})
+        for raw_term in data.get("terms", []):
+            llm_year = raw_term.get("publication_year")
+            if not pub_year and isinstance(llm_year, int) and 1990 <= llm_year <= 2026:
+                pub_year = llm_year
+                _pm_enriched.setdefault("publication_year", pub_year)
+                logger.debug(f"Got publication_year {pub_year} from LLM for {filename}")
+            for _f in ("paper_title", "doi", "journal"):
+                if raw_term.get(_f) and not _pm_enriched.get(_f):
+                    _pm_enriched[_f] = raw_term[_f]
+            if raw_term.get("authors") and not _pm_enriched.get("authors"):
+                _pm_enriched["authors"] = raw_term["authors"]
+            if all(_pm_enriched.get(f) for f in ("publication_year", "paper_title", "doi")):
+                break  # have enough
+        pub_meta = _pm_enriched
 
         added_or_updated = False
         page_terms: List[str] = []
@@ -831,6 +1142,7 @@ INSTRUCTIONS:
 
             # Helper to compare relation tuples
             def relation_tuple(rel: Dict[str, Any]) -> Tuple[str, str]:
+                """Return (predicate, object) tuple for deduplication."""
                 return (rel["relation"], rel["related_term"])
 
             if existing_key:
@@ -840,6 +1152,20 @@ INSTRUCTIONS:
                     entry.setdefault("source_papers", []).append(filename)
                     entry.setdefault("context_snippets", []).append(snippet)
                     added_or_updated = True
+                if pub_year and not entry.get("publication_year"):
+                    entry["publication_year"] = pub_year
+                    added_or_updated = True
+                # backfill pub_meta fields on existing entries if not yet set
+                if pub_meta:
+                    for _field in ("paper_title", "doi", "journal", "volume", "issue",
+                                   "pages_range", "abstract_text"):
+                        if pub_meta.get(_field) and not entry.get(_field):
+                            entry[_field] = pub_meta[_field]
+                            added_or_updated = True
+                    for _list_field in ("authors", "institutions", "keywords"):
+                        if pub_meta.get(_list_field) and not entry.get(_list_field):
+                            entry[_list_field] = pub_meta[_list_field]
+                            added_or_updated = True
 
                 ex_rels = entry.setdefault("relations", [])
                 existing_rel_tups = {relation_tuple(r) for r in ex_rels}
@@ -884,6 +1210,7 @@ INSTRUCTIONS:
 
             else:
                 new_key = self._register_new_term(name)
+                _pm = pub_meta or {}
                 entry: Dict[str, Any] = {
                     "term": name,
                     "definition": validated_term.get("definition", ""),
@@ -894,6 +1221,17 @@ INSTRUCTIONS:
                     "pages": [page_num + 1],
                     "source_papers": [filename],
                     "context_snippets": [snippet],
+                    "publication_year": pub_year,
+                    "paper_title": _pm.get("paper_title"),
+                    "authors": _pm.get("authors") or [],
+                    "institutions": _pm.get("institutions") or [],
+                    "doi": _pm.get("doi"),
+                    "journal": _pm.get("journal"),
+                    "volume": _pm.get("volume"),
+                    "issue": _pm.get("issue"),
+                    "pages_range": _pm.get("pages_range"),
+                    "abstract_text": _pm.get("abstract_text"),
+                    "keywords": _pm.get("keywords") or [],
                 }
                 # include any ChEBI enrichment
                 for chem_key in ("chebi", "smiles", "charge", "inchi", "inchikey", "mass"):
@@ -923,10 +1261,13 @@ INSTRUCTIONS:
         # 5) After terms are merged, extract + normalize properties for all known materials on this page
         prop_updated = self._extract_and_attach_properties(raw_text)
 
+        # 6) Additive: scan page for x-ray scattering peak-finding code snippets
+        snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
+
         if added_or_updated or prop_updated:
             self._save_terms_threadsafe()
 
-        return added_or_updated or prop_updated
+        return added_or_updated or prop_updated or snippets_updated
 
     def _extract_and_attach_properties(self, full_text: str) -> bool:
         """
@@ -972,6 +1313,218 @@ INSTRUCTIONS:
 
         return updated
 
+    def _extract_year_from_pdf(self, doc: fitz.Document, pdf_path: str) -> Optional[int]:
+        """
+        Attempt to extract publication year from PDF metadata or first-page text.
+        Delegates to _extract_pub_metadata for the full date-aware logic.
+        Returns a 4-digit year int or None.
+        """
+        meta = self._extract_pub_metadata(doc, pdf_path)
+        return meta.get("publication_year")
+
+    def _extract_pub_metadata(self, doc: fitz.Document, pdf_path: str) -> Dict[str, Any]:
+        """
+        Extract publication metadata from PDF metadata fields and first-page text.
+        Returns a dict with keys: publication_year, paper_title, authors,
+        institutions, doi, journal, volume, issue, pages_range, abstract_text, keywords.
+        All values are None or [] if not found.
+
+        Year extraction priority:
+          1. Explicit publication/accepted/received date on first page
+          2. PDF metadata creationDate / modDate (only if plausible — not future-dated)
+          3. Most common year in first-page text that appears near a date-like context
+          4. Most common 4-digit year on first page as last resort
+        """
+        import datetime as _dt
+        pdf_meta = doc.metadata or {}
+        filename = os.path.basename(pdf_path)
+        current_year = _dt.datetime.now(_dt.timezone.utc).year
+
+        # Month names for date pattern matching
+        _MONTHS = (
+            r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+            r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+        )
+
+        # --- first page text (primary source for pub dates) ---
+        first_text = doc.load_page(0).get_text() if doc.page_count > 0 else ""
+
+        # --- publication year ---
+        publication_year: Optional[int] = None
+
+        # Priority 1: explicit pub/accepted/received/revised date on first page
+        # Patterns: "Received 14 March 2023", "Accepted: 2023-07-01",
+        #            "Published online 5 Jan 2024", "Available online 2022"
+        explicit_patterns = [
+            # "Published"/"Accepted"/"Received"/"Revised" + full date
+            rf"(?i)(?:published|accepted|received|revised|available\s+online)[^\n]{{0,40}}"
+            rf"(?:{_MONTHS}\s+\d{{1,2}},?\s*((?:19|20)\d{{2}})"
+            rf"|\d{{1,2}}\s+{_MONTHS}\s*((?:19|20)\d{{2}})"
+            rf"|((?:19|20)\d{{2}})\s*[-–]\s*\d{{1,2}}\s*[-–]\s*\d{{1,2}})",
+            # "Published"/"Accepted" + bare year
+            r"(?i)(?:published|accepted|received|revised)[^\n]{0,30}((?:19|20)\d{2})",
+            # ISO date near pub keyword: "2023-03-15"
+            rf"(?i)(?:published|accepted|received|revised)[^\n]{{0,20}}"
+            rf"((?:19|20)\d{{2}})-\d{{2}}-\d{{2}}",
+            # "© 2023" or "Copyright 2023" — weaker signal, use only if nothing else
+        ]
+        for pat in explicit_patterns:
+            m = re.search(pat, first_text)
+            if m:
+                # grab first non-None capture group
+                yr_str = next((g for g in m.groups() if g and re.match(r"(19|20)\d{2}", g)), None)
+                if yr_str:
+                    yr = int(yr_str[:4])
+                    if 1990 <= yr <= current_year:
+                        publication_year = yr
+                        logger.debug(f"Year {yr} from explicit date pattern for {filename}")
+                        break
+
+        # Priority 2: PDF metadata creationDate / modDate — only trust if ≤ current year
+        if not publication_year:
+            for key in ("creationDate", "modDate"):
+                val = (pdf_meta.get(key) or "").strip()
+                m = re.search(r"((?:19|20)\d{2})", val)
+                if m:
+                    yr = int(m.group(1))
+                    if 1990 <= yr <= current_year:
+                        publication_year = yr
+                        logger.debug(f"Year {yr} from PDF metadata '{key}' for {filename}")
+                        break
+
+        # Priority 3: year adjacent to a month name on first page
+        if not publication_year:
+            month_year_m = re.findall(
+                rf"(?:{_MONTHS})\s+(?:\d{{1,2}},?\s*)?((?:19|20)\d{{2}})"
+                rf"|((?:19|20)\d{{2}})\s+{_MONTHS}",
+                first_text,
+            )
+            candidates = []
+            for grp in month_year_m:
+                for g in grp:
+                    if g and re.match(r"(19|20)\d{2}", g):
+                        yr = int(g)
+                        if 1990 <= yr <= current_year:
+                            candidates.append(yr)
+            if candidates:
+                publication_year = max(set(candidates), key=candidates.count)
+                logger.debug(f"Year {publication_year} from month-adjacent pattern for {filename}")
+
+        # Priority 4: most common 4-digit year on first page (last resort)
+        if not publication_year:
+            all_years = [
+                int(y) for y in re.findall(r"\b((?:19|20)\d{2})\b", first_text)
+                if 1990 <= int(y) <= current_year
+            ]
+            if all_years:
+                publication_year = max(set(all_years), key=all_years.count)
+                logger.debug(f"Year {publication_year} from most-common fallback for {filename}")
+
+        if not publication_year:
+            logger.debug(f"Could not determine publication year for {filename}")
+
+        # --- title ---
+        paper_title: Optional[str] = (pdf_meta.get("title") or "").strip() or None
+        if not paper_title and doc.page_count > 0:
+            first_lines = [ln.strip() for ln in first_text.splitlines() if ln.strip()]
+            # Find first substantive line (10–200 chars, not a URL/DOI/journal header)
+            _skip = re.compile(r"(?i)^(https?://|10\.\d{4}|doi|vol|pp\.|©|received|accepted|published|edited|keywords)")
+            for i, ln in enumerate(first_lines[:10]):
+                if 10 <= len(ln) <= 200 and not _skip.search(ln):
+                    # join next line if it looks like title continuation
+                    # (short, no verb, no punctuation ending, not a name/email line)
+                    title_parts = [ln]
+                    for nxt in first_lines[i+1:i+4]:
+                        if (5 <= len(nxt) <= 120
+                                and not _skip.search(nxt)
+                                and not re.search(r"[@,;]", nxt)
+                                and not re.search(r"\.$", nxt)):
+                            title_parts.append(nxt)
+                        else:
+                            break
+                    paper_title = " ".join(title_parts)
+                    break
+
+        # --- authors ---
+        authors: List[str] = []
+        raw_author = (pdf_meta.get("author") or "").strip()
+        if raw_author:
+            parts = re.split(r";| and ", raw_author)
+            authors = [p.strip() for p in parts if p.strip()]
+
+        # --- DOI ---
+        doi: Optional[str] = None
+        for key in ("subject", "keywords", "identifier"):
+            val = pdf_meta.get(key, "") or ""
+            m = re.search(r"10\.\d{4,}/\S+", val)
+            if m:
+                doi = m.group(0).rstrip(".,)")
+                break
+        if not doi:
+            for pn in range(min(2, doc.page_count)):
+                text = doc.load_page(pn).get_text()
+                m = re.search(r"10\.\d{4,}/\S+", text)
+                if m:
+                    doi = m.group(0).rstrip(".,)")
+                    break
+
+        # --- keywords from metadata ---
+        keywords: List[str] = []
+        raw_kw = (pdf_meta.get("keywords") or "").strip()
+        if raw_kw:
+            kw_parts = re.split(r"[;,]", raw_kw)
+            keywords = [k.strip() for k in kw_parts if k.strip()]
+
+        # --- journal / volume / issue / pages_range / abstract ---
+        journal: Optional[str] = None
+        volume: Optional[str] = None
+        issue: Optional[str] = None
+        pages_range: Optional[str] = None
+        abstract_text: Optional[str] = None
+
+        if first_text:
+            jrnl_m = re.search(
+                r"(?i)((?:journal|letters|review|advanced|nature|science|ACS|RSC|wiley|elsevier)[^\n]{0,80})",
+                first_text,
+            )
+            if jrnl_m:
+                journal = jrnl_m.group(1).strip()
+
+            vi_m = re.search(
+                r"(?i)vol(?:ume)?\.?\s*(\d+)[,\s]+(?:no|issue|iss)\.?\s*(\d+)",
+                first_text,
+            )
+            if vi_m:
+                volume = vi_m.group(1)
+                issue = vi_m.group(2)
+
+            pg_m = re.search(r"(?i)pp?\.?\s*(\d+\s*[-–]\s*\d+)", first_text)
+            if pg_m:
+                pages_range = pg_m.group(1).replace(" ", "")
+
+            abs_m = re.search(
+                r"(?i)abstract\s*\n([\s\S]{50,1500}?)(?:\n(?:introduction|keywords|1\.|©))",
+                first_text,
+            )
+            if abs_m:
+                abstract_text = " ".join(abs_m.group(1).split())
+
+        result = {
+            "publication_year": publication_year,
+            "paper_title": paper_title,
+            "authors": authors,
+            "institutions": [],
+            "doi": doi,
+            "journal": journal,
+            "volume": volume,
+            "issue": issue,
+            "pages_range": pages_range,
+            "abstract_text": abstract_text,
+            "keywords": keywords,
+        }
+        logger.debug(f"Pub metadata for {filename}: year={publication_year}, title={paper_title!r}, doi={doi!r}, authors={authors}")
+        return result
+
     def process_pdf(self, pdf_path: str) -> int:
         """
         Open PDF and process all pages in parallel.
@@ -988,10 +1541,15 @@ INSTRUCTIONS:
         self.metadata["processed_pages_total"] += total_pages
         pages_with_terms = 0
 
+        pub_meta = self._extract_pub_metadata(doc, pdf_path)
+        pub_year = pub_meta.get("publication_year")
+        if pub_year:
+            logger.debug(f"Publication year for {os.path.basename(pdf_path)}: {pub_year}")
+
         logger.debug(f"Processing '{pdf_path}' ({total_pages} pages) with {self.max_workers} workers")
         with ThreadPoolExecutor(max_workers=self.max_workers) as exe:
             futures = {
-                exe.submit(self.process_page, doc, pdf_path, i): i for i in range(total_pages)
+                exe.submit(self.process_page, doc, pdf_path, i, pub_year, pub_meta): i for i in range(total_pages)
             }
             for fut in as_completed(futures):
                 page_i = futures[fut]
@@ -1013,8 +1571,56 @@ INSTRUCTIONS:
 
         self.metadata["processed_files"] += 1
         self.metadata["processed_pages_with_terms"] += pages_with_terms
+
+        # --- Post-process: propagate best pub metadata across all terms from this PDF ---
+        # Threads may have enriched metadata on some pages but not others.
+        # Gather the richest metadata across all terms from this file, then backfill.
+        filename = os.path.basename(pdf_path)
+        best_meta: Dict[str, Any] = dict(pub_meta or {})
+        scalar_fields = ("paper_title", "doi", "journal", "volume", "issue",
+                         "pages_range", "abstract_text", "publication_year")
+        list_fields = ("authors", "institutions", "keywords")
+
+        # First pass: collect best metadata from any term belonging to this PDF
+        for entry in self.terms_dict.values():
+            if filename not in (entry.get("source_papers") or []):
+                continue
+            for f in scalar_fields:
+                if entry.get(f) and not best_meta.get(f):
+                    best_meta[f] = entry[f]
+            for f in list_fields:
+                if entry.get(f) and not best_meta.get(f):
+                    best_meta[f] = entry[f]
+
+        # Second pass: stamp best metadata onto all terms from this PDF
+        backfilled = 0
+        for entry in self.terms_dict.values():
+            if filename not in (entry.get("source_papers") or []):
+                continue
+            for f in scalar_fields:
+                if best_meta.get(f) and not entry.get(f):
+                    entry[f] = best_meta[f]
+                    backfilled += 1
+            for f in list_fields:
+                if best_meta.get(f) and not entry.get(f):
+                    entry[f] = best_meta[f]
+                    backfilled += 1
+
+        # Also backfill code_snippets from this PDF
+        for snip in self.code_snippets:
+            if snip.get("source_paper") != filename:
+                continue
+            for f in scalar_fields:
+                if best_meta.get(f) and not snip.get(f):
+                    snip[f] = best_meta[f]
+            if best_meta.get("authors") and not snip.get("paper_authors"):
+                snip["paper_authors"] = best_meta["authors"]
+
+        if backfilled:
+            logger.debug(f"Backfilled {backfilled} metadata fields across terms from {filename}")
+
         logger.info(
-            f"Finished '{os.path.basename(pdf_path)}': {pages_with_terms}/{total_pages} pages yielded terms or properties"
+            f"Finished '{filename}': {pages_with_terms}/{total_pages} pages yielded terms or properties"
         )
         return pages_with_terms
 
@@ -1084,6 +1690,7 @@ def run_extraction(
     cborg_base: Optional[str] = None,
     cborg_api_key: Optional[str] = None,
     schema_path: Path | str = "storage/schema/matkg_schema.yaml",
+    chebi_obo_path: Path | str | None = None,
     temperature: float = 0.0,
     context_length: int = 50,
     max_workers: int = 4,
@@ -1094,9 +1701,13 @@ def run_extraction(
     Args:
         pdf_dir: Directory containing input PDFs.
         output_json: Path where extracted terms JSON will be written.
-        model: Ollama model name (e.g. "gemma3:27b").
+        model: Backend model name.
+        backend: LLM backend ("cborg", "cborg-openai", or "ollama").
         ollama_url: Base URL for Ollama server.
+        cborg_base: Base URL for CBORG/OpenAI-compatible backend.
+        cborg_api_key: API key for CBORG/OpenAI-compatible backend.
         schema_path: LinkML schema path used for validation.
+        chebi_obo_path: Optional ChEBI OBO path for chemical enrichment.
         temperature: Sampling temperature for the LLM.
         context_length: Max tokens to keep in context snippets.
         max_workers: Page-level parallelism.
@@ -1135,6 +1746,7 @@ def run_extraction(
         schema_path=str(schema_path),
         max_workers=max_workers,
         chat_client=chat,
+        chebi_obo_path=str(chebi_obo_path) if chebi_obo_path else None,
     )
 
     result = extractor.process_directory()
@@ -1143,21 +1755,102 @@ def run_extraction(
     return result
 
 
-if __name__ == "__main__":
-    extractor = LLMTermExtractor(
-        model_name="qwen3:235b",  # "mistral-small3.1:latest",
-        ollama_base_url="http://localhost:11434",
-        temperature=0.0,
-        data_dir="./polymer_papers",
-        output_file="./storage/terminology/extracted_terms_aug21.json",
-        context_length=50,
-        schema_path="./storage/schema/matkg_schema.yaml",
-        max_workers=4,
+def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for the term extraction script."""
+    parser = argparse.ArgumentParser(
+        description="Extract schema-aligned terms from PDFs into extracted_terms JSON."
     )
-    result = extractor.process_directory()
+    parser.add_argument(
+        "--pdf-dir",
+        type=Path,
+        default=Path("polymer_papers"),
+        help="Directory containing PDFs to process.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("storage/terminology/extracted_terms.json"),
+        help="Output extracted terms JSON path.",
+    )
+    parser.add_argument(
+        "--backend",
+        choices=["cborg", "cborg-openai", "ollama"],
+        default=os.environ.get("EXTRACT_TERMS_BACKEND", "cborg"),
+        help="LLM backend to use.",
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("EXTRACT_TERMS_MODEL", "lbl/cborg-chat"),
+        help="Backend model name.",
+    )
+    parser.add_argument(
+        "--ollama-url",
+        "--ollama-base-url",
+        default=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
+        help="Ollama base URL, used only with --backend ollama.",
+    )
+    parser.add_argument(
+        "--cborg-base",
+        default=os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov"),
+        help="CBORG/OpenAI-compatible base URL.",
+    )
+    parser.add_argument(
+        "--cborg-api-key",
+        default=os.environ.get("CBORG_API_KEY"),
+        help="CBORG API key. Defaults to CBORG_API_KEY from environment.",
+    )
+    parser.add_argument(
+        "--schema-path",
+        type=Path,
+        default=Path("storage/schema/matkg_schema.yaml"),
+        help="LinkML schema path.",
+    )
+    parser.add_argument(
+        "--chebi-obo",
+        type=Path,
+        default=os.environ.get("CHEBI_OBO_PATH"),
+        help="Optional ChEBI OBO path. Defaults to CHEBI_OBO_PATH or storage/ontologies/chebi.obo.",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="LLM sampling temperature.",
+    )
+    parser.add_argument(
+        "--context-length",
+        type=int,
+        default=50,
+        help="Max tokens/chunks to keep in context snippets.",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=4,
+        help="Page-level worker count.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    result = run_extraction(
+        args.pdf_dir,
+        args.output,
+        model=args.model,
+        backend=args.backend,
+        ollama_url=args.ollama_url,
+        cborg_base=args.cborg_base,
+        cborg_api_key=args.cborg_api_key,
+        schema_path=args.schema_path,
+        chebi_obo_path=args.chebi_obo,
+        temperature=args.temperature,
+        context_length=args.context_length,
+        max_workers=args.max_workers,
+    )
     if result.get("status") == "error":
         print(f"✗ Error: {result.get('message')}")
-        print(f"  Expected directory: {extractor.data_dir}")
+        print(f"  Expected directory: {args.pdf_dir}")
         print(f"  Current working directory: {os.getcwd()}")
         print(f"  Available directories: {[d for d in os.listdir('.') if os.path.isdir(d)]}")
     else:

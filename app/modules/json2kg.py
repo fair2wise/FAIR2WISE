@@ -48,11 +48,58 @@ def ensure_list(val: Any) -> List[Any]:
     return val if isinstance(val, list) else [val]
 
 
+def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build a CodeSnippet node from a code_snippets entry.
+
+    Node ID includes MD5 hash of code body to prevent collisions.
+    """
+    import hashlib as _hl
+    fn_name = snip.get("function_name") or ""
+    paper = snip.get("source_paper", "unknown")
+    page = snip.get("page", 0)
+    code_hash = _hl.md5((snip.get("code_snippet") or "").encode()).hexdigest()[:8]
+    raw_id = f"snippet_{fn_name}_{paper}_p{page}_{code_hash}" if fn_name else f"snippet_{paper}_p{page}_{code_hash}"
+    node_id = make_id(raw_id)
+    name = f"{fn_name} snippet" if fn_name else f"code snippet ({paper} p.{page})"
+
+    return {
+        "id": node_id,
+        "name": name,
+        "category": "CodeSnippet",
+        "type": "matkg:CodeSnippet",
+        "description": snip.get("code_description") or "",
+        "pages": [page] if page else [],
+        "source_papers": [paper] if paper else [],
+        "context_snippets": [],
+        "formula": "",
+        "formula_validation": {},
+        "properties": [],
+        "publication_year": snip.get("publication_year"),
+        "paper_title": snip.get("paper_title"),
+        "authors": ensure_list(snip.get("authors")),
+        "paper_authors": ensure_list(snip.get("paper_authors")),
+        "doi": snip.get("doi"),
+        "function_name": fn_name or None,
+        "code_snippet": snip.get("code_snippet"),
+        "code_language": snip.get("code_language"),
+        "code_description": snip.get("code_description"),
+        "code_domain": snip.get("code_domain") or "xray",
+        # scattering context from LLM enrichment
+        "scattering_technique": snip.get("scattering_technique"),
+        "peak_positions": ensure_list(snip.get("peak_positions")),
+        "d_spacing": ensure_list(snip.get("d_spacing")),
+        "peak_assignments": ensure_list(snip.get("peak_assignments")),
+    }
+
+
 def build_graph(
-    raw_terms: Iterable[Dict[str, Any]]
+    raw_terms: Iterable[Dict[str, Any]],
+    code_snippets: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Build a MatKG-compatible graph from raw term records.
+    Build a MatKG-compatible graph from raw term records and (optionally)
+    code_snippets produced by the code snippet extraction pass.
 
     Returns a dict with keys:
       - "things": list of node dicts
@@ -62,9 +109,54 @@ def build_graph(
     edges: List[Dict[str, Any]] = []
     seen: Set[Tuple[str, str, str]] = set()
 
+    # Add CodeSnippet nodes from code snippet extraction
+    # Track snippet nodes by (source_paper, page) for wiring to term nodes later
+    snippets_by_paper_page: Dict[Tuple[str, int], List[str]] = {}
+    for snip in (code_snippets or []):
+        code_body = (snip.get("code_snippet") or "").strip()
+        if not code_body:
+            continue
+        has_anchor = bool(
+            snip.get("function_name")
+            or re.search(r"\b(def |class |import )", code_body)
+        )
+        if len(code_body) < 150 or not has_anchor:
+            logging.debug("Skipping fragment snippet (len=%d, anchor=%s): %r",
+                          len(code_body), has_anchor, code_body[:60])
+            continue
+        # Reject truncated snippets: unbalanced parens/brackets indicate
+        # the PDF text extraction cut off mid-line (page boundary).
+        balanced = (
+            code_body.count("(") == code_body.count(")")
+            and code_body.count("[") == code_body.count("]")
+        )
+        if not balanced:
+            logging.debug("Skipping truncated snippet (unbalanced delimiters): %s",
+                          snip.get("function_name", code_body[:40]))
+            continue
+
+        snippet_node = make_code_snippet_node(snip)
+        if snippet_node["id"] not in nodes:
+            nodes[snippet_node["id"]] = snippet_node
+        paper = snip.get("source_paper", "")
+        page = snip.get("page", 0)
+        snippets_by_paper_page.setdefault((paper, page), []).append(snippet_node["id"])
+        # Also index by paper-only for broader wiring
+        snippets_by_paper_page.setdefault((paper, 0), []).append(snippet_node["id"])
+
     for term in raw_terms:
         name = term.get("term") or term.get("name") or "UNKNOWN"
         tid = make_id(name)
+
+        # Terms mis-categorized as CodeSnippet by the LLM: demote to Unknown.
+        # Real CodeSnippet nodes come exclusively from code_snippets.
+        # Also remap removed XRayScatteringAnalysis → ExperimentalTechnique.
+        if term.get("category") == "CodeSnippet":
+            term = dict(term)
+            term["category"] = "Unknown"
+        elif term.get("category") == "XRayScatteringAnalysis":
+            term = dict(term)
+            term["category"] = "ExperimentalTechnique"
 
         # Create node if new
         if tid not in nodes:
@@ -79,6 +171,17 @@ def build_graph(
                 "formula": term.get("formula", "") or "",
                 "formula_validation": term.get("formula_validation", {}) or {},
                 "properties": ensure_list(term.get("properties")),
+                "publication_year": term.get("publication_year"),
+                "paper_title": term.get("paper_title"),
+                "authors": ensure_list(term.get("authors")),
+                "institutions": ensure_list(term.get("institutions")),
+                "doi": term.get("doi"),
+                "journal": term.get("journal"),
+                "volume": term.get("volume"),
+                "issue": term.get("issue"),
+                "pages_range": term.get("pages_range"),
+                "abstract_text": term.get("abstract_text"),
+                "keywords": ensure_list(term.get("keywords")),
             }
 
         # Process relations
@@ -117,6 +220,44 @@ def build_graph(
                 "has_evidence": "; ".join(evidence) if evidence else None,
             })
 
+    # Wire has_code_snippet edges: any term node from same paper gets linked
+    # to CodeSnippet nodes from that paper. Prefer same-page match, fall back
+    # to same-paper.
+    wired_snippets: Set[str] = set()
+    for nid, node in nodes.items():
+        if node.get("category") == "CodeSnippet":
+            continue
+        node_papers = node.get("source_papers") or []
+        node_pages = node.get("pages") or []
+        for paper in node_papers:
+            # try same-page first
+            for pg in node_pages:
+                for snip_id in snippets_by_paper_page.get((paper, pg), []):
+                    sig = (nid, "rel:has_code_snippet", snip_id)
+                    if sig not in seen:
+                        seen.add(sig)
+                        edges.append({
+                            "subject": nid,
+                            "predicate": "rel:has_code_snippet",
+                            "object": snip_id,
+                            "has_evidence": None,
+                        })
+                        wired_snippets.add(snip_id)
+            # paper-level fallback for snippets not yet wired
+            for snip_id in snippets_by_paper_page.get((paper, 0), []):
+                if snip_id in wired_snippets:
+                    continue
+                sig = (nid, "rel:has_code_snippet", snip_id)
+                if sig not in seen:
+                    seen.add(sig)
+                    edges.append({
+                        "subject": nid,
+                        "predicate": "rel:has_code_snippet",
+                        "object": snip_id,
+                        "has_evidence": None,
+                    })
+                    wired_snippets.add(snip_id)
+
     return {"things": list(nodes.values()), "associations": edges}
 
 
@@ -135,7 +276,8 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any
         data = json.load(f)
 
     terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-    graph = build_graph(terms)
+    snippets = data.get("code_snippets", data.get("xray_code_snippets", [])) if isinstance(data, dict) else []
+    graph = build_graph(terms, code_snippets=snippets)
 
     output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
     return graph
@@ -171,11 +313,15 @@ def main() -> None:
         with args.input_json.open("r", encoding="utf-8") as f:
             data = json.load(f)
         terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-        graph = build_graph(terms)
+        snippets = data.get("code_snippets", data.get("xray_code_snippets", [])) if isinstance(data, dict) else []
+        graph = build_graph(terms, code_snippets=snippets)
         args.output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         logging.info(
-            "Wrote %d nodes and %d edges → %s",
-            len(graph["things"]), len(graph["associations"]), args.output_json
+            "Wrote %d nodes (%d snippets) and %d edges → %s",
+            len(graph["things"]),
+            sum(1 for n in graph["things"] if n.get("category") == "CodeSnippet"),
+            len(graph["associations"]),
+            args.output_json,
         )
     except Exception as e:
         logging.error("Failed: %s", e)
@@ -227,14 +373,47 @@ def test_build_graph_minimal(tmp_path):
     assert edge["has_evidence"] is None
 
 
-def test_cli(tmp_path, capsys):
+def test_code_snippet_node():
+    """CodeSnippet nodes built from code_snippets and wired to term nodes from same paper."""
+    terms = [{
+        "term": "peak detection",
+        "category": "ExperimentalTechnique",
+        "definition": "Identification of scattering peaks in 1D intensity profiles",
+        "pages": [1],
+        "source_papers": ["SCIPY_DOCS.pdf"],
+    }]
+    snips = [{
+        "scattering_technique": "SAXS/WAXS",
+        "function_name": "find_scattering_peaks",
+        "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef find_scattering_peaks(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    peaks, props = find_peaks(y_smooth, prominence=0.05 * np.max(y_smooth))\n    return peaks, props",
+        "code_language": "python",
+        "code_description": "Processes 1D scattering data by smoothing to identify peaks.",
+        "page": 1,
+        "source_paper": "SCIPY_DOCS.pdf",
+    }]
+    graph = build_graph(terms, code_snippets=snips)
+    snippets = [n for n in graph["things"] if n["category"] == "CodeSnippet"]
+    assert len(snippets) == 1
+    snippet = snippets[0]
+
+    assert "find_scattering_peaks" in snippet["code_snippet"]
+    assert snippet["code_language"] == "python"
+    assert snippet["function_name"] == "find_scattering_peaks"
+
+    # edge wired from term node to snippet
+    has_code_edges = [e for e in graph["associations"] if e["predicate"] == "rel:has_code_snippet"]
+    assert len(has_code_edges) >= 1
+    assert any(e["object"] == snippet["id"] for e in has_code_edges)
+
+
+def test_cli(tmp_path):
     in_json = tmp_path / "in.json"
     out_json = tmp_path / "out.json"
     data = {"terms": [{"term": "X"}]}
     in_json.write_text(json.dumps(data))
     sys.argv = ["json2kg.py", str(in_json), str(out_json)]
     main()
-    captured = capsys.readouterr()
-    assert "Wrote 1 nodes and 0 edges" in captured.out
     out = json.loads(out_json.read_text())
     assert "things" in out and "associations" in out
+    assert len(out["things"]) == 1
+    assert out["things"][0]["id"] == "matkg:X"

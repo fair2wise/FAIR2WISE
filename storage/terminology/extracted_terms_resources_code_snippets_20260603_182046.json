@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "extraction_date": "2026-06-03T18:20:47.046006Z",
+    "processed_files": 0,
+    "processed_pages_total": 3,
+    "processed_pages_with_terms": 0,
+    "version": "2.1"
+  },
+  "terms": [],
+  "xray_code_snippets": [
+    {
+      "scattering_technique": "SAXS, WAXS, GISAXS, GIWAXS",
+      "peak_positions": [],
+      "d_spacing": [],
+      "peak_assignments": [],
+      "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef detect_1d_peaks(q, intensity, *, prominence=0.05, min_distance=5):\n    y = np.asarray(intensity, dtype=float)\n    y = np.nan_to_num(y, nan=np.nanmedian(y))\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    baseline = np.percentile(y_smooth, 10)\n    y_corrected = y_smooth - baseline\n    peaks, props = find_peaks(\n        y_corrected,\n        prominence=prominence * np.nanmax(y_corrected),\n        distance=min_distance,\n    )\n    widths = peak_widths(y_corrected, peaks, rel_height=0.5)\n    return [\n        {\n            \"q\": float(q[idx]),\n            \"intensity\": float(y_corrected[idx]),\n            \"prominence\": float(props[\"prominences\"][i]),\n            \"fwhm_samples\": float(widths[0][i]),\n        }\n        for i, idx in enumerate(peaks)\n    ]",
+      "code_language": "python",
+      "code_description": "Performs 1D peak detection on reduced x-ray scattering data (intensity vs q) using Savitzky-Golay smoothing, baseline correction, and SciPy's find_peaks.",
+      "page": 1,
+      "source_paper": "resources_code_snippets.pdf"
+    }
+  ]
+}

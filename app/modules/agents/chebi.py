@@ -14,7 +14,7 @@ def load_chebi_obo(obo_path: str):
         return graph
     except Exception as e:
         print(f"Failed to load OBO file '{obo_path}': {e}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"Failed to load OBO file '{obo_path}': {e}") from e
 
 # ──────────────────────────────────────────────────────────────────────────────
 class ChebiOboLookup:
