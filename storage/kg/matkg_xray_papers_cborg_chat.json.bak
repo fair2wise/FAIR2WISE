@@ -580,12 +580,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:scatteringintensity",
@@ -625,28 +620,11 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:SAXS",
       "name": "SAXS",
-      "category": "Unknown",
-      "description": "",
-      "pages": [],
-      "source_papers": [],
-      "context_snippets": [],
-      "formula": "",
-      "formula_validation": {},
-      "properties": []
-    },
-    {
-      "id": "matkg:ElectronicProperty",
-      "name": "ElectronicProperty",
       "category": "Unknown",
       "description": "",
       "pages": [],
@@ -684,25 +662,18 @@
       "id": "matkg:crystallinity",
       "name": "crystallinity",
       "category": "MaterialProperty",
-      "description": "The degree to which a material's molecules or atoms are arranged in an ordered, repeating structure.",
+      "description": "The degree of structural order in a solid material.",
       "pages": [
-        2,
-        1
+        2
       ],
       "source_papers": [
-        "SCIPY_DOCS.pdf",
-        "XRAY3.pdf"
+        "SCIPY_DOCS.pdf"
       ],
       "context_snippets": [
         {
           "text": "Best use case: capture peak broadening, compare crystallinity/order, or prepare initial sigma guesses for later Gaussian/Lorentzian fitting.",
           "source_paper": "SCIPY_DOCS.pdf",
           "page": 2
-        },
-        {
-          "text": "However, the vertical crystallization of a BHJ is not homogeneous and low crystallinity regions form far from the substrate driving the crystallization process.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
         }
       ],
       "formula": "",
@@ -725,12 +696,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:WAXS",
@@ -791,12 +757,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:order",
@@ -836,12 +797,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:GISAXS",
@@ -913,12 +869,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:nanoparticleshapes",
@@ -982,18 +933,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:GIWAXS",
       "name": "GIWAXS",
       "category": "ExperimentalTechnique",
-      "description": "Grazing-Incidence Wide-Angle X-ray Scattering, used to study the crystallinity and orientation of thin films.",
+      "description": "Grazing-Incidence Wide-Angle X-ray Scattering, a technique used to characterize material structure.",
       "pages": [
         1,
         6,
@@ -1041,18 +987,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:Braggpeaks",
       "name": "Bragg peaks",
       "category": "MaterialProperty",
-      "description": "Sharp diffraction peaks resulting from the constructive interference of X-rays or neutrons scattered by a crystalline lattice.",
+      "description": "Sharp diffraction peaks resulting from the constructive interference of X-rays scattered by a crystalline lattice.",
       "pages": [
         1,
         3,
@@ -1100,18 +1041,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:intensity",
       "name": "intensity",
       "category": "MaterialProperty",
-      "description": "The magnitude of the scattered X-ray signal, typically plotted against the scattering vector q.",
+      "description": "The magnitude of the scattered X-ray signal.",
       "pages": [
         1
       ],
@@ -1145,12 +1081,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:localpeakfitting",
@@ -1190,12 +1121,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:geometryconversion",
@@ -1235,12 +1161,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:2DGaussianrefinement",
@@ -1280,18 +1201,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:Azimuthalintegration",
       "name": "Azimuthal integration",
       "category": "ExperimentalTechnique",
-      "description": "A processing method used to convert 2D detector images from scattering experiments into 1D radial profiles.",
+      "description": "A process of integrating 2D scattering detector images into 1D radial profiles.",
       "pages": [
         3
       ],
@@ -1325,12 +1241,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:peakdetection",
@@ -1370,12 +1281,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:X-rayscatteringcharacterization",
@@ -1415,12 +1321,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:scatteringvectorq",
@@ -1460,12 +1361,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:grazingincidencegeometry",
@@ -1505,12 +1401,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:softmattersystems",
@@ -1550,12 +1441,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:silicon",
@@ -1602,12 +1488,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:biodegradableplastics",
@@ -1647,12 +1528,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:polymermixtures",
@@ -1692,12 +1568,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:nanomaterials",
@@ -1737,18 +1608,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:softmatter",
       "name": "soft matter",
       "category": "Material",
-      "description": "A subfield of materials science dealing with materials that are easily deformed by thermal stresses or external forces.",
+      "description": "A class of materials that are easily deformed by thermal stresses or fluctuations.",
       "pages": [
         6
       ],
@@ -1782,12 +1648,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:microemulsions",
@@ -1827,18 +1688,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:reversed-phaseliquidchromatography",
       "name": "reversed-phase liquid chromatography",
       "category": "ExperimentalTechnique",
-      "description": "A chromatographic technique used to separate components in a mixture based on their polarity using a non-polar stationary phase and a polar mobile phase.",
+      "description": "Reversed-Phase Liquid Chromatography, a technique used to separate components in a mixture based on hydrophobicity.",
       "pages": [
         1,
         9
@@ -1999,7 +1855,7 @@
       "id": "matkg:GCMS",
       "name": "GC–MS",
       "category": "ExperimentalTechnique",
-      "description": "Gas Chromatography-Mass Spectrometry, a technique used to separate and analyze compounds in a mixture.",
+      "description": "Gas Chromatography-Mass Spectrometry, a technique used to identify substances within a test sample",
       "pages": [
         2
       ],
@@ -2044,15 +1900,9 @@
       "description": "Convolutional Neural Network model used for automated peak detection in chromatograms.",
       "pages": [
         1,
-        8,
-        6,
-        7,
-        5
+        8
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
@@ -2066,21 +1916,6 @@
           "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)–40/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 8
-        },
-        {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)–75/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 6
-        },
-        {
-          "text": "True positives False positives False negatives Total CNN SG CNN SG CNN SG Mixture 1 ( Fig.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 7
-        },
-        {
-          "text": "Training and evaluation of the CNN on simulated chromatograms To train the CNN model, 1,0 0 0,0 0 0 simulated chromatograms were generated and used as input (in batches of 32) for the CNN model.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 5
         }
       ],
       "formula": "",
@@ -2111,7 +1946,7 @@
       "id": "matkg:UV-absorption",
       "name": "UV-absorption",
       "category": "ExperimentalTechnique",
-      "description": "The process by which a substance absorbs ultraviolet light, used to determine concentration or identity.",
+      "description": "The absorption of ultraviolet light by a substance, used to determine concentration or identity",
       "pages": [
         2
       ],
@@ -2153,7 +1988,7 @@
       "id": "matkg:peakarea",
       "name": "peak area",
       "category": "MaterialProperty",
-      "description": "The integral of the signal intensity over time for a specific peak in a chromatogram, proportional to the amount of analyte.",
+      "description": "The integrated area under a chromatographic peak, typically proportional to the amount of analyte.",
       "pages": [
         2,
         7,
@@ -2209,7 +2044,7 @@
       "id": "matkg:peakheight",
       "name": "peak height",
       "category": "MaterialProperty",
-      "description": "The maximum intensity of a signal peak in a chromatogram.",
+      "description": "The maximum intensity of a peak in a chromatogram",
       "pages": [
         2
       ],
@@ -2251,7 +2086,7 @@
       "id": "matkg:linearinterpolation",
       "name": "linear interpolation",
       "category": "ProcessingMethod",
-      "description": "A method of curve fitting using linear segments to estimate values between two known points.",
+      "description": "A method of curve fitting using linear segments to estimate values between two known points",
       "pages": [
         2
       ],
@@ -2293,7 +2128,7 @@
       "id": "matkg:normalization",
       "name": "normalization",
       "category": "ProcessingMethod",
-      "description": "The process of rescaling data to a standard range, such as setting the maximum intensity to 1.",
+      "description": "The process of rescaling data to a specific range, such as 0 to 1, to ensure consistency",
       "pages": [
         2
       ],
@@ -2335,7 +2170,7 @@
       "id": "matkg:ACN",
       "name": "ACN",
       "category": "ChemicalEntity",
-      "description": "A chemical solvent (ACN, HPLC grade) used in experimental chromatograms.",
+      "description": "Acetonitrile, a common organic solvent used in chromatography.",
       "pages": [
         6,
         8,
@@ -2508,17 +2343,13 @@
       "id": "matkg:Savitzky-GolaySGfilter",
       "name": "Savitzky-Golay (SG) filter",
       "category": "ExperimentalTechnique",
-      "description": "A digital filter used to smooth data and calculate derivatives by fitting successive sub-sets of adjacent data points with a low-degree polynomial.",
+      "description": "Savitzky-Golay method, a digital filter used for smoothing data and calculating derivatives in peak detection.",
       "pages": [
         7,
-        8,
-        3,
-        6
+        8
       ],
       "source_papers": [
         "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
-        "SCIPY_DOCS.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -2531,16 +2362,6 @@
           "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)–40/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 8
-        },
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        },
-        {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)–75/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 6
         }
       ],
       "formula": "",
@@ -2926,7 +2747,7 @@
       "id": "matkg:2-naphthol",
       "name": "2-naphthol",
       "category": "ChemicalEntity",
-      "description": "A polycyclic aromatic hydrocarbon derivative used as an analyte.",
+      "description": "A chemical compound used in experimental chromatograms.",
       "pages": [
         4,
         5,
@@ -2986,7 +2807,7 @@
       "id": "matkg:eugenol",
       "name": "eugenol",
       "category": "ChemicalEntity",
-      "description": "An aromatic compound found in clove oil used as an analyte.",
+      "description": "A chemical compound used in experimental chromatograms.",
       "pages": [
         4,
         5,
@@ -3597,7 +3418,7 @@
       "id": "matkg:StableBondC18column",
       "name": "Stable Bond C18 column",
       "category": "Material",
-      "description": "A reversed-phase chromatography column used for separation.",
+      "description": "A chromatographic column used for separation of analytes.",
       "pages": [
         4,
         5
@@ -3646,7 +3467,7 @@
       "id": "matkg:ZorbaxExtend-C18column",
       "name": "Zorbax Extend-C18 column",
       "category": "Material",
-      "description": "A reversed-phase chromatography column used for separation.",
+      "description": "A chromatographic column used for separation of analytes.",
       "pages": [
         4,
         5
@@ -3695,7 +3516,7 @@
       "id": "matkg:isocraticelution",
       "name": "isocratic elution",
       "category": "ProcessingMethod",
-      "description": "A chromatographic technique where the mobile phase composition remains constant.",
+      "description": "A chromatographic process where the mobile phase composition remains constant.",
       "pages": [
         4,
         5
@@ -3870,25 +3691,18 @@
       "id": "matkg:peakwidth",
       "name": "peak width",
       "category": "MaterialProperty",
-      "description": "The width of a scattering peak, typically measured at half-maximum (FWHM), relating to crystallite size or correlation length.",
+      "description": "The width of a chromatographic peak, often used to assess efficiency or distinguish overlapping peaks.",
       "pages": [
-        9,
-        3
+        9
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
-        "SCIPY_DOCS.pdf"
+        "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
         {
           "text": "It seems that the differences in width between the unresolved peaks and the neigh- boring peaks made it possible for the CNN model to distinguish them (note that peaks that are in the vicinity of each other have similar peak widths).",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 9
-        },
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
         }
       ],
       "formula": "",
@@ -4524,7 +4338,7 @@
       "id": "matkg:ACNwater",
       "name": "ACN/water",
       "category": "ChemicalEntity",
-      "description": "A mixture of acetonitrile and water used as a solvent/mobile phase.",
+      "description": "A mixture of acetonitrile and water used as a mobile phase",
       "pages": [
         5
       ],
@@ -6023,13 +5837,11 @@
       "id": "matkg:theophylline",
       "name": "theophylline",
       "category": "ChemicalEntity",
-      "description": "A chemical compound used in experimental chromatograms.",
+      "description": "A xanthine derivative",
       "pages": [
-        5,
-        3
+        5
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -6037,11 +5849,6 @@
           "text": "Mixture 5 consisted of 43 analytes (in order of elution): theophylline, paracetamol, caffeine, resorcinol, furfuryl alco- hol, 2-hydroxybenzyl alcohol, 2-methylresorcin, m-aminophenol, salicylamide, 4-methoxyacetanilide, 2-hydroxyacetophenone, 7- hydroxycoumarine, acetanilide, benzyl alcohol, methylnicotinate, 4-methoxyphenol, 2-aminophenol, 2,7-dihydroxynaphthalene, 1,2-phenylenediamine, phenobarbital, phenol, phthalide, 4- hydroxypropiophenone, N-methylphenylacetamide, 3-nitrophenol, m-cresol, o-cresol, ethylparaben, acetophenone, 2-nitrophenol, 2,6-dimethylaniline, 2-naphthol, propylparaben, indole,",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
-        },
-        {
-          "text": "Chemicals The compounds 2-hydroxyacetophenone, 2-naphthol, 2- nitrophenol, anisole, benzyl alcohol, bromobenzene, butyl- paraben, caffeine, ethylbenzene, ethylparaben, eugenol, iodoben- zene, isopropyl benzoate, m-cresol, m-methylacetophenone, o-methylacetophenone, p-methylacetophenone, propiophe- none, propylparaben and valerophenone were obtained from Sigma-Aldrich (Diegem, Belgium); 2,3-dihydroxynaphthalene, 2,6-dimethylaniline, 2-hydroxybenzyl alcohol, 3-nitrophenol, 4-hydroxypropiophenone, benzhydrol, indole, methylparaben, N,N- dimethylaniline, naphthalene, N-methylaniline, phenol,",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 3
         }
       ],
       "formula": "C7H8N4O2",
@@ -6182,13 +5989,11 @@
       "id": "matkg:4-methoxyacetanilide",
       "name": "4-methoxyacetanilide",
       "category": "ChemicalEntity",
-      "description": "A chemical compound used in experimental chromatograms.",
+      "description": "A methoxy-substituted acetanilide",
       "pages": [
-        5,
-        3
+        5
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -6196,11 +6001,6 @@
           "text": "Mixture 5 consisted of 43 analytes (in order of elution): theophylline, paracetamol, caffeine, resorcinol, furfuryl alco- hol, 2-hydroxybenzyl alcohol, 2-methylresorcin, m-aminophenol, salicylamide, 4-methoxyacetanilide, 2-hydroxyacetophenone, 7- hydroxycoumarine, acetanilide, benzyl alcohol, methylnicotinate, 4-methoxyphenol, 2-aminophenol, 2,7-dihydroxynaphthalene, 1,2-phenylenediamine, phenobarbital, phenol, phthalide, 4- hydroxypropiophenone, N-methylphenylacetamide, 3-nitrophenol, m-cresol, o-cresol, ethylparaben, acetophenone, 2-nitrophenol, 2,6-dimethylaniline, 2-naphthol, propylparaben, indole,",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
-        },
-        {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 3
         }
       ],
       "formula": "C9H11NO2",
@@ -6436,18 +6236,18 @@
       "id": "matkg:gradientmode",
       "name": "gradient mode",
       "category": "ProcessingMethod",
-      "description": "A mode of chromatography where the composition of the mobile phase is changed over time to improve separation.",
+      "description": "A chromatographic method where the mobile phase composition changes over time",
       "pages": [
-        9
+        5
       ],
       "source_papers": [
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 though in c a false positive was also observed). It seems that the differences in width between the unresolved peaks and the neigh- boring peaks made it possible for the CNN model to distinguish them",
+          "text": "Mix- ture 5 was analyzed on a Stable Bond C18 column (4.6 × 250 mm, 5 μm) from Agilent Technologies at a ﬂow rate of 1.00 mL/min and using an injection volume of 1.0 μL in gradient mode.",
           "source_paper": "XRAY_MISC1.pdf",
-          "page": 9
+          "page": 5
         }
       ],
       "formula": "",
@@ -6604,17 +6404,11 @@
       "id": "matkg:chromatogram",
       "name": "chromatogram",
       "category": "ExperimentalTechnique",
-      "description": "A visual record of the detection of compounds as they elute from a chromatographic column.",
+      "description": "A visual representation of the separation of chemical components over time.",
       "pages": [
-        3,
-        2,
-        6,
-        7
+        3
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -6622,21 +6416,6 @@
           "text": "Labeling of a chromatogram.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
-        },
-        {
-          "text": "For instance, Risum and Boro [9] employed a convolutional neural net- work (CNN) to classify PARAFAC2 (Parallel factor analysis 2) re- solved intervals of chromatograms extracted from GC–MS data into four potential classes: peaks, baselines, shoulder peaks or other.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 2
-        },
-        {
-          "text": "Predicted peaks on a simulated chromatogram.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 6
-        },
-        {
-          "text": "Journal of Chromatography A 1672 (2022) 463005 Table 1 Summary of the peak detection results obtained on the experimental chromatograms.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 7
         }
       ],
       "formula": "",
@@ -6705,12 +6484,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:deposition",
@@ -6728,7 +6502,7 @@
       "id": "matkg:n-Te",
       "name": "n-Te",
       "category": "ChemicalEntity",
-      "description": "Tellurium nanoparticles (implied by the context of shape classification and chemical symbol Te).",
+      "description": "Tellurium nanoparticles used in the experimental data for shape classification.",
       "pages": [
         3
       ],
@@ -6759,18 +6533,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:averagethickness",
       "name": "average thickness",
       "category": "MaterialProperty",
-      "description": "The mean thickness of the nanoparticles, measured as 2.7 nm for the Te nanoparticles.",
+      "description": "The mean thickness of the nanoparticles, a structural property.",
       "pages": [
         4
       ],
@@ -6801,12 +6570,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:nanodots",
@@ -6848,18 +6612,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:X-rayabsorptionnear-edgestructure",
       "name": "X-ray absorption near-edge structure",
       "category": "ExperimentalTechnique",
-      "description": "An X-ray spectroscopy technique that provides information on the local structure and oxidation state of a specific element.",
+      "description": "An X-ray spectroscopy technique used to analyze the local electronic and geometric structure of materials.",
       "pages": [
         1
       ],
@@ -6895,18 +6654,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:Sisubstrate",
       "name": "Si substrate",
       "category": "Material",
-      "description": "Silicon wafer used as the base material for the deposition of tellurium nanoparticles.",
+      "description": "Silicon substrate used as the base for the deposition of tellurium nanoparticles.",
       "pages": [
         2
       ],
@@ -6937,12 +6691,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:silverdocosanoate",
@@ -6979,12 +6728,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:refractionindex",
@@ -7021,12 +6765,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:OPVs",
@@ -7070,12 +6809,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:powerconversionefficiency",
@@ -7124,18 +6858,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:donormaterials",
       "name": "donor materials",
       "category": "Material",
-      "description": "Electron-donating materials used in organic photovoltaic cells.",
+      "description": "Electron-donating materials used in organic solar cells.",
       "pages": [
         2
       ],
@@ -7166,18 +6895,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:acceptormaterials",
       "name": "acceptor materials",
       "category": "Material",
-      "description": "Electron-accepting materials used in organic photovoltaic cells.",
+      "description": "Electron-accepting materials used in organic solar cells.",
       "pages": [
         2
       ],
@@ -7208,12 +6932,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:electrodes",
@@ -7250,12 +6969,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:D18-Cl",
@@ -7292,12 +7006,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:N3",
@@ -7334,12 +7043,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:AT-b2O",
@@ -7376,12 +7080,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:2PCAz",
@@ -7418,12 +7117,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:PEDOTPSS",
@@ -7460,12 +7154,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:cross-sectionalscanningelectronmicroscopy",
@@ -7502,18 +7191,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:energydispersivespectroscopymapping",
       "name": "energy dispersive spectroscopy mapping",
       "category": "ExperimentalTechnique",
-      "description": "Technique used for elemental analysis and mapping of a sample.",
+      "description": "A technique used for elemental analysis or chemical imaging.",
       "pages": [
         1
       ],
@@ -7544,18 +7228,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:time-of-flightsecondaryionmassspectrometry",
       "name": "time-of-flight secondary ion mass spectrometry",
       "category": "ExperimentalTechnique",
-      "description": "Analytical technique used for high-resolution chemical mapping of surfaces and thin films.",
+      "description": "A surface analysis technique used for ion spatial mapping.",
       "pages": [
         1
       ],
@@ -7586,18 +7265,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:blade-coating",
       "name": "blade-coating",
       "category": "ProcessingMethod",
-      "description": "A solution-processing method for depositing thin films over large areas.",
+      "description": "A solution-processing method for depositing thin films.",
       "pages": [
         1
       ],
@@ -7628,12 +7302,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:layer-by-layerdeposition",
@@ -7670,12 +7339,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:chargemobility",
@@ -7712,12 +7376,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:serialcrystallography",
@@ -7764,12 +7423,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:diffractionimage",
@@ -7809,12 +7463,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:amorphousisotropicscattering",
@@ -7854,12 +7503,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:single-crystaldiffraction",
@@ -7899,12 +7543,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:Lauediffraction",
@@ -7951,12 +7590,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:LaB6",
@@ -8000,12 +7634,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:XRPD",
@@ -8045,12 +7674,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:CeO2",
@@ -8094,12 +7718,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:silverbehenate",
@@ -8139,12 +7758,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:massifdetection",
@@ -8184,12 +7798,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:blobdetection",
@@ -8229,12 +7838,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:DifferenceofGaussians",
@@ -8274,12 +7878,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:Debye-Scherrerrings",
@@ -8287,13 +7886,9 @@
       "category": "ExperimentalTechnique",
       "description": "Concentric diffraction rings produced by polycrystalline samples used for calibration.",
       "pages": [
-        4,
-        5,
-        6
+        4
       ],
       "source_papers": [
-        "PYFAI_DOCS.pdf",
-        "PYFAI_DOCS.pdf",
         "PYFAI_DOCS.pdf"
       ],
       "context_snippets": [
@@ -8301,16 +7896,6 @@
           "text": "Use case: calibration with Debye-Scherrer rings from calibrants such as LaB6, CeO2, silicon, or silver behenate.",
           "source_paper": "PYFAI_DOCS.pdf",
           "page": 4
-        },
-        {
-          "text": "Geometry refinement from picked peaks Functionality: After calibration peak picking, each group is assigned to a Debye-Scherrer ring number and d-spacing.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 5
-        },
-        {
-          "text": "KG node candidates: AzimuthalIntegrator.integrate1d, AzimuthalIntegrator.sigma_clip_ng, OCL_PeakFinder, peakfinder8, Massif, BlobDetection, Steepest Ascent, Monte Carlo sampling, GeometryRefinement, FiberIntegrator, integrate2d_grazing_incidence, integrate1d_grazing_incidence, sparsify-Bragg, Debye-Scherrer rings, calibrant, .poni geometry file.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 6
         }
       ],
       "formula": "",
@@ -8333,12 +7918,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:d-spacing",
@@ -8378,12 +7958,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:2thetapositions",
@@ -8423,12 +7998,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     },
     {
       "id": "matkg:fiberdiffraction",
@@ -8468,1026 +8038,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:Gaussianmodel",
-      "name": "Gaussian model",
-      "category": "ExperimentalTechnique",
-      "description": "A mathematical model used to fit scattering peaks based on a normal distribution.",
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:Lorentzianmodel",
-      "name": "Lorentzian model",
-      "category": "ExperimentalTechnique",
-      "description": "A mathematical model used to fit scattering peaks, often associated with lifetime broadening.",
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:pseudo-Voigtmodel",
-      "name": "pseudo-Voigt model",
-      "category": "ExperimentalTechnique",
-      "description": "A linear combination of Gaussian and Lorentzian profiles used to fit asymmetric or mixed-broadening peaks.",
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Fit selected peaks with Gaussian/Lorentzian/pseudo-Voigt model if quantitative parameters are needed.",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:peakprominence",
-      "name": "peak prominence",
-      "category": "MaterialProperty",
-      "description": "A measure of how much a peak stands out relative to the surrounding baseline.",
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:PCA",
-      "name": "PCA",
-      "category": "ExperimentalTechnique",
-      "description": "Principal Component Analysis, a dimensionality reduction technique used to transform a large set of variables into a smaller one that still contains most of the information.",
-      "pages": [
-        4,
-        5
-      ],
-      "source_papers": [
-        "XRAY1.pdf",
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Confusion matrices for top performing models (PCA of 99%, 40 components).",
-          "source_paper": "XRAY1.pdf",
-          "page": 4
-        },
-        {
-          "text": "Confusion matrices for top performing models (PCA of 95%, 10 components).",
-          "source_paper": "XRAY1.pdf",
-          "page": 5
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:biomacromolecules",
-      "name": "biomacromolecules",
-      "category": "Material",
-      "description": "Large biological molecules such as proteins or nucleic acids.",
-      "pages": [
-        2
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "He et al., instead turned to the auto- encoder to reconstruct biomacromolecules from bio-SAXS curves [16].",
-          "source_paper": "XRAY1.pdf",
-          "page": 2
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:nanostructure",
-      "name": "nanostructure",
-      "category": "Material",
-      "description": "Structures with dimensions in the nanometer range.",
-      "pages": [
-        2
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "For the general nanostructure analysis, Archibald et al.",
-          "source_paper": "XRAY1.pdf",
-          "page": 2
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:neutronscattering",
-      "name": "neutron scattering",
-      "category": "ExperimentalTechnique",
-      "description": "An experimental technique using neutrons to probe the structure and dynamics of materials.",
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Ganeva, “Deep learning for X-ray or neutron scattering under grazing-incidence: extraction of distributions,” Materials Research Express, vol.",
-          "source_paper": "XRAY1.pdf",
-          "page": 6
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:X-rayscattering",
-      "name": "X-ray scattering",
-      "category": "ExperimentalTechnique",
-      "description": "A technique where X-rays are scattered by a sample to determine its structural properties.",
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Li, “Machine learning on neutron and x-ray scattering and spectroscopies,” Chemical Physics Reviews, vol.",
-          "source_paper": "XRAY1.pdf",
-          "page": 6
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:grazing-incidence",
-      "name": "grazing-incidence",
-      "category": "ProcessingMethod",
-      "description": "A geometry in scattering experiments where the incident beam is at a very small angle to the sample surface.",
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Ganeva, “Deep learning for X-ray or neutron scattering under grazing-incidence: extraction of distributions,” Materials Research Express, vol.",
-          "source_paper": "XRAY1.pdf",
-          "page": 6
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:baselinedrift",
-      "name": "baseline drift",
-      "category": "MaterialProperty",
-      "description": "A long-term noise component in a chromatographic signal where the baseline shifts over time.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "However, chro- matograms are noisy, both in terms of short-term noise (e.g., white noise) and long-term noise (e.g., baseline drift) (see Felinger [1] for ∗Corresponding author.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:whitenoise",
-      "name": "white noise",
-      "category": "MaterialProperty",
-      "description": "Short-term random fluctuations in a signal with a constant power spectral density.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Journal of Chromatography A 1672 (2022) 463005 Contents lists available at ScienceDirect Journal of Chromatography A journal homepage: www.elsevier.com/locate/chroma Convolutional neural network for automated peak detection in reversed-phase liquid chromatography Alexander Kensert a , b , Emery Bosten a , d , Gilles Collaerts a , b , Kyriakos Efthymiadis",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:gaschromatographycombustionisotoperatiomassspectrometry",
-      "name": "gas chromatography/combustion isotope ratio mass spectrometry",
-      "category": "ExperimentalTechnique",
-      "description": "A technique combining gas chromatography with combustion isotope ratio mass spectrometry for isotopic analysis",
-      "pages": [
-        10
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 References [1] A. Felinger , Data Analysis and Signal Processing in Chromatography, Data Anal- ysis and Signal Processing in Chromatography, 21, 1st ed., Elsevier Science, 1998 . [2] G. Vivó-Truyols, J.R. Torres-Lapasió, A.M. van Nederkassel,",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 10
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:isocraticmode",
-      "name": "isocratic mode",
-      "category": "ProcessingMethod",
-      "description": "A mode of chromatography where the composition of the mobile phase remains constant throughout the separation.",
-      "pages": [
-        9
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Finally, the CNN model and the SG method were also tested on a chromatogram obtained in a different mode (gradient instead of isocratic mode) and a chromatogram obtained at a different wave- length (240 nm instead of 210 nm) (see Figs.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 9
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:nanoparticles",
-      "name": "nanoparticles",
-      "category": "Material",
-      "description": "Particles of matter in the nanometer size range.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY2.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "CNN was applied to classify GISAXS patterns, focusing on the shape of the nanoparticles.",
-          "source_paper": "XRAY2.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2020,
-      "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
-      "authors": [
-        "Ikemoto H",
-        "Yamamoto K",
-        "Touyama H",
-        "Yamashita D",
-        "Nakamura M",
-        "Okuda H"
-      ],
-      "institutions": [],
-      "doi": "10.1107/S1600577520005767",
-      "journal": "Science and Engineering, Kyoto University, Japan. *Correspondence e-mail: ikemoto@sci.u",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:fullerene",
-      "name": "fullerene",
-      "category": "ChemicalEntity",
-      "description": "A class of carbon allotropes used as acceptors in early OPVs.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "For at least two decades, fullerene-based OPVs have dominated the field, with the 10% power conversion efficiency (PCE) barrier being difficult to overcome due to the poor absorption properties and reduced voltage of these devices.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:non-fullereneacceptors",
-      "name": "non-fullerene acceptors",
-      "category": "Material",
-      "description": "Organic molecules used as electron acceptors in OPVs as an alternative to fullerenes.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "A breakthrough was the discovery of non-fullerene acceptors (NFAs) with complementary absorption, with the donor materials, tun- able energetics and similar transport properties of fullerene.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:Y-family",
-      "name": "Y-family",
-      "category": "ChemicalEntity",
-      "description": "A specific family of high-performance non-fullerene acceptors.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "NFA-based OPVs, in particular the Y-family, allowed superior PCE and opened up applications, that is, semi-transparent devices, not achievable with fullerene-based OPVs and inorganic counterparts2.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:bulkheterojunction",
-      "name": "bulk heterojunction",
-      "category": "Material",
-      "description": "An interpenetrating network of donor and acceptor materials in the photoactive layer.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "nature materials Volume 24 | March 2025 | 336–337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency. Organic photovoltaics",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:D18-4Cl",
-      "name": "D18-4Cl",
-      "category": "ConjugatedPolymer",
-      "description": "A variant of the D18 donor polymer.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "In fact, the ternary D18:4Cl:AT-b2O:N3 blends form a BHJ gradient vertical phase separation consisting of a donor-rich (D18-4Cl) phase close to the substrate, a uniform BHJ region in the middle and an acceptor-rich phase (N3) with enhanced crystallinity near the top of the active layer (Fig.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:electronmobilities",
-      "name": "electron mobilities",
-      "category": "ElectronicProperty",
-      "description": "The measure of how quickly electrons can move through a semiconductor.",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "When introduced in the ternary blend, AT-b2O promotes higher crystallinity and a longer-range order of N3, with long diffusion lengths approaching 50 nm, facilitat- ing exciton separation and higher electron mobilities in the vertical direction.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:q",
-      "name": "q",
-      "category": "MaterialProperty",
-      "description": "The scattering vector magnitude",
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "PYFAI_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "AzimuthalIntegrator.integrate1d: reduce 2D detector images to 1D peak curves Functionality: AzimuthalIntegrator.integrate1d converts an area-detector image into a 1D scattering curve such as intensity versus q or two-theta.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 1
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
-    },
-    {
-      "id": "matkg:Braggimages",
-      "name": "Bragg images",
-      "category": "ExperimentalTechnique",
-      "description": "Diffraction patterns resulting from Bragg's law of X-ray diffraction",
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "PYFAI_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "- Spotty 2D Bragg images: OCL_PeakFinder.peakfinder or peakfinder8.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 6
-        }
-      ],
-      "formula": "",
-      "formula_validation": {
-        "status": "missing"
-      },
-      "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ]
+      "keywords": []
     }
   ],
   "associations": [
@@ -9501,12 +8052,6 @@
       "subject": "matkg:scatteringintensity",
       "predicate": "rel:PropertyMeasuredBy",
       "object": "matkg:SAXS",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:scatteringintensity",
-      "predicate": "rel:property_type",
-      "object": "matkg:ElectronicProperty",
       "has_evidence": null
     },
     {
@@ -9543,12 +8088,6 @@
       "subject": "matkg:Tenanoparticles",
       "predicate": "rel:MaterialProcessedBy",
       "object": "matkg:deposition",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:averagethickness",
-      "predicate": "rel:PropertyMeasuredBy",
-      "object": "matkg:GISAXS",
       "has_evidence": null
     },
     {
@@ -9633,12 +8172,6 @@
       "subject": "matkg:crystallinity",
       "predicate": "rel:has_code_snippet",
       "object": "matkg:snippetmeasurepeakwidthsSCIPYDOCSpdfp2be603315",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:crystallinity",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetfindscatteringpeaksSCIPYDOCSpdfp183c84edc",
       "has_evidence": null
     },
     {
@@ -9930,30 +8463,6 @@
       "has_evidence": null
     },
     {
-      "subject": "matkg:Savitzky-GolaySGfilter",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetwaveletpeakcandidatesSCIPYDOCSpdfp327492d38",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Savitzky-GolaySGfilter",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:peakwidth",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetwaveletpeakcandidatesSCIPYDOCSpdfp327492d38",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:peakwidth",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
-      "has_evidence": null
-    },
-    {
       "subject": "matkg:serialcrystallography",
       "predicate": "rel:has_code_snippet",
       "object": "matkg:snippetrunpeakfinder8PYFAIDOCSpdfp3ae36d21e",
@@ -10032,24 +8541,6 @@
       "has_evidence": null
     },
     {
-      "subject": "matkg:Debye-Scherrerrings",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetmontecarlopeakseedsPYFAIDOCSpdfp5becb8e2a",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Debye-Scherrerrings",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetrefineseedswithmassifPYFAIDOCSpdfp51bcb86ad",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Debye-Scherrerrings",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetgiwaxslineprofilepeaksPYFAIDOCSpdfp639ba75d9",
-      "has_evidence": null
-    },
-    {
       "subject": "matkg:d-spacing",
       "predicate": "rel:has_code_snippet",
       "object": "matkg:snippetmontecarlopeakseedsPYFAIDOCSpdfp5becb8e2a",
@@ -10075,60 +8566,6 @@
     },
     {
       "subject": "matkg:fiberdiffraction",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetgiwaxslineprofilepeaksPYFAIDOCSpdfp639ba75d9",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Gaussianmodel",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetwaveletpeakcandidatesSCIPYDOCSpdfp327492d38",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Gaussianmodel",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Lorentzianmodel",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetwaveletpeakcandidatesSCIPYDOCSpdfp327492d38",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Lorentzianmodel",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:pseudo-Voigtmodel",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetwaveletpeakcandidatesSCIPYDOCSpdfp327492d38",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:pseudo-Voigtmodel",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:peakprominence",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetwaveletpeakcandidatesSCIPYDOCSpdfp327492d38",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:peakprominence",
-      "predicate": "rel:has_code_snippet",
-      "object": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
-      "has_evidence": null
-    },
-    {
-      "subject": "matkg:Braggimages",
       "predicate": "rel:has_code_snippet",
       "object": "matkg:snippetgiwaxslineprofilepeaksPYFAIDOCSpdfp639ba75d9",
       "has_evidence": null

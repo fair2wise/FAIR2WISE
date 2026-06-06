@@ -26,7 +26,7 @@ from modules.json2kg import convert_terms_to_graph
 # -----------------------------------------------------------------------------
 # Configuration for evaluation
 # -----------------------------------------------------------------------------
-load_dotenv(override=True)
+load_dotenv()
 
 EVALUATION_MODELS = [
     "google/gemini-flash-lite",

@@ -1,9 +1,9 @@
 {
   "metadata": {
     "extraction_date": "2026-06-05T22:21:46.914713Z",
-    "processed_files": 21,
-    "processed_pages_total": 108,
-    "processed_pages_with_terms": 62,
+    "processed_files": 7,
+    "processed_pages_total": 36,
+    "processed_pages_with_terms": 34,
     "version": "2.1"
   },
   "terms": [
@@ -35,7 +35,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -44,12 +44,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -71,11 +66,6 @@
           "relation": "PropertyMeasuredBy",
           "related_term": "SAXS",
           "verified": false
-        },
-        {
-          "relation": "property_type",
-          "related_term": "ElectronicProperty",
-          "verified": true
         }
       ],
       "pages": [
@@ -97,7 +87,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -106,12 +96,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -166,7 +151,7 @@
           "page": 3
         },
         {
-          "text": "On our data set, our classi\ufb01cation models outperform previous work reported in the literature and the accuracy \ufb01gures we obtain make them highly relevant to users analyzing SAXS data.",
+          "text": "On our data set, our classiﬁcation models outperform previous work reported in the literature and the accuracy ﬁgures we obtain make them highly relevant to users analyzing SAXS data.",
           "source_paper": "XRAY1.pdf",
           "page": 2
         },
@@ -187,7 +172,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -196,18 +181,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "high"
     },
     {
       "term": "crystallinity",
-      "definition": "The degree to which a material's molecules or atoms are arranged in an ordered, repeating structure.",
+      "definition": "The degree of structural order in a solid material.",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -215,23 +195,16 @@
       },
       "relations": [],
       "pages": [
-        2,
-        1
+        2
       ],
       "source_papers": [
-        "SCIPY_DOCS.pdf",
-        "XRAY3.pdf"
+        "SCIPY_DOCS.pdf"
       ],
       "context_snippets": [
         {
           "text": "Best use case: capture peak broadening, compare crystallinity/order, or prepare initial sigma guesses for later Gaussian/Lorentzian fitting.",
           "source_paper": "SCIPY_DOCS.pdf",
           "page": 2
-        },
-        {
-          "text": "However, the vertical crystallization of a BHJ is not homogeneous and low crystallinity regions form far from the substrate driving the crystallization process.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
         }
       ],
       "publication_year": 2021,
@@ -240,7 +213,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -249,14 +222,9 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
-      "importance": "high"
+      "importance": "low"
     },
     {
       "term": "WAXS",
@@ -307,7 +275,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -316,12 +284,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "high"
     },
@@ -353,7 +316,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -362,12 +325,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -424,7 +382,7 @@
           "page": 3
         },
         {
-          "text": "Therefore, they may be excellent for the classi\ufb01cation of GISAXS patterns.",
+          "text": "Therefore, they may be excellent for the classiﬁcation of GISAXS patterns.",
           "source_paper": "XRAY2.pdf",
           "page": 2
         },
@@ -451,12 +409,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "high"
     },
@@ -488,7 +441,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -497,18 +450,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "GIWAXS",
-      "definition": "Grazing-Incidence Wide-Angle X-ray Scattering, used to study the crystallinity and orientation of thin films.",
+      "definition": "Grazing-Incidence Wide-Angle X-ray Scattering, a technique used to characterize material structure.",
       "category": "XRayScatteringAnalysis",
       "formula": null,
       "formula_validation": {
@@ -548,7 +496,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -557,18 +505,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "high"
     },
     {
       "term": "Bragg peaks",
-      "definition": "Sharp diffraction peaks resulting from the constructive interference of X-rays or neutrons scattered by a crystalline lattice.",
+      "definition": "Sharp diffraction peaks resulting from the constructive interference of X-rays scattered by a crystalline lattice.",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -608,7 +551,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -617,18 +560,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "high"
     },
     {
       "term": "intensity",
-      "definition": "The magnitude of the scattered X-ray signal, typically plotted against the scattering vector q.",
+      "definition": "The magnitude of the scattered X-ray signal.",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -654,7 +592,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -663,12 +601,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -700,7 +633,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -709,12 +642,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -746,7 +674,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -755,12 +683,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -792,7 +715,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -801,18 +724,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "Azimuthal integration",
-      "definition": "A processing method used to convert 2D detector images from scattering experiments into 1D radial profiles.",
+      "definition": "A process of integrating 2D scattering detector images into 1D radial profiles.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -838,7 +756,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -847,12 +765,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -884,7 +797,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -893,12 +806,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -930,7 +838,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -939,18 +847,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "scattering vector q",
-      "definition": "The momentum transfer variable in scattering experiments, defined as q = 4\u03c0/\u03bb sin(\u03b8).",
+      "definition": "The momentum transfer variable in scattering experiments, defined as q = 4π/λ sin(θ).",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -965,7 +868,7 @@
       ],
       "context_snippets": [
         {
-          "text": "All the data are generated as (x,y) curves with y as the scattering intensity and x as the scattering vector q (nm\u22121), which is de\ufb01ned as q = 4\u03c0 \u03bb sin(\u03b8) with \u03b8 as half of the scattering angle.",
+          "text": "All the data are generated as (x,y) curves with y as the scattering intensity and x as the scattering vector q (nm−1), which is deﬁned as q = 4π λ sin(θ) with θ as half of the scattering angle.",
           "source_paper": "XRAY1.pdf",
           "page": 3
         }
@@ -976,7 +879,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -985,12 +888,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1022,7 +920,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1031,12 +929,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1057,7 +950,7 @@
       ],
       "context_snippets": [
         {
-          "text": "The output is another CSV \ufb01le, where each input item is annotated with a predicted nanostructure shape and a corresponding probability (con\ufb01dence) for each selected ML classi\ufb01er.",
+          "text": "The output is another CSV ﬁle, where each input item is annotated with a predicted nanostructure shape and a corresponding probability (conﬁdence) for each selected ML classiﬁer.",
           "source_paper": "XRAY1.pdf",
           "page": 2
         }
@@ -1068,7 +961,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1077,12 +970,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1114,7 +1002,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1123,12 +1011,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1149,7 +1032,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering Piotr Tomaszewski, Shun Yu, Markus Borg and Jerk R\u00a8onnols RISE Research Institutes of Sweden, Lund and Stockholm, Sweden Email: {piotr.tomaszewski, shun.yu, markus.borg, jerk.ronnols}@ri.se Abstract\u2014Small angle X-ray scattering (SAXS) is extensively used in materials science as a way of examining nanostructures.",
+          "text": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering Piotr Tomaszewski, Shun Yu, Markus Borg and Jerk R¨onnols RISE Research Institutes of Sweden, Lund and Stockholm, Sweden Email: {piotr.tomaszewski, shun.yu, markus.borg, jerk.ronnols}@ri.se Abstract—Small angle X-ray scattering (SAXS) is extensively used in materials science as a way of examining nanostructures.",
           "source_paper": "XRAY1.pdf",
           "page": 1
         }
@@ -1160,7 +1043,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1169,12 +1052,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1213,7 +1091,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1222,12 +1100,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "high"
     },
@@ -1248,7 +1121,7 @@
       ],
       "context_snippets": [
         {
-          "text": "The obtained knowledge paves the way for the development of new materials in various \ufb01elds, e.g., medications, microelectronics, energy generation and storage, biodegradable plastics, and novel packaging, etc.",
+          "text": "The obtained knowledge paves the way for the development of new materials in various ﬁelds, e.g., medications, microelectronics, energy generation and storage, biodegradable plastics, and novel packaging, etc.",
           "source_paper": "XRAY1.pdf",
           "page": 1
         }
@@ -1259,7 +1132,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1268,12 +1141,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1294,7 +1162,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Hammouda, \u201cSans from homogeneous polymer mixtures: A uni\ufb01ed overview,\u201d Polymer Characteristics, pp.",
+          "text": "Hammouda, “Sans from homogeneous polymer mixtures: A uniﬁed overview,” Polymer Characteristics, pp.",
           "source_paper": "XRAY1.pdf",
           "page": 6
         }
@@ -1305,7 +1173,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1314,12 +1182,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1340,7 +1203,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Konovalov, \u201cSynchrotron scattering methods for nanomaterials and soft matter research,\u201d Materials, vol.",
+          "text": "Konovalov, “Synchrotron scattering methods for nanomaterials and soft matter research,” Materials, vol.",
           "source_paper": "XRAY1.pdf",
           "page": 6
         }
@@ -1351,7 +1214,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1360,18 +1223,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "soft matter",
-      "definition": "A subfield of materials science dealing with materials that are easily deformed by thermal stresses or external forces.",
+      "definition": "A class of materials that are easily deformed by thermal stresses or fluctuations.",
       "category": "Material",
       "formula": null,
       "formula_validation": {
@@ -1386,7 +1244,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Konovalov, \u201cSynchrotron scattering methods for nanomaterials and soft matter research,\u201d Materials, vol.",
+          "text": "Konovalov, “Synchrotron scattering methods for nanomaterials and soft matter research,” Materials, vol.",
           "source_paper": "XRAY1.pdf",
           "page": 6
         }
@@ -1397,7 +1255,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1406,12 +1264,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -1443,7 +1296,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -1452,18 +1305,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "reversed-phase liquid chromatography",
-      "definition": "A chromatographic technique used to separate components in a mixture based on their polarity using a non-polar stationary phase and a polar mobile phase.",
+      "definition": "Reversed-Phase Liquid Chromatography, a technique used to separate components in a mixture based on hydrophobicity.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -1599,7 +1447,7 @@
           "page": 1
         },
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)\u201375/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)–75/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 6
         }
@@ -1626,8 +1474,8 @@
       "importance": "low"
     },
     {
-      "term": "GC\u2013MS",
-      "definition": "Gas Chromatography-Mass Spectrometry, a technique used to separate and analyze compounds in a mixture.",
+      "term": "GC–MS",
+      "definition": "Gas Chromatography-Mass Spectrometry, a technique used to identify substances within a test sample",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -1642,7 +1490,7 @@
       ],
       "context_snippets": [
         {
-          "text": "For instance, Risum and Boro [9] employed a convolutional neural net- work (CNN) to classify PARAFAC2 (Parallel factor analysis 2) re- solved intervals of chromatograms extracted from GC\u2013MS data into four potential classes: peaks, baselines, shoulder peaks or other.",
+          "text": "For instance, Risum and Boro [9] employed a convolutional neural net- work (CNN) to classify PARAFAC2 (Parallel factor analysis 2) re- solved intervals of chromatograms extracted from GC–MS data into four potential classes: peaks, baselines, shoulder peaks or other.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 2
         }
@@ -1679,15 +1527,9 @@
       "relations": [],
       "pages": [
         1,
-        8,
-        6,
-        7,
-        5
+        8
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
@@ -1698,24 +1540,9 @@
           "page": 1
         },
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)\u201340/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)–40/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 8
-        },
-        {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)\u201375/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 6
-        },
-        {
-          "text": "True positives False positives False negatives Total CNN SG CNN SG CNN SG Mixture 1 ( Fig.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 7
-        },
-        {
-          "text": "Training and evaluation of the CNN on simulated chromatograms To train the CNN model, 1,0 0 0,0 0 0 simulated chromatograms were generated and used as input (in batches of 32) for the CNN model.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 5
         }
       ],
       "publication_year": 2021,
@@ -1737,11 +1564,11 @@
         "\"Method development\""
       ],
       "properties": [],
-      "importance": "medium"
+      "importance": "low"
     },
     {
       "term": "UV-absorption",
-      "definition": "The process by which a substance absorbs ultraviolet light, used to determine concentration or identity.",
+      "definition": "The absorption of ultraviolet light by a substance, used to determine concentration or identity",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -1784,7 +1611,7 @@
     },
     {
       "term": "peak area",
-      "definition": "The integral of the signal intensity over time for a specific peak in a chromatogram, proportional to the amount of analyte.",
+      "definition": "The integrated area under a chromatographic peak, typically proportional to the amount of analyte.",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -1803,7 +1630,7 @@
       ],
       "context_snippets": [
         {
-          "text": "In contrast to the deep learning models covered in the previous section \u2013 in which ROIs where proposed by the use of external tools and the resulting intervals were classi\ufb01ed into one of several classes (and in the case of Melnikov et al., also segmented into peak areas etc.) \u2013",
+          "text": "In contrast to the deep learning models covered in the previous section – in which ROIs where proposed by the use of external tools and the resulting intervals were classiﬁed into one of several classes (and in the case of Melnikov et al., also segmented into peak areas etc.) –",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 2
         },
@@ -1841,7 +1668,7 @@
     },
     {
       "term": "peak height",
-      "definition": "The maximum intensity of a signal peak in a chromatogram.",
+      "definition": "The maximum intensity of a peak in a chromatogram",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -1884,7 +1711,7 @@
     },
     {
       "term": "linear interpolation",
-      "definition": "A method of curve fitting using linear segments to estimate values between two known points.",
+      "definition": "A method of curve fitting using linear segments to estimate values between two known points",
       "category": "ProcessingMethod",
       "formula": null,
       "formula_validation": {
@@ -1927,7 +1754,7 @@
     },
     {
       "term": "normalization",
-      "definition": "The process of rescaling data to a standard range, such as setting the maximum intensity to 1.",
+      "definition": "The process of rescaling data to a specific range, such as 0 to 1, to ensure consistency",
       "category": "ProcessingMethod",
       "formula": null,
       "formula_validation": {
@@ -1942,7 +1769,7 @@
       ],
       "context_snippets": [
         {
-          "text": "The con- volutional block consisted of (1) a convolutional layer, convolving F numbers of \ufb01lters (of dimension 9 \u00d7 1 or 1 \u00d7 1 ) with the input; (2) a batch normalization layer (re-centering and re-scaling the input); (3) a recti\ufb01ed linear activation unit (ReLU; a simple non-linear transformation); and",
+          "text": "The con- volutional block consisted of (1) a convolutional layer, convolving F numbers of ﬁlters (of dimension 9 × 1 or 1 × 1 ) with the input; (2) a batch normalization layer (re-centering and re-scaling the input); (3) a rectiﬁed linear activation unit (ReLU; a simple non-linear transformation); and",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 2
         }
@@ -1970,7 +1797,7 @@
     },
     {
       "term": "ACN",
-      "definition": "A chemical solvent (ACN, HPLC grade) used in experimental chromatograms.",
+      "definition": "Acetonitrile, a common organic solvent used in chromatography.",
       "category": "ChemicalEntity",
       "formula": "CH3CN",
       "formula_validation": {
@@ -1978,7 +1805,7 @@
         "canonical": "H3 C2 N1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -1995,17 +1822,17 @@
       ],
       "context_snippets": [
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)\u201375/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)–75/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 6
         },
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)\u201340/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)–40/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 8
         },
         {
-          "text": "All analytes had a concentration of 5 \u03bcg/mL and were dissolved in 50/50 (v:v) ACN/water.",
+          "text": "All analytes had a concentration of 5 μg/mL and were dissolved in 50/50 (v:v) ACN/water.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 4
         },
@@ -2046,7 +1873,7 @@
         "canonical": "H2 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2061,17 +1888,17 @@
       ],
       "context_snippets": [
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)\u201375/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)–75/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 6
         },
         {
-          "text": "Water was produced in the lab using a Milli-Q gradient puri\ufb01cation system (Millipore, Bedford, MA, USA).",
+          "text": "Water was produced in the lab using a Milli-Q gradient puriﬁcation system (Millipore, Bedford, MA, USA).",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 4
         },
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)\u201340/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)–40/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 8
         }
@@ -2107,7 +1934,7 @@
         "canonical": "H5 C6 Cl1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2146,7 +1973,7 @@
     },
     {
       "term": "Savitzky-Golay (SG) filter",
-      "definition": "A digital filter used to smooth data and calculate derivatives by fitting successive sub-sets of adjacent data points with a low-degree polynomial.",
+      "definition": "Savitzky-Golay method, a digital filter used for smoothing data and calculating derivatives in peak detection.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -2155,14 +1982,10 @@
       "relations": [],
       "pages": [
         7,
-        8,
-        3,
-        6
+        8
       ],
       "source_papers": [
         "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
-        "SCIPY_DOCS.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -2172,19 +1995,9 @@
           "page": 7
         },
         {
-          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)\u201340/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
+          "text": "Peak detection performed on a real chromatogram (Mixture 2; mobile phase (isocratic)–40/60 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 8
-        },
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        },
-        {
-          "text": "Peak detection performed on a real chromatogram (Mixture 1; mobile phase (isocratic)\u201375/25 (v:v) ACN/water; 210 nm) by the CNN model and the SG method.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 6
         }
       ],
       "publication_year": 2021,
@@ -2206,7 +2019,7 @@
         "\"Method development\""
       ],
       "properties": [],
-      "importance": "high"
+      "importance": "low"
     },
     {
       "term": "local minima searches",
@@ -2225,7 +2038,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Evaluation on experimental chromatograms To evaluate the performance of the CNN, it was compared to a peak detection methodology which used the well-established Savitzky-Golay (SG) \ufb01lter to obtain second order derivatives in combination with local minima searches on the computed deriva- tives (from here on referred to as SG method",
+          "text": "Evaluation on experimental chromatograms To evaluate the performance of the CNN, it was compared to a peak detection methodology which used the well-established Savitzky-Golay (SG) ﬁlter to obtain second order derivatives in combination with local minima searches on the computed deriva- tives (from here on referred to as SG method",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 7
         }
@@ -2325,7 +2138,7 @@
           "page": 8
         },
         {
-          "text": "To simulate noise, a random variable \u0006 SNR was sampled from a random log-uniform distribution U log \u223c(3 , 300) .",
+          "text": "To simulate noise, a random variable \u0006 SNR was sampled from a random log-uniform distribution U log ∼(3 , 300) .",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         }
@@ -2352,7 +2165,7 @@
       "importance": "medium"
     },
     {
-      "term": "In\ufb01nity 1290 series UH-PLC",
+      "term": "Inﬁnity 1290 series UH-PLC",
       "definition": "An ultra-high performance liquid chromatography system used for recording chromatograms.",
       "category": "Device",
       "formula": null,
@@ -2368,7 +2181,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 2. The architecture of the CNN. The CNN inputs a raw chromatogram of 8192 (x 1) data points, and forward propagates it through the convolutional blocks to output a 256 \u00d7 3 array with",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 2. The architecture of the CNN. The CNN inputs a raw chromatogram of 8192 (x 1) data points, and forward propagates it through the convolutional blocks to output a 256 × 3 array with",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 4
         }
@@ -2404,7 +2217,7 @@
         "canonical": "H8 C8 O3",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2458,7 +2271,7 @@
         "canonical": "H10 C9 O3",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2483,7 +2296,7 @@
           "page": 3
         },
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 \u03bcg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 μg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         }
@@ -2519,7 +2332,7 @@
         "canonical": "H8 C7 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2572,7 +2385,7 @@
     },
     {
       "term": "2-naphthol",
-      "definition": "A polycyclic aromatic hydrocarbon derivative used as an analyte.",
+      "definition": "A chemical compound used in experimental chromatograms.",
       "category": "ChemicalEntity",
       "formula": "C10H8O",
       "formula_validation": {
@@ -2580,7 +2393,7 @@
         "canonical": "H8 C10 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2633,7 +2446,7 @@
     },
     {
       "term": "eugenol",
-      "definition": "An aromatic compound found in clove oil used as an analyte.",
+      "definition": "A chemical compound used in experimental chromatograms.",
       "category": "ChemicalEntity",
       "formula": "C10H12O2",
       "formula_validation": {
@@ -2641,7 +2454,7 @@
         "canonical": "H12 C10 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2702,7 +2515,7 @@
         "canonical": "H10 C9 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2717,7 +2530,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 2. The architecture of the CNN. The CNN inputs a raw chromatogram of 8192 (x 1) data points, and forward propagates it through the convolutional blocks to output a 256 \u00d7 3 array with",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 2. The architecture of the CNN. The CNN inputs a raw chromatogram of 8192 (x 1) data points, and forward propagates it through the convolutional blocks to output a 256 × 3 array with",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 4
         },
@@ -2763,7 +2576,7 @@
         "canonical": "H10 C9 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2824,7 +2637,7 @@
         "canonical": "H10 C9 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2885,7 +2698,7 @@
         "canonical": "H10 C13 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2939,7 +2752,7 @@
         "canonical": "H5 C6 Br1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -2993,7 +2806,7 @@
         "canonical": "H8 C10",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3047,7 +2860,7 @@
         "canonical": "H5 C6 I1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3065,7 +2878,7 @@
           "page": 4
         },
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         }
@@ -3101,7 +2914,7 @@
         "canonical": "H10 C8",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3155,7 +2968,7 @@
         "canonical": "H10 C8",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3209,7 +3022,7 @@
         "canonical": "H10 C8",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3255,7 +3068,7 @@
     },
     {
       "term": "Stable Bond C18 column",
-      "definition": "A reversed-phase chromatography column used for separation.",
+      "definition": "A chromatographic column used for separation of analytes.",
       "category": "Material",
       "formula": null,
       "formula_validation": {
@@ -3272,12 +3085,12 @@
       ],
       "context_snippets": [
         {
-          "text": "Mixture 1 was analyzed on a Stable Bond C18 column (4.6 \u00d7 250 mm, 5 \u03bcm) from Agilent Technologies at a \ufb02ow rate of 1.50 mL/min and using an injection volume of 0.5 \u03bcL.",
+          "text": "Mixture 1 was analyzed on a Stable Bond C18 column (4.6 × 250 mm, 5 μm) from Agilent Technologies at a ﬂow rate of 1.50 mL/min and using an injection volume of 0.5 μL.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 4
         },
         {
-          "text": "Mix- ture 5 was analyzed on a Stable Bond C18 column (4.6 \u00d7 250 mm, 5 \u03bcm) from Agilent Technologies at a \ufb02ow rate of 1.00 mL/min and using an injection volume of 1.0 \u03bcL in gradient mode.",
+          "text": "Mix- ture 5 was analyzed on a Stable Bond C18 column (4.6 × 250 mm, 5 μm) from Agilent Technologies at a ﬂow rate of 1.00 mL/min and using an injection volume of 1.0 μL in gradient mode.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         }
@@ -3305,7 +3118,7 @@
     },
     {
       "term": "Zorbax Extend-C18 column",
-      "definition": "A reversed-phase chromatography column used for separation.",
+      "definition": "A chromatographic column used for separation of analytes.",
       "category": "Material",
       "formula": null,
       "formula_validation": {
@@ -3322,12 +3135,12 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 2. The architecture of the CNN. The CNN inputs a raw chromatogram of 8192 (x 1) data points, and forward propagates it through the convolutional blocks to output a 256 \u00d7 3 array with",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 2. The architecture of the CNN. The CNN inputs a raw chromatogram of 8192 (x 1) data points, and forward propagates it through the convolutional blocks to output a 256 × 3 array with",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 4
         },
         {
-          "text": "Mixture 4 was analyzed on a Zorbax Extend-C18 column (2.1 \u00d7 50 mm, 1.8 \u03bcm) from Agilent Technologies at a \ufb02ow rate of 0.50 mL/min and using an injection volume of 1.0 \u03bcL.",
+          "text": "Mixture 4 was analyzed on a Zorbax Extend-C18 column (2.1 × 50 mm, 1.8 μm) from Agilent Technologies at a ﬂow rate of 0.50 mL/min and using an injection volume of 1.0 μL.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         }
@@ -3355,7 +3168,7 @@
     },
     {
       "term": "isocratic elution",
-      "definition": "A chromatographic technique where the mobile phase composition remains constant.",
+      "definition": "A chromatographic process where the mobile phase composition remains constant.",
       "category": "ProcessingMethod",
       "formula": null,
       "formula_validation": {
@@ -3420,7 +3233,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Brenna, Curve \ufb01tting for restoration of accuracy for overlap- ping peaks in gas chromatography/combustion isotope ratio mass spectrome- try, Anal.",
+          "text": "Brenna, Curve ﬁtting for restoration of accuracy for overlap- ping peaks in gas chromatography/combustion isotope ratio mass spectrome- try, Anal.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 10
         }
@@ -3463,7 +3276,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Emili, Statistical and computational methods for comparative proteomic pro\ufb01ling using liquid chromatography-tandem mass spectrometry, Mol.",
+          "text": "Emili, Statistical and computational methods for comparative proteomic proﬁling using liquid chromatography-tandem mass spectrometry, Mol.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 10
         }
@@ -3534,7 +3347,7 @@
     },
     {
       "term": "peak width",
-      "definition": "The width of a scattering peak, typically measured at half-maximum (FWHM), relating to crystallite size or correlation length.",
+      "definition": "The width of a chromatographic peak, often used to assess efficiency or distinguish overlapping peaks.",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
@@ -3542,23 +3355,16 @@
       },
       "relations": [],
       "pages": [
-        9,
-        3
+        9
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
-        "SCIPY_DOCS.pdf"
+        "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
         {
           "text": "It seems that the differences in width between the unresolved peaks and the neigh- boring peaks made it possible for the CNN model to distinguish them (note that peaks that are in the vicinity of each other have similar peak widths).",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 9
-        },
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
         }
       ],
       "publication_year": 2021,
@@ -3580,7 +3386,7 @@
         "\"Method development\""
       ],
       "properties": [],
-      "importance": "high"
+      "importance": "low"
     },
     {
       "term": "indole",
@@ -3592,7 +3398,7 @@
         "canonical": "H7 C8 N1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3646,7 +3452,7 @@
         "canonical": "H9 C10 N1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3759,7 +3565,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         },
@@ -3800,7 +3606,7 @@
         "canonical": "H10 C9 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -3904,7 +3710,7 @@
         "canonical": "H8 C8 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4008,7 +3814,7 @@
         "canonical": "H12 C10 O3",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4069,7 +3875,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         }
@@ -4155,7 +3961,7 @@
         "canonical": "H8 C10 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4201,7 +4007,7 @@
     },
     {
       "term": "ACN/water",
-      "definition": "A mixture of acetonitrile and water used as a solvent/mobile phase.",
+      "definition": "A mixture of acetonitrile and water used as a mobile phase",
       "category": "ChemicalEntity",
       "formula": null,
       "formula_validation": {
@@ -4216,7 +4022,7 @@
       ],
       "context_snippets": [
         {
-          "text": "All analytes had a concentration of 20 \u03bcg/mL and were dissolved in 30/70 (v:v) ACN/water.",
+          "text": "All analytes had a concentration of 20 μg/mL and were dissolved in 30/70 (v:v) ACN/water.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         }
@@ -4295,7 +4101,7 @@
         "canonical": "H7 C6 N1 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4349,7 +4155,7 @@
         "canonical": "H8 C6 N2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4403,7 +4209,7 @@
         "canonical": "H8 C7 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4457,7 +4263,7 @@
         "canonical": "H11 C8 N1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4511,7 +4317,7 @@
         "canonical": "H7 C7 N1 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4524,7 +4330,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 \u03bcg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 μg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         },
@@ -4565,7 +4371,7 @@
         "canonical": "H7 C7 N1 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4578,7 +4384,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 \u03bcg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 μg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         },
@@ -4662,7 +4468,7 @@
         "canonical": "H9 C8 N1 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4766,7 +4572,7 @@
         "canonical": "H8 C7 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4870,7 +4676,7 @@
         "canonical": "H8 C10 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -4933,7 +4739,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         },
@@ -4974,7 +4780,7 @@
         "canonical": "H6 C8 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5078,7 +4884,7 @@
         "canonical": "H11 C9 N1 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5182,7 +4988,7 @@
         "canonical": "H12 C12 N2 O3",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5293,7 +5099,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         }
@@ -5329,7 +5135,7 @@
         "canonical": "H8 C7 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5347,7 +5153,7 @@
           "page": 5
         },
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         }
@@ -5433,7 +5239,7 @@
         "canonical": "H18 C14 N2 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5537,7 +5343,7 @@
         "canonical": "H11 C8 N1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5684,7 +5490,7 @@
         "canonical": "H5 C6 N1 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5730,7 +5536,7 @@
     },
     {
       "term": "theophylline",
-      "definition": "A chemical compound used in experimental chromatograms.",
+      "definition": "A xanthine derivative",
       "category": "ChemicalEntity",
       "formula": "C7H8N4O2",
       "formula_validation": {
@@ -5738,15 +5544,13 @@
         "canonical": "H8 C7 N4 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
-        5,
-        3
+        5
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -5754,11 +5558,6 @@
           "text": "Mixture 5 consisted of 43 analytes (in order of elution): theophylline, paracetamol, caffeine, resorcinol, furfuryl alco- hol, 2-hydroxybenzyl alcohol, 2-methylresorcin, m-aminophenol, salicylamide, 4-methoxyacetanilide, 2-hydroxyacetophenone, 7- hydroxycoumarine, acetanilide, benzyl alcohol, methylnicotinate, 4-methoxyphenol, 2-aminophenol, 2,7-dihydroxynaphthalene, 1,2-phenylenediamine, phenobarbital, phenol, phthalide, 4- hydroxypropiophenone, N-methylphenylacetamide, 3-nitrophenol, m-cresol, o-cresol, ethylparaben, acetophenone, 2-nitrophenol, 2,6-dimethylaniline, 2-naphthol, propylparaben, indole,",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
-        },
-        {
-          "text": "Chemicals The compounds 2-hydroxyacetophenone, 2-naphthol, 2- nitrophenol, anisole, benzyl alcohol, bromobenzene, butyl- paraben, caffeine, ethylbenzene, ethylparaben, eugenol, iodoben- zene, isopropyl benzoate, m-cresol, m-methylacetophenone, o-methylacetophenone, p-methylacetophenone, propiophe- none, propylparaben and valerophenone were obtained from Sigma-Aldrich (Diegem, Belgium); 2,3-dihydroxynaphthalene, 2,6-dimethylaniline, 2-hydroxybenzyl alcohol, 3-nitrophenol, 4-hydroxypropiophenone, benzhydrol, indole, methylparaben, N,N- dimethylaniline, naphthalene, N-methylaniline, phenol,",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 3
         }
       ],
       "publication_year": 2021,
@@ -5792,7 +5591,7 @@
         "canonical": "H9 C8 N1 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5846,7 +5645,7 @@
         "canonical": "H6 C5 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5859,7 +5658,7 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 \u03bcg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 μg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         },
@@ -5892,7 +5691,7 @@
     },
     {
       "term": "4-methoxyacetanilide",
-      "definition": "A chemical compound used in experimental chromatograms.",
+      "definition": "A methoxy-substituted acetanilide",
       "category": "ChemicalEntity",
       "formula": "C9H11NO2",
       "formula_validation": {
@@ -5900,15 +5699,13 @@
         "canonical": "H11 C9 N1 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
-        5,
-        3
+        5
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -5916,11 +5713,6 @@
           "text": "Mixture 5 consisted of 43 analytes (in order of elution): theophylline, paracetamol, caffeine, resorcinol, furfuryl alco- hol, 2-hydroxybenzyl alcohol, 2-methylresorcin, m-aminophenol, salicylamide, 4-methoxyacetanilide, 2-hydroxyacetophenone, 7- hydroxycoumarine, acetanilide, benzyl alcohol, methylnicotinate, 4-methoxyphenol, 2-aminophenol, 2,7-dihydroxynaphthalene, 1,2-phenylenediamine, phenobarbital, phenol, phthalide, 4- hydroxypropiophenone, N-methylphenylacetamide, 3-nitrophenol, m-cresol, o-cresol, ethylparaben, acetophenone, 2-nitrophenol, 2,6-dimethylaniline, 2-naphthol, propylparaben, indole,",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
-        },
-        {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 3
         }
       ],
       "publication_year": 2021,
@@ -5954,7 +5746,7 @@
         "canonical": "H6 C9 O3",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -5967,12 +5759,12 @@
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 \u03bcg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 indole, 1-naphthylamine, 2-naphthol, p-methylacetophenone, o- methylacetophenone, methyl benzoate, propylparaben, anisole, propiophenone, 1-naphthol and eugenol. All analytes had a concentration of 20 μg/mL and were dissolved in 30/70 (v:v) ACN/water. Mixture 3 was analyzed on a",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 5
         },
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signi\ufb01cantly wider compared to the actual segments); second, peak probability (p), relative",
+          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 Fig. 1. Labeling of a chromatogram. First, a given chromatogram is divided into 256 segments (note that the segments in the illustration are signiﬁcantly wider compared to the actual segments); second, peak probability (p), relative",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
         }
@@ -6008,7 +5800,7 @@
         "canonical": "H7 C6 N1 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -6062,7 +5854,7 @@
         "canonical": "H8 C8 O1",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -6151,7 +5943,7 @@
     },
     {
       "term": "gradient mode",
-      "definition": "A mode of chromatography where the composition of the mobile phase is changed over time to improve separation.",
+      "definition": "A chromatographic method where the mobile phase composition changes over time",
       "category": "ProcessingMethod",
       "formula": null,
       "formula_validation": {
@@ -6159,16 +5951,16 @@
       },
       "relations": [],
       "pages": [
-        9
+        5
       ],
       "source_papers": [
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
         {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 though in c a false positive was also observed). It seems that the differences in width between the unresolved peaks and the neigh- boring peaks made it possible for the CNN model to distinguish them",
+          "text": "Mix- ture 5 was analyzed on a Stable Bond C18 column (4.6 × 250 mm, 5 μm) from Agilent Technologies at a ﬂow rate of 1.00 mL/min and using an injection volume of 1.0 μL in gradient mode.",
           "source_paper": "XRAY_MISC1.pdf",
-          "page": 9
+          "page": 5
         }
       ],
       "publication_year": 2021,
@@ -6323,7 +6115,7 @@
     },
     {
       "term": "chromatogram",
-      "definition": "A visual record of the detection of compounds as they elute from a chromatographic column.",
+      "definition": "A visual representation of the separation of chemical components over time.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -6331,15 +6123,9 @@
       },
       "relations": [],
       "pages": [
-        3,
-        2,
-        6,
-        7
+        3
       ],
       "source_papers": [
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
-        "XRAY_MISC1.pdf",
         "XRAY_MISC1.pdf"
       ],
       "context_snippets": [
@@ -6347,21 +6133,6 @@
           "text": "Labeling of a chromatogram.",
           "source_paper": "XRAY_MISC1.pdf",
           "page": 3
-        },
-        {
-          "text": "For instance, Risum and Boro [9] employed a convolutional neural net- work (CNN) to classify PARAFAC2 (Parallel factor analysis 2) re- solved intervals of chromatograms extracted from GC\u2013MS data into four potential classes: peaks, baselines, shoulder peaks or other.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 2
-        },
-        {
-          "text": "Predicted peaks on a simulated chromatogram.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 6
-        },
-        {
-          "text": "Journal of Chromatography A 1672 (2022) 463005 Table 1 Summary of the peak detection results obtained on the experimental chromatograms.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 7
         }
       ],
       "publication_year": 2021,
@@ -6383,7 +6154,7 @@
         "\"Method development\""
       ],
       "properties": [],
-      "importance": "medium"
+      "importance": "low"
     },
     {
       "term": "Te nanoparticles",
@@ -6432,18 +6203,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "n-Te",
-      "definition": "Tellurium nanoparticles (implied by the context of shape classification and chemical symbol Te).",
+      "definition": "Tellurium nanoparticles used in the experimental data for shape classification.",
       "category": "ChemicalEntity",
       "formula": null,
       "formula_validation": {
@@ -6475,30 +6241,19 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "average thickness",
-      "definition": "The mean thickness of the nanoparticles, measured as 2.7 nm for the Te nanoparticles.",
+      "definition": "The mean thickness of the nanoparticles, a structural property.",
       "category": "MaterialProperty",
       "formula": null,
       "formula_validation": {
         "status": "missing"
       },
-      "relations": [
-        {
-          "relation": "PropertyMeasuredBy",
-          "related_term": "GISAXS",
-          "verified": false
-        }
-      ],
+      "relations": [],
       "pages": [
         4
       ],
@@ -6507,7 +6262,7 @@
       ],
       "context_snippets": [
         {
-          "text": "may be valuable for the analysis of GISAXS. Further analysis should be required to study the in\ufb02uence of the angle of incidence, volume fraction, in-plane orientation, etc. on the successful classi\ufb01cation of the nanoparticle shape. 4. Conclusion We constructed a simple CNN structure to classify GISAXS patterns. The network was",
+          "text": "may be valuable for the analysis of GISAXS. Further analysis should be required to study the inﬂuence of the angle of incidence, volume fraction, in-plane orientation, etc. on the successful classiﬁcation of the nanoparticle shape. 4. Conclusion We constructed a simple CNN structure to classify GISAXS patterns. The network was",
           "source_paper": "XRAY2.pdf",
           "page": 4
         }
@@ -6524,12 +6279,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6567,12 +6317,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6593,7 +6338,7 @@
       ],
       "context_snippets": [
         {
-          "text": "Introduction Grazing-incidence small-angle X-ray scattering (GISAXS) is a valuable tool for characterizing the nanostructure of materials, particularly at surfaces and interfaces (Hexemer & Mu\u00a8ller- Buschbaum, 2015; Rauscher et al., 1995, 2005; Renaud et al., 2003, 2009).",
+          "text": "Introduction Grazing-incidence small-angle X-ray scattering (GISAXS) is a valuable tool for characterizing the nanostructure of materials, particularly at surfaces and interfaces (Hexemer & Mu¨ller- Buschbaum, 2015; Rauscher et al., 1995, 2005; Renaud et al., 2003, 2009).",
           "source_paper": "XRAY2.pdf",
           "page": 1
         }
@@ -6615,12 +6360,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6641,7 +6381,7 @@
       ],
       "context_snippets": [
         {
-          "text": "The classi- \ufb01cation of GISAXS patterns in relation to the shape and morphology of nanodots is the essential point in GISAXS analysis.",
+          "text": "The classi- ﬁcation of GISAXS patterns in relation to the shape and morphology of nanodots is the essential point in GISAXS analysis.",
           "source_paper": "XRAY2.pdf",
           "page": 1
         }
@@ -6663,18 +6403,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "X-ray absorption near-edge structure",
-      "definition": "An X-ray spectroscopy technique that provides information on the local structure and oxidation state of a specific element.",
+      "definition": "An X-ray spectroscopy technique used to analyze the local electronic and geometric structure of materials.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -6711,18 +6446,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "Si substrate",
-      "definition": "Silicon wafer used as the base material for the deposition of tellurium nanoparticles.",
+      "definition": "Silicon substrate used as the base for the deposition of tellurium nanoparticles.",
       "category": "Material",
       "formula": null,
       "formula_validation": {
@@ -6737,7 +6467,7 @@
       ],
       "context_snippets": [
         {
-          "text": "We simulated the GISAXS patterns of tellurium nano- particles on a Si substrate [the real part of the refraction index (\u0002) is 7.6733 \u0002 10\u00036 for the X-ray wavelength of 1.5 A\u02da ] with an incident angle of 0.2\u0004.",
+          "text": "We simulated the GISAXS patterns of tellurium nano- particles on a Si substrate [the real part of the refraction index (\u0002) is 7.6733 \u0002 10\u00036 for the X-ray wavelength of 1.5 A˚ ] with an incident angle of 0.2\u0004.",
           "source_paper": "XRAY2.pdf",
           "page": 2
         }
@@ -6754,18 +6484,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "deposition",
-      "definition": "The process of applying a thin layer of material (tellurium) onto a substrate (silicon).",
+      "definition": "A processing method used to create tellurium nanoparticles on a Si(100) substrate.",
       "category": "ProcessingMethod",
       "formula": null,
       "formula_validation": {
@@ -6797,12 +6522,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6823,7 +6543,7 @@
       ],
       "context_snippets": [
         {
-          "text": "CNNs have particular advantages for the classi\ufb01cation of images, and are trained with a lot of data. Therefore, they may be excellent for the classi\ufb01cation of GISAXS patterns. A CNN system was applied to classify the orientation of nanoparticles in thin \ufb01lms (Liu et al., 2019). In this paper we",
+          "text": "CNNs have particular advantages for the classiﬁcation of images, and are trained with a lot of data. Therefore, they may be excellent for the classiﬁcation of GISAXS patterns. A CNN system was applied to classify the orientation of nanoparticles in thin ﬁlms (Liu et al., 2019). In this paper we",
           "source_paper": "XRAY2.pdf",
           "page": 2
         }
@@ -6840,12 +6560,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6866,7 +6581,7 @@
       ],
       "context_snippets": [
         {
-          "text": "We simulated the GISAXS patterns of tellurium nano- particles on a Si substrate [the real part of the refraction index (\u0002) is 7.6733 \u0002 10\u00036 for the X-ray wavelength of 1.5 A\u02da ] with an incident angle of 0.2\u0004.",
+          "text": "We simulated the GISAXS patterns of tellurium nano- particles on a Si substrate [the real part of the refraction index (\u0002) is 7.6733 \u0002 10\u00036 for the X-ray wavelength of 1.5 A˚ ] with an incident angle of 0.2\u0004.",
           "source_paper": "XRAY2.pdf",
           "page": 2
         }
@@ -6883,12 +6598,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6922,7 +6632,7 @@
           "page": 2
         },
         {
-          "text": "nature materials Volume 24 | March 2025 | 336\u2013337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency.",
+          "text": "nature materials Volume 24 | March 2025 | 336–337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency.",
           "source_paper": "XRAY3.pdf",
           "page": 1
         }
@@ -6939,12 +6649,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -6967,7 +6672,7 @@
       ],
       "context_snippets": [
         {
-          "text": "nature materials Volume 24 | March 2025 | 336\u2013337 | 337 News & views Published online: 17 January 2025 References 1. Li, Y. et al. Nat. Rev. Mater. 8, 186\u2013201 (2023). 2. Yi, J. et al. Nat. Rev. Mater. 9, 46\u201362 (2024). 3. Wadsworth, A. et al. Adv. Mater. 32,",
+          "text": "nature materials Volume 24 | March 2025 | 336–337 | 337 News & views Published online: 17 January 2025 References 1. Li, Y. et al. Nat. Rev. Mater. 8, 186–201 (2023). 2. Yi, J. et al. Nat. Rev. Mater. 9, 46–62 (2024). 3. Wadsworth, A. et al. Adv. Mater. 32,",
           "source_paper": "XRAY3.pdf",
           "page": 2
         },
@@ -6989,12 +6694,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7032,18 +6732,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "donor materials",
-      "definition": "Electron-donating materials used in organic photovoltaic cells.",
+      "definition": "Electron-donating materials used in organic solar cells.",
       "category": "Material",
       "formula": null,
       "formula_validation": {
@@ -7058,7 +6753,7 @@
       ],
       "context_snippets": [
         {
-          "text": "nature materials Volume 24 | March 2025 | 336\u2013337 | 337 News & views Published online: 17 January 2025 References 1. Li, Y. et al. Nat. Rev. Mater. 8, 186\u2013201 (2023). 2. Yi, J. et al. Nat. Rev. Mater. 9, 46\u201362 (2024). 3. Wadsworth, A. et al. Adv. Mater. 32,",
+          "text": "nature materials Volume 24 | March 2025 | 336–337 | 337 News & views Published online: 17 January 2025 References 1. Li, Y. et al. Nat. Rev. Mater. 8, 186–201 (2023). 2. Yi, J. et al. Nat. Rev. Mater. 9, 46–62 (2024). 3. Wadsworth, A. et al. Adv. Mater. 32,",
           "source_paper": "XRAY3.pdf",
           "page": 2
         }
@@ -7075,18 +6770,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "acceptor materials",
-      "definition": "Electron-accepting materials used in organic photovoltaic cells.",
+      "definition": "Electron-accepting materials used in organic solar cells.",
       "category": "Material",
       "formula": null,
       "formula_validation": {
@@ -7118,12 +6808,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7161,12 +6846,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7204,12 +6884,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7247,12 +6922,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7290,12 +6960,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7333,12 +6998,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7376,12 +7036,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7419,18 +7074,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "energy dispersive spectroscopy mapping",
-      "definition": "Technique used for elemental analysis and mapping of a sample.",
+      "definition": "A technique used for elemental analysis or chemical imaging.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -7462,18 +7112,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "time-of-flight secondary ion mass spectrometry",
-      "definition": "Analytical technique used for high-resolution chemical mapping of surfaces and thin films.",
+      "definition": "A surface analysis technique used for ion spatial mapping.",
       "category": "ExperimentalTechnique",
       "formula": null,
       "formula_validation": {
@@ -7488,7 +7133,7 @@
       ],
       "context_snippets": [
         {
-          "text": "nature materials Volume 24 | March 2025 | 336\u2013337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency. Organic photovoltaics",
+          "text": "nature materials Volume 24 | March 2025 | 336–337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency. Organic photovoltaics",
           "source_paper": "XRAY3.pdf",
           "page": 1
         }
@@ -7505,18 +7150,13 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
     {
       "term": "blade-coating",
-      "definition": "A solution-processing method for depositing thin films over large areas.",
+      "definition": "A solution-processing method for depositing thin films.",
       "category": "ProcessingMethod",
       "formula": null,
       "formula_validation": {
@@ -7548,12 +7188,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7591,12 +7226,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7617,7 +7247,7 @@
       ],
       "context_snippets": [
         {
-          "text": "nature materials Volume 24 | March 2025 | 336\u2013337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency. Organic photovoltaics",
+          "text": "nature materials Volume 24 | March 2025 | 336–337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency. Organic photovoltaics",
           "source_paper": "XRAY3.pdf",
           "page": 1
         }
@@ -7634,12 +7264,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7678,7 +7303,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7687,12 +7312,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7724,7 +7344,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7733,12 +7353,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7770,7 +7385,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7779,12 +7394,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7816,7 +7426,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7825,12 +7435,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7869,7 +7474,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7878,12 +7483,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7897,7 +7497,7 @@
         "canonical": "La1 B6",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -7919,7 +7519,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7928,12 +7528,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7965,7 +7560,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -7974,12 +7569,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -7993,7 +7583,7 @@
         "canonical": "Ce1 O2",
         "mp_hits": -1,
         "status": "corrected",
-        "error": "mp\u2011error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
+        "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "relations": [],
       "pages": [
@@ -8015,7 +7605,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8024,12 +7614,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8061,7 +7646,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8070,12 +7655,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8107,7 +7687,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8116,12 +7696,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8153,7 +7728,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8162,12 +7737,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8199,7 +7769,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8208,12 +7778,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8227,13 +7792,9 @@
       },
       "relations": [],
       "pages": [
-        4,
-        5,
-        6
+        4
       ],
       "source_papers": [
-        "PYFAI_DOCS.pdf",
-        "PYFAI_DOCS.pdf",
         "PYFAI_DOCS.pdf"
       ],
       "context_snippets": [
@@ -8241,16 +7802,6 @@
           "text": "Use case: calibration with Debye-Scherrer rings from calibrants such as LaB6, CeO2, silicon, or silver behenate.",
           "source_paper": "PYFAI_DOCS.pdf",
           "page": 4
-        },
-        {
-          "text": "Geometry refinement from picked peaks Functionality: After calibration peak picking, each group is assigned to a Debye-Scherrer ring number and d-spacing.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 5
-        },
-        {
-          "text": "KG node candidates: AzimuthalIntegrator.integrate1d, AzimuthalIntegrator.sigma_clip_ng, OCL_PeakFinder, peakfinder8, Massif, BlobDetection, Steepest Ascent, Monte Carlo sampling, GeometryRefinement, FiberIntegrator, integrate2d_grazing_incidence, integrate1d_grazing_incidence, sparsify-Bragg, Debye-Scherrer rings, calibrant, .poni geometry file.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 6
         }
       ],
       "publication_year": 2000,
@@ -8259,7 +7810,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8268,14 +7819,9 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
-      "importance": "medium"
+      "importance": "low"
     },
     {
       "term": "d-spacing",
@@ -8326,7 +7872,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8335,12 +7881,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8372,7 +7913,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8381,12 +7922,7 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     },
@@ -8418,7 +7954,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "institutions": [],
       "doi": "arXiv:2111.08645v1",
@@ -8427,1054 +7963,12 @@
       "issue": null,
       "pages_range": null,
       "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "Gaussian model",
-      "definition": "A mathematical model used to fit scattering peaks based on a normal distribution.",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "Lorentzian model",
-      "definition": "A mathematical model used to fit scattering peaks, often associated with lifetime broadening.",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "pseudo-Voigt model",
-      "definition": "A linear combination of Gaussian and Lorentzian profiles used to fit asymmetric or mixed-broadening peaks.",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Fit selected peaks with Gaussian/Lorentzian/pseudo-Voigt model if quantitative parameters are needed.",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "peak prominence",
-      "definition": "A measure of how much a peak stands out relative to the surrounding baseline.",
-      "category": "MaterialProperty",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        3
-      ],
-      "source_papers": [
-        "SCIPY_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "import numpy as np from scipy.signal import find_peaks_cwt def wavelet_peak_candidates(q, intensity, min_width=2, max_width=30): widths = np.arange(min_width, max_width + 1) peak_indices = find_peaks_cwt(intensity, widths) return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices] ``` 5. scipy.signal.argrelextrema / argrelmax / argrelmin Functionality: finds relative extrema using an order window and comparator. argrelmax",
-          "source_paper": "SCIPY_DOCS.pdf",
-          "page": 3
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "PCA",
-      "definition": "Principal Component Analysis, a dimensionality reduction technique used to transform a large set of variables into a smaller one that still contains most of the information.",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        4,
-        5
-      ],
-      "source_papers": [
-        "XRAY1.pdf",
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Confusion matrices for top performing models (PCA of 99%, 40 components).",
-          "source_paper": "XRAY1.pdf",
-          "page": 4
-        },
-        {
-          "text": "Confusion matrices for top performing models (PCA of 95%, 10 components).",
-          "source_paper": "XRAY1.pdf",
-          "page": 5
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "biomacromolecules",
-      "definition": "Large biological molecules such as proteins or nucleic acids.",
-      "category": "Material",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        2
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "He et al., instead turned to the auto- encoder to reconstruct biomacromolecules from bio-SAXS curves [16].",
-          "source_paper": "XRAY1.pdf",
-          "page": 2
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "nanostructure",
-      "definition": "Structures with dimensions in the nanometer range.",
-      "category": "Material",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        2
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "For the general nanostructure analysis, Archibald et al.",
-          "source_paper": "XRAY1.pdf",
-          "page": 2
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "neutron scattering",
-      "definition": "An experimental technique using neutrons to probe the structure and dynamics of materials.",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Ganeva, \u201cDeep learning for X-ray or neutron scattering under grazing-incidence: extraction of distributions,\u201d Materials Research Express, vol.",
-          "source_paper": "XRAY1.pdf",
-          "page": 6
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "X-ray scattering",
-      "definition": "A technique where X-rays are scattered by a sample to determine its structural properties.",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Li, \u201cMachine learning on neutron and x-ray scattering and spectroscopies,\u201d Chemical Physics Reviews, vol.",
-          "source_paper": "XRAY1.pdf",
-          "page": 6
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "grazing-incidence",
-      "definition": "A geometry in scattering experiments where the incident beam is at a very small angle to the sample surface.",
-      "category": "ProcessingMethod",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "XRAY1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Ganeva, \u201cDeep learning for X-ray or neutron scattering under grazing-incidence: extraction of distributions,\u201d Materials Research Express, vol.",
-          "source_paper": "XRAY1.pdf",
-          "page": 6
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "baseline drift",
-      "definition": "A long-term noise component in a chromatographic signal where the baseline shifts over time.",
-      "category": "MaterialProperty",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "However, chro- matograms are noisy, both in terms of short-term noise (e.g., white noise) and long-term noise (e.g., baseline drift) (see Felinger [1] for \u2217Corresponding author.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "white noise",
-      "definition": "Short-term random fluctuations in a signal with a constant power spectral density.",
-      "category": "MaterialProperty",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Journal of Chromatography A 1672 (2022) 463005 Contents lists available at ScienceDirect Journal of Chromatography A journal homepage: www.elsevier.com/locate/chroma Convolutional neural network for automated peak detection in reversed-phase liquid chromatography Alexander Kensert a , b , Emery Bosten a , d , Gilles Collaerts a , b , Kyriakos Efthymiadis",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "gas chromatography/combustion isotope ratio mass spectrometry",
-      "definition": "A technique combining gas chromatography with combustion isotope ratio mass spectrometry for isotopic analysis",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        10
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "A. Kensert, E. Bosten, G. Collaerts et al. Journal of Chromatography A 1672 (2022) 463005 References [1] A. Felinger , Data Analysis and Signal Processing in Chromatography, Data Anal- ysis and Signal Processing in Chromatography, 21, 1st ed., Elsevier Science, 1998 . [2] G. Viv\u00f3-Truyols, J.R. Torres-Lapasi\u00f3, A.M. van Nederkassel,",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 10
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "isocratic mode",
-      "definition": "A mode of chromatography where the composition of the mobile phase remains constant throughout the separation.",
-      "category": "ProcessingMethod",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        9
-      ],
-      "source_papers": [
-        "XRAY_MISC1.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "Finally, the CNN model and the SG method were also tested on a chromatogram obtained in a different mode (gradient instead of isocratic mode) and a chromatogram obtained at a different wave- length (240 nm instead of 210 nm) (see Figs.",
-          "source_paper": "XRAY_MISC1.pdf",
-          "page": 9
-        }
-      ],
-      "publication_year": 2021,
-      "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
-      "authors": [
-        "Alexander Kensert"
-      ],
-      "institutions": [],
-      "doi": "10.1016/j.chroma.2022.463005",
-      "journal": "Journal of Chromatography A 1672 (2022) 463005",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "nanoparticles",
-      "definition": "Particles of matter in the nanometer size range.",
-      "category": "Material",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY2.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "CNN was applied to classify GISAXS patterns, focusing on the shape of the nanoparticles.",
-          "source_paper": "XRAY2.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2020,
-      "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
-      "authors": [
-        "Ikemoto H",
-        "Yamamoto K",
-        "Touyama H",
-        "Yamashita D",
-        "Nakamura M",
-        "Okuda H"
-      ],
-      "institutions": [],
-      "doi": "10.1107/S1600577520005767",
-      "journal": "Science and Engineering, Kyoto University, Japan. *Correspondence e-mail: ikemoto@sci.u",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "fullerene",
-      "definition": "A class of carbon allotropes used as acceptors in early OPVs.",
-      "category": "ChemicalEntity",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "For at least two decades, fullerene-based OPVs have dominated the field, with the 10% power conversion efficiency (PCE) barrier being difficult to overcome due to the poor absorption properties and reduced voltage of these devices.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "non-fullerene acceptors",
-      "definition": "Organic molecules used as electron acceptors in OPVs as an alternative to fullerenes.",
-      "category": "Material",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "A breakthrough was the discovery of non-fullerene acceptors (NFAs) with complementary absorption, with the donor materials, tun- able energetics and similar transport properties of fullerene.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "Y-family",
-      "definition": "A specific family of high-performance non-fullerene acceptors.",
-      "category": "ChemicalEntity",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "NFA-based OPVs, in particular the Y-family, allowed superior PCE and opened up applications, that is, semi-transparent devices, not achievable with fullerene-based OPVs and inorganic counterparts2.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "bulk heterojunction",
-      "definition": "An interpenetrating network of donor and acceptor materials in the photoactive layer.",
-      "category": "Material",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "nature materials Volume 24 | March 2025 | 336\u2013337 | 336 https://doi.org/10.1038/s41563-024-02076-8 News & views Photovoltaics Organic photovoltaics surpass the 20% efficiency milestone Francesco Furlan & Nicola Gasparini Crystallization dynamics manipulation leads to vertically separated donor and acceptor phases in thick films, improving charge mobility and device efficiency. Organic photovoltaics",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "D18-4Cl",
-      "definition": "A variant of the D18 donor polymer.",
-      "category": "ConjugatedPolymer",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "In fact, the ternary D18:4Cl:AT-b2O:N3 blends form a BHJ gradient vertical phase separation consisting of a donor-rich (D18-4Cl) phase close to the substrate, a uniform BHJ region in the middle and an acceptor-rich phase (N3) with enhanced crystallinity near the top of the active layer (Fig.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "electron mobilities",
-      "definition": "The measure of how quickly electrons can move through a semiconductor.",
-      "category": "ElectronicProperty",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "XRAY3.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "When introduced in the ternary blend, AT-b2O promotes higher crystallinity and a longer-range order of N3, with long diffusion lengths approaching 50 nm, facilitat- ing exciton separation and higher electron mobilities in the vertical direction.",
-          "source_paper": "XRAY3.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2025,
-      "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
-      "authors": [
-        "Francesco Furlan"
-      ],
-      "institutions": [],
-      "doi": "10.1038/s41563-024-02076-8",
-      "journal": "nature materials",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "q",
-      "definition": "The scattering vector magnitude",
-      "category": "MaterialProperty",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        1
-      ],
-      "source_papers": [
-        "PYFAI_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "AzimuthalIntegrator.integrate1d: reduce 2D detector images to 1D peak curves Functionality: AzimuthalIntegrator.integrate1d converts an area-detector image into a 1D scattering curve such as intensity versus q or two-theta.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 1
-        }
-      ],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
-      "properties": [],
-      "importance": "low"
-    },
-    {
-      "term": "Bragg images",
-      "definition": "Diffraction patterns resulting from Bragg's law of X-ray diffraction",
-      "category": "ExperimentalTechnique",
-      "formula": null,
-      "formula_validation": {
-        "status": "missing"
-      },
-      "relations": [],
-      "pages": [
-        6
-      ],
-      "source_papers": [
-        "PYFAI_DOCS.pdf"
-      ],
-      "context_snippets": [
-        {
-          "text": "- Spotty 2D Bragg images: OCL_PeakFinder.peakfinder or peakfinder8.",
-          "source_paper": "PYFAI_DOCS.pdf",
-          "page": 6
-        }
-      ],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "R\u00f6nnols J"
-      ],
-      "institutions": [],
-      "doi": "arXiv:2111.08645v1",
-      "journal": "science as a way of examining nanostructures.",
-      "volume": null,
-      "issue": null,
-      "pages_range": null,
-      "abstract_text": null,
-      "keywords": [
-        "\"Machine learning\"",
-        "\"Convolutional neural networks\"",
-        "\"Peak finding\"",
-        "\"Method development\""
-      ],
+      "keywords": [],
       "properties": [],
       "importance": "low"
     }
   ],
-  "code_snippets": [
+  "xray_code_snippets": [
     {
       "scattering_technique": null,
       "peak_positions": [],
@@ -9493,7 +7987,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9516,7 +8010,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9539,7 +8033,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9562,7 +8056,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9585,7 +8079,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9608,7 +8102,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9631,7 +8125,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9654,7 +8148,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9679,7 +8173,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9702,7 +8196,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9725,7 +8219,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2021,
       "journal": "science as a way of examining nanostructures."
@@ -9748,7 +8242,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9771,7 +8265,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9794,7 +8288,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9817,7 +8311,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9840,7 +8334,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9863,7 +8357,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9886,7 +8380,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9909,7 +8403,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."
@@ -9932,7 +8426,7 @@
         "Tomaszewski P",
         "Yu S",
         "Borg M",
-        "R\u00f6nnols J"
+        "Rönnols J"
       ],
       "publication_year": 2000,
       "journal": "science as a way of examining nanostructures."

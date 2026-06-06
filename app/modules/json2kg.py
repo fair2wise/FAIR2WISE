@@ -50,7 +50,7 @@ def ensure_list(val: Any) -> List[Any]:
 
 def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Build a CodeSnippet node from an xray_code_snippets entry.
+    Build a CodeSnippet node from a code_snippets entry.
 
     Node ID includes MD5 hash of code body to prevent collisions.
     """
@@ -95,11 +95,11 @@ def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
 
 def build_graph(
     raw_terms: Iterable[Dict[str, Any]],
-    xray_code_snippets: List[Dict[str, Any]] | None = None,
+    code_snippets: List[Dict[str, Any]] | None = None,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Build a MatKG-compatible graph from raw term records and (optionally)
-    xray_code_snippets produced by the x-ray scattering extraction pass.
+    code_snippets produced by the code snippet extraction pass.
 
     Returns a dict with keys:
       - "things": list of node dicts
@@ -112,7 +112,7 @@ def build_graph(
     # Add CodeSnippet nodes from code snippet extraction
     # Track snippet nodes by (source_paper, page) for wiring to term nodes later
     snippets_by_paper_page: Dict[Tuple[str, int], List[str]] = {}
-    for snip in (xray_code_snippets or []):
+    for snip in (code_snippets or []):
         code_body = (snip.get("code_snippet") or "").strip()
         if not code_body:
             continue
@@ -149,7 +149,7 @@ def build_graph(
         tid = make_id(name)
 
         # Terms mis-categorized as CodeSnippet by the LLM: demote to Unknown.
-        # Real CodeSnippet nodes come exclusively from xray_code_snippets.
+        # Real CodeSnippet nodes come exclusively from code_snippets.
         # Also remap removed XRayScatteringAnalysis → ExperimentalTechnique.
         if term.get("category") == "CodeSnippet":
             term = dict(term)
@@ -276,8 +276,8 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any
         data = json.load(f)
 
     terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-    xray_snippets = data.get("xray_code_snippets", []) if isinstance(data, dict) else []
-    graph = build_graph(terms, xray_code_snippets=xray_snippets)
+    snippets = data.get("code_snippets", data.get("xray_code_snippets", [])) if isinstance(data, dict) else []
+    graph = build_graph(terms, code_snippets=snippets)
 
     output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
     return graph
@@ -313,8 +313,8 @@ def main() -> None:
         with args.input_json.open("r", encoding="utf-8") as f:
             data = json.load(f)
         terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-        xray_snippets = data.get("xray_code_snippets", []) if isinstance(data, dict) else []
-        graph = build_graph(terms, xray_code_snippets=xray_snippets)
+        snippets = data.get("code_snippets", data.get("xray_code_snippets", [])) if isinstance(data, dict) else []
+        graph = build_graph(terms, code_snippets=snippets)
         args.output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         logging.info(
             "Wrote %d nodes (%d snippets) and %d edges → %s",
@@ -374,32 +374,31 @@ def test_build_graph_minimal(tmp_path):
 
 
 def test_code_snippet_node():
-    """CodeSnippet nodes built from xray_code_snippets and wired to term nodes from same paper."""
+    """CodeSnippet nodes built from code_snippets and wired to term nodes from same paper."""
     terms = [{
-        "term": "GIWAXS analysis",
+        "term": "peak detection",
         "category": "ExperimentalTechnique",
-        "definition": "Grazing-incidence wide-angle x-ray scattering",
-        "pages": [3],
-        "source_papers": ["test_paper.pdf"],
+        "definition": "Identification of scattering peaks in 1D intensity profiles",
+        "pages": [1],
+        "source_papers": ["SCIPY_DOCS.pdf"],
     }]
     snips = [{
-        "scattering_technique": "GIWAXS",
-        "peak_positions": ["q = 0.38 A^-1"],
-        "function_name": "find_peaks",
-        "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks\ndef find_peaks_wrapper(intensity):\n    \"\"\"Finds peaks in a 1D intensity profile using scipy.\"\"\"\n    peaks, props = find_peaks(intensity, prominence=0.05 * np.max(intensity))\n    return peaks, props",
+        "scattering_technique": "SAXS/WAXS",
+        "function_name": "find_scattering_peaks",
+        "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef find_scattering_peaks(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    peaks, props = find_peaks(y_smooth, prominence=0.05 * np.max(y_smooth))\n    return peaks, props",
         "code_language": "python",
-        "code_description": "Finds peaks in intensity profile.",
-        "page": 3,
-        "source_paper": "test_paper.pdf",
+        "code_description": "Processes 1D scattering data by smoothing to identify peaks.",
+        "page": 1,
+        "source_paper": "SCIPY_DOCS.pdf",
     }]
-    graph = build_graph(terms, xray_code_snippets=snips)
+    graph = build_graph(terms, code_snippets=snips)
     snippets = [n for n in graph["things"] if n["category"] == "CodeSnippet"]
     assert len(snippets) == 1
     snippet = snippets[0]
 
-    assert "find_peaks" in snippet["code_snippet"]
+    assert "find_scattering_peaks" in snippet["code_snippet"]
     assert snippet["code_language"] == "python"
-    assert snippet["function_name"] == "find_peaks"
+    assert snippet["function_name"] == "find_scattering_peaks"
 
     # edge wired from term node to snippet
     has_code_edges = [e for e in graph["associations"] if e["predicate"] == "rel:has_code_snippet"]

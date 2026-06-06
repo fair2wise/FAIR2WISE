@@ -33,20 +33,28 @@ from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormali
 # ----------------------------------------
 # LLM Client Setup
 # ----------------------------------------
-load_dotenv(override=True)
+load_dotenv()
 
 
 class ChatClient(ABC):
+    """Abstract base class for synchronous LLM chat clients used by term extraction."""
+
     @abstractmethod
-    def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str: ...
+    def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        """Send a prompt and return the LLM response text."""
+        ...
 
 
 class OllamaChatClient(ChatClient):
+    """Synchronous Ollama chat client for local LLM inference."""
+
     def __init__(self, model: str, base_url: str):
+        """Initialize with model name and Ollama base URL."""
         self.model = model
         self.base = base_url.rstrip("/")
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        """Send a prompt to Ollama and return the response text."""
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -65,6 +73,7 @@ class CBorgChatClient(ChatClient):
     Env: CBORG_API_KEY, CBORG_BASE_URL (defaults to https://api.cborg.lbl.gov)
     """
     def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
+        """Initialize with CBORG model, API key, and base URL."""
         self.model = model
         self.client = openai.OpenAI(
             api_key=api_key or os.environ.get("CBORG_API_KEY"),
@@ -72,6 +81,7 @@ class CBorgChatClient(ChatClient):
         )
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        """Send a prompt to CBORG and return the response text."""
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
@@ -89,6 +99,7 @@ def make_chat_client(
     cborg_base: Optional[str] = None,
     cborg_api_key: Optional[str] = None,
 ) -> ChatClient:
+    """Instantiate the appropriate synchronous chat client for the given backend."""
     b = (backend or "ollama").lower()
     if b == "ollama":
         return OllamaChatClient(model=model, base_url=ollama_url)
@@ -103,6 +114,8 @@ def make_chat_client(
 
 
 class _AnsiColorFormatter(logging.Formatter):
+    """Log formatter that adds ANSI colour codes based on log level."""
+
     _COLORS = {
         "DEBUG": "\033[36m",    # cyan
         "INFO": "\033[32m",     # green
@@ -113,6 +126,7 @@ class _AnsiColorFormatter(logging.Formatter):
     _RESET = "\033[0m"
 
     def format(self, record):
+        """Format log record with colour-coded level and message."""
         level = record.levelname
         color = self._COLORS.get(level)
         if color:
@@ -149,8 +163,10 @@ def retry_on_exception(
     Sleeps `delay_seconds * 2^attempt` between attempts.
     """
     def decorator(fn):
+        """Wrap function with retry logic."""
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+            """Execute fn with retry on specified exceptions."""
             last_exc = None
             for attempt in range(retries + 1):
                 try:
@@ -400,8 +416,8 @@ class LLMTermExtractor:
         self.schema_helper = SchemaHelper(schema_path=schema_path)
         self.terms_dict: Dict[str, Dict[str, Any]] = {}
         self._bk_terms: Dict[str, str] = {}  # display_text → key
-        self.xray_code_snippets: List[Dict[str, Any]] = []
-        self._xray_seen: set = set()  # dedup keys for code snippets
+        self.code_snippets: List[Dict[str, Any]] = []
+        self._snippet_seen: set = set()  # dedup keys for code snippets
 
         # If no chat_client provided, use OllamaChatClient by default
         self.chat_client = chat_client or OllamaChatClient(
@@ -439,20 +455,21 @@ class LLMTermExtractor:
                         key = term["term"].strip().lower()
                         self.terms_dict[key] = term
                         self._bk_terms[term["term"]] = key
-                    for snip in prev.get("xray_code_snippets", []):
-                        self.xray_code_snippets.append(snip)
-                        self._xray_seen.add(self._xray_snippet_key(snip))
+                    for snip in prev.get("code_snippets", prev.get("xray_code_snippets", [])):
+                        self.code_snippets.append(snip)
+                        self._snippet_seen.add(self._snippet_key(snip))
                     loaded_meta = prev.get("metadata", {})
                     self.metadata.update(loaded_meta)
                 logger.info(
                     f"Loaded {len(self.terms_dict)} existing terms and "
-                    f"{len(self.xray_code_snippets)} xray code snippets from {self.output_file}"
+                    f"{len(self.code_snippets)} code snippets from {self.output_file}"
                 )
             except Exception as e:
                 logger.warning(f"Could not load previous terms: {e}")
 
     @retry_on_exception((Exception,), retries=2, delay_seconds=2.0)
     def call_llm(self, prompt: str, timeout: int = 240) -> str:
+        """Call the configured chat client with retry logic."""
         return self.chat_client.chat(prompt, temperature=self.temperature, timeout=timeout)
 
     # def call_ollama(self, prompt: str, timeout: int = 240) -> str:
@@ -486,7 +503,7 @@ class LLMTermExtractor:
         return {"terms": []}
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
-    def extract_xray_json_from_text(self, text: str) -> Dict[str, Any]:
+    def extract_json_from_text(self, text: str) -> Dict[str, Any]:
         """
         Extract largest JSON object containing "snippets". Return {"snippets": []} if none.
         """
@@ -504,8 +521,8 @@ class LLMTermExtractor:
         return {"snippets": []}
 
     @staticmethod
-    def _xray_snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
-        """Dedup key for an x-ray code snippet (source_paper, page, code body)."""
+    def _snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
+        """Dedup key for a code snippet (source_paper, page, code body)."""
         return (
             str(snip.get("source_paper", "")),
             str(snip.get("page", "")),
@@ -788,7 +805,7 @@ INSTRUCTIONS:
                 out = {
                     "metadata": self.metadata,
                     "terms": terms_out,
-                    "xray_code_snippets": self.xray_code_snippets,
+                    "code_snippets": self.code_snippets,
                 }
                 with open(self.output_file, "w") as fh:
                     json.dump(out, fh, indent=2)
@@ -796,8 +813,8 @@ INSTRUCTIONS:
             except Exception as e:
                 logger.error(f"Failed to save terms: {e}")
 
-    def _save_xray_snippets_threadsafe(self) -> None:
-        """Acquire lock and write JSON to disk (terms + xray code snippets)."""
+    def _save_snippets_threadsafe(self) -> None:
+        """Acquire lock and write JSON to disk (terms + code snippets)."""
         with self._save_lock:
             try:
                 terms_out = []
@@ -808,43 +825,43 @@ INSTRUCTIONS:
                 out = {
                     "metadata": self.metadata,
                     "terms": terms_out,
-                    "xray_code_snippets": self.xray_code_snippets,
+                    "code_snippets": self.code_snippets,
                 }
                 with open(self.output_file, "w") as fh:
                     json.dump(out, fh, indent=2)
                 logger.debug(
-                    f"Saved {len(self.xray_code_snippets)} xray code snippets to {self.output_file}"
+                    f"Saved {len(self.code_snippets)} code snippets to {self.output_file}"
                 )
             except Exception as e:
-                logger.error(f"Failed to save xray code snippets: {e}")
+                logger.error(f"Failed to save code snippets: {e}")
 
-    def _prepare_xray_code_prompt(self, page_text: str) -> str:
+    def _prepare_code_snippet_prompt(self, page_text: str) -> str:
         """
-        Prompt for scattering CONTEXT only (technique, peaks, d-spacing).
+        Prompt for scientific CONTEXT around code snippets.
         Code bodies are extracted by regex — not by LLM.
-        Returns JSON with "snippets" keyed by function_name → scattering metadata.
+        Returns JSON with "snippets" keyed by function_name → domain metadata.
         """
         max_len = 6000
         text = page_text[-max_len:] if len(page_text) > max_len else page_text
 
-        return f"""=== SCATTERING CONTEXT EXTRACTION ===
-This page may contain x-ray scattering analysis (SAXS, WAXS, GIWAXS, GISAXS).
-Extract scattering metadata for any code functions mentioned or used on this page.
+        return f"""=== CODE SNIPPET CONTEXT EXTRACTION ===
+This page may contain scientific analysis code (e.g. scattering, spectroscopy, simulation).
+Extract domain metadata for any code functions mentioned or used on this page.
 Do NOT extract code bodies — only the surrounding scientific context.
 
 CONTENT:
 {text}
 
 For each function name or code block referenced on this page, extract:
-- "function_name": the Python/MATLAB function name (e.g. "find_scattering_peaks"), or null
-- "scattering_technique": one of SAXS, WAXS, GIWAXS, GISAXS, or null
-- "peak_positions": list of observed peak positions (e.g. ["q = 0.38 A^-1"]) or []
-- "d_spacing": list of d-spacing values (e.g. ["d = 16.5 A"]) or []
-- "peak_assignments": list of crystallographic assignments (e.g. ["(100) lamellar"]) or []
-- "authors": authors of the library/code (e.g. ["Virtanen P"]) or []
+- "function_name": the Python/MATLAB function name, or null
+- "scattering_technique": one of SAXS, WAXS, GIWAXS, GISAXS, or null if not scattering-related
+- "peak_positions": list of observed peak positions mentioned on the page, or []
+- "d_spacing": list of d-spacing values mentioned on the page, or []
+- "peak_assignments": list of crystallographic assignments mentioned on the page, or []
+- "authors": authors of the library/code, or []
 - "code_description": one-sentence plain-English description of what the function does
 
-Return {{"snippets": []}} if page has no scattering analysis or code references.
+Return {{"snippets": []}} if page has no scientific analysis or code references.
 
 Output JSON:
 {{
@@ -861,7 +878,7 @@ Output JSON:
   ]
 }}"""
 
-    def extract_xray_code_snippets(
+    def extract_code_snippets(
         self,
         page_text: str,
         client: ChatClient,
@@ -925,11 +942,11 @@ Output JSON:
             logger.debug(f"Regex extracted '{fn_name}' from {source_paper} page {page}")
 
         # ── Step 2: LLM extracts scattering context (no code bodies) ──────────
-        prompt = self._prepare_xray_code_prompt(page_text)
+        prompt = self._prepare_code_snippet_prompt(page_text)
         llm_context: Dict[str, Dict] = {}  # function_name.lower() → context dict
         try:
             response = client.chat(prompt, temperature=self.temperature, timeout=120)
-            data = self.extract_xray_json_from_text(response)
+            data = self.extract_json_from_text(response)
             for snip in data.get("snippets", []):
                 if not isinstance(snip, dict):
                     continue
@@ -961,7 +978,7 @@ Output JSON:
                         f"({len(regex_results)} regex, {len(llm_context)} LLM context matches)")
         return results
 
-    def _collect_xray_code_snippets(
+    def _collect_code_snippets(
         self,
         page_text: str,
         filename: str,
@@ -969,11 +986,11 @@ Output JSON:
         pub_meta: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
-        Run xray code-snippet extraction for one page, dedup into
-        `self.xray_code_snippets`, and save (thread-safe). Returns True if new
+        Run code-snippet extraction for one page, dedup into
+        `self.code_snippets`, and save (thread-safe). Returns True if new
         snippets were added.
         """
-        snippets = self.extract_xray_code_snippets(
+        snippets = self.extract_code_snippets(
             page_text,
             self.chat_client,
             self.schema_helper,
@@ -995,15 +1012,15 @@ Output JSON:
             # stamp publication_year so recency boost fires in score_prp
             if not snip.get("publication_year"):
                 snip["publication_year"] = _pm.get("publication_year")
-            key = self._xray_snippet_key(snip)
-            if key in self._xray_seen:
+            key = self._snippet_key(snip)
+            if key in self._snippet_seen:
                 continue
-            self._xray_seen.add(key)
-            self.xray_code_snippets.append(snip)
+            self._snippet_seen.add(key)
+            self.code_snippets.append(snip)
             updated = True
 
         if updated:
-            self._save_xray_snippets_threadsafe()
+            self._save_snippets_threadsafe()
         return updated
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
@@ -1062,8 +1079,8 @@ Output JSON:
             # Even if no new terms, we may still want to extract properties if existing materials appear
             new_or_updated = self._extract_and_attach_properties(raw_text)
             # Additive: scan for x-ray scattering code snippets regardless of terms
-            xray_updated = self._collect_xray_code_snippets(raw_text, filename, page_num, pub_meta)
-            return new_or_updated or xray_updated
+            snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
+            return new_or_updated or snippets_updated
 
         # Harvest pub metadata from LLM term responses — fill gaps in pub_meta
         # LLM now stamps paper_title/authors/doi/journal on every term it extracts.
@@ -1125,6 +1142,7 @@ Output JSON:
 
             # Helper to compare relation tuples
             def relation_tuple(rel: Dict[str, Any]) -> Tuple[str, str]:
+                """Return (predicate, object) tuple for deduplication."""
                 return (rel["relation"], rel["related_term"])
 
             if existing_key:
@@ -1244,12 +1262,12 @@ Output JSON:
         prop_updated = self._extract_and_attach_properties(raw_text)
 
         # 6) Additive: scan page for x-ray scattering peak-finding code snippets
-        xray_updated = self._collect_xray_code_snippets(raw_text, filename, page_num, pub_meta)
+        snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
 
         if added_or_updated or prop_updated:
             self._save_terms_threadsafe()
 
-        return added_or_updated or prop_updated or xray_updated
+        return added_or_updated or prop_updated or snippets_updated
 
     def _extract_and_attach_properties(self, full_text: str) -> bool:
         """
@@ -1588,8 +1606,8 @@ Output JSON:
                     entry[f] = best_meta[f]
                     backfilled += 1
 
-        # Also backfill xray_code_snippets from this PDF
-        for snip in self.xray_code_snippets:
+        # Also backfill code_snippets from this PDF
+        for snip in self.code_snippets:
             if snip.get("source_paper") != filename:
                 continue
             for f in scalar_fields:
@@ -1738,6 +1756,7 @@ def run_extraction(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for the term extraction script."""
     parser = argparse.ArgumentParser(
         description="Extract schema-aligned terms from PDFs into extracted_terms JSON."
     )

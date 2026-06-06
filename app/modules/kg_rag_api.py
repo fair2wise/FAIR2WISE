@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-"""
-kg_rag_ollama.py
+"""KG-RAG API: Knowledge-Graph-augmented Retrieval-Augmented Generation for materials science.
+
+Provides semantic/lexical retrieval over a JSON knowledge graph, LLM chat clients
+(Ollama, CBORG), a FastAPI proxy for OpenWebUI, and an interactive CLI.
 """
 from __future__ import annotations
 
@@ -32,10 +34,11 @@ np = None
 torch = None
 SentenceTransformer = None
 
-load_dotenv(override=True)
+load_dotenv()
 
 
 def _load_kg_deps() -> None:
+    """Lazily import heavy numeric/ML dependencies (faiss, PyMuPDF, numpy, torch, SentenceTransformer)."""
     global faiss, fitz, np, torch, SentenceTransformer
     if faiss is not None:
         return
@@ -70,7 +73,7 @@ _NLTK_OK = False
 
 
 # ───────────────────── configuration ─────────────────────
-LLM_BACKEND = os.environ.get("KG_RAG_BACKEND", "cborg").lower()
+LLM_BACKEND = os.environ.get("KG_RAG_BACKEND", "ollama").lower()
 OLLAMA_MODEL = os.environ.get("KG_RAG_OLLAMA_MODEL", os.environ.get("KG_RAG_MODEL", "deepseek-r1:70b"))
 OLLAMA_API_URL = os.environ.get("KG_RAG_OLLAMA_URL", "http://localhost:11434/api/chat")
 CBORG_MODEL = os.environ.get("KG_RAG_CBORG_MODEL", os.environ.get("KG_RAG_MODEL", "lbl/cborg-chat"))
@@ -127,8 +130,11 @@ MAX_PDF_CACHE = int(os.environ.get("KG_RAG_PDF_CACHE", "256"))
 
 
 class _Fmt(logging.Formatter):
+    """Coloured log formatter using colorama."""
+
     # @annotate('_Fmt::format')
-    def format(self, record: logging.LogRecord) -> str:  # noqa: D401
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record with cyan timestamp and magenta level."""
         t = Fore.CYAN + self.formatTime(record) + Style.RESET_ALL
         return f"{t} {Fore.MAGENTA}{record.levelname}{Style.RESET_ALL}: {record.getMessage()}"
 
@@ -149,7 +155,17 @@ def create_fastapi_app(
     graph_file: str,
     backend: str = LLM_BACKEND,
     model: Optional[str] = None,
-) -> Any:
+) -> FastAPI:
+    """Create a FastAPI app that proxies chat requests through the KG-RAG pipeline.
+
+    Args:
+        graph_file: Path to the KG graph JSON file.
+        backend: LLM backend to use ('ollama', 'cborg', or 'cborg-openai').
+        model: Model name override; defaults to backend-specific env var.
+
+    Returns:
+        Configured FastAPI application with /v1/chat/completions endpoint.
+    """
     app = FastAPI(title="KG-RAG Chat Proxy")
 
     kg = KnowledgeGraph(graph_file)
@@ -160,6 +176,7 @@ def create_fastapi_app(
 
     @app.post("/api/chat")
     async def api_chat(req: Request):
+        """Handle incoming chat request: retrieve KG context, call LLM, return response."""
         body = await req.json()
         messages = body.get("messages", [])
         if not messages:
@@ -195,6 +212,7 @@ def create_fastapi_app(
 
     @app.get("/api/tags")
     async def list_models():
+        """Return available model tags for OpenWebUI compatibility."""
         return {
             "models": [
                 {"name": "kg-rag:latest", "model": "kg-rag:latest", "modified_at": "2025-09-17T00:00:00Z"}
@@ -203,12 +221,20 @@ def create_fastapi_app(
 
     @app.get("/api/ps")
     async def list_processes():
+        """Return running processes (stub for OpenWebUI compatibility)."""
         return {"processes": []}
 
     return app
 
 
 def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: Optional[str] = None):
+    """Launch the FastAPI KG-RAG server on port 11435.
+
+    Args:
+        graph_file: Path to the KG graph JSON file.
+        backend: LLM backend to use ('ollama', 'cborg', or 'cborg-openai').
+        model: Model name override; defaults to backend-specific env var.
+    """
     import uvicorn
 
     app = create_fastapi_app(graph_file, backend=backend, model=model)
@@ -220,6 +246,8 @@ def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: Optional[str
 
 @dataclass
 class MissingNode:
+    """Record of an entity queried but not found in the KG."""
+
     query: str
     entity: str
     reason: str   # e.g., "no evidence in KG", "llm_fallback"
@@ -227,7 +255,10 @@ class MissingNode:
 
 
 class MissingNodeTracker:
+    """Tracks entities queried but not found in the KG, persisted as JSONL."""
+
     def __init__(self, kg_file: str) -> None:
+        """Initialize tracker with output path derived from KG filename."""
         # derive file name from KG file
         kg_name = Path(kg_file).stem
         out_dir = Path("storage/knowledge_gaps")
@@ -260,16 +291,19 @@ GENERIC_PAT = re.compile(r"(generic|material|property|parameter|technique|proces
 
 # @annotate('_strip_ansi')
 def _strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
     return ANSI_RE.sub("", text)
 
 
 # @annotate('_tokenize')
 def _tokenize(text: str) -> List[str]:
+    """Split text into lowercase alphanumeric tokens."""
     return re.findall(r"[A-Za-z0-9]+", text.lower())
 
 
 # @annotate('_noun_phrases')
 def _noun_phrases(text: str) -> List[str]:
+    """Extract noun phrases via NLTK chunking, or return text as-is if NLTK unavailable."""
     if not _NLTK_OK:
         return [text] if text.strip() else []
     toks = word_tokenize(text)
@@ -303,6 +337,7 @@ def extract_query_entities(q: str) -> List[str]:
 
 # @annotate('auto_device')
 def auto_device() -> str:
+    """Return 'cuda' if available and not forced to CPU, otherwise 'cpu'."""
     _load_kg_deps()
     if FORCE_CPU:
         return "cpu"
@@ -313,6 +348,7 @@ def auto_device() -> str:
 
 # @annotate('cuda_warmup')
 def cuda_warmup(device: str) -> None:
+    """Warm up CUDA with a dummy matmul to avoid cold-start latency on first query."""
     _load_kg_deps()
     if device.startswith("cuda") and torch.cuda.is_available():
         try:
@@ -326,6 +362,7 @@ def cuda_warmup(device: str) -> None:
 
 # @annotate('snippet_text')
 def snippet_text(txt: str, length: int, hints: Sequence[str] | None) -> str:
+    """Extract a text snippet of given length, centered around hint term occurrences."""
     if not txt or length <= 0:
         return ""
     if len(txt) <= length:
@@ -343,6 +380,8 @@ def snippet_text(txt: str, length: int, hints: Sequence[str] | None) -> str:
 # ───────────────────── dataclasses ─────────────────────
 @dataclass(slots=True)
 class NodeScore:
+    """A KG node with a retrieval score and BFS depth."""
+
     id: str
     score: float
     depth: int = 0
@@ -350,6 +389,8 @@ class NodeScore:
 
 @dataclass(slots=True)
 class NodeInfo:
+    """Enriched node info with semantic, graph, and lexical scores for PRP ranking."""
+
     id: str
     name: str
     category: str
@@ -364,6 +405,7 @@ class NodeInfo:
     @property
     # @annotate('NodeInfo::score_prp')
     def score_prp(self) -> float:
+        """Compute composite PRP score blending semantic, graph, lexical, evidence, recency, and snippet bonus."""
         depth_fac = 1.0 / (1.0 + self.depth)
         evid = math.tanh(self.evidence_ct / 5.0)
         # Recency boost: papers from last 3 years get up to 0.1 bonus,
@@ -393,6 +435,7 @@ from functools import lru_cache  # noqa: E402
 @lru_cache(maxsize=MAX_PDF_CACHE)
 # @annotate('load_pdf_text')
 def load_pdf_text(path: str) -> str:
+    """Load and cache full text from a PDF file. Returns empty string if file missing or unreadable."""
     if not Path(path).exists():
         logger.debug("PDF missing, skipping evidence lookup: %s", path)
         return ""
@@ -411,8 +454,11 @@ def load_pdf_text(path: str) -> str:
 
 # ───────────────────── KnowledgeGraph ─────────────────────
 class KnowledgeGraph:
+    """In-memory knowledge graph with lexical and semantic search over nodes."""
+
     # @annotate('KnowledgeGraph::__init__')
-    def __init__(self, graph_file: str, embed_model: str = EMBED_MODEL) -> None:  # noqa: D401
+    def __init__(self, graph_file: str, embed_model: str = EMBED_MODEL) -> None:
+        """Load KG from JSON, build adjacency index, and initialize retrieval backend."""
         logger.info(Fore.YELLOW + "Loading KG..." + Style.RESET_ALL)
         with open(graph_file, "r") as fh:
             data = json.load(fh)
@@ -449,6 +495,7 @@ class KnowledgeGraph:
         )
 
     def _build_semantic_index(self, texts: Sequence[str], embed_model: str) -> None:
+        """Encode node texts with SentenceTransformer and build a FAISS IVF-Flat index."""
         _load_kg_deps()
         device = auto_device()
         cuda_warmup(device)
@@ -498,7 +545,8 @@ class KnowledgeGraph:
 
     #  FAISS index ----------------------------------------------------------
     # @annotate('KnowledgeGraph::_build_faiss_index')
-    def _build_faiss_index(self, emb: np.ndarray) -> None:  # noqa: D401
+    def _build_faiss_index(self, emb: np.ndarray) -> None:
+        """Build a FAISS IVF-Flat (or FlatIP) index from embedding matrix, with GPU fallback."""
         dim, N = emb.shape[1], emb.shape[0]
         nlist = max(64, int(np.sqrt(N) * 2))
         logger.info("Building IVF-Flat: dim=%d nlist=%d vectors=%d", dim, nlist, N)
@@ -529,9 +577,11 @@ class KnowledgeGraph:
     #  Semantic search ------------------------------------------------------
     # @annotate('KnowledgeGraph::_norm')
     def _norm(self, d: np.ndarray) -> np.ndarray:
+        """Normalize inner-product distances from [-1,1] to [0,1]."""
         return np.clip((d + 1.0) * 0.5, 0.0, 1.0)
 
     def _semantic_search(self, q: str, topk: int) -> List[NodeScore]:
+        """Search nodes by embedding similarity using FAISS."""
         if q in self._cache:
             return self._cache[q]
         q_vec = self.embed_model.encode([q], convert_to_numpy=True, normalize_embeddings=True)
@@ -553,6 +603,7 @@ class KnowledgeGraph:
         return uniq
 
     def _lexical_search(self, q: str, topk: int) -> List[NodeScore]:
+        """Search nodes by token overlap (Jaccard-like) with query terms."""
         if q in self._cache:
             return self._cache[q]
         qt = set(t for t in _tokenize(q) if len(t) >= 3)
@@ -573,6 +624,7 @@ class KnowledgeGraph:
 
     # @annotate('KnowledgeGraph::semantic_search')
     def semantic_search(self, q: str, topk: int = DEFAULT_K * 2) -> List[NodeScore]:
+        """Dispatch to semantic or lexical search based on configured retrieval backend."""
         if self.retrieval_backend == "semantic":
             return self._semantic_search(q, topk)
         return self._lexical_search(q, topk)
@@ -580,6 +632,7 @@ class KnowledgeGraph:
     #  Weighted BFS ---------------------------------------------------------
     # @annotate('KnowledgeGraph::weighted_bfs')
     def weighted_bfs(self, seeds: Sequence[NodeScore], hops: int) -> List[NodeScore]:
+        """Expand seed nodes via weighted breadth-first search over KG edges."""
         if not seeds:
             return []
         visited: Dict[str, float] = {}
@@ -614,6 +667,7 @@ class KnowledgeGraph:
     def build_nodeinfo(
         self, sem: Sequence[NodeScore], graph: Sequence[NodeScore], q_tokens: Sequence[str]
     ) -> List[NodeInfo]:
+        """Merge semantic and graph scores into ranked NodeInfo objects with lexical overlap."""
         qt = [t.lower() for t in q_tokens if t]
         gmap, smap = {n.id: n for n in graph}, {n.id: n for n in sem}
         ids = set(gmap) | set(smap)
@@ -657,6 +711,17 @@ class KnowledgeGraph:
         char_budget: int,
         hint_terms: Sequence[str] | None,
     ) -> str:
+        """Assemble retrieved context string from ranked nodes for LLM prompt injection.
+
+        Args:
+            nodes: Ranked NodeInfo objects to render.
+            include_structured: Whether to prepend structured KG triples.
+            char_budget: Maximum character budget for the context block.
+            hint_terms: Query tokens used to center PDF snippet extraction.
+
+        Returns:
+            Formatted context string with node metadata, code blocks, and relations.
+        """
         parts: List[str] = []
         chars = 0
 
@@ -733,6 +798,7 @@ class KnowledgeGraph:
 # ───────────────────── retrieval orchestrator ─────────────────────
 # @annotate('decompose')
 def decompose(q: str) -> List[str]:
+    """Split a compound query into sub-questions for stepwise retrieval."""
     segs = re.split(r"[?;,]|\\band\\b|\\bthen\\b", q, flags=re.I)
     out = [s.strip() for s in segs if len(s.strip()) >= 3]
     return out or [q]
@@ -740,6 +806,7 @@ def decompose(q: str) -> List[str]:
 
 # @annotate('retrieve_nodes')
 def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
+    """Retrieve and rank KG nodes relevant to query, including BFS expansion and CodeSnippet injection."""
     ents = extract_query_entities(q)
     seeds = kg.semantic_search(q)[: DEFAULT_K * 2]
 
@@ -808,6 +875,7 @@ async def run_competency_questions(
     kg: KnowledgeGraph, cli: ChatClient, rag_c: Conversation, base_c: Conversation,
     infile: Path, out_json: Path, gap_tracker: MissingNodeTracker
 ) -> None:
+    """Run a batch of competency questions, saving baseline and KG-RAG responses to JSON."""
     # load questions
     with open(infile, "r") as f:
         questions = [line.strip() for line in f if line.strip()]
@@ -861,18 +929,26 @@ async def run_competency_questions(
 
 # ───────────────────── LLM clients ─────────────────────
 class ChatClient(Protocol):
+    """Protocol for async LLM chat clients used by the KG-RAG pipeline."""
+
     model: str
 
-    async def chat(self, messages: Sequence[Dict[str, str]]) -> str: ...
+    async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+        """Send messages and return the assistant response."""
+        ...
 
 
 class OllamaClient:
+    """Async Ollama chat client for local LLM inference."""
+
     # @annotate('OllamaClient::__init__')
-    def __init__(self, url: str = OLLAMA_API_URL, model: str = OLLAMA_MODEL) -> None:  # noqa: D401
+    def __init__(self, url: str = OLLAMA_API_URL, model: str = OLLAMA_MODEL) -> None:
+        """Initialize with Ollama API URL and model name."""
         self.url, self.model = url, model
         self.timeout = aiohttp.ClientTimeout(total=LLM_TIMEOUT)
 
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+        """Send messages to Ollama and return the assistant response."""
         async with aiohttp.ClientSession(timeout=self.timeout) as sess:
             r = await sess.post(
                 self.url,
@@ -900,6 +976,7 @@ class CBorgClient:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
     ) -> None:
+        """Initialize with CBORG model, API key, and base URL."""
         self.model = model
         self.client = openai.AsyncOpenAI(
             api_key=api_key or os.environ.get("CBORG_API_KEY"),
@@ -907,6 +984,7 @@ class CBorgClient:
         )
 
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+        """Send messages to CBORG and return the assistant response."""
         try:
             resp = await self.client.chat.completions.create(
                 model=self.model,
@@ -928,6 +1006,7 @@ class CBorgClient:
 
 
 def make_chat_client(backend: str = LLM_BACKEND, model: Optional[str] = None) -> ChatClient:
+    """Instantiate the appropriate async chat client for the given backend."""
     b = (backend or "ollama").lower()
     if b == "ollama":
         return OllamaClient(model=model or OLLAMA_MODEL)
@@ -938,17 +1017,22 @@ def make_chat_client(backend: str = LLM_BACKEND, model: Optional[str] = None) ->
 
 # ───────────────────── conversation helpers ─────────────────────
 class Conversation:
+    """Multi-turn conversation buffer with system prompt, user/assistant history."""
+
     # @annotate('Conversation::__init__')
-    def __init__(self, system_prompt: str) -> None:  # noqa: D401
+    def __init__(self, system_prompt: str) -> None:
+        """Initialize with a system prompt message."""
         self.messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
     # @annotate('Conversation::add')
     def add(self, user: str, assistant: str) -> None:
+        """Append a user/assistant turn pair to history."""
         self.messages.append({"role": "user", "content": user})
         self.messages.append({"role": "assistant", "content": assistant})
 
     # @annotate('Conversation::build')
     def build(self, user: str, prepend: str | None = None) -> List[Dict[str, str]]:
+        """Build message list for LLM call, optionally prepending a system message."""
         msgs = list(self.messages)
         if prepend:
             msgs.append({"role": "system", "content": prepend})
@@ -968,6 +1052,7 @@ BASELINE_SYSTEM = (
 
 # @annotate('build_baseline_prompt')
 def build_baseline_prompt(q: str) -> str:
+    """Build a simple non-RAG baseline prompt."""
     return f"Question: {q}\n\nAnswer:"
 
 
@@ -1013,6 +1098,7 @@ def build_rag_prompt(q: str, ctx: str) -> str:
 
 
 async def call_llm(cli: ChatClient, messages: Sequence[Dict[str, str]], label: str) -> str:
+    """Call the LLM with timeout handling, printing status to stdout."""
     print(
         Fore.YELLOW
         + f"Calling {cli.model} for {label} (timeout={LLM_TIMEOUT}s)..."
@@ -1035,6 +1121,7 @@ async def answer(
     base_c: Conversation,
     gap_tracker: MissingNodeTracker
 ) -> None:
+    """Answer a single question: retrieve KG context, call LLM, print result, log gaps."""
     print(Fore.MAGENTA + f"\nQ: {q}" + Style.RESET_ALL)
     infos = retrieve_nodes(q, kg)
     print(
@@ -1080,6 +1167,7 @@ async def answer(
 
 
 async def main_async(args) -> None:
+    """Async entry point: interactive loop, one-shot question, or competency batch."""
     # ap = argparse.ArgumentParser()
     # ap.add_argument("--graph", type=Path, default=GRAPH_FILE)
     # ap.add_argument("--question", type=str, help="One-shot question, then exit")
@@ -1116,6 +1204,7 @@ async def main_async(args) -> None:
 
 # @annotate('main')
 def main(args) -> None:  # pragma: no cover
+    """CLI entry point — wraps main_async with KeyboardInterrupt handling."""
     try:
         asyncio.run(main_async(args))
     except KeyboardInterrupt:
