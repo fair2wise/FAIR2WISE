@@ -1,17 +1,17 @@
-# From FAIR to WISE: Creating Knowledge Graphs from Research Papers
+# From FAIR to WISE: Weaving Intelligent Scientific Ecosystems
 
 ## Getting Started
 
 Clone and/or fork this repository.
 
 ```bash
-git clone https://github.com/fair2wise/FAIRtoWISE-FORUM-AI
+git clone https://github.com/fair2wise/FAIR2WISE
 ```
 
 Install project requirements:
 
 ```bash
-cd FAIRtoWISE-FORUM-AI
+cd FAIR2WISE
 pip install -r requirements.txt
 ```
 
