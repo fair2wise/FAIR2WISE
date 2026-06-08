@@ -1,0 +1,225 @@
+# Central project configuration defaults.
+# Secrets should stay in .env or the runtime environment, not in this file.
+
+secrets:
+  cborg_api_key:
+    env: CBORG_API_KEY
+    value: null
+  materials_project_api_key:
+    env: MP_API_KEY
+    value: null
+
+paths:
+  pdf_dir: polymer_papers
+  xray_pdf_dir: xray_papers
+  schema: storage/schema/matkg_schema.yaml
+  graph: storage/kg/matkg_qwen3_235b_580papers.json
+  chebi_obo:
+    env: CHEBI_OBO_PATH
+    default: storage/ontologies/chebi.obo
+  pystow_home: .cache/pystow
+
+kg_rag:
+  backend:
+    env: KG_RAG_BACKEND
+    default: ollama
+  ollama:
+    model:
+      env:
+        - KG_RAG_OLLAMA_MODEL
+        - KG_RAG_MODEL
+      default: deepseek-r1:70b
+    api_url:
+      env: KG_RAG_OLLAMA_URL
+      default: http://localhost:11434/api/chat
+  cborg:
+    model:
+      env:
+        - KG_RAG_CBORG_MODEL
+        - KG_RAG_MODEL
+      default: lbl/cborg-chat
+    base_url:
+      env:
+        - KG_RAG_CBORG_BASE_URL
+        - CBORG_BASE_URL
+      default: https://api.cborg.lbl.gov
+  llm:
+    temperature:
+      env: KG_RAG_TEMPERATURE
+      default: 0.4
+    timeout_seconds:
+      env: KG_RAG_LLM_TIMEOUT
+      default: 120
+    show_baseline:
+      env: KG_RAG_SHOW_BASELINE
+      default: false
+  retrieval:
+    graph_file:
+      env: KG_RAG_GRAPH
+      default: storage/kg/matkg_qwen3_235b_580papers.json
+    pdf_dir:
+      env: KG_RAG_PDF_DIR
+      default: polymer_papers
+    top_k:
+      env: KG_RAG_TOPK
+      default: 12
+    embed_model:
+      env: KG_RAG_EMBED_MODEL
+      default: all-MiniLM-L6-v2
+    backend:
+      env: KG_RAG_RETRIEVAL_BACKEND
+      default: semantic
+      python_3_14_default: lexical
+    batch:
+      env: KG_RAG_BATCH
+      default: null
+    force_cpu:
+      env: KG_RAG_FORCE_CPU
+      default: false
+  context:
+    pdf_snippet_chars:
+      env: KG_RAG_SNIP
+      default: 1000
+    context_char_budget:
+      env: KG_RAG_CTX_CHARS
+      default: 16000
+    context_soft_limit_ratio: 0.75
+    max_text_chars:
+      env: KG_RAG_MAX_TEXT_CHARS
+      default: 1024
+    context_volume_triples:
+      env: KG_RAG_CONTEXT_VOLUME
+      default: 150
+    structured_context:
+      env: KG_RAG_STRUCT_CTX
+      default: true
+    max_code_snippets:
+      env: KG_RAG_MAX_CODE_SNIPPETS
+      default: 6
+    max_code_snippets_per_source:
+      env: KG_RAG_MAX_CODE_SNIPPETS_PER_SOURCE
+      default: 3
+  graph_expansion:
+    enable_bfs:
+      env: KG_RAG_ENABLE_BFS
+      default: true
+    bfs_seed_topk_multiplier: 2
+    bfs_seed_topk:
+      env: KG_RAG_BFS_TOPK
+      default: null
+    max_bfs_hops:
+      env: KG_RAG_MAX_HOPS
+      default: 1
+    stepwise:
+      env: KG_RAG_STEPWISE
+      default: true
+    stepwise_max_steps:
+      env: KG_RAG_STEPWISE_MAX_STEPS
+      default: 6
+  ranking:
+    weights:
+      semantic: 0.8
+      depth: 0.6
+      lexical: 0.6
+      evidence: 0.3
+    generic_penalty:
+      env: KG_RAG_GENERIC_PENALTY
+      default: 0.8
+  misc:
+    debug:
+      env: KG_RAG_DEBUG
+      default: false
+    max_pdf_cache:
+      env: KG_RAG_PDF_CACHE
+      default: 256
+    nltk_enabled: false
+
+extract_terms:
+  backend:
+    env: EXTRACT_TERMS_BACKEND
+    default: cborg
+  model:
+    env: EXTRACT_TERMS_MODEL
+    default: lbl/cborg-chat
+  ollama_url:
+    env: OLLAMA_URL
+    default: http://localhost:11434
+  cborg_base_url:
+    env: CBORG_BASE_URL
+    default: https://api.cborg.lbl.gov
+  default_pdf_dir: polymer_papers
+  default_output: storage/terminology/extracted_terms.json
+  default_schema: storage/schema/matkg_schema.yaml
+  temperature: 0.0
+  context_length: 50
+  max_workers: 4
+
+pipeline:
+  evaluation_models:
+    - google/gemini-flash-lite
+  paper_folders:
+    25:
+      - paper_25
+    50:
+      - paper_50
+    75:
+      - paper_75
+    100:
+      - paper_100
+  default_pdf_root: polymer_papers
+  default_ollama_url: http://localhost:11434
+  default_schema: storage/schema/matkg_schema.yaml
+  default_cborg_base:
+    env: CBORG_BASE_URL
+    default: https://api.cborg.lbl.gov
+
+build_kg:
+  pdf_dir: xray_papers/
+  terms_output: storage/terminology/extracted_terms_xray_papers_cborg_chat.json
+  kg_output: storage/kg/matkg_xray_papers_cborg_chat.json
+  backend: cborg
+  model: lbl/cborg-chat
+
+scripts:
+  test_chat_apis:
+    model: google/gemini-flash
+
+ontology:
+  input_skos: storage/terminology/extracted_terms_skos.ttl
+  output_dir: storage/ontology
+  ontology_id: MATONTO
+  ontology_title: Materials Science Ontology
+  base_iri: http://example.org/materials/
+  prefix: matonto
+
+docker_env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  PIP_NO_CACHE_DIR: "1"
+  KG_RAG_BACKEND: cborg
+  KG_RAG_CBORG_MODEL: lbl/cborg-chat
+  KG_RAG_GRAPH: storage/kg/matkg_qwen3_235b_580papers.json
+  KG_RAG_RETRIEVAL_BACKEND: lexical
+  KG_RAG_LLM_TIMEOUT: "120"
+  KG_RAG_CTX_CHARS: "6000"
+  KG_RAG_SHOW_BASELINE: "0"
+  CBORG_BASE_URL: https://api.cborg.lbl.gov
+  PYSTOW_HOME: .cache/pystow
+
+legacy:
+  kg_rag_ollama:
+    ollama_model: gemma3:27b
+    ollama_api_url: http://localhost:11434/api/chat
+    graph_file: /pscratch/sd/d/dabramov/fair2wise/storage/kg/matkg-jun6.json
+    pdf_dir: polymer_papers
+    default_k: 4
+    default_max_hops: 3
+    embed_model: all-MiniLM-L6-v2
+    pdf_snippet_len: 1000
+  kg_rag_ollama_nersc:
+    ollama_model: mistral-small3.1:latest
+    ollama_api_url: http://localhost:11434/api/chat
+    graph_file: /pscratch/sd/d/dabramov/fair2wise/matkg_graph_new1.json
+    k_neighbors: 3
+    hops: 4
+    embed_model: all-MiniLM-L6-v2

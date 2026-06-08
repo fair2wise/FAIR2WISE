@@ -2,11 +2,16 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
-import os
+from pathlib import Path
 import requests
+import sys
 from typing import List, Optional
 
 import openai
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
+
+from modules.project_config import config_value, secret_env
 
 
 class ChatClient(ABC):
@@ -49,8 +54,8 @@ class CBorgChatClient(ChatClient):
                  timeout: float = 240):
         self.model = model
         self.client = openai.OpenAI(
-            api_key=api_key or os.environ.get("CBORG_API_KEY"),
-            base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),
+            api_key=api_key or secret_env("secrets.cborg_api_key"),
+            base_url=(base_url or config_value("extract_terms.cborg_base_url", "https://api.cborg.lbl.gov")).rstrip("/"),
             # If you need different per-call timeouts, you can also use client.with_options(timeout=...)
         )
         self.timeout = timeout
@@ -71,9 +76,9 @@ if __name__ == "__main__":
     # load from env
     load_dotenv()
     client = CBorgChatClient(
-        model="google/gemini-flash",
-        base_url=os.getenv("CBORG_BASE_URL", "https://api.cborg.lbl.gov"),
-        api_key=os.getenv("CBORG_API_KEY", "your_api_key_here")
+        model=config_value("scripts.test_chat_apis.model", "google/gemini-flash"),
+        base_url=config_value("extract_terms.cborg_base_url", "https://api.cborg.lbl.gov"),
+        api_key=secret_env("secrets.cborg_api_key"),
     )
 
     response = client.chat("Explain the significance of the Higgs boson.")

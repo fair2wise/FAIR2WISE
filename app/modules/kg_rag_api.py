@@ -18,7 +18,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 import time
-from typing import Any, Deque, Dict, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Deque, Dict, List, Optional, Protocol, Sequence, Set, Tuple
 import aiohttp
 import openai
 from colorama import Fore, Style, init as colorama_init
@@ -795,6 +795,47 @@ class KnowledgeGraph:
         return _strip_ansi("\n\n".join(parts))
 
 
+# ───────────────────── source-paper filter ─────────────────────
+
+
+def _detect_source_filter(query: str, kg: "KnowledgeGraph") -> List[str]:
+    """Detect source-paper references in a query and return matching source_papers values.
+
+    Builds an alias map from KG nodes' ``source_papers`` filenames and
+    ``paper_title`` fields, then checks which aliases appear in the query.
+    Returns a list of matching ``source_papers`` values (e.g.
+    ``["SCIPY_DOCS.pdf"]``).  Empty list means no source filter detected.
+    """
+    q_lower = query.lower()
+
+    # alias → canonical source_papers value
+    alias_map: Dict[str, str] = {}
+    for n in kg.nodes.values():
+        for sp in (n.get("source_papers") or []):
+            # "SCIPY_DOCS.pdf" → aliases: "scipy_docs", "scipy docs", "scipy"
+            base = sp.replace(".pdf", "").lower()
+            alias_map[base] = sp
+            alias_map[base.replace("_", " ")] = sp
+            # first token before underscore as short alias (e.g. "scipy", "pyfai")
+            short = base.split("_")[0]
+            if len(short) >= 4:
+                alias_map[short] = sp
+
+        title = (n.get("paper_title") or "").strip().lower()
+        if title and sp:
+            # first 5 meaningful words of title as alias
+            words = [w for w in title.split()[:6] if len(w) > 2]
+            alias_map[" ".join(words)] = sp
+
+    # Match longest aliases first to avoid partial matches
+    matches: Set[str] = set()
+    for alias in sorted(alias_map, key=len, reverse=True):
+        if alias in q_lower:
+            matches.add(alias_map[alias])
+
+    return list(matches)
+
+
 # ───────────────────── retrieval orchestrator ─────────────────────
 # @annotate('decompose')
 def decompose(q: str) -> List[str]:
@@ -806,13 +847,35 @@ def decompose(q: str) -> List[str]:
 
 # @annotate('retrieve_nodes')
 def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
-    """Retrieve and rank KG nodes relevant to query, including BFS expansion and CodeSnippet injection."""
+    """Retrieve and rank KG nodes relevant to query, with optional source-paper
+    filtering and BFS expansion.
+
+    When the query references a specific source (e.g. "SciPy", "pyFAI",
+    "XRAY2"), results are restricted to nodes from that source and all
+    source-matched nodes are injected as seeds so they participate in scoring
+    even when lexical overlap is low.
+    """
     ents = extract_query_entities(q)
+
+    # Detect source-paper filter early so we can seed source-matched nodes.
+    source_filter = _detect_source_filter(q, kg)
+
     seeds = kg.semantic_search(q)[: DEFAULT_K * 2]
 
     if STEPWISE:
         for sub in decompose(q)[:STEPWISE_MAX_STEPS]:
             seeds.extend(kg.semantic_search(sub)[:DEFAULT_K])
+
+    # When source filter is active, inject all nodes from matched source(s)
+    # as seeds with a baseline score so they participate in scoring even if
+    # lexical search missed them (e.g. "scipy" = 1 token → low overlap).
+    if source_filter:
+        source_set = set(source_filter)
+        seed_ids = {ns.id for ns in seeds}
+        baseline = min((ns.score for ns in seeds), default=0.1) if seeds else 0.1
+        for nid, n in kg.nodes.items():
+            if nid not in seed_ids and source_set & set(n.get("source_papers") or []):
+                seeds.append(NodeScore(nid, baseline, depth=0))
 
     #  keep highest score per node
     s_map: Dict[str, NodeScore] = {}
@@ -830,43 +893,49 @@ def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
         )
 
     infos = kg.build_nodeinfo(sem, graph, ents)
+
+    # Source-paper post-filter: restrict to nodes from matched source(s).
+    if source_filter:
+        source_set = set(source_filter)
+        filtered = [
+            ni for ni in infos
+            if source_set & set(kg.nodes.get(ni.id, {}).get("source_papers") or [])
+        ]
+        # Fall back to unfiltered if filter is too aggressive (< 3 results)
+        if len(filtered) >= 3:
+            infos = filtered
+            logger.info(f"Source filter active: {source_filter} → {len(infos)} nodes")
+
     ranked = sorted(infos, key=lambda x: x.score_prp, reverse=True)
-    #  evidence-aware trimming
-    ranked = sorted(
-        ranked,
-        key=lambda x: (x.score_prp, x.evidence_ct),
-        reverse=True,
-    )[:DEFAULT_K]
 
-    # Inject CodeSnippet nodes linked via has_code_snippet from any node
-    # in the top-K — ensures code always reaches context.
-    ranked_ids = {ni.id for ni in ranked}
-    injected: List[NodeInfo] = []
-    for ni in ranked:
-        for e in kg.out_edges.get(ni.id, []):
-            if e["predicate"] != "rel:has_code_snippet":
-                continue
-            snip_id = e["object"]
-            if snip_id in ranked_ids:
-                continue
-            snip_raw = kg.nodes.get(snip_id, {})
-            if not (snip_raw.get("code_snippet") or "").strip():
-                continue
-            ranked_ids.add(snip_id)
-            injected.append(NodeInfo(
-                id=snip_id,
-                name=snip_raw.get("name", snip_id),
-                category="CodeSnippet",
-                description=snip_raw.get("description", ""),
-                score_sem=ni.score_sem,
-                score_graph=ni.score_graph,
-                depth=ni.depth + 1,
-                lexical_overlap=ni.lexical_overlap,
-                evidence_ct=ni.evidence_ct,
-                publication_year=snip_raw.get("publication_year"),
-            ))
+    # When query explicitly asks for code and a source filter narrowed results,
+    # reserve slots for all CodeSnippet nodes so none are pushed out by term
+    # nodes with higher lexical overlap.
+    _CODE_TERMS = {"code", "snippet", "snippets", "implementation",
+                   "implementations", "function", "functions", "script"}
+    q_tokens = set(q.lower().split())
+    wants_code = bool(q_tokens & _CODE_TERMS)
 
-    return ranked + injected
+    if wants_code:
+        code_nodes = [ni for ni in ranked if ni.category == "CodeSnippet"]
+        other_nodes = [ni for ni in ranked if ni.category != "CodeSnippet"]
+        # Cap code nodes to avoid context explosion
+        code_nodes = code_nodes[: DEFAULT_K * 2]
+        remaining = max(0, DEFAULT_K - len(code_nodes))
+        ranked = code_nodes + other_nodes[:remaining]
+        ranked.sort(key=lambda x: (x.score_prp, x.evidence_ct), reverse=True)
+        logger.info(
+            f"Code-priority ranking: {len(code_nodes)} snippets "
+            f"+ {remaining} terms = {len(ranked)} total"
+        )
+    else:
+        ranked = sorted(
+            ranked,
+            key=lambda x: (x.score_prp, x.evidence_ct),
+            reverse=True,
+        )[:DEFAULT_K]
+
+    return ranked
 
 # ───────────────────── Ask QCs ─────────────────────
 
