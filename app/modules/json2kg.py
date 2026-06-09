@@ -14,6 +14,7 @@ Features:
 """
 import json
 import argparse
+import hashlib
 import logging
 import re
 import sys
@@ -48,17 +49,35 @@ def ensure_list(val: Any) -> List[Any]:
     return val if isinstance(val, list) else [val]
 
 
+def normalize_domain_features(features: Any) -> List[Dict[str, Any]]:
+    """Normalize schema-driven CodeSnippet domain feature entries."""
+    normalized: List[Dict[str, Any]] = []
+    for feature in ensure_list(features):
+        if not isinstance(feature, dict):
+            continue
+        name = feature.get("feature_name")
+        value = feature.get("feature_value")
+        if not name or value in (None, "", []):
+            continue
+        normalized.append({
+            "feature_name": str(name),
+            "feature_value": str(value),
+            "feature_units": feature.get("feature_units"),
+            "feature_source_text": feature.get("feature_source_text"),
+        })
+    return normalized
+
+
 def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build a CodeSnippet node from a code_snippets entry.
 
     Node ID includes MD5 hash of code body to prevent collisions.
     """
-    import hashlib as _hl
     fn_name = snip.get("function_name") or ""
     paper = snip.get("source_paper", "unknown")
     page = snip.get("page", 0)
-    code_hash = _hl.md5((snip.get("code_snippet") or "").encode()).hexdigest()[:8]
+    code_hash = hashlib.md5((snip.get("code_snippet") or "").encode()).hexdigest()[:8]
     raw_id = f"snippet_{fn_name}_{paper}_p{page}_{code_hash}" if fn_name else f"snippet_{paper}_p{page}_{code_hash}"
     node_id = make_id(raw_id)
     name = f"{fn_name} snippet" if fn_name else f"code snippet ({paper} p.{page})"
@@ -84,12 +103,8 @@ def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
         "code_snippet": snip.get("code_snippet"),
         "code_language": snip.get("code_language"),
         "code_description": snip.get("code_description"),
-        "code_domain": snip.get("code_domain") or "xray",
-        # scattering context from LLM enrichment
-        "scattering_technique": snip.get("scattering_technique"),
-        "peak_positions": ensure_list(snip.get("peak_positions")),
-        "d_spacing": ensure_list(snip.get("d_spacing")),
-        "peak_assignments": ensure_list(snip.get("peak_assignments")),
+        "code_domain": snip.get("code_domain"),
+        "domain_features": normalize_domain_features(snip.get("domain_features")),
     }
 
 
@@ -276,7 +291,7 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any
         data = json.load(f)
 
     terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-    snippets = data.get("code_snippets", data.get("xray_code_snippets", [])) if isinstance(data, dict) else []
+    snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
     graph = build_graph(terms, code_snippets=snippets)
 
     output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -313,7 +328,7 @@ def main() -> None:
         with args.input_json.open("r", encoding="utf-8") as f:
             data = json.load(f)
         terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
-        snippets = data.get("code_snippets", data.get("xray_code_snippets", [])) if isinstance(data, dict) else []
+        snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
         graph = build_graph(terms, code_snippets=snippets)
         args.output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         logging.info(
@@ -383,11 +398,16 @@ def test_code_snippet_node():
         "source_papers": ["SCIPY_DOCS.pdf"],
     }]
     snips = [{
-        "scattering_technique": "SAXS/WAXS",
         "function_name": "find_scattering_peaks",
         "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef find_scattering_peaks(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    peaks, props = find_peaks(y_smooth, prominence=0.05 * np.max(y_smooth))\n    return peaks, props",
         "code_language": "python",
         "code_description": "Processes 1D scattering data by smoothing to identify peaks.",
+        "domain_features": [{
+            "feature_name": "scattering_technique",
+            "feature_value": "SAXS/WAXS",
+            "feature_units": None,
+            "feature_source_text": "Processes 1D scattering data",
+        }],
         "page": 1,
         "source_paper": "SCIPY_DOCS.pdf",
     }]
@@ -399,6 +419,7 @@ def test_code_snippet_node():
     assert "find_scattering_peaks" in snippet["code_snippet"]
     assert snippet["code_language"] == "python"
     assert snippet["function_name"] == "find_scattering_peaks"
+    assert snippet["domain_features"][0]["feature_name"] == "scattering_technique"
 
     # edge wired from term node to snippet
     has_code_edges = [e for e in graph["associations"] if e["predicate"] == "rel:has_code_snippet"]

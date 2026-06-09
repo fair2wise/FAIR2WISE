@@ -265,6 +265,49 @@ class SchemaHelper:
         lines.append("\nIMPORTANT: Do NOT use relations named 'description' or 'category'.")
         return "\n".join(lines)
 
+    def get_code_domain_feature_context(self) -> str:
+        """Return schema-defined feature names allowed for CodeSnippet domain_features."""
+        excluded = {
+            "id",
+            "name",
+            "category",
+            "type",
+            "description",
+            "provided_by",
+            "publication_year",
+            "paper_title",
+            "authors",
+            "institutions",
+            "doi",
+            "journal",
+            "volume",
+            "issue",
+            "pages_range",
+            "abstract_text",
+            "keywords",
+            "has_code_snippet",
+        }
+        feature_slots: List[str] = []
+        for slot_name, slot_def in self.schema_view.all_slots().items():
+            annotation = (slot_def.annotations or {}).get("code_domain_feature")
+            annotation_value = getattr(annotation, "value", annotation)
+            if str(annotation_value).lower() in {"true", "1", "yes"} and slot_name in self.slots:
+                feature_slots.append(slot_name)
+
+        if not feature_slots:
+            logger.debug("No code_domain_feature annotations found; falling back to ExperimentalTechnique slots")
+            for class_name in ("ExperimentalTechnique",):
+                for slot_name in self.schema_view.class_slots(class_name):
+                    if slot_name not in excluded and slot_name in self.slots:
+                        feature_slots.append(slot_name)
+
+        lines: List[str] = []
+        for slot_name in sorted(set(feature_slots)):
+            info = self.slots[slot_name]
+            mv = "multiple values allowed" if info["multivalued"] else "single value"
+            lines.append(f"- {slot_name}: {info['description']} ({mv})")
+        return "\n".join(lines) or "- None"
+
     def _find_closest_class(self, target: str) -> Optional[str]:
         """Return exact or fuzzy-matched class, or None."""
         if not target:
@@ -455,7 +498,7 @@ class LLMTermExtractor:
                         key = term["term"].strip().lower()
                         self.terms_dict[key] = term
                         self._bk_terms[term["term"]] = key
-                    for snip in prev.get("code_snippets", prev.get("xray_code_snippets", [])):
+                    for snip in prev.get("code_snippets", []):
                         self.code_snippets.append(snip)
                         self._snippet_seen.add(self._snippet_key(snip))
                     loaded_meta = prev.get("metadata", {})
@@ -503,7 +546,7 @@ class LLMTermExtractor:
         return {"terms": []}
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
-    def extract_json_from_text(self, text: str) -> Dict[str, Any]:
+    def _extract_snippets_json_from_text(self, text: str) -> Dict[str, Any]:
         """
         Extract largest JSON object containing "snippets". Return {"snippets": []} if none.
         """
@@ -835,7 +878,7 @@ INSTRUCTIONS:
             except Exception as e:
                 logger.error(f"Failed to save code snippets: {e}")
 
-    def _prepare_code_snippet_prompt(self, page_text: str) -> str:
+    def _prepare_code_snippet_prompt(self, page_text: str, schema_helper: SchemaHelper) -> str:
         """
         Prompt for scientific CONTEXT around code snippets.
         Code bodies are extracted by regex — not by LLM.
@@ -843,6 +886,7 @@ INSTRUCTIONS:
         """
         max_len = 6000
         text = page_text[-max_len:] if len(page_text) > max_len else page_text
+        domain_feature_context = schema_helper.get_code_domain_feature_context()
 
         return f"""=== CODE SNIPPET CONTEXT EXTRACTION ===
 This page may contain scientific analysis code (e.g. scattering, spectroscopy, simulation).
@@ -854,12 +898,18 @@ CONTENT:
 
 For each function name or code block referenced on this page, extract:
 - "function_name": the Python/MATLAB function name, or null
-- "scattering_technique": one of SAXS, WAXS, GIWAXS, GISAXS, or null if not scattering-related
-- "peak_positions": list of observed peak positions mentioned on the page, or []
-- "d_spacing": list of d-spacing values mentioned on the page, or []
-- "peak_assignments": list of crystallographic assignments mentioned on the page, or []
 - "authors": authors of the library/code, or []
 - "code_description": one-sentence plain-English description of what the function does
+- "domain_features": schema-driven scientific metadata found near the code, or []
+
+Allowed domain_features feature_name values from the schema:
+{domain_feature_context}
+
+Each domain_features item must include:
+- "feature_name": exactly one allowed schema feature name
+- "feature_value": extracted value as a string
+- "feature_units": units as a string, or null
+- "feature_source_text": short source text supporting the value
 
 Return {{"snippets": []}} if page has no scientific analysis or code references.
 
@@ -868,15 +918,47 @@ Output JSON:
   "snippets": [
     {{
       "function_name": "function name or null",
-      "scattering_technique": "SAXS/WAXS/GIWAXS/GISAXS or null",
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": [],
       "authors": [],
-      "code_description": "what this function does"
+      "code_description": "what this function does",
+      "domain_features": [
+        {{
+          "feature_name": "schema feature name",
+          "feature_value": "extracted value",
+          "feature_units": null,
+          "feature_source_text": "supporting text"
+        }}
+      ]
     }}
   ]
 }}"""
+
+    def _normalize_domain_features(
+        self,
+        features: Any,
+        schema_helper: SchemaHelper,
+    ) -> List[Dict[str, Optional[str]]]:
+        """Keep only schema-allowed CodeSnippet domain features."""
+        allowed = {
+            line.split(":", 1)[0].lstrip("- ").strip()
+            for line in schema_helper.get_code_domain_feature_context().splitlines()
+            if line.startswith("- ") and line != "- None"
+        }
+        normalized: List[Dict[str, Optional[str]]] = []
+        feature_items = features if isinstance(features, list) else [features]
+        for feature in feature_items:
+            if not isinstance(feature, dict):
+                continue
+            name = str(feature.get("feature_name") or "").strip()
+            value = feature.get("feature_value")
+            if name not in allowed or value in (None, "", []):
+                continue
+            normalized.append({
+                "feature_name": name,
+                "feature_value": str(value),
+                "feature_units": feature.get("feature_units") or None,
+                "feature_source_text": feature.get("feature_source_text") or None,
+            })
+        return normalized
 
     def extract_code_snippets(
         self,
@@ -892,8 +974,8 @@ Output JSON:
 
         Strategy:
           1. Regex extracts ALL named code blocks (def/class/function) deterministically.
-          2. LLM extracts scattering context (technique, peaks, d-spacing, description,
-             authors) keyed by function_name — enriches regex results.
+          2. LLM extracts schema-driven domain context and authors keyed by
+             function_name — enriches regex results.
           3. Merge: regex provides code body, LLM provides scientific context.
 
         Returns list of snippet dicts. Empty list if no code found.
@@ -927,10 +1009,7 @@ Output JSON:
                 lang = "matlab" if re.search(r"\bend\b", code_body) else "r"
 
             regex_results.append({
-                "scattering_technique": None,
-                "peak_positions": [],
-                "d_spacing": [],
-                "peak_assignments": [],
+                "domain_features": [],
                 "function_name": fn_name,
                 "authors": [],
                 "code_snippet": code_body,
@@ -941,12 +1020,12 @@ Output JSON:
             })
             logger.debug(f"Regex extracted '{fn_name}' from {source_paper} page {page}")
 
-        # ── Step 2: LLM extracts scattering context (no code bodies) ──────────
-        prompt = self._prepare_code_snippet_prompt(page_text)
+        # ── Step 2: LLM extracts schema-driven domain context (no code bodies)
+        prompt = self._prepare_code_snippet_prompt(page_text, schema_helper)
         llm_context: Dict[str, Dict] = {}  # function_name.lower() → context dict
         try:
             response = client.chat(prompt, temperature=self.temperature, timeout=120)
-            data = self.extract_json_from_text(response)
+            data = self._extract_snippets_json_from_text(response)
             for snip in data.get("snippets", []):
                 if not isinstance(snip, dict):
                     continue
@@ -964,11 +1043,11 @@ Output JSON:
         for r in regex_results:
             fn_key = (r["function_name"] or "").lower()
             ctx = llm_context.get(fn_key) or llm_context.get("__anonymous__") or {}
-            r["scattering_technique"] = ctx.get("scattering_technique") or None
-            r["peak_positions"]  = ctx.get("peak_positions")  or []
-            r["d_spacing"]       = ctx.get("d_spacing")       or []
-            r["peak_assignments"]= ctx.get("peak_assignments")or []
-            r["authors"]         = ctx.get("authors")         or []
+            r["domain_features"] = self._normalize_domain_features(
+                ctx.get("domain_features") or [],
+                schema_helper,
+            )
+            r["authors"] = ctx.get("authors") or []
             if ctx.get("code_description"):
                 r["code_description"] = ctx["code_description"]
             results.append(r)
@@ -1078,7 +1157,7 @@ Output JSON:
             logger.info(f"No terms found on {filename} page {page_num+1}.")
             # Even if no new terms, we may still want to extract properties if existing materials appear
             new_or_updated = self._extract_and_attach_properties(raw_text)
-            # Additive: scan for x-ray scattering code snippets regardless of terms
+            # Additive: scan for code snippets regardless of term extraction results
             snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
             return new_or_updated or snippets_updated
 
@@ -1261,7 +1340,7 @@ Output JSON:
         # 5) After terms are merged, extract + normalize properties for all known materials on this page
         prop_updated = self._extract_and_attach_properties(raw_text)
 
-        # 6) Additive: scan page for x-ray scattering peak-finding code snippets
+        # 6) Additive: scan page for code snippets
         snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
 
         if added_or_updated or prop_updated:
@@ -1335,10 +1414,9 @@ Output JSON:
           3. Most common year in first-page text that appears near a date-like context
           4. Most common 4-digit year on first page as last resort
         """
-        import datetime as _dt
         pdf_meta = doc.metadata or {}
         filename = os.path.basename(pdf_path)
-        current_year = _dt.datetime.now(_dt.timezone.utc).year
+        current_year = datetime.datetime.now(datetime.timezone.utc).year
 
         # Month names for date pattern matching
         _MONTHS = (

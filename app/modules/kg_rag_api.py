@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import json
 import logging
 import math
@@ -18,58 +19,34 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 import time
-from typing import Any, Deque, Dict, List, Optional, Protocol, Sequence, Set, Tuple
+from typing import Any, Deque, Dict, List, Optional, Protocol, Sequence, Tuple
 import aiohttp
 import openai
 from colorama import Fore, Style, init as colorama_init
 from dotenv import load_dotenv
+import faiss  # type: ignore
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+import fitz  # PyMuPDF
+import numpy as np
 # from nvtx import annotate
 from rapidfuzz import fuzz
-
-faiss = None
-fitz = None
-np = None
-torch = None
-SentenceTransformer = None
+from sentence_transformers import SentenceTransformer
+import torch
+import uvicorn
 
 load_dotenv()
 
 
 def _load_kg_deps() -> None:
-    """Lazily import heavy numeric/ML dependencies (faiss, PyMuPDF, numpy, torch, SentenceTransformer)."""
-    global faiss, fitz, np, torch, SentenceTransformer
-    if faiss is not None:
-        return
-    import faiss as _faiss  # type: ignore
-    import fitz as _fitz  # PyMuPDF
-    import numpy as _np
-    import torch as _torch
-    from sentence_transformers import SentenceTransformer as _SentenceTransformer
-
-    faiss = _faiss
-    fitz = _fitz
-    np = _np
-    torch = _torch
-    SentenceTransformer = _SentenceTransformer
+    """Ensure numeric/ML dependencies are available."""
+    return
 
 # ───────────────────── optional noun-phrase extraction ─────────────────────
-try:
-    import nltk
-    from nltk import word_tokenize, pos_tag
-    from nltk.chunk import RegexpParser
-
-    _NLTK_OK = True
-    for corp in ("punkt", "averaged_perceptron_tagger"):
-        try:
-            nltk.data.find(f"tokenizers/{corp}")
-        except LookupError:
-            nltk.download(corp, quiet=True)
-except Exception:
-    _NLTK_OK = False
-
 _NLTK_OK = False
+word_tokenize = None
+pos_tag = None
+RegexpParser = None
 
 
 # ───────────────────── configuration ─────────────────────
@@ -235,8 +212,6 @@ def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: Optional[str
         backend: LLM backend to use ('ollama', 'cborg', or 'cborg-openai').
         model: Model name override; defaults to backend-specific env var.
     """
-    import uvicorn
-
     app = create_fastapi_app(graph_file, backend=backend, model=model)
     uvicorn.run(app, host="0.0.0.0", port=11435)
 
@@ -377,6 +352,31 @@ def snippet_text(txt: str, length: int, hints: Sequence[str] | None) -> str:
     return txt[:length]
 
 
+def format_domain_features(features: Any, *, multiline: bool = False) -> str:
+    """Format schema-driven CodeSnippet domain features for search and context."""
+    if not isinstance(features, list):
+        return ""
+    parts: List[str] = []
+    for feature in features:
+        if not isinstance(feature, dict):
+            continue
+        name = str(feature.get("feature_name") or "").strip()
+        value = str(feature.get("feature_value") or "").strip()
+        if not name or not value:
+            continue
+        units = str(feature.get("feature_units") or "").strip()
+        source = str(feature.get("feature_source_text") or "").strip()
+        rendered = f"{name}: {value}"
+        if units:
+            rendered = f"{rendered} {units}"
+        if source and multiline:
+            rendered = f"{rendered} ({source})"
+        parts.append(rendered)
+    if multiline:
+        return "\n".join(f"- {part}" for part in parts)
+    return " ".join(parts)
+
+
 # ───────────────────── dataclasses ─────────────────────
 @dataclass(slots=True)
 class NodeScore:
@@ -405,26 +405,22 @@ class NodeInfo:
     @property
     # @annotate('NodeInfo::score_prp')
     def score_prp(self) -> float:
-        """Compute composite PRP score blending semantic, graph, lexical, evidence, recency, and snippet bonus."""
+        """Compute composite PRP score blending semantic, graph, lexical, evidence, and recency."""
         depth_fac = 1.0 / (1.0 + self.depth)
         evid = math.tanh(self.evidence_ct / 5.0)
         # Recency boost: papers from last 3 years get up to 0.1 bonus,
         # decaying linearly for older papers. No penalty for missing year.
         recency = 0.0
         if self.publication_year:
-            age = max(0, 2026 - self.publication_year)
+            current_year = datetime.datetime.now(datetime.timezone.utc).year
+            age = max(0, current_year - self.publication_year)
             recency = max(0.0, 0.1 * (1.0 - age / 10.0))
-        # CodeSnippet bonus: ensures code nodes rank above their XRay parent
-        # nodes when code is in the result set — prevents crowding out by
-        # identically-scored XRayScatteringAnalysis siblings.
-        snippet_bonus = 0.15 if self.category == "CodeSnippet" else 0.0
         return (
             PRP_W_SEM * self.score_sem
             + PRP_W_DEPTH * depth_fac * self.score_graph
             + PRP_W_LEX * self.lexical_overlap
             + PRP_W_EVID * evid
             + recency
-            + snippet_bonus
         )
 
 
@@ -476,7 +472,15 @@ class KnowledgeGraph:
         for nid, n in self.nodes.items():
             src = " ".join(n.get("source_papers") or [])
             title = n.get("paper_title") or ""
-            txt = f"{n.get('name','')} {n.get('description','')} {src} {title}".strip()[:MAX_TEXT_CHARS]
+            domain_features = format_domain_features(n.get("domain_features"))
+            code_bits = " ".join(
+                str(n.get(field) or "")
+                for field in ("function_name", "code_domain", "code_description", "code_language")
+            )
+            txt = (
+                f"{n.get('name','')} {n.get('description','')} {src} {title} "
+                f"{code_bits} {domain_features}"
+            ).strip()[:MAX_TEXT_CHARS]
             texts.append(txt)
             self.ids.append(nid)
 
@@ -773,6 +777,9 @@ class KnowledgeGraph:
                     lines.append(f"Domain: {raw['code_domain']}")
                 if raw.get("paper_authors"):
                     lines.append(f"Paper_Authors: {', '.join(raw['paper_authors'])}")
+                domain_features = format_domain_features(raw.get("domain_features"), multiline=True)
+                if domain_features:
+                    lines.append(f"Domain_Features:\n{domain_features}")
                 lang = raw.get("code_language") or ""
                 lines.append(f"Code ({lang}):\n```{lang}\n{raw['code_snippet']}\n```")
             for pdf in raw.get("source_papers", [])[:3]:
@@ -795,47 +802,6 @@ class KnowledgeGraph:
         return _strip_ansi("\n\n".join(parts))
 
 
-# ───────────────────── source-paper filter ─────────────────────
-
-
-def _detect_source_filter(query: str, kg: "KnowledgeGraph") -> List[str]:
-    """Detect source-paper references in a query and return matching source_papers values.
-
-    Builds an alias map from KG nodes' ``source_papers`` filenames and
-    ``paper_title`` fields, then checks which aliases appear in the query.
-    Returns a list of matching ``source_papers`` values (e.g.
-    ``["SCIPY_DOCS.pdf"]``).  Empty list means no source filter detected.
-    """
-    q_lower = query.lower()
-
-    # alias → canonical source_papers value
-    alias_map: Dict[str, str] = {}
-    for n in kg.nodes.values():
-        for sp in (n.get("source_papers") or []):
-            # "SCIPY_DOCS.pdf" → aliases: "scipy_docs", "scipy docs", "scipy"
-            base = sp.replace(".pdf", "").lower()
-            alias_map[base] = sp
-            alias_map[base.replace("_", " ")] = sp
-            # first token before underscore as short alias (e.g. "scipy", "pyfai")
-            short = base.split("_")[0]
-            if len(short) >= 4:
-                alias_map[short] = sp
-
-        title = (n.get("paper_title") or "").strip().lower()
-        if title and sp:
-            # first 5 meaningful words of title as alias
-            words = [w for w in title.split()[:6] if len(w) > 2]
-            alias_map[" ".join(words)] = sp
-
-    # Match longest aliases first to avoid partial matches
-    matches: Set[str] = set()
-    for alias in sorted(alias_map, key=len, reverse=True):
-        if alias in q_lower:
-            matches.add(alias_map[alias])
-
-    return list(matches)
-
-
 # ───────────────────── retrieval orchestrator ─────────────────────
 # @annotate('decompose')
 def decompose(q: str) -> List[str]:
@@ -847,35 +813,13 @@ def decompose(q: str) -> List[str]:
 
 # @annotate('retrieve_nodes')
 def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
-    """Retrieve and rank KG nodes relevant to query, with optional source-paper
-    filtering and BFS expansion.
-
-    When the query references a specific source (e.g. "SciPy", "pyFAI",
-    "XRAY2"), results are restricted to nodes from that source and all
-    source-matched nodes are injected as seeds so they participate in scoring
-    even when lexical overlap is low.
-    """
+    """Retrieve and rank KG nodes relevant to query, including BFS expansion."""
     ents = extract_query_entities(q)
-
-    # Detect source-paper filter early so we can seed source-matched nodes.
-    source_filter = _detect_source_filter(q, kg)
-
     seeds = kg.semantic_search(q)[: DEFAULT_K * 2]
 
     if STEPWISE:
         for sub in decompose(q)[:STEPWISE_MAX_STEPS]:
             seeds.extend(kg.semantic_search(sub)[:DEFAULT_K])
-
-    # When source filter is active, inject all nodes from matched source(s)
-    # as seeds with a baseline score so they participate in scoring even if
-    # lexical search missed them (e.g. "scipy" = 1 token → low overlap).
-    if source_filter:
-        source_set = set(source_filter)
-        seed_ids = {ns.id for ns in seeds}
-        baseline = min((ns.score for ns in seeds), default=0.1) if seeds else 0.1
-        for nid, n in kg.nodes.items():
-            if nid not in seed_ids and source_set & set(n.get("source_papers") or []):
-                seeds.append(NodeScore(nid, baseline, depth=0))
 
     #  keep highest score per node
     s_map: Dict[str, NodeScore] = {}
@@ -893,49 +837,27 @@ def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
         )
 
     infos = kg.build_nodeinfo(sem, graph, ents)
+    ranked = sorted(
+        infos,
+        key=lambda x: (x.score_prp, x.evidence_ct),
+        reverse=True,
+    )
 
-    # Source-paper post-filter: restrict to nodes from matched source(s).
-    if source_filter:
-        source_set = set(source_filter)
-        filtered = [
-            ni for ni in infos
-            if source_set & set(kg.nodes.get(ni.id, {}).get("source_papers") or [])
-        ]
-        # Fall back to unfiltered if filter is too aggressive (< 3 results)
-        if len(filtered) >= 3:
-            infos = filtered
-            logger.info(f"Source filter active: {source_filter} → {len(infos)} nodes")
+    # Cap CodeSnippet nodes to top 6 to prevent code from saturating
+    # context on code-heavy queries (each snippet renders full code body).
+    MAX_SNIPPETS = 6
+    code_ct = 0
+    capped: List[NodeInfo] = []
+    for ni in ranked:
+        if ni.category == "CodeSnippet":
+            code_ct += 1
+            if code_ct > MAX_SNIPPETS:
+                continue
+        capped.append(ni)
+        if len(capped) >= DEFAULT_K:
+            break
 
-    ranked = sorted(infos, key=lambda x: x.score_prp, reverse=True)
-
-    # When query explicitly asks for code and a source filter narrowed results,
-    # reserve slots for all CodeSnippet nodes so none are pushed out by term
-    # nodes with higher lexical overlap.
-    _CODE_TERMS = {"code", "snippet", "snippets", "implementation",
-                   "implementations", "function", "functions", "script"}
-    q_tokens = set(q.lower().split())
-    wants_code = bool(q_tokens & _CODE_TERMS)
-
-    if wants_code:
-        code_nodes = [ni for ni in ranked if ni.category == "CodeSnippet"]
-        other_nodes = [ni for ni in ranked if ni.category != "CodeSnippet"]
-        # Cap code nodes to avoid context explosion
-        code_nodes = code_nodes[: DEFAULT_K * 2]
-        remaining = max(0, DEFAULT_K - len(code_nodes))
-        ranked = code_nodes + other_nodes[:remaining]
-        ranked.sort(key=lambda x: (x.score_prp, x.evidence_ct), reverse=True)
-        logger.info(
-            f"Code-priority ranking: {len(code_nodes)} snippets "
-            f"+ {remaining} terms = {len(ranked)} total"
-        )
-    else:
-        ranked = sorted(
-            ranked,
-            key=lambda x: (x.score_prp, x.evidence_ct),
-            reverse=True,
-        )[:DEFAULT_K]
-
-    return ranked
+    return capped
 
 # ───────────────────── Ask QCs ─────────────────────
 

@@ -30,11 +30,8 @@
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks_cwt\ndef wavelet_peak_candidates(q, intensity, min_width=2, max_width=30):\n    widths = np.arange(min_width, max_width + 1)\n    peak_indices = find_peaks_cwt(intensity, widths)\n    return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices]",
       "code_language": "python",
       "code_description": "Identifies potential peak candidates in scattering data using a continuous wavelet transform.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
@@ -66,11 +63,8 @@
       "code_snippet": "import numpy as np\nfrom scipy.signal import argrelmax, argrelmin\ndef local_extrema(q, intensity, order=5):\n    y = np.asarray(intensity, dtype=float)\n    maxima = argrelmax(y, order=order)[0]\n    minima = argrelmin(y, order=order)[0]\n    return {\n        \"maxima\": [{\"q\": float(q[i]), \"intensity\": float(y[i])} for i in maxima],\n        \"minima\": [{\"q\": float(q[i]), \"intensity\": float(y[i])} for i in minima],\n    }",
       "code_language": "python",
       "code_description": "Detects local maxima and minima in a scattering curve using a specified order window.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetrankpeaksbyprominenceSCIPYDOCSpdfp23ee806bc",
@@ -102,11 +96,8 @@
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_prominences\ndef rank_peaks_by_prominence(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    peaks, _ = find_peaks(y, distance=8)\n    prominences, left_bases, right_bases = peak_prominences(y, peaks)\n    order = np.argsort(prominences)[::-1]\n    return [\n        {\n            \"q\": float(q[peaks[i]]),\n            \"prominence\": float(prominences[i]),\n            \"left_base_q\": float(q[left_bases[i]]),\n            \"right_base_q\": float(q[right_bases[i]]),\n        }\n        for i in order\n    ]",
       "code_language": "python",
       "code_description": "Ranks detected peaks by their prominence to handle sloping backgrounds and compare peak quality across different intensity scales.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetmeasurepeakwidthsSCIPYDOCSpdfp2be603315",
@@ -138,11 +129,8 @@
       "code_snippet": "from scipy.signal import find_peaks, peak_widths\ndef measure_peak_widths(x, y):\n    peaks, props = find_peaks(y, prominence=0.05 * max(y))\n    widths, width_heights, left_ips, right_ips = peak_widths(y, peaks, rel_height=0.5)\n    dx = x[1] - x[0]\n    return [\n        {\n            \"center_x\": float(x[p]),\n            \"width_x\": float(w * dx),\n            \"left_x\": float(x[0] + left * dx),\n            \"right_x\": float(x[0] + right * dx),\n        }\n        for p, w, left, right in zip(peaks, widths, left_ips, right_ips)\n    ]",
       "code_language": "python",
       "code_description": "Estimates peak widths at a relative height to capture peak broadening and compare crystallinity or order.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetfindscatteringpeaksSCIPYDOCSpdfp183c84edc",
@@ -174,11 +162,8 @@
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef find_scattering_peaks(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    y = np.nan_to_num(y, nan=np.nanmedian(y))\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    y_corrected = y_smooth - np.percentile(y_smooth, 10)\n    peaks, props = find_peaks(\n        y_corrected,\n        prominence=0.05 * np.max(y_corrected),\n        distance=8,\n        width=2,\n    )\n    widths = peak_widths(y_corrected, peaks, rel_height=0.5)\n    return [\n        {\n            \"q\": float(q[idx]),\n            \"intensity\": float(y_corrected[idx]),\n            \"prominence\": float(props[\"prominences\"][i]),\n            \"fwhm_samples\": float(widths[0][i]),\n        }\n        for i, idx in enumerate(peaks)\n    ]",
       "code_language": "python",
       "code_description": "Processes 1D scattering data by smoothing and baseline correction to identify peaks and calculate their positions, intensities, prominences, and widths.",
-      "code_domain": "xray",
-      "scattering_technique": "SAXS/WAXS",
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetfitgaussianpeaksMISCDOCSpdfp2743fd4cf",
@@ -210,11 +195,8 @@
       "code_snippet": "def fit_gaussian_peaks(x, y, peak_indices):\n    model = LinearModel(prefix=\"bg_\")\n    params = model.make_params(slope=0.0, intercept=float(np.nanmedian(y)))\n    for n, idx in enumerate(peak_indices):\n        prefix = f\"p{n}_\"\n        peak = GaussianModel(prefix=prefix)\n        model += peak\n        params.update(\n            peak.make_params(\n                center=float(x[idx]),\n                amplitude=float(max(y[idx], 1e-12)),\n                sigma=max(float(np.diff(x).mean() * 3), 1e-12),\n            )\n        )\n        params[f\"{prefix}sigma\"].min = 0\n    result = model.fit(y, params, x=x, nan_policy=\"omit\")\n    return result",
       "code_language": "python",
       "code_description": "Fits multiple Gaussian peaks and a linear background to 1D scattering data.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetintegratethenfindpeaksMISCDOCSpdfp3e90ec8ef",
@@ -248,11 +230,8 @@
       "code_snippet": "import pyFAI\ndef integrate_then_find_peaks(image, poni_file, *, npt=1000):\n    ai = pyFAI.load(poni_file)\n    result = ai.integrate1d(image, npt=npt, unit=\"q_A^-1\")\n    q = result.radial\n    intensity = result.intensity\n    peaks = detect_1d_peaks(q, intensity, prominence=0.03, min_distance=8)\n    return q, intensity, peaks",
       "code_language": "python",
       "code_description": "Performs 1D azimuthal integration of a detector image using a poni file and detects peaks in the resulting q-space profile.",
-      "code_domain": "xray",
-      "scattering_technique": "SAXS/WAXS",
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetanalyzescatteringimageMISCDOCSpdfp3eb99bfd3",
@@ -284,11 +263,8 @@
       "code_snippet": "def analyze_scattering_image(image, poni_file=None):\n    if poni_file:\n        q, intensity, peaks = integrate_then_find_peaks(image, poni_file)\n        return {\"mode\": \"integrated_1d\", \"q\": q, \"intensity\": intensity, \"peaks\": peaks}\n    spots = detect_2d_spots(image)\n    return {\"mode\": \"raw_2d\", \"spots\": spots}",
       "code_language": "python",
       "code_description": "A pipeline that chooses between 1D integrated analysis or 2D spot detection based on the availability of a poni file.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetdetect1dpeaksMISCDOCSpdfp1d4e1cc8b",
@@ -320,11 +296,8 @@
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef detect_1d_peaks(q, intensity, *, prominence=0.05, min_distance=5):\n    y = np.asarray(intensity, dtype=float)\n    y = np.nan_to_num(y, nan=np.nanmedian(y))\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    baseline = np.percentile(y_smooth, 10)\n    y_corrected = y_smooth - baseline\n    peaks, props = find_peaks(\n        y_corrected,\n        prominence=prominence * np.nanmax(y_corrected),\n        distance=min_distance,\n    )\n    widths = peak_widths(y_corrected, peaks, rel_height=0.5)\n    return [\n        {\n            \"q\": float(q[idx]),\n            \"intensity\": float(y_corrected[idx]),\n            \"prominence\": float(props[\"prominences\"][i]),\n            \"fwhm_samples\": float(widths[0][i]),\n        }\n        for i, idx in enumerate(peaks)\n    ]",
       "code_language": "python",
       "code_description": "Detects peaks in 1D scattering curves (intensity vs q) using smoothing, baseline correction, and prominence filtering.",
-      "code_domain": "xray",
-      "scattering_technique": "SAXS/WAXS/GISAXS/GIWAXS",
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetrunpeakfinder8PYFAIDOCSpdfp3ae36d21e",
@@ -356,11 +329,8 @@
       "code_snippet": "from pyFAI.opencl.peak_finder import OCL_PeakFinder\ndef run_peakfinder8(peak_finder, image):\n    peaks = peak_finder.peakfinder8(\n        image,\n        error_model=\"azimuthal\",\n        cycle=3,\n        cutoff_peak=3,\n        noise=2,\n        connected=9,\n        patch_size=5,\n    )\n    return [\n        {\n            \"pixel_index\": int(row[\"index\"]),\n            \"intensity\": float(row[\"intensity\"]),\n            \"sigma\": float(row[\"sigma\"]),\n            \"row\": float(row[\"pos0\"]),\n            \"col\": float(row[\"pos1\"]),\n        }\n        for row in peaks\n    ]",
       "code_language": "python",
       "code_description": "Implements a GPU-oriented workflow to detect Bragg peaks in diffraction images by integrating signal over patches and calculating centroids.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetestimatebackgroundwithsigmaclippingPYFAIDOCSpdfp221267f0d",
@@ -392,11 +362,8 @@
       "code_snippet": "import pyFAI\nimport numpy as np\ndef estimate_background_with_sigma_clipping(image, poni_file, mask=None, npt=2000):\n    ai = pyFAI.load(poni_file)\n    clipped = ai.sigma_clip_ng(\n        image,\n        npt=npt,\n        unit=\"q_A^-1\",\n        mask=mask,\n        thres=5.0,\n        max_iter=5,\n        error_model=\"poisson\",\n        method=(\"no\", \"csr\", \"cython\"),\n    )\n    normal = ai.integrate1d(image, npt=npt, unit=\"q_A^-1\", mask=mask)\n    excess = normal.intensity - clipped.intensity\n    return clipped.radial, clipped.intensity, excess",
       "code_language": "python",
       "code_description": "Uses sigma clipping to estimate a smooth background and isolate excess intensity from crystalline peaks.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetpickcalibrationpeaksmassifPYFAIDOCSpdfp47c32b041",
@@ -428,11 +395,8 @@
       "code_snippet": "from pyFAI.massif import Massif\ndef pick_calibration_peaks_massif(image, seed_yx, mask=None, nmax=200):\n    massif = Massif(image, mask=mask, median_prefilter=True)\n    nearest = massif.nearest_peak(seed_yx)\n    peaks = massif.find_peaks(nearest, nmax=nmax)\n    return peaks",
       "code_language": "python",
       "code_description": "A wrapper function that uses the Massif class to find calibration peaks starting from a user-provided seed location.",
-      "code_domain": "xray",
-      "scattering_technique": "WAXS",
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetmontecarlopeakseedsPYFAIDOCSpdfp5becb8e2a",
@@ -464,11 +428,8 @@
       "code_snippet": "import random\ndef monte_carlo_peak_seeds(expected_ring_pixels, n_samples=200):\n    seeds = []\n    for _ in range(n_samples):\n        y, x = random.choice(expected_ring_pixels)\n        seeds.append((y + random.uniform(-3, 3), x + random.uniform(-3, 3)))\n    return seeds",
       "code_language": "python",
       "code_description": "Generates random seed coordinates near an expected ring locus for peak picking.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetrefineseedswithmassifPYFAIDOCSpdfp51bcb86ad",
@@ -500,11 +461,8 @@
       "code_snippet": "def refine_seeds_with_massif(image, seeds, mask=None):\n    from pyFAI.massif import Massif\n    massif = Massif(image, mask=mask, median_prefilter=True)\n    refined = []\n    for seed in seeds:\n        try:\n            refined.append(massif.nearest_peak(seed))\n        except Exception:\n            pass\n    return refined",
       "code_language": "python",
       "code_description": "Refines initial seed coordinates to the nearest local maximum using the Massif algorithm.",
-      "code_domain": "xray",
-      "scattering_technique": null,
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:snippetgiwaxslineprofilepeaksPYFAIDOCSpdfp639ba75d9",
@@ -536,11 +494,8 @@
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks\nfrom pyFAI.integrator.fiber import FiberIntegrator\ndef giwaxs_line_profile_peaks(image, poni_file, incident_angle_deg=0.12):\n    fi = FiberIntegrator(poni_file)\n    line = fi.integrate1d_grazing_incidence(\n        data=image,\n        sample_orientation=6,\n        incident_angle=np.deg2rad(incident_angle_deg),\n        npt_ip=1000,\n        npt_oop=100,\n        ip_range=(-7, 7),\n        oop_range=(5.5, 6.25),\n        vertical_integration=False,\n        method=(\"no\", \"csr\", \"cython\"),\n    )\n    x = line.integrated\n    y = line.intensity\n    peaks, props = find_peaks(y, prominence=0.03 * y.max(), distance=10)\n    return [{\"q_ip\": float(x[p]), \"intensity\": float(y[p])} for p in peaks]",
       "code_language": "python",
       "code_description": "Custom wrapper that integrates GIWAXS data into a 1D line profile and identifies peaks using SciPy.",
-      "code_domain": "xray",
-      "scattering_technique": "GIWAXS",
-      "peak_positions": [],
-      "d_spacing": [],
-      "peak_assignments": []
+      "code_domain": null,
+      "domain_features": []
     },
     {
       "id": "matkg:1dscatteringcurve",

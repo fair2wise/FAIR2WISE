@@ -27,6 +27,7 @@ import yaml
 import json
 import rdflib
 import dataclasses
+from rdflib.collection import Collection
 from typing import List, Dict, Any, Optional
 
 # Set up logging
@@ -880,8 +881,6 @@ def process_ontology(graph: Graph, output_path: str) -> bool:
                     g.add((intersection, RDF.type, OWL.Class))
                     g.add((class_iri, OWL.equivalentClass, intersection))
                     # Build RDF collection using rdflib.collection.Collection
-                    from rdflib.collection import Collection
-
                     items = []
                     for item in class_data["equivalent_to"]["items"]:
                         if "class" in item:

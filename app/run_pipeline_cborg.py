@@ -11,6 +11,7 @@ Organization:
   • Each run produces new unique JSONs with timestamp suffixes
 """
 
+import argparse
 import logging
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -155,8 +156,6 @@ def run_checkpoint_pipeline(
 # Main
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="Run FAIR2WISE checkpoint evaluation")
     parser.add_argument("--pdf-root", type=Path, default=DEFAULT_PDF_ROOT)
     parser.add_argument("--source-dir", type=Path, help="Source directory with all PDFs (for --organize)")

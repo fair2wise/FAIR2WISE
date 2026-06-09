@@ -198,10 +198,26 @@ classes:
       - code_description
       - function_name
       - code_domain
+      - domain_features
     slot_usage:
       id:
         description: A unique identifier for this code snippet
         required: true
+    annotations:
+      owl: Class
+
+  DomainFeature:
+    is_a: Thing
+    description: A schema-defined scientific metadata item extracted from code context
+    slots:
+      - feature_name
+      - feature_value
+      - feature_units
+      - feature_source_text
+    slot_usage:
+      id:
+        description: A unique identifier for this domain feature
+        required: false
     annotations:
       owl: Class
 
@@ -660,6 +676,7 @@ slots:
     slot_uri: matkg:technique_type
     annotations:
       owl: AnnotationAssertion
+      code_domain_feature: true
 
   measured_property:
     description: The property being measured by an experimental technique
@@ -668,6 +685,7 @@ slots:
     slot_uri: matkg:measured_property
     annotations:
       owl: AnnotationAssertion
+      code_domain_feature: true
 
   scattering_technique:
     description: Specific scattering technique (SAXS, WAXS, GIWAXS, GISAXS)
@@ -676,6 +694,7 @@ slots:
     slot_uri: matkg:scattering_technique
     annotations:
       owl: AnnotationAssertion
+      code_domain_feature: true
 
   peak_positions:
     description: Observed scattering peak positions (e.g., "q = 0.38 A^-1")
@@ -685,6 +704,7 @@ slots:
     slot_uri: matkg:peak_positions
     annotations:
       owl: AnnotationAssertion
+      code_domain_feature: true
 
   d_spacing:
     description: d-spacing values derived from scattering peaks
@@ -694,6 +714,7 @@ slots:
     slot_uri: matkg:d_spacing
     annotations:
       owl: AnnotationAssertion
+      code_domain_feature: true
 
   peak_assignments:
     description: Crystallographic assignments of scattering peaks
@@ -703,6 +724,7 @@ slots:
     slot_uri: matkg:peak_assignments
     annotations:
       owl: AnnotationAssertion
+      code_domain_feature: true
 
   function_name:
     description: Name of the primary function or class in a code snippet
@@ -741,6 +763,48 @@ slots:
     range: string
     required: false
     slot_uri: matkg:code_domain
+    annotations:
+      owl: AnnotationAssertion
+
+  domain_features:
+    description: Schema-driven domain-specific metadata extracted from code context
+    range: DomainFeature
+    required: false
+    multivalued: true
+    inlined_as_list: true
+    slot_uri: matkg:domain_features
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_name:
+    description: Schema slot or feature name represented by this domain feature
+    range: string
+    required: false
+    slot_uri: matkg:feature_name
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_value:
+    description: Extracted value for the domain feature
+    range: string
+    required: false
+    slot_uri: matkg:feature_value
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_units:
+    description: Units associated with the extracted feature value
+    range: string
+    required: false
+    slot_uri: matkg:feature_units
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_source_text:
+    description: Source text supporting the extracted feature value
+    range: string
+    required: false
+    slot_uri: matkg:feature_source_text
     annotations:
       owl: AnnotationAssertion
 

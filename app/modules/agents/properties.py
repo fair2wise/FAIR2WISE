@@ -26,6 +26,7 @@ Author: David Abramov (@dabramov)
 
 import re
 from typing import List, Dict, Optional, Any
+import pytest
 
 
 class PhysicalPropertyExtractor:
@@ -659,5 +660,4 @@ def test_normalizer_failed_unit():
     assert ne["unit_conversion_failed"]
 
 if __name__ == "__main__":
-    import pytest
     pytest.main([__file__])
