@@ -52,8 +52,12 @@ def _env_names(entry: Any) -> Iterable[str]:
 
 
 def _default_value(entry: Any, fallback: Any = None) -> Any:
-    if isinstance(entry, dict) and "default" in entry:
-        return entry["default"]
+    if isinstance(entry, dict):
+        if "default" in entry:
+            return entry["default"]
+        if "env" in entry:
+            return fallback
+        return entry
     if entry is not None:
         return entry
     return fallback

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="19" time="3.388" timestamp="redacted" hostname="redacted">
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_lexical_search_cache_hit" time="0.002"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_weighted_bfs_multi_hop_score_attenuation" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_weighted_bfs_empty_seeds" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_build_context_respects_char_budget" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_build_context_skips_empty_code_snippet" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_format_domain_features_multiline_false" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_format_domain_features_skips_incomplete_entries" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_fastapi_chat_returns_rag_response" time="0.003"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_fastapi_chat_logs_missing_node_on_zero_evidence" time="0.002"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_fastapi_chat_logs_domain_knowledge_fallback" time="0.002"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_fastapi_tags_returns_kg_rag_model" time="0.002"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_fastapi_ps_returns_empty_processes" time="0.002"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_ollama_client_chat_returns_content" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_ollama_client_chat_raises_on_http_error" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_connection_error" time="0.198"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_timeout_error" time="0.012"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_auth_error" time="0.012"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_retrieve_nodes_stepwise_expands_seeds" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_snippet_text_no_hint_match_falls_back_to_start" time="0.000"/>
+  </testsuite>
+</testsuites>

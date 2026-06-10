@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="9" time="1.970" timestamp="redacted" hostname="redacted">
+    <testcase classname="tests.test_extract_terms_extended" name="test_init_resumes_from_existing_output_file" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_call_llm_retries_then_succeeds" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_fuzzy_merge_returns_none_when_no_registered_terms" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_fuzzy_merge_returns_key_on_llm_match" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_fuzzy_merge_returns_none_when_llm_response_not_registered" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_process_page_skips_short_pages" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_process_page_handles_llm_failure" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_process_page_handles_json_parse_failure" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_extended" name="test_process_page_enriches_pub_meta_from_term_fields" time="0.002"/>
+  </testsuite>
+</testsuites>

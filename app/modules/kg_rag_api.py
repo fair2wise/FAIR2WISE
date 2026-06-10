@@ -806,7 +806,7 @@ class KnowledgeGraph:
 # @annotate('decompose')
 def decompose(q: str) -> List[str]:
     """Split a compound query into sub-questions for stepwise retrieval."""
-    segs = re.split(r"[?;,]|\\band\\b|\\bthen\\b", q, flags=re.I)
+    segs = re.split(r"[?;,]|\band\b|\bthen\b", q, flags=re.I)
     out = [s.strip() for s in segs if len(s.strip()) >= 3]
     return out or [q]
 

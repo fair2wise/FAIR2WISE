@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="4" time="0.018" timestamp="redacted" hostname="redacted">
+    <testcase classname="tests.test_json2kg_extended" name="test_build_graph_paper_level_fallback_snippet_wiring" time="0.000"/>
+    <testcase classname="tests.test_json2kg_extended" name="test_build_graph_propagates_formula_validation" time="0.000"/>
+    <testcase classname="tests.test_json2kg_extended" name="test_build_graph_propagates_properties_list" time="0.000"/>
+    <testcase classname="tests.test_json2kg_extended" name="test_convert_terms_to_graph_passes_code_snippets" time="0.003"/>
+  </testsuite>
+</testsuites>
