@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <testsuites name="pytest tests">
-  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="81" time="4.744" timestamp="redacted" hostname="redacted">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="175" time="4.522" timestamp="redacted" hostname="redacted">
     <testcase classname="tests.test_kg_rag_api" name="test_tokenize_entities_and_snippet_helpers" time="0.000"/>
     <testcase classname="tests.test_kg_rag_api" name="test_knowledge_graph_lexical_search_and_bfs" time="0.001"/>
     <testcase classname="tests.test_kg_rag_api" name="test_knowledge_graph_rejects_unknown_retrieval_backend" time="0.001"/>
@@ -31,13 +31,42 @@
     <testcase classname="tests.test_kg_rag_api_extended" name="test_fastapi_ps_returns_empty_processes" time="0.002"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_ollama_client_chat_returns_content" time="0.001"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_ollama_client_chat_raises_on_http_error" time="0.001"/>
-    <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_connection_error" time="0.255"/>
+    <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_connection_error" time="0.207"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_timeout_error" time="0.012"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_cborg_client_raises_on_auth_error" time="0.012"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_retrieve_nodes_stepwise_expands_seeds" time="0.001"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_snippet_text_no_hint_match_falls_back_to_start" time="0.000"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_stepwise_and_bfs_combined" time="0.001"/>
     <testcase classname="tests.test_kg_rag_api_extended" name="test_knowledge_graph_raises_on_malformed_json" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestNounPhrases" name="test_returns_empty_list_for_empty_string" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestNounPhrases" name="test_returns_whitespace_only_as_empty" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestNounPhrases" name="test_fallback_returns_full_text_when_nltk_unavailable" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestNounPhrases" name="test_nltk_path_returns_noun_phrases_when_available" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestRunFastapi" name="test_run_fastapi_calls_uvicorn_with_correct_args" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildContextRichFields" name="test_formula_rendered_in_context" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildContextRichFields" name="test_paper_title_doi_authors_journal_rendered" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildContextRichFields" name="test_code_snippet_function_domain_authors_rendered" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildContextRichFields" name="test_relations_rendered_in_context" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildContextRichFields" name="test_pdf_snippet_injected_when_load_returns_text" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildContextRichFields" name="test_char_budget_stops_before_adding_more_nodes" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildNodeinfoScoring" name="test_evidence_ct_positive_for_node_with_source_paper" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildNodeinfoScoring" name="test_evidence_ct_zero_for_node_without_source_papers" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestBuildNodeinfoScoring" name="test_formula_boosts_score_prp" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestExtractQueryEntities" name="test_returns_tokens_for_normal_input" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestExtractQueryEntities" name="test_returns_empty_for_empty_string" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestExtractQueryEntities" name="test_deduplicates_entries" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestExtractQueryEntities" name="test_filters_short_tokens" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestSnippetTextEdgeCases" name="test_returns_full_text_when_shorter_than_length" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestSnippetTextEdgeCases" name="test_centers_on_first_hint_occurrence" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestSnippetTextEdgeCases" name="test_no_hints_falls_back_to_start" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestFormatDomainFeaturesSourceText" name="test_source_text_included_in_multiline_mode" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestFormatDomainFeaturesSourceText" name="test_source_text_not_included_in_single_line_mode" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestFormatDomainFeaturesSourceText" name="test_non_dict_feature_skipped" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestAutoDeviceAndLoadPdf" name="test_auto_device_returns_cpu_when_force_cpu_set" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestAutoDeviceAndLoadPdf" name="test_auto_device_returns_cpu_when_cuda_unavailable" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestAutoDeviceAndLoadPdf" name="test_auto_device_returns_cuda_when_available" time="0.000"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestAutoDeviceAndLoadPdf" name="test_load_pdf_text_returns_text_from_fitz" time="0.001"/>
+    <testcase classname="tests.test_kg_rag_api_coverage.TestSemanticBackend" name="test_semantic_search_returns_node_scores" time="0.002"/>
     <testcase classname="tests.test_json2kg" name="test_make_id_removes_spaces_and_punctuation" time="0.000"/>
     <testcase classname="tests.test_json2kg" name="test_ensure_list_and_domain_features_handle_empty_or_bad_values" time="0.000"/>
     <testcase classname="tests.test_json2kg" name="test_build_graph_deduplicates_relations_and_stubs_targets" time="0.000"/>
@@ -71,7 +100,7 @@
     <testcase classname="tests.test_extract_terms" name="test_extract_code_snippets_applies_anonymous_llm_context" time="0.000"/>
     <testcase classname="tests.test_extract_terms" name="test_collect_code_snippets_deduplicates_and_saves_once" time="0.000"/>
     <testcase classname="tests.test_extract_terms" name="test_save_terms_threadsafe_writes_properties_key" time="0.001"/>
-    <testcase classname="tests.test_extract_terms" name="test_schema_helper_validate_and_fix_term_filters_bad_relations" time="0.001"/>
+    <testcase classname="tests.test_extract_terms" name="test_schema_helper_validate_and_fix_term_filters_bad_relations" time="0.000"/>
     <testcase classname="tests.test_extract_terms" name="test_schema_helper_relation_validity_respects_subclasses" time="0.000"/>
     <testcase classname="tests.test_extract_terms_extended" name="test_init_resumes_from_existing_output_file" time="0.001"/>
     <testcase classname="tests.test_extract_terms_extended" name="test_call_llm_retries_then_succeeds" time="0.001"/>
@@ -82,5 +111,70 @@
     <testcase classname="tests.test_extract_terms_extended" name="test_process_page_handles_llm_failure" time="0.001"/>
     <testcase classname="tests.test_extract_terms_extended" name="test_process_page_handles_json_parse_failure" time="0.001"/>
     <testcase classname="tests.test_extract_terms_extended" name="test_process_page_enriches_pub_meta_from_term_fields" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestOllamaChatClient" name="test_chat_returns_content" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestOllamaChatClient" name="test_chat_raises_on_http_error" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestOllamaChatClient" name="test_chat_returns_empty_string_on_missing_content" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestCBorgChatClient" name="test_chat_returns_last_choice_content" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestCBorgChatClient" name="test_chat_returns_empty_string_when_content_is_none" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestMakeChatClient" name="test_cborg_backend_returns_cborg_client" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestMakeChatClient" name="test_cborg_openai_alias_also_returns_cborg_client" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestMakeChatClient" name="test_unknown_backend_raises_value_error" time="0.000"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_from_explicit_received_date" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_from_explicit_published_year" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_from_accepted_iso_date" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_from_pdf_creation_date_metadata" time="0.004"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_ignores_future_pdf_metadata_date" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_from_month_adjacent_pattern" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_from_most_common_fallback" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_year_none_when_no_year_present" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_empty_document_returns_none_year" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_title_from_pdf_metadata" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_title_extracted_from_first_substantive_line" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_doi_extracted_from_first_page_text" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_doi_extracted_from_pdf_metadata_subject" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_authors_from_pdf_metadata" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_journal_extracted_from_first_page" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_volume_issue_extracted" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_pages_range_extracted" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_abstract_extracted_from_first_page" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractPubMetadata" name="test_keywords_from_pdf_metadata" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPdf" name="test_happy_path_processes_pages_and_updates_metadata" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPdf" name="test_fitz_open_failure_returns_zero" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPdf" name="test_per_page_exception_is_caught_and_logged" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPdf" name="test_metadata_backfill_propagates_across_terms" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessDirectory" name="test_returns_error_for_missing_directory" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessDirectory" name="test_returns_success_with_zero_files_for_empty_dir" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessDirectory" name="test_importance_scoring_high_medium_low" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessDirectory" name="test_processes_all_pdf_files_in_directory" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractAndAttachProperties" name="test_returns_false_when_terms_dict_empty" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractAndAttachProperties" name="test_returns_false_when_no_raw_props_found" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractAndAttachProperties" name="test_attaches_new_property_to_matching_term" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractAndAttachProperties" name="test_deduplicates_properties" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestExtractAndAttachProperties" name="test_skips_property_for_unknown_material" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPageMergePath" name="test_merge_updates_pages_and_source_papers" time="0.001"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPageMergePath" name="test_merge_backfills_missing_pub_meta_fields" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPageMergePath" name="test_merge_longer_definition_overwrites_shorter" time="0.002"/>
+    <testcase classname="tests.test_extract_terms_coverage.TestProcessPageMergePath" name="test_merge_deduplicates_relations" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_load_project_config_reads_yaml_and_uses_cache" time="0.002"/>
+    <testcase classname="tests.test_project_config" name="test_load_project_config_returns_empty_for_missing_or_empty_yaml" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_load_project_config_raises_yaml_error_for_invalid_yaml" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_get_config_returns_nested_values_and_fallbacks" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_config_value_prefers_env_then_default_then_literal_then_fallback" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_config_value_uses_first_defined_env_name_even_if_empty" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_config_value_returns_dict_literal_without_env_or_default" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_env_names_accepts_string_list_and_rejects_other_shapes" time="0.000"/>
+    <testcase classname="tests.test_project_config" name="test_as_bool_coerces_common_values" time="0.000"/>
+    <testcase classname="tests.test_project_config" name="test_secret_env_reads_only_environment_not_yaml_value" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_secret_env_skips_empty_primary_and_uses_secondary" time="0.001"/>
+    <testcase classname="tests.test_project_config" name="test_config_value_cast_skips_none_fallback" time="0.001"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_organize_papers_into_folders_copies_sorted_pdfs" time="0.005"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_organize_papers_handles_empty_source" time="0.001"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_organize_papers_caps_at_first_100_pdfs" time="0.028"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_run_checkpoint_pipeline_requires_cborg_api_key" time="0.001"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_run_checkpoint_pipeline_dry_run_prints_plan_without_side_effects" time="0.001"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_run_checkpoint_pipeline_skips_missing_folder_in_dry_run" time="0.001"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_run_checkpoint_pipeline_logs_missing_folder" time="0.001"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_run_checkpoint_pipeline_extracts_and_converts_incrementally" time="0.003"/>
+    <testcase classname="tests.test_run_pipeline_cborg" name="test_run_checkpoint_pipeline_handles_no_pdfs_with_mocked_extraction" time="0.002"/>
   </testsuite>
 </testsuites>

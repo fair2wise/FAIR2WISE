@@ -1,17 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <testsuites name="pytest tests">
+  
+  
   <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="12" time="369.998" timestamp="redacted" hostname="redacted">
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_rag_answer_relevancy" time="47.377"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_rag_faithfulness" time="37.772"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_retrieval_context_relevancy" time="36.660"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_baseline_hallucination" time="27.442"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_build_rag_prompt_contains_required_sections" time="0.001"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_decompose_produces_sub_questions" time="0.000"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_end_to_end_pipeline_answer_relevancy" time="45.055"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_rag_answer_contains_kg_citations" time="50.375"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_multi_turn_faithfulness" time="53.763"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_context_budget_cuts_low_ranked_nodes" time="0.001"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_sparse_kg_answer_relevancy" time="41.845"/>
+    
+    
     <testcase classname="tests.deepeval.test_llm_quality" name="test_rag_scores_higher_than_baseline" time="26.554"/>
+    
+  
   </testsuite>
+  
+
 </testsuites>
