@@ -1,5 +1,6 @@
 from .clients import CBorgChatClient, ChatClient, OllamaChatClient, make_chat_client
 from .orchestrator import Orchestrator, run_extraction
+from .schema import SchemaHelper
 
 __all__ = [
     "ChatClient",
@@ -8,4 +9,5 @@ __all__ = [
     "make_chat_client",
     "Orchestrator",
     "run_extraction",
+    "SchemaHelper",
 ]

@@ -15,7 +15,7 @@ from langchain_openai import ChatOpenAI
 from ..agents.chebi import ChebiOboLookup
 from ..agents.chem_checker import ChemicalFormulaValidator
 from ..agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
-from ..extract_terms import SchemaHelper
+from .schema import SchemaHelper
 from .agent import build_graph
 from .tools import ToolState, build_tools
 
