@@ -52,7 +52,8 @@ INSTRUCTIONS:
       photoemission spectroscopy"). If it returns 'match:<key>', skip registration.
    c. For chemical entities call lookup_chebi; for any formula string call
       repair_formula (validates and auto-corrects via LLM if invalid).
-   d. Call register_term only if no match was found.
+   d. Call register_term only if no match was found. Always pass the sentence
+      where the term appears as the 'context' argument.
 """
 
 

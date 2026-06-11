@@ -6,7 +6,7 @@ from typing import Callable, Dict, List, Optional
 
 from langchain_core.tools import tool
 
-from .models import RelationRecord, TermRecord
+from .models import ContextSnippet, RelationRecord, TermRecord
 from .schema import SchemaHelper
 from .services import Services
 from .store import TermStore
@@ -130,7 +130,7 @@ as "{name}"?  If none match, respond with `None`.
         existing_set = set(existing)
         if response in existing_set:
             key = TermStore.normalize(response)
-            logger.debug("fuzzy_merge_term: '%s' → matched '%s' (key=%s)", name, response, key)
+            logger.info("fuzzy_merge_term: '%s' → matched '%s' (key=%s)", name, response, key)
             return f"match:{key}"
 
         return "no_match"
@@ -138,10 +138,10 @@ as "{name}"?  If none match, respond with `None`.
     @tool
     def validate_formula(formula: str) -> str:
         """Validate a chemical formula string against the Materials Project database."""
-        logger.debug("validate_formula: '%s'", formula)
+        logger.info("validate_formula: '%s'", formula)
         try:
             result = state.services.formula_checker.validate(formula)
-            logger.debug("validate_formula: '%s' → %s", formula, result.get("status"))
+            logger.info("validate_formula: '%s' → %s", formula, result.get("status"))
             return json.dumps(result)
         except Exception as e:
             logger.warning("validate_formula: error for '%s': %s", formula, e)
@@ -193,12 +193,12 @@ as "{name}"?  If none match, respond with `None`.
     def lookup_chebi(name: str) -> str:
         """Look up a chemical entity by name in the ChEBI ontology.
         Returns formula, mass, charge, SMILES, InChI, InChIKey when found."""
-        logger.debug("lookup_chebi: '%s'", name)
+        logger.info("lookup_chebi: '%s'", name)
         if not state.services.chebi_lookup:
             return "ChEBI not available"
         try:
             info = state.services.chebi_lookup.lookup(name)
-            logger.debug("lookup_chebi: '%s' → %s", name, "found" if info else "not_found")
+            logger.info("lookup_chebi: '%s' → %s", name, "found" if info else "not_found")
             return json.dumps(info) if info else "not_found"
         except Exception as e:
             logger.warning("lookup_chebi: error for '%s': %s", name, e)
@@ -213,11 +213,13 @@ as "{name}"?  If none match, respond with `None`.
         relations: Optional[List[Dict[str, str]]] = None,
         source_paper: Optional[str] = None,
         page: Optional[int] = None,
+        context: Optional[str] = None,
     ) -> str:
         """Register an extracted materials-science term into the knowledge base.
-        Call check_existing_term first to avoid duplicates. Relations must use exact
-        predicate names from the schema."""
-        logger.debug("register_term: '%s' category=%s", term, category)
+        Call check_existing_term then fuzzy_merge_term first to avoid duplicates.
+        Relations must use exact predicate names from the schema.
+        Pass a short context sentence (the sentence where the term appears) as 'context'."""
+        logger.info("register_term: '%s' category=%s", term, category)
         raw = {
             "term": term,
             "definition": definition,
@@ -230,6 +232,12 @@ as "{name}"?  If none match, respond with `None`.
         key = TermStore.normalize(fixed["term"])
         is_new = state.store.get(key) is None
 
+        snippet = (
+            ContextSnippet(text=context, source_paper=source_paper, page=page)
+            if context and source_paper and page is not None
+            else None
+        )
+
         record = TermRecord(
             term=fixed["term"],
             definition=fixed.get("definition", ""),
@@ -238,6 +246,7 @@ as "{name}"?  If none match, respond with `None`.
             relations=[RelationRecord.from_dict(r) for r in fixed.get("relations", [])],
             pages=[page] if page else [],
             source_papers=[source_paper] if source_paper else [],
+            context_snippets=[snippet] if snippet else [],
         )
 
         final_key, _ = state.store.upsert(record)
