@@ -15,8 +15,9 @@ from langchain_openai import ChatOpenAI
 from ..agents.chebi import ChebiOboLookup
 from ..agents.chem_checker import ChemicalFormulaValidator
 from ..agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
-from .schema import SchemaHelper
 from .agent import build_graph
+from .prompts import build_page_prompt
+from .schema import SchemaHelper
 from .tools import ToolState, build_tools
 
 logger = logging.getLogger(__name__)
@@ -139,59 +140,6 @@ class Orchestrator:
     def _looks_like_formula(self, s: str) -> bool:
         return bool(re.search(r"[A-Z][a-z]?[\d]", s or ""))
 
-    def _prepare_prompt(self, schema_ctx: str, filename: str, page_num: int, text: str) -> str:
-        max_len = 8000
-        page_text = text[-max_len:] if len(text) > max_len else text
-
-        few_shot = r"""
-### EXAMPLE
-Input:
-CONTENT:
-"Poly(3-hexylthiophene) (P3HT) is a conjugated polymer used in organic photovoltaics."
-
-Output:
-{
-  "terms": [
-    {
-      "term": "Poly(3-hexylthiophene) (P3HT)",
-      "definition": "A conjugated polymer used in organic photovoltaics.",
-      "category": "Polymer",
-      "formula": "C10H14S",
-      "relations": [
-        {
-          "relation": "has_application",
-          "related_term": "organic photovoltaics",
-          "verified": true
-        }
-      ]
-    }
-  ]
-}
-### END-EXAMPLE
-"""
-        template = r"""
-=== EXTRACTION TASK ===
-schema_context:
-{schema_ctx}
-
-PAPER: {filename}
-PAGE: {pnum}
-
-CONTENT:
-{text}
-
-INSTRUCTIONS:
-1. Extract key materials-science terms + their relations using ONLY schema slots.
-2. Do NOT output relations named 'description' or 'category'.
-3. For each term call register_term. Use lookup_chebi for chemical entities,
-   validate_formula for any formula string, and check_existing_term before
-   registering to avoid duplicates.
-"""
-        return (
-            f"{template.format(schema_ctx=schema_ctx, filename=filename, pnum=page_num + 1, text=page_text)}\n"
-            f"{few_shot}"
-        )
-
     def _save_terms_threadsafe(self) -> None:
         with self._save_lock:
             try:
@@ -256,7 +204,7 @@ INSTRUCTIONS:
             return False
         logger.debug("process_page: %s page %d", filename, page_num + 1)
         schema_ctx = self.schema_helper.get_schema_context_for_llm()
-        prompt = self._prepare_prompt(schema_ctx, filename, page_num, text)
+        prompt = build_page_prompt(schema_ctx, filename, page_num, text)
         self._tl.updated = False
         try:
             self.graph.invoke({"messages": [HumanMessage(content=prompt)]})
