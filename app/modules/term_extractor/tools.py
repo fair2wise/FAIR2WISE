@@ -26,7 +26,8 @@ def build_tools(state: ToolState) -> list:
     @tool
     def check_existing_term(name: str) -> str:
         """Check whether a term already exists in the knowledge base.
-        Returns 'exact_match:<key>', 'possible_matches:<csv>', or 'not_found'."""
+        Returns 'exact_match:<key>', 'possible_matches:<csv>', or 'not_found'.
+        If 'not_found', call fuzzy_merge_term before registering."""
         key = TermStore.normalize(name)
         logger.debug("check_existing_term: '%s'", name)
         if state.store.get(key) is not None:
@@ -40,6 +41,99 @@ def build_tools(state: ToolState) -> list:
             logger.debug("check_existing_term: '%s' → possible_matches %s", name, candidates[:5])
             return "possible_matches:" + ",".join(candidates[:5])
         return "not_found"
+
+    @tool
+    def fuzzy_merge_term(name: str) -> str:
+        """Ask the LLM whether a newly extracted term is semantically equivalent to any
+        already-registered term, handling punctuation variants and acronym↔expansion pairs.
+        Call this when check_existing_term returns 'not_found'.
+        Returns 'match:<key>' if matched to an existing term, or 'no_match'."""
+        if not state.llm_invoke:
+            return "no_match"
+        existing = state.store.all_display_names()
+        if not existing:
+            return "no_match"
+
+        bullets = "\n".join(f"- {d}" for d in existing)
+        prompt = f"""
+We have just extracted a new term:    "{name}"
+Below is the list of all already-registered terms (one per line; the first time we saw each term):
+{bullets}
+
+You must decide whether "{name}" refers to exactly the same concept as one of these,
+or if it is a distinct new concept. Follow these rules:
+
+  1. **Ignore only trivial punctuation (spaces, hyphens, slashes, brackets, parentheses, capitalization)**
+     when comparing.  For example, "GIWAXS" and "GI-WAXS" are the *same* technique and should be merged
+     (choose the variant already in the list).  Likewise, "XRD" and "X-RD" (if it appeared) are identical.
+     Anything beyond punctuation differences (letters, numbers, or added qualifiers) is not trivial.
+
+  2. **Do NOT merge distinct instrument or method acronyms**.  Even if two acronyms share letters, if they are
+     known to be different techniques or materials, keep them separate.
+     Examples you must treat as always distinct:
+       - "SEM" (scanning electron microscopy) vs. "TEM" (transmission electron microscopy)
+       - "AFM" (atomic force microscopy)
+       - "XPS" vs. "UPS"
+       - "MoTe2" vs. "WTe2" (different compounds)
+       - "Al2O3[0001]" (specific surface) vs. "Al2O3" (generic material)
+     In other words, if two strings differ by more than punctuation—by letters, numbers
+     or explicit qualifiers—they should not be merged.
+
+  3. **Do NOT merge general vs. specific variants**.
+     If one term is a broader concept (e.g. "band structure") and another is a specialized version
+     (e.g. "Dirac-like band structure"), treat them as distinct.
+     Similarly, if a term includes an added qualifier or context
+     (e.g. surface orientation "[0001]" vs. generic material), do not merge into a more general term.
+
+  4. **If the newly extracted term is an exact punctuation-agnostic match** to one of the existing
+     terms—i.e., removing or changing only punctuation/brackets/spaces/case makes them identical—then respond
+     with exactly that already-registered term (preserve its original casing/spelling).
+     Otherwise, respond `"None"`.
+
+  5. **DO merge terms if one is the acronym for the other term**, vice versa,
+      or one term includes the acronym and the other doesn't
+      For example, "angle-resolved photoelectric spectroscopy" and "ARPES" should merge to become:
+      "angle-resolved photoemission spectroscopy (ARPES)".
+      Another example: "resonant soft xray scattering" or "R-SoXS" should merge to become:
+      "Resonant soft xray scattering (RSoXS)"
+
+  6. **Your response must be exactly one line**: either the exact existing term (matching punctuation
+     and case as it appears above) or the single word `None`. Don't output anything else—no quotes,
+     no extra commentary.
+
+Here are additional examples to illustrate:
+
+  • If the new term is `"GI-WAXS"` and the list already contains `"GIWAXS"`, respond exactly `"GIWAXS"`.
+  • If the new term is `"RSoXS"` and the list already contains `"R-SoXS"`,
+    respond exactly `"RSoXS" as the correct term`.
+  • If the new term is `"SEM"` and the list contains `"SEM"`, respond `"SEM"`, but if the list contains
+    only `"TEM"`, respond `"None"` (distinct acronyms).
+  • If the new term is `"MoTe2"` and the list has `"WTe2"`, respond `"None"` (different compound).
+  • If the new term is `"Band-structure"` and the list has `"Dirac-like band structure"`, respond `"None"`
+    (general vs. specific).
+  • If the new term is `"Al2O3[0001]"` and the list has `"Al2O3"`, respond `"None"` (surface-specific vs. generic).
+  • If the new term is `"photoemission"` and the list has `"angle-resolved photoemission spectroscopy (ARPES)"`,
+    respond `"None"` (general process vs. specific technique).
+  • If the new term is `"X-RD"` and the list has `"XRD"`, respond `"XRD"`
+    (consistent acronym once punctuation is removed).
+  • "organic solar cells" and "OSCs" should merge to become "Organic solar cells (OSCs)"
+
+Now, having read the rules, please answer: which of the above existing terms is exactly the same concept
+as "{name}"?  If none match, respond with `None`.
+"""
+        try:
+            response = (state.llm_invoke(prompt) or "").strip()
+        except Exception as e:
+            logger.warning("fuzzy_merge_term: LLM call failed for '%s': %s", name, e)
+            return "no_match"
+
+        existing_set = set(existing)
+        if response in existing_set:
+            key = TermStore.normalize(response)
+            logger.debug("fuzzy_merge_term: '%s' → matched '%s' (key=%s)", name, response, key)
+            return f"match:{key}"
+
+        return "no_match"
 
     @tool
     def validate_formula(formula: str) -> str:
@@ -151,4 +245,4 @@ def build_tools(state: ToolState) -> list:
         logger.info("register_term: %s '%s' (key=%s)", action, term, final_key)
         return action + f":{final_key}"
 
-    return [check_existing_term, validate_formula, repair_formula, lookup_chebi, register_term]
+    return [check_existing_term, fuzzy_merge_term, validate_formula, repair_formula, lookup_chebi, register_term]

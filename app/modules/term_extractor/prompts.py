@@ -45,9 +45,14 @@ CONTENT:
 INSTRUCTIONS:
 1. Extract key materials-science terms + their relations using ONLY schema slots.
 2. Do NOT output relations named 'description' or 'category'.
-3. For each term call register_term. Use lookup_chebi for chemical entities,
-   validate_formula for any formula string, and check_existing_term before
-   registering to avoid duplicates.
+3. For each term:
+   a. Call check_existing_term first.
+   b. If 'not_found', call fuzzy_merge_term to catch punctuation variants and
+      acronym↔expansion pairs (e.g. "GIWAXS"/"GI-WAXS", "ARPES"/"angle-resolved
+      photoemission spectroscopy"). If it returns 'match:<key>', skip registration.
+   c. For chemical entities call lookup_chebi; for any formula string call
+      repair_formula (validates and auto-corrects via LLM if invalid).
+   d. Call register_term only if no match was found.
 """
 
 
