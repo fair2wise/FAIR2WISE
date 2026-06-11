@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 
 import fitz
 from langchain_core.messages import HumanMessage
-
 from langchain_openai import ChatOpenAI
 
 from ..agents.chebi import ChebiOboLookup
@@ -18,7 +17,7 @@ from ..agents.chem_checker import ChemicalFormulaValidator
 from ..agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
 from ..extract_terms import SchemaHelper
 from .agent import build_graph
-from .tools import TOOLS
+from .tools import ToolState, build_tools
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +76,7 @@ class Orchestrator:
             "processed_pages_with_terms": 0,
             "version": "2.1",
         }
+        self._state_lock = threading.Lock()  # guards terms_dict / _bk_terms
         self._save_lock = threading.Lock()
         self._tl = threading.local()  # per-thread dirty flag set by tools
 
@@ -94,9 +94,22 @@ class Orchestrator:
             except Exception as e:
                 logger.warning("Could not load previous terms from %s: %s", self.output_file, e)
 
-        # Build LangChain LLM bound to tools, then compile graph
-        llm = self._build_llm().bind_tools(TOOLS)
-        self.graph = build_graph(llm=llm)
+        # Build tools as closures, then wire up LLM + graph
+        tools = self._build_tools()
+        llm = self._build_llm().bind_tools(tools)
+        self.graph = build_graph(llm=llm, tools=tools)
+
+    def _build_tools(self) -> list:
+        state = ToolState(
+            terms_dict=self.terms_dict,
+            bk_terms=self._bk_terms,
+            state_lock=self._state_lock,
+            schema_helper=self.schema_helper,
+            formula_checker=self.formula_checker,
+            chebi_lookup=self.chebi_lookup,
+            mark_updated=self._mark_updated,
+        )
+        return build_tools(state)
 
     def _build_llm(self) -> ChatOpenAI:
         """Return a LangChain ChatOpenAI instance for the configured backend."""

@@ -1,10 +1,10 @@
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from .tools import TOOLS
 
+def build_graph(llm=None, tools=None):
+    tool_node = ToolNode(tools or [])
 
-def build_graph(llm=None):
     def agent_node(state: MessagesState) -> dict:
         response = llm.invoke(state["messages"])
         return {"messages": [response]}
@@ -17,7 +17,7 @@ def build_graph(llm=None):
 
     graph = StateGraph(MessagesState)
     graph.add_node("agent", agent_node)
-    graph.add_node("tools", ToolNode(TOOLS))
+    graph.add_node("tools", tool_node)
     graph.set_entry_point("agent")
     graph.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
     graph.add_edge("tools", "agent")
