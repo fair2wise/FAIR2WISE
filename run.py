@@ -59,6 +59,7 @@ def main() -> None:
     ))
     logging.root.setLevel(getattr(logging, args.log_level))
     logging.root.addHandler(handler)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     log = logging.getLogger(__name__)
     log.info("Logging to %s", args.log_file)
