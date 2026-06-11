@@ -55,8 +55,9 @@ class Orchestrator:
         mp_api_key = os.environ.get("MP_API_KEY", "")
         if not mp_api_key:
             logger.warning("MP_API_KEY not set; formula validation may be incomplete.")
-        self.formula_checker = ChemicalFormulaValidator(api_key=mp_api_key or "JziDvAj2FWxzonCe2hketK1yz4bKHRlA")
+        self.formula_checker = ChemicalFormulaValidator(api_key=mp_api_key or "JziDvAj2FWxzonCe2hketK1yz4bKHRlA") # To add to tools later
 
+        # ChebiOboLookup is actually not used
         try:
             self.chebi_lookup = ChebiOboLookup("storage/ontologies/chebi.obo")
         except Exception as e:
