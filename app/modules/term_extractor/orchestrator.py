@@ -93,13 +93,13 @@ class Orchestrator:
         logger.debug("process_page: %s page %d", filename, page_num + 1)
         schema_ctx = self.schema_helper.get_schema_context_for_llm()
         prompt = build_page_prompt(schema_ctx, filename, page_num, text)
-        self.store.consume_updated()  # clear any stale flag from a prior run on this thread
+        terms_before = len(self.store)
         try:
             self.graph.invoke({"messages": [HumanMessage(content=prompt)]})
         except Exception as e:
             logger.error("Agent failed on %s page %d: %s", filename, page_num + 1, e)
             return False
-        added = self.store.consume_updated()
+        added = len(self.store) > terms_before
         prop_updated = extract_and_attach_properties(text, self.store, self.services)
         if added or prop_updated:
             self.store.save()
