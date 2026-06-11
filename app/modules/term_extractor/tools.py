@@ -1,7 +1,8 @@
 import json
 import logging
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+import re
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional
 
 from langchain_core.tools import tool
 
@@ -18,6 +19,7 @@ class ToolState:
     store: TermStore
     schema: SchemaHelper
     services: Services
+    llm_invoke: Optional[Callable[[str], str]] = field(default=None, repr=False)
 
 
 def build_tools(state: ToolState) -> list:
@@ -50,6 +52,48 @@ def build_tools(state: ToolState) -> list:
         except Exception as e:
             logger.warning("validate_formula: error for '%s': %s", formula, e)
             return json.dumps({"status": "error", "error": str(e)})
+
+    @tool
+    def repair_formula(formula: str, context: str) -> str:
+        """Validate a chemical formula and repair it via LLM if invalid.
+        Pass the surrounding sentence as context to help guess the correct formula.
+        Returns JSON with keys: status ('valid'|'corrected'|'invalid'|'missing'|'error'),
+        formula (possibly corrected), and original (only when corrected)."""
+        if not formula or not re.search(r"[A-Z][a-z]?[\d]", formula):
+            return json.dumps({"status": "missing", "formula": None})
+        try:
+            validation = state.services.formula_checker.validate(formula)
+        except Exception as e:
+            logger.warning("repair_formula: validation error for '%s': %s", formula, e)
+            return json.dumps({"status": "error", "details": {"error": str(e)}})
+
+        if validation.get("status") != "invalid" or not state.llm_invoke:
+            return json.dumps({**validation, "formula": formula})
+
+        repair_prompt = (
+            f"The extracted string '{formula}' is not a valid chemical formula.\n"
+            "Based on the context below, guess the correct formula and return ONLY the formula string.\n\n"
+            f"CONTEXT:\n{context}"
+        )
+        try:
+            candidate = (state.llm_invoke(repair_prompt) or "").strip().split()[0]
+        except Exception as e:
+            logger.warning("repair_formula: LLM repair failed for '%s': %s", formula, e)
+            return json.dumps({**validation, "formula": formula})
+
+        if not candidate or candidate == formula:
+            return json.dumps({**validation, "formula": formula})
+
+        try:
+            new_validation = state.services.formula_checker.validate(candidate)
+            if new_validation.get("status") != "invalid":
+                logger.info("repair_formula: corrected '%s' → '%s'", formula, candidate)
+                new_validation["status"] = "corrected"
+                return json.dumps({**new_validation, "formula": candidate, "original": formula})
+        except Exception as e:
+            logger.warning("repair_formula: re-validation failed for candidate '%s': %s", candidate, e)
+
+        return json.dumps({**validation, "formula": formula})
 
     @tool
     def lookup_chebi(name: str) -> str:
@@ -107,4 +151,4 @@ def build_tools(state: ToolState) -> list:
         logger.info("register_term: %s '%s' (key=%s)", action, term, final_key)
         return action + f":{final_key}"
 
-    return [check_existing_term, validate_formula, lookup_chebi, register_term]
+    return [check_existing_term, validate_formula, repair_formula, lookup_chebi, register_term]

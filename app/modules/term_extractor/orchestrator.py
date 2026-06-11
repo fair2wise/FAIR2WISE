@@ -51,16 +51,21 @@ class Orchestrator:
         self.store = TermStore(output_file)
         self.services = build_services(chebi_obo_path=chebi_obo_path)
 
-        tools = self._build_tools()
-        llm = self._build_llm().bind_tools(tools)
-        self.graph = build_graph(llm=llm, tools=tools)
+        llm_base = self._build_llm()
+        tools = self._build_tools(llm_base)
+        self.graph = build_graph(llm=llm_base.bind_tools(tools), tools=tools)
         logger.debug("Orchestrator ready: %d tools bound", len(tools))
 
-    def _build_tools(self) -> list:
+    def _build_tools(self, llm_base: ChatOpenAI) -> list:
+        def _llm_invoke(prompt: str) -> str:
+            from langchain_core.messages import HumanMessage
+            return llm_base.invoke([HumanMessage(content=prompt)]).content or ""
+
         state = ToolState(
             store=self.store,
             schema=self.schema_helper,
             services=self.services,
+            llm_invoke=_llm_invoke,
         )
         return build_tools(state)
 
