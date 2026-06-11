@@ -4,19 +4,17 @@ from langgraph.prebuilt import ToolNode
 from .tools import TOOLS
 
 
-def agent_node(state: MessagesState) -> dict:
-    # TODO: llm.invoke(state["messages"])
-    pass
+def build_graph(llm=None):
+    def agent_node(state: MessagesState) -> dict:
+        response = llm.invoke(state["messages"])
+        return {"messages": [response]}
 
+    def should_continue(state: MessagesState) -> str:
+        last = state["messages"][-1]
+        if hasattr(last, "tool_calls") and last.tool_calls:
+            return "tools"
+        return END
 
-def should_continue(state: MessagesState) -> str:
-    last = state["messages"][-1]
-    if hasattr(last, "tool_calls") and last.tool_calls:
-        return "tools"
-    return END
-
-
-def build_graph():
     graph = StateGraph(MessagesState)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", ToolNode(TOOLS))
