@@ -1,8 +1,11 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional
 
 import openai
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class ChatClient(ABC):
@@ -16,6 +19,7 @@ class OllamaChatClient(ChatClient):
         self.base = base_url.rstrip("/")
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        logger.debug("OllamaClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -24,7 +28,9 @@ class OllamaChatClient(ChatClient):
         }
         r = requests.post(f"{self.base}/api/chat", json=payload, timeout=timeout)
         r.raise_for_status()
-        return r.json().get("message", {}).get("content", "") or ""
+        result = r.json().get("message", {}).get("content", "") or ""
+        logger.debug("OllamaClient.chat: response_len=%d", len(result))
+        return result
 
 
 class CBorgChatClient(ChatClient):
@@ -40,13 +46,16 @@ class CBorgChatClient(ChatClient):
         )
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
+        logger.debug("CBorgClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             timeout=timeout,
         )
-        return resp.choices[-1].message.content or ""
+        result = resp.choices[-1].message.content or ""
+        logger.debug("CBorgClient.chat: response_len=%d", len(result))
+        return result
 
 
 def make_chat_client(
@@ -58,6 +67,7 @@ def make_chat_client(
     cborg_api_key: Optional[str] = None,
 ) -> ChatClient:
     b = (backend or "ollama").lower()
+    logger.debug("make_chat_client: backend=%s model=%s", b, model)
     if b == "ollama":
         return OllamaChatClient(model=model, base_url=ollama_url)
     if b in ("cborg", "cborg-openai"):

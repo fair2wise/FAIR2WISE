@@ -43,17 +43,25 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dry-run", action="store_true",
                    help="Validate config and print settings without running")
     p.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING"], default="INFO")
+    p.add_argument("--log-file", type=Path, default=Path("logs/run.log"),
+                   help="File to write logs to")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s %(levelname)-8s %(message)s",
-        datefmt="%H:%M:%S",
-    )
+
+    args.log_file.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(args.log_file, mode="w", encoding="utf-8")
+    handler.setFormatter(logging.Formatter(
+        fmt="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logging.root.setLevel(getattr(logging, args.log_level))
+    logging.root.addHandler(handler)
+
     log = logging.getLogger(__name__)
+    log.info("Logging to %s", args.log_file)
 
     # --- Validate inputs ---
     if not args.pdf_dir.exists():

@@ -43,6 +43,10 @@ class Orchestrator:
         self.cborg_api_key = cborg_api_key or os.environ.get("CBORG_API_KEY")
         self.ollama_url = ollama_url
 
+        logger.info(
+            "Initializing Orchestrator: model=%s backend=%s workers=%d output=%s",
+            model, backend, max_workers, output_file,
+        )
         self.schema_helper = SchemaHelper(schema_path=schema_path)
         self.store = TermStore(output_file)
         self.services = build_services(chebi_obo_path=chebi_obo_path)
@@ -50,6 +54,7 @@ class Orchestrator:
         tools = self._build_tools()
         llm = self._build_llm().bind_tools(tools)
         self.graph = build_graph(llm=llm, tools=tools)
+        logger.debug("Orchestrator ready: %d tools bound", len(tools))
 
     def _build_tools(self) -> list:
         state = ToolState(
@@ -61,12 +66,14 @@ class Orchestrator:
 
     def _build_llm(self) -> ChatOpenAI:
         if self.backend == "ollama":
+            logger.debug("Building LLM: backend=ollama url=%s model=%s", self.ollama_url, self.model)
             return ChatOpenAI(
                 model=self.model,
                 base_url=self.ollama_url.rstrip("/") + "/v1",
                 api_key="ollama",
                 temperature=self.temperature,
             )
+        logger.debug("Building LLM: backend=cborg base=%s model=%s", self.cborg_base, self.model)
         return ChatOpenAI(
             model=self.model,
             api_key=self.cborg_api_key,
@@ -184,6 +191,7 @@ def run_extraction(
     chebi_obo_path: Optional[str] = None,
 ) -> dict:
     """Drop-in replacement for extract_terms.run_extraction."""
+    logger.info("run_extraction: dir=%s output=%s model=%s backend=%s", pdf_dir, output_json, model, backend)
     o = Orchestrator(
         model=model,
         output_file=str(output_json),

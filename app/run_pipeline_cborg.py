@@ -163,9 +163,20 @@ if __name__ == "__main__":
     parser.add_argument("--organize", action="store_true", help="Organize PDFs into 4 folders of 25 papers each")
     parser.add_argument("--models", nargs="+", default=EVALUATION_MODELS)
     parser.add_argument("--dry-run", action="store_true", help="Print planned runs without executing")
+    parser.add_argument("--log-file", type=Path, default=Path("logs/pipeline.log"),
+                        help="File to write logs to")
+    parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING"], default="INFO")
 
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+    args.log_file.parent.mkdir(parents=True, exist_ok=True)
+    _handler = logging.FileHandler(args.log_file, mode="w", encoding="utf-8")
+    _handler.setFormatter(logging.Formatter(
+        fmt="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logging.root.setLevel(getattr(logging, args.log_level))
+    logging.root.addHandler(_handler)
+    logging.info("Logging to %s", args.log_file)
 
     if args.organize:
         if not args.source_dir:
