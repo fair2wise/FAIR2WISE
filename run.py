@@ -24,11 +24,11 @@ def parse_args() -> argparse.Namespace:
         description="FAIR2WISE term-extraction agent",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--pdf-dir", type=Path, default=Path("polymer_papers"),
+    p.add_argument("--pdf-dir", type=Path, default=Path("papers_test"),
                    help="Directory containing PDF files to process")
-    p.add_argument("--output", type=Path, default=Path("storage/terminology/terms.json"),
+    p.add_argument("--output", type=Path, default=Path("storage/terminology/terms_test.json"),
                    help="Output JSON file for extracted terms")
-    p.add_argument("--model", default="google/gemini-flash-lite",
+    p.add_argument("--model", default="amazon/gpt-oss-20b",
                    help="LLM model name")
     p.add_argument("--backend", choices=["cborg", "ollama"], default="cborg",
                    help="LLM backend")
