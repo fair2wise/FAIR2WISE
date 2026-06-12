@@ -31,6 +31,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[logging.FileHandler("academy_extractor.log", mode="w")],
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 ACADEMY_EXCHANGE_URL = "https://exchange.academy-agents.org"

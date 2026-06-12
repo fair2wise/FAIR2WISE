@@ -58,6 +58,7 @@ class TermExtractorAgent(Agent):
             handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
             logging.getLogger().addHandler(handler)
             logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger("httpx").setLevel(logging.WARNING)
         logger.info("TermExtractorAgent starting up on remote endpoint")
         self._orchestrator = Orchestrator(
             model=self._model,
