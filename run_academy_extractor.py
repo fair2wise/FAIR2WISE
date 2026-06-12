@@ -29,7 +29,7 @@ load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.FileHandler("academy_extractor.log")],
+    handlers=[logging.FileHandler("academy_extractor.log", mode="w")],
 )
 logger = logging.getLogger(__name__)
 
