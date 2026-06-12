@@ -229,6 +229,23 @@ as "{name}"?  If none match, respond with `None`.
         }
         fixed = state.schema.validate_and_fix_term(raw)
 
+        # Domain/range validation: downgrade verified=True relations that violate schema constraints.
+        subj_cat = fixed.get("category", "")
+        for rel in fixed.get("relations", []):
+            if not rel.get("verified", False):
+                continue
+            obj_key = TermStore.normalize(rel.get("related_term", ""))
+            obj_record = state.store.get(obj_key)
+            obj_cat = obj_record.category if obj_record else ""
+            if subj_cat and obj_cat and not state.schema.check_relation_validity(
+                subj_cat, rel["relation"], obj_cat
+            ):
+                logger.warning(
+                    "register_term: relation '%s' invalid for %s→%s, marking verified=False",
+                    rel["relation"], subj_cat, obj_cat,
+                )
+                rel["verified"] = False
+
         key = TermStore.normalize(fixed["term"])
         is_new = state.store.get(key) is None
 
