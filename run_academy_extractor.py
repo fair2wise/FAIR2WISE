@@ -40,6 +40,7 @@ async def run(
     data_dir: str,
     output_file: str,
     model: str,
+    schema_path: str,
     backend: str,
     max_workers: int,
 ) -> None:
@@ -60,6 +61,7 @@ async def run(
         logger.info("Launching TermExtractorAgent on remote endpoint...")
         agent = TermExtractorAgent(
             model=model,
+            schema_path=schema_path,
             output_file=output_file,
             backend=backend,
             max_workers=max_workers,
@@ -88,6 +90,7 @@ def main() -> None:
     parser.add_argument("--output", required=True, help="Output JSON path on NERSC")
     parser.add_argument("--model", default="qwen3.5:9b", help="LLM model name")
     parser.add_argument("--backend", default="ollama", choices=["cborg", "ollama"])
+    parser.add_argument("--schema-path", default="/pscratch/sd/b/bzheng2/FAIR2WISE/storage/schema/matkg_schema.yaml", help="Path to LinkML schema")
     parser.add_argument("--max-workers", type=int, default=2)
     args = parser.parse_args()
 
@@ -96,6 +99,7 @@ def main() -> None:
         output_file=args.output,
         model=args.model,
         backend=args.backend,
+        schema_path=args.schema_path,
         max_workers=args.max_workers,
     ))
 
