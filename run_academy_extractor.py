@@ -85,9 +85,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run term extraction on NERSC via Academy")
     parser.add_argument("--data-dir", required=True, help="Path to PDF directory on NERSC")
     parser.add_argument("--output", required=True, help="Output JSON path on NERSC")
-    parser.add_argument("--model", default="lbl/llama-3-70b-instruct", help="LLM model name")
-    parser.add_argument("--backend", default="cborg", choices=["cborg", "ollama"])
-    parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--model", default="qwen3.5:9b", help="LLM model name")
+    parser.add_argument("--backend", default="ollama", choices=["cborg", "ollama"])
+    parser.add_argument("--max-workers", type=int, default=2)
     args = parser.parse_args()
 
     asyncio.run(run(
