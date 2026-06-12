@@ -57,8 +57,7 @@ async def run(
         executors=executor,
     ) as manager:
         logger.info("Launching TermExtractorAgent on remote endpoint...")
-        handle = await manager.launch(
-            TermExtractorAgent,
+        agent = TermExtractorAgent(
             model=model,
             output_file=output_file,
             backend=backend,
@@ -66,6 +65,7 @@ async def run(
             cborg_base=cborg_base,
             cborg_api_key=cborg_api_key,
         )
+        handle = await manager.launch(agent)
         logger.info("Agent launched. Waiting for startup...")
 
         logger.info("Starting extraction from: %s", data_dir)
