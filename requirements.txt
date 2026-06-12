@@ -1,9 +1,11 @@
+academy-py==0.4.0
 anthropic>=0.40.0
 aiohttp>=3.14.0
 arxiv>=4.0.0
 colorama>=0.4.6
 faiss-cpu>=1.14.2
 fastapi>=0.136.3
+globus-compute-sdk
 langchain-core>=0.3
 langchain-openai>=0.3
 langgraph>=0.2
