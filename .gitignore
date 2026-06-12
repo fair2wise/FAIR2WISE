@@ -139,3 +139,7 @@ priv_key.pem
 sfapi_training.json
 
 *.obo
+
+# SLURM output files
+slurm_scripts/out*
+slurm_scripts/err*
