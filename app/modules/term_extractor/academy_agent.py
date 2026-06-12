@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from academy.agent import Agent, action
@@ -30,6 +31,7 @@ class TermExtractorAgent(Agent):
         cborg_base: Optional[str] = None,
         cborg_api_key: Optional[str] = None,
         chebi_obo_path: Optional[str] = None,
+        log_file: Optional[str] = None,
     ) -> None:
         super().__init__()
         # These are serialized and sent to the remote executor.
@@ -44,10 +46,18 @@ class TermExtractorAgent(Agent):
         self._cborg_base = cborg_base or os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov")
         self._cborg_api_key = cborg_api_key or os.environ.get("CBORG_API_KEY")
         self._chebi_obo_path = chebi_obo_path
+        self._log_file = log_file
         self._orchestrator: Optional[Orchestrator] = None
 
     async def agent_on_startup(self) -> None:
         """Called once on the remote executor after the agent is launched."""
+        if self._log_file:
+            log_path = Path(self._log_file)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
+            handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+            logging.getLogger().addHandler(handler)
+            logging.getLogger().setLevel(logging.INFO)
         logger.info("TermExtractorAgent starting up on remote endpoint")
         self._orchestrator = Orchestrator(
             model=self._model,

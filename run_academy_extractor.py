@@ -43,6 +43,7 @@ async def run(
     schema_path: str,
     backend: str,
     max_workers: int,
+    log_file: str | None,
 ) -> None:
     endpoint_id = os.environ["GLOBUS_COMPUTE_ENDPOINT_ID"]
     cborg_api_key = os.environ.get("CBORG_API_KEY")
@@ -67,6 +68,7 @@ async def run(
             max_workers=max_workers,
             cborg_base=cborg_base,
             cborg_api_key=cborg_api_key,
+            log_file=log_file,
         )
         handle = await manager.launch(agent)
         logger.info("Agent launched. Waiting for startup...")
@@ -92,6 +94,7 @@ def main() -> None:
     parser.add_argument("--backend", default="ollama", choices=["cborg", "ollama"])
     parser.add_argument("--schema-path", default="/pscratch/sd/b/bzheng2/FAIR2WISE/storage/schema/matkg_schema.yaml", help="Path to LinkML schema")
     parser.add_argument("--max-workers", type=int, default=2)
+    parser.add_argument("--log-file", default="/pscratch/sd/b/bzheng2/FAIR2WISE/f2w_academy.log", help="Remote log file path (written on the NERSC endpoint)")
     args = parser.parse_args()
 
     asyncio.run(run(
@@ -101,6 +104,7 @@ def main() -> None:
         backend=args.backend,
         schema_path=args.schema_path,
         max_workers=args.max_workers,
+        log_file=args.log_file,
     ))
 
 
