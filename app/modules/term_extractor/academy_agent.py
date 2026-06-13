@@ -55,6 +55,7 @@ class TermExtractorAgent(MonitoredAgent):
 
     async def agent_on_startup(self) -> None:
         """Called once on the remote executor after the agent is launched."""
+        await super().agent_on_startup()
         if self._log_file:
             log_path = Path(self._log_file)
             log_path.parent.mkdir(parents=True, exist_ok=True)
