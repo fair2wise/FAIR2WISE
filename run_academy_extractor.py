@@ -13,12 +13,14 @@ import asyncio
 import logging
 import os
 import sys
+import pickle
 
 from dotenv import load_dotenv
 from globus_compute_sdk import Executor as GlobusComputeExecutor
 
 from academy.exchange.cloud.client import HttpExchangeFactory
 from academy.manager import Manager
+from academy.handle import Handle
 
 # The agent class must be importable on the remote endpoint too.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,6 +37,10 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 ACADEMY_EXCHANGE_URL = "https://exchange.academy-agents.org"
+
+with open('user_agent_handle.pkl', 'rb') as f:
+    user_agent_id = pickle.load(f)
+user_agent_handle = Handle(user_agent_id)
 
 
 async def run(
@@ -62,6 +68,7 @@ async def run(
     ) as manager:
         logger.info("Launching TermExtractorAgent on remote endpoint...")
         agent = TermExtractorAgent(
+            user_agent_handle=user_agent_handle,
             model=model,
             schema_path=schema_path,
             output_file=output_file,

@@ -11,8 +11,8 @@ from academy.agent import action
 from academy.agent import Agent
 from academy.identifier import AgentId
 
-from als_knowledge_agent.dashboard import Dashboard
-from als_knowledge_agent.message import Log, Message, Registration, Stats, UserPrompt
+from .dashboard import Dashboard
+from .message import Log, Message, Registration, Stats, UserPrompt
 
 logger = logging.getLogger(__name__)
 

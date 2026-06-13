@@ -15,7 +15,7 @@ from academy.exchange.cloud.scopes import AcademyExchangeScopes
 from academy.logging import init_logging
 from academy.manager import Manager
 
-from als_knowledge_agent.user_agent import UserAgent
+from app.modules.term_extractor.user_agent import UserAgent
 
 
 DEFAULT_TOKEN_DB = Path('~/local/share/academy/storage.db').expanduser()

@@ -15,7 +15,7 @@ from flask import request
 from flask import Response
 from flask import send_from_directory
 
-from als_knowledge_agent.message import Log, Registration, Stats, UserPrompt
+from .message import Log, Registration, Stats, UserPrompt
 
 _ASSETS_DIR = _os.path.join(_os.path.dirname(__file__), 'assets')
 

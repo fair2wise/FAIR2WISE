@@ -5,13 +5,16 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from academy.agent import Agent, action
+from academy.handle import Handle
 
 from .orchestrator import Orchestrator
+from .monitored_agent import MonitoredAgent
+from .user_agent import UserAgent
 
 logger = logging.getLogger(__name__)
 
 
-class TermExtractorAgent(Agent):
+class TermExtractorAgent(MonitoredAgent):
     """Academy agent wrapping the LangGraph term-extraction pipeline.
 
     Runs on the remote Globus Compute endpoint; the Orchestrator is
@@ -20,6 +23,7 @@ class TermExtractorAgent(Agent):
 
     def __init__(
         self,
+        user_agent_handle: Handle[UserAgent], 
         model: str,
         output_file: str,
         *,
@@ -33,7 +37,7 @@ class TermExtractorAgent(Agent):
         chebi_obo_path: Optional[str] = None,
         log_file: Optional[str] = None,
     ) -> None:
-        super().__init__()
+        super().__init__(user_agent_handle=user_agent_handle)
         # These are serialized and sent to the remote executor.
         # Resolve env vars now so the remote side doesn't need the .env file.
         self._model = model

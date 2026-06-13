@@ -17,7 +17,7 @@ from academy.agent import action
 from academy.agent import Agent
 from academy.handle import Handle
 
-from als_knowledge_agent.message import Log, Message, Registration, Stats, UserPrompt
+from .message import Log, Message, Registration, Stats, UserPrompt
 
 _FORWARDED_LOGGER_SKIP_PREFIXES = (
     # 'academy',
