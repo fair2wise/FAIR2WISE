@@ -90,6 +90,68 @@ def test_knowledge_graph_rejects_unknown_retrieval_backend(tmp_path, monkeypatch
         raise AssertionError("Expected ValueError")
 
 
+def test_knowledge_graph_loads_splash_links_source(monkeypatch):
+    class FakeResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": self._data}
+
+    def fake_post(url, json, timeout):
+        assert url == "http://localhost:8080/splash_links/graphql"
+        assert timeout == 30
+        query = json["query"]
+        offset = json["variables"]["offset"]
+        if "entities" in query:
+            entities = [
+                {
+                    "id": "uuid-p3ht",
+                    "entityType": "ConjugatedPolymer",
+                    "name": "P3HT",
+                    "uri": "matkg:P3HT",
+                    "properties": {
+                        "description": "Conjugated polymer for organic photovoltaics.",
+                        "source_papers": ["paper.pdf"],
+                        "publication_year": 2025,
+                    },
+                },
+                {
+                    "id": "uuid-opv",
+                    "entityType": "Device",
+                    "name": "Organic photovoltaic device",
+                    "uri": "matkg:OPV",
+                    "properties": {"description": "Solar cell device."},
+                },
+            ]
+            return FakeResponse({"entities": entities if offset == 0 else []})
+        links = [
+            {
+                "id": "link-1",
+                "subjectId": "uuid-p3ht",
+                "predicate": "rel:has_application",
+                "objectId": "uuid-opv",
+                "properties": {"has_evidence": "p1"},
+            }
+        ]
+        return FakeResponse({"links": links if offset == 0 else []})
+
+    monkeypatch.setattr(kg_rag_api, "GRAPH_SOURCE", "splash")
+    monkeypatch.setattr(kg_rag_api, "SPLASH_LINKS_URI", "splash://localhost:8080")
+    monkeypatch.setattr(kg_rag_api, "SPLASH_LINKS_PAGE_SIZE", 1000)
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
+    monkeypatch.setattr(kg_rag_api.requests, "post", fake_post)
+
+    kg = kg_rag_api.KnowledgeGraph("unused.json")
+
+    assert set(kg.nodes) == {"matkg:P3HT", "matkg:OPV"}
+    assert kg.out_edges["matkg:P3HT"][0]["object"] == "matkg:OPV"
+    assert kg.semantic_search("P3HT photovoltaics", topk=2)[0].id == "matkg:P3HT"
+
+
 def test_retrieve_nodes_ranks_and_caps_results(tmp_path, monkeypatch):
     monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
     monkeypatch.setattr(kg_rag_api, "DEFAULT_K", 2)
@@ -176,7 +238,7 @@ def test_build_context_uses_structured_facts_without_pdf_reads(tmp_path, monkeyp
     graph_path = write_graph(tmp_path)
     kg = kg_rag_api.KnowledgeGraph(str(graph_path))
     node_info = kg.build_nodeinfo(
-        [kg_rag_api.NodeScore("matkg:P3HT", 0.9)],
+        [kg_rag_api.NodeScore("matkg:P3HT", 0.9), kg_rag_api.NodeScore("matkg:OPV", 0.8)],
         [kg_rag_api.NodeScore("matkg:P3HT", 1.0)],
         ["p3ht"],
     )
@@ -281,6 +343,44 @@ def test_fastapi_chat_returns_error_for_missing_messages(tmp_path, monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {"error": "No messages"}
+
+
+def test_fastapi_exposes_openwebui_model_discovery_and_openai_chat(tmp_path, monkeypatch):
+    class FakeClient:
+        model = "fake-cborg"
+
+        async def chat(self, messages):
+            assert messages[-1]["role"] == "user"
+            return "grounded answer"
+
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
+    monkeypatch.setattr(kg_rag_api, "load_pdf_text", lambda path: "")
+    monkeypatch.setattr(kg_rag_api, "make_chat_client", lambda backend, model=None: FakeClient())
+    graph_path = write_graph(tmp_path)
+    app = kg_rag_api.create_fastapi_app(str(graph_path), backend="cborg")
+    client = TestClient(app)
+
+    tags = client.get("/api/tags")
+    assert tags.status_code == 200
+    assert tags.json()["models"][0]["name"] == "kg-rag:latest"
+
+    version = client.get("/api/version")
+    assert version.status_code == 200
+    assert version.json()["version"]
+
+    models = client.get("/v1/models")
+    assert models.status_code == 200
+    assert models.json()["data"][0]["id"] == "kg-rag:latest"
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "kg-rag:latest",
+            "messages": [{"role": "user", "content": "Which papers mention P3HT?"}],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["content"] == "grounded answer"
 
 
 def test_conversation_and_prompt_builders():

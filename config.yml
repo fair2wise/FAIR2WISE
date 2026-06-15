@@ -54,9 +54,20 @@ kg_rag:
       env: KG_RAG_SHOW_BASELINE
       default: false
   retrieval:
+    graph_source:
+      env: KG_RAG_GRAPH_SOURCE
+      default: splash
+    splash_uri:
+      env:
+        - KG_RAG_SPLASH_URI
+        - SPLASH_LINKS_URI
+      default: splash://localhost:8081
+    splash_page_size:
+      env: KG_RAG_SPLASH_PAGE_SIZE
+      default: 1000
     graph_file:
       env: KG_RAG_GRAPH
-      default: storage/kg/matkg_qwen3_235b_580papers.json
+      default: storage/kg/matkg_xray_papers_cborg_chat.json
     pdf_dir:
       env: KG_RAG_PDF_DIR
       default: polymer_papers
@@ -198,7 +209,9 @@ docker_env:
   PIP_NO_CACHE_DIR: "1"
   KG_RAG_BACKEND: cborg
   KG_RAG_CBORG_MODEL: lbl/cborg-chat
-  KG_RAG_GRAPH: storage/kg/matkg_qwen3_235b_580papers.json
+  KG_RAG_GRAPH_SOURCE: splash
+  KG_RAG_SPLASH_URI: splash://localhost:8081
+  KG_RAG_GRAPH: storage/kg/matkg_xray_papers_cborg_chat.json
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_LLM_TIMEOUT: "120"
   KG_RAG_CTX_CHARS: "6000"

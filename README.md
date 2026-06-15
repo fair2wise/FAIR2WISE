@@ -7,8 +7,8 @@ This repository builds materials-science knowledge graphs from research papers (
 1. Collect PDFs into a domain folder (e.g. `polymer_papers/`, `xray_papers/`)
 2. Extract schema-aligned terminology + publication metadata with an LLM → `storage/terminology/`
 3. Convert extracted terms JSON into a MatKG graph JSON → `storage/kg/`
-4. Point `KG_RAG_GRAPH` in `.env` at the new KG
-5. Query the graph via KG-RAG chat (CLI or Open WebUI)
+4. Import the MatKG JSON into `splash_links`
+5. Query the database-backed graph via KG-RAG chat (CLI or Open WebUI)
 
 ---
 
@@ -55,6 +55,9 @@ MP_API_KEY=your-materials-project-key
 # KG-RAG chat settings
 KG_RAG_BACKEND=cborg
 KG_RAG_CBORG_MODEL=lbl/cborg-chat
+KG_RAG_GRAPH_SOURCE=splash
+KG_RAG_SPLASH_URI=splash://localhost:8081
+KG_RAG_SPLASH_PAGE_SIZE=1000
 KG_RAG_GRAPH=storage/kg/matkg_qwen3_235b_580papers.json
 KG_RAG_RETRIEVAL_BACKEND=lexical
 KG_RAG_LLM_TIMEOUT=120
@@ -63,7 +66,7 @@ KG_RAG_SHOW_BASELINE=0
 PYSTOW_HOME=.cache/pystow
 ```
 
-> **Note:** `load_dotenv(override=True)` is used throughout, so `.env` values always take precedence over any shell environment variables.
+> **Note:** runtime environment variables and CLI flags override `.env`; `.env` overrides `config.yml` defaults.
 
 ---
 
@@ -242,11 +245,21 @@ python3 app/modules/json2kg.py \
   --verbose
 ```
 
-Point KG-RAG at the new KG by setting `KG_RAG_GRAPH` in `.env`:
+Import the MatKG JSON into a running `splash_links` service:
+
+```bash
+cd ../splash_links
+pixi run serve
+pixi run python scripts/import_kg.py ../f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
+```
 
 ```env
-KG_RAG_GRAPH=storage/kg/matkg_xray_papers_cborg_chat.json
+KG_RAG_GRAPH_SOURCE=splash
+KG_RAG_SPLASH_URI=splash://localhost:8081
+KG_RAG_RETRIEVAL_BACKEND=lexical
 ```
+
+The RAG code uses `splash_links` by default and normalizes database entities and links back into the same in-memory graph shape used by local JSON, so retrieval, BFS expansion, context rendering, CLI, and FastAPI chat keep the same behavior. To bypass the database and load a local JSON file, set `KG_RAG_GRAPH_SOURCE=json` or pass `--graph-source json --graph <path>`.
 
 ### Implementation details
 
@@ -347,7 +360,10 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 
 | Argument | Default | Description |
 |---|---|---|
-| `--graph` | `KG_RAG_GRAPH` env | Path to KG JSON file |
+| `--graph-source` | `splash` | KG source (`splash` database or `json` file) |
+| `--splash-uri` | `splash://localhost:8081` | `splash_links` service URI |
+| `--splash-page-size` | `1000` | GraphQL page size for database graph loading |
+| `--graph` | `KG_RAG_GRAPH` env | Path to KG JSON file when `--graph-source json` |
 | `--question` | — | One-shot question, then exit |
 | `--backend` | `cborg` | `ollama`, `cborg`, or `cborg-openai` |
 | `--model` | from env | Model name for selected backend |
@@ -365,7 +381,10 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 | `KG_RAG_BACKEND` | `cborg` | LLM backend (`cborg` or `ollama`) |
 | `KG_RAG_CBORG_MODEL` | `lbl/cborg-chat` | CBORG model name |
 | `KG_RAG_OLLAMA_MODEL` | `deepseek-r1:70b` | Ollama model name |
-| `KG_RAG_GRAPH` | `storage/kg/matkg_qwen3_235b_580papers.json` | KG file to load |
+| `KG_RAG_GRAPH_SOURCE` | `splash` | KG source (`splash`, `splash_links`, `splash-links`, or `json`) |
+| `KG_RAG_SPLASH_URI` | `splash://localhost:8081` | `splash_links` service URI |
+| `KG_RAG_SPLASH_PAGE_SIZE` | `1000` | GraphQL page size for database graph loading |
+| `KG_RAG_GRAPH` | `storage/kg/matkg_qwen3_235b_580papers.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` |
 | `KG_RAG_RETRIEVAL_BACKEND` | `lexical` (Python 3.14), `semantic` otherwise | Retrieval method |
 | `KG_RAG_CTX_CHARS` | `16000` | Max chars of KG context per prompt |
 | `KG_RAG_LLM_TIMEOUT` | `120` | LLM request timeout in seconds |

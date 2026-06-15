@@ -188,7 +188,11 @@ class TestBuildContextRichFields:
 
     def test_relations_rendered_in_context(self, tmp_path, monkeypatch):
         kg = self._kg(tmp_path, monkeypatch)
-        nodes = kg.build_nodeinfo([kg_rag_api.NodeScore("matkg:P3HT", 0.9)], [], [])
+        # Include both P3HT and OPV so the relation target is in the rendered set
+        nodes = kg.build_nodeinfo(
+            [kg_rag_api.NodeScore("matkg:P3HT", 0.9), kg_rag_api.NodeScore("matkg:OPV", 0.8)],
+            [], [],
+        )
         ctx = kg.build_context(nodes, include_structured=False, char_budget=5000, hint_terms=[])
         assert "Relations:" in ctx
         assert "has_application" in ctx

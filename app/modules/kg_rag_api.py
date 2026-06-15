@@ -20,8 +20,10 @@ from dataclasses import dataclass
 from pathlib import Path
 import time
 from typing import Any, Deque, Dict, List, Optional, Protocol, Sequence, Tuple
+from urllib.parse import urlparse
 import aiohttp
 import openai
+import requests
 from colorama import Fore, Style, init as colorama_init
 from dotenv import load_dotenv
 import faiss  # type: ignore
@@ -34,6 +36,11 @@ from rapidfuzz import fuzz
 from sentence_transformers import SentenceTransformer
 import torch
 import uvicorn
+
+try:
+    from app.modules.project_config import config_value
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from project_config import config_value
 
 load_dotenv()
 
@@ -61,10 +68,17 @@ CBORG_BASE_URL = os.environ.get(
 LLM_TEMPERATURE = float(os.environ.get("KG_RAG_TEMPERATURE", "0.4"))
 LLM_TIMEOUT = int(os.environ.get("KG_RAG_LLM_TIMEOUT", "120"))
 SHOW_BASELINE = bool(int(os.environ.get("KG_RAG_SHOW_BASELINE", "0")))
-GRAPH_FILE = os.environ.get(
-    "KG_RAG_GRAPH",
-    "storage/kg/matkg_qwen3_235b_580papers.json",
+GRAPH_FILE = str(
+    config_value(
+        "kg_rag.retrieval.graph_file",
+        "storage/kg/matkg_qwen3_235b_580papers.json",
+    )
 )
+GRAPH_SOURCE = str(config_value("kg_rag.retrieval.graph_source", "splash")).lower()
+SPLASH_LINKS_URI = str(
+    config_value("kg_rag.retrieval.splash_uri", "splash://localhost:8081")
+)
+SPLASH_LINKS_PAGE_SIZE = int(config_value("kg_rag.retrieval.splash_page_size", 1000))
 PDF_DIR = os.environ.get("KG_RAG_PDF_DIR", "polymer_papers")
 
 DEFAULT_K = int(os.environ.get("KG_RAG_TOPK", "12"))
@@ -151,14 +165,7 @@ def create_fastapi_app(
     # base_c = Conversation(BASELINE_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file)
 
-    @app.post("/api/chat")
-    async def api_chat(req: Request):
-        """Handle incoming chat request: retrieve KG context, call LLM, return response."""
-        body = await req.json()
-        messages = body.get("messages", [])
-        if not messages:
-            return JSONResponse({"error": "No messages"}, status_code=400)
-
+    async def _answer_messages(messages: Sequence[Dict[str, str]]) -> str:
         q = messages[-1]["content"]
 
         infos = retrieve_nodes(q, kg)
@@ -181,10 +188,45 @@ def create_fastapi_app(
         for mn in missing:
             gap_tracker.log(mn)
 
+        return rag_resp
+
+    @app.post("/api/chat")
+    async def api_chat(req: Request):
+        """Handle incoming chat request: retrieve KG context, call LLM, return response."""
+        body = await req.json()
+        messages = body.get("messages", [])
+        if not messages:
+            return JSONResponse({"error": "No messages"}, status_code=400)
+
+        rag_resp = await _answer_messages(messages)
+
         return {
             "model": cli.model,
             "message": {"role": "assistant", "content": rag_resp},
             "done": True,
+        }
+
+    @app.post("/v1/chat/completions")
+    async def openai_chat_completions(req: Request):
+        """Handle OpenAI-compatible chat completions for Open WebUI."""
+        body = await req.json()
+        messages = body.get("messages", [])
+        if not messages:
+            return JSONResponse({"error": {"message": "No messages"}}, status_code=400)
+
+        rag_resp = await _answer_messages(messages)
+        return {
+            "id": f"chatcmpl-{int(time.time() * 1000)}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": "kg-rag:latest",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": rag_resp},
+                    "finish_reason": "stop",
+                }
+            ],
         }
 
     @app.get("/api/tags")
@@ -194,6 +236,26 @@ def create_fastapi_app(
             "models": [
                 {"name": "kg-rag:latest", "model": "kg-rag:latest", "modified_at": "2025-09-17T00:00:00Z"}
             ]
+        }
+
+    @app.get("/api/version")
+    async def ollama_version():
+        """Return a minimal Ollama-compatible version response."""
+        return {"version": "0.1.0"}
+
+    @app.get("/v1/models")
+    async def openai_models():
+        """Return OpenAI-compatible model list for Open WebUI."""
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "id": "kg-rag:latest",
+                    "object": "model",
+                    "created": 0,
+                    "owned_by": "kg-rag",
+                }
+            ],
         }
 
     @app.get("/api/ps")
@@ -377,6 +439,120 @@ def format_domain_features(features: Any, *, multiline: bool = False) -> str:
     return " ".join(parts)
 
 
+def _splash_base_url(uri: str) -> str:
+    """Normalize splash://, http://, or https:// URI to HTTP base URL."""
+    parsed = urlparse(uri)
+    if parsed.scheme == "splash":
+        return f"http://{parsed.netloc}".rstrip("/")
+    if parsed.scheme in ("http", "https"):
+        return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    raise ValueError(f"Unsupported splash-links URI scheme {parsed.scheme!r}")
+
+
+def _splash_graphql(uri: str, query: str, variables: Optional[dict] = None) -> dict:
+    """Execute one splash-links GraphQL request and return data payload."""
+    url = f"{_splash_base_url(uri)}/splash_links/graphql"
+    resp = requests.post(
+        url,
+        json={"query": query, "variables": variables or {}},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    body = resp.json()
+    if body.get("errors"):
+        raise RuntimeError(f"splash-links GraphQL error: {body['errors']}")
+    return body["data"]
+
+
+_SPLASH_ENTITIES_QUERY = """
+query Entities($limit: Int, $offset: Int) {
+  entities(limit: $limit, offset: $offset) {
+    id
+    entityType
+    name
+    uri
+    properties
+  }
+}
+"""
+
+_SPLASH_LINKS_QUERY = """
+query Links($limit: Int, $offset: Int) {
+  links(limit: $limit, offset: $offset) {
+    id
+    subjectId
+    predicate
+    objectId
+    properties
+  }
+}
+"""
+
+
+def _splash_node_id(entity: Dict[str, Any]) -> str:
+    props = entity.get("properties") or {}
+    return entity.get("uri") or props.get("matkg_id") or entity["id"]
+
+
+def _splash_entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert splash-links Entity GraphQL record to MatKG node dict."""
+    props = dict(entity.get("properties") or {})
+    node_id = _splash_node_id(entity)
+    node = {
+        **props,
+        "id": node_id,
+        "name": entity.get("name") or node_id,
+        "category": entity.get("entityType") or props.get("category", "Thing"),
+    }
+    if "description" not in node:
+        node["description"] = ""
+    return node
+
+
+def _load_splash_links_graph(
+    uri: str,
+    page_size: int = SPLASH_LINKS_PAGE_SIZE,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Load all splash-links entities and links into MatKG-shaped data."""
+    entities: List[Dict[str, Any]] = []
+    links: List[Dict[str, Any]] = []
+
+    offset = 0
+    while True:
+        data = _splash_graphql(uri, _SPLASH_ENTITIES_QUERY, {"limit": page_size, "offset": offset})
+        batch = data.get("entities", [])
+        entities.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    offset = 0
+    while True:
+        data = _splash_graphql(uri, _SPLASH_LINKS_QUERY, {"limit": page_size, "offset": offset})
+        batch = data.get("links", [])
+        links.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    uuid_to_node_id = {entity["id"]: _splash_node_id(entity) for entity in entities}
+    nodes = [_splash_entity_to_node(entity) for entity in entities]
+    associations: List[Dict[str, Any]] = []
+    for link in links:
+        subject = uuid_to_node_id.get(link.get("subjectId"))
+        obj = uuid_to_node_id.get(link.get("objectId"))
+        if not subject or not obj:
+            continue
+        props = link.get("properties") or {}
+        associations.append({
+            "subject": subject,
+            "predicate": link.get("predicate", "rel:related_to"),
+            "object": obj,
+            "has_evidence": props.get("has_evidence"),
+        })
+    return {"things": nodes, "associations": associations}
+
+
 # ───────────────────── dataclasses ─────────────────────
 @dataclass(slots=True)
 class NodeScore:
@@ -454,10 +630,27 @@ class KnowledgeGraph:
 
     # @annotate('KnowledgeGraph::__init__')
     def __init__(self, graph_file: str, embed_model: str = EMBED_MODEL) -> None:
-        """Load KG from JSON, build adjacency index, and initialize retrieval backend."""
+        """Load KG from configured source, build adjacency index, and initialize retrieval backend."""
         logger.info(Fore.YELLOW + "Loading KG..." + Style.RESET_ALL)
-        with open(graph_file, "r") as fh:
-            data = json.load(fh)
+        if GRAPH_SOURCE == "json":
+            with open(graph_file, "r") as fh:
+                data = json.load(fh)
+        elif GRAPH_SOURCE in {"splash", "splash_links", "splash-links"}:
+            logger.info("Loading KG from splash-links at %s...", SPLASH_LINKS_URI)
+            try:
+                data = _load_splash_links_graph(SPLASH_LINKS_URI)
+            except Exception as exc:
+                logger.warning(
+                    Fore.RED
+                    + "splash-links unreachable (%s) — falling back to JSON: %s"
+                    + Style.RESET_ALL,
+                    exc,
+                    graph_file,
+                )
+                with open(graph_file, "r") as fh:
+                    data = json.load(fh)
+        else:
+            raise ValueError(f"Unknown KG_RAG_GRAPH_SOURCE: {GRAPH_SOURCE}")
         self.nodes: Dict[str, Dict[str, Any]] = {n["id"]: n for n in data["things"]}
         self.out_edges: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         for e in data["associations"]:
@@ -728,14 +921,18 @@ class KnowledgeGraph:
         """
         parts: List[str] = []
         chars = 0
+        rendered_ids = {ni.id for ni in nodes}
 
         if include_structured:
             triples: List[str] = []
             for ni in nodes:
                 for e in self.out_edges.get(ni.id, []):
-                    tgt = self.nodes.get(e["object"], {})
+                    tgt_id = e["object"]
+                    if tgt_id not in rendered_ids:
+                        continue
+                    tgt = self.nodes.get(tgt_id, {})
                     triples.append(
-                        f"({ni.name}) -[{e['predicate'].split(':')[-1]}]-> ({tgt.get('name', e['object'])})"
+                        f"({ni.name}) -[{e['predicate'].split(':')[-1]}]-> ({tgt.get('name', tgt_id)})"
                     )
                     if len(triples) >= CTX_VOLUME_TRIPLES:
                         break
@@ -789,11 +986,17 @@ class KnowledgeGraph:
                 if snip:
                     lines.append(f"[PDF {pdf}]\n{snip}")
             if self.out_edges.get(ni.id):
-                lines.append("Relations:")
+                rel_lines: List[str] = []
                 for e in sorted(self.out_edges[ni.id], key=lambda x: x["predicate"]):
-                    tgt = self.nodes.get(e["object"], {})
+                    tgt_id = e["object"]
+                    if tgt_id not in rendered_ids:
+                        continue
+                    tgt = self.nodes.get(tgt_id, {})
                     pred = e["predicate"].split(":")[-1]
-                    lines.append(f"- {pred}: {tgt.get('name', e['object'])}")
+                    rel_lines.append(f"- {pred}: {tgt.get('name', tgt_id)}")
+                if rel_lines:
+                    lines.append("Relations:")
+                    lines.extend(rel_lines)
             sec = "\n".join(lines)
             parts.append(sec)
             chars += len(sec)
@@ -1063,6 +1266,11 @@ RAG_SYSTEM = (
     "question first, then by recency (most recent first). Always include the publication "
     "year when known (e.g., 'Smith et al., 2023'). If the user asks about papers, "
     "include title, authors, year, and DOI when available in the context. "
+    "8) When the Retrieved Context contains CodeSnippet nodes with source code (marked with "
+    "```python code blocks), ALWAYS include the complete source code in your response. "
+    "Reproduce the code exactly as it appears in the context—do not summarize, paraphrase, "
+    "or omit it. Each CodeSnippet's code is the actual implementation; never claim the code "
+    "is missing or implemented elsewhere when it is present in the context. "
 )
 
 
@@ -1207,6 +1415,24 @@ def main(args) -> None:  # pragma: no cover
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--graph", type=Path, default=GRAPH_FILE)
+    ap.add_argument(
+        "--graph-source",
+        choices=["splash", "splash_links", "splash-links", "json"],
+        default=GRAPH_SOURCE,
+        help="KG source: splash-links database by default, or local JSON.",
+    )
+    ap.add_argument(
+        "--splash-uri",
+        type=str,
+        default=SPLASH_LINKS_URI,
+        help="splash_links service URI used when --graph-source=splash.",
+    )
+    ap.add_argument(
+        "--splash-page-size",
+        type=int,
+        default=SPLASH_LINKS_PAGE_SIZE,
+        help="GraphQL page size for loading entities and links from splash_links.",
+    )
     ap.add_argument("--question", type=str, help="One-shot question, then exit")
     ap.add_argument("--competency", action="store_true", help="Run full competency Q set")
     ap.add_argument("--api", action="store_true", help="Run as FastAPI server")
@@ -1236,6 +1462,9 @@ if __name__ == "__main__":
     )
 
     args = ap.parse_args()
+    GRAPH_SOURCE = args.graph_source.lower()
+    SPLASH_LINKS_URI = args.splash_uri
+    SPLASH_LINKS_PAGE_SIZE = args.splash_page_size
     LLM_TIMEOUT = args.timeout
     SHOW_BASELINE = args.show_baseline
 
