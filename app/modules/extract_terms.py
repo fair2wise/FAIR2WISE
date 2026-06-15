@@ -1079,6 +1079,14 @@ Output JSON:
         _pm = pub_meta or {}
         updated = False
         for snip in snippets:
+            key = self._snippet_key(snip)
+            if key in self._snippet_seen:
+                for existing in self.code_snippets:
+                    if self._snippet_key(existing) == key:
+                        if self._merge_source_metadata(existing, filename, _pm):
+                            updated = True
+                        break
+                continue
             # Stamp pub metadata onto snippet — authors from pub_meta only if
             # LLM didn't attribute to a library author
             if not snip.get("paper_title"):
@@ -1091,9 +1099,8 @@ Output JSON:
             # stamp publication_year so recency boost fires in score_prp
             if not snip.get("publication_year"):
                 snip["publication_year"] = _pm.get("publication_year")
-            key = self._snippet_key(snip)
-            if key in self._snippet_seen:
-                continue
+            if self._merge_source_metadata(snip, filename, _pm):
+                updated = True
             self._snippet_seen.add(key)
             self.code_snippets.append(snip)
             updated = True
@@ -1101,6 +1108,54 @@ Output JSON:
         if updated:
             self._save_snippets_threadsafe()
         return updated
+
+    @staticmethod
+    def _clean_pub_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Drop empty metadata fields before storing source-scoped provenance."""
+        cleaned: Dict[str, Any] = {}
+        for key in (
+            "publication_year",
+            "paper_title",
+            "authors",
+            "institutions",
+            "doi",
+            "journal",
+            "volume",
+            "issue",
+            "pages_range",
+            "abstract_text",
+            "keywords",
+        ):
+            value = (meta or {}).get(key)
+            if value in (None, "", []):
+                continue
+            if isinstance(value, list):
+                value = [v for v in value if v]
+                if not value:
+                    continue
+            cleaned[key] = value
+        return cleaned
+
+    def _merge_source_metadata(
+        self,
+        record: Dict[str, Any],
+        source_paper: str,
+        meta: Optional[Dict[str, Any]],
+    ) -> bool:
+        """Attach metadata to one source paper without overwriting other sources."""
+        cleaned = self._clean_pub_meta(meta)
+        if not source_paper or not cleaned:
+            return False
+        source_metadata = record.setdefault("source_metadata", {})
+        if not isinstance(source_metadata, dict):
+            source_metadata = {}
+            record["source_metadata"] = source_metadata
+        before = dict(source_metadata.get(source_paper) or {})
+        merged = {**before, **{k: v for k, v in cleaned.items() if v not in (None, "", [])}}
+        if merged == before:
+            return False
+        source_metadata[source_paper] = merged
+        return True
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
     def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int, pub_year: Optional[int] = None, pub_meta: Optional[Dict[str, Any]] = None) -> bool:
@@ -1161,24 +1216,12 @@ Output JSON:
             snippets_updated = self._collect_code_snippets(raw_text, filename, page_num, pub_meta)
             return new_or_updated or snippets_updated
 
-        # Harvest pub metadata from LLM term responses — fill gaps in pub_meta
-        # LLM now stamps paper_title/authors/doi/journal on every term it extracts.
-        # Use first term that has any of these fields to enrich pub_meta for the page.
-        _pm_enriched = dict(pub_meta or {})
-        for raw_term in data.get("terms", []):
-            llm_year = raw_term.get("publication_year")
-            if not pub_year and isinstance(llm_year, int) and 1990 <= llm_year <= 2026:
-                pub_year = llm_year
-                _pm_enriched.setdefault("publication_year", pub_year)
-                logger.debug(f"Got publication_year {pub_year} from LLM for {filename}")
-            for _f in ("paper_title", "doi", "journal"):
-                if raw_term.get(_f) and not _pm_enriched.get(_f):
-                    _pm_enriched[_f] = raw_term[_f]
-            if raw_term.get("authors") and not _pm_enriched.get("authors"):
-                _pm_enriched["authors"] = raw_term["authors"]
-            if all(_pm_enriched.get(f) for f in ("publication_year", "paper_title", "doi")):
-                break  # have enough
-        pub_meta = _pm_enriched
+        # Publication/authorship metadata must come from PDF-derived pub_meta.
+        # Ignore LLM-stamped paper_title/authors/doi/year fields because they can
+        # be hallucinated or copied from unrelated context.
+        pub_meta = dict(pub_meta or {})
+        if pub_year is None:
+            pub_year = pub_meta.get("publication_year")
 
         added_or_updated = False
         page_terms: List[str] = []
@@ -1236,6 +1279,8 @@ Output JSON:
                     added_or_updated = True
                 # backfill pub_meta fields on existing entries if not yet set
                 if pub_meta:
+                    if self._merge_source_metadata(entry, filename, pub_meta):
+                        added_or_updated = True
                     for _field in ("paper_title", "doi", "journal", "volume", "issue",
                                    "pages_range", "abstract_text"):
                         if pub_meta.get(_field) and not entry.get(_field):
@@ -1311,6 +1356,11 @@ Output JSON:
                     "pages_range": _pm.get("pages_range"),
                     "abstract_text": _pm.get("abstract_text"),
                     "keywords": _pm.get("keywords") or [],
+                    "source_metadata": (
+                        {filename: self._clean_pub_meta(_pm)}
+                        if self._clean_pub_meta(_pm)
+                        else {}
+                    ),
                 }
                 # include any ChEBI enrichment
                 for chem_key in ("chebi", "smiles", "charge", "inchi", "inchikey", "mass"):
@@ -1650,31 +1700,22 @@ Output JSON:
         self.metadata["processed_files"] += 1
         self.metadata["processed_pages_with_terms"] += pages_with_terms
 
-        # --- Post-process: propagate best pub metadata across all terms from this PDF ---
-        # Threads may have enriched metadata on some pages but not others.
-        # Gather the richest metadata across all terms from this file, then backfill.
+        # --- Post-process: propagate PDF-derived metadata across terms from this PDF ---
+        # Do not infer missing publication/authorship fields from extracted terms;
+        # those term fields may have been hallucinated by the LLM or loaded from
+        # old generated output.
         filename = os.path.basename(pdf_path)
         best_meta: Dict[str, Any] = dict(pub_meta or {})
         scalar_fields = ("paper_title", "doi", "journal", "volume", "issue",
                          "pages_range", "abstract_text", "publication_year")
         list_fields = ("authors", "institutions", "keywords")
 
-        # First pass: collect best metadata from any term belonging to this PDF
-        for entry in self.terms_dict.values():
-            if filename not in (entry.get("source_papers") or []):
-                continue
-            for f in scalar_fields:
-                if entry.get(f) and not best_meta.get(f):
-                    best_meta[f] = entry[f]
-            for f in list_fields:
-                if entry.get(f) and not best_meta.get(f):
-                    best_meta[f] = entry[f]
-
-        # Second pass: stamp best metadata onto all terms from this PDF
         backfilled = 0
         for entry in self.terms_dict.values():
             if filename not in (entry.get("source_papers") or []):
                 continue
+            if self._merge_source_metadata(entry, filename, best_meta):
+                backfilled += 1
             for f in scalar_fields:
                 if best_meta.get(f) and not entry.get(f):
                     entry[f] = best_meta[f]
@@ -1688,6 +1729,7 @@ Output JSON:
         for snip in self.code_snippets:
             if snip.get("source_paper") != filename:
                 continue
+            self._merge_source_metadata(snip, filename, best_meta)
             for f in scalar_fields:
                 if best_meta.get(f) and not snip.get(f):
                     snip[f] = best_meta[f]

@@ -16,22 +16,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "wavelet_peak_candidates",
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks_cwt\ndef wavelet_peak_candidates(q, intensity, min_width=2, max_width=30):\n    widths = np.arange(min_width, max_width + 1)\n    peak_indices = find_peaks_cwt(intensity, widths)\n    return [{\"q\": float(q[i]), \"intensity\": float(intensity[i])} for i in peak_indices]",
       "code_language": "python",
       "code_description": "Identifies potential peak candidates in scattering data using a continuous wavelet transform.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:snippetlocalextremaSCIPYDOCSpdfp3f168c708",
@@ -49,22 +49,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "local_extrema",
       "code_snippet": "import numpy as np\nfrom scipy.signal import argrelmax, argrelmin\ndef local_extrema(q, intensity, order=5):\n    y = np.asarray(intensity, dtype=float)\n    maxima = argrelmax(y, order=order)[0]\n    minima = argrelmin(y, order=order)[0]\n    return {\n        \"maxima\": [{\"q\": float(q[i]), \"intensity\": float(y[i])} for i in maxima],\n        \"minima\": [{\"q\": float(q[i]), \"intensity\": float(y[i])} for i in minima],\n    }",
       "code_language": "python",
       "code_description": "Detects local maxima and minima in a scattering curve using a specified order window.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:snippetrankpeaksbyprominenceSCIPYDOCSpdfp23ee806bc",
@@ -82,22 +82,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "rank_peaks_by_prominence",
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_prominences\ndef rank_peaks_by_prominence(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    peaks, _ = find_peaks(y, distance=8)\n    prominences, left_bases, right_bases = peak_prominences(y, peaks)\n    order = np.argsort(prominences)[::-1]\n    return [\n        {\n            \"q\": float(q[peaks[i]]),\n            \"prominence\": float(prominences[i]),\n            \"left_base_q\": float(q[left_bases[i]]),\n            \"right_base_q\": float(q[right_bases[i]]),\n        }\n        for i in order\n    ]",
       "code_language": "python",
       "code_description": "Ranks detected peaks by their prominence to handle sloping backgrounds and compare peak quality across different intensity scales.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:snippetmeasurepeakwidthsSCIPYDOCSpdfp2be603315",
@@ -115,22 +115,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "measure_peak_widths",
       "code_snippet": "from scipy.signal import find_peaks, peak_widths\ndef measure_peak_widths(x, y):\n    peaks, props = find_peaks(y, prominence=0.05 * max(y))\n    widths, width_heights, left_ips, right_ips = peak_widths(y, peaks, rel_height=0.5)\n    dx = x[1] - x[0]\n    return [\n        {\n            \"center_x\": float(x[p]),\n            \"width_x\": float(w * dx),\n            \"left_x\": float(x[0] + left * dx),\n            \"right_x\": float(x[0] + right * dx),\n        }\n        for p, w, left, right in zip(peaks, widths, left_ips, right_ips)\n    ]",
       "code_language": "python",
       "code_description": "Estimates peak widths at a relative height to capture peak broadening and compare crystallinity or order.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:snippetfindscatteringpeaksSCIPYDOCSpdfp183c84edc",
@@ -148,22 +148,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "find_scattering_peaks",
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef find_scattering_peaks(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    y = np.nan_to_num(y, nan=np.nanmedian(y))\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    y_corrected = y_smooth - np.percentile(y_smooth, 10)\n    peaks, props = find_peaks(\n        y_corrected,\n        prominence=0.05 * np.max(y_corrected),\n        distance=8,\n        width=2,\n    )\n    widths = peak_widths(y_corrected, peaks, rel_height=0.5)\n    return [\n        {\n            \"q\": float(q[idx]),\n            \"intensity\": float(y_corrected[idx]),\n            \"prominence\": float(props[\"prominences\"][i]),\n            \"fwhm_samples\": float(widths[0][i]),\n        }\n        for i, idx in enumerate(peaks)\n    ]",
       "code_language": "python",
       "code_description": "Processes 1D scattering data by smoothing and baseline correction to identify peaks and calculate their positions, intensities, prominences, and widths.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:snippetfitgaussianpeaksMISCDOCSpdfp2743fd4cf",
@@ -181,22 +181,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "fit_gaussian_peaks",
       "code_snippet": "def fit_gaussian_peaks(x, y, peak_indices):\n    model = LinearModel(prefix=\"bg_\")\n    params = model.make_params(slope=0.0, intercept=float(np.nanmedian(y)))\n    for n, idx in enumerate(peak_indices):\n        prefix = f\"p{n}_\"\n        peak = GaussianModel(prefix=prefix)\n        model += peak\n        params.update(\n            peak.make_params(\n                center=float(x[idx]),\n                amplitude=float(max(y[idx], 1e-12)),\n                sigma=max(float(np.diff(x).mean() * 3), 1e-12),\n            )\n        )\n        params[f\"{prefix}sigma\"].min = 0\n    result = model.fit(y, params, x=x, nan_policy=\"omit\")\n    return result",
       "code_language": "python",
       "code_description": "Fits multiple Gaussian peaks and a linear background to 1D scattering data.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      }
     },
     {
       "id": "matkg:snippetintegratethenfindpeaksMISCDOCSpdfp3e90ec8ef",
@@ -214,24 +214,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
-      "authors": [
-        "pyFAI"
-      ],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
+      "authors": [],
+      "paper_authors": [],
+      "doi": null,
       "function_name": "integrate_then_find_peaks",
       "code_snippet": "import pyFAI\ndef integrate_then_find_peaks(image, poni_file, *, npt=1000):\n    ai = pyFAI.load(poni_file)\n    result = ai.integrate1d(image, npt=npt, unit=\"q_A^-1\")\n    q = result.radial\n    intensity = result.intensity\n    peaks = detect_1d_peaks(q, intensity, prominence=0.03, min_distance=8)\n    return q, intensity, peaks",
       "code_language": "python",
       "code_description": "Performs 1D azimuthal integration of a detector image using a poni file and detects peaks in the resulting q-space profile.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      }
     },
     {
       "id": "matkg:snippetanalyzescatteringimageMISCDOCSpdfp3eb99bfd3",
@@ -249,22 +247,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "analyze_scattering_image",
       "code_snippet": "def analyze_scattering_image(image, poni_file=None):\n    if poni_file:\n        q, intensity, peaks = integrate_then_find_peaks(image, poni_file)\n        return {\"mode\": \"integrated_1d\", \"q\": q, \"intensity\": intensity, \"peaks\": peaks}\n    spots = detect_2d_spots(image)\n    return {\"mode\": \"raw_2d\", \"spots\": spots}",
       "code_language": "python",
       "code_description": "A pipeline that chooses between 1D integrated analysis or 2D spot detection based on the availability of a poni file.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      }
     },
     {
       "id": "matkg:snippetdetect1dpeaksMISCDOCSpdfp1d4e1cc8b",
@@ -282,22 +280,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "detect_1d_peaks",
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef detect_1d_peaks(q, intensity, *, prominence=0.05, min_distance=5):\n    y = np.asarray(intensity, dtype=float)\n    y = np.nan_to_num(y, nan=np.nanmedian(y))\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    baseline = np.percentile(y_smooth, 10)\n    y_corrected = y_smooth - baseline\n    peaks, props = find_peaks(\n        y_corrected,\n        prominence=prominence * np.nanmax(y_corrected),\n        distance=min_distance,\n    )\n    widths = peak_widths(y_corrected, peaks, rel_height=0.5)\n    return [\n        {\n            \"q\": float(q[idx]),\n            \"intensity\": float(y_corrected[idx]),\n            \"prominence\": float(props[\"prominences\"][i]),\n            \"fwhm_samples\": float(widths[0][i]),\n        }\n        for i, idx in enumerate(peaks)\n    ]",
       "code_language": "python",
       "code_description": "Detects peaks in 1D scattering curves (intensity vs q) using smoothing, baseline correction, and prominence filtering.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      }
     },
     {
       "id": "matkg:snippetrunpeakfinder8PYFAIDOCSpdfp3ae36d21e",
@@ -315,22 +313,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "run_peakfinder8",
       "code_snippet": "from pyFAI.opencl.peak_finder import OCL_PeakFinder\ndef run_peakfinder8(peak_finder, image):\n    peaks = peak_finder.peakfinder8(\n        image,\n        error_model=\"azimuthal\",\n        cycle=3,\n        cutoff_peak=3,\n        noise=2,\n        connected=9,\n        patch_size=5,\n    )\n    return [\n        {\n            \"pixel_index\": int(row[\"index\"]),\n            \"intensity\": float(row[\"intensity\"]),\n            \"sigma\": float(row[\"sigma\"]),\n            \"row\": float(row[\"pos0\"]),\n            \"col\": float(row[\"pos1\"]),\n        }\n        for row in peaks\n    ]",
       "code_language": "python",
       "code_description": "Implements a GPU-oriented workflow to detect Bragg peaks in diffraction images by integrating signal over patches and calculating centroids.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:snippetestimatebackgroundwithsigmaclippingPYFAIDOCSpdfp221267f0d",
@@ -348,22 +346,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "estimate_background_with_sigma_clipping",
       "code_snippet": "import pyFAI\nimport numpy as np\ndef estimate_background_with_sigma_clipping(image, poni_file, mask=None, npt=2000):\n    ai = pyFAI.load(poni_file)\n    clipped = ai.sigma_clip_ng(\n        image,\n        npt=npt,\n        unit=\"q_A^-1\",\n        mask=mask,\n        thres=5.0,\n        max_iter=5,\n        error_model=\"poisson\",\n        method=(\"no\", \"csr\", \"cython\"),\n    )\n    normal = ai.integrate1d(image, npt=npt, unit=\"q_A^-1\", mask=mask)\n    excess = normal.intensity - clipped.intensity\n    return clipped.radial, clipped.intensity, excess",
       "code_language": "python",
       "code_description": "Uses sigma clipping to estimate a smooth background and isolate excess intensity from crystalline peaks.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:snippetpickcalibrationpeaksmassifPYFAIDOCSpdfp47c32b041",
@@ -381,22 +379,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "pick_calibration_peaks_massif",
       "code_snippet": "from pyFAI.massif import Massif\ndef pick_calibration_peaks_massif(image, seed_yx, mask=None, nmax=200):\n    massif = Massif(image, mask=mask, median_prefilter=True)\n    nearest = massif.nearest_peak(seed_yx)\n    peaks = massif.find_peaks(nearest, nmax=nmax)\n    return peaks",
       "code_language": "python",
       "code_description": "A wrapper function that uses the Massif class to find calibration peaks starting from a user-provided seed location.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:snippetmontecarlopeakseedsPYFAIDOCSpdfp5becb8e2a",
@@ -414,22 +412,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "monte_carlo_peak_seeds",
       "code_snippet": "import random\ndef monte_carlo_peak_seeds(expected_ring_pixels, n_samples=200):\n    seeds = []\n    for _ in range(n_samples):\n        y, x = random.choice(expected_ring_pixels)\n        seeds.append((y + random.uniform(-3, 3), x + random.uniform(-3, 3)))\n    return seeds",
       "code_language": "python",
       "code_description": "Generates random seed coordinates near an expected ring locus for peak picking.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:snippetrefineseedswithmassifPYFAIDOCSpdfp51bcb86ad",
@@ -447,22 +445,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "refine_seeds_with_massif",
       "code_snippet": "def refine_seeds_with_massif(image, seeds, mask=None):\n    from pyFAI.massif import Massif\n    massif = Massif(image, mask=mask, median_prefilter=True)\n    refined = []\n    for seed in seeds:\n        try:\n            refined.append(massif.nearest_peak(seed))\n        except Exception:\n            pass\n    return refined",
       "code_language": "python",
       "code_description": "Refines initial seed coordinates to the nearest local maximum using the Massif algorithm.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:snippetgiwaxslineprofilepeaksPYFAIDOCSpdfp639ba75d9",
@@ -480,22 +478,22 @@
       "formula": "",
       "formula_validation": {},
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
       "authors": [],
-      "paper_authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
-      "doi": "arXiv:2111.08645v1",
+      "paper_authors": [],
+      "doi": null,
       "function_name": "giwaxs_line_profile_peaks",
       "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks\nfrom pyFAI.integrator.fiber import FiberIntegrator\ndef giwaxs_line_profile_peaks(image, poni_file, incident_angle_deg=0.12):\n    fi = FiberIntegrator(poni_file)\n    line = fi.integrate1d_grazing_incidence(\n        data=image,\n        sample_orientation=6,\n        incident_angle=np.deg2rad(incident_angle_deg),\n        npt_ip=1000,\n        npt_oop=100,\n        ip_range=(-7, 7),\n        oop_range=(5.5, 6.25),\n        vertical_integration=False,\n        method=(\"no\", \"csr\", \"cython\"),\n    )\n    x = line.integrated\n    y = line.intensity\n    peaks, props = find_peaks(y, prominence=0.03 * y.max(), distance=10)\n    return [{\"q_ip\": float(x[p]), \"intensity\": float(y[p])} for p in peaks]",
       "code_language": "python",
       "code_description": "Custom wrapper that integrates GIWAXS data into a 1D line profile and identifies peaks using SciPy.",
       "code_domain": null,
-      "domain_features": []
+      "domain_features": [],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:1dscatteringcurve",
@@ -520,16 +518,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -540,7 +533,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:scatteringintensity",
@@ -565,16 +564,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -585,7 +579,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:SAXS",
@@ -685,7 +685,21 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        },
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:WAXS",
@@ -731,16 +745,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -751,7 +760,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        },
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        },
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:order",
@@ -776,16 +797,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -796,7 +812,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:GISAXS",
@@ -873,7 +895,28 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        },
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        },
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:nanoparticleshapes",
@@ -922,16 +965,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -942,7 +980,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:GIWAXS",
@@ -981,16 +1025,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1001,7 +1040,16 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        },
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Braggpeaks",
@@ -1040,16 +1088,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1060,7 +1103,16 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        },
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:intensity",
@@ -1085,16 +1137,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1105,7 +1152,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:localpeakfitting",
@@ -1130,16 +1183,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1150,7 +1198,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:geometryconversion",
@@ -1175,16 +1229,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1195,7 +1244,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:2DGaussianrefinement",
@@ -1220,16 +1275,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1240,7 +1290,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Azimuthalintegration",
@@ -1265,16 +1321,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1285,7 +1336,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:peakdetection",
@@ -1310,16 +1367,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "# Peak Detection and Fitting Code Snippets Sources started from `resources.txt`: - SciPy: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html - Astropy modeling:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "Peak Detection and Fitting Code Snippets",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -1330,7 +1382,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "MISC_DOCS.pdf": {
+          "paper_title": "Peak Detection and Fitting Code Snippets"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:X-rayscatteringcharacterization",
@@ -1375,7 +1433,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:scatteringvectorq",
@@ -1420,7 +1490,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:grazingincidencegeometry",
@@ -1465,7 +1547,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:softmattersystems",
@@ -1510,7 +1604,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:silicon",
@@ -1562,7 +1668,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        },
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      }
     },
     {
       "id": "matkg:biodegradableplastics",
@@ -1607,7 +1728,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:polymermixtures",
@@ -1652,7 +1785,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:nanomaterials",
@@ -1697,7 +1842,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:softmatter",
@@ -1742,7 +1899,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:microemulsions",
@@ -1787,7 +1956,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:reversed-phaseliquidchromatography",
@@ -1836,7 +2017,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:chromatography",
@@ -1899,7 +2096,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:Savitzky-Golayalgorithm",
@@ -1948,7 +2161,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:GCMS",
@@ -1990,7 +2219,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:convolutionalneuralnetwork",
@@ -2060,7 +2305,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:UV-absorption",
@@ -2102,7 +2363,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:peakarea",
@@ -2158,7 +2435,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:peakheight",
@@ -2200,7 +2493,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:linearinterpolation",
@@ -2242,7 +2551,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:normalization",
@@ -2284,7 +2609,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:ACN",
@@ -2351,7 +2692,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:water",
@@ -2411,7 +2768,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:chlorobenzene",
@@ -2457,7 +2830,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:Savitzky-GolaySGfilter",
@@ -2520,7 +2909,26 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        },
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:localminimasearches",
@@ -2562,7 +2970,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:peaklocation",
@@ -2604,7 +3028,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:SNR",
@@ -2660,7 +3100,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:Innity1290seriesUH-PLC",
@@ -2702,7 +3158,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:methylparaben",
@@ -2755,7 +3227,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:ethylparaben",
@@ -2815,7 +3303,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:m-cresol",
@@ -2875,7 +3379,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2-naphthol",
@@ -2935,7 +3455,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:eugenol",
@@ -2995,7 +3531,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:p-methylacetophenone",
@@ -3055,7 +3607,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:m-methylacetophenone",
@@ -3115,7 +3683,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:propiophenone",
@@ -3175,7 +3759,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:benzophenone",
@@ -3228,7 +3828,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:bromobenzene",
@@ -3281,7 +3897,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:naphthalene",
@@ -3334,7 +3966,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:iodobenzene",
@@ -3387,7 +4035,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:o-xylene",
@@ -3440,7 +4104,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:ethylbenzene",
@@ -3493,7 +4173,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:m-xylene",
@@ -3546,7 +4242,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:StableBondC18column",
@@ -3595,7 +4307,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:ZorbaxExtend-C18column",
@@ -3644,7 +4372,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:isocraticelution",
@@ -3693,7 +4437,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:gaschromatography",
@@ -3735,7 +4495,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:liquidchromatography-tandemmassspectrometry",
@@ -3777,7 +4553,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:HILIC",
@@ -3819,7 +4611,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:peakwidth",
@@ -3868,7 +4676,26 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        },
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      }
     },
     {
       "id": "matkg:indole",
@@ -3921,7 +4748,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:1-naphthylamine",
@@ -3974,7 +4817,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2-hydroxyacetophenone",
@@ -4023,7 +4882,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2-nitrophenol",
@@ -4072,7 +4947,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:o-methylacetophenone",
@@ -4125,7 +5016,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:anisole",
@@ -4174,7 +5081,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:methylbenzoate",
@@ -4227,7 +5150,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:benzylalcohol",
@@ -4276,7 +5215,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:propylparaben",
@@ -4329,7 +5284,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:butylparaben",
@@ -4371,7 +5342,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:caffeine",
@@ -4420,7 +5407,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:1-naphthol",
@@ -4473,7 +5476,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:ACNwater",
@@ -4515,7 +5534,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:isopropylbenzoate",
@@ -4557,7 +5592,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:m-aminophenol",
@@ -4610,7 +5661,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:12-phenylenediamine",
@@ -4663,7 +5730,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2-methylresorcin",
@@ -4716,7 +5799,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:25-dimethylaniline",
@@ -4769,7 +5868,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:salicylamide",
@@ -4822,7 +5937,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:methylnicotinate",
@@ -4875,7 +6006,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:valerophenone",
@@ -4917,7 +6064,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:acetanilide",
@@ -4970,7 +6133,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:23-dihydroxynaphthalene",
@@ -5019,7 +6198,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:4-methoxyphenol",
@@ -5072,7 +6267,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:26-dimethylaniline",
@@ -5121,7 +6332,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:27-dihydroxynaphthalene",
@@ -5174,7 +6401,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2-hydroxybenzylalcohol",
@@ -5223,7 +6466,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:phthalide",
@@ -5276,7 +6535,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:3-nitrophenol",
@@ -5325,7 +6600,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:N-methylphenylacetamide",
@@ -5378,7 +6669,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:4-hydroxypropiophenone",
@@ -5427,7 +6734,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:phenobarbital",
@@ -5480,7 +6803,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:benzhydrol",
@@ -5529,7 +6868,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:NN-dimethylaniline",
@@ -5571,7 +6926,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:o-cresol",
@@ -5624,7 +6995,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:N-methylaniline",
@@ -5673,7 +7060,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:o-dianisidine",
@@ -5726,7 +7129,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:phenol",
@@ -5775,7 +7194,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:35-dimethylaniline",
@@ -5828,7 +7263,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:p-xylene",
@@ -5870,7 +7321,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:resorcinol",
@@ -5919,7 +7386,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:nitrobenzene",
@@ -5972,7 +7455,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:theophylline",
@@ -6025,7 +7524,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:paracetamol",
@@ -6078,7 +7593,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:furfurylalcohol",
@@ -6131,7 +7662,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:4-methoxyacetanilide",
@@ -6184,7 +7731,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:7-hydroxycoumarine",
@@ -6237,7 +7800,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2-aminophenol",
@@ -6290,7 +7869,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:acetophenone",
@@ -6343,7 +7938,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:phenylsalicylate",
@@ -6385,7 +7996,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:gradientmode",
@@ -6427,7 +8054,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:carvacrol",
@@ -6469,7 +8112,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:ethylbenzoate",
@@ -6511,7 +8170,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:thymol",
@@ -6553,7 +8228,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:chromatogram",
@@ -6616,7 +8307,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:Tenanoparticles",
@@ -6665,7 +8372,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:deposition",
@@ -6719,7 +8441,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:averagethickness",
@@ -6761,7 +8498,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:nanodots",
@@ -6808,7 +8560,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:X-rayabsorptionnear-edgestructure",
@@ -6855,7 +8622,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:Sisubstrate",
@@ -6897,7 +8679,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:silverdocosanoate",
@@ -6939,7 +8736,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:refractionindex",
@@ -6981,7 +8793,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:OPVs",
@@ -7030,7 +8857,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:powerconversionefficiency",
@@ -7084,7 +8922,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:donormaterials",
@@ -7126,7 +8975,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:acceptormaterials",
@@ -7168,7 +9028,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:electrodes",
@@ -7210,7 +9081,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:D18-Cl",
@@ -7252,7 +9134,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:N3",
@@ -7294,7 +9187,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:AT-b2O",
@@ -7336,7 +9240,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:2PCAz",
@@ -7378,7 +9293,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:PEDOTPSS",
@@ -7420,7 +9346,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:cross-sectionalscanningelectronmicroscopy",
@@ -7462,7 +9399,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:energydispersivespectroscopymapping",
@@ -7504,7 +9452,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:time-of-flightsecondaryionmassspectrometry",
@@ -7546,7 +9505,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:blade-coating",
@@ -7588,7 +9558,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:layer-by-layerdeposition",
@@ -7630,7 +9611,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:chargemobility",
@@ -7672,7 +9664,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:serialcrystallography",
@@ -7704,16 +9707,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -7724,7 +9722,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:diffractionimage",
@@ -7749,16 +9753,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -7769,7 +9768,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:amorphousisotropicscattering",
@@ -7794,16 +9799,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -7814,7 +9814,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:single-crystaldiffraction",
@@ -7839,16 +9845,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -7859,7 +9860,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Lauediffraction",
@@ -7891,16 +9898,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -7911,7 +9913,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:LaB6",
@@ -7940,16 +9948,11 @@
         "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -7960,7 +9963,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:XRPD",
@@ -7985,16 +9994,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8005,7 +10009,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:CeO2",
@@ -8034,16 +10044,11 @@
         "error": "mp‑error: Please obtain a valid API key from https://materialsproject.org/api and export it as an environment variable `MP_API_KEY`. Valid API keys are 32 characters."
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8054,7 +10059,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:silverbehenate",
@@ -8079,16 +10090,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8099,7 +10105,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:massifdetection",
@@ -8124,16 +10136,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8144,7 +10151,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:blobdetection",
@@ -8169,16 +10182,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8189,7 +10197,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:DifferenceofGaussians",
@@ -8214,16 +10228,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8234,7 +10243,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Debye-Scherrerrings",
@@ -8273,16 +10288,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8293,7 +10303,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:d-spacing",
@@ -8318,16 +10334,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8338,7 +10349,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:2thetapositions",
@@ -8363,16 +10380,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8383,7 +10395,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:fiberdiffraction",
@@ -8408,16 +10426,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8428,7 +10441,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Gaussianmodel",
@@ -8453,16 +10472,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8473,7 +10487,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Lorentzianmodel",
@@ -8498,16 +10518,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8518,7 +10533,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:pseudo-Voigtmodel",
@@ -8543,16 +10564,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8563,7 +10579,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:peakprominence",
@@ -8588,16 +10610,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2021,
-      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS Source docs: - SciPy signal peak finding reference:",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -8608,7 +10625,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "SCIPY_DOCS.pdf": {
+          "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:PCA",
@@ -8660,7 +10683,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:biomacromolecules",
@@ -8705,7 +10740,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:nanostructure",
@@ -8750,7 +10797,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:neutronscattering",
@@ -8795,7 +10854,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:X-rayscattering",
@@ -8840,7 +10911,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:grazing-incidence",
@@ -8885,7 +10968,19 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY1.pdf": {
+          "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+          "publication_year": 2021,
+          "authors": [
+            "Tomaszewski P",
+            "Yu S",
+            "Borg M",
+            "Rönnols J"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:baselinedrift",
@@ -8927,7 +11022,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:whitenoise",
@@ -8969,7 +11080,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:gaschromatographycombustionisotoperatiomassspectrometry",
@@ -9011,7 +11138,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:isocraticmode",
@@ -9053,7 +11196,23 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY_MISC1.pdf": {
+          "paper_title": "Convolutional neural network for automated peak detection in reversed-phase liquid chromatography",
+          "publication_year": 2022,
+          "doi": "10.1016/j.chroma.2022.463005",
+          "authors": [
+            "Kensert A",
+            "Bosten E",
+            "Collaerts G",
+            "Efthymiadis K",
+            "Van Broeck P",
+            "Desmet G",
+            "Cabooter D"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:nanoparticles",
@@ -9100,7 +11259,22 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY2.pdf": {
+          "paper_title": "Classification of grazing-incidence small-angle X-ray scattering patterns by convolutional neural network",
+          "publication_year": 2020,
+          "doi": "10.1107/S1600577520005767",
+          "authors": [
+            "Ikemoto H",
+            "Yamamoto K",
+            "Touyama H",
+            "Yamashita D",
+            "Nakamura M",
+            "Okuda H"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:fullerene",
@@ -9142,7 +11316,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:non-fullereneacceptors",
@@ -9184,7 +11369,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:Y-family",
@@ -9226,7 +11422,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:bulkheterojunction",
@@ -9268,7 +11475,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:D18-4Cl",
@@ -9310,7 +11528,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:electronmobilities",
@@ -9352,7 +11581,18 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "XRAY3.pdf": {
+          "paper_title": "Organic photovoltaics surpass the 20% efficiency milestone",
+          "publication_year": 2025,
+          "doi": "10.1038/s41563-024-02076-8",
+          "authors": [
+            "Furlan F",
+            "Gasparini N"
+          ]
+        }
+      }
     },
     {
       "id": "matkg:q",
@@ -9377,16 +11617,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -9397,7 +11632,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     },
     {
       "id": "matkg:Braggimages",
@@ -9422,16 +11663,11 @@
         "status": "missing"
       },
       "properties": [],
-      "publication_year": 2000,
-      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms Source docs used: - pyFAI stable docs: https://pyfai.readthedocs.io/en/stable/ - Calibration peak-picking: https://pyfai.readthedocs.io/en/stable/calibration.html",
-      "authors": [
-        "Tomaszewski P",
-        "Yu S",
-        "Borg M",
-        "Rönnols J"
-      ],
+      "publication_year": null,
+      "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+      "authors": [],
       "institutions": [],
-      "doi": "arXiv:2111.08645v1",
+      "doi": null,
       "journal": "science as a way of examining nanostructures.",
       "volume": null,
       "issue": null,
@@ -9442,7 +11678,13 @@
         "\"Convolutional neural networks\"",
         "\"Peak finding\"",
         "\"Method development\""
-      ]
+      ],
+      "source_metadata": {
+        "PYFAI_DOCS.pdf": {
+          "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms"
+        }
+      },
+      "paper_authors": []
     }
   ],
   "associations": [

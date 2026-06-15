@@ -287,6 +287,116 @@ def test_build_context_renders_code_snippet_nodes(tmp_path, monkeypatch):
     assert "```python\ndef analyze(x):\n    return x\n```" in context
 
 
+def test_build_context_prefers_source_scoped_metadata(tmp_path, monkeypatch):
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
+    monkeypatch.setattr(kg_rag_api, "load_pdf_text", lambda path: "")
+    graph = {
+        "things": [
+            {
+                "id": "matkg:SAXS",
+                "name": "SAXS",
+                "category": "ExperimentalTechnique",
+                "description": "Small-angle X-ray scattering.",
+                "source_papers": ["SCIPY_DOCS.pdf", "XRAY1.pdf"],
+                "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+                "doi": "arXiv:2111.08645v1",
+                "authors": ["Tomaszewski P", "Yu S"],
+                "source_metadata": {
+                    "SCIPY_DOCS.pdf": {
+                        "paper_title": "SciPy Peak Finding Algorithms for SAXS/WAXS/GISAXS/GIWAXS"
+                    },
+                    "XRAY1.pdf": {
+                        "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+                        "publication_year": 2021,
+                        "doi": "arXiv:2111.08645v1",
+                        "authors": ["Tomaszewski P", "Yu S"],
+                    },
+                },
+            }
+        ],
+        "associations": [],
+    }
+    graph_path = tmp_path / "graph.json"
+    graph_path.write_text(json.dumps(graph))
+    kg = kg_rag_api.KnowledgeGraph(str(graph_path))
+    node_info = kg.build_nodeinfo([kg_rag_api.NodeScore("matkg:SAXS", 0.9)], [], ["saxs"])
+
+    context = kg.build_context(node_info, include_structured=False, char_budget=3000, hint_terms=[])
+
+    scipy_line = next(line for line in context.splitlines() if line.startswith("- SCIPY_DOCS.pdf"))
+    xray_line = next(line for line in context.splitlines() if line.startswith("- XRAY1.pdf"))
+    assert "SciPy Peak Finding Algorithms" in scipy_line
+    assert "arXiv:2111.08645v1" not in scipy_line
+    assert "Tomaszewski" not in scipy_line
+    assert "arXiv:2111.08645v1" in xray_line
+    assert "Paper_Title: Machine Learning-Assisted" not in context
+
+
+def test_build_context_suppresses_scalar_metadata_across_multiple_sources(tmp_path, monkeypatch):
+    # Legacy graph shape (no source_metadata) where a node aggregates two source
+    # PDFs but carries scalar publication fields from only one of them. The
+    # scalar fields must NOT be rendered, otherwise XRAY1's provenance would be
+    # smeared onto the PYFAI_DOCS.pdf source.
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
+    monkeypatch.setattr(kg_rag_api, "load_pdf_text", lambda path: "")
+    graph = {
+        "things": [
+            {
+                "id": "matkg:silicon",
+                "name": "silicon",
+                "category": "ChemicalEntity",
+                "description": "Calibrant for x-ray scattering geometry refinement.",
+                "source_papers": ["XRAY1.pdf", "PYFAI_DOCS.pdf"],
+                "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+                "publication_year": 2021,
+                "doi": "arXiv:2111.08645v1",
+                "authors": ["Tomaszewski P", "Yu S"],
+                "journal": "science as a way of examining nanostructures.",
+            }
+        ],
+        "associations": [],
+    }
+    graph_path = tmp_path / "graph.json"
+    graph_path.write_text(json.dumps(graph))
+    kg = kg_rag_api.KnowledgeGraph(str(graph_path))
+    node_info = kg.build_nodeinfo([kg_rag_api.NodeScore("matkg:silicon", 0.9)], [], ["silicon"])
+
+    context = kg.build_context(node_info, include_structured=False, char_budget=3000, hint_terms=[])
+
+    assert "Source_Papers: XRAY1.pdf, PYFAI_DOCS.pdf" in context
+    assert "Paper_Title:" not in context
+    assert "arXiv:2111.08645v1" not in context
+    assert "Tomaszewski" not in context
+    assert "Authors:" not in context
+
+
+def test_build_context_keeps_scalar_metadata_for_single_source(tmp_path, monkeypatch):
+    # Single-source legacy node: scalar provenance is unambiguous and preserved.
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
+    monkeypatch.setattr(kg_rag_api, "load_pdf_text", lambda path: "")
+    graph = {
+        "things": [
+            {
+                "id": "matkg:massif",
+                "name": "massif detection",
+                "category": "ExperimentalTechnique",
+                "description": "Peak-picking method on calibration rings.",
+                "source_papers": ["PYFAI_DOCS.pdf"],
+                "paper_title": "pyFAI Peak-Finding and Scattering Reduction Algorithms",
+            }
+        ],
+        "associations": [],
+    }
+    graph_path = tmp_path / "graph.json"
+    graph_path.write_text(json.dumps(graph))
+    kg = kg_rag_api.KnowledgeGraph(str(graph_path))
+    node_info = kg.build_nodeinfo([kg_rag_api.NodeScore("matkg:massif", 0.9)], [], ["massif"])
+
+    context = kg.build_context(node_info, include_structured=False, char_budget=3000, hint_terms=[])
+
+    assert "Paper_Title: pyFAI Peak-Finding and Scattering Reduction Algorithms" in context
+
+
 def test_load_pdf_text_returns_empty_for_missing_file(tmp_path):
     missing = tmp_path / "missing.pdf"
 

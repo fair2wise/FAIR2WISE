@@ -10,7 +10,7 @@ Tests 24–32 from the coverage gap list:
   29. process_page skips pages with fewer than 20 words
   30. process_page handles LLM failure gracefully — returns False
   31. process_page handles JSON parse failure — returns False
-  32. process_page enriches pub_meta from first term's metadata fields
+  32. process_page ignores LLM publication metadata when PDF metadata is absent
 """
 from __future__ import annotations
 
@@ -278,7 +278,11 @@ def test_process_page_handles_json_parse_failure(tmp_path, monkeypatch):
     # Make extract_json_from_text always raise to simulate parse failure
     e.extract_json_from_text = MagicMock(side_effect=ValueError("bad json"))
 
-    long_text = " ".join(["word"] * 30)
+    long_text = (
+        "Advances in OPV Smith J Lee K 10.1002/adma.fake "
+        "Advanced Materials 2022 "
+        + " ".join(["word"] * 30)
+    )
     fake_doc = _make_fake_doc(long_text)
 
     result = e.process_page(fake_doc, "paper.pdf", page_num=0)
@@ -287,10 +291,10 @@ def test_process_page_handles_json_parse_failure(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 32. process_page enriches pub_meta from the first term's metadata fields
+# 32. process_page ignores LLM publication metadata when PDF metadata is absent
 # ---------------------------------------------------------------------------
 
-def test_process_page_enriches_pub_meta_from_term_fields(tmp_path):
+def test_process_page_ignores_llm_pub_meta_without_pdf_metadata(tmp_path):
     llm_response = json.dumps({
         "terms": [
             {
@@ -315,22 +319,25 @@ def test_process_page_enriches_pub_meta_from_term_fields(tmp_path):
     e.fuzzy_merge = MagicMock(return_value=None)  # always new term
     e._save_terms_threadsafe = MagicMock()
 
-    long_text = " ".join(["word"] * 30)
+    long_text = (
+        "Advances in OPV Smith J Lee K 10.1002/adma.fake "
+        "Advanced Materials 2022 "
+        + " ".join(["word"] * 30)
+    )
     fake_doc = _make_fake_doc(long_text)
 
-    # Pass pub_meta with only publication_year missing
     result = e.process_page(
         fake_doc,
         "paper.pdf",
         page_num=0,
         pub_year=None,
-        pub_meta={"journal": ""},
+        pub_meta={},
     )
 
     assert result is True
     term_entry = e.terms_dict.get("p3ht")
     assert term_entry is not None, "P3HT not registered"
-    assert term_entry["paper_title"] == "Advances in OPV"
-    assert term_entry["doi"] == "10.1002/adma.fake"
-    assert term_entry["authors"] == ["Smith J", "Lee K"]
-    assert term_entry["publication_year"] == 2022
+    assert term_entry["paper_title"] is None
+    assert term_entry["doi"] is None
+    assert term_entry["authors"] == []
+    assert term_entry["publication_year"] is None

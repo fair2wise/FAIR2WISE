@@ -439,6 +439,53 @@ def format_domain_features(features: Any, *, multiline: bool = False) -> str:
     return " ".join(parts)
 
 
+def _as_source_metadata(raw: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Return source_paper -> metadata map from supported graph shapes."""
+    meta = raw.get("source_metadata") or {}
+    if not isinstance(meta, dict):
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for source, values in meta.items():
+        if isinstance(values, dict):
+            out[str(source)] = values
+    return out
+
+
+def _unique_sources(sources: Sequence[Any], limit: int = 3) -> List[str]:
+    """Return first unique non-empty source strings."""
+    out: List[str] = []
+    seen: set[str] = set()
+    for source in sources:
+        text = str(source).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _format_source_metadata(source: str, meta: Dict[str, Any]) -> str:
+    """Render one source-scoped provenance line."""
+    parts = [source]
+    field_labels = (
+        ("paper_title", "title"),
+        ("publication_year", "year"),
+        ("doi", "doi"),
+        ("authors", "authors"),
+        ("journal", "journal"),
+    )
+    for field, label in field_labels:
+        value = meta.get(field)
+        if not value:
+            continue
+        if isinstance(value, list):
+            value = ", ".join(str(v) for v in value if v)
+        parts.append(f"{label}={value}")
+    return "; ".join(parts)
+
+
 def _splash_base_url(uri: str) -> str:
     """Normalize splash://, http://, or https:// URI to HTTP base URL."""
     parsed = urlparse(uri)
@@ -952,19 +999,37 @@ class KnowledgeGraph:
                 lines.append(f"Description: {ni.description}")
             if raw.get("formula"):
                 lines.append(f"Formula: {raw['formula']}")
-            # publication provenance - shown for all nodes
-            if raw.get("paper_title"):
-                lines.append(f"Paper_Title: {raw['paper_title']}")
-            if raw.get("publication_year"):
-                lines.append(f"Publication_Year: {raw['publication_year']}")
-            if raw.get("doi"):
-                lines.append(f"DOI: {raw['doi']}")
-            if raw.get("authors"):
-                lines.append(f"Authors: {', '.join(raw['authors'])}")
-            if raw.get("journal"):
-                lines.append(f"Journal: {raw['journal']}")
-            if raw.get("source_papers"):
-                lines.append(f"Source_Papers: {', '.join(raw['source_papers'][:3])}")
+            source_papers = _unique_sources(raw.get("source_papers") or [])
+            if source_papers:
+                lines.append(f"Source_Papers: {', '.join(source_papers)}")
+            source_meta = _as_source_metadata(raw)
+            if source_meta:
+                meta_lines = []
+                for source in (source_papers or _unique_sources(list(source_meta))):
+                    meta = source_meta.get(source)
+                    if meta:
+                        meta_lines.append(f"- {_format_source_metadata(source, meta)}")
+                if meta_lines:
+                    lines.append("Source_Metadata:")
+                    lines.extend(meta_lines)
+            elif len(source_papers) <= 1:
+                # Legacy graph shape with no per-source metadata: scalar
+                # publication provenance is unambiguous ONLY when the node has
+                # at most one source paper. With multiple sources we cannot tell
+                # which paper the scalar fields describe, so attaching them would
+                # smear one paper's metadata onto every source (e.g. stamping
+                # XRAY1's authors/DOI onto a PYFAI_DOCS.pdf entry). Blank beats
+                # misattributed provenance, so we suppress the scalar fields.
+                if raw.get("paper_title"):
+                    lines.append(f"Paper_Title: {raw['paper_title']}")
+                if raw.get("publication_year"):
+                    lines.append(f"Publication_Year: {raw['publication_year']}")
+                if raw.get("doi"):
+                    lines.append(f"DOI: {raw['doi']}")
+                if raw.get("authors"):
+                    lines.append(f"Authors: {', '.join(raw['authors'])}")
+                if raw.get("journal"):
+                    lines.append(f"Journal: {raw['journal']}")
             if raw.get("category") == "CodeSnippet":
                 if not (raw.get("code_snippet") or "").strip():
                     continue
@@ -972,14 +1037,18 @@ class KnowledgeGraph:
                     lines.append(f"Function: {raw['function_name']}")
                 if raw.get("code_domain"):
                     lines.append(f"Domain: {raw['code_domain']}")
-                if raw.get("paper_authors"):
+                # paper_authors is a node-level scalar; only safe to render when
+                # the snippet has a single source and no per-source metadata that
+                # already scopes authorship, otherwise it can misattribute one
+                # paper's authors to another source.
+                if raw.get("paper_authors") and not source_meta and len(source_papers) <= 1:
                     lines.append(f"Paper_Authors: {', '.join(raw['paper_authors'])}")
                 domain_features = format_domain_features(raw.get("domain_features"), multiline=True)
                 if domain_features:
                     lines.append(f"Domain_Features:\n{domain_features}")
                 lang = raw.get("code_language") or ""
                 lines.append(f"Code ({lang}):\n```{lang}\n{raw['code_snippet']}\n```")
-            for pdf in raw.get("source_papers", [])[:3]:
+            for pdf in source_papers:
                 path = str(Path(PDF_DIR) / pdf)
                 txt = load_pdf_text(path)
                 snip = snippet_text(txt, PDF_SNIPPET_LEN, hint_terms)
@@ -1262,10 +1331,15 @@ RAG_SYSTEM = (
     "4) If something is missing, briefly note the gap or add minimal domain knowledge, marked as [Domain Knowledge]. "
     "5) Avoid rigid templates—write as you would in a scientific review article, with a mix of paragraphs and short lists. "
     "6) If sources disagree, mention the discrepancy briefly. "
-    "7) When listing or comparing multiple papers/sources, rank them by relevance to the "
-    "question first, then by recency (most recent first). Always include the publication "
-    "year when known (e.g., 'Smith et al., 2023'). If the user asks about papers, "
-    "include title, authors, year, and DOI when available in the context. "
+    "7) Publication metadata is STRICTLY FORBIDDEN unless it literally appears in the "
+    "Retrieved Context. This includes author names, publication years, DOIs, journals, "
+    "volumes, and formal bibliographic paper descriptions. Do not infer, recall, or invent "
+    "these fields from training knowledge. Only reproduce values that appear verbatim in "
+    "context fields such as Source_Metadata, Paper_Title, Authors, Publication_Year, DOI, "
+    "or Journal. If the context provides only a filename, synthetic title, or code snippet "
+    "without authorship or DOI, describe only what is shown and omit missing bibliographic "
+    "details—do not fabricate them. When listing sources, rank by relevance using only "
+    "context-provided titles and filenames. "
     "8) When the Retrieved Context contains CodeSnippet nodes with source code (marked with "
     "```python code blocks), ALWAYS include the complete source code in your response. "
     "Reproduce the code exactly as it appears in the context—do not summarize, paraphrase, "
@@ -1289,6 +1363,11 @@ def build_rag_prompt(q: str, ctx: str) -> str:
         f"Retrieved Context:\n{ctx.strip()}\n\n"
         "Write a natural, coherent scientific answer that integrates the Retrieved Context. "
         "Use inline citations [KG: ...] or [PDF: ...] when grounding claims. "
+        "Publication metadata rule: do not state any author name, publication year, DOI, "
+        "journal, volume, or formal paper description unless that exact value appears "
+        "verbatim in the Retrieved Context (e.g. Source_Metadata, Paper_Title, Authors, "
+        "Publication_Year, DOI, or Journal lines). If absent, omit it—do not guess or "
+        "fill from outside knowledge. "
         "Skip irrelevant context unless it highlights a limitation. "
         "Note any gaps or minimal fallback knowledge under [Domain Knowledge]."
     )

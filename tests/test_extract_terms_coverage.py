@@ -109,6 +109,66 @@ def _fake_doc(pages: list[str], metadata: dict | None = None) -> MagicMock:
     return doc
 
 
+def test_llm_pub_metadata_is_not_used_when_pdf_meta_missing(tmp_path):
+    e = _bare_extractor(tmp_path)
+    llm_response = json.dumps({
+        "terms": [{
+            "term": "P3HT",
+            "definition": "conjugated polymer",
+            "category": "ConjugatedPolymer",
+            "formula": None,
+            "publication_year": 2024,
+            "paper_title": "Hallucinated Paper",
+            "authors": ["Made Up"],
+            "doi": "10.1002/hallucinated",
+            "relations": [],
+        }]
+    })
+    e.chat_client = _DummyClient(response=llm_response)
+    e.fuzzy_merge = MagicMock(return_value=None)
+    e._extract_and_attach_properties = MagicMock(return_value=False)
+    e._collect_code_snippets = MagicMock(return_value=False)
+    e._save_terms_threadsafe = MagicMock()
+
+    fake_doc = MagicMock()
+    fake_page = MagicMock()
+    fake_page.get_text.return_value = " ".join(["word"] * 30)
+    fake_doc.load_page.return_value = fake_page
+
+    assert e.process_page(fake_doc, "paper.pdf", 0, pub_meta={}) is True
+
+    entry = e.terms_dict["p3ht"]
+    assert entry["paper_title"] is None
+    assert entry["doi"] is None
+    assert entry["authors"] == []
+    assert entry["publication_year"] is None
+
+
+def test_source_metadata_attaches_per_source_without_overwriting(tmp_path):
+    e = _bare_extractor(tmp_path)
+    record = {}
+
+    assert e._merge_source_metadata(
+        record,
+        "SCIPY_DOCS.pdf",
+        {"paper_title": "SciPy Peak Finding Algorithms", "doi": None, "authors": []},
+    )
+    assert e._merge_source_metadata(
+        record,
+        "XRAY1.pdf",
+        {
+            "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+            "doi": "arXiv:2111.08645v1",
+            "authors": ["Tomaszewski P"],
+        },
+    )
+
+    assert record["source_metadata"]["SCIPY_DOCS.pdf"] == {
+        "paper_title": "SciPy Peak Finding Algorithms"
+    }
+    assert record["source_metadata"]["XRAY1.pdf"]["doi"] == "arXiv:2111.08645v1"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # A. OllamaChatClient / CBorgChatClient / make_chat_client
 # ─────────────────────────────────────────────────────────────────────────────
@@ -633,7 +693,10 @@ class TestProcessPageMergePath:
 
         fake_doc = MagicMock()
         fake_page = MagicMock()
-        fake_page.get_text.return_value = " ".join(["word"] * 30)
+        fake_page.get_text.return_value = (
+            "Existing Title New OPV Paper Jones R 10.1002/new Nature Energy "
+            + " ".join(["word"] * 30)
+        )
         fake_doc.load_page.return_value = fake_page
 
         result = e.process_page(fake_doc, "paper.pdf", page_num=1)
@@ -662,7 +725,10 @@ class TestProcessPageMergePath:
 
         fake_doc = MagicMock()
         fake_page = MagicMock()
-        fake_page.get_text.return_value = " ".join(["word"] * 30)
+        fake_page.get_text.return_value = (
+            "Existing Title New OPV Paper Jones R 10.1002/new Nature Energy "
+            + " ".join(["word"] * 30)
+        )
         fake_doc.load_page.return_value = fake_page
 
         e.process_page(
@@ -671,8 +737,9 @@ class TestProcessPageMergePath:
         )
 
         entry = e.terms_dict["p3ht"]
-        # doi was None → should be backfilled from pub_meta LLM enrichment
-        assert entry["doi"] == "10.1002/new"
+        assert entry["paper_title"] == "Existing Title"
+        assert entry["doi"] is None
+        assert entry["authors"] == []
 
     def test_merge_longer_definition_overwrites_shorter(self, tmp_path):
         e = _bare_extractor(tmp_path)

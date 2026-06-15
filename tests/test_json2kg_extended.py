@@ -115,6 +115,30 @@ def test_build_graph_propagates_properties_list():
     assert prop_names == {"hole_mobility", "bandgap"}
 
 
+def test_build_graph_preserves_source_metadata():
+    raw = [
+        {
+            "term": "SAXS",
+            "source_papers": ["scipy_docs.pdf", "saxs_paper.pdf"],
+            "paper_title": "Stale scalar title",
+            "source_metadata": {
+                "scipy_docs.pdf": {"paper_title": "SciPy Peak Finding Algorithms"},
+                "saxs_paper.pdf": {
+                    "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+                    "publication_year": 2021,
+                    "authors": ["Tomaszewski P"],
+                },
+            },
+        }
+    ]
+
+    graph = json2kg.build_graph(raw)
+
+    node = next(n for n in graph["things"] if n["id"] == "matkg:SAXS")
+    assert node["source_metadata"]["scipy_docs.pdf"]["paper_title"] == "SciPy Peak Finding Algorithms"
+    assert node["source_metadata"]["saxs_paper.pdf"]["publication_year"] == 2021
+
+
 # ---------------------------------------------------------------------------
 # 23. convert_terms_to_graph passes code_snippets key through to graph
 # ---------------------------------------------------------------------------

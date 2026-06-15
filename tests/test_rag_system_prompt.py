@@ -46,6 +46,11 @@ class TestRagSystemPrompt:
     def test_mentions_domain_knowledge_marker(self):
         assert "[Domain Knowledge]" in kg_rag_api.RAG_SYSTEM
 
+    def test_guideline_7_forbids_invented_publication_metadata(self):
+        assert "STRICTLY FORBIDDEN" in kg_rag_api.RAG_SYSTEM
+        assert "Do not infer, recall, or invent" in kg_rag_api.RAG_SYSTEM
+        assert "Source_Metadata" in kg_rag_api.RAG_SYSTEM
+
     def test_is_nonempty_string(self):
         assert isinstance(kg_rag_api.RAG_SYSTEM, str)
         assert len(kg_rag_api.RAG_SYSTEM) > 100
@@ -73,6 +78,12 @@ class TestBuildRagPrompt:
     def test_contains_domain_knowledge_instruction(self):
         prompt = kg_rag_api.build_rag_prompt("Q?", "ctx")
         assert "[Domain Knowledge]" in prompt
+
+    def test_contains_publication_metadata_grounding_rule(self):
+        prompt = kg_rag_api.build_rag_prompt("Q?", "ctx")
+        assert "Publication metadata rule:" in prompt
+        assert "do not state any author name" in prompt
+        assert "verbatim in the Retrieved Context" in prompt
 
     def test_strips_whitespace_from_question(self):
         prompt = kg_rag_api.build_rag_prompt("  spaced question  ", "ctx")
