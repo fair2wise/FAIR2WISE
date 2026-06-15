@@ -1307,17 +1307,12 @@ BASELINE_SYSTEM = (
     "You are an expert materials-science assistant. Answer clearly and concisely. "
     "If unsure, say so."
 )
-# RAG_SYSTEM = (
-#     "You are an expert materials-science assistant with access to a retrieved KG context. "
-#     "Use it as evidence, but flag gaps if context is missing or noisy."
-# )
 
-
-# @annotate('build_baseline_prompt')
-def build_baseline_prompt(q: str) -> str:
-    """Build a simple non-RAG baseline prompt."""
-    return f"Question: {q}\n\nAnswer:"
-
+CODE_SNIPPET_DISCLAIMER = (
+    "Disclaimer: This code snippet is reproduced verbatim from the retrieved "
+    "knowledge graph context. Review and validate it against the cited source "
+    "before use in analysis or production workflows."
+)
 
 RAG_SYSTEM = (
     "You are an expert materials-science assistant with access to a retrieved KG/PDF context. "
@@ -1345,7 +1340,15 @@ RAG_SYSTEM = (
     "Reproduce the code exactly as it appears in the context—do not summarize, paraphrase, "
     "or omit it. Each CodeSnippet's code is the actual implementation; never claim the code "
     "is missing or implemented elsewhere when it is present in the context. "
+    f"Immediately after each reproduced code block, append this exact disclaimer on its "
+    f"own line: {CODE_SNIPPET_DISCLAIMER}"
 )
+
+
+# @annotate('build_baseline_prompt')
+def build_baseline_prompt(q: str) -> str:
+    """Build a simple non-RAG baseline prompt."""
+    return f"Question: {q}\n\nAnswer:"
 
 
 def build_rag_prompt(q: str, ctx: str) -> str:
@@ -1368,6 +1371,9 @@ def build_rag_prompt(q: str, ctx: str) -> str:
         "verbatim in the Retrieved Context (e.g. Source_Metadata, Paper_Title, Authors, "
         "Publication_Year, DOI, or Journal lines). If absent, omit it—do not guess or "
         "fill from outside knowledge. "
+        "When you include a code block from a CodeSnippet node, append this exact "
+        f"disclaimer immediately after the closing fence on its own line: "
+        f"{CODE_SNIPPET_DISCLAIMER} "
         "Skip irrelevant context unless it highlights a limitation. "
         "Note any gaps or minimal fallback knowledge under [Domain Knowledge]."
     )

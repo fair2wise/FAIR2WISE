@@ -37,6 +37,10 @@ class TestRagSystemPrompt:
     def test_guideline_8_forbids_claiming_implemented_elsewhere(self):
         assert "implemented elsewhere" in kg_rag_api.RAG_SYSTEM
 
+    def test_guideline_8_requires_code_snippet_disclaimer(self):
+        assert kg_rag_api.CODE_SNIPPET_DISCLAIMER in kg_rag_api.RAG_SYSTEM
+        assert "Immediately after each reproduced code block" in kg_rag_api.RAG_SYSTEM
+
     def test_mentions_kg_citation_format(self):
         assert "[KG:" in kg_rag_api.RAG_SYSTEM
 
@@ -84,6 +88,11 @@ class TestBuildRagPrompt:
         assert "Publication metadata rule:" in prompt
         assert "do not state any author name" in prompt
         assert "verbatim in the Retrieved Context" in prompt
+
+    def test_contains_code_snippet_disclaimer_instruction(self):
+        prompt = kg_rag_api.build_rag_prompt("Q?", "ctx")
+        assert kg_rag_api.CODE_SNIPPET_DISCLAIMER in prompt
+        assert "append this exact disclaimer immediately after the closing fence" in prompt
 
     def test_strips_whitespace_from_question(self):
         prompt = kg_rag_api.build_rag_prompt("  spaced question  ", "ctx")
