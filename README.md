@@ -58,7 +58,7 @@ KG_RAG_CBORG_MODEL=lbl/cborg-chat
 KG_RAG_GRAPH_SOURCE=splash
 KG_RAG_SPLASH_URI=splash://localhost:8081
 KG_RAG_SPLASH_PAGE_SIZE=1000
-KG_RAG_GRAPH=storage/kg/matkg_qwen3_235b_580papers.json
+KG_RAG_GRAPH=storage/kg/matkg_xray_papers_cborg_chat.json
 KG_RAG_RETRIEVAL_BACKEND=lexical
 KG_RAG_LLM_TIMEOUT=120
 KG_RAG_CTX_CHARS=6000
@@ -108,7 +108,7 @@ python3 scripts/download_pdfs.py --help
 - Chemical formula validation and repair
 - ChEBI ontology enrichment
 - Physical property extraction and normalization
-- X-ray scattering code snippet extraction (`xray_code_snippets`)
+- X-ray scattering code snippet extraction (`code_snippets`)
 - Publication metadata extraction per PDF (title, authors, DOI, journal, volume, issue, pages, abstract, keywords)
 - Parallel page-level processing with `ThreadPoolExecutor`
 - Thread-safe incremental saving and exponential-backoff retries
@@ -198,10 +198,10 @@ Each extracted terms JSON contains two top-level keys:
 
 | Key | Description |
 |---|---|
-| `terms` | List of schema-aligned entities. Each entry carries: `term`, `definition`, `category`, `formula`, `relations`, `pages`, `source_papers`, `context_snippets`, `publication_year`, `paper_title`, `authors`, `institutions`, `doi`, `journal`, `volume`, `issue`, `pages_range`, `abstract_text`, `keywords` |
-| `xray_code_snippets` | List of peak-finding / scattering analysis code blocks extracted per page. Each entry carries: `code_snippet`, `code_language`, `code_description`, `scattering_technique`, `peak_positions`, `d_spacing`, `peak_assignments`, `source_paper`, `page` |
+| `terms` | List of schema-aligned entities. Each entry carries: `term`, `definition`, `category`, `formula`, `relations`, `pages`, `source_papers`, `context_snippets`, `source_metadata` (per-PDF publication fields), plus legacy scalar fields (`publication_year`, `paper_title`, `authors`, `institutions`, `doi`, `journal`, `volume`, `issue`, `pages_range`, `abstract_text`, `keywords`) |
+| `code_snippets` | List of peak-finding / scattering analysis code blocks extracted per page. Each entry carries: `code_snippet`, `code_language`, `code_description`, `function_name`, `domain_features`, `source_paper`, `page`, and `source_metadata` |
 
-Publication metadata (`paper_title`, `authors`, `doi`, etc.) is extracted from PDF metadata fields first, then from first-page text via regex. Fields not found are `null` or `[]`.
+Publication metadata (`paper_title`, `authors`, `doi`, etc.) is extracted from PDF metadata fields first, then from first-page text via regex. Fields not found are `null` or `[]`. Metadata is stored per source PDF in `source_metadata` so a term that appears in multiple papers does not smear one paper's authors/DOI onto another.
 
 ### Implementation details
 
@@ -218,7 +218,7 @@ Publication metadata (`paper_title`, `authors`, `doi`, etc.) is extracted from P
 
 ## Step 3 — [Convert to Knowledge Graph](app/modules/json2kg.py)
 
-Converts an extracted terms JSON into a MatKG-compatible JSON graph with `things` (nodes) and `associations` (edges). All publication metadata fields (`paper_title`, `authors`, `doi`, `journal`, etc.) and `xray_code_snippets` are carried into the graph.
+Converts an extracted terms JSON into a MatKG-compatible JSON graph with `things` (nodes) and `associations` (edges). Publication metadata and `code_snippets` are carried into the graph, including per-source `source_metadata`.
 
 ### Polymer papers KG
 
@@ -236,7 +236,7 @@ python3 app/modules/json2kg.py \
   storage/kg/matkg_xray_papers_cborg_chat.json
 ```
 
-With verbose output (node/edge counts, xray node count):
+With verbose output (node/edge counts, snippet count):
 
 ```bash
 python3 app/modules/json2kg.py \
@@ -245,27 +245,12 @@ python3 app/modules/json2kg.py \
   --verbose
 ```
 
-Import the MatKG JSON into a running `splash_links` service:
-
-```bash
-cd ../splash_links
-pixi run serve
-pixi run python scripts/import_kg.py ../f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
-```
-
-```env
-KG_RAG_GRAPH_SOURCE=splash
-KG_RAG_SPLASH_URI=splash://localhost:8081
-KG_RAG_RETRIEVAL_BACKEND=lexical
-```
-
-The RAG code uses `splash_links` by default and normalizes database entities and links back into the same in-memory graph shape used by local JSON, so retrieval, BFS expansion, context rendering, CLI, and FastAPI chat keep the same behavior. To bypass the database and load a local JSON file, set `KG_RAG_GRAPH_SOURCE=json` or pass `--graph-source json --graph <path>`.
-
 ### Implementation details
 
 - Stable canonical IDs via `matkg:` prefix + regex-cleaned term name
-- Full publication metadata preserved on every node: `paper_title`, `authors`, `institutions`, `doi`, `journal`, `volume`, `issue`, `pages_range`, `abstract_text`, `keywords`
-- `xray_code_snippets` converted to `XRayScatteringAnalysis` nodes
+- `source_metadata` preserved on term and `CodeSnippet` nodes (per-PDF provenance)
+- Legacy scalar publication fields retained for backward compatibility
+- `code_snippets` converted to `CodeSnippet` nodes and wired to term nodes from the same paper
 - Missing edge targets auto-stubbed to prevent dangling edges
 - Edges carry optional evidence strings
 - Duplicate `(subject, predicate, object)` edges de-duplicated
@@ -273,7 +258,135 @@ The RAG code uses `splash_links` by default and normalizes database entities and
 
 ---
 
-## Step 4 — [KG-RAG LLM Chat](app/modules/kg_rag_api.py)
+## Step 4 — Import into splash_links
+
+KG-RAG loads from the `splash_links` graph database by default (`KG_RAG_GRAPH_SOURCE=splash`). **After every KG JSON rebuild or metadata fix, you must re-import into splash_links and restart KG-RAG.** The splash DB is not updated automatically when `storage/kg/*.json` changes.
+
+`splash_links` is a separate repo (sibling checkout is typical):
+
+```bash
+git clone https://github.com/als-computing/splash_links
+cd splash_links
+pixi install
+```
+
+### 4a. Start the splash-links server
+
+In a dedicated terminal (keep it running):
+
+```bash
+cd /path/to/splash_links
+pixi run serve
+```
+
+Server listens on `http://localhost:8081`. Verify:
+
+```bash
+curl -s http://localhost:8081/docs -o /dev/null -w "%{http_code}\n"
+# expect: 200
+```
+
+### 4b. Wipe stale DB before re-import (recommended)
+
+If you are re-importing after a metadata or schema fix, delete the old SQLite DB so stale entities (missing `source_metadata`, `code_snippet`, etc.) do not linger:
+
+```bash
+cd /path/to/splash_links
+# stop the server first (Ctrl+C in the serve terminal)
+rm -f links.sqlite
+pixi run serve
+```
+
+> **Why wipe?** `import_kg.py` creates new entities; it does not delete old ones. A partial or pre-fix import leaves duplicate/stale records that KG-RAG may still load.
+
+### 4c. Import the MatKG JSON
+
+```bash
+cd /path/to/splash_links
+pixi run python scripts/import_kg.py /path/to/f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
+```
+
+Dry-run first (validate counts, no writes):
+
+```bash
+pixi run python scripts/import_kg.py --dry-run /path/to/f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
+```
+
+Custom server URL:
+
+```bash
+pixi run python scripts/import_kg.py \
+  --url http://localhost:8081 \
+  /path/to/f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
+```
+
+Expected output for the xray demo KG:
+
+```
+=== TOTALS: 206 entities, 107 links created, 0 links skipped ===
+```
+
+### 4d. Verify splash import
+
+Quick GraphQL check:
+
+```bash
+curl -s http://localhost:8081/splash_links/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"{ entities(limit:1) { name properties } }"}' | python3 -m json.tool
+```
+
+Confirm imported entities carry full `properties` (e.g. `source_metadata`, `code_snippet` on CodeSnippet nodes).
+
+### 4e. Point KG-RAG at splash
+
+In `.env` (or export before starting KG-RAG):
+
+```env
+KG_RAG_GRAPH_SOURCE=splash
+KG_RAG_SPLASH_URI=splash://localhost:8081
+KG_RAG_GRAPH=storage/kg/matkg_xray_papers_cborg_chat.json
+KG_RAG_RETRIEVAL_BACKEND=lexical
+```
+
+`KG_RAG_GRAPH` is the JSON fallback path used when splash-links is unreachable.
+
+### 4f. Restart KG-RAG after import
+
+KG-RAG caches the graph in memory at startup. **Always restart** after splash re-import:
+
+```bash
+cd /path/to/f2wlocal
+python3 app/modules/kg_rag_api.py --api --backend cborg --graph-source splash
+```
+
+### JSON fallback (no splash server)
+
+To bypass the database and load a local JSON file directly:
+
+```env
+KG_RAG_GRAPH_SOURCE=json
+```
+
+Or pass CLI flags:
+
+```bash
+python3 app/modules/kg_rag_api.py --graph-source json --graph storage/kg/matkg_xray_papers_cborg_chat.json
+```
+
+### splash_links troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Wrong/missing code snippets or metadata in answers | Wipe `links.sqlite`, re-import KG JSON, restart KG-RAG |
+| `splash-links unreachable` warning in KG-RAG logs | Start `pixi run serve` in `splash_links`, or set `KG_RAG_GRAPH_SOURCE=json` |
+| Import succeeds but answers unchanged | Restart KG-RAG — old process still holds cached graph |
+| Duplicate entities after multiple imports | Wipe `links.sqlite` before re-import |
+| `import_kg.py` cannot connect | Confirm `curl http://localhost:8081/docs` returns 200 |
+
+---
+
+## Step 5 — [KG-RAG LLM Chat](app/modules/kg_rag_api.py)
 
 Query the knowledge graph via retrieval-augmented generation. Supports CLI, one-shot, competency evaluation, and an Open WebUI-compatible FastAPI server.
 
@@ -384,7 +497,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 | `KG_RAG_GRAPH_SOURCE` | `splash` | KG source (`splash`, `splash_links`, `splash-links`, or `json`) |
 | `KG_RAG_SPLASH_URI` | `splash://localhost:8081` | `splash_links` service URI |
 | `KG_RAG_SPLASH_PAGE_SIZE` | `1000` | GraphQL page size for database graph loading |
-| `KG_RAG_GRAPH` | `storage/kg/matkg_qwen3_235b_580papers.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` |
+| `KG_RAG_GRAPH` | `storage/kg/matkg_xray_papers_cborg_chat.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` (also splash fallback path) |
 | `KG_RAG_RETRIEVAL_BACKEND` | `lexical` (Python 3.14), `semantic` otherwise | Retrieval method |
 | `KG_RAG_CTX_CHARS` | `16000` | Max chars of KG context per prompt |
 | `KG_RAG_LLM_TIMEOUT` | `120` | LLM request timeout in seconds |
@@ -396,7 +509,10 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 - Hybrid retrieval: SentenceTransformer embeddings + FAISS IVF-Flat + weighted BFS
 - Lexical retrieval available (no FAISS/Torch) for Python 3.14 stability
 - Multi-factor node scoring: semantic similarity, graph depth, lexical overlap, evidence count
-- Context blocks include KG triples, formulas, descriptions, and PDF snippets (page-cached)
+- Context blocks include per-source `Source_Metadata`, KG triples, formulas, descriptions, and PDF snippets (page-cached)
+- Legacy scalar publication fields suppressed when `source_metadata` exists, or when a node has multiple sources without per-source metadata (prevents metadata smear)
+- LLM prompt enforces strict grounding: publication metadata (authors, year, DOI, journal) forbidden unless verbatim in retrieved context
+- Reproduced code snippets must be followed by a standard disclaimer (`CODE_SNIPPET_DISCLAIMER` in `kg_rag_api.py`)
 - Question decomposition for multi-clause queries
 - Missing-node tracking logged to `storage/knowledge_gaps/`
 - FastAPI proxy exposes `/api/chat`, `/api/tags`, `/api/ps` (Open WebUI-compatible)
@@ -430,11 +546,11 @@ Open the UI at `http://localhost:8080`. First startup may take a minute to downl
 
 ### 3. Start the KG-RAG API server
 
-In a separate terminal (outside the Open WebUI venv):
+In a separate terminal (outside the Open WebUI venv). Ensure splash-links is running (see **Step 4**) if using the default `splash` graph source:
 
 ```bash
 cd /path/to/FAIRtoWISE-FORUM-AI
-python3 app/modules/kg_rag_api.py --api
+python3 app/modules/kg_rag_api.py --api --graph-source splash
 ```
 
 This starts FastAPI on `http://0.0.0.0:11435`. Verify it is running:
@@ -472,6 +588,8 @@ curl -X POST http://localhost:11435/api/chat \
 | Port 11435 already in use | `lsof -i :11435` — kill stale process, restart from current repo code |
 | Model list empty | Refresh connections in Admin Settings after server starts |
 | Answers time out | Reduce `KG_RAG_CTX_CHARS` (e.g. `3000`) or increase `KG_RAG_LLM_TIMEOUT` |
+| Wrong publication metadata in answers | Wipe `splash_links/links.sqlite`, re-import KG JSON, restart KG-RAG (see **Step 4**) |
+| Invented author names in answers | Expected if context lacks authors — prompt forbids fabrication; verify `Source_Metadata` in context |
 | `Invalid model name` | Check `CBORG_BASE_URL` is `https://api.cborg.lbl.gov` (not `api-local`), model is `lbl/cborg-chat` (no `:latest`) |
 | `Authentication failed` | Verify `CBORG_API_KEY` is set in `.env` |
 
