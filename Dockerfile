@@ -1,28 +1,22 @@
-# Pull official Python image from Dockerhub
-# Check here for specific versions/tags: https://hub.docker.com/_/python/tags
-FROM python:slim
+FROM python:3.12-slim
 
-# Set the working directory in the container.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy only the requirements first to leverage Docker’s caching mechanism.
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Upgrade pip and install Python dependencies in one layer.
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application code.
 COPY . .
 
-# Expose the port your app runs on.
-EXPOSE 8080
+RUN useradd -m appuser && \
+    mkdir -p /app/storage && \
+    chown -R appuser:appuser /app
 
-# Default command: replace with your application’s entrypoint.
-CMD ["python", "-c", "print('Hello, World!')"]
+USER appuser
 
-# Metadata labels (update with your project info).
-LABEL Name="Project Template" \
-      Version="1.0" \
-      Description="A template for a Python project with Docker" \
-      Maintainer="Your Name"
+EXPOSE 11435
+
+CMD ["python", "app/modules/kg_rag_ollama_api.py", "--api", "--graph", "storage/kg/matkg_qwen3_235b_580papers.json"]

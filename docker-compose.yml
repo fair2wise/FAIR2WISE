@@ -1,0 +1,36 @@
+# Host must have Ollama running with the target model pulled (e.g. ollama pull llama3.2).
+
+services:
+  kg-rag:
+    build: .
+    container_name: kg-rag
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KG_RAG_OLLAMA_URL: ${KG_RAG_OLLAMA_URL:-http://host.docker.internal:11434/api/chat}
+      KG_RAG_OLLAMA_MODEL: ${KG_RAG_OLLAMA_MODEL:-llama3.2:latest}
+      KG_RAG_GRAPH: ${KG_RAG_GRAPH:-storage/kg/matkg_qwen3_235b_580papers.json}
+      KG_RAG_CTX_CHARS: ${KG_RAG_CTX_CHARS:-16000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:11435:11435"
+    volumes:
+      - ./storage:/app/storage
+      - ./polymer_papers:/app/polymer_papers
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    depends_on:
+      - kg-rag
+    environment:
+      OLLAMA_BASE_URL: http://kg-rag:11435
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - open-webui:/app/backend/data
+
+volumes:
+  open-webui:

@@ -48,7 +48,7 @@ _NLTK_OK = False
 
 
 # ───────────────────── configuration ─────────────────────
-OLLAMA_MODEL = os.environ.get("KG_RAG_OLLAMA_MODEL", "deepseek-r1:70b")  # "gemma3:27b")
+OLLAMA_MODEL = os.environ.get("KG_RAG_OLLAMA_MODEL", "llama3.2:latest")
 OLLAMA_API_URL = os.environ.get("KG_RAG_OLLAMA_URL", "http://localhost:11434/api/chat")
 GRAPH_FILE = os.environ.get(
     "KG_RAG_GRAPH",
