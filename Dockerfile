@@ -19,4 +19,4 @@ USER appuser
 
 EXPOSE 11435
 
-CMD ["python", "app/modules/kg_rag_ollama_api.py", "--api", "--graph", "storage/kg/matkg_qwen3_235b_580papers.json"]
+CMD ["python", "app/modules/kg_rag_ollama.py", "--api", "--graph", "storage/kg/matkg_qwen3_235b_580papers.json"]

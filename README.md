@@ -1,4 +1,4 @@
-# From FAIR to WISE: Weaving Intelligent Scientific Ecosystems
+# From FAIR2WISE: Weaving Intelligent Scientific Ecosystems
 
 ## Getting Started
 
@@ -17,9 +17,11 @@ pip install -r requirements.txt
 
 All LLM calls in this branch go to a local [Ollama](https://ollama.com/) instance. No API keys are required for Ollama.
 
-**Reviewer default model:** `llama3.2:latest` — used in `docker-compose.yml`, `.env.example`, `kg_rag_ollama_api.py`, and the `extract_terms.py` `__main__` block. It is a lightweight choice for quick smoke tests (~2 GB). The paper's reported extraction/RAG results used `qwen3:235b`, which requires substantial memory (Mac Studio M3 Ultra, 256 GB in the paper).
+**Quick start (no PDFs):** jump to [KG-RAG LLM Chat](#kg-rag-llm-chat) to chat against the bundled `storage/kg/matkg_qwen3_235b_580papers.json` immediately — no download step required.
 
-**Code default mismatch:** if you construct `LLMTermExtractor(...)` directly without `model_name=`, the class default is still `gemma3:27b`. Use `python app/modules/extract_terms.py`, `run_extraction(model=...)`, or pass `model_name=` explicitly to use `llama3.2:latest`.
+**Reviewer default model:** `llama3.2:latest` — used in `docker-compose.yml`, `.env.example`, `kg_rag_ollama.py`, and the `extract_terms.py` `__main__` block. It is a lightweight choice for quick smoke tests (~2 GB). The paper's reported extraction/RAG results used `qwen3:235b`, which requires substantial memory (Mac Studio M3 Ultra, 256 GB in the paper).
+
+**Code default mismatch:** if you construct `LLMTermExtractor(...)` directly without `model_name=`, the class default is still `gemma3:27b`. Use `PYTHONPATH=app python app/modules/extract_terms.py`, `run_extraction(model=...)`, or pass `model_name=` explicitly to use `llama3.2:latest`.
 
 ## LinkML "Core Model" Schema
 
@@ -32,7 +34,7 @@ The reproducible workflow has four entry points, run in order:
 1. [scripts/download_pdfs.py](scripts/download_pdfs.py) — fetch PDFs into a corpus directory
 2. [app/modules/extract_terms.py](app/modules/extract_terms.py) — extract schema-aligned terms from PDFs
 3. [app/modules/json2kg.py](app/modules/json2kg.py) — convert extracted terms JSON to a MatKG graph
-4. [app/modules/kg_rag_ollama_api.py](app/modules/kg_rag_ollama_api.py) — KG-grounded chat (CLI or Open WebUI-compatible API)
+4. [app/modules/kg_rag_ollama.py](app/modules/kg_rag_ollama.py) — KG-grounded chat (CLI or Open WebUI-compatible API)
 
 The default knowledge graph is `storage/kg/matkg_qwen3_235b_580papers.json`. PDF snippet grounding reads from `polymer_papers/` at runtime (see [Corpus data](#corpus-data) — PDFs are not redistributed).
 
@@ -70,12 +72,12 @@ python scripts/download_pdfs.py --keyword "organic photovoltaics" --target ./pol
 
 Schema-aware terminology extraction from scientific PDFs. Integrates Ollama, LinkML schema validation, ChEBI enrichment, chemical-formula repair, and parallel page-level processing.
 
-**Requires PDF files** in `data_dir` (not just the manifest). See [Corpus data](#corpus-data).
+**Requires PDF files** in `data_dir` (not just the manifest). See [Corpus data](#corpus-data). **Prerequisites:** Ollama running with the model pulled; optional [ChEBI ontology](#optional-chebi-ontology-enrichment) and `MP_API_KEY` (see below).
 
 ### Quick run (`__main__`)
 
 ```bash
-python app/modules/extract_terms.py
+PYTHONPATH=app python app/modules/extract_terms.py
 ```
 
 Runs the `if __name__ == "__main__"` block with these defaults:
@@ -120,11 +122,47 @@ Ollama must be running with the model pulled (e.g. `ollama pull llama3.2`).
 
 **Optional:** set `MP_API_KEY` in `.env` for Materials Project chemical-formula validation/enrichment. Without it, local formula parsing still runs; Materials Project cross-check is skipped.
 
+### Optional: ChEBI ontology enrichment
+
+ChEBI adds formula, SMILES, InChI, InChIKey, charge, and mass to recognized chemical entities. The code loads it via `ChebiOboLookup("storage/ontologies/chebi.obo")` using `obonet.read_obo` on the full `chebi.obo` file (not `chebi_lite.obo`). Extraction runs without it; chemical entities simply won't receive ChEBI fields.
+
+The paper's full-corpus extraction used the ChEBI release current as of **August 2025**; pulling a newer `chebi.obo` may yield slightly different enrichment for edge cases, but established chemicals rarely change.
+
+Download into the expected path:
+
+```bash
+mkdir -p storage/ontologies
+curl -L https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo \
+  -o storage/ontologies/chebi.obo
+```
+
+URL verified: `https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo`
+
 ---
 
 ## [Convert to KG](app/modules/json2kg.py)
 
 Transform enriched terms JSON into a MatKG-compatible graph (nodes + edges).
+
+The extraction step writes whatever path you set as `output_file` / `output_json`. The `__main__` default is `storage/terminology/extracted_terms_aug21.json`; files named `extracted_terms_aug21_580papers.json` (and similar `_*papers.json` names under `storage/terminology/`) are **full-corpus runs bundled in the repo**, not produced by the default `__main__` block.
+
+**End-to-end chain (fresh run, consistent filenames):**
+
+```bash
+# 1. PDFs in polymer_papers/ (see Download PDFs + Corpus data)
+# 2. Extract → storage/terminology/extracted_terms_aug21.json
+PYTHONPATH=app python app/modules/extract_terms.py
+
+# 3. Convert terms → graph
+python app/modules/json2kg.py \
+    storage/terminology/extracted_terms_aug21.json \
+    storage/kg/my_graph.json
+
+# 4. Chat against the new graph (or use the bundled default graph)
+python app/modules/kg_rag_ollama.py --graph storage/kg/my_graph.json --api
+```
+
+To convert a **bundled** terminology file instead:
 
 ```bash
 python app/modules/json2kg.py \
@@ -140,7 +178,7 @@ python app/modules/json2kg.py \
 
 ---
 
-## [KG-RAG LLM Chat](app/modules/kg_rag_ollama_api.py)
+## [KG-RAG LLM Chat](app/modules/kg_rag_ollama.py)
 
 Hybrid semantic + graph retrieval over a local KG JSON file, with optional PDF snippet grounding and an Ollama-compatible FastAPI server for [Open WebUI](https://docs.openwebui.com/).
 
@@ -158,28 +196,34 @@ PDF snippets are loaded from `KG_RAG_PDF_DIR` (default `polymer_papers/`) when m
 ### Interactive REPL
 
 ```bash
-python app/modules/kg_rag_ollama_api.py
+python app/modules/kg_rag_ollama.py
 ```
 
 ### One-shot question
 
 ```bash
-python app/modules/kg_rag_ollama_api.py \
+python app/modules/kg_rag_ollama.py \
     --question "What is the role of P3HT crystallinity in OPV performance?"
 ```
 
 ### Competency evaluation
 
 ```bash
-python app/modules/kg_rag_ollama_api.py --competency
+python app/modules/kg_rag_ollama.py --competency
 ```
 
 Reads questions from `storage/competency_questions/thomas_f.txt` and writes incremental results under `storage/competency_questions/`.
 
+**Shipped results (paper reproducibility):** the bundled file for the paper's competency-question findings — including the CQ 21 (RSOXS at ALS) and CQ 26 (P3HT vs PM6) worked examples — is:
+
+`storage/competency_questions/competency_results_ask_qwen3_32b_using_kg_qwen3_235b_580papers.json`
+
+That file records **qwen3:32b** answering with KG-RAG over the **qwen3:235b-built** graph (`matkg_qwen3_235b_580papers.json`), matching the paper's "large graph grounds a smaller model" design. `competency_results_qwen3_235b_580papers.json` is a partial run (questions 1–18 only) and does not contain CQ 21 or 26. HTML viewers: `results.html`, `results_tabs.html`. A fresh `--competency` run produces new output; use the shipped JSON to reproduce the paper's qualitative comparisons.
+
 ### API server (Open WebUI)
 
 ```bash
-python app/modules/kg_rag_ollama_api.py --api
+python app/modules/kg_rag_ollama.py --api
 ```
 
 Listens on `http://0.0.0.0:11435`. Exposes `/api/chat`, `/api/tags`, and `/api/ps` for Open WebUI's Ollama connection.
@@ -187,14 +231,14 @@ Listens on `http://0.0.0.0:11435`. Exposes `/api/chat`, `/api/tags`, and `/api/p
 ### Custom graph
 
 ```bash
-python app/modules/kg_rag_ollama_api.py \
+python app/modules/kg_rag_ollama.py \
     --graph storage/kg/matkg_qwen3_235b_580papers.json \
     --question "How does annealing influence phase separation in P3HT:PCBM?"
 ```
 
 ### Environment variables (`KG_RAG_*`)
 
-Read by `kg_rag_ollama_api.py` via `os.environ.get`. Compose and `.env.example` default `KG_RAG_OLLAMA_MODEL` to `llama3.2:latest` (matches the code default in `kg_rag_ollama_api.py`).
+Read by `kg_rag_ollama.py` via `os.environ.get`. Compose and `.env.example` default `KG_RAG_OLLAMA_MODEL` to `llama3.2:latest` (matches the code default in `kg_rag_ollama.py`).
 
 | Variable | Code default | Purpose |
 |----------|---------|---------|
@@ -243,6 +287,36 @@ Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest 
 
 ---
 
+## Tests
+
+`pytest.ini` sets `testpaths = _tests`, so plain `pytest` collects only `_tests/test_example.py`. The `json2kg.py` test suite is inline in the module; run it explicitly:
+
+```bash
+pytest app/modules/json2kg.py
+```
+
+---
+
+## Utilities
+
+Helper scripts and viewers not part of the main four-step pipeline:
+
+| Path | Purpose |
+|------|---------|
+| [storage/kg/view_kg.html](storage/kg/view_kg.html) | Browser-based interactive viewer for a KG JSON (loads `matkg_qwen3_235b_580papers.json` by default) |
+| [storage/competency_questions/results.html](storage/competency_questions/results.html) | HTML viewer for competency-question evaluation results |
+| [storage/competency_questions/results_tabs.html](storage/competency_questions/results_tabs.html) | Tabbed HTML viewer for competency results |
+| [storage/terminology/parse_terms.py](storage/terminology/parse_terms.py) | Small helper to extract term names from extracted-terms JSON |
+| [scripts/analyze_kgs.py](scripts/analyze_kgs.py) | Compare structural metrics across multiple KG JSON files |
+| [scripts/get_pdf_years.py](scripts/get_pdf_years.py) | Infer publication years from PDF filenames in `polymer_papers/` |
+| [scripts/test_chat_apis.py](scripts/test_chat_apis.py) | Smoke-test Ollama/CBORG chat API clients |
+| [scripts/update_readme_tree.py](scripts/update_readme_tree.py) | Regenerate the project tree block in this README |
+| [app/run_pipeline_cborg.py](app/run_pipeline_cborg.py) | Legacy CBORG checkpoint batch runner (see note below) |
+
+`app/run_pipeline_cborg.py` imports `modules.extract_terms_cborg`, which is **not present** on this branch — the script is broken here and is not part of the Ollama-only reproducibility path.
+
+---
+
 ## Project Structure
 <!-- TREE START -->
 <pre>
@@ -255,9 +329,6 @@ Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest 
 ├── app
 │   ├── modules
 │   │   ├── __init__.py
-│   │   ├── __pycache__
-│   │   │   ├── __init__.cpython-311.pyc
-│   │   │   └── extract_terms.cpython-311.pyc
 │   │   ├── agents
 │   │   │   ├── __init__.py
 │   │   │   ├── chebi.py
@@ -265,7 +336,7 @@ Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest 
 │   │   │   └── properties.py
 │   │   ├── extract_terms.py
 │   │   ├── json2kg.py
-│   │   ├── kg_rag_ollama_api.py
+│   │   ├── kg_rag_ollama.py
 │   │   └── legacy
 │   │       ├── build_onto.py
 │   │       ├── extract_terms.py
@@ -307,6 +378,14 @@ Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest 
 │   └── update_readme_tree.py
 └── storage
     ├── competency_questions
+    │   ├── competency_results_ask_qwen3_32b_using_kg_qwen3_235b_580papers.json
+    │   ├── competency_results_ask_qwen3_4b_using_kg_qwen3_235b_580papers.json
+    │   ├── competency_results_qwen3_235b_580papers.json
+    │   ├── results.html
+    │   ├── results_tabs.html
+    │   ├── test1_qwen235b_580papers
+    │   │   ├── competency_results_qwen3_235b_580papers.json
+    │   │   └── competency_results_qwen3_235b_580papers_part2.json
     │   └── thomas_f.txt
     ├── kg
     │   ├── matkg_deepseek-r1_14b_100_20250918_095748.json
@@ -348,6 +427,8 @@ Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest 
     │   ├── matkg_qwen3_235b_580papers.json
     │   ├── matkg_qwen3_235b_75_20251003_084431.json
     │   └── view_kg.html
+    ├── knowledge_gaps
+    │   └── missing_nodes_matkg_qwen3_235b_580papers.jsonl
     ├── schema
     │   └── matkg_schema.yaml
     └── terminology
@@ -401,7 +482,7 @@ Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest 
         ├── extracted_terms_qwen3_235b_75_20251003_084431.json
         └── parse_terms.py
 
-21 directories, 133 files
+22 directories, 139 files
 </pre>
 <!-- TREE END -->
 

@@ -54,7 +54,10 @@ def get_tree_output(target_dir: str = ".") -> str:
 
     try:
         result = subprocess.run(
-            ["tree", target_dir], capture_output=True, text=True, check=True
+            ["tree", "-I", "__pycache__", target_dir],
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
@@ -90,7 +93,9 @@ def generate_tree_with_links(
     try:
         # List non-hidden entries
         entries = [
-            entry for entry in os.listdir(current_dir) if not entry.startswith(".")
+            entry
+            for entry in os.listdir(current_dir)
+            if not entry.startswith(".") and entry != "__pycache__"
         ]
     except OSError as e:
         raise OSError(f"Unable to list directory '{current_dir}': {e.strerror}") from e

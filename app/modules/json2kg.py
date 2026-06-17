@@ -187,7 +187,7 @@ if __name__ == "__main__":
 
 
 # ----------------------- Pytest Test Suite -----------------------
-# To run: pytest test_json2kg.py
+# To run: pytest app/modules/json2kg.py
 
 def test_make_id_simple():
     assert make_id("P3HT") == "matkg:P3HT"
