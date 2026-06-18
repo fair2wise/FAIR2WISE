@@ -23,6 +23,89 @@ An example of a core model for organic photovoltaics can be found in [storage/sc
 
 The code in this repository is configured to allow users to pass LLM calls to [Ollama](https://ollama.com/) running locally, or, using [CBORG](https://cborg.lbl.gov/). The `extract_terms.py` module allows you to choose which backend to use, and the API url. For CBORG, you will need your access key in your environment.
 
+## Distributed Term Extraction (Academy Agent)
+
+This branch adds a distributed extraction mode that runs the term-extraction pipeline on a remote HPC system via [Academy](https://academy-agents.org/) and Globus Compute. This offloads the heavy LLM work to a remote GPU endpoint while the local machine only orchestrates and monitors.
+
+### Architecture
+
+```
+Local machine                          Remote HPC
+──────────────────────────────         ──────────────────────────────
+user_agent_launcher.py                 Globus Compute Endpoint
+  └─ UserAgent (Academy)               └─ TermExtractorAgent (Academy)
+       │  Dashboard: localhost:8000          │  Orchestrator
+       │                                    │  LangGraph pipeline
+       └─────── Academy Exchange ───────────┘
+                 (real-time logs,
+                  stats, prompts)
+```
+
+- **`UserAgent`** runs locally, exposes a live Flask dashboard at `http://localhost:8000` that streams logs and resource stats from remote agents.
+- **`TermExtractorAgent`** runs on the Globus Compute endpoint. It initializes the `Orchestrator` (LangGraph + tools + ChEBI + property extraction) on startup and exposes `process_pdf`, `process_directory`, `process_page`, `get_term_count`, and `get_status` as remote-callable actions.
+- **`MonitoredAgent`** (base class) forwards all Python log records and periodic CPU/memory/GPU stats back to the `UserAgent` dashboard.
+
+### Prerequisites
+
+1. A running Globus Compute endpoint on the HPC system with the project dependencies installed.
+2. A `.env` file with the following variables set (see `.env.example`):
+   - `GLOBUS_COMPUTE_ENDPOINT_ID` — UUID of your Globus Compute endpoint
+   - `GLOBUS_PROJECT_ID` — Globus project UUID
+   - `ACADEMY_GLOBUS_CLIENT_ID` — OAuth client ID for Academy Exchange
+   - `ACADEMY_GLOBUS_CLIENT_SECRET` — OAuth client secret for Academy Exchange
+3. Globus / Academy authentication (one-time):
+   ```bash
+   python auth.py
+   ```
+   This opens a browser to authenticate with Globus and caches the token locally.
+
+### Running
+
+**Step 1 — Start the Globus Compute endpoint on the HPC system** and confirm it is active before proceeding.
+
+**Step 2 — Launch the local User Agent (keep this running):**
+```bash
+python user_agent_launcher.py
+```
+This writes `user_agent_handle.pkl` and starts the dashboard at `http://localhost:8000`.
+
+**Step 3 — Submit extraction to the HPC endpoint:**
+```bash
+python run_academy_extractor.py \
+    --data-dir /path/to/pdfs \
+    --output   /path/to/terms.json
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--data-dir` | *(required)* | Path to PDF directory on the HPC system |
+| `--output` | *(required)* | Output JSON path on the HPC system |
+| `--backend` | `ollama` | `cborg` or `ollama` |
+| `--model` | `qwen3.5:9b` | LLM model name |
+| `--schema-path` | see script | LinkML schema path on the HPC system |
+| `--max-workers` | `2` | Threads per PDF for page parallelism |
+| `--log-file` | see script | Remote log file path on the HPC system |
+
+### `term_extractor` Module
+
+| File | Role |
+|------|------|
+| `academy_agent.py` | `TermExtractorAgent` — Academy agent launched on the HPC endpoint |
+| `orchestrator.py` | `Orchestrator` — wraps LangGraph pipeline for per-page processing |
+| `agent.py` | LangGraph graph definition |
+| `tools.py` | LangGraph tools (store, ChEBI, property extraction) |
+| `prompts.py` | Page-level prompt builder |
+| `schema.py` | `SchemaHelper` — LinkML fuzzy schema validator |
+| `store.py` | `TermStore` — thread-safe incremental JSON persistence |
+| `services.py` | ChEBI + property services |
+| `user_agent.py` | `UserAgent` — local Academy agent serving the dashboard |
+| `monitored_agent.py` | `MonitoredAgent` — base class forwarding logs/stats to UserAgent |
+| `dashboard.py` | Flask dashboard for real-time monitoring |
+| `message.py` | Message types (Log, Stats, Registration, UserPrompt) |
+| `models.py` | Shared Pydantic models |
+
+---
+
 ## [Concept Extraction](app/modules/extract_terms.py)
 
 ### Getting started
