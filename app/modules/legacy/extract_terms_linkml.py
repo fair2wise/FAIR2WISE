@@ -304,10 +304,12 @@ class OllamaTermExtractor:
         self.context_length = context_length
         self.max_workers = max_workers
 
-        mp_api_key = os.environ.get("MP_API_KEY", "")
+        mp_api_key = os.environ.get("MP_API_KEY") or None
         if not mp_api_key:
-            logger.warning("MP_API_KEY not set; formula validation may be incomplete.")
-            mp_api_key = "JziDvAj2FWxzonCe2hketK1yz4bKHRlA"
+            logger.warning(
+                "MP_API_KEY not set; Materials Project cross-check skipped "
+                "(local formula parsing still runs)."
+            )
         self.formula_checker = ChemicalFormulaValidator(api_key=mp_api_key)
 
         self.schema_helper = SchemaHelper(schema_path=schema_path)

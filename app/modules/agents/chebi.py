@@ -1,25 +1,32 @@
 #!/usr/bin/env python3
+import logging
 import obonet
 import sys
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
+
+logger = logging.getLogger(__name__)
+
 
 def load_chebi_obo(obo_path: str):
     """
     Loads the ChEBI OBO into a networkx graph using obonet.
-    Each node is keyed by its OBO ID (e.g. 'CHEBI:15377'),
-    and node attributes include everything from the OBO (name, def, synonym, xref, property_value, etc.).
+    Returns None if the file is missing or unreadable (logs a warning).
     """
     try:
-        graph = obonet.read_obo(obo_path)
-        return graph
-    except Exception as e:
-        print(f"Failed to load OBO file '{obo_path}': {e}", file=sys.stderr)
-        sys.exit(1)
+        return obonet.read_obo(obo_path)
+    except Exception as exc:
+        logger.warning("Failed to load OBO file '%s': %s", obo_path, exc)
+        return None
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 class ChebiOboLookup:
     def __init__(self, obo_path: str):
         self.graph = load_chebi_obo(obo_path)
+        if self.graph is None:
+            raise FileNotFoundError(
+                f"ChEBI ontology not found or unreadable: {obo_path}"
+            )
 
         # Build a lookup index from lowercase name + synonyms → node ID
         self.name_index: Dict[str, str] = {}
@@ -96,7 +103,7 @@ class ChebiOboLookup:
             "smiles": None,
         }
         for pv in attrs.get("property_value", []):
-            # Each pv is like: 
+            # Each pv is like:
             #   'http://purl.obolibrary.org/obo/chebi/formula "C" xsd:string'
             # or 'http://purl.obolibrary.org/obo/chebi/charge "0"^^xsd:string', etc.
             parts = pv.split()
@@ -163,7 +170,11 @@ def main():
         sys.exit(1)
 
     obo_path = sys.argv[1]
-    chebi_lookup = ChebiOboLookup(obo_path)
+    try:
+        chebi_lookup = ChebiOboLookup(obo_path)
+    except FileNotFoundError as exc:
+        print(exc, file=sys.stderr)
+        sys.exit(1)
 
     print("Enter a chemical name (exact label or synonym) to look it up in ChEBI (Ctrl+C to exit):")
     try:

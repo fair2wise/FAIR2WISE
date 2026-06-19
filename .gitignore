@@ -100,8 +100,9 @@ celerybeat-schedule
 # SageMath parsed files
 *.sage.py
 
-# Environments
-.env
+# Ontology downloads (large; not shipped)
+storage/ontologies/
+
 .venv
 env/
 venv/

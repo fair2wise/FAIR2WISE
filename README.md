@@ -1,4 +1,4 @@
-# From FAIR to WISE: Weaving Intelligent Scientific Ecosystems
+# From FAIR2WISE: Weaving Intelligent Scientific Ecosystems
 
 ## Getting Started
 
@@ -6,178 +6,324 @@ Clone and/or fork this repository.
 
 ```bash
 git clone https://github.com/fair2wise/FAIR2WISE
+cd FAIR2WISE
 ```
 
-Install project requirements:
+Use **Python 3.12** for local installs. The torch / faiss / sentence-transformers stack is unstable on Python 3.14.
 
 ```bash
-cd FAIR2WISE
 pip install -r requirements.txt
 ```
 
+All LLM calls in this branch go to a local [Ollama](https://ollama.com/) instance. No API keys are required for Ollama.
+
+**Quick start (no PDFs):** jump to [KG-RAG LLM Chat](#kg-rag-llm-chat) to chat against the bundled `storage/kg/matkg_qwen3_235b_580papers.json` immediately — no download step required.
+
+**Reviewer default model:** `llama3.2:latest` — used in `docker-compose.yml`, `.env.example`, `kg_rag_ollama.py`, and the `extract_terms.py` `__main__` block. It is a lightweight choice for quick smoke tests (~2 GB). The paper's reported extraction/RAG results used `qwen3:235b`, which requires substantial memory (Mac Studio M3 Ultra, 256 GB in the paper).
+
+**Code default mismatch:** if you construct `LLMTermExtractor(...)` directly without `model_name=`, the class default is still `gemma3:27b`. Use `PYTHONPATH=app python app/modules/extract_terms.py`, `run_extraction(model=...)`, or pass `model_name=` explicitly to use `llama3.2:latest`.
+
 ## LinkML "Core Model" Schema
 
-An example of a core model for organic photovoltaics can be found in [storage/schema/matkg_schema.yaml](storage/schema/matkg_schema.yaml). You can use this as a starting point for defining a new schema for a different niche topic. The concept extraction uses this schema in the LLM call to help keep the results structured and relevant. 
+An example core model for organic photovoltaics is in [storage/schema/matkg_schema.yaml](storage/schema/matkg_schema.yaml). Concept extraction uses this schema in the LLM call to keep results structured and relevant.
 
-## LLM Backend
+## Pipeline Overview
 
-The code in this repository is configured to allow users to pass LLM calls to [Ollama](https://ollama.com/) running locally, or, using [CBORG](https://cborg.lbl.gov/). The `extract_terms.py` module allows you to choose which backend to use, and the API url. For CBORG, you will need your access key in your environment.
+The reproducible workflow has four entry points, run in order:
+
+1. [scripts/download_pdfs.py](scripts/download_pdfs.py) — fetch PDFs into a corpus directory
+2. [app/modules/extract_terms.py](app/modules/extract_terms.py) — extract schema-aligned terms from PDFs
+3. [app/modules/json2kg.py](app/modules/json2kg.py) — convert extracted terms JSON to a MatKG graph
+4. [app/modules/kg_rag_ollama.py](app/modules/kg_rag_ollama.py) — KG-grounded chat (CLI or Open WebUI-compatible API)
+
+The default knowledge graph is `storage/kg/matkg_qwen3_235b_580papers.json`. PDF snippet grounding reads from `polymer_papers/` at runtime (see [Corpus data](#corpus-data) — PDFs are not redistributed).
+
+## Corpus data
+
+Full-text PDFs are **not** included in this repository (publisher copyright). In their place, [polymer_papers/corpus_manifest.csv](polymer_papers/corpus_manifest.csv) lists the OPV corpus used in the paper: one row per paper with `filename`, `identifier_type` (`arxiv` or `doi`), and `identifier` (580 papers; filenames match those referenced in the bundled KG).
+
+| What you can run without local PDFs | What needs PDFs in `polymer_papers/` |
+|-------------------------------------|----------------------------------------|
+| KG-RAG chat/API using the bundled graph (`storage/kg/…`) — KG triples, node text, and descriptions still ground answers | `extract_terms.py` — full re-extraction pipeline |
+| Competency evaluation against the pre-built graph | PDF snippet blocks in KG-RAG context (`KG_RAG_PDF_DIR`) |
+
+To obtain PDFs for re-extraction or snippet grounding, download them yourself (respecting publisher terms) into `polymer_papers/` using [scripts/download_pdfs.py](scripts/download_pdfs.py) or any source that matches the manifest filenames/identifiers. The manifest is the authoritative list of which papers the bundled graph was built from.
+
+---
+
+## [Download PDFs](scripts/download_pdfs.py)
+
+Fetch papers from arXiv or OpenAlex by keyword into a local directory. Use this (or your own access) to populate `polymer_papers/` before running extraction; filenames should align with [polymer_papers/corpus_manifest.csv](polymer_papers/corpus_manifest.csv) when reproducing the paper corpus.
+
+```bash
+python scripts/download_pdfs.py --keyword "organic photovoltaics" --target ./polymer_papers
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--keyword` | Search term (required) | — |
+| `--target` | Output directory for PDFs | `./pdfs` |
+| `--max-results` | Maximum papers to download | `500` |
+| `--source` | `arxiv` or `openalex` | `arxiv` |
+
+---
 
 ## [Concept Extraction](app/modules/extract_terms.py)
 
-### Getting started
+Schema-aware terminology extraction from scientific PDFs. Integrates Ollama, LinkML schema validation, ChEBI enrichment, chemical-formula repair, and parallel page-level processing.
 
-`extract_terms.py` implements a high-performance, schema-aware terminology extraction engine that processes scientific PDFs and produces structured, ontology-aligned JSON output.
-It integrates:
+**Requires PDF files** in `data_dir` (not just the manifest). See [Corpus data](#corpus-data). **Prerequisites:** Ollama running with the model pulled; optional [ChEBI ontology](#optional-chebi-ontology-enrichment) and `MP_API_KEY` (see below).
 
-⚙️ Ollama or CBORG (OpenAI-compatible) LLM backends
-📘 LinkML schema enforcement via SchemaHelper
-🧪 Chemical formula validation & repair
-🧬 ChEBI enrichment
-📏 Physical property extraction + normalization
-⚡ Full parallel page-level processing
-🔧 Robust logging, retries, and thread-safe saving
+### Quick run (`__main__`)
 
-This module is designed for large corpora, high throughput, and strict schema alignment for downstream knowledge-graph construction.
+```bash
+PYTHONPATH=app python app/modules/extract_terms.py
+```
 
+Runs the `if __name__ == "__main__"` block with these defaults:
 
+| Setting | Default |
+|---------|---------|
+| `model_name` | `llama3.2:latest` |
+| `ollama_base_url` | `http://localhost:11434` |
+| `data_dir` | `./polymer_papers` |
+| `output_file` | `./storage/terminology/extracted_terms_aug21.json` |
+| `schema_path` | `./storage/schema/matkg_schema.yaml` |
+| `max_workers` | `4` |
 
-### Implementation Details
+To change paths, model, or workers for a one-off run, edit those values in the `__main__` block.
 
-The term extraction system employs parallel page-level processing through Python’s ThreadPoolExecutor, processing PDF pages concurrently with up to 50 workers to balance throughput with LLM latency. To ensure resilience against crashes during long-running extraction jobs, extracted terms and properties are persisted after every page via a lock-guarded \_save\_terms\_threadsafe method, providing thread-safe incremental saving that allows the system to resume from interruptions.
+### Programmatic run (`run_extraction`)
 
-Schema-driven validation forms the core of the extraction accuracy. A SchemaHelper class loads the LinkML schema and performs fuzzy matching of classes and slots using RapidFuzz, enforcing domain/range constraints while auto-correcting invalid categories or relations. The system demonstrates robust fault tolerance by wrapping API calls and JSON parsing with an exponential backoff @retry\_on\_exception decorator, allowing recovery from transient Ollama or network errors without losing progress.
+For a different folder, model, or output path without editing source:
 
-The chemical enrichment pipeline represents a sophisticated multi-stage process for handling chemical entities. The ChemicalFormulaValidator ensures valid chemical formulas and attempts repair through LLM prompts when invalid formulas are detected. Integration with the ChEBI ontology enriches recognized chemicals with additional data including formulas, SMILES notation, InChI identifiers, and charge information. Additionally, the PhysicalPropertyExtractor and PropertyNormalizer work in tandem to detect numerical properties in text and standardize their units and values on the fly, ensuring consistent representation across the knowledge graph.
+```python
+# from repo root: PYTHONPATH=app python your_script.py
+from pathlib import Path
+from modules.extract_terms import run_extraction
 
-Duplicate handling leverages LLM-guided semantic merging through a fuzzy merge function that prompts the LLM to determine whether a new term matches an existing one. This prevents duplicate nodes that might arise from variations in notation, such as “GIWAXS” versus “GI-WAXS”, while preserving genuinely distinct concepts. For provenance tracking, the system extracts 50-token snippets around each term mention, creating context-aware captures that link every knowledge graph node back to its source page and paper.
+run_extraction(
+    Path("./polymer_papers"),
+    Path("./storage/terminology/my_terms.json"),
+    model="llama3.2:latest",
+    ollama_url="http://localhost:11434",
+    schema_path="storage/schema/matkg_schema.yaml",
+    temperature=0.0,
+    context_length=50,
+    max_workers=4,
+)
+```
 
-Quality assurance mechanisms include relation verification, where candidate edges are checked against schema domain/range constraints, with invalid ones downgraded to verified=false status. Terms receive post-run annotation with importance scores of high, medium, or low based on their frequency across pages and papers, helping prioritize validation and display. The system provides real-time feedback through a custom ANSI logger that streams color-highlighted progress and warnings, improving interpretability during large-scale runs.
+Key arguments: `pdf_dir`, `output_json`, `model`, `ollama_url`, `schema_path`, `temperature`, `context_length`, `max_workers`.
 
-The architecture maintains model-agnostic design, supporting configurable Ollama models such as Gemma 3, Qwen-3-235B, and Mistral, with temperature locked at 0.0 to minimize hallucinations and ensure consistent, deterministic outputs across extraction runs.
+Ollama must be running with the model pulled (e.g. `ollama pull llama3.2`).
+
+`llama3.2:latest` is a lightweight default for quick reviewer testing and will produce a sparse graph; the paper's reported results used `qwen3:235b`, which requires substantial memory (Mac Studio M3 Ultra, 256 GB in the paper).
+
+**Optional:** set `MP_API_KEY` in `.env` for Materials Project chemical-formula validation/enrichment. Without it, local formula parsing still runs; Materials Project cross-check is skipped.
+
+### Optional: ChEBI ontology enrichment
+
+ChEBI adds formula, SMILES, InChI, InChIKey, charge, and mass to recognized chemical entities. The code loads it via `ChebiOboLookup("storage/ontologies/chebi.obo")` using `obonet.read_obo` on the full `chebi.obo` file (not `chebi_lite.obo`). Extraction runs without it; chemical entities simply won't receive ChEBI fields.
+
+The paper's full-corpus extraction used the ChEBI release current as of **August 2025**; pulling a newer `chebi.obo` may yield slightly different enrichment for edge cases, but established chemicals rarely change.
+
+Download into the expected path:
+
+```bash
+mkdir -p storage/ontologies
+curl -L https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo \
+  -o storage/ontologies/chebi.obo
+```
+
+URL verified: `https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo`
+
+---
 
 ## [Convert to KG](app/modules/json2kg.py)
 
-The graph construction module transforms the enriched terms produced by the extractor into a MatKG-compatible JSON-LD graph structure with explicit things (nodes) and associations (edges). Each term receives a stable canonical identifier through a precompiled regex-based cleaner (make\_id), prepending "matkg:" to cleaned term names to ensure reproducibility and compatibility across runs. This identifier system provides consistent node references throughout the knowledge graph lifecycle.
+Transform enriched terms JSON into a MatKG-compatible graph (nodes + edges).
 
-Full metadata preservation ensures downstream usability by retaining all extracted information within the graph structure. Nodes maintain complete records including formula data, formula validation results, extracted properties, and comprehensive provenance fields such as pages, source papers, and context snippets. The system handles incomplete data gracefully through automatic stubbing of unseen targets—when related terms are mentioned in edges but not yet defined as nodes, placeholder nodes are automatically created to prevent dangling edges in the graph.
+The extraction step writes whatever path you set as `output_file` / `output_json`. The `__main__` default is `storage/terminology/extracted_terms_aug21.json`; files named `extracted_terms_aug21_580papers.json` (and similar `_*papers.json` names under `storage/terminology/`) are **full-corpus runs bundled in the repo**, not produced by the default `__main__` block.
 
-Edge creation incorporates evidence awareness, carrying relation objects into the knowledge graph with optional evidence strings that make associations more interpretable and traceable. The system prevents duplicate edges by tracking (subject, predicate, object) signatures, ensuring each unique relationship appears only once in the final graph. Robustness is enhanced through utility functions like ensure\_list, which normalizes scalar and None values into lists, preventing schema violations in the graph output that could break downstream processing.
-
-The module provides a configurable command-line interface enabling direct JSON to knowledge graph conversion with verbosity control through the --verbose flag, making it suitable for batch workflows and pipeline integration. Quality assurance comes through an integrated pytest test suite that validates ID generation, list normalization, node and edge field retention, and CLI behavior. This comprehensive testing ensures reproducibility and maintainability across different environments and use cases, providing confidence in the graph construction process.
-
-## [KG-RAG LLM Chat](app/modules/kg_rag_ollama_api.py)
-
-### CLI Chat
-
-Interactive mode lets you manually ask scientific or KG-grounded questions and receive answers directly in the console.
-
-**Basic usage**
-```bash
-python kg_rag_ollama.py
-```
-
-The prompt will appear:
-```bash
-Ask (exit to quit):
-```
-🎯 **Ask a one-shot question without entering the REPL**
+**End-to-end chain (fresh run, consistent filenames):**
 
 ```bash
-python kg_rag_ollama.py --question "What is the role of P3HT crystallinity in OPV performance?"
+# 1. PDFs in polymer_papers/ (see Download PDFs + Corpus data)
+# 2. Extract → storage/terminology/extracted_terms_aug21.json
+PYTHONPATH=app python app/modules/extract_terms.py
+
+# 3. Convert terms → graph
+python app/modules/json2kg.py \
+    storage/terminology/extracted_terms_aug21.json \
+    storage/kg/my_graph.json
+
+# 4. Chat against the new graph (or use the bundled default graph)
+python app/modules/kg_rag_ollama.py --graph storage/kg/my_graph.json --api
 ```
 
-This performs:
-
-- Semantic search over the KG
-- BFS node expansion
-- PDF snippet grounding
-- RAG answer generation
-- And exits after producing the final answer.
-
-**Running Competency Question Evaluation**
-To evaluate your KG-RAG vs baseline model:
-
-```
-python kg_rag_ollama.py --competency
-```
-
-This runs the full competency question set defined in:
-
-```
-storage/competency_questions/thomas_f.txt
-```
-
-Results are saved incrementally to:
-```
-storage/competency_questions/competency_results_qwen3_235b_580papers.json
-```
-
-### Open WebUI
-
-You can use Open WebUI to chat with the KG-RAG LLM.
-
-[Open WebUI Installation instructions](https://docs.openwebui.com/)
+To convert a **bundled** terminology file instead:
 
 ```bash
-open-webui serve
+python app/modules/json2kg.py \
+    storage/terminology/extracted_terms_aug21_580papers.json \
+    storage/kg/my_graph.json
 ```
 
-To connect with the `kg_rag_ollama.py` FastAPI server, there are a few settings to tweak in OpenWebUI:
+| Argument / flag | Description |
+|-----------------|-------------|
+| `input_json` | Path to extracted-terms JSON (positional) |
+| `output_json` | Path for output graph JSON (positional) |
+| `--verbose`, `-v` | Increase logging verbosity |
 
-- Go to `Admin Settings` -> `Connections` -> `Ollama API`
-- Update the url to `http://localhost:11435`
+---
 
-**Start the server**
-```
-python kg_rag_ollama.py --api
-```
-This launches FastAPI on:
-```
-http://0.0.0.0:11435
-```
+## [KG-RAG LLM Chat](app/modules/kg_rag_ollama.py)
 
-### Run with a specific KG
+Hybrid semantic + graph retrieval over a local KG JSON file, with optional PDF snippet grounding and an Ollama-compatible FastAPI server for [Open WebUI](https://docs.openwebui.com/).
 
-The script accepts --graph to load a specific KG JSON file instead of the default.
+PDF snippets are loaded from `KG_RAG_PDF_DIR` (default `polymer_papers/`) when matching files exist; without local PDFs, retrieval still uses KG structure and node metadata from the graph JSON. See [Corpus data](#corpus-data).
 
-Example (CLI mode)
+### CLI flags
+
+| Flag | Description |
+|------|-------------|
+| `--graph` | Path to KG JSON (default: `storage/kg/matkg_qwen3_235b_580papers.json`) |
+| `--question` | One-shot question, then exit |
+| `--competency` | Run full competency-question evaluation set |
+| `--api` | Start FastAPI server on port 11435 |
+
+### Interactive REPL
+
 ```bash
-python kg_rag_ollama.py --graph storage/kg/my_custom_kg.json
+python app/modules/kg_rag_ollama.py
 ```
-Example (one-shot)
+
+### One-shot question
+
 ```bash
-python kg_rag_ollama.py \
-    --graph storage/kg/opv_expert_graph.json \
+python app/modules/kg_rag_ollama.py \
+    --question "What is the role of P3HT crystallinity in OPV performance?"
+```
+
+### Competency evaluation
+
+```bash
+python app/modules/kg_rag_ollama.py --competency
+```
+
+Reads questions from `storage/competency_questions/thomas_f.txt` and writes incremental results under `storage/competency_questions/`.
+
+**Shipped results (paper reproducibility):** the bundled file for the paper's competency-question findings — including the CQ 21 (RSOXS at ALS) and CQ 26 (P3HT vs PM6) worked examples — is:
+
+`storage/competency_questions/competency_results_ask_qwen3_32b_using_kg_qwen3_235b_580papers.json`
+
+That file records **qwen3:32b** answering with KG-RAG over the **qwen3:235b-built** graph (`matkg_qwen3_235b_580papers.json`), matching the paper's "large graph grounds a smaller model" design. `competency_results_qwen3_235b_580papers.json` is a partial run (questions 1–18 only) and does not contain CQ 21 or 26. HTML viewers: `results.html`, `results_tabs.html`. A fresh `--competency` run produces new output; use the shipped JSON to reproduce the paper's qualitative comparisons.
+
+### API server (Open WebUI)
+
+```bash
+python app/modules/kg_rag_ollama.py --api
+```
+
+Listens on `http://0.0.0.0:11435`. Exposes `/api/chat`, `/api/tags`, and `/api/ps` for Open WebUI's Ollama connection.
+
+### Custom graph
+
+```bash
+python app/modules/kg_rag_ollama.py \
+    --graph storage/kg/matkg_qwen3_235b_580papers.json \
     --question "How does annealing influence phase separation in P3HT:PCBM?"
 ```
-Example (FastAPI server with a specific KG)
+
+### Environment variables (`KG_RAG_*`)
+
+Read by `kg_rag_ollama.py` via `os.environ.get`. Compose and `.env.example` default `KG_RAG_OLLAMA_MODEL` to `llama3.2:latest` (matches the code default in `kg_rag_ollama.py`).
+
+| Variable | Code default | Purpose |
+|----------|---------|---------|
+| `KG_RAG_OLLAMA_MODEL` | `llama3.2:latest` | Ollama model name |
+| `KG_RAG_OLLAMA_URL` | `http://localhost:11434/api/chat` | Ollama chat endpoint |
+| `KG_RAG_GRAPH` | `storage/kg/matkg_qwen3_235b_580papers.json` | Default KG JSON path |
+| `KG_RAG_PDF_DIR` | `polymer_papers` | Directory of source PDFs |
+| `KG_RAG_TOPK` | `12` | Semantic search top-k |
+| `KG_RAG_EMBED_MODEL` | `all-MiniLM-L6-v2` | Sentence-transformer model |
+| `KG_RAG_BATCH` | (unset) | Optional embedding batch override |
+| `KG_RAG_SNIP` | `1000` | PDF snippet length (chars) |
+| `KG_RAG_CTX_CHARS` | `16000` | Total context character budget |
+| `KG_RAG_FORCE_CPU` | (unset) | Force CPU for embeddings/FAISS |
+| `KG_RAG_MAX_TEXT_CHARS` | `1024` | Max chars per node text field |
+| `KG_RAG_ENABLE_BFS` | `1` | Enable BFS graph expansion |
+| `KG_RAG_BFS_TOPK` | `24` | BFS seed top-k |
+| `KG_RAG_MAX_HOPS` | `1` | Max BFS hops |
+| `KG_RAG_STEPWISE` | `1` | Enable stepwise query decomposition |
+| `KG_RAG_STEPWISE_MAX_STEPS` | `6` | Max decomposition steps |
+| `KG_RAG_GENERIC_PENALTY` | `0.8` | Penalty for generic node labels |
+| `KG_RAG_CONTEXT_VOLUME` | `150` | Max triples in context block |
+| `KG_RAG_STRUCT_CTX` | `1` | Include structured context |
+| `KG_RAG_DEBUG` | `0` | Verbose debug logging |
+| `KG_RAG_PDF_CACHE` | `256` | LRU PDF page cache size |
+
+---
+
+## Docker
+
+Runtime data is **not** baked into the image: `storage/` (graphs, terminology) and `polymer_papers/` (manifest and any PDFs you add locally) are volume-mounted. The repo ships `polymer_papers/corpus_manifest.csv` only; PDFs are not in git or the image.
+
+1. Copy env defaults: `cp .env.example .env` and adjust if needed.
+2. Ensure Ollama is running on the host with the target model pulled (e.g. `ollama pull llama3.2`).
+3. Start services:
+
 ```bash
-python kg_rag_ollama.py \
-    --graph storage/kg/opv_expert_graph.json \
-    --api
+docker compose up --build
 ```
 
-### Implementation Details
+| Service | URL | Notes |
+|---------|-----|-------|
+| `kg-rag` | `http://127.0.0.1:11435` | KG-RAG FastAPI (localhost only) |
+| `open-webui` | `http://127.0.0.1:8080` | Chat UI; `OLLAMA_BASE_URL=http://kg-rag:11435` inside compose |
 
-The knowledge graph retrieval-augmented generation system implements a hybrid retrieval strategy that combines semantic search using SentenceTransformer embeddings with a FAISS IVF-Flat index alongside weighted graph expansion through breadth-first search. This dual approach ensures retrieval balances vector similarity with relational structure, leveraging both the semantic understanding from embeddings and the structural knowledge encoded in graph relationships.
+Volumes: `./storage` and `./polymer_papers` are mounted into `kg-rag` (manifest from the clone; add PDFs locally for snippet grounding). Open WebUI state persists in the `open-webui` named volume.
 
-Evidence-aware ranking forms the core of result prioritization, where nodes are scored through a weighted combination of semantic similarity, graph depth, lexical overlap, and evidence count. This multi-factor scoring produces more interpretable and grounded answers by considering not just relevance but also the strength of supporting evidence. For each selected node, the system builds structured context blocks that include knowledge graph triples, chemical formulas, descriptions, and up to three PDF snippets with page-level caching for speed, all controlled by a configurable character budget to prevent context overflow.
+---
 
-Complex query handling is achieved through question decomposition and stepwise retrieval. The system decomposes multi-clause questions into sub-queries, performs retrieval for each component, and merges results to improve coverage on long or compound scientific questions. This approach ensures that queries touching multiple concepts or requiring multi-step reasoning receive comprehensive answers drawing from relevant graph regions.
+## Tests
 
-The competency question evaluation loop automates batch evaluation of baseline versus KG-RAG answers using a curated set of materials science competency questions. Results are saved incrementally to JSON for traceability, allowing interrupted evaluations to resume and providing detailed comparison data between augmented and non-augmented responses. Knowledge gap tracking continuously logs missing or unsupported entities—such as queries with no knowledge graph evidence or LLM fallbacks flagged as domain knowledge—into JSONL files, enabling iterative knowledge graph improvement based on actual usage patterns.
+`pytest.ini` sets `testpaths = _tests`, so plain `pytest` collects only `_tests/test_example.py`. The `json2kg.py` test suite is inline in the module; run it explicitly:
 
-FastAPI integration provides a proxy server for OpenWebUI, exposing endpoints including /api/chat, /api/tags, and /api/ps that serve KG-RAG answers as if they were a standard model. This allows seamless integration with existing chat interfaces while maintaining the enhanced capabilities of knowledge-grounded responses. Additionally, an interactive REPL mode supports live question-answering at the terminal, displaying baseline versus KG-RAG outputs side by side with color-coded logs for easy comparison during development and testing.
+```bash
+pytest app/modules/json2kg.py
+```
 
-The system demonstrates GPU-aware optimization by auto-detecting CUDA devices and performing warm-up routines for faster inference, with graceful fallback to CPU if GPU embedding or FAISS indexing fails. Robust PDF caching through LRU mechanisms supports fast repeated lookups when the same papers are cited across multiple questions, significantly reducing latency for document-heavy queries. All key parameters—including model choice, graph file, context budgets, BFS hops, and penalties—can be overridden via environment variables, simplifying deployment across different HPC environments and enabling rapid experimentation without code changes.
+---
 
+## Utilities
 
+Helper scripts and viewers not part of the main four-step pipeline:
+
+| Path | Purpose |
+|------|---------|
+| [storage/kg/view_kg.html](storage/kg/view_kg.html) | Browser-based interactive viewer for a KG JSON (loads `matkg_qwen3_235b_580papers.json` by default) |
+| [storage/competency_questions/results.html](storage/competency_questions/results.html) | HTML viewer for competency-question evaluation results |
+| [storage/competency_questions/results_tabs.html](storage/competency_questions/results_tabs.html) | Tabbed HTML viewer for competency results |
+| [storage/terminology/parse_terms.py](storage/terminology/parse_terms.py) | Small helper to extract term names from extracted-terms JSON |
+| [scripts/analyze_kgs.py](scripts/analyze_kgs.py) | Compare structural metrics across multiple KG JSON files |
+| [scripts/get_pdf_years.py](scripts/get_pdf_years.py) | Infer publication years from PDF filenames in `polymer_papers/` |
+| [scripts/test_chat_apis.py](scripts/test_chat_apis.py) | Smoke-test Ollama/CBORG chat API clients |
+| [scripts/update_readme_tree.py](scripts/update_readme_tree.py) | Regenerate the project tree block in this README |
+| [app/run_pipeline_cborg.py](app/run_pipeline_cborg.py) | Legacy CBORG checkpoint batch runner (see note below) |
+
+`app/run_pipeline_cborg.py` imports `modules.extract_terms_cborg`, which is **not present** on this branch — the script is broken here and is not part of the Ollama-only reproducibility path.
+
+---
 
 ## Project Structure
 <!-- TREE START -->
 <pre>
 .
+├── Dockerfile
+├── LICENSE.txt
+├── README.md
 ├── _tests
 │   └── test_example.py
 ├── app
@@ -188,20 +334,20 @@ The system demonstrates GPU-aware optimization by auto-detecting CUDA devices an
 │   │   │   ├── chebi.py
 │   │   │   ├── chem_checker.py
 │   │   │   └── properties.py
-│   │   ├── extract_terms_cborg.py
+│   │   ├── extract_terms.py
 │   │   ├── json2kg.py
-│   │   ├── kg_rag_ollama_api.py
+│   │   ├── kg_rag_ollama.py
 │   │   └── legacy
 │   │       ├── build_onto.py
-│   │       ├── extract_terms_linkml_jun3.py
-│   │       ├── extract_terms_linkml.py
 │   │       ├── extract_terms.py
+│   │       ├── extract_terms_linkml.py
+│   │       ├── extract_terms_linkml_jun3.py
 │   │       ├── extracted_terms_json2kg_with_context.py
 │   │       ├── json2kg.py
-│   │       ├── kg_rag_ollama_nersc.py
-│   │       └── kg_rag_ollama.py
+│   │       ├── kg_rag_ollama.py
+│   │       └── kg_rag_ollama_nersc.py
 │   └── run_pipeline_cborg.py
-├── Dockerfile
+├── docker-compose.yml
 ├── mkdocs
 │   ├── docs
 │   │   ├── about.md
@@ -221,93 +367,8 @@ The system demonstrates GPU-aware optimization by auto-detecting CUDA devices an
 │       │       └── favicon.png
 │       └── main.html
 ├── polymer_papers
-│   ├── 10.1002adfm.201002014.md
-│   ├── 10.1002adfm.201002014.pdf
-│   ├── 10.1002adfm.201301121.pdf
-│   ├── 10.1002adfm.201304216.pdf
-│   ├── 10.1002adfm.201801874.pdf
-│   ├── 10.1002adfm.201802895.pdf
-│   ├── 10.1002adfm.201806262.pdf
-│   ├── 10.1002adfm.201806977.pdf
-│   ├── 10.1002adfm.201902238.pdf
-│   ├── 10.1002adfm.201902478.pdf
-│   ├── 10.1002adfm.201906855.pdf
-│   ├── 10.1002adfm.202000489.pdf
-│   ├── 10.1002adfm.202008699.pdf
-│   ├── 10.1002adfm.202102522.pdf
-│   ├── 10.1002adfm.202105304.pdf
-│   ├── 10.1002adfm.202109271.pdf
-│   ├── 10.1002adfm.202112511.pdf
-│   ├── 10.1002adfm.202201150.pdf
-│   ├── 10.1002adfm.202305611.pdf
-│   ├── 10.1002adma.201102421.pdf
-│   ├── 10.1002adma.201405913.pdf
-│   ├── 10.1002adma.201505435.pdf
-│   ├── 10.1002adma.201604603.pdf
-│   ├── 10.1002adma.201606574.pdf
-│   ├── 10.1002adma.201700144.pdf
-│   ├── 10.1002adma.201703777.pdf
-│   ├── 10.1002adma.201704713.pdf
-│   ├── 10.1002adma.201705243.pdf
-│   ├── 10.1002adma.201705485.pdf
-│   ├── 10.1002adma.201801501.pdf
-│   ├── 10.1002adma.201803045.pdf
-│   ├── 10.1002adma.201806660.pdf
-│   ├── 10.1002adma.201808279.pdf
-│   ├── 10.1002adma.201902899.pdf
-│   ├── 10.1002adma.202002784.pdf
-│   ├── 10.1002adma.202005897.pdf
-│   ├── 10.1002adma.202105707.pdf
-│   ├── 10.1002adma.202107316.pdf
-│   ├── 10.1002adma.202108317.pdf
-│   ├── 10.1002adma.202108749.pdf
-│   ├── 10.1002adma.202110155.pdf
-│   ├── 10.1002adma.202202608.pdf
-│   ├── 10.1002adma.202203379.pdf
-│   ├── 10.1002adma.202205926.pdf
-│   ├── 10.1002adma.202207020.pdf
-│   ├── 10.1002adom.202300776.pdf
-│   ├── 10.1002advs.201500095.pdf
-│   ├── 10.1002advs.201500250.pdf
-│   ├── 10.1002advs.201600032.pdf
-│   ├── 10.1002advs.201600117.pdf
-│   ├── 10.1002advs.201903419.pdf
-│   ├── 10.1002advs.202000149.pdf
-│   ├── 10.1002advs.202001986.pdf
-│   ├── 10.1002advs.202104613.pdf
-│   ├── 10.1002advs.202203513.pdf
-│   ├── 10.1002advs.202302880.pdf
-│   ├── 10.1002aelm.201800915.pdf
-│   ├── 10.1002aelm.202300422.pdf
-│   ├── 10.1002aenm.201601225.pdf
-│   ├── 10.1002aenm.201700390.pdf
-│   ├── 10.1002aenm.201700519.pdf
-│   ├── 10.1002aenm.201701073.pdf
-│   ├── 10.1002aenm.201701201.pdf
-│   ├── 10.1002aenm.201701942.pdf
-│   ├── 10.1002aenm.201702831.pdf
-│   ├── 10.1002aenm.201702941.pdf
-│   ├── 10.1002aenm.201703058.pdf
-│   ├── 10.1002aenm.201800550.pdf
-│   ├── 10.1002aenm.201802050.pdf
-│   ├── 10.1002aenm.201901728.pdf
-│   ├── 10.1002aenm.201903609.pdf
-│   ├── 10.1002aenm.202001203.pdf
-│   ├── 10.1002aenm.202001589.pdf
-│   ├── 10.1002aenm.202003141.pdf
-│   ├── 10.1002aenm.202102135.pdf
-│   ├── 10.1002aenm.202200641.pdf
-│   ├── 10.1002aenm.202300249.pdf
-│   ├── 10.1002aenm.202300980.pdf
-│   ├── 10.1002anie.201806354.pdf
-│   ├── 10.1002anie.202115585.pdf
-│   ├── 10.1002app.45399.pdf
-│   ├── 10.1002asia.201100419.pdf
-│   ├── 10.1002chem.202002632.pdf
-│   ├── 10.1002cphc.200901023.pdf
-│   └── s41563-024-02076-8.pdf
+│   └── corpus_manifest.csv
 ├── pytest.ini
-├── README.md
 ├── requirements.txt
 ├── scripts
 │   ├── analyze_kgs.py
@@ -317,6 +378,14 @@ The system demonstrates GPU-aware optimization by auto-detecting CUDA devices an
 │   └── update_readme_tree.py
 └── storage
     ├── competency_questions
+    │   ├── competency_results_ask_qwen3_32b_using_kg_qwen3_235b_580papers.json
+    │   ├── competency_results_ask_qwen3_4b_using_kg_qwen3_235b_580papers.json
+    │   ├── competency_results_qwen3_235b_580papers.json
+    │   ├── results.html
+    │   ├── results_tabs.html
+    │   ├── test1_qwen235b_580papers
+    │   │   ├── competency_results_qwen3_235b_580papers.json
+    │   │   └── competency_results_qwen3_235b_580papers_part2.json
     │   └── thomas_f.txt
     ├── kg
     │   ├── matkg_deepseek-r1_14b_100_20250918_095748.json
@@ -349,8 +418,8 @@ The system demonstrates GPU-aware optimization by auto-detecting CUDA devices an
     │   ├── matkg_lbl_cborg-chat_latest_75_20251008_001702.json
     │   ├── matkg_qwen3_235b_100_20251004_054233.json
     │   ├── matkg_qwen3_235b_147papers.json
-    │   ├── matkg_qwen3_235b_25_20251001_120436.json
     │   ├── matkg_qwen3_235b_257papers.json
+    │   ├── matkg_qwen3_235b_25_20251001_120436.json
     │   ├── matkg_qwen3_235b_333papers.json
     │   ├── matkg_qwen3_235b_361papers.json
     │   ├── matkg_qwen3_235b_444papers.json
@@ -358,6 +427,8 @@ The system demonstrates GPU-aware optimization by auto-detecting CUDA devices an
     │   ├── matkg_qwen3_235b_580papers.json
     │   ├── matkg_qwen3_235b_75_20251003_084431.json
     │   └── view_kg.html
+    ├── knowledge_gaps
+    │   └── missing_nodes_matkg_qwen3_235b_580papers.jsonl
     ├── schema
     │   └── matkg_schema.yaml
     └── terminology
@@ -411,38 +482,9 @@ The system demonstrates GPU-aware optimization by auto-detecting CUDA devices an
         ├── extracted_terms_qwen3_235b_75_20251003_084431.json
         └── parse_terms.py
 
-20 directories, 213 files
+22 directories, 139 files
 </pre>
 <!-- TREE END -->
-
-
-## Features
-
-Included in this template are a number of helpful things to get you started on the ground running.
-
-### GitHub Actions `.github/workflows/build-app.yml`
-
-Automate linting, pytest, and mkdocs when you push changes to GitHub.
-
-### MkDocs
-
-Create nice documentation with MkDocs and deploy it directly in your repository (Note: Your repository must be set to `public`).
-
-### `.gitignore`
-
-Already configured with a number of common files to ignore.
-
-### `requirements.txt`
-
-List of Python dependencies, such as flake8, pytest, and mkdocs.
-
-### flake8
-
-Lint your Python code for errors with flake8.
-
-### PyTest
-
-Write unit tests with PyTest and they will run when you submit a push to GitHub.
 
 ## LBNL Software Disclosure and Distribution
 
@@ -456,7 +498,6 @@ Redistribution and use in source and binary forms, with or without modification,
  
 (3) Neither the name of the University of California, Lawrence Berkeley National Laboratory, U.S. Dept. of Energy nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
  
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  
-You are under no obligation whatsoever to provide any bug fixes, patches, or upgrades to the features, functionality or performance of the source code (“Enhancements”) to anyone; however, if you choose to make your Enhancements available either publicly, or directly to Lawrence Berkeley National Laboratory, without imposing a separate written license agreement for such Enhancements, then you hereby grant the following license: a non-exclusive, royalty-free perpetual license to install, use, modify, prepare derivative works, incorporate into other computer software, distribute, and sublicense such Enhancements or derivative works thereof, in binary and source code form.
-
+You are under no obligation whatsoever to provide any bug fixes, patches, or upgrades to the features, functionality or performance of the source code ("Enhancements") to anyone; however, if you choose to make your Enhancements available either publicly, or directly to Lawrence Berkeley National Laboratory, without imposing a separate written license agreement for such Enhancements, then you hereby grant the following license: a non-exclusive, royalty-free perpetual license to install, use, modify, prepare derivative works, incorporate into other computer software, distribute, and sublicense such Enhancements or derivative works thereof, in binary and source code form.

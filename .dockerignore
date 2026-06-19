@@ -1,0 +1,12 @@
+polymer_papers/*
+!polymer_papers/corpus_manifest.csv
+storage/
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.venv-open-webui/
+.git/
+mkdocs/site/
+.DS_Store

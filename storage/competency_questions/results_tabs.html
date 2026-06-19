@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OPV QA Results (Tabbed + Side by Side)</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 2rem;
+    background: #f9f9f9;
+    color: #333;
+  }
+  .tabs {
+    display: flex;
+    margin-bottom: 1rem;
+  }
+  .tab {
+    padding: 0.5rem 1rem;
+    background: #eee;
+    margin-right: 0.5rem;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+  }
+  .tab.active {
+    background: #0066cc;
+    color: #fff;
+    font-weight: bold;
+  }
+  .question-block {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.5rem;
+  }
+  .question-block h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+    color: #0066cc;
+  }
+  .answers {
+    display: flex;
+    gap: 1rem;
+  }
+  .answer {
+    flex: 1;
+    background: #f4f4f4;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    white-space: pre-wrap;      /* preserve whitespace, wrap lines */
+    word-wrap: break-word;      /* break long words if needed */
+  }
+  .answer strong {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #444;
+  }
+  .answer pre {
+    margin: 0;
+    font-family: inherit;       /* optional: match body font */
+    white-space: pre-wrap;      /* wrap inside <pre> */
+    word-wrap: break-word;
+    overflow-x: hidden;         /* remove scroll bar */
+  }
+  .think {
+  font-style: italic;
+  color: #555; /* optional: gray to distinguish */
+}
+
+</style>
+</head>
+<body>
+  <h1>Organic Photovoltaics Q&A Results</h1>
+  <div class="tabs" id="tabs"></div>
+  <div id="results"></div>
+
+  <script>
+    const files = {
+      "Qwen-3-4B": "competency_results_ask_qwen3_4b_using_kg_qwen3_235b_580papers.json",
+      "Qwen-3-32B": "competency_results_ask_qwen3_32b_using_kg_qwen3_235b_580papers.json",
+      "deepseek-r1-70B": "competency_results_qwen3_235b_580papers.json"
+
+    };
+
+    const tabs = document.getElementById("tabs");
+    const results = document.getElementById("results");
+
+    function renderData(data) {
+      results.innerHTML = "";
+      data.forEach(item => {
+        const block = document.createElement("div");
+        block.className = "question-block";
+
+        // helper to format answers
+        function formatAnswer(text) {
+          return text
+            .replace(/<think>/g, '<span class="think">')
+            .replace(/<\/think>/g, '</span>');
+        }
+
+        block.innerHTML = `
+          <h2>Q${item.question_num}: ${item.question}</h2>
+          <div class="answers">
+            <div class="answer">
+              <strong>Baseline Answer</strong>
+              <pre>${formatAnswer(item.baseline)}</pre>
+            </div>
+            <div class="answer">
+              <strong>KG-RAG Answer</strong>
+              <pre>${formatAnswer(item.kg_rag)}</pre>
+            </div>
+          </div>
+        `;
+        results.appendChild(block);
+      });
+    }
+
+    function loadFile(name, file) {
+      fetch(file)
+        .then(res => res.json())
+        .then(data => renderData(data))
+        .catch(err => {
+          results.innerHTML = `<p style="color:red;">Error loading ${file}: ${err}</p>`;
+        });
+    }
+
+    // build tabs
+    Object.entries(files).forEach(([name, file], idx) => {
+      const tab = document.createElement("div");
+      tab.className = "tab" + (idx === 0 ? " active" : "");
+      tab.textContent = name;
+      tab.onclick = () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        loadFile(name, file);
+      };
+      tabs.appendChild(tab);
+
+      if (idx === 0) loadFile(name, file); // load first by default
+    });
+  </script>
+</body>
+</html>
