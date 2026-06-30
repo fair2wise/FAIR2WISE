@@ -151,7 +151,11 @@ skills-lock.json
 
 # Local run/cache artifacts
 .cache/
+runs/
 storage/knowledge_gaps/
+node_modules/
+ui/node_modules/
+ui/dist/
 
 # Local generated/reference notes
 HANDOFF.md

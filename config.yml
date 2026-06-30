@@ -163,7 +163,9 @@ extract_terms:
   default_schema: storage/schema/matkg_schema.yaml
   temperature: 0.0
   context_length: 50
-  max_workers: 4
+  max_workers:
+    env: F2W_WORKERS
+    default: 8
 
 pipeline:
   evaluation_models:

@@ -23,6 +23,19 @@ from typing import Any, Dict, Iterable, List, Set, Tuple
 
 # Precompile regex pattern for performance
 _CLEAN_PATTERN = re.compile(r"[^A-Za-z0-9\-]")
+_PUB_FIELDS = (
+    "publication_year",
+    "paper_title",
+    "authors",
+    "institutions",
+    "doi",
+    "journal",
+    "volume",
+    "issue",
+    "pages_range",
+    "abstract_text",
+    "keywords",
+)
 
 
 def make_id(term: str) -> str:
@@ -68,6 +81,56 @@ def normalize_domain_features(features: Any) -> List[Dict[str, Any]]:
     return normalized
 
 
+def normalize_publications(record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Build embedded publication records without smearing scalar metadata."""
+    explicit = record.get("publications")
+    if isinstance(explicit, list):
+        publications = []
+        for pub in explicit:
+            if not isinstance(pub, dict):
+                continue
+            source = str(pub.get("source_paper") or "").strip()
+            clean = {
+                key: pub.get(key)
+                for key in _PUB_FIELDS
+                if pub.get(key) not in (None, "", [])
+            }
+            if source:
+                clean = {"source_paper": source, **clean}
+            if clean:
+                publications.append(clean)
+        if publications:
+            return sorted(publications, key=lambda p: str(p.get("source_paper", "")))
+
+    source_meta = record.get("source_metadata") or {}
+    if isinstance(source_meta, dict):
+        publications = []
+        for source in sorted(str(k) for k in source_meta if str(k).strip()):
+            meta = source_meta.get(source)
+            if not isinstance(meta, dict):
+                continue
+            clean = {
+                key: meta.get(key)
+                for key in _PUB_FIELDS
+                if meta.get(key) not in (None, "", [])
+            }
+            publications.append({"source_paper": source, **clean})
+        if publications:
+            return publications
+
+    source_papers = ensure_list(record.get("source_papers") or record.get("source_paper"))
+    if len(source_papers) <= 1:
+        clean = {
+            key: record.get(key)
+            for key in _PUB_FIELDS
+            if record.get(key) not in (None, "", [])
+        }
+        if clean or source_papers:
+            source = str(source_papers[0]) if source_papers else str(record.get("source_paper") or "")
+            return [{"source_paper": source, **clean} if source else clean]
+    return []
+
+
 def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build a CodeSnippet node from a code_snippets entry.
@@ -97,6 +160,7 @@ def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
         "publication_year": snip.get("publication_year"),
         "paper_title": snip.get("paper_title"),
         "source_metadata": snip.get("source_metadata", {}),
+        "publications": normalize_publications(snip),
         "authors": ensure_list(snip.get("authors")),
         "paper_authors": ensure_list(snip.get("paper_authors")),
         "doi": snip.get("doi"),
@@ -106,6 +170,19 @@ def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
         "code_description": snip.get("code_description"),
         "code_domain": snip.get("code_domain"),
         "domain_features": normalize_domain_features(snip.get("domain_features")),
+        "source_type": snip.get("source_type"),
+        "repo_url": snip.get("repo_url"),
+        "repo_owner": snip.get("repo_owner"),
+        "repo_name": snip.get("repo_name"),
+        "repo_default_branch": snip.get("repo_default_branch"),
+        "repo_commit_sha": snip.get("repo_commit_sha"),
+        "source_file_path": snip.get("source_file_path"),
+        "source_file_url": snip.get("source_file_url"),
+        "source_start_line": snip.get("source_start_line"),
+        "source_end_line": snip.get("source_end_line"),
+        "repository_license": snip.get("repository_license"),
+        "license_warning": snip.get("license_warning"),
+        "source_score": snip.get("source_score"),
     }
 
 
@@ -169,9 +246,11 @@ def build_graph(
         # Also remap removed XRayScatteringAnalysis → ExperimentalTechnique.
         if term.get("category") == "CodeSnippet":
             term = dict(term)
+            term.setdefault("raw_category", "CodeSnippet")
             term["category"] = "Unknown"
         elif term.get("category") == "XRayScatteringAnalysis":
             term = dict(term)
+            term.setdefault("raw_category", "XRayScatteringAnalysis")
             term["category"] = "ExperimentalTechnique"
 
         # Create node if new
@@ -180,6 +259,7 @@ def build_graph(
                 "id": tid,
                 "name": name,
                 "category": term.get("category", "Unknown"),
+                "raw_category": term.get("raw_category"),
                 "description": term.get("definition", "") or "N/A",
                 "pages": ensure_list(term.get("pages")),
                 "source_papers": ensure_list(term.get("source_papers")),
@@ -190,6 +270,7 @@ def build_graph(
                 "publication_year": term.get("publication_year"),
                 "paper_title": term.get("paper_title"),
                 "source_metadata": term.get("source_metadata", {}),
+                "publications": normalize_publications(term),
                 "authors": ensure_list(term.get("authors")),
                 "institutions": ensure_list(term.get("institutions")),
                 "doi": term.get("doi"),
@@ -214,6 +295,7 @@ def build_graph(
                     "id": rid,
                     "name": tgt,
                     "category": "Unknown",
+                    "raw_category": None,
                     "description": "",
                     "pages": [],
                     "source_papers": [],
@@ -221,6 +303,7 @@ def build_graph(
                     "formula": "",
                     "formula_validation": {},
                     "properties": [],
+                    "publications": [],
                 }
 
             pred = f"rel:{rel.get('relation', 'RELATED_TO')}"
@@ -230,12 +313,15 @@ def build_graph(
             seen.add(sig)
 
             evidence = ensure_list(rel.get("evidence"))
-            edges.append({
+            edge = {
                 "subject": tid,
                 "predicate": pred,
                 "object": rid,
                 "has_evidence": "; ".join(evidence) if evidence else None,
-            })
+            }
+            if rel.get("raw_predicate") or rel.get("raw_relation"):
+                edge["raw_predicate"] = rel.get("raw_predicate") or rel.get("raw_relation")
+            edges.append(edge)
 
     # Wire has_code_snippet edges: any term node from same paper gets linked
     # to CodeSnippet nodes from that paper. Prefer same-page match, fall back

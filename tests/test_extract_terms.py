@@ -329,9 +329,83 @@ def test_schema_helper_validate_and_fix_term_filters_bad_relations():
 
     assert fixed["category"] == "Material"
     assert fixed["relations"] == [
-        {"relation": "has_application", "related_term": "OPV", "verified": True},
+        {
+            "relation": "has_application",
+            "related_term": "OPV",
+            "verified": True,
+            "raw_predicate": "has applicaton",
+        },
         {"relation": "unknown_relation", "related_term": "X", "verified": False},
     ]
+
+
+def test_schema_helper_maps_unknown_labels_to_general_schema():
+    helper = SchemaHelper.__new__(SchemaHelper)
+    helper.classes = {
+        "Thing": {"description": "Thing", "slots": []},
+        "Structure": {"description": "Structure", "slots": []},
+    }
+    helper.class_parents = {"Thing": None, "Structure": "Thing"}
+    helper.slots = {
+        "has_property": {"domain": "Thing", "range": "Thing", "multivalued": True},
+        "related_to": {"domain": "Thing", "range": "Thing", "multivalued": True},
+    }
+    helper._class_names_lower = ["thing", "structure"]
+    helper._class_map_lower = {"thing": "Thing", "structure": "Structure"}
+    helper._slot_names_lower = ["has_property", "related_to"]
+    helper._slot_map_lower = {"has_property": "has_property", "related_to": "related_to"}
+    helper.fuzzy_cutoff = 95
+
+    fixed = helper.validate_and_fix_term(
+        {
+            "term": "lithium dendrite",
+            "category": "Morphology",
+            "relations": [
+                {"relation": "MaterialHasProperty", "related_term": "battery performance"},
+                {"relation": "surprising_new_relation", "related_term": "electrolyte"},
+            ],
+        }
+    )
+
+    assert fixed["category"] == "Structure"
+    assert fixed["raw_category"] == "Morphology"
+    assert fixed["relations"] == [
+        {
+            "relation": "has_property",
+            "related_term": "battery performance",
+            "verified": True,
+            "raw_predicate": "MaterialHasProperty",
+        },
+        {
+            "relation": "related_to",
+            "related_term": "electrolyte",
+            "verified": True,
+            "raw_predicate": "surprising_new_relation",
+        },
+    ]
+
+
+def test_schema_helper_validate_and_fix_term_tolerates_null_relations_and_category():
+    helper = SchemaHelper.__new__(SchemaHelper)
+    helper.classes = {"Thing": {"description": "Thing", "slots": []}}
+    helper.class_parents = {"Thing": None}
+    helper.slots = {}
+    helper._class_names_lower = ["thing"]
+    helper._class_map_lower = {"thing": "Thing"}
+    helper._slot_names_lower = []
+    helper._slot_map_lower = {}
+    helper.fuzzy_cutoff = 70
+
+    fixed = helper.validate_and_fix_term(
+        {
+            "term": "X-ray nanotomography",
+            "category": None,
+            "relations": None,
+        }
+    )
+
+    assert fixed["category"] == "Thing"
+    assert fixed["relations"] == []
 
 
 def test_schema_helper_relation_validity_respects_subclasses():

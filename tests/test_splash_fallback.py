@@ -55,6 +55,8 @@ class TestSplashFallbackToJson:
 
         assert "matkg:Fallback" in kg.nodes
         assert kg.nodes["matkg:Fallback"]["name"] == "Fallback Node"
+        assert kg.graph_source_requested == "splash"
+        assert kg.graph_source_used == "json_fallback"
 
     def test_falls_back_on_runtime_error(self, tmp_path, monkeypatch):
         monkeypatch.setattr(kg_rag_api, "GRAPH_SOURCE", "splash")
@@ -70,6 +72,7 @@ class TestSplashFallbackToJson:
         kg = kg_rag_api.KnowledgeGraph(str(graph_path))
 
         assert "matkg:Fallback" in kg.nodes
+        assert kg.graph_source_used == "json_fallback"
 
     def test_no_fallback_on_splash_success(self, tmp_path, monkeypatch):
         monkeypatch.setattr(kg_rag_api, "GRAPH_SOURCE", "splash")
@@ -97,6 +100,7 @@ class TestSplashFallbackToJson:
         # Should have splash data, not JSON fallback
         assert "matkg:SplashNode" in kg.nodes
         assert "matkg:Fallback" not in kg.nodes
+        assert kg.graph_source_used == "splash"
 
     def test_splash_links_alias_accepted(self, tmp_path, monkeypatch):
         """GRAPH_SOURCE='splash_links' and 'splash-links' should both work."""
@@ -118,6 +122,8 @@ class TestSplashFallbackToJson:
 
             kg = kg_rag_api.KnowledgeGraph(str(_write_json_graph(tmp_path)))
             assert "matkg:X" in kg.nodes
+            assert kg.graph_source_requested == source
+            assert kg.graph_source_used == source
 
 
 class TestUnknownGraphSource:

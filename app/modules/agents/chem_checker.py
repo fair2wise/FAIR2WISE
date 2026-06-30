@@ -28,6 +28,7 @@ class ChemicalFormulaValidator:
     def __init__(self, api_key: Optional[str] = None, timeout: int = 60):
         self.api_key = api_key or os.getenv("MP_API_KEY")
         self.timeout = timeout
+        self._mp_disabled = False
 
     # -------------------------- public helpers --------------------------- #
 
@@ -67,15 +68,16 @@ class ChemicalFormulaValidator:
             return result                 # short‑circuit
 
         # ---------- 2. Materials Project cross‑check (optional) ---------- #
-        if self.api_key:
+        if self.api_key and not self._mp_disabled:
             try:
                 result["mp_hits"] = self._query_mp(result["canonical"])
                 if result["mp_hits"] == 0 and status == "ok":
                     # syntactically valid but not in MP → still suspicious
                     result["status"] = "invalid"
             except Exception as exc:      # noqa: BLE001
-                logger.warning("MP lookup failed: %s", exc)
-                result["error"] = f"mp‑error: {exc}"
+                logger.warning("MP lookup failed; skipping Materials Project checks for this run: %s", exc)
+                self._mp_disabled = True
+                result["error"] = f"mp-error: {exc}"
 
         return result
 

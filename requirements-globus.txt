@@ -1,0 +1,7 @@
+# Optional: extractor-only Bowen/Academy deployment through Globus Compute.
+#
+# Do not install this for the full 3-agent NERSC path unless you are also
+# configuring a Globus Compute endpoint.
+globus-sdk>=4.8,<5
+globus-compute-sdk==4.13.0
+globus-compute-endpoint==4.13.0

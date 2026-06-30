@@ -16,6 +16,7 @@ import os
 import time
 import argparse
 import logging
+from pathlib import Path
 import arxiv
 import requests
 from pyalex import Works
@@ -26,6 +27,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler()],
 )
+
+
+PDF_MAGIC = b"%PDF-"
 
 
 def search_arxiv(keyword: str, max_results: int):
@@ -43,23 +47,72 @@ def search_arxiv(keyword: str, max_results: int):
     return client.results(search)
 
 
+def _cleanup_partial(path: Path):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def download_pdf(url: str, dest: str, retries=3):
     """
     Download PDF from URL and save to dest file.
-    Handles retries, timeout, streaming.
+    Handles retries, timeout, streaming, and rejects non-PDF payloads.
     """
+    dest_path = Path(dest)
+    tmp_path = dest_path.with_name(dest_path.name + ".part")
+
     for attempt in range(1, retries + 1):
         try:
             logging.debug(f"Downloading {url}")
+            _cleanup_partial(tmp_path)
             resp = requests.get(url, stream=True, timeout=30)
             resp.raise_for_status()
-            with open(dest, 'wb') as f:
+
+            header = b""
+            pending = []
+            validated = False
+            invalid_response = False
+            content_type = (resp.headers.get("Content-Type") or "").lower()
+
+            with open(tmp_path, 'wb') as f:
                 for chunk in resp.iter_content(1024*32):
-                    if chunk:
-                        f.write(chunk)
+                    if not chunk:
+                        continue
+                    if not validated:
+                        pending.append(chunk)
+                        header += chunk
+                        if len(header) < len(PDF_MAGIC):
+                            continue
+                        if not header.startswith(PDF_MAGIC):
+                            invalid_response = True
+                            break
+                        for buffered in pending:
+                            f.write(buffered)
+                        pending = []
+                        validated = True
+                        continue
+                    f.write(chunk)
+
+            if invalid_response:
+                _cleanup_partial(tmp_path)
+                logging.warning(
+                    "Rejected non-PDF response from %s (Content-Type: %s)",
+                    url,
+                    content_type or "unknown",
+                )
+                return False
+
+            if not validated:
+                _cleanup_partial(tmp_path)
+                logging.warning("Rejected empty or truncated PDF response from %s", url)
+                return False
+
+            os.replace(tmp_path, dest_path)
             logging.info(f"Saved PDF to {dest}")
             return True
         except Exception as e:
+            _cleanup_partial(tmp_path)
             logging.warning(f"Attempt {attempt} failed: {e}")
             time.sleep(5)
     logging.error(f"Failed to download {url}")

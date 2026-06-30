@@ -68,13 +68,26 @@ def test_knowledge_graph_lexical_search_and_bfs(tmp_path, monkeypatch):
     monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
     graph_path = write_graph(tmp_path)
 
-    kg = kg_rag_api.KnowledgeGraph(str(graph_path))
+    kg = kg_rag_api.KnowledgeGraph(str(graph_path), graph_source="json")
+    assert kg.graph_source_requested == "json"
+    assert kg.graph_source_used == "json"
     seeds = kg.semantic_search("P3HT organic photovoltaics", topk=2)
     expanded = kg.weighted_bfs(seeds, hops=1)
 
     assert seeds[0].id == "matkg:P3HT"
     assert "matkg:OPV" in {node.id for node in expanded}
     assert kg.semantic_search("??", topk=2) == []
+    assert kg.weighted_bfs([], hops=1) == []
+
+
+def test_empty_knowledge_graph_semantic_search_returns_no_hits(tmp_path, monkeypatch):
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "semantic")
+    graph_path = tmp_path / "empty_graph.json"
+    graph_path.write_text(json.dumps({"things": [], "associations": []}))
+
+    kg = kg_rag_api.KnowledgeGraph(str(graph_path), graph_source="json")
+
+    assert kg.semantic_search("anything", topk=2) == []
     assert kg.weighted_bfs([], hops=1) == []
 
 
@@ -139,17 +152,18 @@ def test_knowledge_graph_loads_splash_links_source(monkeypatch):
         ]
         return FakeResponse({"links": links if offset == 0 else []})
 
-    monkeypatch.setattr(kg_rag_api, "GRAPH_SOURCE", "splash")
     monkeypatch.setattr(kg_rag_api, "SPLASH_LINKS_URI", "splash://localhost:8080")
     monkeypatch.setattr(kg_rag_api, "SPLASH_LINKS_PAGE_SIZE", 1000)
     monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
     monkeypatch.setattr(kg_rag_api.requests, "post", fake_post)
 
-    kg = kg_rag_api.KnowledgeGraph("unused.json")
+    kg = kg_rag_api.KnowledgeGraph("unused.json", graph_source="splash")
 
     assert set(kg.nodes) == {"matkg:P3HT", "matkg:OPV"}
     assert kg.out_edges["matkg:P3HT"][0]["object"] == "matkg:OPV"
     assert kg.semantic_search("P3HT photovoltaics", topk=2)[0].id == "matkg:P3HT"
+    assert kg.graph_source_requested == "splash"
+    assert kg.graph_source_used == "splash"
 
 
 def test_retrieve_nodes_ranks_and_caps_results(tmp_path, monkeypatch):
@@ -267,6 +281,14 @@ def test_build_context_renders_code_snippet_nodes(tmp_path, monkeypatch):
                 "code_language": "python",
                 "code_snippet": "def analyze(x):\n    return x",
                 "domain_features": [{"feature_name": "q_range", "feature_value": "0.1-1.0"}],
+                "source_type": "github",
+                "repo_url": "https://github.com/example/analyze",
+                "repo_commit_sha": "abc123",
+                "source_file_path": "src/analyze.py",
+                "source_file_url": "https://github.com/example/analyze/blob/abc123/src/analyze.py",
+                "source_start_line": 4,
+                "source_end_line": 5,
+                "repository_license": "MIT",
             }
         ],
         "associations": [],
@@ -283,6 +305,11 @@ def test_build_context_renders_code_snippet_nodes(tmp_path, monkeypatch):
     context = kg.build_context(node_info, include_structured=False, char_budget=2000, hint_terms=[])
 
     assert "Function: analyze" in context
+    assert "Source_Type: github" in context
+    assert "Repository: https://github.com/example/analyze" in context
+    assert "Source_File: src/analyze.py:4-5" in context
+    assert "Repository_Commit: abc123" in context
+    assert "Repository_License: MIT" in context
     assert "Domain_Features:\n- q_range: 0.1-1.0" in context
     assert "```python\ndef analyze(x):\n    return x\n```" in context
 
@@ -330,6 +357,44 @@ def test_build_context_prefers_source_scoped_metadata(tmp_path, monkeypatch):
     assert "Tomaszewski" not in scipy_line
     assert "arXiv:2111.08645v1" in xray_line
     assert "Paper_Title: Machine Learning-Assisted" not in context
+
+
+def test_build_context_renders_publications_field(tmp_path, monkeypatch):
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical")
+    monkeypatch.setattr(kg_rag_api, "load_pdf_text", lambda path: "")
+    graph = {
+        "things": [
+            {
+                "id": "matkg:Graphene",
+                "name": "graphene",
+                "category": "Material",
+                "description": "Two-dimensional carbon material.",
+                "source_papers": ["graphene_review.pdf"],
+                "publications": [
+                    {
+                        "source_paper": "graphene_review.pdf",
+                        "paper_title": "Graphene in Scattering Experiments",
+                        "publication_year": 2024,
+                        "doi": "10.1234/graphene",
+                        "authors": ["Doe J", "Roe A"],
+                    }
+                ],
+            }
+        ],
+        "associations": [],
+    }
+    graph_path = tmp_path / "graph.json"
+    graph_path.write_text(json.dumps(graph))
+    kg = kg_rag_api.KnowledgeGraph(str(graph_path))
+    node_info = kg.build_nodeinfo([kg_rag_api.NodeScore("matkg:Graphene", 0.9)], [], ["graphene"])
+
+    context = kg.build_context(node_info, include_structured=False, char_budget=3000, hint_terms=[])
+
+    assert "Publications:" in context
+    assert "- graphene_review.pdf; title=Graphene in Scattering Experiments" in context
+    assert "year=2024" in context
+    assert "doi=10.1234/graphene" in context
+    assert "authors=Doe J, Roe A" in context
 
 
 def test_build_context_suppresses_scalar_metadata_across_multiple_sources(tmp_path, monkeypatch):

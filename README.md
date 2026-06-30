@@ -10,13 +10,16 @@ This repository builds materials-science knowledge graphs from research papers (
 4. Import the MatKG JSON into `splash_links`
 5. Query the database-backed graph via KG-RAG chat (CLI or Open WebUI)
 
+**Optional — 3-agent automated pipeline:** [`f2w_agent.py`](f2w_agent.py) runs three Academy agents that answer from the KG when evidence suffices, and otherwise download relevant OpenAlex papers, extract terms, rebuild the KG, and re-query in a loop. See **[3-Agent KG-RAG Pipeline](#3-agent-kg-rag-pipeline)**.
+
 ---
 
 ## Prerequisites
 
 - Python 3.10+ (Python 3.12 recommended; Python 3.14 supported with lexical retrieval only)
-- A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend)
+- A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend). CBORG requires LBLnet/VPN or an authorized IP — see [CBORG IP authorization](https://api.cborg.lbl.gov/key/manage).
 - Optional: [Ollama](https://ollama.com/) running locally for offline inference
+- For the 3-agent pipeline: `academy-py`, `langgraph`, `langchain-core`, `langchain-openai` (included in `requirements.txt`)
 
 ---
 
@@ -64,6 +67,12 @@ KG_RAG_LLM_TIMEOUT=120
 KG_RAG_CTX_CHARS=6000
 KG_RAG_SHOW_BASELINE=0
 PYSTOW_HOME=.cache/pystow
+
+# Optional — OpenAlex polite pool (download agent)
+OPENALEX_EMAIL=you@example.com
+
+# Optional — splash_links repo path (3-agent splash mode)
+SPLASH_LINKS_REPO=../splash_links
 ```
 
 > **Note:** runtime environment variables and CLI flags override `.env`; `.env` overrides `config.yml` defaults.
@@ -199,7 +208,7 @@ Each extracted terms JSON contains two top-level keys:
 | Key | Description |
 |---|---|
 | `terms` | List of schema-aligned entities. Each entry carries: `term`, `definition`, `category`, `formula`, `relations`, `pages`, `source_papers`, `context_snippets`, `source_metadata` (per-PDF publication fields), plus legacy scalar fields (`publication_year`, `paper_title`, `authors`, `institutions`, `doi`, `journal`, `volume`, `issue`, `pages_range`, `abstract_text`, `keywords`) |
-| `code_snippets` | List of peak-finding / scattering analysis code blocks extracted per page. Each entry carries: `code_snippet`, `code_language`, `code_description`, `function_name`, `domain_features`, `source_paper`, `page`, and `source_metadata` |
+| `code_snippets` | List of peak-finding / scattering analysis code blocks extracted from embedded PDF text or paper-linked GitHub repositories. Each entry carries: `code_snippet`, `code_language`, `code_description`, `function_name`, `domain_features`, `source_paper`, `page`, and `source_metadata`; GitHub-derived snippets also carry repo/file/commit/license provenance |
 
 Publication metadata (`paper_title`, `authors`, `doi`, etc.) is extracted from PDF metadata fields first, then from first-page text via regex. Fields not found are `null` or `[]`. Metadata is stored per source PDF in `source_metadata` so a term that appears in multiple papers does not smear one paper's authors/DOI onto another.
 
@@ -288,16 +297,16 @@ curl -s http://localhost:8081/docs -o /dev/null -w "%{http_code}\n"
 
 ### 4b. Wipe stale DB before re-import (recommended)
 
-If you are re-importing after a metadata or schema fix, delete the old SQLite DB so stale entities (missing `source_metadata`, `code_snippet`, etc.) do not linger:
+If you are re-importing after a metadata or schema fix, clear the existing splash graph so stale entities (missing `source_metadata`, `code_snippet`, etc.) do not linger:
 
 ```bash
 cd /path/to/splash_links
-# stop the server first (Ctrl+C in the serve terminal)
+# stop the server first if you plan to delete links.sqlite manually
 rm -f links.sqlite
 pixi run serve
 ```
 
-> **Why wipe?** `import_kg.py` creates new entities; it does not delete old ones. A partial or pre-fix import leaves duplicate/stale records that KG-RAG may still load.
+> **Why wipe?** `import_kg.py` creates new entities; it does not delete old ones. A partial or pre-fix import leaves duplicate/stale records that KG-RAG may still load. The 3-agent pipeline now does this safely through GraphQL, so you usually do not need to delete `links.sqlite` by hand.
 
 ### 4c. Import the MatKG JSON
 
@@ -305,6 +314,8 @@ pixi run serve
 cd /path/to/splash_links
 pixi run python scripts/import_kg.py /path/to/f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
 ```
+
+If you are using the 3-agent pipeline, `splash_reimport()` is the preferred path. It clears the live splash graph through GraphQL and then runs the import script against the running server. That avoids the SQLite "readonly database" failure that can happen when `links.sqlite` is deleted while `pixi run serve` is still holding the file open.
 
 Dry-run first (validate counts, no writes):
 
@@ -360,6 +371,39 @@ cd /path/to/f2wlocal
 python3 app/modules/kg_rag_api.py --api --backend cborg --graph-source splash
 ```
 
+### 4g. Helper scripts for the 3-agent pipeline
+
+Use these scripts from `f2wlocal` when you want the automated download/extract/rebuild loop:
+
+```bash
+# Start splash-links in the sibling repo
+cd /Users/mateo/Desktop/splash_links
+pixi run serve
+
+# Start the backend API used by the colocated UI
+cd /Users/mateo/Desktop/f2wlocal
+./scripts/start_agent_backend.sh
+
+# Start the frontend dev server from ./ui
+cd /Users/mateo/Desktop/f2wlocal
+./scripts/start_agent_frontend.sh
+```
+
+Defaults used by `start_agent_backend.sh`:
+
+- `F2W_KG_MODE=splash`
+- `F2W_MAX_PAPERS=1`
+- `F2W_WORKERS=1`
+- `F2W_DOWNLOAD_DELAY=0`
+- `F2W_WORKDIR=runs/ui_session_splash`
+- `SPLASH_LINKS_REPO=/Users/mateo/Desktop/splash_links`
+
+Override them for heavier runs:
+
+```bash
+F2W_MAX_PAPERS=3 F2W_WORKERS=8 ./scripts/start_agent_backend.sh
+```
+
 ### JSON fallback (no splash server)
 
 To bypass the database and load a local JSON file directly:
@@ -408,6 +452,34 @@ Ask (exit to quit):
 python3 app/modules/kg_rag_api.py \
   --question "What is the role of P3HT crystallinity in OPV performance?"
 ```
+
+### Web UI / agent bridge
+
+The prototype UI in [`ui/`](ui/) talks to the agent pipeline through `http://127.0.0.1:8090/chat`.
+It renders grounded answers, highlighted KG nodes, and relevant publication metadata returned by the backend.
+
+Install UI dependencies once:
+
+```bash
+cd /Users/mateo/Desktop/f2wlocal/ui
+npm ci
+```
+
+Run it with:
+
+```bash
+cd /Users/mateo/Desktop/f2wlocal
+./scripts/start_agent_frontend.sh
+```
+
+`scripts/start_agent_frontend.sh` defaults to `ui/` and can still be pointed elsewhere with `FAIR2WISE_UI_DIR=/path/to/ui`.
+
+`POST /chat` and `POST /chat/stream` responses include:
+
+- `answer`: grounded answer text
+- `node_ids`: selected KG node IDs for graph highlighting
+- `publications`: deduped publication records from selected nodes, including `paper_title`, `authors`, `publication_year`, `doi`, `source_paper`, and `supporting_nodes` when available
+- `graph`: current session graph payload for UI refresh
 
 With a shorter timeout:
 
@@ -517,6 +589,205 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 - Missing-node tracking logged to `storage/knowledge_gaps/`
 - FastAPI proxy exposes `/api/chat`, `/api/tags`, `/api/ps` (Open WebUI-compatible)
 - GPU auto-detect with CPU fallback for embeddings
+
+---
+
+## 3-Agent KG-RAG Pipeline
+
+[`f2w_agent.py`](f2w_agent.py) is an **Academy-based, self-growing KG-RAG chat** that wraps the manual Steps 1–5 workflow behind three cooperating agents. A user asks a question; if the KG lacks sufficient evidence, the system downloads relevant papers, extracts terms, rebuilds the KG, and retries — up to `--max-rounds` times.
+
+### Architecture
+
+| Agent | Module | Role |
+|---|---|---|
+| **RetrievalAgent** | [`app/modules/f2w_agent/retrieval_agent.py`](app/modules/f2w_agent/retrieval_agent.py) | Retrieve KG context, judge whether evidence suffices (no inference/hallucination), answer if sufficient |
+| **DownloadAgent** | [`app/modules/f2w_agent/download_agent.py`](app/modules/f2w_agent/download_agent.py) | Search OpenAlex, rank abstracts by relevance, download top-N open-access PDFs |
+| **ExtractorAgent** | [`app/modules/f2w_agent/extractor_agent.py`](app/modules/f2w_agent/extractor_agent.py) | Run the LangGraph [`term_extractor`](app/modules/term_extractor/) pipeline on downloaded PDFs |
+
+The **coordinator** ([`app/modules/f2w_agent/coordinator.py`](app/modules/f2w_agent/coordinator.py)) launches all three agents in one local Academy `Manager` and drives this loop per question:
+
+```
+User question
+  → RetrievalAgent.query
+      → sufficient? → print grounded answer, done
+      → insufficient → DownloadAgent.find_and_download (OpenAlex)
+          → 0 new PDFs? → stop (cannot gather more evidence)
+          → PDFs → ExtractorAgent.extract
+              → rebuild KG (json2kg) → reload KG → retry query
+```
+
+### Quick start (xray demo KG)
+
+Use the repaired xray demo data already in `storage/`:
+
+```bash
+# Check configuration
+python3 f2w_agent.py status
+
+# One-shot question (JSON KG mode — no splash-links server required)
+KG_RAG_GRAPH_SOURCE=json python3 f2w_agent.py \
+  --backend cborg \
+  --model lbl/cborg-chat \
+  --kg-mode json \
+  --graph storage/kg/matkg_xray_papers_cborg_chat.json \
+  --seed-terms storage/terminology/extracted_terms_xray_papers_cborg_chat.json \
+  --workdir runs/my_session \
+  ask "What is find_scattering_peaks used for?"
+
+# Interactive chat loop
+KG_RAG_GRAPH_SOURCE=json python3 f2w_agent.py \
+  --graph storage/kg/matkg_xray_papers_cborg_chat.json \
+  --seed-terms storage/terminology/extracted_terms_xray_papers_cborg_chat.json \
+  --workdir runs/my_session \
+  chat
+
+# HTTP API for the repo-local UI
+./scripts/start_agent_backend.sh
+```
+
+Then run the prototype UI:
+
+```bash
+./scripts/start_agent_frontend.sh
+```
+
+When the KG already contains enough evidence, the retrieval agent answers immediately — no download or extraction runs.
+
+When evidence is missing, the loop downloads papers (default `--max-papers 3` per round), extracts terms into a cumulative session JSON, rebuilds `runs/<workdir>/kg.json`, reloads the in-memory graph, and re-queries.
+
+### CLI reference
+
+```bash
+python3 f2w_agent.py --help
+python3 f2w_agent.py ask --help   # (global flags go before subcommand)
+```
+
+| Subcommand | Description |
+|---|---|
+| `status` | Print resolved backend, graph, workdir, and loop limits |
+| `ask <question>` | One-shot question through the full loop |
+| `api` | FastAPI bridge for the prototype web chat UI |
+| `chat` | Interactive REPL (`exit` to quit) |
+
+| Flag | Default | Description |
+|---|---|---|
+| `--backend` | `cborg` | LLM backend (`cborg`, `cborg-openai`, `ollama`) |
+| `--model` | env default | Model name |
+| `--graph` | — | Initial KG JSON for retrieval |
+| `--seed-terms` | — | Cumulative extracted-terms JSON (merged on each extract pass) |
+| `--kg-mode` | `splash` | `splash` = use/re-import splash-links; `json` = rebuild + in-process reload only |
+| `--workdir` | `runs/session` | Session dir: `pdfs/`, `terms.json`, `kg.json` |
+| `--max-rounds` | `3` | Max download→extract→reload cycles per question |
+| `--max-papers` | `3` | PDFs to download per round |
+| `--candidate-pool` | `25` | OpenAlex candidates to rank before downloading |
+| `--download-delay` | `1.0` | Seconds to wait between PDF download attempts |
+| `--no-download-validation` | off | Disable best-effort LLM relevance validation for downloaded PDFs |
+| `--workers` | `4` | Page-level extraction parallelism |
+| `--schema` | `storage/schema/matkg_schema.yaml` | LinkML schema for extraction |
+| `--chebi` | — | Optional ChEBI `.obo` path |
+| `--splash-repo` | `../splash_links` | Path to splash_links checkout (`--kg-mode splash`) |
+| `--allow-splash-wipe` | off | Permit `--kg-mode splash` to delete `links.sqlite` before re-import |
+
+### KG update modes
+
+**JSON mode (explicit local fallback):**
+
+- After each extraction pass, `json2kg.py` rebuilds `workdir/kg.json`.
+- `RetrievalAgent.reload_kg()` reloads the graph in-process.
+- Pass `--kg-mode json` when you want to skip splash-links.
+
+**Splash mode (`--kg-mode splash`):**
+
+- Same JSON rebuild, then wipes/re-imports into `splash_links` via `scripts/import_kg.py` (see **Step 4**).
+- Requires a running splash-links server and a local `splash_links` checkout (`SPLASH_LINKS_REPO`).
+- Requires `--allow-splash-wipe` before deleting `links.sqlite`; the run prints the DB path it is about to use.
+- Heavier per round; use when you want the live splash DB to stay in sync.
+
+### Extractor package (`term_extractor`)
+
+The extractor agent uses [`app/modules/term_extractor/`](app/modules/term_extractor/), ported from the FAIR2WISE `bowen/academy_agent` branch with **local provenance patches**:
+
+- Output JSON includes top-level `code_snippets` and per-term `source_metadata` (source-scoped publication fields).
+- Publication metadata comes **only** from PDF-derived extraction (`provenance.py`); the term LLM never stamps authors/DOI/year.
+- Code snippets come from embedded PDF code blocks and explicit GitHub repository links found in PDF text; set optional `GITHUB_TOKEN` for higher GitHub API rate limits.
+- KG conversion uses the existing [`json2kg.py`](app/modules/json2kg.py) (preserves `source_metadata` + CodeSnippet nodes).
+
+The legacy standalone extractor [`extract_terms.py`](app/modules/extract_terms.py) remains available for manual/batch runs. The monitored remote `TermExtractorAgent` + dashboard stack in `term_extractor/` is available for standalone Globus/NERSC extraction, but is **not** used by the local `f2w_agent.py` loop.
+
+### NERSC deploy helper
+
+Use [`scripts/deploy_nersc.sh`](scripts/deploy_nersc.sh) to sync the current extractor code to Perlmutter, update the remote Python environment, optionally sync PDFs, restart the Globus Compute endpoint, and submit a Bowen/Academy remote extraction run. It intentionally excludes `.env`, `.venv`, run artifacts, and caches.
+
+Set local shell variables first:
+
+```bash
+export NERSC_USER=<username>
+export NERSC_REPO=/pscratch/sd/<first-letter>/<username>/f2wlocal
+export NERSC_HOST=perlmutter.nersc.gov
+export NERSC_ENDPOINT=f2w-extractor
+```
+
+First-time setup/update:
+
+```bash
+scripts/deploy_nersc.sh --sync-code --setup
+```
+
+Sync code and PDFs, then restart the endpoint:
+
+```bash
+scripts/deploy_nersc.sh --sync-code --sync-pdfs /local/path/to/pdfs --restart-endpoint
+```
+
+Submit extraction after `python user_agent_launcher.py --port 8000` has written `user_agent_handle.pkl`:
+
+```bash
+scripts/deploy_nersc.sh --submit
+```
+
+One-command flow:
+
+```bash
+scripts/deploy_nersc.sh --all /local/path/to/pdfs
+```
+
+The script defaults to CBORG (`F2W_BACKEND=cborg`, `F2W_MODEL=lbl/cborg-chat`, `F2W_MAX_WORKERS=4`). Override those env vars before running if needed. Keep Globus/Academy/CBORG secrets in local `.env`; do not copy `.env` to NERSC.
+
+For the full three-agent NERSC path, install only `requirements.txt`. Install `requirements-globus.txt` only when configuring the extractor-only Globus Compute endpoint path.
+
+### Download relevance ranking
+
+The download agent:
+
+1. Searches OpenAlex with the question + `missing_topics`, plus focused missing-topic queries, and deduplicates by DOI/OpenAlex ID.
+2. Reconstructs each candidate abstract from `abstract_inverted_index`.
+3. Keeps works with open-access URLs, preferring OpenAlex `pdf_url` fields before `oa_url`.
+4. Ranks candidates by LLM relevance score (title + abstract); falls back to lexical overlap if the LLM is unavailable.
+5. Downloads the top `--max-papers` PDFs into `workdir/pdfs/`, skipping files already present.
+6. Rejects non-PDF payloads by checking `%PDF-` bytes before saving.
+7. Runs best-effort LLM validation on downloaded PDF preview text; semantic validation failures delete the PDF, while validator outages fail open.
+
+Set `OPENALEX_EMAIL` in `.env` for polite-pool access.
+
+The loop writes `workdir/downloads.jsonl` with OpenAlex ID/DOI/title, attempted URLs, score, destination path, and validation status for each attempted work.
+
+Extraction uses `workdir/processed_pdfs.json` to avoid reprocessing PDFs already merged into `workdir/terms.json`. Each round stages only unprocessed PDFs under `workdir/extract_rounds/round_<n>/`.
+
+### Sufficiency judgement
+
+The retrieval agent uses a strict JSON judge prompt: answer **only** from retrieved KG/PDF context; no inference, no hallucinated metadata. If retrieved nodes have no direct source evidence, the verdict is forced insufficient without calling the LLM.
+
+For the 3-agent loop, the retrieval agent now skips the judge LLM entirely when retrieved nodes have no direct source evidence (`source_papers`, snippets, code, or edge evidence), reports whether splash fell back to JSON, and treats judge/runtime failures as insufficient evidence rather than crashing the session.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `403 ip_not_authorized` from CBORG | Connect via LBLnet/VPN or authorize your IP at [api.cborg.lbl.gov/key/manage](https://api.cborg.lbl.gov/key/manage) |
+| Answer immediately but question is out-of-domain | Expected when xray demo KG lacks coverage — loop should trigger download/extract |
+| `downloaded 0 paper(s)` | No open-access PDFs matched; try broadening the question or increasing `--candidate-pool` |
+| Splash mode import fails | Verify `SPLASH_LINKS_REPO`, run splash-links server, see **Step 4** |
+| Wrong metadata in answers | Same provenance rules as Step 5 — verify `source_metadata` in terms JSON and re-import splash if needed |
 
 ---
 
@@ -698,6 +969,7 @@ docker stop kg-rag && docker rm kg-rag
 | Script | Description |
 |---|---|
 | `scripts/download_pdfs.py` | Download PDFs from arXiv or OpenAlex by DOI/ID |
+| `f2w_agent.py` | 3-agent KG-RAG pipeline CLI (retrieval → download → extract → reload loop) |
 | `scripts/test_chat_apis.py` | Standalone CBORG API connectivity test |
 | `scripts/analyze_kgs.py` | Evaluate KG JSON files: node/edge counts, coverage, growth rates |
 | `scripts/get_pdf_years.py` | Estimate publication year for PDFs; writes `pdf_years.csv` |
@@ -731,8 +1003,23 @@ Tests live in `_tests/`. The `json2kg.py` module also has inline pytest tests th
 │   │   │   ├── chem_checker.py
 │   │   │   └── properties.py
 │   │   ├── extract_terms.py
+│   │   ├── f2w_agent
+│   │   │   ├── __init__.py
+│   │   │   ├── cli.py
+│   │   │   ├── coordinator.py
+│   │   │   ├── download_agent.py
+│   │   │   ├── extractor_agent.py
+│   │   │   ├── kg_update.py
+│   │   │   └── retrieval_agent.py
 │   │   ├── json2kg.py
 │   │   ├── kg_rag_api.py
+│   │   ├── term_extractor
+│   │   │   ├── academy_agent.py
+│   │   │   ├── agent.py
+│   │   │   ├── orchestrator.py
+│   │   │   ├── provenance.py
+│   │   │   ├── store.py
+│   │   │   └── …
 │   │   └── legacy
 │   │       ├── build_onto.py
 │   │       ├── extract_terms_linkml_jun3.py
@@ -766,6 +1053,7 @@ Tests live in `_tests/`. The `json2kg.py` module also has inline pytest tests th
 │   └── *.pdf
 ├── pytest.ini
 ├── README.md
+├── f2w_agent.py
 ├── requirements.txt
 ├── scripts
 │   ├── analyze_kgs.py
@@ -809,7 +1097,7 @@ Pre-configured to exclude venvs, caches, secrets, and generated artifacts.
 
 ### `requirements.txt`
 
-Dev tooling dependencies: `black`, `flake8`, `mkdocs`, `mkdocs-material`, `pre-commit`, `pytest`.
+Runtime includes CBORG/OpenAI clients, PyMuPDF, LinkML, FAISS, splash/KG-RAG stack, and **3-agent pipeline** deps (`academy-py`, `langgraph`, `langchain-core`, `langchain-openai`, `flask`, `psutil`). Optional Globus Compute endpoint deps live in `requirements-globus.txt`. Dev tooling: `black`, `flake8`, `mkdocs`, `mkdocs-material`, `pre-commit`, `pytest`.
 
 ### flake8
 

@@ -144,6 +144,72 @@ handler.setFormatter(
     )
 )
 logger = logging.getLogger("LLMTermExtractor")
+
+
+def _schema_label_key(label: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", label.lower())
+
+
+GENERAL_CATEGORY_ALIASES: Dict[str, str] = {
+    "anode": "Component",
+    "batteryperformance": "Property",
+    "chemicalelement": "Element",
+    "compound": "Compound",
+    "computationalmethod": "Method",
+    "condition": "Condition",
+    "crystallinestructure": "Structure",
+    "depositionprocess": "Process",
+    "electrochemicalparameter": "Parameter",
+    "electrodecomponent": "Component",
+    "element": "Element",
+    "experimentaltechnique": "ExperimentalTechnique",
+    "externalpressure": "Condition",
+    "growthdirection": "Structure",
+    "interface": "Interface",
+    "metal": "Material",
+    "morphology": "Structure",
+    "nucleation": "Phenomenon",
+    "physicalcondition": "Condition",
+    "pressure": "Parameter",
+    "process": "Process",
+    "processparameter": "Parameter",
+    "separator": "Component",
+    "setup": "Method",
+    "structure": "Structure",
+    "substrate": "Component",
+    "substratesurface": "Interface",
+}
+
+
+GENERAL_RELATION_ALIASES: Dict[str, str] = {
+    "affects": "affects",
+    "appliedto": "applied_to",
+    "belongsto": "belongs_to",
+    "causes": "causes",
+    "composedof": "composed_of",
+    "contains": "contains",
+    "containsmaterial": "contains",
+    "devicecontainsmaterial": "contains",
+    "drives": "causes",
+    "electrodematerial": "contains",
+    "exhibitsproperty": "has_property",
+    "formson": "forms_on",
+    "hasapplication": "used_in",
+    "haselectrodematerial": "contains",
+    "hasprocess": "processed_by",
+    "hasprocessingmethod": "processed_by",
+    "hasproperty": "has_property",
+    "materialhasproperty": "has_property",
+    "materialprocessedby": "processed_by",
+    "measuredby": "measures",
+    "occursat": "occurs_in",
+    "partof": "part_of",
+    "processedby": "processed_by",
+    "propertymeasuredby": "measures",
+    "providessitefor": "provides_site_for",
+    "relatedto": "related_to",
+    "usedin": "used_in",
+}
 logger.setLevel(logging.DEBUG)
 if not logger.handlers:
     logger.addHandler(handler)
@@ -334,6 +400,14 @@ class SchemaHelper:
             return self._slot_map_lower.get(found_lower)
         return None
 
+    def _general_category_for(self, category: str) -> Optional[str]:
+        broad = GENERAL_CATEGORY_ALIASES.get(_schema_label_key(category))
+        return broad if broad in self.classes else None
+
+    def _general_relation_for(self, relation: str) -> Optional[str]:
+        broad = GENERAL_RELATION_ALIASES.get(_schema_label_key(relation))
+        return broad if broad in self.slots else None
+
     def validate_and_fix_term(self, term_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Ensure 'category' is valid (fuzzy-fix if needed).
@@ -344,20 +418,44 @@ class SchemaHelper:
           - Else keep original name, verified=False
         """
         # 1) Category
-        cat = term_data.get("category", "").strip()
+        cat = str(term_data.get("category") or "").strip()
+        if not cat:
+            cat = "Thing"
+            term_data["category"] = cat
         if cat not in self.classes:
-            fixed = self._find_closest_class(cat)
+            fixed = self._general_category_for(cat) or self._find_closest_class(cat)
             if fixed:
-                logger.warning(f"Fixed category '{cat}' → '{fixed}'")
+                if fixed == self._general_category_for(cat):
+                    logger.info("Mapped category '%s' → '%s'", cat, fixed)
+                else:
+                    logger.warning(f"Fixed category '{cat}' → '{fixed}'")
+                term_data["raw_category"] = cat
                 term_data["category"] = fixed
             else:
-                logger.warning(f"Unknown category '{cat}' (left as-is)")
+                fallback = "Thing" if "Thing" in self.classes else cat
+                if fallback != cat:
+                    term_data["raw_category"] = cat
+                    term_data["category"] = fallback
+                    logger.info("Mapped unknown category '%s' → '%s'", cat, fallback)
+                else:
+                    logger.warning(f"Unknown category '{cat}' (left as-is)")
 
         # 2) Process relations
+        raw_rels = term_data.get("relations") or []
+        if not isinstance(raw_rels, list):
+            logger.warning("Dropping non-list relations for term '%s'", term_data.get("term", ""))
+            raw_rels = []
+
         cleaned_rels: List[Dict[str, Union[str, bool]]] = []
-        for rel in term_data.get("relations", []):
-            pred = rel.get("relation", "").strip()
-            obj = rel.get("related_term", "").strip()
+        for rel in raw_rels:
+            if not isinstance(rel, dict):
+                logger.debug("Dropping malformed relation for term '%s': %r", term_data.get("term", ""), rel)
+                continue
+            pred = str(rel.get("relation") or "").strip()
+            obj = str(rel.get("related_term") or "").strip()
+            if not pred or not obj:
+                logger.debug("Dropping blank relation for term '%s': %r", term_data.get("term", ""), rel)
+                continue
             if pred.lower() in ("description", "category"):
                 logger.debug(f"Dropping relation '{pred}' as prohibited")
                 continue
@@ -365,13 +463,31 @@ class SchemaHelper:
             if pred in self.slots:
                 cleaned_rels.append({"relation": pred, "related_term": obj, "verified": True})
             else:
-                fixed_slot = self._find_closest_slot(pred)
+                fixed_slot = self._general_relation_for(pred) or self._find_closest_slot(pred)
                 if fixed_slot:
-                    logger.warning(f"Fixed relation '{pred}' → '{fixed_slot}'")
-                    cleaned_rels.append({"relation": fixed_slot, "related_term": obj, "verified": True})
+                    if fixed_slot == self._general_relation_for(pred):
+                        logger.info("Mapped relation '%s' → '%s'", pred, fixed_slot)
+                    else:
+                        logger.warning(f"Fixed relation '{pred}' → '{fixed_slot}'")
+                    cleaned_rels.append({
+                        "relation": fixed_slot,
+                        "related_term": obj,
+                        "verified": True,
+                        "raw_predicate": pred,
+                    })
                 else:
-                    logger.warning(f"Unknown relation '{pred}' → marking unverified")
-                    cleaned_rels.append({"relation": pred, "related_term": obj, "verified": False})
+                    fallback_slot = "related_to" if "related_to" in self.slots else pred
+                    rel_out: Dict[str, Union[str, bool]] = {
+                        "relation": fallback_slot,
+                        "related_term": obj,
+                        "verified": fallback_slot != pred,
+                    }
+                    if fallback_slot != pred:
+                        rel_out["raw_predicate"] = pred
+                        logger.info("Mapped unknown relation '%s' → '%s'", pred, fallback_slot)
+                    else:
+                        logger.warning(f"Unknown relation '{pred}' → marking unverified")
+                    cleaned_rels.append(rel_out)
 
         term_data["relations"] = cleaned_rels
         return term_data

@@ -42,6 +42,11 @@ try:
 except ImportError:  # pragma: no cover - direct script execution fallback
     from project_config import config_value
 
+try:
+    from app.modules.cborg_limiter import async_slot
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from cborg_limiter import async_slot
+
 load_dotenv()
 
 
@@ -443,12 +448,58 @@ def _as_source_metadata(raw: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Return source_paper -> metadata map from supported graph shapes."""
     meta = raw.get("source_metadata") or {}
     if not isinstance(meta, dict):
-        return {}
+        meta = {}
     out: Dict[str, Dict[str, Any]] = {}
     for source, values in meta.items():
         if isinstance(values, dict):
             out[str(source)] = values
+    if out:
+        return out
+    for pub in raw.get("publications") or []:
+        if not isinstance(pub, dict):
+            continue
+        source = str(pub.get("source_paper") or "").strip()
+        if source:
+            out[source] = {k: v for k, v in pub.items() if k != "source_paper"}
     return out
+
+
+def _as_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return embedded publication records from new or legacy graph shapes."""
+    publications: List[Dict[str, Any]] = []
+    for pub in raw.get("publications") or []:
+        if isinstance(pub, dict):
+            source = str(pub.get("source_paper") or "").strip()
+            clean = {k: v for k, v in pub.items() if v not in (None, "", [])}
+            if source and clean:
+                publications.append({"source_paper": source, **{k: v for k, v in clean.items() if k != "source_paper"}})
+    if publications:
+        return publications
+
+    source_meta = _as_source_metadata(raw)
+    if source_meta:
+        return [{"source_paper": source, **meta} for source, meta in source_meta.items()]
+
+    source_papers = _unique_sources(raw.get("source_papers") or [], limit=2)
+    if len(source_papers) <= 1:
+        fields = (
+            "publication_year",
+            "paper_title",
+            "authors",
+            "institutions",
+            "doi",
+            "journal",
+            "volume",
+            "issue",
+            "pages_range",
+            "abstract_text",
+            "keywords",
+        )
+        clean = {field: raw.get(field) for field in fields if raw.get(field) not in (None, "", [])}
+        if clean or source_papers:
+            source = source_papers[0] if source_papers else str(raw.get("source_paper") or "")
+            return [{"source_paper": source, **clean} if source else clean]
+    return []
 
 
 def _unique_sources(sources: Sequence[Any], limit: int = 3) -> List[str]:
@@ -676,17 +727,26 @@ class KnowledgeGraph:
     """In-memory knowledge graph with lexical and semantic search over nodes."""
 
     # @annotate('KnowledgeGraph::__init__')
-    def __init__(self, graph_file: str, embed_model: str = EMBED_MODEL) -> None:
+    def __init__(
+        self,
+        graph_file: str,
+        embed_model: str = EMBED_MODEL,
+        graph_source: Optional[str] = None,
+    ) -> None:
         """Load KG from configured source, build adjacency index, and initialize retrieval backend."""
         logger.info(Fore.YELLOW + "Loading KG..." + Style.RESET_ALL)
-        if GRAPH_SOURCE == "json":
+        source = (graph_source or GRAPH_SOURCE).lower()
+        self.graph_source_requested = source
+        self.graph_source_used = source
+        if source == "json":
             with open(graph_file, "r") as fh:
                 data = json.load(fh)
-        elif GRAPH_SOURCE in {"splash", "splash_links", "splash-links"}:
+        elif source in {"splash", "splash_links", "splash-links"}:
             logger.info("Loading KG from splash-links at %s...", SPLASH_LINKS_URI)
             try:
                 data = _load_splash_links_graph(SPLASH_LINKS_URI)
             except Exception as exc:
+                self.graph_source_used = "json_fallback"
                 logger.warning(
                     Fore.RED
                     + "splash-links unreachable (%s) — falling back to JSON: %s"
@@ -697,7 +757,7 @@ class KnowledgeGraph:
                 with open(graph_file, "r") as fh:
                     data = json.load(fh)
         else:
-            raise ValueError(f"Unknown KG_RAG_GRAPH_SOURCE: {GRAPH_SOURCE}")
+            raise ValueError(f"Unknown KG_RAG_GRAPH_SOURCE: {source}")
         self.nodes: Dict[str, Dict[str, Any]] = {n["id"]: n for n in data["things"]}
         self.out_edges: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         for e in data["associations"]:
@@ -712,13 +772,20 @@ class KnowledgeGraph:
         for nid, n in self.nodes.items():
             src = " ".join(n.get("source_papers") or [])
             title = n.get("paper_title") or ""
+            publication_text = " ".join(
+                " ".join(
+                    str(pub.get(field) or "")
+                    for field in ("source_paper", "paper_title", "doi", "journal")
+                )
+                for pub in _as_publications(n)
+            )
             domain_features = format_domain_features(n.get("domain_features"))
             code_bits = " ".join(
                 str(n.get(field) or "")
                 for field in ("function_name", "code_domain", "code_description", "code_language")
             )
             txt = (
-                f"{n.get('name','')} {n.get('description','')} {src} {title} "
+                f"{n.get('name','')} {n.get('description','')} {src} {title} {publication_text} "
                 f"{code_bits} {domain_features}"
             ).strip()[:MAX_TEXT_CHARS]
             texts.append(txt)
@@ -727,7 +794,13 @@ class KnowledgeGraph:
         self.retrieval_backend = RETRIEVAL_BACKEND
         self._lexical_docs = [set(_tokenize(txt)) for txt in texts]
         if self.retrieval_backend == "semantic":
-            self._build_semantic_index(texts, embed_model)
+            if texts:
+                self._build_semantic_index(texts, embed_model)
+            else:
+                logger.warning("KG has no nodes; semantic retrieval will return no hits.")
+                self.embed_model = None
+                self.index = None
+                self.id_map = np.asarray([], dtype=object)
         elif self.retrieval_backend != "lexical":
             raise ValueError(f"Unknown KG_RAG_RETRIEVAL_BACKEND: {self.retrieval_backend}")
 
@@ -828,6 +901,9 @@ class KnowledgeGraph:
         """Search nodes by embedding similarity using FAISS."""
         if q in self._cache:
             return self._cache[q]
+        if not self.ids or self.index is None or self.embed_model is None:
+            self._cache[q] = []
+            return []
         q_vec = self.embed_model.encode([q], convert_to_numpy=True, normalize_embeddings=True)
         dists, idx = self.index.search(q_vec.astype("float32"), topk)
         hits = [
@@ -923,7 +999,11 @@ class KnowledgeGraph:
             txt_low = f"{name} {desc}".lower()
             hit = sum(1 for t in qt if t in txt_low)
             lex = math.sqrt(hit) / max(1, len(qt))
-            evid = len(raw.get("source_papers", [])) + len(self.out_edges.get(nid, []))
+            evid = (
+                len(raw.get("source_papers", []))
+                + len(raw.get("publications", []) or [])
+                + len(self.out_edges.get(nid, []))
+            )
             sem_sc = smap.get(nid, NodeScore(nid, 0.0)).score
             g_sc = gmap.get(nid, NodeScore(nid, 0.0)).score
             depth = gmap.get(nid, NodeScore(nid, 0, 0)).depth
@@ -1003,15 +1083,38 @@ class KnowledgeGraph:
             if source_papers:
                 lines.append(f"Source_Papers: {', '.join(source_papers)}")
             source_meta = _as_source_metadata(raw)
-            if source_meta:
+            publications = _as_publications(raw)
+            if publications:
+                pub_by_source = {
+                    str(pub.get("source_paper") or ""): pub
+                    for pub in publications
+                    if isinstance(pub, dict)
+                }
+                ordered_sources = source_papers or _unique_sources(list(pub_by_source))
                 meta_lines = []
-                for source in (source_papers or _unique_sources(list(source_meta))):
-                    meta = source_meta.get(source)
-                    if meta:
-                        meta_lines.append(f"- {_format_source_metadata(source, meta)}")
+                for source in ordered_sources:
+                    pub = pub_by_source.get(source)
+                    if pub:
+                        meta_lines.append(f"- {_format_source_metadata(source, pub)}")
+                if not meta_lines:
+                    for pub in publications:
+                        source = str(pub.get("source_paper") or "").strip()
+                        if source:
+                            meta_lines.append(f"- {_format_source_metadata(source, pub)}")
                 if meta_lines:
-                    lines.append("Source_Metadata:")
+                    lines.append("Publications:")
                     lines.extend(meta_lines)
+                if not raw.get("publications") and not raw.get("source_metadata") and len(source_papers) <= 1:
+                    if raw.get("paper_title"):
+                        lines.append(f"Paper_Title: {raw['paper_title']}")
+                    if raw.get("publication_year"):
+                        lines.append(f"Publication_Year: {raw['publication_year']}")
+                    if raw.get("doi"):
+                        lines.append(f"DOI: {raw['doi']}")
+                    if raw.get("authors"):
+                        lines.append(f"Authors: {', '.join(raw['authors'])}")
+                    if raw.get("journal"):
+                        lines.append(f"Journal: {raw['journal']}")
             elif len(source_papers) <= 1:
                 # Legacy graph shape with no per-source metadata: scalar
                 # publication provenance is unambiguous ONLY when the node has
@@ -1035,6 +1138,23 @@ class KnowledgeGraph:
                     continue
                 if raw.get("function_name"):
                     lines.append(f"Function: {raw['function_name']}")
+                if raw.get("source_type"):
+                    lines.append(f"Source_Type: {raw['source_type']}")
+                if raw.get("repo_url"):
+                    lines.append(f"Repository: {raw['repo_url']}")
+                if raw.get("source_file_path"):
+                    loc = raw["source_file_path"]
+                    if raw.get("source_start_line") and raw.get("source_end_line"):
+                        loc = f"{loc}:{raw['source_start_line']}-{raw['source_end_line']}"
+                    lines.append(f"Source_File: {loc}")
+                if raw.get("source_file_url"):
+                    lines.append(f"Source_File_URL: {raw['source_file_url']}")
+                if raw.get("repo_commit_sha"):
+                    lines.append(f"Repository_Commit: {raw['repo_commit_sha']}")
+                if raw.get("repository_license"):
+                    lines.append(f"Repository_License: {raw['repository_license']}")
+                if raw.get("license_warning"):
+                    lines.append(f"License_Warning: {raw['license_warning']}")
                 if raw.get("code_domain"):
                     lines.append(f"Domain: {raw['code_domain']}")
                 # paper_authors is a node-level scalar; only safe to render when
@@ -1249,12 +1369,13 @@ class CBorgClient:
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
         """Send messages to CBORG and return the assistant response."""
         try:
-            resp = await self.client.chat.completions.create(
-                model=self.model,
-                messages=list(messages),
-                temperature=LLM_TEMPERATURE,
-                timeout=LLM_TIMEOUT,
-            )
+            async with async_slot():
+                resp = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=list(messages),
+                    temperature=LLM_TEMPERATURE,
+                    timeout=LLM_TIMEOUT,
+                )
         except openai.APIConnectionError as exc:
             raise RuntimeError(
                 f"CBORG connection failed for {self.model}. Check CBORG_BASE_URL/network. {exc}"

@@ -97,6 +97,33 @@ def test_build_graph_remaps_removed_xray_category():
     graph = json2kg.build_graph([{"term": "GIWAXS", "category": "XRayScatteringAnalysis"}])
 
     assert graph["things"][0]["category"] == "ExperimentalTechnique"
+    assert graph["things"][0]["raw_category"] == "XRayScatteringAnalysis"
+
+
+def test_build_graph_preserves_normalized_raw_labels():
+    graph = json2kg.build_graph(
+        [
+            {
+                "term": "lithium dendrite",
+                "category": "Structure",
+                "raw_category": "Morphology",
+                "relations": [
+                    {
+                        "relation": "has_property",
+                        "raw_predicate": "MaterialHasProperty",
+                        "related_term": "battery performance",
+                    }
+                ],
+            }
+        ]
+    )
+
+    node = next(n for n in graph["things"] if n["id"] == "matkg:lithiumdendrite")
+    edge = graph["associations"][0]
+    assert node["category"] == "Structure"
+    assert node["raw_category"] == "Morphology"
+    assert edge["predicate"] == "rel:has_property"
+    assert edge["raw_predicate"] == "MaterialHasProperty"
 
 
 def test_build_graph_remaps_code_snippet_terms_and_wires_real_snippets():
@@ -158,6 +185,35 @@ def test_make_code_snippet_node_without_function_name():
     assert node["function_name"] is None
     assert node["pages"] == [7]
     assert node["authors"] == ["Library Author"]
+
+
+def test_make_code_snippet_node_preserves_github_provenance():
+    node = json2kg.make_code_snippet_node(
+        {
+            "source_paper": "paper.pdf",
+            "page": 0,
+            "function_name": "find_peaks_for_q",
+            "code_snippet": "def find_peaks_for_q(q, intensity):\n    return []\n" + "    # filler\n" * 20,
+            "source_type": "github",
+            "repo_url": "https://github.com/example/peaks",
+            "repo_commit_sha": "abc123",
+            "source_file_path": "src/peaks.py",
+            "source_file_url": "https://github.com/example/peaks/blob/abc123/src/peaks.py",
+            "source_start_line": 10,
+            "source_end_line": 20,
+            "repository_license": "MIT",
+            "source_score": 12.5,
+        }
+    )
+
+    assert node["source_type"] == "github"
+    assert node["repo_url"] == "https://github.com/example/peaks"
+    assert node["repo_commit_sha"] == "abc123"
+    assert node["source_file_path"] == "src/peaks.py"
+    assert node["source_start_line"] == 10
+    assert node["source_end_line"] == 20
+    assert node["repository_license"] == "MIT"
+    assert node["source_score"] == 12.5
 
 
 def test_convert_terms_to_graph_writes_output(tmp_path):

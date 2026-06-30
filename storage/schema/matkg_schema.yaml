@@ -42,6 +42,7 @@ classes:
       - id
       - name
       - category
+      - raw_category
       - type
       - description
       - provided_by
@@ -56,7 +57,26 @@ classes:
       - pages_range
       - abstract_text
       - keywords
+      - publications
       - has_code_snippet
+    annotations:
+      owl: Class
+
+  Publication:
+    description: Source publication metadata associated with a graph entity
+    slots:
+      - source_paper
+      - publication_year
+      - paper_title
+      - authors
+      - institutions
+      - doi
+      - journal
+      - volume
+      - issue
+      - pages_range
+      - abstract_text
+      - keywords
     annotations:
       owl: Class
 
@@ -72,6 +92,46 @@ classes:
         required: true
     annotations:
       owl: Class
+
+  Component:
+    is_a: Thing
+    description: A functional part, layer, electrode, separator, substrate, or other component of a material system or device
+
+  Condition:
+    is_a: Thing
+    description: An experimental, processing, operating, or environmental condition
+
+  Interface:
+    is_a: Thing
+    description: A boundary, surface, interphase, or contact region between materials or components
+
+  Measurement:
+    is_a: Thing
+    description: A measurement, observation, or characterization result
+
+  Method:
+    is_a: Thing
+    description: A general method, algorithm, experimental setup, computational approach, or workflow
+
+  Parameter:
+    is_a: Thing
+    description: A controllable or measured parameter such as pressure, voltage, current density, time, temperature, or concentration
+
+  Phenomenon:
+    is_a: Thing
+    description: A physical, chemical, electrochemical, or structural phenomenon
+
+  Process:
+    is_a: Thing
+    description: A transformation, growth, fabrication, degradation, nucleation, deposition, or other process
+
+  Property:
+    is_a: Thing
+    description: A property, performance metric, behavior, or characteristic of a material, component, device, or process
+
+  Structure:
+    is_a: Thing
+    description: A morphology, phase, crystal structure, geometry, texture, or structural feature
 
   ConjugatedPolymer:
     is_a: Material
@@ -98,6 +158,14 @@ classes:
         required: true
     id_prefixes:
       - CHEBI
+
+  Compound:
+    is_a: ChemicalEntity
+    description: A chemical compound or molecular species
+
+  Element:
+    is_a: ChemicalEntity
+    description: A chemical element or elemental species
 
   Device:
     is_a: Thing
@@ -143,7 +211,7 @@ classes:
         string_serialization: "organic_field_effect_transistor"
 
   MaterialProperty:
-    is_a: Thing
+    is_a: Property
     description: A property or characteristic of a material
     slots:
       - unit
@@ -164,7 +232,7 @@ classes:
         string_serialization: "electronic"
 
   ProcessingMethod:
-    is_a: Thing
+    is_a: Method
     description: A method or technique for processing or modifying materials
     slots:
       - process_parameters
@@ -324,6 +392,14 @@ slots:
     description: The category or type of an entity
     range: uriorcurie
     is_a: type
+
+  raw_category:
+    description: Original category label emitted by an extractor before schema normalization
+    range: string
+    required: false
+    slot_uri: matkg:raw_category
+    annotations:
+      owl: AnnotationAssertion
 
   type:
     description: The type or class of an entity
@@ -500,6 +576,22 @@ slots:
     slot_uri: dcterms:subject
     annotations:
       owl: AnnotationAssertion
+
+  source_paper:
+    description: Local source PDF filename or source identifier for a publication
+    range: string
+    required: false
+    slot_uri: dcterms:source
+    annotations:
+      owl: AnnotationAssertion
+
+  publications:
+    description: Publications that discuss or mention this entity
+    range: Publication
+    required: false
+    multivalued: true
+    inlined_as_list: true
+    slot_uri: dcterms:references
 
   has_evidence:
     description: Evidence supporting the association
@@ -814,5 +906,155 @@ slots:
     required: false
     multivalued: true
     slot_uri: matkg:has_code_snippet
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  related_to:
+    description: Broad fallback relation between two entities when the source text supports a relationship but no narrower predicate is available
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:related_to
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  part_of:
+    description: Subject is a part, layer, component, region, or member of the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:part_of
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  has_property:
+    description: Subject has, exhibits, or is characterized by the object property or behavior
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:has_property
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  processed_by:
+    description: Subject is fabricated, treated, modified, prepared, grown, or otherwise processed by the object process or method
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:processed_by
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  used_in:
+    description: Subject is used in, applied in, or relevant to the object device, method, process, or application
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:used_in
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  causes:
+    description: Subject causes, drives, initiates, enables, or contributes to the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:causes
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  affects:
+    description: Subject affects, changes, controls, influences, improves, suppresses, or degrades the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:affects
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  measures:
+    description: Subject method, measurement, or technique measures, probes, observes, or quantifies the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:measures
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  occurs_in:
+    description: Subject occurs in, at, during, or under the object condition, structure, component, device, process, or system
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:occurs_in
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  contains:
+    description: Subject contains, includes, incorporates, or is composed with the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:contains
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  applied_to:
+    description: Subject method, process, condition, or material is applied to the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:applied_to
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  composed_of:
+    description: Subject is composed of, made of, or constituted by the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:composed_of
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  belongs_to:
+    description: Subject belongs to, is categorized within, or is a member of the object grouping or system
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:belongs_to
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  forms_on:
+    description: Subject forms, deposits, grows, or nucleates on the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:forms_on
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  provides_site_for:
+    description: Subject provides a site, surface, interface, or location for the object process or structure
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:provides_site_for
     annotations:
       owl: ObjectSomeValuesFrom

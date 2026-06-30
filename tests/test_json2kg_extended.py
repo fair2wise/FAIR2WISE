@@ -137,6 +137,18 @@ def test_build_graph_preserves_source_metadata():
     node = next(n for n in graph["things"] if n["id"] == "matkg:SAXS")
     assert node["source_metadata"]["scipy_docs.pdf"]["paper_title"] == "SciPy Peak Finding Algorithms"
     assert node["source_metadata"]["saxs_paper.pdf"]["publication_year"] == 2021
+    assert node["publications"] == [
+        {
+            "source_paper": "saxs_paper.pdf",
+            "publication_year": 2021,
+            "paper_title": "Machine Learning-Assisted Analysis of Small Angle X-ray Scattering",
+            "authors": ["Tomaszewski P"],
+        },
+        {
+            "source_paper": "scipy_docs.pdf",
+            "paper_title": "SciPy Peak Finding Algorithms",
+        },
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +175,12 @@ def test_convert_terms_to_graph_passes_code_snippets(tmp_path):
                 "source_paper": "fitting.pdf",
                 "page": 1,
                 "code_language": "python",
+                "source_metadata": {
+                    "fitting.pdf": {
+                        "paper_title": "Curve Fitting for Scattering Data",
+                        "doi": "10.1234/fitting",
+                    }
+                },
                 "code_snippet": (
                     "import numpy as np\n"
                     "from scipy.optimize import curve_fit\n"
@@ -182,6 +200,13 @@ def test_convert_terms_to_graph_passes_code_snippets(tmp_path):
     snippet_nodes = [n for n in graph["things"] if n["category"] == "CodeSnippet"]
     assert len(snippet_nodes) == 1
     assert snippet_nodes[0]["function_name"] == "fit_gaussian"
+    assert snippet_nodes[0]["publications"] == [
+        {
+            "source_paper": "fitting.pdf",
+            "paper_title": "Curve Fitting for Scattering Data",
+            "doi": "10.1234/fitting",
+        }
+    ]
 
     # edge wired
     snip_id = snippet_nodes[0]["id"]
