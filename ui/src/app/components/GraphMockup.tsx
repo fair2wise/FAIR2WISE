@@ -197,14 +197,6 @@ function layoutGraph(graph: GraphPayload): LayoutResult {
   return { nodes, width, height };
 }
 
-function splitLabel(label: string) {
-  const clean = label.length > 28 ? `${label.slice(0, 25)}...` : label;
-  const words = clean.split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return [clean];
-  const mid = Math.ceil(words.length / 2);
-  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
-}
-
 function directedEdgeGeometry(
   src: { x: number; y: number },
   tgt: { x: number; y: number },
@@ -345,39 +337,76 @@ function NodeDetailPopup({
             <X size={13} />
           </button>
         </div>
-        {(display.description || node.id) && (
-          <p className="mt-3 whitespace-pre-wrap text-xs font-semibold leading-relaxed text-slate-700">
-            {display.description || node.id}
-          </p>
-        )}
-        <PublicationList publications={publications} />
-        {display.code_snippet && (
-          <div className="mt-4 space-y-2">
-            {(display.function_name || display.code_language) && (
-              <div className="text-xs text-slate-500">
-                {[display.function_name, display.code_language].filter(Boolean).join(' · ')}
+        {(display.description || node.id || publications.length > 0 || display.code_snippet) && (
+          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+            {(display.description || node.id || display.code_snippet) && (
+              <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
+                {(display.description || node.id) && (
+                  <p className="whitespace-pre-wrap font-semibold text-slate-700">
+                    {display.description || node.id}
+                  </p>
+                )}
+                {display.code_snippet && (
+                  <div className={display.description || node.id ? 'mt-4 space-y-2' : 'space-y-2'}>
+                    {(display.function_name || display.code_language) && (
+                      <div className="text-xs text-slate-500">
+                        {[display.function_name, display.code_language].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    <CodeBlock content={display.code_snippet} />
+                  </div>
+                )}
               </div>
             )}
-            <CodeBlock content={display.code_snippet} />
+            {publications.length > 0 && (
+              <div className="border-t border-slate-200 bg-white/60 px-4 py-3">
+                <p className="mb-8 text-sm font-bold text-slate-800">
+                  Relevant Publications and Sources:
+                </p>
+                <PublicationList
+                  publications={publications}
+                  intro={null}
+                  collapseLimit={3}
+                  className="mt-0"
+                />
+              </div>
+            )}
           </div>
         )}
         {linkedSnippets.length > 0 && (
           <div className="mt-4 space-y-4">
             <p className="text-xs leading-relaxed text-slate-700">Related code snippets:</p>
-            {linkedSnippets.map((snippet: LinkedCodeSnippet) => (
-              <div key={snippet.id} className="space-y-2">
-                <div className="text-xs font-medium text-slate-800">
-                  {snippet.label || snippet.function_name || snippet.id}
-                </div>
-                <PublicationList publications={(snippet.publications ?? []) as PublicationInfo[]} />
-                {(snippet.function_name || snippet.code_language) && (
-                  <div className="text-xs text-slate-500">
-                    {[snippet.function_name, snippet.code_language].filter(Boolean).join(' · ')}
+            {linkedSnippets.map((snippet: LinkedCodeSnippet) => {
+              const snippetPublications = (snippet.publications ?? []) as PublicationInfo[];
+              return (
+                <div key={snippet.id} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+                  <div className="space-y-2 px-4 py-3.5">
+                    <div className="text-xs font-medium text-slate-800">
+                      {snippet.label || snippet.function_name || snippet.id}
+                    </div>
+                    {(snippet.function_name || snippet.code_language) && (
+                      <div className="text-xs text-slate-500">
+                        {[snippet.function_name, snippet.code_language].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    <CodeBlock content={snippet.code_snippet} />
                   </div>
-                )}
-                <CodeBlock content={snippet.code_snippet} />
-              </div>
-            ))}
+                  {snippetPublications.length > 0 && (
+                    <div className="border-t border-slate-200 bg-white/60 px-4 py-3">
+                      <p className="mb-8 text-sm font-bold text-slate-800">
+                        Relevant Publications and Sources:
+                      </p>
+                      <PublicationList
+                        publications={snippetPublications}
+                        intro={null}
+                        collapseLimit={3}
+                        className="mt-0"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -890,8 +919,6 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
               hoverPopup?.target.kind === 'node' && hoverPopup.target.node.id === node.id;
             const color = NODE_COLORS[node.bucket];
             const [r, g, b] = hexToRgb(color);
-            const labelLines = splitLabel(node.label);
-            const showLabel = nodes.length <= 150 || isHl || isHovered;
 
             return (
               <g
@@ -916,31 +943,6 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
                   )}
 
                   <circle cx={0} cy={0} r={R} fill={color} stroke="none" />
-
-                  {showLabel && (
-                    <>
-                      <text
-                        x={0} y={R + 11}
-                        textAnchor="middle" fontSize={9}
-                        fontFamily="system-ui, sans-serif"
-                        fill={isHl ? 'rgba(0,0,0,0.78)' : 'rgba(0,0,0,0.5)'}
-                        fontWeight={isHl ? '600' : '400'}
-                      >
-                        {labelLines[0]}
-                      </text>
-                      {labelLines[1] && (
-                        <text
-                          x={0} y={R + 21}
-                          textAnchor="middle" fontSize={9}
-                          fontFamily="system-ui, sans-serif"
-                          fill={isHl ? 'rgba(0,0,0,0.78)' : 'rgba(0,0,0,0.5)'}
-                          fontWeight={isHl ? '600' : '400'}
-                        >
-                          {labelLines[1]}
-                        </text>
-                      )}
-                    </>
-                  )}
                 </g>
               </g>
             );

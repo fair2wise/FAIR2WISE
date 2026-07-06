@@ -313,6 +313,9 @@ def test_node_publications_derives_identifiers_from_pdf_filenames():
     doi = api_mod._node_publications({"source_papers": ["10.1063_5.0055649.pdf"]})
     assert doi == [{"source_paper": "10.1063_5.0055649.pdf", "doi": "10.1063/5.0055649"}]
 
+    wiley = api_mod._node_publications({"source_papers": ["10.1002aenm.201702831.pdf"]})
+    assert wiley == [{"source_paper": "10.1002aenm.201702831.pdf", "doi": "10.1002/aenm.201702831"}]
+
     multiple = api_mod._node_publications({"source_papers": ["2303.02004v3.pdf", "2307.09698v1.pdf"]})
     assert multiple == [
         {"source_paper": "2303.02004v3.pdf", "doi": "arXiv:2303.02004v3"},

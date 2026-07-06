@@ -3,6 +3,8 @@ import { PublicationInfo } from './data/liveAgent';
 const DOI_URL_PREFIX_RE = /^https?:\/\/(?:dx\.)?doi\.org\//i;
 const CROSSREF_DOI_RE = /^10\.\d{4,}\/[^\s]+$/i;
 const DOI_PDF_FILENAME_RE = /^(10\.\d{4,})[_/](.+)\.pdf$/i;
+/** Wiley-style PDF names omit the DOI slash: 10.1002/aenm.201702831 → 10.1002aenm.201702831.pdf */
+const DOI_PDF_FILENAME_STRIPPED_RE = /^(10\.\d{4,})([a-z][a-z0-9]*\.\d+)\.pdf$/i;
 const ARXIV_ID_RE = /^(?:arXiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)$/i;
 const ARXIV_PDF_FILENAME_RE = /^(?:arxiv[_-]?)?(\d{4}\.\d{4,5}(?:v\d+)?)\.pdf$/i;
 const SEMANTIC_SCHOLAR_SEARCH = 'https://www.semanticscholar.org/search?q=';
@@ -27,10 +29,20 @@ function stripTrailingPunctuation(value: string): string {
   return value.replace(/[.,;)]+$/, '');
 }
 
+function doiFromPdfFilename(source: string): string | null {
+  const withSeparator = source.match(DOI_PDF_FILENAME_RE);
+  if (withSeparator) return `${withSeparator[1]}/${withSeparator[2]}`;
+
+  const slashStripped = source.match(DOI_PDF_FILENAME_STRIPPED_RE);
+  if (slashStripped) return `${slashStripped[1]}/${slashStripped[2]}`;
+
+  return null;
+}
+
 export function parseCrossrefDoi(publication: PublicationInfo): string | null {
   const source = publication.source_paper?.trim() ?? '';
-  const sourceDoi = source.match(DOI_PDF_FILENAME_RE);
-  const id = normalizeIdentifier(publication.doi || (sourceDoi ? `${sourceDoi[1]}/${sourceDoi[2]}` : ''));
+  const sourceDoi = doiFromPdfFilename(source);
+  const id = normalizeIdentifier(publication.doi || sourceDoi || '');
   if (!id) return null;
   if (/^arxiv:/i.test(id)) return null;
 

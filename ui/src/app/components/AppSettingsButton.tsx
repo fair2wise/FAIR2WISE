@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { ButtonWithIcon } from '@blueskyproject/finch';
-import { Save, Settings, Info } from 'lucide-react';
+import { Check, ChevronDown, Info, Save, Settings } from 'lucide-react';
 import {
   DEFAULT_AGENT_SETTINGS,
   loadAgentSettings,
@@ -17,15 +17,15 @@ import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
 import { fetchAgentSettings, updateAgentSettings } from './data/liveAgent';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
 import { Label } from './ui/label';
 import { RadioGroup } from './ui/radio-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
 import {
   Sheet,
   SheetContent,
@@ -33,6 +33,103 @@ import {
   SheetHeader,
   SheetTitle,
 } from './ui/sheet';
+import { cn } from './ui/utils';
+
+function formatJsonGraphLabel(path: string): string {
+  return path.replace(/^storage\/kg\//, '');
+}
+
+function JsonGraphPickerDialog({
+  open,
+  onOpenChange,
+  value,
+  options,
+  onChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: string;
+  options: string[];
+  onChange: (path: string) => void;
+}) {
+  function handlePick(path: string) {
+    onChange(path);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} modal>
+      <DialogContent
+        overlayClassName="z-[200] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="z-[201] top-[88px] left-1/2 flex max-h-[calc(100vh-7rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 translate-y-0 flex-col gap-0 overflow-hidden border border-slate-200 bg-white p-0 text-slate-800 shadow-xl"
+      >
+        <DialogHeader className="border-b border-slate-200 bg-white px-5 py-5 text-left">
+          <DialogTitle className="text-slate-900">Choose JSON graph</DialogTitle>
+          <DialogDescription className="text-slate-500">
+            Select a MatKG JSON file from storage/kg.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white p-4">
+          {options.map(path => {
+            const selected = path === value;
+            return (
+              <button
+                key={path}
+                type="button"
+                onClick={() => handlePick(path)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg px-4 py-3.5 text-left text-sm transition hover:bg-slate-50',
+                  selected && 'bg-sky-50 ring-1 ring-sky-200',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-4 shrink-0 items-center justify-center rounded-full border border-slate-300',
+                    selected && 'border-sky-500 bg-sky-500 text-white',
+                  )}
+                  aria-hidden="true"
+                >
+                  {selected && <Check size={12} strokeWidth={3} />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-slate-800">
+                    {formatJsonGraphLabel(path)}
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-slate-500">{path}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function JsonGraphFilePicker({
+  value,
+  disabled,
+  onOpenPicker,
+}: {
+  value: string;
+  disabled?: boolean;
+  onOpenPicker: () => void;
+}) {
+  const selectedLabel = value ? formatJsonGraphLabel(value) : 'Select a JSON graph';
+
+  return (
+    <button
+      type="button"
+      id="json-graph-select"
+      disabled={disabled}
+      onClick={onOpenPicker}
+      className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <span className="truncate font-medium">{selectedLabel}</span>
+      <ChevronDown size={16} className="shrink-0 text-slate-500" aria-hidden="true" />
+    </button>
+  );
+}
 
 function SettingOption({
   id,
@@ -74,6 +171,8 @@ export function AppSettingsButton({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [errorTitle, setErrorTitle] = useState('Settings update failed');
+  const [jsonPickerOpen, setJsonPickerOpen] = useState(false);
 
   const hasUnsavedChanges = !settingsEqual(draftSettings, savedSettings);
 
@@ -84,6 +183,7 @@ export function AppSettingsButton({
     async function load() {
       setLoading(true);
       setError('');
+      setErrorTitle('Settings unavailable');
       const saved = loadAgentSettings();
       setSavedSettings(saved);
       setDraftSettings(saved);
@@ -125,6 +225,7 @@ export function AppSettingsButton({
   async function handleSave() {
     setSaving(true);
     setError('');
+    setErrorTitle('Settings update failed');
     try {
       const response = await updateAgentSettings(settingsToApiPayload(draftSettings));
       const synced = settingsFromApiResponse(response);
@@ -140,6 +241,8 @@ export function AppSettingsButton({
       saveAgentSettings(saved);
       setAvailableJsonGraphs(response.available_json_graphs ?? []);
       await onSettingsApplied?.();
+      setJsonPickerOpen(false);
+      setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -241,22 +344,11 @@ export function AppSettingsButton({
                   JSON graph file
                 </Label>
                 {availableJsonGraphs.length > 0 ? (
-                  <Select
+                  <JsonGraphFilePicker
                     value={draftSettings.jsonGraphPath}
-                    onValueChange={updateJsonGraphPath}
                     disabled={loading || saving}
-                  >
-                    <SelectTrigger id="json-graph-select" className="w-full bg-white">
-                      <SelectValue placeholder="Select a JSON graph" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableJsonGraphs.map(path => (
-                        <SelectItem key={path} value={path}>
-                          {path.replace(/^storage\/kg\//, '')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onOpenPicker={() => setJsonPickerOpen(true)}
+                  />
                 ) : (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     {loading ? 'Loading available JSON graphs…' : 'No JSON graph files found in storage/kg.'}
@@ -267,7 +359,7 @@ export function AppSettingsButton({
             )}
 
             {error && (
-              <AppErrorMessage title="Settings update failed" className="text-xs">
+              <AppErrorMessage title={errorTitle} className="text-xs">
                 {error}
               </AppErrorMessage>
             )}
@@ -289,6 +381,13 @@ export function AppSettingsButton({
           </div>
         </SheetContent>
       </Sheet>
+      <JsonGraphPickerDialog
+        open={jsonPickerOpen}
+        onOpenChange={setJsonPickerOpen}
+        value={draftSettings.jsonGraphPath}
+        options={availableJsonGraphs}
+        onChange={updateJsonGraphPath}
+      />
     </>
   );
 }

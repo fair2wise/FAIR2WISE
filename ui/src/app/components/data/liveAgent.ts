@@ -136,30 +136,51 @@ export interface AgentSettingsApiUpdate {
   json_graph_path?: string | null;
 }
 
-import { settingsApiErrorMessage } from '../agentApiErrors';
+import { agentNetworkErrorMessage, settingsApiErrorMessage } from '../agentApiErrors';
 
 export async function fetchAgentSettings(): Promise<AgentSettingsApiResponse> {
-  const response = await fetch(`${AGENT_API_BASE}/settings`);
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(settingsApiErrorMessage(detail, response.status));
+  try {
+    const response = await fetch(`${AGENT_API_BASE}/settings`);
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(settingsApiErrorMessage(detail, response.status));
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Settings endpoint')) {
+      throw error;
+    }
+    if (error instanceof Error && error.message.startsWith('Agent API returned')) {
+      throw error;
+    }
+    throw new Error(agentNetworkErrorMessage(AGENT_API_BASE, error));
   }
-  return response.json();
 }
 
 export async function updateAgentSettings(
   update: AgentSettingsApiUpdate,
 ): Promise<AgentSettingsApiResponse> {
-  const response = await fetch(`${AGENT_API_BASE}/settings`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(update),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(settingsApiErrorMessage(detail, response.status));
+  try {
+    const response = await fetch(`${AGENT_API_BASE}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(settingsApiErrorMessage(detail, response.status));
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof Error && (
+      error.message.startsWith('Settings endpoint')
+      || error.message.startsWith('Agent API returned')
+      || error.message.startsWith('Cannot reach the FAIR2WISE agent backend')
+    )) {
+      throw error;
+    }
+    throw new Error(agentNetworkErrorMessage(AGENT_API_BASE, error));
   }
-  return response.json();
 }
 
 export async function queryLiveAgent(message: string, signal?: AbortSignal): Promise<AgentChatResponse> {

@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { PublicationInfo } from './data/liveAgent';
 import { PublicationFavoriteButton } from './PublicationFavoriteButton';
 import { getPublicationLinks, primaryLinkTitle } from './publicationLinks';
+import { cn } from './ui/utils';
 
 function formatAuthors(authors?: string[]) {
   if (!authors || authors.length === 0) return '';
@@ -13,7 +14,7 @@ function formatAuthors(authors?: string[]) {
 function formatPages(pages?: number[]) {
   if (!pages || pages.length === 0) return '';
   const sorted = [...pages].sort((a, b) => a - b);
-  return `p. ${sorted.join(', ')}`;
+  return `page ${sorted.join(', ')}`;
 }
 
 const linkClass = 'text-sky-700 hover:text-sky-800 hover:underline';
@@ -47,21 +48,33 @@ export function PublicationList({
   intro = 'Here are a list of relevant publications:',
   showSupportingNodes = false,
   showFavorite = true,
+  collapseLimit,
+  className = '',
   renderActions,
 }: {
   publications: PublicationInfo[];
   intro?: string | null;
   showSupportingNodes?: boolean;
   showFavorite?: boolean;
+  /** When set, show this many publications until expanded. */
+  collapseLimit?: number;
+  className?: string;
   renderActions?: (publication: PublicationInfo, index: number) => ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (!publications.length) return null;
 
+  const shouldCollapse = collapseLimit != null && collapseLimit > 0 && publications.length > collapseLimit;
+  const visiblePublications = shouldCollapse && !expanded
+    ? publications.slice(0, collapseLimit)
+    : publications;
+  const hiddenCount = shouldCollapse && !expanded ? publications.length - collapseLimit : 0;
+
   return (
-    <div className="mt-4 space-y-3">
+    <div className={cn('mt-4 space-y-3', className)}>
       {intro && <p className="text-xs leading-relaxed text-slate-700">{intro}</p>}
       <div className="space-y-3">
-        {publications.map((publication, index) => {
+        {visiblePublications.map((publication, index) => {
           const title = publication.paper_title || publication.source_paper || 'Untitled publication';
           const authors = formatAuthors(publication.authors);
           const meta = [
@@ -132,6 +145,24 @@ export function PublicationList({
           );
         })}
       </div>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="text-xs font-medium text-sky-700 hover:text-sky-800 hover:underline"
+        >
+          Show {hiddenCount} more
+        </button>
+      )}
+      {shouldCollapse && expanded && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="text-xs font-medium text-sky-700 hover:text-sky-800 hover:underline"
+        >
+          Show fewer
+        </button>
+      )}
     </div>
   );
 }

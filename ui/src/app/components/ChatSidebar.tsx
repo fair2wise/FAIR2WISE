@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, Copy } from 'lucide-react';
+import { ArrowUp, Check, Copy, Share2 } from 'lucide-react';
 import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
@@ -118,66 +118,25 @@ function MessageText({ text, cursor = false }: { text: string; cursor?: boolean 
   );
 }
 
-function stepDetailFromEvent(event: ChatProgressEvent): string | undefined {
-  if (event.phase === 'retrieval_result' && event.sufficient === false) {
-    const topics = (event.missing_topics ?? []).filter(Boolean);
-    if (topics.length) return `Missing: ${topics.slice(0, 4).join(', ')}`;
-  }
-  if (event.phase === 'download_started') {
-    const topics = (event.missing_topics ?? []).filter(Boolean);
-    if (topics.length) return `Topics: ${topics.slice(0, 4).join(', ')}`;
-  }
-  if ((event.phase === 'extraction_started' || event.phase === 'download_result') && event.titles?.length) {
-    return event.titles.slice(0, 4).join(', ');
-  }
-  if (event.phase === 'extraction_started' && event.pdfs?.length) {
-    return event.pdfs.slice(0, 4).join(', ');
-  }
-  return undefined;
-}
-
 function progressEventToStep(event: ChatProgressEvent): ThinkingStep {
   return {
     id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     phase: event.phase,
     label: event.message,
-    detail: stepDetailFromEvent(event),
     round: event.round,
     state: 'active',
   };
 }
 
-function ThinkingTimeline({ steps, live, typedLen }: { steps: ThinkingStep[]; live: boolean; typedLen: number }) {
-  if (!steps.length) return null;
+function ThinkingStatus({ status, elapsedSeconds }: { status: string; elapsedSeconds: number }) {
   return (
-    <ol className="space-y-4">
-      {steps.map((step, index) => {
-        const isLast = index === steps.length - 1;
-        const isActive = live && isLast && step.state === 'active';
-        const label = isActive ? step.label.slice(0, typedLen) : step.label;
-        const showCursor = isActive && typedLen < step.label.length;
-        return (
-          <li key={step.id} className="flex gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden">
-              {isActive ? (
-                <AsciiOrb size={16} interactive={false} />
-              ) : (
-                <Check size={12} className="text-emerald-500" />
-              )}
-            </span>
-            <div className="min-w-0 text-sm leading-relaxed text-slate-700">
-              <div>
-                {label}
-                {showCursor && <span className="ml-px animate-pulse text-slate-400">▌</span>}
-              </div>
-              {step.detail && !showCursor && (
-                <div className="mt-0.5">{step.detail}</div>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="mt-10 flex min-w-0 items-center gap-2 text-sm text-slate-500">
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden">
+        <AsciiOrb size={16} interactive={false} />
+      </span>
+      <span className="min-w-0 flex-1 truncate leading-relaxed">{status}</span>
+      <span className="shrink-0 tabular-nums">{elapsedSeconds}s</span>
+    </div>
   );
 }
 
@@ -295,7 +254,6 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamedLen, setStreamedLen] = useState(0);
-  const [stepTypedLen, setStepTypedLen] = useState(0);
   const [streamGraph, setStreamGraph] = useState<GraphPayload | null>(null);
   const [streamNodeIds, setStreamNodeIds] = useState<string[]>([]);
   const [pinnedViewId, setPinnedViewId] = useState<string | null>(null);
@@ -309,28 +267,13 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
 
   const isBusy = isThinking || streamingId !== null;
   const canSubmit = inputValue.trim().length > 0 && !isBusy;
-
-  const lastStep = steps.length ? steps[steps.length - 1] : null;
-  const activeStepId = lastStep && lastStep.state === 'active' ? lastStep.id : null;
-  const activeStepLabelLen = lastStep && lastStep.state === 'active' ? lastStep.label.length : 0;
+  const thinkingStatus = steps.length > 0
+    ? steps[steps.length - 1].label
+    : 'Starting agent loop…';
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, isThinking, steps, streamedLen, stepTypedLen]);
-
-  // Reset the typewriter whenever a new active step arrives.
-  useEffect(() => {
-    setStepTypedLen(0);
-  }, [activeStepId]);
-
-  // Type out the latest active thinking step character-by-character.
-  useEffect(() => {
-    if (!activeStepId || stepTypedLen >= activeStepLabelLen) return;
-    const interval = window.setInterval(() => {
-      setStepTypedLen(prev => Math.min(activeStepLabelLen, prev + 1));
-    }, 18);
-    return () => window.clearInterval(interval);
-  }, [activeStepId, stepTypedLen, activeStepLabelLen]);
+  }, [messages, isThinking, steps, streamedLen]);
 
   useEffect(() => {
     if (!streamingId) return;
@@ -630,15 +573,10 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
           <ResizablePanel defaultSize={36} minSize={24}>
             <div className="flex h-full min-h-0 flex-col">
               <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
-                {/* Intro */}
-                <div className="text-sm text-slate-500 leading-relaxed">
-                  Hello. Ask a question and I will route it through the FAIR2WISE retrieval, paper download, extraction, and KG reload loop.
-                </div>
-
                 {messageExchanges.map((exchange, exchangeIndex) => (
                   <div
                     key={exchange.key}
-                    className={exchangeIndex === 0 ? 'mt-10' : 'mt-14'}
+                    className={exchangeIndex === 0 ? '' : 'mt-14'}
                   >
                     <div className="space-y-6">
                         {exchange.user && (
@@ -667,44 +605,57 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
                                     {message.content.replace(/^Agent run failed:\s*/i, '') || message.content}
                                   </AppErrorMessage>
                                 ) : (
-                                <div className="text-sm leading-relaxed text-slate-700">
-                                  <MessageText text={displayText} cursor={showAnswerCursor} />
-                                  {showPublications && (
-                                    <div className="mt-6">
-                                      <PublicationList publications={publications} />
+                                <div>
+                                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+                                    <div className="relative px-4 py-3.5 pr-12 text-sm leading-relaxed text-slate-700">
+                                      {!streaming && (
+                                        <button
+                                          type="button"
+                                          aria-label={copiedMessageId === message.id ? 'Copied' : 'Copy answer'}
+                                          title={copiedMessageId === message.id ? 'Copied' : 'Copy'}
+                                          onClick={() => copyAssistantMessage(message)}
+                                          className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                        >
+                                          {copiedMessageId === message.id ? (
+                                            <Check size={15} className="text-emerald-500" />
+                                          ) : (
+                                            <Copy size={15} />
+                                          )}
+                                        </button>
+                                      )}
+                                      <MessageText text={displayText} cursor={showAnswerCursor} />
                                     </div>
-                                  )}
+                                    {showPublications && (
+                                      <div className="border-t border-slate-200 bg-white/60 px-4 py-3">
+                                        <p className="mb-8 text-sm font-bold text-slate-800">
+                                          Relevant Publications and Sources:
+                                        </p>
+                                        <PublicationList
+                                          publications={publications}
+                                          intro={null}
+                                          collapseLimit={3}
+                                          className="mt-0"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                                 )}
 
-                                {!streaming && !isError && (
-                                  <div className="mt-4 flex items-center gap-1">
+                                {!streaming && !isError && hasGraphNodes && (
+                                  <div className="mt-3 flex items-center gap-1">
                                     <button
                                       type="button"
-                                      aria-label={copiedMessageId === message.id ? 'Copied' : 'Copy answer'}
-                                      title={copiedMessageId === message.id ? 'Copied' : 'Copy'}
-                                      onClick={() => copyAssistantMessage(message)}
-                                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                      onClick={() => viewKnowledgeGraph(message)}
+                                      className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs transition ${
+                                        isPinned
+                                          ? 'bg-sky-100 text-sky-700'
+                                          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                                      }`}
                                     >
-                                      {copiedMessageId === message.id ? (
-                                        <Check size={15} className="text-emerald-500" />
-                                      ) : (
-                                        <Copy size={15} />
-                                      )}
+                                      <Share2 size={14} strokeWidth={2} aria-hidden="true" />
+                                      View Knowledge Graph
                                     </button>
-                                    {hasGraphNodes && (
-                                      <button
-                                        type="button"
-                                        onClick={() => viewKnowledgeGraph(message)}
-                                        className={`inline-flex items-center rounded-lg px-4 py-1.5 text-xs transition ${
-                                          isPinned
-                                            ? 'bg-sky-100 text-sky-700'
-                                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                                        }`}
-                                      >
-                                        View Knowledge Graph
-                                      </button>
-                                    )}
                                   </div>
                                 )}
 
@@ -717,14 +668,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
                 ))}
 
                 {isThinking && (
-                  <div className="mt-10 text-sm leading-relaxed text-slate-700">
-                    <div className="mb-2">Thinking {elapsedSeconds}s</div>
-                    {steps.length > 0 ? (
-                      <ThinkingTimeline steps={steps} live typedLen={stepTypedLen} />
-                    ) : (
-                      <div>Starting agent loop...</div>
-                    )}
-                  </div>
+                  <ThinkingStatus status={thinkingStatus} elapsedSeconds={elapsedSeconds} />
                 )}
 
                 <div ref={endRef} />

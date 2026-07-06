@@ -189,16 +189,28 @@ _PUBLICATION_FIELDS = (
 )
 
 _DOI_PDF_FILENAME_RE = re.compile(r"^(10\.\d{4,})[_/](.+)\.pdf$", re.I)
+# Wiley-style PDF names omit the DOI slash: 10.1002/aenm.201702831 → 10.1002aenm.201702831.pdf
+_DOI_PDF_FILENAME_STRIPPED_RE = re.compile(r"^(10\.\d{4,})([a-z][a-z0-9]*\.\d+)\.pdf$", re.I)
 _ARXIV_PDF_FILENAME_RE = re.compile(r"^(?:arxiv[_-]?)?(\d{4}\.\d{4,5}(?:v\d+)?)\.pdf$", re.I)
+
+
+def _doi_from_pdf_filename(source: str) -> Optional[str]:
+    doi_match = _DOI_PDF_FILENAME_RE.match(source)
+    if doi_match:
+        return f"{doi_match.group(1)}/{doi_match.group(2)}"
+    stripped_match = _DOI_PDF_FILENAME_STRIPPED_RE.match(source)
+    if stripped_match:
+        return f"{stripped_match.group(1)}/{stripped_match.group(2)}"
+    return None
 
 
 def _publication_from_source_identifier(source: str) -> Dict[str, Any]:
     """Derive stable identifiers from source filenames without inventing metadata."""
     clean_source = str(source or "").strip()
     publication: Dict[str, Any] = {"source_paper": clean_source} if clean_source else {}
-    doi_match = _DOI_PDF_FILENAME_RE.match(clean_source)
-    if doi_match:
-        publication["doi"] = f"{doi_match.group(1)}/{doi_match.group(2)}"
+    doi = _doi_from_pdf_filename(clean_source)
+    if doi:
+        publication["doi"] = doi
         return publication
     arxiv_match = _ARXIV_PDF_FILENAME_RE.match(clean_source)
     if arxiv_match:
