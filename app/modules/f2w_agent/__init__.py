@@ -1,11 +1,12 @@
 """FAIR2WISE 3-agent KG-RAG pipeline.
 
-Three Academy agents coordinate a retrieve -> (download -> extract -> update KG)
+Academy agents coordinate a retrieve -> (download -> extract -> update KG)
 -> retrieve loop:
 
 - RetrievalAgent: KG retrieval + strict sufficiency judgement / answer.
 - DownloadAgent:  OpenAlex relevance search + PDF download.
 - ExtractorAgent: term extraction (copied branch term_extractor) + KG update.
+- EvidenceDebateAgent: opt-in agentic evidence gate before download/extraction.
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ __all__ = [
     "RetrievalAgent",
     "DownloadAgent",
     "ExtractorAgent",
+    "EvidenceDebateAgent",
 ]
 
 
@@ -40,4 +42,8 @@ def __getattr__(name: str):  # lazy exports to keep import light
         from .extractor_agent import ExtractorAgent
 
         return ExtractorAgent
+    if name == "EvidenceDebateAgent":
+        from .debate_agent import EvidenceDebateAgent
+
+        return EvidenceDebateAgent
     raise AttributeError(name)

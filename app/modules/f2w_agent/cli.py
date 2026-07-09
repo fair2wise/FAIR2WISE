@@ -15,12 +15,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .coordinator import Coordinator, CoordinatorConfig, default_workers
+from .coordinator import Coordinator, CoordinatorConfig, default_workers, default_workflow_mode
 
 load_dotenv()
 
 
 def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
+    workflow_mode = "agentic" if args.agentic else args.workflow_mode
     return CoordinatorConfig(
         backend=args.backend,
         model=args.model,
@@ -38,6 +39,7 @@ def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
         download_delay_seconds=args.download_delay,
         validate_downloads=not args.no_download_validation,
         allow_splash_wipe=args.allow_splash_wipe,
+        workflow_mode=workflow_mode,
     )
 
 
@@ -72,6 +74,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-rounds", type=int, default=3)
     p.add_argument("--max-papers", type=int, default=3)
     p.add_argument("--candidate-pool", type=int, default=25)
+    p.add_argument("--workflow-mode", choices=["deterministic", "agentic"], default=default_workflow_mode())
+    p.add_argument("--agentic", action="store_true", help="Alias for --workflow-mode agentic")
     p.add_argument("--download-delay", type=float, default=1.0, help="Seconds to wait between PDF download attempts")
     p.add_argument(
         "--no-download-validation",
@@ -116,6 +120,7 @@ def main(argv=None) -> int:
             "max_papers": cfg.max_papers, "download_delay": cfg.download_delay_seconds,
             "validate_downloads": cfg.validate_downloads,
             "allow_splash_wipe": cfg.allow_splash_wipe,
+            "workflow_mode": cfg.workflow_mode,
         }, indent=2))
         return 0
 

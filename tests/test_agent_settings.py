@@ -59,6 +59,7 @@ def test_settings_get_returns_defaults(tmp_path, monkeypatch):
     body = response.json()
     assert body["backend"] == "cborg"
     assert body["graph_source"] == "splash"
+    assert body["workflow_mode"] == "deterministic"
     assert body["available_json_graphs"] == []
 
 
@@ -78,6 +79,17 @@ def test_settings_update_backend_only(tmp_path, monkeypatch):
     health = client.get("/health").json()
     assert health["backend"] == "ollama"
     assert health["kg_mode"] == "splash"
+    assert health["workflow_mode"] == "deterministic"
+
+
+def test_settings_update_workflow_mode(tmp_path, monkeypatch):
+    client = _settings_client(tmp_path, monkeypatch)
+
+    response = client.put("/settings", json={"workflow_mode": "agentic"})
+
+    assert response.status_code == 200
+    assert response.json()["workflow_mode"] == "agentic"
+    assert client.get("/health").json()["workflow_mode"] == "agentic"
 
 
 def test_settings_switch_json_graph_and_back_to_splash(tmp_path, monkeypatch):

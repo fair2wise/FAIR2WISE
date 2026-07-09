@@ -68,8 +68,20 @@ def _reconstruct_abstract(inverted_index: Optional[Dict[str, List[int]]]) -> str
     return " ".join(w for _, w in positions)
 
 
+def _candidate_abstract(work: Dict[str, Any]) -> str:
+    """Return candidate abstract from either OpenAlex raw or scout summary."""
+    abstract = work.get("abstract")
+    if abstract:
+        return str(abstract)
+    return _reconstruct_abstract(work.get("abstract_inverted_index"))
+
+
 def _pdf_urls(work: Dict[str, Any]) -> List[str]:
     """Open-access URLs in PDF-first preference order."""
+    explicit = work.get("pdf_urls")
+    if isinstance(explicit, list):
+        return [str(url) for url in explicit if str(url).strip()]
+
     urls: List[str] = []
     for loc_key in ("best_oa_location", "primary_location"):
         loc = work.get(loc_key) or {}
@@ -97,6 +109,22 @@ def _safe_name(work: Dict[str, Any]) -> str:
         return re.sub(r"^https?://(dx\.)?doi\.org/", "", doi).replace("/", "_")
     wid = (work.get("id") or "").rstrip("/").split("/")[-1]
     return wid or "openalex_work"
+
+
+def _candidate_summary(work: Dict[str, Any]) -> Dict[str, Any]:
+    """Compact JSON-safe candidate used by agentic preflight."""
+    urls = _pdf_urls(work)
+    return {
+        "id": work.get("id"),
+        "doi": work.get("doi"),
+        "title": work.get("title") or work.get("display_name") or "",
+        "abstract": _candidate_abstract(work),
+        "publication_year": work.get("publication_year"),
+        "pdf_urls": urls,
+        "oa_url": (work.get("open_access") or {}).get("oa_url"),
+        "score": float(work.get("_score", work.get("score", 0.0)) or 0.0),
+        "_score": float(work.get("_score", work.get("score", 0.0)) or 0.0),
+    }
 
 
 def _lexical_score(query: str, text: str) -> float:
@@ -282,7 +310,7 @@ class DownloadAgent(Agent):
             listing = []
             for i, w in enumerate(candidates):
                 title = w.get("title") or ""
-                abstract = _reconstruct_abstract(w.get("abstract_inverted_index"))[:1200]
+                abstract = _candidate_abstract(w)[:1200]
                 listing.append(f"[{i}] TITLE: {title}\nABSTRACT: {abstract}")
             prompt = (
                 "Rate how relevant each paper is to answering the QUESTION, using only the "
@@ -298,7 +326,7 @@ class DownloadAgent(Agent):
         except Exception as e:
             logger.warning("LLM ranking failed (%s); using lexical overlap", e)
             for w in candidates:
-                text = (w.get("title") or "") + " " + _reconstruct_abstract(w.get("abstract_inverted_index"))
+                text = (w.get("title") or "") + " " + _candidate_abstract(w)
                 w["_score"] = _lexical_score(query, text)
         scored = sorted(candidates, key=lambda w: w.get("_score", 0.0), reverse=True)
         return scored
@@ -327,7 +355,7 @@ class DownloadAgent(Agent):
                 cborg_api_key=os.environ.get("CBORG_API_KEY"),
             )
             title = work.get("title") or ""
-            abstract = _reconstruct_abstract(work.get("abstract_inverted_index"))[:1600]
+            abstract = _candidate_abstract(work)[:1600]
             prompt = (
                 "You are validating a downloaded PDF for a retrieval-augmented paper "
                 "download agent. Use only the provided OpenAlex title/abstract and "
@@ -354,17 +382,33 @@ class DownloadAgent(Agent):
             logger.warning("Semantic PDF validation failed for %s (%s); keeping file", path.name, e)
             return True
 
-    def _download(self, query: str, missing_topics: List[str], target_dir: str,
-                  max_papers: int, candidate_pool: int) -> Dict[str, Any]:
+    def _candidate_search(self, query: str, missing_topics: List[str], candidate_pool: int) -> Dict[str, Any]:
+        candidates = self._search_candidates(query, missing_topics, candidate_pool)
+        candidates = [w for w in candidates if _pdf_urls(w)]
+        ranked = self._rank(query, candidates) if candidates else []
+        summaries = [_candidate_summary(w) for w in ranked]
+        return {
+            "status": "success",
+            "query": query,
+            "missing_topics": missing_topics,
+            "candidates": summaries,
+            "count": len(summaries),
+        }
+
+    def _download_candidates(
+        self,
+        query: str,
+        missing_topics: List[str],
+        target_dir: str,
+        candidates: List[Dict[str, Any]],
+        max_papers: int,
+    ) -> Dict[str, Any]:
         import download_pdfs as dl  # scripts/download_pdfs.py
 
         target = Path(target_dir)
         target.mkdir(parents=True, exist_ok=True)
         manifest = _download_manifest_path(target)
 
-        candidates = self._search_candidates(query, missing_topics, candidate_pool)
-        # keep only works with an open-access URL. download_pdf validates bytes.
-        candidates = [w for w in candidates if _pdf_urls(w)]
         if not candidates:
             return {
                 "status": "success",
@@ -379,7 +423,11 @@ class DownloadAgent(Agent):
                 "manifest": str(manifest),
             }
 
-        ranked = self._rank(query, candidates)
+        ranked = sorted(
+            candidates,
+            key=lambda w: float(w.get("_score", w.get("score", 0.0)) or 0.0),
+            reverse=True,
+        )
 
         downloaded: List[str] = []
         skipped = 0
@@ -410,10 +458,11 @@ class DownloadAgent(Agent):
 
             ok = False
             attempted_urls: List[str] = []
+            oa_url = (w.get("open_access") or {}).get("oa_url") or w.get("oa_url")
             for url in urls:
                 attempted_urls.append(url)
                 url_attempts += 1
-                if url == (w.get("open_access") or {}).get("oa_url"):
+                if url == oa_url:
                     oa_url_attempts += 1
                 ok = dl.download_pdf(url, str(dest))
                 if ok:
@@ -483,6 +532,53 @@ class DownloadAgent(Agent):
             "target_dir": str(target),
             "manifest": str(manifest),
         }
+
+    def _download(self, query: str, missing_topics: List[str], target_dir: str,
+                  max_papers: int, candidate_pool: int) -> Dict[str, Any]:
+        search = self._candidate_search(query, missing_topics, candidate_pool)
+        return self._download_candidates(
+            query,
+            missing_topics,
+            target_dir,
+            search.get("candidates") or [],
+            max_papers,
+        )
+
+    @action
+    async def search_candidates(
+        self,
+        query: str,
+        missing_topics: Optional[List[str]] = None,
+        candidate_pool: int = 25,
+    ) -> Dict[str, Any]:
+        """Search/rank OpenAlex candidates without writing PDFs."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._candidate_search(query, missing_topics or [], candidate_pool),
+        )
+
+    @action
+    async def download_selected(
+        self,
+        query: str,
+        missing_topics: Optional[List[str]] = None,
+        target_dir: str = "pdfs",
+        candidates: Optional[List[Dict[str, Any]]] = None,
+        max_papers: int = 1,
+    ) -> Dict[str, Any]:
+        """Download only controller-approved candidate(s)."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self._download_candidates(
+                query,
+                missing_topics or [],
+                target_dir,
+                candidates or [],
+                max_papers,
+            ),
+        )
 
     @action
     async def find_and_download(

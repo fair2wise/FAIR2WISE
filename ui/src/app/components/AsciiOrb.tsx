@@ -5,7 +5,7 @@ type Ripple = { x: number; y: number; startTime: number };
 // 1:1 port of cue.sf.tools ASCII orb (noise-driven sphere + click ripples).
 export function AsciiOrb({
   size = 28,
-  className = 'text-sky-500',
+  className = 'text-sky-400',
   interactive = true,
   animated = true,
 }: {
@@ -20,6 +20,7 @@ export function AsciiOrb({
   const ripplesRef = useRef<Ripple[]>([]);
   const getTimeRef = useRef<(now: number) => number>(() => 0);
   const fontPx = (size / 28) * 1.8;
+  const blueHue = !className.includes('text-black');
 
   useEffect(() => {
     const pre = preRef.current;
@@ -187,7 +188,7 @@ export function AsciiOrb({
   return (
     <div
       ref={wrapRef}
-      className={`ascii-orb-wrap flex shrink-0 items-center justify-center ${
+      className={`ascii-orb-wrap relative flex shrink-0 items-center justify-center ${
         interactive
           ? 'cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2'
           : 'pointer-events-none'
@@ -197,10 +198,25 @@ export function AsciiOrb({
       aria-hidden="true"
       style={{ width: size, height: size }}
     >
+      {blueHue && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 scale-110 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, rgba(37, 99, 235, 0.08) 45%, transparent 72%)',
+          }}
+        />
+      )}
       <pre
         ref={preRef}
-        className={`ascii-orb m-0 select-none whitespace-pre font-mono ${className}`}
-        style={{ fontSize: `${fontPx}px`, lineHeight: `${fontPx}px` }}
+        className={`ascii-orb relative z-[1] m-0 select-none whitespace-pre font-mono ${className}`}
+        style={{
+          fontSize: `${fontPx}px`,
+          lineHeight: `${fontPx}px`,
+          ...(blueHue
+            ? { textShadow: '0 0 10px rgba(56, 189, 248, 0.55), 0 0 22px rgba(37, 99, 235, 0.28)' }
+            : {}),
+        }}
       />
     </div>
   );

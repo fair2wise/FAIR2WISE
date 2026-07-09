@@ -81,6 +81,7 @@ export default function App() {
         saveAgentSettings({
           backend: local.backend,
           graphSource: local.graphSource,
+          workflowMode: local.workflowMode,
           jsonGraphPath: synced.jsonGraphPath,
         });
         const nextGraph = await fetchLiveGraph();

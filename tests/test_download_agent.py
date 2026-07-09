@@ -40,6 +40,37 @@ def test_find_and_download_action_delegates_to_download(tmp_path):
     assert calls == [("question", ["missing"], str(tmp_path / "pdfs"), 2, 7)]
 
 
+def test_search_candidates_action_does_not_write_pdfs(tmp_path, monkeypatch):
+    agent = DownloadAgent(backend="ollama", model="test", download_delay_seconds=0)
+    candidate = {
+        "id": "W123",
+        "doi": "https://doi.org/10.1234/example",
+        "title": "Relevant abstract paper",
+        "abstract_inverted_index": {"Relevant": [0], "abstract": [1]},
+        "best_oa_location": {"pdf_url": "https://example.test/paper.pdf"},
+        "_score": 0.82,
+    }
+
+    monkeypatch.setattr(agent, "_search_candidates", lambda query, missing, pool: [candidate])
+    monkeypatch.setattr(agent, "_rank", lambda query, candidates: candidates)
+
+    result = asyncio.run(
+        agent.search_candidates(
+            "question",
+            ["missing"],
+            candidate_pool=5,
+        )
+    )
+
+    assert result["status"] == "success"
+    assert result["count"] == 1
+    assert result["candidates"][0]["title"] == "Relevant abstract paper"
+    assert result["candidates"][0]["abstract"] == "Relevant abstract"
+    assert result["candidates"][0]["pdf_urls"] == ["https://example.test/paper.pdf"]
+    assert not list(tmp_path.rglob("*.pdf"))
+    assert not (tmp_path / "downloads.jsonl").exists()
+
+
 class FakeWorks:
     calls = []
     fail_all = False

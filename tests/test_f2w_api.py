@@ -60,9 +60,230 @@ class FakeExtractor:
         return {"status": "success", "unique_terms": 2}
 
 
+class AgenticDownload:
+    instances = []
+
+    def __init__(self, *args, **kwargs):
+        self.search_calls = []
+        self.download_calls = []
+        type(self).instances.append(self)
+
+    async def find_and_download(self, *args, **kwargs):
+        raise AssertionError("agentic path must not use combined find_and_download")
+
+    async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+        self.search_calls.append(
+            {"query": query, "missing_topics": missing_topics or [], "candidate_pool": candidate_pool}
+        )
+        return {"status": "success", "count": 0, "candidates": []}
+
+    async def download_selected(self, query, missing_topics=None, target_dir="pdfs", candidates=None, max_papers=1):
+        self.download_calls.append(
+            {
+                "query": query,
+                "missing_topics": missing_topics or [],
+                "target_dir": target_dir,
+                "candidates": candidates or [],
+                "max_papers": max_papers,
+            }
+        )
+        return {"status": "success", "count": 0, "downloaded": [], "failed": 0, "skipped": 0}
+
+
+class AgenticExtractor:
+    instances = []
+
+    def __init__(self, *args, **kwargs):
+        self.calls = []
+        type(self).instances.append(self)
+
+    async def extract(self, *args, **kwargs):
+        self.calls.append(args)
+        return {"status": "success", "unique_terms": 2, "processed_files": 1}
+
+
+class AgenticDebate:
+    instances = []
+    decisions = []
+
+    def __init__(self, *args, **kwargs):
+        self.calls = []
+        type(self).instances.append(self)
+
+    async def decide(self, question, retrieval_probe, candidates=None, round_no=1):
+        self.calls.append(
+            {
+                "question": question,
+                "retrieval_probe": retrieval_probe,
+                "candidates": candidates or [],
+                "round_no": round_no,
+            }
+        )
+        if type(self).decisions:
+            return type(self).decisions.pop(0)
+        if retrieval_probe.get("sufficient"):
+            return {
+                "hypothesis": "KG enough",
+                "objections": [],
+                "selected_action": "answer_from_kg",
+                "reason": "KG evidence sufficient",
+                "candidate_titles": [],
+                "candidate_indices": [],
+            }
+        return {
+            "hypothesis": "Need more evidence",
+            "objections": ["No good candidates"],
+            "selected_action": "stop_insufficient",
+            "reason": "Weak candidates",
+            "candidate_titles": [],
+            "candidate_indices": [],
+        }
+
+
 class FakeNodeInfo:
     def __init__(self, node_id):
         self.id = node_id
+
+
+def force_agent_router(service):
+    service._judge_agent_requirement = lambda question, history: asyncio.sleep(
+        0, result={"requires_agents": True, "reason": "Test requires agent workflow."}
+    )
+
+
+class NoCallRetrieval:
+    reload_calls = 0
+    query_calls = 0
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def reload_kg(self, graph_file, graph_source=None):
+        type(self).reload_calls += 1
+        raise AssertionError("direct_response must not reload KG")
+
+    async def query(self, question):
+        type(self).query_calls += 1
+        raise AssertionError("direct_response must not query KG")
+
+    @classmethod
+    def reset(cls):
+        cls.reload_calls = 0
+        cls.query_calls = 0
+
+
+def test_direct_response_bypasses_retrieval_after_llm_router(tmp_path, monkeypatch):
+    NoCallRetrieval.reset()
+    monkeypatch.setattr(api_mod, "RetrievalAgent", NoCallRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    judge_calls = []
+    answer_calls = []
+
+    async def fake_judge(question, history):
+        judge_calls.append((question, history))
+        return {"requires_agents": False, "reason": "Greeting/test does not need agents."}
+
+    async def fake_direct_answer(question, history):
+        answer_calls.append((question, history))
+        return "Hello. I'm ready when you have a materials question."
+
+    service._judge_agent_requirement = fake_judge
+    service._generate_direct_response = fake_direct_answer
+    response = asyncio.run(service.ask("Testing?"))
+
+    assert response.status == "direct_response"
+    assert response.answer == "Hello. I'm ready when you have a materials question."
+    assert response.rounds[0]["routing"]["requires_agents"] is False
+    assert response.node_ids == []
+    assert judge_calls == [("Testing?", [])]
+    assert answer_calls == [("Testing?", [])]
+    assert NoCallRetrieval.reload_calls == 0
+    assert NoCallRetrieval.query_calls == 0
+
+
+def test_direct_response_stream_completes_without_progress(tmp_path, monkeypatch):
+    NoCallRetrieval.reset()
+    monkeypatch.setattr(api_mod, "RetrievalAgent", NoCallRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    service._judge_agent_requirement = lambda question, history: asyncio.sleep(
+        0, result={"requires_agents": False, "reason": "No agents needed."}
+    )
+    service._generate_direct_response = lambda question, history: asyncio.sleep(
+        0, result="Hi. What would you like to explore?"
+    )
+    events = []
+
+    async def run():
+        async def emit(event, message, data):
+            events.append((event, message, data))
+
+        return await service.ask_with_progress("ping", emit)
+
+    response = asyncio.run(run())
+
+    assert response.status == "direct_response"
+    assert response.answer == "Hi. What would you like to explore?"
+    assert events == []
+    assert NoCallRetrieval.reload_calls == 0
+    assert NoCallRetrieval.query_calls == 0
+
+
+def test_followup_history_rewrites_before_retrieval(tmp_path, monkeypatch):
+    class RecordingRetrieval:
+        queries = []
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question):
+            type(self).queries.append(question)
+            return {
+                "status": "success",
+                "sufficient": True,
+                "answer": "grounded rewritten answer",
+                "selected": [],
+                "direct_evidence_count": 1,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
+    RecordingRetrieval.queries = []
+    monkeypatch.setattr(api_mod, "RetrievalAgent", RecordingRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    service._judge_agent_requirement = lambda question, history: asyncio.sleep(
+        0, result={"requires_agents": True, "reason": "Follow-up needs KG context."}
+    )
+
+    async def fake_rewrite(question, history):
+        assert question == "What about the second one?"
+        assert history[-1]["role"] == "assistant"
+        return "What evidence supports the second candidate material?"
+
+    service._rewrite_standalone_question = fake_rewrite
+    response = asyncio.run(
+        service.ask(
+            "What about the second one?",
+            messages=[
+                {"role": "user", "content": "Compare P3HT and PTB7."},
+                {"role": "assistant", "content": "P3HT is first. PTB7 is second."},
+            ],
+        )
+    )
+
+    assert response.status == "answered"
+    assert RecordingRetrieval.queries == ["What evidence supports the second candidate material?"]
 
 
 def test_agent_pipeline_service_answers_after_growth(tmp_path, monkeypatch):
@@ -113,6 +334,7 @@ def test_agent_pipeline_service_answers_after_growth(tmp_path, monkeypatch):
     monkeypatch.setattr(api_mod.kg_update, "rebuild_kg", fake_rebuild)
 
     service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=2))
+    force_agent_router(service)
     response = asyncio.run(service.ask("question"))
 
     assert response.status == "answered"
@@ -140,6 +362,7 @@ def test_agent_pipeline_service_emits_progress_events(tmp_path, monkeypatch):
     )
 
     service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=2))
+    force_agent_router(service)
     events = []
 
     async def run():
@@ -179,6 +402,327 @@ def test_agent_pipeline_service_emits_progress_events(tmp_path, monkeypatch):
     assert by_phase["extraction_started"]["pdfs"] == ["paper.pdf"]
     assert by_phase["extraction_result"]["term_count"] == 2
     assert by_phase["kg_rebuild_result"]["node_count"] == 2
+
+
+def test_agentic_path_answers_from_kg_without_download(tmp_path, monkeypatch):
+    class SufficientRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question):
+            return {
+                "status": "success",
+                "sufficient": True,
+                "answer": "grounded kg answer",
+                "selected": ["n1"],
+                "direct_evidence_count": 1,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = []
+    monkeypatch.setattr(api_mod, "RetrievalAgent", SufficientRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", AgenticDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(workdir=tmp_path, max_rounds=1, kg_mode="splash", workflow_mode="agentic")
+    )
+    force_agent_router(service)
+    response = asyncio.run(service.ask("question"))
+
+    assert response.status == "answered"
+    assert response.answer == "grounded kg answer"
+    assert response.rounds[0]["debate"]["selected_action"] == "answer_from_kg"
+    assert AgenticDownload.instances[0].search_calls == []
+    assert AgenticDownload.instances[0].download_calls == []
+    assert AgenticExtractor.instances[0].calls == []
+
+
+def test_agentic_path_rejects_weak_candidates_without_extraction(tmp_path, monkeypatch):
+    class InsufficientRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 0}
+
+        async def query(self, question):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "missing_topics": ["missing topic"],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": True,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
+    class WeakDownload(AgenticDownload):
+        async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+            await super().search_candidates(query, missing_topics, candidate_pool)
+            return {
+                "status": "success",
+                "count": 1,
+                "candidates": [
+                    {
+                        "id": "Wweak",
+                        "title": "Unrelated abstract",
+                        "abstract": "Unrelated topic.",
+                        "score": 0.01,
+                        "pdf_urls": ["https://example.test/weak.pdf"],
+                    }
+                ],
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Candidates weak",
+            "objections": ["Top abstract does not fill gap"],
+            "selected_action": "stop_insufficient",
+            "reason": "Weak OpenAlex candidates",
+            "candidate_titles": ["Unrelated abstract"],
+            "candidate_indices": [],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", InsufficientRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", WeakDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(workdir=tmp_path, max_rounds=1, kg_mode="splash", workflow_mode="agentic")
+    )
+    force_agent_router(service)
+    response = asyncio.run(service.ask("question"))
+
+    assert response.status == "insufficient_evidence"
+    assert "Weak OpenAlex candidates" in response.answer
+    assert response.rounds[0]["debate"]["selected_action"] == "stop_insufficient"
+    assert WeakDownload.instances[0].download_calls == []
+    assert AgenticExtractor.instances[0].calls == []
+
+
+def test_agentic_path_downloads_only_approved_candidate_then_answers(tmp_path, monkeypatch):
+    class GrowthRetrieval:
+        def __init__(self, *args, **kwargs):
+            self.verdicts = [
+                {
+                    "status": "success",
+                    "sufficient": False,
+                    "missing_topics": ["approved topic"],
+                    "selected": [],
+                    "direct_evidence_count": 0,
+                    "no_evidence": True,
+                    "graph_source_requested": "splash",
+                    "graph_source_used": "splash",
+                },
+                {
+                    "status": "success",
+                    "sufficient": True,
+                    "answer": "answer after reload",
+                    "selected": ["n1"],
+                    "direct_evidence_count": 1,
+                    "graph_source_requested": "splash",
+                    "graph_source_used": "splash",
+                },
+            ]
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question):
+            return self.verdicts.pop(0)
+
+    class ApprovedDownload(AgenticDownload):
+        async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+            await super().search_candidates(query, missing_topics, candidate_pool)
+            return {
+                "status": "success",
+                "count": 2,
+                "candidates": [
+                    {
+                        "id": "Wskip",
+                        "doi": "10.1234/skip",
+                        "title": "Skip paper",
+                        "abstract": "Less relevant.",
+                        "score": 0.2,
+                        "pdf_urls": ["https://example.test/skip.pdf"],
+                    },
+                    {
+                        "id": "Wapproved",
+                        "doi": "10.1234/approved",
+                        "title": "Approved paper",
+                        "abstract": "Directly addresses approved topic.",
+                        "score": 0.91,
+                        "pdf_urls": ["https://example.test/approved.pdf"],
+                    },
+                ],
+            }
+
+        async def download_selected(self, query, missing_topics=None, target_dir="pdfs", candidates=None, max_papers=1):
+            await super().download_selected(query, missing_topics, target_dir, candidates, max_papers)
+            target = Path(target_dir)
+            target.mkdir(parents=True, exist_ok=True)
+            pdf = target / "approved.pdf"
+            pdf.write_bytes(b"%PDF-1.4\nbody")
+            return {
+                "status": "success",
+                "count": 1,
+                "downloaded": [str(pdf)],
+                "failed": 0,
+                "skipped": 0,
+            }
+
+    def fake_rebuild(terms, kg):
+        Path(kg).write_text(
+            json.dumps(
+                {
+                    "things": [{"id": "n1", "name": "Approved evidence", "category": "Thing"}],
+                    "associations": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return {"status": "success", "nodes": 1, "edges": 0}
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Approved paper fills gap",
+            "objections": ["Skip paper is weaker"],
+            "selected_action": "download_selected",
+            "reason": "Approved paper has best abstract evidence",
+            "candidate_titles": ["Approved paper"],
+            "candidate_indices": [1],
+        },
+        {
+            "hypothesis": "KG enough",
+            "objections": [],
+            "selected_action": "answer_from_kg",
+            "reason": "Reloaded KG has enough evidence",
+            "candidate_titles": [],
+            "candidate_indices": [],
+        },
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", GrowthRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", ApprovedDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+    monkeypatch.setattr(api_mod.kg_update, "rebuild_kg", fake_rebuild)
+    monkeypatch.setattr(api_mod.kg_update, "splash_reimport", lambda *args, **kwargs: {"status": "success"})
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(workdir=tmp_path, max_rounds=2, kg_mode="splash", workflow_mode="agentic")
+    )
+    force_agent_router(service)
+    response = asyncio.run(service.ask("question"))
+
+    assert response.status == "answered"
+    assert response.answer == "answer after reload"
+    assert ApprovedDownload.instances[0].download_calls[0]["candidates"][0]["title"] == "Approved paper"
+    assert len(ApprovedDownload.instances[0].download_calls[0]["candidates"]) == 1
+    assert AgenticExtractor.instances[0].calls
+    extracted_dir = Path(AgenticExtractor.instances[0].calls[0][0])
+    assert sorted(p.name for p in extracted_dir.glob("*.pdf")) == ["approved.pdf"]
+
+
+def test_agentic_progress_events_include_debate_candidate_and_action(tmp_path, monkeypatch):
+    class InsufficientRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 0}
+
+        async def query(self, question):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "missing_topics": ["missing topic"],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": True,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
+    class OneCandidateDownload(AgenticDownload):
+        async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+            await super().search_candidates(query, missing_topics, candidate_pool)
+            return {
+                "status": "success",
+                "count": 1,
+                "candidates": [
+                    {
+                        "id": "W1",
+                        "title": "Candidate paper",
+                        "abstract": "Fills missing topic.",
+                        "score": 0.7,
+                        "pdf_urls": ["https://example.test/paper.pdf"],
+                    }
+                ],
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Candidate enough to download",
+            "objections": [],
+            "selected_action": "stop_insufficient",
+            "reason": "Testing stop after event emission",
+            "candidate_titles": ["Candidate paper"],
+            "candidate_indices": [],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", InsufficientRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", OneCandidateDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(workdir=tmp_path, max_rounds=1, kg_mode="splash", workflow_mode="agentic")
+    )
+    force_agent_router(service)
+    events = []
+
+    async def run():
+        async def emit(event, message, data):
+            events.append((event, data))
+
+        return await service.ask_with_progress("question", emit)
+
+    response = asyncio.run(run())
+
+    assert response.status == "insufficient_evidence"
+    phases = [event for event, _ in events]
+    assert phases == [
+        "retrieval_started",
+        "retrieval_result",
+        "candidate_search_started",
+        "candidate_search_result",
+        "debate_started",
+        "debate_result",
+        "action_selected",
+    ]
+    assert events[3][1]["candidate_titles"] == ["Candidate paper"]
+    assert events[5][1]["selected_action"] == "stop_insufficient"
+    assert events[6][1]["reason"] == "Testing stop after event emission"
 
 
 def test_graph_payload_from_file_normalizes_matkg(tmp_path):
@@ -542,4 +1086,3 @@ def test_settings_update_switches_json_graph(tmp_path, monkeypatch):
     graph_body = graph_response.json()
     assert graph_body["source_path"].endswith("storage/kg/selected.json")
     assert graph_body["nodes"][0]["id"] == "n1"
-

@@ -30,11 +30,13 @@ describe('agentSettings', () => {
     const settings: AgentSettings = {
       backend: 'cborg',
       graphSource: 'splash_links',
+      workflowMode: 'deterministic',
       jsonGraphPath: 'storage/kg/ignored.json',
     };
     expect(settingsToApiPayload(settings)).toEqual({
       backend: 'cborg',
       graph_source: 'splash',
+      workflow_mode: 'deterministic',
       json_graph_path: null,
     });
   });
@@ -43,11 +45,13 @@ describe('agentSettings', () => {
     const settings: AgentSettings = {
       backend: 'ollama',
       graphSource: 'json',
+      workflowMode: 'agentic',
       jsonGraphPath: 'storage/kg/alpha.json',
     };
     expect(settingsToApiPayload(settings)).toEqual({
       backend: 'ollama',
       graph_source: 'json',
+      workflow_mode: 'agentic',
       json_graph_path: 'storage/kg/alpha.json',
     });
   });
@@ -56,12 +60,14 @@ describe('agentSettings', () => {
     const settings = settingsFromApiResponse({
       backend: 'ollama',
       graph_source: 'json',
+      workflow_mode: 'agentic',
       json_graph_path: 'storage/kg/alpha.json',
       available_json_graphs: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
     });
     expect(settings).toEqual({
       backend: 'ollama',
       graphSource: 'json',
+      workflowMode: 'agentic',
       jsonGraphPath: 'storage/kg/alpha.json',
     });
   });
@@ -70,6 +76,7 @@ describe('agentSettings', () => {
     const settings: AgentSettings = {
       backend: 'ollama',
       graphSource: 'json',
+      workflowMode: 'agentic',
       jsonGraphPath: 'storage/kg/custom.json',
     };
     saveAgentSettings(settings);
@@ -81,6 +88,7 @@ describe('agentSettings', () => {
     expect(loadAgentSettings()).toEqual({
       backend: 'cborg',
       graphSource: 'splash_links',
+      workflowMode: 'deterministic',
       jsonGraphPath: DEFAULT_AGENT_SETTINGS.jsonGraphPath,
     });
   });
@@ -89,10 +97,12 @@ describe('agentSettings', () => {
     const base: AgentSettings = {
       backend: 'cborg',
       graphSource: 'splash_links',
+      workflowMode: 'deterministic',
       jsonGraphPath: DEFAULT_AGENT_SETTINGS.jsonGraphPath,
     };
     expect(settingsEqual(base, { ...base })).toBe(true);
     expect(settingsEqual(base, { ...base, backend: 'ollama' })).toBe(false);
     expect(settingsEqual(base, { ...base, graphSource: 'json' })).toBe(false);
+    expect(settingsEqual(base, { ...base, workflowMode: 'agentic' })).toBe(false);
   });
 });

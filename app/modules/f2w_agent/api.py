@@ -19,13 +19,20 @@ from . import kg_update
 from .coordinator import Coordinator, CoordinatorConfig
 from app.modules import kg_rag_api as krag
 
+from .debate_agent import EvidenceDebateAgent
 from .download_agent import DownloadAgent, _reconstruct_abstract, _sanitize_openalex_search
 from .extractor_agent import ExtractorAgent
 from .retrieval_agent import RetrievalAgent
 
 
+class ChatMessageInput(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
+    messages: List[ChatMessageInput] = Field(default_factory=list)
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     json_graph_path: Optional[str] = None
 
@@ -105,6 +112,7 @@ class PublicationSearchResponse(BaseModel):
 class AgentSettingsResponse(BaseModel):
     backend: str
     graph_source: str
+    workflow_mode: str = "deterministic"
     json_graph_path: Optional[str] = None
     available_json_graphs: List[str] = Field(default_factory=list)
 
@@ -112,6 +120,7 @@ class AgentSettingsResponse(BaseModel):
 class AgentSettingsUpdate(BaseModel):
     backend: Optional[str] = Field(default=None, pattern="^(cborg|ollama)$")
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
+    workflow_mode: Optional[str] = Field(default=None, pattern="^(deterministic|agentic)$")
     json_graph_path: Optional[str] = None
 
 
@@ -163,6 +172,7 @@ def default_json_graph_path(
 class RuntimeSettings:
     backend: str = "cborg"
     graph_source: str = "splash"
+    workflow_mode: str = "deterministic"
     json_graph_path: Optional[str] = None
 
 
@@ -564,6 +574,85 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+MAX_HISTORY_MESSAGES = 8
+
+
+def _parse_json_object(raw: str) -> Dict[str, Any]:
+    if not raw:
+        return {}
+    match = re.search(r"\{[\s\S]*\}", raw)
+    if not match:
+        return {}
+    try:
+        obj = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return {}
+    return obj if isinstance(obj, dict) else {}
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "yes", "1"}
+    return bool(value)
+
+
+def _normalize_chat_text(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s']", " ", text.lower())).strip()
+
+
+def _history_payload(messages: Optional[List[ChatMessageInput]]) -> List[Dict[str, str]]:
+    history: List[Dict[str, str]] = []
+    for message in (messages or [])[-MAX_HISTORY_MESSAGES:]:
+        if isinstance(message, dict):
+            role = str(message.get("role") or "").strip()
+            content = str(message.get("content") or "").strip()
+        else:
+            role = str(message.role or "").strip()
+            content = str(message.content or "").strip()
+        if role in {"user", "assistant"} and content:
+            history.append({"role": role, "content": content[:4000]})
+    return history
+
+
+def _needs_history_rewrite(question: str, history: List[Dict[str, str]]) -> bool:
+    if not history:
+        return False
+    normalized = _normalize_chat_text(question)
+    if not normalized:
+        return False
+    followup_patterns = (
+        r"\b(it|that|this|those|these|them|they|there)\b",
+        r"\b(first|second|third|last|previous|latter|former)\b",
+        r"\b(one|ones|same|other|another)\b",
+        r"^what about\b",
+        r"^how about\b",
+        r"^compare\b",
+        r"^and\b",
+    )
+    return any(re.search(pattern, normalized) for pattern in followup_patterns)
+
+
+def _select_candidates_by_indices(
+    candidates: List[Dict[str, Any]],
+    indices: Any,
+) -> List[Dict[str, Any]]:
+    if isinstance(indices, int):
+        indices = [indices]
+    if not isinstance(indices, list):
+        return []
+    selected: List[Dict[str, Any]] = []
+    for item in indices:
+        try:
+            idx = int(item)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= idx < len(candidates):
+            selected.append(candidates[idx])
+    return selected
+
+
 def _confidence(verdict: Dict[str, Any]) -> float:
     if verdict.get("sufficient"):
         selected = len(verdict.get("selected") or [])
@@ -791,12 +880,13 @@ class AgentPipelineService:
         self.coord = Coordinator(cfg)
         self.lock = asyncio.Lock()
         available_json_graphs = list_storage_kg_json_files()
-        initial_graph_source = "splash" if cfg.kg_mode in {"splash", "splash_links"} else "json"
+        initial_graph_source = "json" if cfg.graph and cfg.kg_mode == "json" else "splash"
         initial_backend = cfg.backend if cfg.backend in {"cborg", "ollama"} else "cborg"
         self.runtime = RuntimeSettings(
             backend=initial_backend,
             graph_source=initial_graph_source,
-            json_graph_path=default_json_graph_path(
+            workflow_mode=cfg.workflow_mode if cfg.workflow_mode in {"deterministic", "agentic"} else "deterministic",
+            json_graph_path=cfg.graph if cfg.graph and initial_graph_source == "json" else default_json_graph_path(
                 configured_graph=cfg.graph,
                 available=available_json_graphs,
             ),
@@ -817,6 +907,10 @@ class AgentPipelineService:
             download_delay_seconds=self.cfg.download_delay_seconds,
             validate_downloads=self.cfg.validate_downloads,
         )
+        self.debate = EvidenceDebateAgent(
+            backend=self.runtime.backend,
+            model=self.cfg.model,
+        )
         self.extractor = ExtractorAgent(
             backend=self.runtime.backend,
             model=self.cfg.model,
@@ -832,7 +926,7 @@ class AgentPipelineService:
 
     def graph_path(self) -> Path:
         if self.runtime.graph_source == "json" and self.runtime.json_graph_path:
-            return self._resolve_json_graph_path(self.runtime.json_graph_path)
+            return self._resolve_runtime_json_graph_path(self.runtime.json_graph_path)
         return self._session_graph_path()
 
     def settings_response(self) -> AgentSettingsResponse:
@@ -846,6 +940,7 @@ class AgentPipelineService:
         return AgentSettingsResponse(
             backend=self.runtime.backend,
             graph_source=self.runtime.graph_source,
+            workflow_mode=self.runtime.workflow_mode,
             json_graph_path=json_graph_path,
             available_json_graphs=available,
         )
@@ -863,6 +958,9 @@ class AgentPipelineService:
                 self.runtime.graph_source = update.graph_source
                 graph_changed = True
 
+            if update.workflow_mode is not None:
+                self.runtime.workflow_mode = update.workflow_mode
+
             if update.json_graph_path is not None:
                 normalized = update.json_graph_path.replace("\\", "/")
                 if normalized != (self.runtime.json_graph_path or "").replace("\\", "/"):
@@ -878,7 +976,7 @@ class AgentPipelineService:
                     )
                 if not self.runtime.json_graph_path:
                     raise ValueError("No JSON knowledge graph files found in storage/kg")
-                active_graph_path = self._resolve_json_graph_path(self.runtime.json_graph_path)
+                active_graph_path = self._resolve_runtime_json_graph_path(self.runtime.json_graph_path)
                 active_graph_source = "json"
             else:
                 active_graph_path = self._session_graph_path()
@@ -972,16 +1070,35 @@ class AgentPipelineService:
             raise FileNotFoundError(f"JSON graph not found: {path}")
         return graph_path
 
+    def _resolve_runtime_json_graph_path(self, path: str) -> Path:
+        graph_path = Path(path)
+        if not graph_path.is_absolute():
+            graph_path = (project_root() / graph_path).resolve()
+        else:
+            graph_path = graph_path.resolve()
+        if self.cfg.graph and graph_path == Path(self.cfg.graph).resolve():
+            if not graph_path.exists():
+                raise FileNotFoundError(f"JSON graph not found: {path}")
+            return graph_path
+        return self._resolve_json_graph_path(path)
+
     async def ask(
         self,
         question: str,
         *,
+        messages: Optional[List[ChatMessageInput]] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
-    ) -> ChatResponse:
+        ) -> ChatResponse:
         async with self.lock:
+            prepared = await self._prepare_chat_question(question.strip(), messages)
+            if prepared.get("status") == "direct_response":
+                return self._direct_response(
+                    answer=str(prepared.get("answer") or ""),
+                    reason=str(prepared.get("reason") or ""),
+                )
             return await self._ask_locked(
-                question.strip(),
+                str(prepared.get("question") or question.strip()),
                 emit=None,
                 graph_source=graph_source,
                 json_graph_path=json_graph_path,
@@ -992,12 +1109,19 @@ class AgentPipelineService:
         question: str,
         emit: ProgressEmitter,
         *,
+        messages: Optional[List[ChatMessageInput]] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
-    ) -> ChatResponse:
+        ) -> ChatResponse:
         async with self.lock:
+            prepared = await self._prepare_chat_question(question.strip(), messages)
+            if prepared.get("status") == "direct_response":
+                return self._direct_response(
+                    answer=str(prepared.get("answer") or ""),
+                    reason=str(prepared.get("reason") or ""),
+                )
             return await self._ask_locked(
-                question.strip(),
+                str(prepared.get("question") or question.strip()),
                 emit=emit,
                 graph_source=graph_source,
                 json_graph_path=json_graph_path,
@@ -1014,6 +1138,144 @@ class AgentPipelineService:
             return
         await emit(event, message, data)
 
+    def _direct_response(self, *, answer: str, reason: str = "") -> ChatResponse:
+        graph_path = self.graph_path()
+        return ChatResponse(
+            status="direct_response",
+            answer=answer,
+            sufficient=False,
+            node_ids=[],
+            publications=[],
+            confidence=1.0,
+            rounds=[
+                {
+                    "routing": {
+                        "requires_agents": False,
+                        "reason": reason,
+                    }
+                }
+            ],
+            graph=graph_payload_from_file(graph_path),
+            graph_source_requested=self.runtime.graph_source,
+            graph_source_used=self.runtime.graph_source,
+            workdir=str(Path(self.cfg.workdir)),
+        )
+
+    async def _prepare_chat_question(
+        self,
+        question: str,
+        messages: Optional[List[ChatMessageInput]],
+    ) -> Dict[str, str]:
+        history = _history_payload(messages)
+        route = await self._judge_agent_requirement(question, history)
+        if not route.get("requires_agents", True):
+            answer = await self._generate_direct_response(question, history)
+            return {
+                "status": "direct_response",
+                "question": question,
+                "answer": answer,
+                "reason": str(route.get("reason") or "LLM router determined agents are not needed."),
+            }
+        if not _needs_history_rewrite(question, history):
+            return {"status": "kg_question", "question": question}
+        rewritten = await self._rewrite_standalone_question(question, history)
+        return {"status": "kg_question", "question": rewritten or question}
+
+    async def _judge_agent_requirement(
+        self,
+        question: str,
+        history: List[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        prompt = (
+            "You route messages for a FAIR2WISE materials-science assistant.\n"
+            "Decide whether the user message needs the retrieval/download/extraction "
+            "agent workflow over a materials knowledge graph and scientific papers.\n\n"
+            "Return ONLY JSON with this schema:\n"
+            '{"requires_agents": true|false, "reason": string}\n\n'
+            "Set requires_agents=false for greetings, tests, thanks, meta-chat, UI/help "
+            "questions, or general conversation that can be answered without KG/paper evidence.\n"
+            "Set requires_agents=true for materials-science questions, requests for citations, "
+            "papers, evidence, code snippets from the KG, or follow-ups that need prior "
+            "KG-grounded context.\n\n"
+            f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
+            f"USER_MESSAGE:\n{question}"
+        )
+
+        def run() -> Dict[str, Any]:
+            raw = self._chat_completion(prompt, timeout=60)
+            obj = _parse_json_object(raw)
+            if "requires_agents" not in obj:
+                return {"requires_agents": True, "reason": "Router returned no usable JSON."}
+            return {
+                "requires_agents": _coerce_bool(obj.get("requires_agents")),
+                "reason": str(obj.get("reason") or ""),
+            }
+
+        try:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, run)
+        except Exception as exc:
+            return {"requires_agents": True, "reason": f"Router failed: {exc}"}
+
+    async def _generate_direct_response(
+        self,
+        question: str,
+        history: List[Dict[str, str]],
+    ) -> str:
+        prompt = (
+            "You are FAIR2WISE, a concise materials-science assistant. The router has "
+            "determined that the retrieval/download/extraction agents are not needed. "
+            "Answer conversationally and briefly. Do not claim to have searched the KG "
+            "or papers.\n\n"
+            f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
+            f"USER_MESSAGE:\n{question}"
+        )
+
+        def run() -> str:
+            return str(self._chat_completion(prompt, timeout=60) or "").strip()
+
+        try:
+            loop = asyncio.get_event_loop()
+            answer = await loop.run_in_executor(None, run)
+        except Exception:
+            answer = "I'm here. Ask a materials question when you want me to use the knowledge graph."
+        return answer or "I'm here. Ask a materials question when you want me to use the knowledge graph."
+
+    def _chat_completion(self, prompt: str, *, timeout: int) -> str:
+        from app.modules.term_extractor.clients import make_chat_client
+
+        cli = make_chat_client(
+            backend=self.runtime.backend,
+            model=self.cfg.model or os.environ.get("KG_RAG_CBORG_MODEL", "lbl/cborg-chat"),
+            cborg_base=os.environ.get("CBORG_BASE_URL"),
+            cborg_api_key=os.environ.get("CBORG_API_KEY"),
+        )
+        return str(cli.chat(prompt, temperature=0.0, timeout=timeout) or "")
+
+    async def _rewrite_standalone_question(
+        self,
+        question: str,
+        history: List[Dict[str, str]],
+    ) -> str:
+        prompt = (
+            "Rewrite the current user turn into a standalone materials-science question "
+            "using the conversation history. Do not answer. Preserve technical terms. "
+            "Return only the rewritten question.\n\n"
+            f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
+            f"CURRENT_USER_TURN:\n{question}"
+        )
+
+        def run() -> str:
+            return str(self._chat_completion(prompt, timeout=60) or "").strip()
+
+        try:
+            loop = asyncio.get_event_loop()
+            rewritten = await loop.run_in_executor(None, run)
+        except Exception:
+            return question
+        rewritten = re.sub(r"^['\"]|['\"]$", "", rewritten.strip())
+        return rewritten if rewritten else question
+
     async def _ask_locked(
         self,
         question: str,
@@ -1022,6 +1284,14 @@ class AgentPipelineService:
         graph_source: Optional[str],
         json_graph_path: Optional[str],
     ) -> ChatResponse:
+        if self.runtime.workflow_mode == "agentic":
+            return await self._ask_agentic_locked(
+                question,
+                emit,
+                graph_source=graph_source,
+                json_graph_path=json_graph_path,
+            )
+
         rounds: List[Dict[str, Any]] = []
         last_verdict: Dict[str, Any] = {}
         effective_graph_source = (graph_source or self.runtime.graph_source).lower()
@@ -1030,7 +1300,7 @@ class AgentPipelineService:
             selected_path = json_graph_path or self.runtime.json_graph_path
             if not selected_path:
                 raise ValueError("JSON graph mode requires a graph file")
-            active_graph_path = self._resolve_json_graph_path(selected_path)
+            active_graph_path = self._resolve_runtime_json_graph_path(selected_path)
             active_graph_source = "json"
         else:
             active_graph_path = self._session_graph_path()
@@ -1268,6 +1538,426 @@ class AgentPipelineService:
             self.graph_path(),
         )
 
+    async def _ask_agentic_locked(
+        self,
+        question: str,
+        emit: Optional[ProgressEmitter],
+        *,
+        graph_source: Optional[str],
+        json_graph_path: Optional[str],
+    ) -> ChatResponse:
+        rounds: List[Dict[str, Any]] = []
+        last_verdict: Dict[str, Any] = {}
+        effective_graph_source = (graph_source or self.runtime.graph_source).lower()
+
+        if effective_graph_source == "json":
+            selected_path = json_graph_path or self.runtime.json_graph_path
+            if not selected_path:
+                raise ValueError("JSON graph mode requires a graph file")
+            active_graph_path = self._resolve_runtime_json_graph_path(selected_path)
+            active_graph_source = "json"
+        else:
+            active_graph_path = self._session_graph_path()
+            active_graph_source = "splash"
+
+        await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
+
+        for round_no in range(1, self.cfg.max_rounds + 1):
+            await self._emit(
+                emit,
+                "retrieval_started",
+                "Retrieval agent searching the KG",
+                round=round_no,
+            )
+            verdict = await self.retrieval.query(question)
+            last_verdict = verdict
+            round_info: Dict[str, Any] = {
+                "round": round_no,
+                "retrieval": verdict,
+            }
+            rounds.append(round_info)
+
+            selected_count = len(verdict.get("selected") or [])
+            await self._emit(
+                emit,
+                "retrieval_result",
+                (
+                    f"Retrieved {selected_count} KG node(s); "
+                    + ("evidence sufficient" if verdict.get("sufficient") else "evidence insufficient")
+                ),
+                round=round_no,
+                selected_count=selected_count,
+                direct_evidence_count=int(verdict.get("direct_evidence_count") or 0),
+                sufficient=bool(verdict.get("sufficient")),
+                missing_topics=verdict.get("missing_topics") or [],
+            )
+
+            selected_ids = [str(n) for n in (verdict.get("selected") or [])]
+            if selected_ids:
+                subset = graph_subset_from_file(active_graph_path, selected_ids)
+                await self._emit(
+                    emit,
+                    "graph_update",
+                    f"Mapping {len(subset['nodes'])} node(s) onto the graph",
+                    round=round_no,
+                    node_ids=selected_ids,
+                    graph=subset,
+                )
+
+            if str(verdict.get("status", "")).endswith("_error"):
+                return self._response(
+                    "retrieval_error",
+                    f"Retrieval failed: {verdict.get('error') or verdict.get('status')}",
+                    False,
+                    verdict,
+                    rounds,
+                    active_graph_path,
+                )
+
+            if verdict.get("sufficient"):
+                await self._emit(
+                    emit,
+                    "debate_started",
+                    "Evidence debate checking KG sufficiency",
+                    round=round_no,
+                )
+                debate_summary = await self.debate.decide(question, verdict, [], round_no)
+                round_info["debate"] = debate_summary
+                await self._emit(
+                    emit,
+                    "debate_result",
+                    str(debate_summary.get("reason") or "Evidence debate finished"),
+                    round=round_no,
+                    **debate_summary,
+                )
+                await self._emit(
+                    emit,
+                    "action_selected",
+                    "Evidence debate selected answer from KG",
+                    round=round_no,
+                    selected_action="answer_from_kg",
+                    reason=debate_summary.get("reason"),
+                    candidate_titles=debate_summary.get("candidate_titles") or [],
+                )
+                return self._response(
+                    "answered",
+                    str(verdict.get("answer") or ""),
+                    True,
+                    verdict,
+                    rounds,
+                    active_graph_path,
+                )
+
+            if active_graph_source == "json":
+                await self._emit(
+                    emit,
+                    "debate_started",
+                    "Evidence debate checking selected JSON graph",
+                    round=round_no,
+                )
+                debate_summary = await self.debate.decide(question, verdict, [], round_no)
+                round_info["debate"] = debate_summary
+                await self._emit(
+                    emit,
+                    "debate_result",
+                    str(debate_summary.get("reason") or "Evidence debate finished"),
+                    round=round_no,
+                    **debate_summary,
+                )
+                await self._emit(
+                    emit,
+                    "action_selected",
+                    "Evidence debate stopped without extraction",
+                    round=round_no,
+                    selected_action="stop_insufficient",
+                    reason=debate_summary.get("reason"),
+                    candidate_titles=[],
+                )
+                return self._response(
+                    "insufficient_json_graph",
+                    "The selected JSON graph did not contain enough direct evidence to answer this question.",
+                    False,
+                    verdict,
+                    rounds,
+                    active_graph_path,
+                )
+
+            missing = verdict.get("missing_topics") or [question]
+            candidates: List[Dict[str, Any]] = []
+            debate_summary: Dict[str, Any] = {}
+            search_query = question
+            for preflight_no in range(1, 3):
+                await self._emit(
+                    emit,
+                    "candidate_search_started",
+                    "Literature scout searching OpenAlex abstracts",
+                    round=round_no,
+                    preflight=preflight_no,
+                    query=search_query,
+                    missing_topics=missing,
+                )
+                search = await self.download.search_candidates(
+                    search_query,
+                    missing_topics=missing,
+                    candidate_pool=self.cfg.candidate_pool,
+                )
+                candidates = search.get("candidates") or []
+                round_info["candidate_search"] = search
+                candidate_titles = [
+                    str(c.get("title") or c.get("doi") or c.get("id") or "Untitled")
+                    for c in candidates[:5]
+                ]
+                await self._emit(
+                    emit,
+                    "candidate_search_result",
+                    f"Literature scout found {len(candidates)} candidate(s)",
+                    round=round_no,
+                    preflight=preflight_no,
+                    count=len(candidates),
+                    candidate_titles=candidate_titles,
+                    scores=[float(c.get("score") or c.get("_score") or 0.0) for c in candidates[:5]],
+                )
+
+                await self._emit(
+                    emit,
+                    "debate_started",
+                    "Evidence debate judging candidate value",
+                    round=round_no,
+                    preflight=preflight_no,
+                )
+                debate_summary = await self.debate.decide(question, verdict, candidates, round_no)
+                round_info["debate"] = debate_summary
+                await self._emit(
+                    emit,
+                    "debate_result",
+                    str(debate_summary.get("reason") or "Evidence debate finished"),
+                    round=round_no,
+                    preflight=preflight_no,
+                    **debate_summary,
+                )
+
+                action_name = str(debate_summary.get("selected_action") or "")
+                if action_name == "refine_search" and debate_summary.get("refined_query") and preflight_no == 1:
+                    await self._emit(
+                        emit,
+                        "action_selected",
+                        "Evidence debate requested a narrower abstract search",
+                        round=round_no,
+                        selected_action=action_name,
+                        reason=debate_summary.get("reason"),
+                        candidate_titles=debate_summary.get("candidate_titles") or [],
+                    )
+                    search_query = str(debate_summary["refined_query"])
+                    continue
+                break
+
+            action_name = str(debate_summary.get("selected_action") or "")
+            await self._emit(
+                emit,
+                "action_selected",
+                f"Evidence debate selected {action_name or 'stop_insufficient'}",
+                round=round_no,
+                selected_action=action_name or "stop_insufficient",
+                reason=debate_summary.get("reason"),
+                candidate_titles=debate_summary.get("candidate_titles") or [],
+            )
+
+            if action_name == "answer_from_kg" and verdict.get("sufficient"):
+                return self._response(
+                    "answered",
+                    str(verdict.get("answer") or ""),
+                    True,
+                    verdict,
+                    rounds,
+                    active_graph_path,
+                )
+            if action_name != "download_selected":
+                return self._response(
+                    "insufficient_evidence",
+                    str(debate_summary.get("reason") or "Evidence debate found insufficient evidence."),
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+
+            selected_candidates = _select_candidates_by_indices(
+                candidates,
+                debate_summary.get("candidate_indices"),
+            )
+            if not selected_candidates and candidates:
+                selected_candidates = candidates[:1]
+            if not selected_candidates:
+                return self._response(
+                    "no_new_papers",
+                    "Evidence debate approved download, but no candidate was selected.",
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+
+            await self._emit(
+                emit,
+                "download_started",
+                "Download agent fetching approved paper",
+                round=round_no,
+                missing_topics=missing,
+                candidate_titles=[
+                    str(c.get("title") or c.get("doi") or c.get("id") or "Untitled")
+                    for c in selected_candidates
+                ],
+            )
+            dl = await self.download.download_selected(
+                question,
+                missing_topics=missing,
+                target_dir=str(self.coord.pdf_dir),
+                candidates=selected_candidates,
+                max_papers=min(self.cfg.max_papers, len(selected_candidates)),
+            )
+            round_info["download"] = dl
+            downloaded_names = [Path(p).name for p in (dl.get("downloaded") or [])]
+            await self._emit(
+                emit,
+                "download_result",
+                (
+                    f"Downloaded {dl.get('count', 0)} approved PDF(s)"
+                    + (f": {', '.join(downloaded_names)}" if downloaded_names else "")
+                ),
+                round=round_no,
+                count=int(dl.get("count") or 0),
+                titles=downloaded_names,
+                skipped=int(dl.get("skipped") or 0),
+                failed=int(dl.get("failed") or 0),
+            )
+            if dl.get("count", 0) == 0:
+                return self._response(
+                    "no_new_papers",
+                    "The approved open-access paper could not be downloaded.",
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+
+            round_pdf_dir, pending_pdfs = self.coord._stage_unprocessed_pdfs(round_no)
+            round_info["pending_pdfs"] = [p.name for p in pending_pdfs]
+            if not pending_pdfs:
+                return self._response(
+                    "no_unprocessed_pdfs",
+                    "Downloaded papers were already processed; no new evidence was available.",
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+
+            await self._emit(
+                emit,
+                "extraction_started",
+                "Extractor agent reading approved PDFs",
+                round=round_no,
+                pdfs=[p.name for p in pending_pdfs],
+            )
+            ext = await self.extractor.extract(str(round_pdf_dir), str(self.coord.session_terms))
+            round_info["extraction"] = ext
+            if ext.get("status") == "error":
+                return self._response(
+                    "extraction_error",
+                    f"Extraction failed: {ext.get('message') or ext}",
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+            await self._emit(
+                emit,
+                "extraction_result",
+                (
+                    f"Extracted {ext.get('unique_terms', 0)} term(s) "
+                    f"from {ext.get('processed_files', 0)} PDF(s)"
+                ),
+                round=round_no,
+                term_count=int(ext.get("unique_terms") or 0),
+                processed_files=int(ext.get("processed_files") or 0),
+                processed_pages_with_terms=int(ext.get("processed_pages_with_terms") or 0),
+            )
+            self.coord._mark_processed_pdfs(pending_pdfs)
+
+            await self._emit(
+                emit,
+                "kg_rebuild_started",
+                "KG builder updating session graph",
+                round=round_no,
+            )
+            kg = kg_update.rebuild_kg(str(self.coord.session_terms), str(self.coord.session_kg))
+            round_info["kg"] = kg
+            await self._emit(
+                emit,
+                "kg_rebuild_result",
+                f"Rebuilt KG: {kg.get('nodes', 0)} node(s), {kg.get('edges', 0)} edge(s)",
+                round=round_no,
+                node_count=int(kg.get("nodes") or 0),
+                edge_count=int(kg.get("edges") or 0),
+            )
+
+            if self.cfg.kg_mode == "splash":
+                await self._emit(
+                    emit,
+                    "splash_reimport_started",
+                    "Splash importer refreshing graph store",
+                    round=round_no,
+                )
+                splash = kg_update.splash_reimport(
+                    str(self.coord.session_kg),
+                    splash_repo=self.cfg.splash_repo,
+                    allow_wipe=self.cfg.allow_splash_wipe,
+                )
+                round_info["splash"] = splash
+                if splash.get("status") == "error":
+                    return self._response(
+                        "splash_error",
+                        f"Splash reimport failed: {splash.get('message') or splash}",
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
+                await self._emit(
+                    emit,
+                    "splash_reimport_result",
+                    "Splash graph store refreshed",
+                    round=round_no,
+                    status=str(splash.get("status") or ""),
+                )
+
+            await self._emit(
+                emit,
+                "reload_started",
+                "Retrieval agent reloading updated KG",
+                round=round_no,
+            )
+            reload_res = await self.retrieval.reload_kg(str(self.coord.session_kg))
+            round_info["reload"] = reload_res
+            active_graph_path = self.graph_path()
+            await self._emit(
+                emit,
+                "reload_result",
+                f"Reloaded KG with {reload_res.get('nodes', 0)} node(s)",
+                round=round_no,
+                node_count=int(reload_res.get("nodes") or 0),
+                status=str(reload_res.get("status") or ""),
+            )
+
+        return self._response(
+            "max_rounds",
+            f"Reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.",
+            False,
+            last_verdict,
+            rounds,
+            self.graph_path(),
+        )
+
     def _response(
         self,
         status: str,
@@ -1314,6 +2004,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             "workdir": str(cfg.workdir),
             "kg_mode": service.runtime.graph_source,
             "backend": service.runtime.backend,
+            "workflow_mode": service.runtime.workflow_mode,
             "max_rounds": cfg.max_rounds,
         }
 
@@ -1357,6 +2048,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         try:
             return await service.ask(
                 req.message,
+                messages=req.messages,
                 graph_source=req.graph_source,
                 json_graph_path=req.json_graph_path,
             )
@@ -1394,6 +2086,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                     response = await service.ask_with_progress(
                         req.message,
                         emit,
+                        messages=req.messages,
                         graph_source=req.graph_source,
                         json_graph_path=req.json_graph_path,
                     )

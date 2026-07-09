@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUp, Check, Copy, Share2 } from 'lucide-react';
 import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
 import { ExampleQuery } from './data/mockupData';
 import { GraphMockup } from './GraphMockup';
+import { parseKgCitationNodeIds } from './kgCitations';
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import {
+  AgentChatHistoryMessage,
   ChatProgressEvent,
   GraphPayload,
   PublicationInfo,
@@ -131,8 +133,8 @@ function progressEventToStep(event: ChatProgressEvent): ThinkingStep {
 function ThinkingStatus({ status, elapsedSeconds }: { status: string; elapsedSeconds: number }) {
   return (
     <div className="mt-10 flex min-w-0 items-center gap-2 text-sm text-slate-500">
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden">
-        <AsciiOrb size={16} interactive={false} />
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-visible">
+        <AsciiOrb size={16} className="text-sky-400" interactive={false} />
       </span>
       <span className="min-w-0 flex-1 truncate leading-relaxed">{status}</span>
       <span className="shrink-0 tabular-nums">{elapsedSeconds}s</span>
@@ -164,6 +166,17 @@ interface ChatMessage {
 
 const CHAT_STORAGE_KEY = 'fair2wise.chat.messages.v1';
 const MAX_STORED_MESSAGES = 80;
+const MAX_REQUEST_HISTORY_MESSAGES = 8;
+
+function requestHistoryFromMessages(messages: ChatMessage[]): AgentChatHistoryMessage[] {
+  return messages
+    .filter(message => message.role === 'user' || message.role === 'assistant')
+    .slice(-MAX_REQUEST_HISTORY_MESSAGES)
+    .map(message => ({
+      role: message.role,
+      content: message.content,
+    }));
+}
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
@@ -362,6 +375,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   async function submit(raw: string) {
     const question = raw.trim();
     if (!question || isThinking) return;
+    const requestHistory = requestHistoryFromMessages(messages);
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -377,6 +391,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
     setStreamGraph(null);
     setStreamNodeIds([]);
     setPinnedViewId(null);
+    onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
     const controller = new AbortController();
     const requestId = requestSeqRef.current + 1;
     requestSeqRef.current = requestId;
@@ -418,6 +433,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
           setSteps(stepsRef.current);
         },
         controller.signal,
+        requestHistory,
       );
       if (requestSeqRef.current !== requestId || controller.signal.aborted) return;
       const elapsed = requestStartedAtRef.current === null
@@ -553,6 +569,41 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   }
 
   const messageExchanges = groupMessageExchanges(messages);
+  const displayGraph = streamGraph ?? graph;
+  const canAnimateCitations = !isThinking && streamingId === null;
+  const citationMessageId = activeQuery.id !== 'idle' ? activeQuery.id : null;
+  const citationAnswerText = useMemo(() => {
+    if (!canAnimateCitations || !citationMessageId) return '';
+
+    const message = messages.find(entry => entry.id === citationMessageId);
+    if (!message || message.role !== 'assistant') return '';
+
+    return message.content;
+  }, [canAnimateCitations, citationMessageId, messages]);
+  const citationPublications = useMemo(() => {
+    if (!canAnimateCitations || !citationMessageId) return [];
+
+    const message = messages.find(entry => entry.id === citationMessageId);
+    if (!message || message.role !== 'assistant') return [];
+
+    return message.publications ?? [];
+  }, [canAnimateCitations, citationMessageId, messages]);
+  const citedNodeIds = useMemo(() => {
+    if (!canAnimateCitations) return [];
+
+    const highlightedIds = activeQuery.nodeIds;
+    const lookupNodes = highlightedIds.length > 0
+      ? displayGraph.nodes.filter(node => highlightedIds.includes(node.id))
+      : displayGraph.nodes;
+    return parseKgCitationNodeIds(citationAnswerText, lookupNodes, citationPublications);
+  }, [
+    canAnimateCitations,
+    citationAnswerText,
+    citationPublications,
+    displayGraph.nodes,
+    activeQuery.nodeIds,
+  ]);
+  const citationAnimationKey = canAnimateCitations ? (citationMessageId ?? '') : '';
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-white">
@@ -562,8 +613,10 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
           <ResizablePanel defaultSize={64} minSize={25}>
             <div className="flex h-full min-h-0 w-full">
               <GraphMockup
-                graph={streamGraph ?? graph}
+                graph={displayGraph}
                 highlightedNodeIds={isThinking && streamNodeIds.length ? streamNodeIds : activeQuery.nodeIds}
+                citedNodeIds={citedNodeIds}
+                citationAnimationKey={citationAnimationKey}
               />
             </div>
           </ResizablePanel>
@@ -607,23 +660,25 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
                                 ) : (
                                 <div>
                                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
-                                    <div className="relative px-4 py-3.5 pr-12 text-sm leading-relaxed text-slate-700">
-                                      {!streaming && (
-                                        <button
-                                          type="button"
-                                          aria-label={copiedMessageId === message.id ? 'Copied' : 'Copy answer'}
-                                          title={copiedMessageId === message.id ? 'Copied' : 'Copy'}
-                                          onClick={() => copyAssistantMessage(message)}
-                                          className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                                        >
-                                          {copiedMessageId === message.id ? (
-                                            <Check size={15} className="text-emerald-500" />
-                                          ) : (
-                                            <Copy size={15} />
-                                          )}
-                                        </button>
-                                      )}
+                                    <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
                                       <MessageText text={displayText} cursor={showAnswerCursor} />
+                                      {!streaming && (
+                                        <div className="mt-2 flex justify-start">
+                                          <button
+                                            type="button"
+                                            aria-label={copiedMessageId === message.id ? 'Copied' : 'Copy answer'}
+                                            title={copiedMessageId === message.id ? 'Copied' : 'Copy'}
+                                            onClick={() => copyAssistantMessage(message)}
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                          >
+                                            {copiedMessageId === message.id ? (
+                                              <Check size={15} className="text-emerald-500" />
+                                            ) : (
+                                              <Copy size={15} />
+                                            )}
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                     {showPublications && (
                                       <div className="border-t border-slate-200 bg-white/60 px-4 py-3">

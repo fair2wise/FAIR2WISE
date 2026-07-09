@@ -12,6 +12,7 @@ import {
   type AgentBackend,
   type AgentGraphSource,
   type AgentSettings,
+  type AgentWorkflowMode,
 } from './agentSettings';
 import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
@@ -148,7 +149,7 @@ function SettingOption({
         className="mt-0.5 flex size-4 shrink-0 items-center justify-center overflow-hidden outline-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-          <AsciiOrb size={16} className="text-black" interactive={false} />
+          <AsciiOrb size={16} className="text-sky-400" interactive={false} />
         </RadioGroupPrimitive.Indicator>
       </RadioGroupPrimitive.Item>
       <span className="min-w-0">
@@ -232,6 +233,7 @@ export function AppSettingsButton({
       const saved: AgentSettings = {
         backend: draftSettings.backend,
         graphSource: draftSettings.graphSource,
+        workflowMode: draftSettings.workflowMode,
         jsonGraphPath: draftSettings.graphSource === 'json'
           ? draftSettings.jsonGraphPath
           : synced.jsonGraphPath,
@@ -261,6 +263,10 @@ export function AppSettingsButton({
     setDraftSettings(prev => ({ ...prev, graphSource, jsonGraphPath }));
   }
 
+  function updateWorkflowMode(workflowMode: AgentWorkflowMode) {
+    setDraftSettings(prev => ({ ...prev, workflowMode }));
+  }
+
   function updateJsonGraphPath(jsonGraphPath: string) {
     setDraftSettings(prev => ({ ...prev, graphSource: 'json', jsonGraphPath }));
   }
@@ -287,6 +293,27 @@ export function AppSettingsButton({
 
           <div className="relative min-h-0 flex-1">
             <div className="h-full space-y-6 overflow-y-auto px-4 py-4 pb-20 text-sm">
+            <div className="space-y-3">
+              <Label className="text-xs font-medium text-slate-500">Workflow</Label>
+              <RadioGroup
+                value={draftSettings.workflowMode}
+                onValueChange={value => updateWorkflowMode(value as AgentWorkflowMode)}
+                className="gap-2"
+                disabled={loading || saving}
+              >
+                <SettingOption
+                  id="agentic"
+                  label="Agentic"
+                  description="Debate evidence sufficiency before downloading and extracting papers."
+                />
+                <SettingOption
+                  id="deterministic"
+                  label="Deterministic"
+                  description="Use the existing retrieve, download, extract loop."
+                />
+              </RadioGroup>
+            </div>
+
             <div className="space-y-3">
               <Label className="text-xs font-medium text-slate-500">LLM backend</Label>
               <RadioGroup

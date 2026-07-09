@@ -15,7 +15,7 @@ import {
 const W = 900;
 const H = 640;
 const R = 16;
-const ARROW_SIZE = 7;
+const ARROW_SIZE = 13;
 const MIN_VIEW = 180;
 const WORLD_PADDING = 96;
 
@@ -43,6 +43,10 @@ interface ViewBox {
 export interface GraphMockupProps {
   graph: GraphPayload;
   highlightedNodeIds: string[];
+  /** Node IDs cited in the answer via [KG: ...], in citation order. */
+  citedNodeIds?: string[];
+  /** Changes when a new assistant answer drives citations; restarts pulse animations. */
+  citationAnimationKey?: string;
 }
 
 const NODE_COLORS: Record<NodeType, string> = {
@@ -195,6 +199,14 @@ function layoutGraph(graph: GraphPayload): LayoutResult {
   }
 
   return { nodes, width, height };
+}
+
+function splitLabel(label: string) {
+  const clean = label.length > 28 ? `${label.slice(0, 25)}...` : label;
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return [clean];
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
 }
 
 function directedEdgeGeometry(
@@ -521,7 +533,10 @@ function choosePopupPosition(
   };
 }
 
-export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
+const CITED_PULSE_MS = 2200;
+const CITED_SCALE = 1.35;
+
+export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], citationAnimationKey = '' }: GraphMockupProps) {
   const [hoverPopup, setHoverPopup] = useState<HoverPopupState | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
   const [selectedNode, setSelectedNode] = useState<LayoutNode | null>(null);
@@ -532,6 +547,7 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
 
   const highlighted = useMemo(() => new Set(highlightedNodeIds), [highlightedNodeIds]);
+  const cited = useMemo(() => new Set(citedNodeIds), [citedNodeIds]);
   const displayGraph = useMemo<GraphPayload>(() => {
     if (highlightedNodeIds.length === 0) {
       return { nodes: [], edges: [], source_path: graph.source_path };
@@ -843,6 +859,15 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
           onPointerCancel={handlePointerEnd}
           onWheel={handleWheel}
         >
+          <defs>
+            <filter id="kg-edge-glow-filter" x="-120%" y="-120%" width="340%" height="340%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           {visibleEdges.map((edge, i) => {
             const src = nodeMap.get(edge.source);
             const tgt = nodeMap.get(edge.target);
@@ -850,12 +875,27 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
 
             const srcHl = highlighted.has(src.id);
             const tgtHl = highlighted.has(tgt.id);
+            const srcCited = cited.has(src.id);
+            const tgtCited = cited.has(tgt.id);
+            const isCitedEdge = srcCited || tgtCited;
             const bothHl = srcHl && tgtHl;
             const connectedHl = srcHl || tgtHl;
             const color = NODE_COLORS[src.bucket];
             const geom = directedEdgeGeometry(src, tgt);
-            const stroke = bothHl ? color : connectedHl ? 'rgba(14,165,233,0.22)' : 'rgba(0,0,0,0.09)';
-            const arrowFill = bothHl ? color : connectedHl ? 'rgba(14,165,233,0.55)' : 'rgba(0,0,0,0.35)';
+            const stroke = isCitedEdge
+              ? 'rgba(14,165,233,0.72)'
+              : bothHl
+                ? color
+                : connectedHl
+                  ? 'rgba(14,165,233,0.22)'
+                  : 'rgba(0,0,0,0.09)';
+            const arrowFill = isCitedEdge
+              ? 'rgba(14,165,233,0.85)'
+              : bothHl
+                ? color
+                : connectedHl
+                  ? 'rgba(14,165,233,0.55)'
+                  : 'rgba(0,0,0,0.35)';
             // Edges draw out after the nodes have populated.
             const edgeDelay = nodes.length * 35 + i * 20;
             const edgeKey = `${edge.source}-${edge.target}-${edge.predicate}-${i}`;
@@ -880,15 +920,28 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
                 />
                 <g transform={`translate(${midX}, ${midY})`}>
                   <g
-                    className={`kg-edge-scale${isEdgeHovered ? ' kg-edge-hovered' : ''}`}
+                    className={`kg-edge-scale${isEdgeHovered && !isCitedEdge ? ' kg-edge-hovered' : ''}${isCitedEdge ? ' kg-edge-cited' : ''}`}
                   >
+                    {isCitedEdge && (
+                      <line
+                        key={`glow-${citationAnimationKey}-${edgeKey}`}
+                        className="kg-edge-cited-glow"
+                        x1={geom.x1 - midX} y1={geom.y1 - midY}
+                        x2={geom.x2 - midX} y2={geom.y2 - midY}
+                        stroke="rgba(56,189,248,0.75)"
+                        strokeWidth={bothHl ? 5 : 4}
+                        strokeLinecap="round"
+                        filter="url(#kg-edge-glow-filter)"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )}
                     <line
                       className="kg-edge-in"
                       x1={geom.x1 - midX} y1={geom.y1 - midY}
                       x2={geom.x2 - midX} y2={geom.y2 - midY}
                       stroke={stroke}
-                      strokeWidth={bothHl ? 1.6 : connectedHl ? 1.1 : 0.7}
-                      strokeOpacity={bothHl ? 0.85 : 1}
+                      strokeWidth={isCitedEdge ? 1.8 : bothHl ? 1.5 : connectedHl ? 1.05 : 0.65}
+                      strokeOpacity={bothHl || isCitedEdge ? 0.85 : 1}
                       style={{
                         pointerEvents: 'none',
                         ['--edge-len' as string]: `${geom.length}`,
@@ -898,10 +951,10 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
                       }}
                     />
                     <polygon
-                      className="kg-edge-arrow-in"
+                      className={`kg-edge-arrow-in${isCitedEdge ? ' kg-edge-cited-arrow' : ''}`}
                       points={relArrow}
                       fill={arrowFill}
-                      fillOpacity={bothHl ? 0.85 : 1}
+                      fillOpacity={bothHl || isCitedEdge ? 0.85 : 1}
                       style={{
                         pointerEvents: 'none',
                         animationDelay: `${edgeDelay}ms`,
@@ -915,10 +968,13 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
 
           {nodes.map((node, nodeIndex) => {
             const isHl = highlighted.has(node.id);
+            const isCited = cited.has(node.id);
             const isHovered =
               hoverPopup?.target.kind === 'node' && hoverPopup.target.node.id === node.id;
             const color = NODE_COLORS[node.bucket];
             const [r, g, b] = hexToRgb(color);
+            const labelLines = splitLabel(node.label);
+            const showLabel = nodes.length <= 150 || isHl || isHovered;
 
             return (
               <g
@@ -935,7 +991,8 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
                 }}
               >
                 <g
-                  className={`kg-node-scale${isHovered ? ' kg-node-hovered' : ''}`}
+                  key={isCited ? `cite-${citationAnimationKey}-${node.id}` : `node-${node.id}`}
+                  className={`kg-node-scale${isHovered && !isCited ? ' kg-node-hovered' : ''}${isCited ? ' kg-node-cited' : ''}`}
                   style={{ cursor: 'pointer' }}
                 >
                   {isHl && (
@@ -944,6 +1001,22 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
 
                   <circle cx={0} cy={0} r={R} fill={color} stroke="none" />
                 </g>
+
+                {showLabel && labelLines.map((line, lineIndex) => (
+                  <text
+                    key={`${node.id}-label-${lineIndex}`}
+                    x={0}
+                    y={R + 11 + lineIndex * 11}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fontFamily="system-ui, sans-serif"
+                    fill={isHl ? 'rgba(0,0,0,0.78)' : 'rgba(0,0,0,0.5)'}
+                    fontWeight={isHl ? '600' : '400'}
+                    pointerEvents="none"
+                  >
+                    {line}
+                  </text>
+                ))}
               </g>
             );
           })}
@@ -990,6 +1063,22 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
         .kg-edge-hovered {
           transform: scale(1.38);
         }
+        @keyframes kg-cited-pulse {
+          0%, 100% { transform: scale(${CITED_SCALE}); }
+          50% { transform: scale(1); }
+        }
+        .kg-node-cited {
+          animation: kg-cited-pulse ${CITED_PULSE_MS}ms ease-in-out infinite;
+          transition: none;
+        }
+        @keyframes kg-cited-edge-glow {
+          0%, 100% { opacity: 0.95; }
+          50% { opacity: 0.28; }
+        }
+        .kg-edge-cited-glow,
+        .kg-edge-cited-arrow {
+          animation: kg-cited-edge-glow ${CITED_PULSE_MS}ms ease-in-out infinite;
+        }
         @keyframes kg-edge-in {
           from { stroke-dashoffset: var(--edge-len); }
           to { stroke-dashoffset: 0; }
@@ -1016,6 +1105,12 @@ export function GraphMockup({ graph, highlightedNodeIds }: GraphMockupProps) {
             stroke-dasharray: none !important;
           }
           .kg-edge-arrow-in { animation: none; }
+          .kg-node-cited { animation: none; transform: scale(1.15); }
+          .kg-edge-cited-glow,
+          .kg-edge-cited-arrow {
+            animation: none;
+            opacity: 0.7;
+          }
         }
       `}</style>
     </div>

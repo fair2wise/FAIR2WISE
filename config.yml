@@ -193,6 +193,11 @@ build_kg:
   backend: cborg
   model: lbl/cborg-chat
 
+f2w_agent:
+  workflow_mode:
+    env: F2W_WORKFLOW_MODE
+    default: deterministic
+
 scripts:
   test_chat_apis:
     model: google/gemini-flash

@@ -74,6 +74,11 @@ export interface AgentChatResponse {
   workdir: string;
 }
 
+export interface AgentChatHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface PublicationSearchOptions {
   maxResults?: number;
   includeExternal?: boolean;
@@ -98,6 +103,9 @@ export interface ChatProgressEvent {
   sufficient?: boolean;
   count?: number;
   titles?: string[];
+  candidate_titles?: string[];
+  selected_action?: string;
+  reason?: string;
   skipped?: number;
   failed?: number;
   term_count?: number;
@@ -126,6 +134,7 @@ export { AGENT_API_BASE };
 export interface AgentSettingsApiResponse {
   backend: 'cborg' | 'ollama';
   graph_source: 'splash' | 'json';
+  workflow_mode: 'deterministic' | 'agentic';
   json_graph_path: string | null;
   available_json_graphs: string[];
 }
@@ -133,6 +142,7 @@ export interface AgentSettingsApiResponse {
 export interface AgentSettingsApiUpdate {
   backend?: 'cborg' | 'ollama';
   graph_source?: 'splash' | 'json';
+  workflow_mode?: 'deterministic' | 'agentic';
   json_graph_path?: string | null;
 }
 
@@ -184,10 +194,18 @@ export async function updateAgentSettings(
 }
 
 export async function queryLiveAgent(message: string, signal?: AbortSignal): Promise<AgentChatResponse> {
+  return queryLiveAgentWithHistory(message, signal, []);
+}
+
+export async function queryLiveAgentWithHistory(
+  message: string,
+  signal?: AbortSignal,
+  messages: AgentChatHistoryMessage[] = [],
+): Promise<AgentChatResponse> {
   const response = await fetch(`${AGENT_API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, messages }),
     signal,
   });
 
@@ -246,6 +264,7 @@ export async function queryLiveAgentStream(
   message: string,
   onProgress: (event: ChatProgressEvent) => void,
   signal?: AbortSignal,
+  messages: AgentChatHistoryMessage[] = [],
 ): Promise<AgentChatResponse> {
   let sawStreamEvent = false;
 
@@ -253,7 +272,7 @@ export async function queryLiveAgentStream(
     const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, messages }),
       signal,
     });
 
@@ -300,7 +319,7 @@ export async function queryLiveAgentStream(
       throw error;
     }
     if (!sawStreamEvent) {
-      return queryLiveAgent(message, signal);
+      return queryLiveAgentWithHistory(message, signal, messages);
     }
     throw error;
   }
