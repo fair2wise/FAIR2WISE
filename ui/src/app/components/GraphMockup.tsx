@@ -4,6 +4,7 @@ import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
 import { KGHoverPopup, KGHoverTarget } from './KGInfoPanel';
 import { PublicationList } from './PublicationList';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import {
   fetchGraphNodeDetail,
   GraphPayload,
@@ -11,6 +12,7 @@ import {
   LiveGraphNode,
   PublicationInfo,
 } from './data/liveAgent';
+import { getNodeColor, isUnknownNodeCategory } from './kgNodeColors';
 
 const W = 900;
 const H = 640;
@@ -19,10 +21,8 @@ const ARROW_SIZE = 13;
 const MIN_VIEW = 180;
 const WORLD_PADDING = 96;
 
-type NodeType = 'material' | 'property' | 'application' | 'process' | 'compound' | 'code' | 'other';
-
 interface LayoutNode extends LiveGraphNode {
-  bucket: NodeType;
+  color: string;
   x: number;
   y: number;
 }
@@ -49,39 +49,8 @@ export interface GraphMockupProps {
   citationAnimationKey?: string;
 }
 
-const NODE_COLORS: Record<NodeType, string> = {
-  material: '#2563eb',
-  property: '#059669',
-  application: '#d97706',
-  process: '#7c3aed',
-  compound: '#dc2626',
-  code: '#0891b2',
-  other: '#64748b',
-};
-
-const NODE_TYPE_LABELS: Record<NodeType, string> = {
-  material: 'Material',
-  property: 'Property',
-  application: 'Application',
-  process: 'Process',
-  compound: 'Compound',
-  code: 'Code',
-  other: 'Other',
-};
-
 function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-}
-
-function classifyNodeType(type: string): NodeType {
-  const value = type.toLowerCase();
-  if (value.includes('material')) return 'material';
-  if (value.includes('property') || value.includes('parameter')) return 'property';
-  if (value.includes('application') || value.includes('device')) return 'application';
-  if (value.includes('process') || value.includes('technique') || value.includes('method')) return 'process';
-  if (value.includes('compound') || value.includes('chemical') || value.includes('molecule')) return 'compound';
-  if (value.includes('codesnippet') || value.includes('code') || value.includes('function')) return 'code';
-  return 'other';
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -124,7 +93,7 @@ function layoutGraph(graph: GraphPayload): LayoutResult {
     const angle = index * goldenAngle;
     return {
       ...node,
-      bucket: classifyNodeType(node.type),
+      color: getNodeColor(node.type),
       x: cx + Math.cos(angle) * radius,
       y: cy + Math.sin(angle) * radius,
     };
@@ -279,7 +248,7 @@ function uploadedGraphQueryParam(sourcePath: string): string | undefined {
   return normalized.includes('/uploads/') ? sourcePath : undefined;
 }
 
-function NodeDetailPopup({
+function NodeDetailPanel({
   node,
   graphSourcePath,
   onClose,
@@ -288,14 +257,8 @@ function NodeDetailPopup({
   graphSourcePath: string;
   onClose: () => void;
 }) {
-  const [shown, setShown] = useState(false);
   const [detail, setDetail] = useState<LiveGraphNode | null>(null);
-  const color = NODE_COLORS[node.bucket];
-
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setShown(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  const color = node.color;
 
   useEffect(() => {
     let cancelled = false;
@@ -314,43 +277,38 @@ function NodeDetailPopup({
     };
   }, [node.id, graphSourcePath]);
 
-  const close = () => {
-    setShown(false);
-    window.setTimeout(onClose, 200);
-  };
-
   const display = detail ?? node;
   const publications = display.publications ?? [];
   const linkedSnippets = display.linked_code_snippets ?? [];
 
   return (
-    <div
-      className={`absolute inset-0 z-20 flex items-center justify-center p-5 transition-opacity duration-200 ${shown ? 'opacity-100' : 'opacity-0'}`}
-    >
-      <div className="absolute inset-0 bg-slate-900/20" onClick={close} />
-      <div
-        className={`relative z-10 max-h-full w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 shadow-xl transition-all duration-200 ${shown ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
-      >
-        <div className="flex items-start gap-3">
-          <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
-          <div className="min-w-0 flex-1">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex shrink-0 items-start gap-3 border-b border-slate-100 px-4 py-3">
+        <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
             <div className="text-xs font-medium" style={{ color }}>
-              {node.type || NODE_TYPE_LABELS[node.bucket]}
+              {node.type || 'Node'}
             </div>
-            <div className="mt-0.5 text-sm font-semibold text-slate-800">{node.label}</div>
+            <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-600">
+              Pinned
+            </span>
           </div>
-          <button
-            type="button"
-            aria-label="Close node details"
-            title="Close"
-            onClick={close}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-200 bg-white text-slate-400 hover:text-slate-600"
-          >
-            <X size={13} />
-          </button>
+          <div className="mt-0.5 text-sm font-semibold text-slate-800">{node.label}</div>
         </div>
+        <button
+          type="button"
+          aria-label="Close node details"
+          title="Close"
+          onClick={onClose}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-200 bg-white text-slate-400 hover:text-slate-600"
+        >
+          <X size={13} />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {(display.description || node.id || publications.length > 0 || display.code_snippet) && (
-          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
             {(display.description || node.id || display.code_snippet) && (
               <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
                 {(display.description || node.id) && (
@@ -419,6 +377,35 @@ function NodeDetailPopup({
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NodeHoverPreview({ node }: { node: LayoutNode }) {
+  const color = node.color;
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-dashed border-slate-200 bg-white/90 shadow-sm">
+      <div className="flex shrink-0 items-start gap-3 border-b border-slate-100 px-4 py-3">
+        <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: color }} />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-medium" style={{ color }}>
+            {node.type || 'Node'}
+          </div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-800">{node.label}</div>
+        </div>
+        <span className="shrink-0 text-[10px] text-slate-400">Click to pin</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {(node.description || node.id) && (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+            <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
+              <p className="whitespace-pre-wrap font-semibold text-slate-700">
+                {node.description || node.id}
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -539,6 +526,7 @@ const CITED_SCALE = 1.35;
 export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], citationAnimationKey = '' }: GraphMockupProps) {
   const [hoverPopup, setHoverPopup] = useState<HoverPopupState | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<LayoutNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<LayoutNode | null>(null);
   const [viewBox, setViewBox] = useState<ViewBox>(fullViewBox(W, H));
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -552,7 +540,10 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
     if (highlightedNodeIds.length === 0) {
       return { nodes: [], edges: [], source_path: graph.source_path };
     }
-    const nodes = graph.nodes.filter(node => highlighted.has(node.id));
+    // Drop Unknown stubs from the top-k set — they are unresolved placeholders.
+    const nodes = graph.nodes.filter(
+      node => highlighted.has(node.id) && !isUnknownNodeCategory(node.type),
+    );
     const visibleNodeIds = new Set(nodes.map(node => node.id));
     return {
       nodes,
@@ -571,6 +562,8 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
   useEffect(() => {
     setHoverPopup(null);
     setPopupPos(null);
+    setHoveredNode(null);
+    setSelectedNode(null);
   }, [revealKey]);
 
   useEffect(() => {
@@ -584,8 +577,9 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
 
   useEffect(() => {
     setHoverPopup(prev =>
-      prev?.target.kind === 'node' && nodeMap.has(prev.target.node.id) ? prev : null,
+      prev?.target.kind === 'edge' ? prev : null,
     );
+    setHoveredNode(prev => (prev && nodeMap.has(prev.id) ? nodeMap.get(prev.id) ?? null : null));
     setSelectedNode(prev => prev && nodeMap.has(prev.id) ? nodeMap.get(prev.id) ?? null : null);
   }, [nodeMap]);
 
@@ -603,15 +597,6 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
     let anchorX = hoverPopup.anchorX;
     let anchorY = hoverPopup.anchorY;
     let anchorRadius = hoverPopup.anchorRadius;
-    if (hoverPopup.target.kind === 'node') {
-      const node = nodeMap.get(hoverPopup.target.node.id);
-      if (node) {
-        const anchor = nodeToContainer(node, viewBox, svgRect, containerRect);
-        anchorX = anchor.x;
-        anchorY = anchor.y;
-        anchorRadius = anchor.radius;
-      }
-    }
 
     setPopupPos(
       choosePopupPosition(
@@ -656,37 +641,12 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
     setViewBox(fullViewBox(layout.width, layout.height));
   }
 
-  function setNodeHover(node: LayoutNode) {
-    const container = containerRef.current;
-    const svg = svgRef.current;
-    if (!container || !svg) return;
-    const containerRect = container.getBoundingClientRect();
-    const svgRect = svg.getBoundingClientRect();
-    const anchor = nodeToContainer(node, viewBox, svgRect, containerRect);
-    setHoverPopup({
-      target: {
-        kind: 'node',
-        node: {
-          id: node.id,
-          label: node.label,
-          type: node.type,
-          description: node.description,
-          bucket: node.bucket,
-        },
-      },
-      anchorX: anchor.x,
-      anchorY: anchor.y,
-      anchorRadius: anchor.radius,
-    });
-  }
-
   function handleNodeEnter(node: LayoutNode) {
-    setNodeHover(node);
+    setHoveredNode(node);
   }
 
   function handleNodeLeave() {
-    setHoverPopup(prev => (prev?.target.kind === 'node' ? null : prev));
-    setPopupPos(null);
+    setHoveredNode(null);
   }
 
   function handleEdgeHover(
@@ -724,6 +684,7 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
     e.currentTarget.setPointerCapture(e.pointerId);
     setHoverPopup(null);
     setPopupPos(null);
+    setHoveredNode(null);
     setDrag({ pointerId: e.pointerId, mouseX: e.clientX, mouseY: e.clientY, viewBox });
   }
 
@@ -772,13 +733,9 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
           <rect width="100%" height="100%" fill="url(#kg-grid-empty)" />
         </svg>
         <div
-          className="relative z-10 flex items-center justify-between gap-3 px-4 py-2.5 shrink-0"
+          className="relative z-10 flex items-center justify-end gap-3 px-4 py-2.5 shrink-0"
           style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.9)' }}
-        >
-          <span className="text-xs" style={{ color: 'rgba(0,0,0,0.35)' }}>
-            0 nodes · 0 edges
-          </span>
-        </div>
+        />
         <div className="relative z-10 flex flex-1 items-center justify-center">
           <AsciiOrb size={400} />
         </div>
@@ -798,12 +755,9 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
       </svg>
 
       <div
-        className="relative z-10 flex items-center justify-between gap-3 px-4 py-2.5 shrink-0"
+        className="relative z-10 flex items-center justify-end gap-3 px-4 py-2.5 shrink-0"
         style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.9)' }}
       >
-        <span className="text-xs" style={{ color: 'rgba(0,0,0,0.35)' }}>
-          {nodes.length} nodes · {visibleEdges.length} edges
-        </span>
         <div className="flex items-center gap-2">
           {hasVisibleNodes && (
             <div className="flex items-center gap-2">
@@ -847,202 +801,217 @@ export function GraphMockup({ graph, highlightedNodeIds, citedNodeIds = [], cita
       </div>
 
       <div className="relative z-10 min-h-0 flex-1">
-        <div ref={containerRef} className="relative h-full min-h-0 overflow-hidden">
-          <svg
-          ref={svgRef}
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-          className="absolute inset-0 w-full h-full"
-          style={{ display: 'block', cursor: drag ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerEnd}
-          onPointerCancel={handlePointerEnd}
-          onWheel={handleWheel}
-        >
-          <defs>
-            <filter id="kg-edge-glow-filter" x="-120%" y="-120%" width="340%" height="340%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          {visibleEdges.map((edge, i) => {
-            const src = nodeMap.get(edge.source);
-            const tgt = nodeMap.get(edge.target);
-            if (!src || !tgt) return null;
+        <ResizablePanelGroup direction="vertical">
+          <ResizablePanel defaultSize={45} minSize={30}>
+            <div ref={containerRef} className="relative h-full min-h-0 overflow-hidden">
+              <svg
+              ref={svgRef}
+              viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+              className="absolute inset-0 w-full h-full"
+              style={{ display: 'block', cursor: drag ? 'grabbing' : 'grab', touchAction: 'none', userSelect: 'none' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+              onWheel={handleWheel}
+            >
+              <defs>
+                <filter id="kg-edge-glow-filter" x="-120%" y="-120%" width="340%" height="340%">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="2.8" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {visibleEdges.map((edge, i) => {
+                const src = nodeMap.get(edge.source);
+                const tgt = nodeMap.get(edge.target);
+                if (!src || !tgt) return null;
 
-            const srcHl = highlighted.has(src.id);
-            const tgtHl = highlighted.has(tgt.id);
-            const srcCited = cited.has(src.id);
-            const tgtCited = cited.has(tgt.id);
-            const isCitedEdge = srcCited || tgtCited;
-            const bothHl = srcHl && tgtHl;
-            const connectedHl = srcHl || tgtHl;
-            const color = NODE_COLORS[src.bucket];
-            const geom = directedEdgeGeometry(src, tgt);
-            const stroke = isCitedEdge
-              ? 'rgba(14,165,233,0.72)'
-              : bothHl
-                ? color
-                : connectedHl
-                  ? 'rgba(14,165,233,0.22)'
-                  : 'rgba(0,0,0,0.09)';
-            const arrowFill = isCitedEdge
-              ? 'rgba(14,165,233,0.85)'
-              : bothHl
-                ? color
-                : connectedHl
-                  ? 'rgba(14,165,233,0.55)'
-                  : 'rgba(0,0,0,0.35)';
-            // Edges draw out after the nodes have populated.
-            const edgeDelay = nodes.length * 35 + i * 20;
-            const edgeKey = `${edge.source}-${edge.target}-${edge.predicate}-${i}`;
-            const isEdgeHovered = hoverPopup?.edgeKey === edgeKey;
-            const midX = (src.x + tgt.x) / 2;
-            const midY = (src.y + tgt.y) / 2;
-            const relArrow = offsetArrowPoints(geom.arrowPoints, midX, midY);
+                const srcHl = highlighted.has(src.id);
+                const tgtHl = highlighted.has(tgt.id);
+                const srcCited = cited.has(src.id);
+                const tgtCited = cited.has(tgt.id);
+                const isCitedEdge = srcCited || tgtCited;
+                const bothHl = srcHl && tgtHl;
+                const connectedHl = srcHl || tgtHl;
+                const color = src.color;
+                const geom = directedEdgeGeometry(src, tgt);
+                const stroke = isCitedEdge
+                  ? 'rgba(14,165,233,0.72)'
+                  : bothHl
+                    ? color
+                    : connectedHl
+                      ? 'rgba(14,165,233,0.22)'
+                      : 'rgba(0,0,0,0.09)';
+                const arrowFill = isCitedEdge
+                  ? 'rgba(14,165,233,0.85)'
+                  : bothHl
+                    ? color
+                    : connectedHl
+                      ? 'rgba(14,165,233,0.55)'
+                      : 'rgba(0,0,0,0.35)';
+                // Edges draw out after the nodes have populated.
+                const edgeDelay = nodes.length * 35 + i * 20;
+                const edgeKey = `${edge.source}-${edge.target}-${edge.predicate}-${i}`;
+                const isEdgeHovered = hoverPopup?.edgeKey === edgeKey;
+                const midX = (src.x + tgt.x) / 2;
+                const midY = (src.y + tgt.y) / 2;
+                const relArrow = offsetArrowPoints(geom.arrowPoints, midX, midY);
 
-            return (
-              <g
-                key={`${revealKey}:edge:${edgeKey}`}
-                onMouseEnter={e => handleEdgeHover(e, src, tgt, edge.predicate, edgeKey)}
-                onMouseMove={e => handleEdgeHover(e, src, tgt, edge.predicate, edgeKey)}
-                onMouseLeave={handleEdgeLeave}
-              >
-                <line
-                  x1={src.x} y1={src.y}
-                  x2={tgt.x} y2={tgt.y}
-                  stroke="transparent"
-                  strokeWidth={8}
-                  style={{ cursor: 'pointer' }}
-                />
-                <g transform={`translate(${midX}, ${midY})`}>
+                return (
                   <g
-                    className={`kg-edge-scale${isEdgeHovered && !isCitedEdge ? ' kg-edge-hovered' : ''}${isCitedEdge ? ' kg-edge-cited' : ''}`}
+                    key={`${revealKey}:edge:${edgeKey}`}
+                    onMouseEnter={e => handleEdgeHover(e, src, tgt, edge.predicate, edgeKey)}
+                    onMouseMove={e => handleEdgeHover(e, src, tgt, edge.predicate, edgeKey)}
+                    onMouseLeave={handleEdgeLeave}
                   >
-                    {isCitedEdge && (
-                      <line
-                        key={`glow-${citationAnimationKey}-${edgeKey}`}
-                        className="kg-edge-cited-glow"
-                        x1={geom.x1 - midX} y1={geom.y1 - midY}
-                        x2={geom.x2 - midX} y2={geom.y2 - midY}
-                        stroke="rgba(56,189,248,0.75)"
-                        strokeWidth={bothHl ? 5 : 4}
-                        strokeLinecap="round"
-                        filter="url(#kg-edge-glow-filter)"
-                        style={{ pointerEvents: 'none' }}
-                      />
-                    )}
                     <line
-                      className="kg-edge-in"
-                      x1={geom.x1 - midX} y1={geom.y1 - midY}
-                      x2={geom.x2 - midX} y2={geom.y2 - midY}
-                      stroke={stroke}
-                      strokeWidth={isCitedEdge ? 1.8 : bothHl ? 1.5 : connectedHl ? 1.05 : 0.65}
-                      strokeOpacity={bothHl || isCitedEdge ? 0.85 : 1}
-                      style={{
-                        pointerEvents: 'none',
-                        ['--edge-len' as string]: `${geom.length}`,
-                        strokeDasharray: geom.length,
-                        strokeDashoffset: geom.length,
-                        animationDelay: `${edgeDelay}ms`,
-                      }}
+                      x1={src.x} y1={src.y}
+                      x2={tgt.x} y2={tgt.y}
+                      stroke="transparent"
+                      strokeWidth={8}
+                      style={{ cursor: 'pointer' }}
                     />
-                    <polygon
-                      className={`kg-edge-arrow-in${isCitedEdge ? ' kg-edge-cited-arrow' : ''}`}
-                      points={relArrow}
-                      fill={arrowFill}
-                      fillOpacity={bothHl || isCitedEdge ? 0.85 : 1}
-                      style={{
-                        pointerEvents: 'none',
-                        animationDelay: `${edgeDelay}ms`,
-                      }}
-                    />
+                    <g transform={`translate(${midX}, ${midY})`}>
+                      <g
+                        className={`kg-edge-scale${isEdgeHovered && !isCitedEdge ? ' kg-edge-hovered' : ''}${isCitedEdge ? ' kg-edge-cited' : ''}`}
+                      >
+                        {isCitedEdge && (
+                          <line
+                            key={`glow-${citationAnimationKey}-${edgeKey}`}
+                            className="kg-edge-cited-glow"
+                            x1={geom.x1 - midX} y1={geom.y1 - midY}
+                            x2={geom.x2 - midX} y2={geom.y2 - midY}
+                            stroke="rgba(56,189,248,0.75)"
+                            strokeWidth={bothHl ? 5 : 4}
+                            strokeLinecap="round"
+                            filter="url(#kg-edge-glow-filter)"
+                            style={{ pointerEvents: 'none' }}
+                          />
+                        )}
+                        <line
+                          className="kg-edge-in"
+                          x1={geom.x1 - midX} y1={geom.y1 - midY}
+                          x2={geom.x2 - midX} y2={geom.y2 - midY}
+                          stroke={stroke}
+                          strokeWidth={isCitedEdge ? 1.8 : bothHl ? 1.5 : connectedHl ? 1.05 : 0.65}
+                          strokeOpacity={bothHl || isCitedEdge ? 0.85 : 1}
+                          style={{
+                            pointerEvents: 'none',
+                            ['--edge-len' as string]: `${geom.length}`,
+                            strokeDasharray: geom.length,
+                            strokeDashoffset: geom.length,
+                            animationDelay: `${edgeDelay}ms`,
+                          }}
+                        />
+                        <polygon
+                          className={`kg-edge-arrow-in${isCitedEdge ? ' kg-edge-cited-arrow' : ''}`}
+                          points={relArrow}
+                          fill={arrowFill}
+                          fillOpacity={bothHl || isCitedEdge ? 0.85 : 1}
+                          style={{
+                            pointerEvents: 'none',
+                            animationDelay: `${edgeDelay}ms`,
+                          }}
+                        />
+                      </g>
+                    </g>
                   </g>
-                </g>
-              </g>
-            );
-          })}
+                );
+              })}
 
-          {nodes.map((node, nodeIndex) => {
-            const isHl = highlighted.has(node.id);
-            const isCited = cited.has(node.id);
-            const isHovered =
-              hoverPopup?.target.kind === 'node' && hoverPopup.target.node.id === node.id;
-            const color = NODE_COLORS[node.bucket];
-            const [r, g, b] = hexToRgb(color);
-            const labelLines = splitLabel(node.label);
-            const showLabel = nodes.length <= 150 || isHl || isHovered;
+              {nodes.map((node, nodeIndex) => {
+                const isHl = highlighted.has(node.id);
+                const isCited = cited.has(node.id);
+                const isHovered = hoveredNode?.id === node.id;
+                const color = node.color;
+                const [r, g, b] = hexToRgb(color);
+                const labelLines = splitLabel(node.label);
+                const showLabel = nodes.length <= 150 || isHl || isHovered;
 
-            return (
-              <g
-                key={`${revealKey}:node:${node.id}`}
-                className="kg-node-in"
-                style={{ animationDelay: `${nodeIndex * 35}ms` }}
-                transform={`translate(${node.x}, ${node.y})`}
-                onMouseEnter={() => handleNodeEnter(node)}
-                onMouseLeave={handleNodeLeave}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => {
-                  e.stopPropagation();
-                  setSelectedNode(node);
-                }}
-              >
-                <g
-                  key={isCited ? `cite-${citationAnimationKey}-${node.id}` : `node-${node.id}`}
-                  className={`kg-node-scale${isHovered && !isCited ? ' kg-node-hovered' : ''}${isCited ? ' kg-node-cited' : ''}`}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {isHl && (
-                    <circle cx={0} cy={0} r={R + 11} fill={`rgba(${r},${g},${b},0.1)`} />
-                  )}
-
-                  <circle cx={0} cy={0} r={R} fill={color} stroke="none" />
-                </g>
-
-                {showLabel && labelLines.map((line, lineIndex) => (
-                  <text
-                    key={`${node.id}-label-${lineIndex}`}
-                    x={0}
-                    y={R + 11 + lineIndex * 11}
-                    textAnchor="middle"
-                    fontSize={9}
-                    fontFamily="system-ui, sans-serif"
-                    fill={isHl ? 'rgba(0,0,0,0.78)' : 'rgba(0,0,0,0.5)'}
-                    fontWeight={isHl ? '600' : '400'}
-                    pointerEvents="none"
+                return (
+                  <g
+                    key={`${revealKey}:node:${node.id}`}
+                    className="kg-node-in"
+                    style={{ animationDelay: `${nodeIndex * 35}ms` }}
+                    transform={`translate(${node.x}, ${node.y})`}
+                    onMouseEnter={() => handleNodeEnter(node)}
+                    onMouseLeave={handleNodeLeave}
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedNode(prev => (prev?.id === node.id ? null : node));
+                    }}
                   >
-                    {line}
-                  </text>
-                ))}
-              </g>
-            );
-          })}
-        </svg>
+                    <g
+                      key={isCited ? `cite-${citationAnimationKey}-${node.id}` : `node-${node.id}`}
+                      className={`kg-node-scale${isHovered && !isCited ? ' kg-node-hovered' : ''}${isCited ? ' kg-node-cited' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {isHl && (
+                        <circle cx={0} cy={0} r={R + 11} fill={`rgba(${r},${g},${b},0.1)`} />
+                      )}
 
-        {hoverPopup && (
-          <KGHoverPopup
-            hoverTarget={hoverPopup.target}
-            popupRef={popupRef}
-            style={{
-              left: popupPos?.x ?? hoverPopup.anchorX,
-              top: popupPos?.y ?? hoverPopup.anchorY,
-              visibility: popupPos ? 'visible' : 'hidden',
-            }}
-          />
-        )}
+                      <circle cx={0} cy={0} r={R} fill={color} stroke="none" />
+                    </g>
 
-        {selectedNode && (
-          <NodeDetailPopup
-            key={selectedNode.id}
-            node={selectedNode}
-            graphSourcePath={graph.source_path}
-            onClose={() => setSelectedNode(null)}
-          />
-        )}
-        </div>
+                    {showLabel && labelLines.map((line, lineIndex) => (
+                      <text
+                        key={`${node.id}-label-${lineIndex}`}
+                        x={0}
+                        y={R + 11 + lineIndex * 11}
+                        textAnchor="middle"
+                        fontSize={9}
+                        fontFamily="system-ui, sans-serif"
+                        fill={isHl ? 'rgba(0,0,0,0.78)' : 'rgba(0,0,0,0.5)'}
+                        fontWeight={isHl ? '600' : '400'}
+                        pointerEvents="none"
+                      >
+                        {line}
+                      </text>
+                    ))}
+                  </g>
+                );
+              })}
+            </svg>
+
+            {hoverPopup && (
+              <KGHoverPopup
+                hoverTarget={hoverPopup.target}
+                popupRef={popupRef}
+                style={{
+                  left: popupPos?.x ?? hoverPopup.anchorX,
+                  top: popupPos?.y ?? hoverPopup.anchorY,
+                  visibility: popupPos ? 'visible' : 'hidden',
+                }}
+              />
+            )}
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle className="bg-slate-200" />
+
+          <ResizablePanel defaultSize={55} minSize={20} maxSize={70}>
+            <div className="h-full min-h-0 px-4 py-3">
+              {selectedNode ? (
+                <NodeDetailPanel
+                  key={selectedNode.id}
+                  node={selectedNode}
+                  graphSourcePath={graph.source_path}
+                  onClose={() => setSelectedNode(null)}
+                />
+              ) : hoveredNode ? (
+                <NodeHoverPreview key={hoveredNode.id} node={hoveredNode} />
+              ) : (
+                <div className="flex h-full min-h-0 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 text-xs text-slate-400">
+                  Hover a node to preview · Click to pin
+                </div>
+              )}
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
       <style>{`

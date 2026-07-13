@@ -194,9 +194,30 @@ build_kg:
   model: lbl/cborg-chat
 
 f2w_agent:
+  model:
+    env: F2W_MODEL
+    default: lbl/cborg-chat
+  cborg_models:
+    - lbl/cborg-chat
+    - gemini-flash
+    - gemini-2.5-flash-lite
+    - gemini-pro
+    - anthropic/claude-opus
+    - anthropic/claude-sonnet
+    - gpt
+    - gpt-chat
+    - gpt-mini
+    - nova-micro
+    - openai/gpt-4o
   workflow_mode:
     env: F2W_WORKFLOW_MODE
-    default: deterministic
+    default: agentic
+  extraction_mode:
+    env: F2W_EXTRACTION_MODE
+    default: targeted
+  targeted_max_pages:
+    env: F2W_TARGETED_MAX_PAGES
+    default: 6
 
 scripts:
   test_chat_apis:

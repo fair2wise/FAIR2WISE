@@ -11,7 +11,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from academy.agent import Agent, action
 
@@ -61,6 +61,37 @@ class ExtractorAgent(Agent):
         )
         return orch.process_directory(str(pdf_dir))
 
+    def _run_targeted(
+        self,
+        pdf_dir: str,
+        terms_json: str,
+        query: str,
+        missing_topics: Optional[List[str]],
+        max_pages: int,
+        max_workers: Optional[int],
+    ) -> Dict[str, Any]:
+        from app.modules.term_extractor import Orchestrator
+
+        Path(terms_json).parent.mkdir(parents=True, exist_ok=True)
+        orch = Orchestrator(
+            model=self._model,
+            output_file=str(terms_json),
+            backend=self._backend,
+            schema_path=self._schema_path,
+            temperature=self._temperature,
+            max_workers=max_workers or self._max_workers,
+            cborg_base=self._cborg_base,
+            cborg_api_key=self._cborg_api_key,
+            ollama_url=self._ollama_url,
+            chebi_obo_path=self._chebi_obo_path,
+        )
+        return orch.process_directory_targeted(
+            str(pdf_dir),
+            query=query,
+            missing_topics=missing_topics or [],
+            max_pages=max_pages,
+        )
+
     @action
     async def extract(
         self,
@@ -71,3 +102,26 @@ class ExtractorAgent(Agent):
         """Extract/merge terms from ``pdf_dir`` into cumulative ``terms_json``."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._run, pdf_dir, terms_json, max_workers)
+
+    @action
+    async def extract_targeted(
+        self,
+        pdf_dir: str,
+        terms_json: str,
+        query: str,
+        missing_topics: Optional[List[str]] = None,
+        max_pages: int = 6,
+        max_workers: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Extract/merge query-relevant terms from selected pages in ``pdf_dir``."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._run_targeted,
+            pdf_dir,
+            terms_json,
+            query,
+            missing_topics or [],
+            max_pages,
+            max_workers,
+        )

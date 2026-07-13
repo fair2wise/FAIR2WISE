@@ -4,12 +4,15 @@ import { ButtonWithIcon } from '@blueskyproject/finch';
 import { Check, ChevronDown, Info, Save, Settings } from 'lucide-react';
 import {
   DEFAULT_AGENT_SETTINGS,
+  DEFAULT_OLLAMA_MODEL,
+  defaultModelForBackend,
   loadAgentSettings,
   saveAgentSettings,
   settingsEqual,
   settingsFromApiResponse,
   settingsToApiPayload,
   type AgentBackend,
+  type AgentExtractionMode,
   type AgentGraphSource,
   type AgentSettings,
   type AgentWorkflowMode,
@@ -38,6 +41,11 @@ import { cn } from './ui/utils';
 
 function formatJsonGraphLabel(path: string): string {
   return path.replace(/^storage\/kg\//, '');
+}
+
+function formatCborgModelLabel(model: string): string {
+  const slash = model.lastIndexOf('/');
+  return slash === -1 ? model : model.slice(slash + 1);
 }
 
 function JsonGraphPickerDialog({
@@ -107,6 +115,73 @@ function JsonGraphPickerDialog({
   );
 }
 
+function CborgModelPickerDialog({
+  open,
+  onOpenChange,
+  value,
+  options,
+  onChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: string;
+  options: string[];
+  onChange: (model: string) => void;
+}) {
+  function handlePick(model: string) {
+    onChange(model);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} modal>
+      <DialogContent
+        overlayClassName="z-[200] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="z-[201] top-[88px] left-1/2 flex max-h-[calc(100vh-7rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 translate-y-0 flex-col gap-0 overflow-hidden border border-slate-200 bg-white p-0 text-slate-800 shadow-xl"
+      >
+        <DialogHeader className="border-b border-slate-200 bg-white px-5 py-5 text-left">
+          <DialogTitle className="text-slate-900">Choose CBORG model</DialogTitle>
+          <DialogDescription className="text-slate-500">
+            Select a hosted model from the CBORG API.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white p-4">
+          {options.map(model => {
+            const selected = model === value;
+            return (
+              <button
+                key={model}
+                type="button"
+                onClick={() => handlePick(model)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg px-4 py-3.5 text-left text-sm transition hover:bg-slate-50',
+                  selected && 'bg-sky-50 ring-1 ring-sky-200',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-4 shrink-0 items-center justify-center rounded-full border border-slate-300',
+                    selected && 'border-sky-500 bg-sky-500 text-white',
+                  )}
+                  aria-hidden="true"
+                >
+                  {selected && <Check size={12} strokeWidth={3} />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-slate-800">
+                    {formatCborgModelLabel(model)}
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-slate-500">{model}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function JsonGraphFilePicker({
   value,
   disabled,
@@ -122,6 +197,31 @@ function JsonGraphFilePicker({
     <button
       type="button"
       id="json-graph-select"
+      disabled={disabled}
+      onClick={onOpenPicker}
+      className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <span className="truncate font-medium">{selectedLabel}</span>
+      <ChevronDown size={16} className="shrink-0 text-slate-500" aria-hidden="true" />
+    </button>
+  );
+}
+
+function CborgModelPicker({
+  value,
+  disabled,
+  onOpenPicker,
+}: {
+  value: string;
+  disabled?: boolean;
+  onOpenPicker: () => void;
+}) {
+  const selectedLabel = value ? formatCborgModelLabel(value) : 'Select a CBORG model';
+
+  return (
+    <button
+      type="button"
+      id="cborg-model-select"
       disabled={disabled}
       onClick={onOpenPicker}
       className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -169,11 +269,14 @@ export function AppSettingsButton({
   const [savedSettings, setSavedSettings] = useState<AgentSettings>(() => loadAgentSettings());
   const [draftSettings, setDraftSettings] = useState<AgentSettings>(() => loadAgentSettings());
   const [availableJsonGraphs, setAvailableJsonGraphs] = useState<string[]>([]);
+  const [availableCborgModels, setAvailableCborgModels] = useState<string[]>([]);
+  const [defaultOllamaModel, setDefaultOllamaModel] = useState(DEFAULT_OLLAMA_MODEL);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [errorTitle, setErrorTitle] = useState('Settings update failed');
   const [jsonPickerOpen, setJsonPickerOpen] = useState(false);
+  const [cborgPickerOpen, setCborgPickerOpen] = useState(false);
 
   const hasUnsavedChanges = !settingsEqual(draftSettings, savedSettings);
 
@@ -192,6 +295,8 @@ export function AppSettingsButton({
         const response = await fetchAgentSettings();
         if (cancelled) return;
         setAvailableJsonGraphs(response.available_json_graphs ?? []);
+        setAvailableCborgModels(response.available_cborg_models ?? []);
+        setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
         const synced = settingsFromApiResponse(response);
         if (!response.available_json_graphs?.includes(saved.jsonGraphPath) && synced.jsonGraphPath) {
           setDraftSettings(prev => ({
@@ -232,8 +337,11 @@ export function AppSettingsButton({
       const synced = settingsFromApiResponse(response);
       const saved: AgentSettings = {
         backend: draftSettings.backend,
+        model: draftSettings.model,
         graphSource: draftSettings.graphSource,
         workflowMode: draftSettings.workflowMode,
+        extractionMode: draftSettings.extractionMode,
+        targetedMaxPages: draftSettings.targetedMaxPages,
         jsonGraphPath: draftSettings.graphSource === 'json'
           ? draftSettings.jsonGraphPath
           : synced.jsonGraphPath,
@@ -242,8 +350,11 @@ export function AppSettingsButton({
       setDraftSettings(saved);
       saveAgentSettings(saved);
       setAvailableJsonGraphs(response.available_json_graphs ?? []);
+      setAvailableCborgModels(response.available_cborg_models ?? []);
+      setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
       await onSettingsApplied?.();
       setJsonPickerOpen(false);
+      setCborgPickerOpen(false);
       setOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -253,7 +364,20 @@ export function AppSettingsButton({
   }
 
   function updateBackend(backend: AgentBackend) {
-    setDraftSettings(prev => ({ ...prev, backend }));
+    setDraftSettings(prev => ({
+      ...prev,
+      backend,
+      model: backend === prev.backend
+        ? prev.model
+        : defaultModelForBackend(backend, {
+          default_ollama_model: defaultOllamaModel,
+          available_cborg_models: availableCborgModels,
+        }),
+    }));
+  }
+
+  function updateModel(model: string) {
+    setDraftSettings(prev => ({ ...prev, model }));
   }
 
   function updateGraphSource(graphSource: AgentGraphSource) {
@@ -265,6 +389,20 @@ export function AppSettingsButton({
 
   function updateWorkflowMode(workflowMode: AgentWorkflowMode) {
     setDraftSettings(prev => ({ ...prev, workflowMode }));
+  }
+
+  function updateExtractionMode(extractionMode: AgentExtractionMode) {
+    setDraftSettings(prev => ({ ...prev, extractionMode }));
+  }
+
+  function updateTargetedMaxPages(value: string) {
+    const parsed = Number.parseInt(value, 10);
+    setDraftSettings(prev => ({
+      ...prev,
+      targetedMaxPages: Number.isFinite(parsed)
+        ? Math.min(100, Math.max(1, parsed))
+        : prev.targetedMaxPages,
+    }));
   }
 
   function updateJsonGraphPath(jsonGraphPath: string) {
@@ -315,6 +453,44 @@ export function AppSettingsButton({
             </div>
 
             <div className="space-y-3">
+              <Label className="text-xs font-medium text-slate-500">Extraction</Label>
+              <RadioGroup
+                value={draftSettings.extractionMode}
+                onValueChange={value => updateExtractionMode(value as AgentExtractionMode)}
+                className="gap-2"
+                disabled={loading || saving}
+              >
+                <SettingOption
+                  id="targeted"
+                  label="Targeted"
+                  description="Extract only pages relevant to the missing evidence."
+                />
+                <SettingOption
+                  id="full"
+                  label="Full"
+                  description="Extract every page after an approved download."
+                />
+              </RadioGroup>
+              {draftSettings.extractionMode === 'targeted' && (
+                <div className="space-y-2 px-3">
+                  <Label htmlFor="targeted-max-pages" className="text-xs font-medium text-slate-500">
+                    Max pages per PDF
+                  </Label>
+                  <input
+                    id="targeted-max-pages"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={draftSettings.targetedMaxPages}
+                    disabled={loading || saving}
+                    onChange={event => updateTargetedMaxPages(event.target.value)}
+                    className="h-9 w-28 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
               <Label className="text-xs font-medium text-slate-500">LLM backend</Label>
               <RadioGroup
                 value={draftSettings.backend}
@@ -334,6 +510,40 @@ export function AppSettingsButton({
                 />
               </RadioGroup>
             </div>
+
+            {draftSettings.backend === 'cborg' ? (
+              <div className="space-y-2 px-3">
+                <Label htmlFor="cborg-model-select" className="text-xs font-medium text-slate-500">
+                  CBORG model
+                </Label>
+                {availableCborgModels.length > 0 ? (
+                  <CborgModelPicker
+                    value={draftSettings.model}
+                    disabled={loading || saving}
+                    onOpenPicker={() => setCborgPickerOpen(true)}
+                  />
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    {loading ? 'Loading CBORG models…' : 'No CBORG models configured.'}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2 px-3">
+                <Label htmlFor="ollama-model-input" className="text-xs font-medium text-slate-500">
+                  Ollama model
+                </Label>
+                <input
+                  id="ollama-model-input"
+                  type="text"
+                  value={draftSettings.model}
+                  disabled={loading || saving}
+                  onChange={event => updateModel(event.target.value)}
+                  placeholder={defaultOllamaModel}
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            )}
 
             <div className="space-y-3">
               <Label className="text-xs font-medium text-slate-500">Knowledge graph source</Label>
@@ -414,6 +624,13 @@ export function AppSettingsButton({
         value={draftSettings.jsonGraphPath}
         options={availableJsonGraphs}
         onChange={updateJsonGraphPath}
+      />
+      <CborgModelPickerDialog
+        open={cborgPickerOpen}
+        onOpenChange={setCborgPickerOpen}
+        value={draftSettings.model}
+        options={availableCborgModels}
+        onChange={updateModel}
       />
     </>
   );

@@ -6,6 +6,7 @@ import contextlib
 import json
 import os
 import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -20,14 +21,30 @@ from .coordinator import Coordinator, CoordinatorConfig
 from app.modules import kg_rag_api as krag
 
 from .debate_agent import EvidenceDebateAgent
-from .download_agent import DownloadAgent, _reconstruct_abstract, _sanitize_openalex_search
+from .download_agent import (
+    DownloadAgent,
+    _reconstruct_abstract,
+    _safe_name,
+    _sanitize_openalex_search,
+)
 from .extractor_agent import ExtractorAgent
+from .orchestrator_agent import (
+    WorkflowOrchestratorAgent,
+    _extracted_terms_followup,
+    _paper_reference_followup,
+)
+from .paper_evidence_agent import PaperEvidenceAgent, summarize_extracted_terms
 from .retrieval_agent import RetrievalAgent
+from app.modules.project_config import config_value, get_config
+from .session_memory import SessionMemory
+from .workflow_state import WorkflowStateStore
 
 
 class ChatMessageInput(BaseModel):
     role: str = Field(..., pattern="^(user|assistant)$")
-    content: str = Field(..., min_length=1)
+    # Pending candidate cards intentionally have no answer text. Accept blank
+    # legacy history entries here; _history_payload discards them.
+    content: str = ""
 
 
 class ChatRequest(BaseModel):
@@ -82,6 +99,17 @@ class ChatResponse(BaseModel):
     graph_source_requested: Optional[str] = None
     graph_source_used: Optional[str] = None
     workdir: str
+    pending: Optional[Dict[str, Any]] = None
+    orchestration: Optional[Dict[str, Any]] = None
+
+
+class ChatActionRequest(BaseModel):
+    decision: str = Field(..., pattern="^(yes|no)$")
+    kind: Optional[str] = Field(default=None, pattern="^(download|extraction)$")
+    candidate_index: Optional[int] = Field(default=None, ge=0)
+    messages: List[ChatMessageInput] = Field(default_factory=list)
+    graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
+    json_graph_path: Optional[str] = None
 
 
 class GraphUploadRequest(BaseModel):
@@ -109,24 +137,60 @@ class PublicationSearchResponse(BaseModel):
     source: str
 
 
+class SessionResetResponse(BaseModel):
+    status: str
+    session_memory: str
+    session_memory_has_context: bool
+    workflow_state: Optional[str] = None
+    workflow_phase: str = "idle"
+
+
 class AgentSettingsResponse(BaseModel):
     backend: str
+    model: str
     graph_source: str
-    workflow_mode: str = "deterministic"
+    workflow_mode: str = "agentic"
+    extraction_mode: str = "targeted"
+    targeted_max_pages: int = 6
     json_graph_path: Optional[str] = None
     available_json_graphs: List[str] = Field(default_factory=list)
+    available_cborg_models: List[str] = Field(default_factory=list)
+    default_ollama_model: str = "deepseek-r1:70b"
 
 
 class AgentSettingsUpdate(BaseModel):
     backend: Optional[str] = Field(default=None, pattern="^(cborg|ollama)$")
+    model: Optional[str] = Field(default=None, min_length=1, max_length=200)
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     workflow_mode: Optional[str] = Field(default=None, pattern="^(deterministic|agentic)$")
+    extraction_mode: Optional[str] = Field(default=None, pattern="^(full|targeted)$")
+    targeted_max_pages: Optional[int] = Field(default=None, ge=1, le=100)
     json_graph_path: Optional[str] = None
 
 
 ProgressEmitter = Callable[[str, str, Dict[str, Any]], Awaitable[None]]
 
 DEFAULT_JSON_GRAPH = "storage/kg/matkg_xray_papers_cborg_chat.json"
+
+# Legacy CBORG ids that still appear in old env/localStorage values.
+_CBORG_MODEL_ALIASES = {
+    "google/gemini-flash": "gemini-flash",
+    "google/gemini-flash-lite": "gemini-2.5-flash-lite",
+    "google/gemini-pro": "gemini-pro",
+    "google/gemini-flash-high": "gemini-flash-high",
+    "google/gemini-pro-high": "gemini-pro-high",
+    # CBORG alias gemini-flash-lite currently resolves to an unavailable Vertex preview.
+    "gemini-flash-lite": "gemini-2.5-flash-lite",
+}
+
+
+def normalize_cborg_model(model: Optional[str]) -> Optional[str]:
+    if model is None:
+        return None
+    cleaned = str(model).strip()
+    if not cleaned:
+        return cleaned
+    return _CBORG_MODEL_ALIASES.get(cleaned, cleaned)
 
 
 def project_root() -> Path:
@@ -171,9 +235,56 @@ def default_json_graph_path(
 @dataclass
 class RuntimeSettings:
     backend: str = "cborg"
+    model: str = "lbl/cborg-chat"
     graph_source: str = "splash"
-    workflow_mode: str = "deterministic"
+    workflow_mode: str = "agentic"
+    extraction_mode: str = "targeted"
+    targeted_max_pages: int = 6
     json_graph_path: Optional[str] = None
+
+
+def default_runtime_model(backend: str, configured: Optional[str] = None) -> str:
+    if configured and str(configured).strip():
+        model = str(configured).strip()
+        if backend == "cborg":
+            model = normalize_cborg_model(model) or model
+        return model
+    if backend == "ollama":
+        for env_name in ("KG_RAG_OLLAMA_MODEL", "KG_RAG_MODEL"):
+            env_value = os.environ.get(env_name)
+            if env_value and env_value.strip():
+                return env_value.strip()
+        return str(config_value("kg_rag.ollama.model", "deepseek-r1:70b") or "deepseek-r1:70b")
+    for env_name in ("KG_RAG_CBORG_MODEL", "KG_RAG_MODEL", "F2W_MODEL"):
+        env_value = os.environ.get(env_name)
+        if env_value and env_value.strip():
+            model = env_value.strip()
+            return normalize_cborg_model(model) or model
+    default = str(config_value("kg_rag.cborg.model", "lbl/cborg-chat") or "lbl/cborg-chat")
+    return normalize_cborg_model(default) or default
+
+
+def list_cborg_models(*, current_model: Optional[str] = None) -> List[str]:
+    configured = get_config("f2w_agent.cborg_models", [])
+    models: List[str] = []
+    seen: set[str] = set()
+    if isinstance(configured, list):
+        for item in configured:
+            normalized = normalize_cborg_model(str(item).strip())
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                models.append(normalized)
+    if not models:
+        models = [default_runtime_model("cborg")]
+        seen.update(models)
+    normalized_current = normalize_cborg_model(current_model)
+    if normalized_current and normalized_current not in seen:
+        models = [normalized_current, *models]
+    return models
+
+
+def default_ollama_model_name() -> str:
+    return default_runtime_model("ollama")
 
 
 def _string_value(value: Any, default: str = "") -> str:
@@ -181,6 +292,11 @@ def _string_value(value: Any, default: str = "") -> str:
         return default
     text = str(value).strip()
     return text or default
+
+
+def _safe_candidate_filename(candidate: Dict[str, Any]) -> str:
+    """Expected downloaded PDF filename for an OpenAlex candidate summary."""
+    return f"{_safe_name(candidate)}.pdf"
 
 
 _PUBLICATION_FIELDS = (
@@ -575,6 +691,88 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
 
 
 MAX_HISTORY_MESSAGES = 8
+CANDIDATE_PAPERS_INTRO = (
+    "I could not answer this query reliably from the retrieved context. "
+    "Below is a list of papers that might be relevant to the subject."
+)
+
+
+def _extraction_outcome_text(result: Dict[str, Any]) -> str:
+    """Summarize extractor output without treating cumulative terms as newly added."""
+    processed_files = int(result.get("processed_files") or 0)
+    processed_pages = int(result.get("processed_pages_total") or 0)
+    pages_with_terms = int(result.get("processed_pages_with_terms") or 0)
+    unique_terms = int(result.get("unique_terms") or 0)
+    parts = [
+        f"processed {processed_files} paper{'s' if processed_files != 1 else ''}",
+    ]
+    if processed_pages:
+        parts.append(
+            f"inspected {processed_pages} page{'s' if processed_pages != 1 else ''}"
+        )
+        parts.append(
+            f"{pages_with_terms} page{'s' if pages_with_terms != 1 else ''} yielded extractable terms"
+        )
+    parts.append(
+        f"term store now contains {unique_terms} unique term{'s' if unique_terms != 1 else ''}"
+    )
+    return "Extraction completed: " + "; ".join(parts) + "."
+
+
+def _post_extraction_answer(
+    extraction: Dict[str, Any],
+    term_report: Dict[str, Any],
+    question: str,
+    verdict: Dict[str, Any],
+) -> str:
+    """Combine extraction facts with an explicit original-query verdict."""
+    sections = [_extraction_outcome_text(extraction)]
+    if term_report.get("sufficient"):
+        sections.append(str(term_report.get("answer") or "").strip())
+    else:
+        sections.append(
+            "Extracted-term summary unavailable: "
+            + str(term_report.get("answer") or "no page-grounded terms were recorded.")
+        )
+
+    if str(verdict.get("status") or "").endswith("_error"):
+        sections.append(
+            "Support for original query: not evaluated.\n"
+            "Why: the updated knowledge graph could not be checked against the original query "
+            f'“{question}”: {verdict.get("error") or verdict.get("status")}.'
+        )
+        return "\n\n".join(section for section in sections if section)
+
+    if verdict.get("sufficient"):
+        direct_count = int(verdict.get("direct_evidence_count") or 0)
+        reason = "updated retrieval found enough direct, grounded evidence"
+        if direct_count:
+            reason += f" across {direct_count} evidence-bearing KG node{'s' if direct_count != 1 else ''}"
+        sections.append(
+            "Support for original query: yes.\n"
+            f"Why: {reason}. The updated knowledge graph now contains enough direct evidence "
+            "to answer the original query.\n\n"
+            + str(verdict.get("answer") or "")
+        )
+        return "\n\n".join(section for section in sections if section)
+
+    missing = [str(topic).strip() for topic in (verdict.get("missing_topics") or []) if str(topic).strip()]
+    reason = (
+        "the extracted concepts still do not provide enough direct evidence to answer "
+        f'“{question}” reliably.'
+    )
+    if verdict.get("no_evidence"):
+        reason = "updated retrieval found no direct evidence that answers the original query."
+    missing_text = "\n".join(f"- {topic}" for topic in missing) if missing else "- Complete grounded answer"
+    sections.append(
+        "Support for original query: no.\n"
+        f"Why: {reason}\n"
+        "Missing topics:\n"
+        f"{missing_text}\n\n"
+        "The updated knowledge graph still does not contain enough direct evidence to answer "
+        "the original query reliably. No additional paper search was started."
+    )
+    return "\n\n".join(section for section in sections if section)
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
@@ -619,6 +817,10 @@ def _history_payload(messages: Optional[List[ChatMessageInput]]) -> List[Dict[st
 def _needs_history_rewrite(question: str, history: List[Dict[str, str]]) -> bool:
     if not history:
         return False
+    return _looks_contextual_followup(question)
+
+
+def _looks_contextual_followup(question: str) -> bool:
     normalized = _normalize_chat_text(question)
     if not normalized:
         return False
@@ -630,6 +832,17 @@ def _needs_history_rewrite(question: str, history: List[Dict[str, str]]) -> bool
         r"^how about\b",
         r"^compare\b",
         r"^and\b",
+        r"^why\b",
+        r"^how so\b",
+        r"^tell me more\b",
+        r"^more\b",
+        r"^continue\b",
+        r"^expand\b",
+        r"^find more\b",
+        r"^give me more\b",
+        r"^show more\b",
+        r"\bsame topic\b",
+        r"\bthis topic\b",
     )
     return any(re.search(pattern, normalized) for pattern in followup_patterns)
 
@@ -873,47 +1086,70 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: List[str]) -> Li
 
 
 class AgentPipelineService:
-    """Reusable in-process 3-agent pipeline for HTTP chat requests."""
+    """Reusable in-process orchestrated pipeline for HTTP chat requests."""
 
     def __init__(self, cfg: CoordinatorConfig) -> None:
         self.cfg = cfg
         self.coord = Coordinator(cfg)
+        self.memory = SessionMemory(self.coord.workdir / "session_memory.json")
+        self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
         self.lock = asyncio.Lock()
+        # Pending approvals survive backend and one-shot CLI restarts.
+        self.pending: Optional[Dict[str, Any]] = self.workflow.pending
+        self._last_orchestration: Optional[Dict[str, Any]] = None
         available_json_graphs = list_storage_kg_json_files()
         initial_graph_source = "json" if cfg.graph and cfg.kg_mode == "json" else "splash"
         initial_backend = cfg.backend if cfg.backend in {"cborg", "ollama"} else "cborg"
+        initial_model = default_runtime_model(initial_backend, cfg.model)
         self.runtime = RuntimeSettings(
             backend=initial_backend,
+            model=initial_model,
             graph_source=initial_graph_source,
-            workflow_mode=cfg.workflow_mode if cfg.workflow_mode in {"deterministic", "agentic"} else "deterministic",
+            workflow_mode=cfg.workflow_mode if cfg.workflow_mode in {"deterministic", "agentic"} else "agentic",
+            extraction_mode=cfg.extraction_mode if cfg.extraction_mode in {"full", "targeted"} else "targeted",
+            targeted_max_pages=cfg.targeted_max_pages if cfg.targeted_max_pages > 0 else 6,
             json_graph_path=cfg.graph if cfg.graph and initial_graph_source == "json" else default_json_graph_path(
                 configured_graph=cfg.graph,
                 available=available_json_graphs,
             ),
         )
+        self.cfg.model = initial_model
         self._rebuild_agents()
 
+    def _active_model(self) -> str:
+        return default_runtime_model(self.runtime.backend, self.runtime.model)
+
     def _rebuild_agents(self) -> None:
+        model = self._active_model()
         graph_file = str(self.graph_path())
         self.retrieval = RetrievalAgent(
             graph_file=graph_file,
             graph_source=self.runtime.graph_source,
             backend=self.runtime.backend,
-            model=self.cfg.model,
+            model=model,
         )
         self.download = DownloadAgent(
             backend=self.runtime.backend,
-            model=self.cfg.model,
+            model=model,
             download_delay_seconds=self.cfg.download_delay_seconds,
             validate_downloads=self.cfg.validate_downloads,
         )
         self.debate = EvidenceDebateAgent(
             backend=self.runtime.backend,
-            model=self.cfg.model,
+            model=model,
+        )
+        self.orchestrator = WorkflowOrchestratorAgent(
+            backend=self.runtime.backend,
+            model=model,
+            max_steps=getattr(self.cfg, "max_orchestration_steps", 12),
+        )
+        self.paper_evidence = PaperEvidenceAgent(
+            backend=self.runtime.backend,
+            model=model,
         )
         self.extractor = ExtractorAgent(
             backend=self.runtime.backend,
-            model=self.cfg.model,
+            model=model,
             schema_path=self.cfg.schema_path,
             chebi_obo_path=self.cfg.chebi_obo_path,
             max_workers=self.cfg.workers,
@@ -939,20 +1175,39 @@ class AgentPipelineService:
             )
         return AgentSettingsResponse(
             backend=self.runtime.backend,
+            model=self._active_model(),
             graph_source=self.runtime.graph_source,
             workflow_mode=self.runtime.workflow_mode,
+            extraction_mode=self.runtime.extraction_mode,
+            targeted_max_pages=self.runtime.targeted_max_pages,
             json_graph_path=json_graph_path,
             available_json_graphs=available,
+            available_cborg_models=list_cborg_models(current_model=self.runtime.model),
+            default_ollama_model=default_ollama_model_name(),
         )
 
     async def apply_settings(self, update: AgentSettingsUpdate) -> AgentSettingsResponse:
         async with self.lock:
             backend_changed = False
+            model_changed = False
             graph_changed = False
 
             if update.backend is not None and update.backend != self.runtime.backend:
                 self.runtime.backend = update.backend
                 backend_changed = True
+                if update.model is None:
+                    self.runtime.model = default_runtime_model(self.runtime.backend)
+                    self.cfg.model = self.runtime.model
+                    model_changed = True
+
+            if update.model is not None:
+                normalized = normalize_cborg_model(update.model.strip()) or ""
+                if not normalized:
+                    raise ValueError("Model name cannot be empty")
+                if normalized != self.runtime.model:
+                    self.runtime.model = normalized
+                    self.cfg.model = normalized
+                    model_changed = True
 
             if update.graph_source is not None and update.graph_source != self.runtime.graph_source:
                 self.runtime.graph_source = update.graph_source
@@ -960,6 +1215,15 @@ class AgentPipelineService:
 
             if update.workflow_mode is not None:
                 self.runtime.workflow_mode = update.workflow_mode
+                self.cfg.workflow_mode = update.workflow_mode
+
+            if update.extraction_mode is not None:
+                self.runtime.extraction_mode = update.extraction_mode
+                self.cfg.extraction_mode = update.extraction_mode
+
+            if update.targeted_max_pages is not None:
+                self.runtime.targeted_max_pages = int(update.targeted_max_pages)
+                self.cfg.targeted_max_pages = int(update.targeted_max_pages)
 
             if update.json_graph_path is not None:
                 normalized = update.json_graph_path.replace("\\", "/")
@@ -982,7 +1246,7 @@ class AgentPipelineService:
                 active_graph_path = self._session_graph_path()
                 active_graph_source = "splash"
 
-            if backend_changed:
+            if backend_changed or model_changed:
                 self._rebuild_agents()
 
             if backend_changed or graph_changed:
@@ -1089,20 +1353,74 @@ class AgentPipelineService:
         messages: Optional[List[ChatMessageInput]] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
+        auto_approve: bool = False,
         ) -> ChatResponse:
+        original_question = question.strip()
         async with self.lock:
-            prepared = await self._prepare_chat_question(question.strip(), messages)
+            if self.pending:
+                pending_response = await self._handle_pending_message(original_question, emit=None)
+                if pending_response is not None:
+                    return pending_response
+            self.workflow.update(orchestration_steps=0)
+            extraction_response = await self._maybe_report_active_extraction(original_question, emit=None)
+            if extraction_response is not None:
+                await self._finalize_memory(original_question, extraction_response, effective_question=original_question)
+                return extraction_response
+            paper_response = await self._maybe_query_active_paper(original_question, emit=None)
+            if paper_response is not None:
+                await self._finalize_memory(original_question, paper_response, effective_question=original_question)
+                return paper_response
+            self.workflow.update(
+                current_query=original_question,
+                current_topic=original_question,
+                phase="idle",
+                last_route=None,
+                approved_action=None,
+                post_extraction_sufficient=None,
+                orchestration_steps=0,
+            )
+            prepared = await self._prepare_orchestrated_question(original_question, messages, emit=None)
             if prepared.get("status") == "direct_response":
-                return self._direct_response(
+                response = self._direct_response(
                     answer=str(prepared.get("answer") or ""),
                     reason=str(prepared.get("reason") or ""),
                 )
-            return await self._ask_locked(
-                str(prepared.get("question") or question.strip()),
+                await self._finalize_memory(original_question, response, effective_question=original_question)
+                return response
+            if prepared.get("status") == "query_extracted_paper":
+                response = await self._maybe_query_active_paper(
+                    original_question, emit=None, force=True, decide=False
+                )
+                if response is not None:
+                    await self._finalize_memory(original_question, response, effective_question=original_question)
+                    return response
+            if prepared.get("status") == "report_extraction":
+                response = await self._maybe_report_active_extraction(
+                    original_question, emit=None, force=True, decide=False
+                )
+                if response is not None:
+                    await self._finalize_memory(original_question, response, effective_question=original_question)
+                    return response
+            effective_question = str(prepared.get("question") or original_question)
+            response = await self._ask_locked(
+                effective_question,
                 emit=None,
                 graph_source=graph_source,
                 json_graph_path=json_graph_path,
             )
+            self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
+            auto_finalized = False
+            while auto_approve and response.pending:
+                kind = str(response.pending.get("kind") or "")
+                candidate_index = 0 if kind == "download" else None
+                response = await self._act_locked(
+                    "yes", kind, emit=None, candidate_index=candidate_index
+                )
+                auto_finalized = kind == "extraction"
+                self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
+            if response.pending is None and not auto_finalized:
+                await self._finalize_memory(original_question, response, effective_question=effective_question)
+            return response
 
     async def ask_with_progress(
         self,
@@ -1112,20 +1430,74 @@ class AgentPipelineService:
         messages: Optional[List[ChatMessageInput]] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
+        auto_approve: bool = False,
         ) -> ChatResponse:
+        original_question = question.strip()
         async with self.lock:
-            prepared = await self._prepare_chat_question(question.strip(), messages)
+            if self.pending:
+                pending_response = await self._handle_pending_message(original_question, emit=emit)
+                if pending_response is not None:
+                    return pending_response
+            self.workflow.update(orchestration_steps=0)
+            extraction_response = await self._maybe_report_active_extraction(original_question, emit=emit)
+            if extraction_response is not None:
+                await self._finalize_memory(original_question, extraction_response, effective_question=original_question)
+                return extraction_response
+            paper_response = await self._maybe_query_active_paper(original_question, emit=emit)
+            if paper_response is not None:
+                await self._finalize_memory(original_question, paper_response, effective_question=original_question)
+                return paper_response
+            self.workflow.update(
+                current_query=original_question,
+                current_topic=original_question,
+                phase="idle",
+                last_route=None,
+                approved_action=None,
+                post_extraction_sufficient=None,
+                orchestration_steps=0,
+            )
+            prepared = await self._prepare_orchestrated_question(original_question, messages, emit=emit)
             if prepared.get("status") == "direct_response":
-                return self._direct_response(
+                response = self._direct_response(
                     answer=str(prepared.get("answer") or ""),
                     reason=str(prepared.get("reason") or ""),
                 )
-            return await self._ask_locked(
-                str(prepared.get("question") or question.strip()),
+                await self._finalize_memory(original_question, response, effective_question=original_question)
+                return response
+            if prepared.get("status") == "query_extracted_paper":
+                response = await self._maybe_query_active_paper(
+                    original_question, emit=emit, force=True, decide=False
+                )
+                if response is not None:
+                    await self._finalize_memory(original_question, response, effective_question=original_question)
+                    return response
+            if prepared.get("status") == "report_extraction":
+                response = await self._maybe_report_active_extraction(
+                    original_question, emit=emit, force=True, decide=False
+                )
+                if response is not None:
+                    await self._finalize_memory(original_question, response, effective_question=original_question)
+                    return response
+            effective_question = str(prepared.get("question") or original_question)
+            response = await self._ask_locked(
+                effective_question,
                 emit=emit,
                 graph_source=graph_source,
                 json_graph_path=json_graph_path,
             )
+            self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
+            auto_finalized = False
+            while auto_approve and response.pending:
+                kind = str(response.pending.get("kind") or "")
+                candidate_index = 0 if kind == "download" else None
+                response = await self._act_locked(
+                    "yes", kind, emit=emit, candidate_index=candidate_index
+                )
+                auto_finalized = kind == "extraction"
+                self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
+            if response.pending is None and not auto_finalized:
+                await self._finalize_memory(original_question, response, effective_question=effective_question)
+            return response
 
     async def _emit(
         self,
@@ -1138,7 +1510,200 @@ class AgentPipelineService:
             return
         await emit(event, message, data)
 
+    def _set_pending(self, pending: Optional[Dict[str, Any]], *, phase: Optional[str] = None) -> None:
+        self.pending = pending
+        values: Dict[str, Any] = {"pending": pending}
+        if phase is not None:
+            values["phase"] = phase
+        self.workflow.update(**values)
+
+    def _normalize_pending_state(self) -> Optional[Dict[str, Any]]:
+        """Migrate legacy/in-memory pending payloads into durable token state."""
+        if not isinstance(self.pending, dict):
+            return None
+        pending = dict(self.pending)
+        pending.setdefault("approval_token", uuid.uuid4().hex)
+        kind = pending.get("kind")
+        values: Dict[str, Any] = {
+            "pending": pending,
+            "phase": f"awaiting_{kind}_approval",
+        }
+        if kind == "download":
+            values["candidates"] = [
+                candidate
+                for candidate in (pending.get("candidate_list") or [])
+                if isinstance(candidate, dict)
+            ]
+        elif kind == "extraction":
+            downloaded = pending.get("downloaded") or []
+            candidate = pending.get("selected_candidate") or {}
+            active = dict(self.workflow.data.get("active_paper") or {})
+            if downloaded and not active:
+                path = Path(str(downloaded[0]))
+                active = {
+                    "paper_id": str(candidate.get("id") or candidate.get("doi") or path.name),
+                    "filename": path.name,
+                    "path": str(path),
+                    "title": str(candidate.get("title") or path.name),
+                    "topic": pending.get("effective_question") or pending.get("original_question") or "",
+                    "status": "downloaded",
+                }
+            values["active_paper"] = active
+        self.pending = pending
+        self.workflow.update(**values)
+        return pending
+
+    async def _orchestrator_decision(
+        self,
+        user_turn: str,
+        emit: Optional[ProgressEmitter],
+        *,
+        route_hint: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        state = self.workflow.snapshot()
+        decision = await self.orchestrator.decide(
+            user_turn,
+            state,
+            route_hint,
+            [
+                "WorkflowOrchestratorAgent",
+                "RetrievalAgent",
+                "PaperEvidenceAgent",
+                "DownloadAgent",
+                "EvidenceDebateAgent",
+                "ExtractorAgent",
+            ],
+        )
+        steps = int(state.get("orchestration_steps") or 0) + 1
+        phase = str(self.workflow.data.get("phase") or "idle")
+        self._last_orchestration = {
+            "action": decision["action"],
+            "agent": decision["agent"],
+            "reason": decision["reason"],
+            "state": phase,
+        }
+        self.workflow.update(
+            last_route=decision,
+            orchestration_steps=steps,
+        )
+        await self._emit(
+            emit,
+            "orchestrator_decision",
+            f"Orchestrator selected {decision['action']} via {decision['agent']}",
+            action=decision["action"],
+            agent=decision["agent"],
+            reason=decision["reason"],
+            state=phase,
+        )
+        return decision
+
+    async def _maybe_query_active_paper(
+        self,
+        question: str,
+        emit: Optional[ProgressEmitter],
+        force: bool = False,
+        decide: bool = True,
+    ) -> Optional[ChatResponse]:
+        state = self.workflow.snapshot()
+        if not force and not _paper_reference_followup(question, state):
+            return None
+        decision = (
+            await self._orchestrator_decision(
+                question, emit, route_hint="query_extracted_paper"
+            )
+            if decide
+            else dict(self.workflow.data.get("last_route") or {})
+        )
+        if decision.get("action") != "query_extracted_paper":
+            return None
+        paper = state.get("active_paper") or {}
+        result = await self.paper_evidence.query(
+            question,
+            str(paper.get("path") or ""),
+            str(self.coord.extraction_manifest),
+        )
+        phase = "paper_answered" if result.get("sufficient") else "paper_insufficient"
+        self.workflow.update(phase=phase, last_route=decision)
+        if self._last_orchestration:
+            self._last_orchestration["state"] = phase
+        return self._response(
+            "paper_answered" if result.get("sufficient") else "paper_insufficient",
+            str(result.get("answer") or "The eligible PDF pages were insufficient."),
+            bool(result.get("sufficient")),
+            {},
+            [{"paper_evidence": result}],
+            self.graph_path(),
+            publications_override=[],
+        )
+
+    async def _maybe_report_active_extraction(
+        self,
+        question: str,
+        emit: Optional[ProgressEmitter],
+        force: bool = False,
+        decide: bool = True,
+    ) -> Optional[ChatResponse]:
+        state = self.workflow.snapshot()
+        if not force and not _extracted_terms_followup(question, state):
+            return None
+        decision = (
+            await self._orchestrator_decision(question, emit, route_hint="report_extraction")
+            if decide
+            else dict(self.workflow.data.get("last_route") or {})
+        )
+        if decision.get("action") != "report_extraction":
+            return None
+        paper = state.get("active_paper") or {}
+        result = summarize_extracted_terms(
+            str(self.coord.session_terms),
+            str(self.coord.extraction_manifest),
+            str(paper.get("filename") or ""),
+        )
+        phase = "paper_answered" if result.get("sufficient") else "paper_insufficient"
+        self.workflow.update(phase=phase, last_route=decision)
+        if self._last_orchestration:
+            self._last_orchestration["state"] = phase
+        return self._response(
+            "extraction_reported" if result.get("sufficient") else "paper_insufficient",
+            str(result.get("answer") or "No page-grounded extracted terms were found."),
+            bool(result.get("sufficient")),
+            {},
+            [{"extraction_report": result}],
+            self.graph_path(),
+            publications_override=[],
+        )
+
+    async def _handle_pending_message(
+        self,
+        message: str,
+        emit: Optional[ProgressEmitter],
+    ) -> Optional[ChatResponse]:
+        if not self.pending:
+            return None
+        if self.pending.get("kind") == "download":
+            return await self._handle_pending_download_message(message, emit=emit)
+        normalized = _normalize_chat_text(message)
+        if re.search(r"\b(yes|approve|extract|run extraction|go ahead|continue)\b", normalized):
+            return await self._act_locked("yes", "extraction", emit)
+        if re.search(r"\b(no|decline|skip|cancel|do not|don't)\b", normalized):
+            return await self._act_locked("no", "extraction", emit)
+        await self._orchestrator_decision(message, emit)
+        verdict = self.pending.get("verdict") or {}
+        return self._response(
+            "awaiting_extraction_decision",
+            "The downloaded paper is waiting for explicit extraction approval. Say ‘run extraction’ or ‘skip’.",
+            False,
+            verdict,
+            [],
+            self.graph_path(),
+            pending=self._pending_payload(),
+            publications_override=[],
+        )
+
     def _direct_response(self, *, answer: str, reason: str = "") -> ChatResponse:
+        self.workflow.update(phase="direct_responded")
+        if self._last_orchestration:
+            self._last_orchestration["state"] = "direct_responded"
         graph_path = self.graph_path()
         return ChatResponse(
             status="direct_response",
@@ -1159,7 +1724,78 @@ class AgentPipelineService:
             graph_source_requested=self.runtime.graph_source,
             graph_source_used=self.runtime.graph_source,
             workdir=str(Path(self.cfg.workdir)),
+            orchestration=self._last_orchestration,
         )
+
+    def _record_memory(
+        self,
+        original_question: str,
+        response: ChatResponse,
+        *,
+        effective_question: str,
+    ) -> None:
+        self.memory.record_turn(
+            user_message=original_question,
+            effective_question=effective_question,
+            answer=response.answer,
+            status=response.status,
+            sufficient=response.sufficient,
+            node_ids=response.node_ids,
+            publications=response.publications,
+            rounds=[dict(item) for item in response.rounds],
+        )
+
+    async def _finalize_memory(
+        self,
+        original_question: str,
+        response: ChatResponse,
+        *,
+        effective_question: str,
+    ) -> None:
+        self._record_memory(original_question, response, effective_question=effective_question)
+        await self._maybe_compress_memory()
+
+    async def _maybe_compress_memory(self) -> None:
+        if not self.memory.needs_compression():
+            return
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self.memory.compress(lambda prompt: self._chat_completion(prompt, timeout=60)),
+            )
+        except Exception:
+            # Compression is best-effort; never let it break the chat turn.
+            pass
+
+    def _remember_pending_meta(
+        self,
+        original_question: str,
+        effective_question: str,
+        graph_source: Optional[str],
+        json_graph_path: Optional[str],
+    ) -> None:
+        if not self.pending:
+            return
+        self.pending.setdefault("original_question", original_question)
+        self.pending.setdefault("effective_question", effective_question)
+        self.pending.setdefault("graph_source", graph_source)
+        self.pending.setdefault("json_graph_path", json_graph_path)
+        self._set_pending(self.pending)
+
+    async def reset_session_context(self) -> SessionResetResponse:
+        async with self.lock:
+            self.memory.clear()
+            self.workflow.clear()
+            self.pending = None
+            self._last_orchestration = None
+            return SessionResetResponse(
+                status="reset",
+                session_memory=str(self.memory.path),
+                session_memory_has_context=self.memory.has_context(),
+                workflow_state=str(self.workflow.path),
+                workflow_phase=str(self.workflow.data.get("phase") or "idle"),
+            )
 
     async def _prepare_chat_question(
         self,
@@ -1176,7 +1812,54 @@ class AgentPipelineService:
                 "answer": answer,
                 "reason": str(route.get("reason") or "LLM router determined agents are not needed."),
             }
-        if not _needs_history_rewrite(question, history):
+        if not _needs_history_rewrite(question, history) and not (
+            self.memory.has_context() and _looks_contextual_followup(question)
+        ):
+            return {"status": "kg_question", "question": question}
+        rewritten = await self._rewrite_standalone_question(question, history)
+        return {"status": "kg_question", "question": rewritten or question}
+
+    async def _prepare_orchestrated_question(
+        self,
+        question: str,
+        messages: Optional[List[ChatMessageInput]],
+        emit: Optional[ProgressEmitter],
+    ) -> Dict[str, str]:
+        """Let the orchestrator classify a fresh turn, then resolve references.
+
+        ``_judge_agent_requirement`` is no longer part of production routing. A
+        monkeypatched instance method is honored as a compatibility hint for
+        older integrations while they migrate.
+        """
+        history = _history_payload(messages)
+        route_hint: Optional[str] = None
+        if "_judge_agent_requirement" in self.__dict__:
+            legacy = await self._judge_agent_requirement(question, history)
+            route_hint = "retrieve_kg" if legacy.get("requires_agents", True) else "direct_response"
+        decision = await self._orchestrator_decision(question, emit, route_hint=route_hint)
+        action_name = str(decision.get("action") or "stop_insufficient")
+        if action_name == "direct_response":
+            answer = await self._generate_direct_response(question, history)
+            return {
+                "status": "direct_response",
+                "question": question,
+                "answer": answer,
+                "reason": str(decision.get("reason") or "Direct response selected."),
+            }
+        if action_name == "query_extracted_paper":
+            return {"status": "query_extracted_paper", "question": question}
+        if action_name == "report_extraction":
+            return {"status": "report_extraction", "question": question}
+        if action_name != "retrieve_kg":
+            return {
+                "status": "direct_response",
+                "question": question,
+                "answer": str(decision.get("reason") or "The workflow stopped safely."),
+                "reason": str(decision.get("reason") or "Invalid initial transition."),
+            }
+        if not _needs_history_rewrite(question, history) and not (
+            self.memory.has_context() and _looks_contextual_followup(question)
+        ):
             return {"status": "kg_question", "question": question}
         rewritten = await self._rewrite_standalone_question(question, history)
         return {"status": "kg_question", "question": rewritten or question}
@@ -1197,6 +1880,7 @@ class AgentPipelineService:
             "Set requires_agents=true for materials-science questions, requests for citations, "
             "papers, evidence, code snippets from the KG, or follow-ups that need prior "
             "KG-grounded context.\n\n"
+            f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"USER_MESSAGE:\n{question}"
         )
@@ -1227,6 +1911,7 @@ class AgentPipelineService:
             "determined that the retrieval/download/extraction agents are not needed. "
             "Answer conversationally and briefly. Do not claim to have searched the KG "
             "or papers.\n\n"
+            f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"USER_MESSAGE:\n{question}"
         )
@@ -1246,7 +1931,7 @@ class AgentPipelineService:
 
         cli = make_chat_client(
             backend=self.runtime.backend,
-            model=self.cfg.model or os.environ.get("KG_RAG_CBORG_MODEL", "lbl/cborg-chat"),
+            model=self._active_model(),
             cborg_base=os.environ.get("CBORG_BASE_URL"),
             cborg_api_key=os.environ.get("CBORG_API_KEY"),
         )
@@ -1261,6 +1946,7 @@ class AgentPipelineService:
             "Rewrite the current user turn into a standalone materials-science question "
             "using the conversation history. Do not answer. Preserve technical terms. "
             "Return only the rewritten question.\n\n"
+            f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"CURRENT_USER_TURN:\n{question}"
         )
@@ -1276,7 +1962,7 @@ class AgentPipelineService:
         rewritten = re.sub(r"^['\"]|['\"]$", "", rewritten.strip())
         return rewritten if rewritten else question
 
-    async def _ask_locked(
+    async def _retired_deterministic_locked(
         self,
         question: str,
         emit: Optional[ProgressEmitter],
@@ -1284,13 +1970,14 @@ class AgentPipelineService:
         graph_source: Optional[str],
         json_graph_path: Optional[str],
     ) -> ChatResponse:
-        if self.runtime.workflow_mode == "agentic":
-            return await self._ask_agentic_locked(
-                question,
-                emit,
-                graph_source=graph_source,
-                json_graph_path=json_graph_path,
-            )
+        # Legacy workflow mode names are accepted by settings/configuration, but
+        # both resolve to this one canonical orchestrated implementation.
+        return await self._ask_locked(
+            question,
+            emit,
+            graph_source=graph_source,
+            json_graph_path=json_graph_path,
+        )
 
         rounds: List[Dict[str, Any]] = []
         last_verdict: Dict[str, Any] = {}
@@ -1306,7 +1993,18 @@ class AgentPipelineService:
             active_graph_path = self._session_graph_path()
             active_graph_source = "splash"
 
-        await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
+        try:
+            await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
+        except Exception as exc:
+            self.workflow.update(phase="retrieval_error")
+            return self._response(
+                "retrieval_error",
+                f"Retrieval agent could not load the active graph: {exc}",
+                False,
+                {},
+                [],
+                active_graph_path,
+            )
 
         for round_no in range(1, self.cfg.max_rounds + 1):
             await self._emit(
@@ -1315,7 +2013,18 @@ class AgentPipelineService:
                 "Retrieval agent searching the KG",
                 round=round_no,
             )
-            verdict = await self.retrieval.query(question)
+            try:
+                verdict = await self.retrieval.query(question)
+            except Exception as exc:
+                self.workflow.update(phase="retrieval_error")
+                return self._response(
+                    "retrieval_error",
+                    f"Retrieval failed safely: {exc}",
+                    False,
+                    {},
+                    rounds,
+                    active_graph_path,
+                )
             last_verdict = verdict
             round_info: Dict[str, Any] = {
                 "round": round_no,
@@ -1351,6 +2060,7 @@ class AgentPipelineService:
                 )
 
             if str(verdict.get("status", "")).endswith("_error"):
+                self.workflow.update(phase="retrieval_error")
                 return self._response(
                     "retrieval_error",
                     f"Retrieval failed: {verdict.get('error') or verdict.get('status')}",
@@ -1462,6 +2172,7 @@ class AgentPipelineService:
                 processed_files=int(ext.get("processed_files") or 0),
                 processed_pages_with_terms=int(ext.get("processed_pages_with_terms") or 0),
             )
+            self.coord._record_full_extraction(pending_pdfs, ext)
             self.coord._mark_processed_pdfs(pending_pdfs)
 
             await self._emit(
@@ -1538,7 +2249,7 @@ class AgentPipelineService:
             self.graph_path(),
         )
 
-    async def _ask_agentic_locked(
+    async def _ask_locked(
         self,
         question: str,
         emit: Optional[ProgressEmitter],
@@ -1560,7 +2271,18 @@ class AgentPipelineService:
             active_graph_path = self._session_graph_path()
             active_graph_source = "splash"
 
-        await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
+        try:
+            await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
+        except Exception as exc:
+            self.workflow.update(phase="retrieval_error")
+            return self._response(
+                "retrieval_error",
+                f"Retrieval agent could not load the active graph: {exc}",
+                False,
+                {},
+                [],
+                active_graph_path,
+            )
 
         for round_no in range(1, self.cfg.max_rounds + 1):
             await self._emit(
@@ -1569,7 +2291,18 @@ class AgentPipelineService:
                 "Retrieval agent searching the KG",
                 round=round_no,
             )
-            verdict = await self.retrieval.query(question)
+            try:
+                verdict = await self.retrieval.query(question)
+            except Exception as exc:
+                self.workflow.update(phase="retrieval_error")
+                return self._response(
+                    "retrieval_error",
+                    f"Retrieval failed safely: {exc}",
+                    False,
+                    {},
+                    rounds,
+                    active_graph_path,
+                )
             last_verdict = verdict
             round_info: Dict[str, Any] = {
                 "round": round_no,
@@ -1605,6 +2338,9 @@ class AgentPipelineService:
                 )
 
             if str(verdict.get("status", "")).endswith("_error"):
+                self.workflow.update(phase="retrieval_error")
+                if self._last_orchestration:
+                    self._last_orchestration["state"] = "retrieval_error"
                 return self._response(
                     "retrieval_error",
                     f"Retrieval failed: {verdict.get('error') or verdict.get('status')}",
@@ -1615,30 +2351,14 @@ class AgentPipelineService:
                 )
 
             if verdict.get("sufficient"):
-                await self._emit(
-                    emit,
-                    "debate_started",
-                    "Evidence debate checking KG sufficiency",
-                    round=round_no,
+                self.workflow.update(
+                    phase="answered",
+                    post_extraction_sufficient=True
+                    if self.workflow.data.get("phase") == "paper_extracted"
+                    else self.workflow.data.get("post_extraction_sufficient"),
                 )
-                debate_summary = await self.debate.decide(question, verdict, [], round_no)
-                round_info["debate"] = debate_summary
-                await self._emit(
-                    emit,
-                    "debate_result",
-                    str(debate_summary.get("reason") or "Evidence debate finished"),
-                    round=round_no,
-                    **debate_summary,
-                )
-                await self._emit(
-                    emit,
-                    "action_selected",
-                    "Evidence debate selected answer from KG",
-                    round=round_no,
-                    selected_action="answer_from_kg",
-                    reason=debate_summary.get("reason"),
-                    candidate_titles=debate_summary.get("candidate_titles") or [],
-                )
+                if self._last_orchestration:
+                    self._last_orchestration["state"] = "answered"
                 return self._response(
                     "answered",
                     str(verdict.get("answer") or ""),
@@ -1649,30 +2369,8 @@ class AgentPipelineService:
                 )
 
             if active_graph_source == "json":
-                await self._emit(
-                    emit,
-                    "debate_started",
-                    "Evidence debate checking selected JSON graph",
-                    round=round_no,
-                )
-                debate_summary = await self.debate.decide(question, verdict, [], round_no)
-                round_info["debate"] = debate_summary
-                await self._emit(
-                    emit,
-                    "debate_result",
-                    str(debate_summary.get("reason") or "Evidence debate finished"),
-                    round=round_no,
-                    **debate_summary,
-                )
-                await self._emit(
-                    emit,
-                    "action_selected",
-                    "Evidence debate stopped without extraction",
-                    round=round_no,
-                    selected_action="stop_insufficient",
-                    reason=debate_summary.get("reason"),
-                    candidate_titles=[],
-                )
+                self.workflow.update(phase="stop_insufficient")
+                await self._orchestrator_decision(question, emit)
                 return self._response(
                     "insufficient_json_graph",
                     "The selected JSON graph did not contain enough direct evidence to answer this question.",
@@ -1683,10 +2381,25 @@ class AgentPipelineService:
                 )
 
             missing = verdict.get("missing_topics") or [question]
+            self.workflow.update(
+                phase="retrieval_insufficient",
+                current_query=question,
+                round_no=round_no,
+            )
             candidates: List[Dict[str, Any]] = []
             debate_summary: Dict[str, Any] = {}
             search_query = question
             for preflight_no in range(1, 3):
+                search_decision = await self._orchestrator_decision(question, emit)
+                if search_decision.get("action") != "search_candidates":
+                    return self._response(
+                        "stop_insufficient",
+                        str(search_decision.get("reason") or "Candidate search was not allowed."),
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
                 await self._emit(
                     emit,
                     "candidate_search_started",
@@ -1696,17 +2409,65 @@ class AgentPipelineService:
                     query=search_query,
                     missing_topics=missing,
                 )
-                search = await self.download.search_candidates(
-                    search_query,
-                    missing_topics=missing,
-                    candidate_pool=self.cfg.candidate_pool,
-                )
+                search_action = getattr(self.download, "search_candidates", None)
+                if not callable(search_action):
+                    self.workflow.update(phase="stop_insufficient")
+                    return self._response(
+                        "agent_unavailable",
+                        "DownloadAgent does not provide candidate metadata search; stopped safely.",
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
+                try:
+                    search = await search_action(
+                        search_query,
+                        missing_topics=missing,
+                        candidate_pool=self.cfg.candidate_pool,
+                    )
+                except Exception as exc:
+                    self.workflow.update(phase="stop_insufficient")
+                    return self._response(
+                        "candidate_search_error",
+                        f"Candidate metadata search failed safely: {exc}",
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
                 candidates = search.get("candidates") or []
+                self.workflow.update(
+                    phase="candidates_found" if candidates else "stop_insufficient",
+                    candidates=candidates,
+                    unavailable_candidate_indices=[],
+                )
                 round_info["candidate_search"] = search
                 candidate_titles = [
                     str(c.get("title") or c.get("doi") or c.get("id") or "Untitled")
                     for c in candidates[:5]
                 ]
+                if not candidates:
+                    await self._orchestrator_decision(question, emit)
+                    return self._response(
+                        "stop_insufficient",
+                        "No usable open-access paper candidates were found.",
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
+
+                debate_decision = await self._orchestrator_decision(question, emit)
+                if debate_decision.get("action") != "consult_debate":
+                    return self._response(
+                        "stop_insufficient",
+                        str(debate_decision.get("reason") or "Candidate ranking was not allowed."),
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
                 await self._emit(
                     emit,
                     "candidate_search_result",
@@ -1725,7 +2486,29 @@ class AgentPipelineService:
                     round=round_no,
                     preflight=preflight_no,
                 )
-                debate_summary = await self.debate.decide(question, verdict, candidates, round_no)
+                debate_action = getattr(self.debate, "decide", None)
+                if not callable(debate_action):
+                    self.workflow.update(phase="stop_insufficient")
+                    return self._response(
+                        "agent_unavailable",
+                        "EvidenceDebateAgent is unavailable; candidate selection stopped safely.",
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
+                try:
+                    debate_summary = await debate_action(question, verdict, candidates, round_no)
+                except Exception as exc:
+                    self.workflow.update(phase="stop_insufficient")
+                    return self._response(
+                        "debate_error",
+                        f"Candidate ranking failed safely: {exc}",
+                        False,
+                        verdict,
+                        rounds,
+                        self.graph_path(),
+                    )
                 round_info["debate"] = debate_summary
                 await self._emit(
                     emit,
@@ -1748,6 +2531,7 @@ class AgentPipelineService:
                         candidate_titles=debate_summary.get("candidate_titles") or [],
                     )
                     search_query = str(debate_summary["refined_query"])
+                    self.workflow.update(phase="retrieval_insufficient")
                     continue
                 break
 
@@ -1771,182 +2555,77 @@ class AgentPipelineService:
                     rounds,
                     active_graph_path,
                 )
+
             if action_name != "download_selected":
+                self.workflow.update(phase="stop_insufficient")
+                await self._orchestrator_decision(question, emit)
                 return self._response(
-                    "insufficient_evidence",
-                    str(debate_summary.get("reason") or "Evidence debate found insufficient evidence."),
+                    "stop_insufficient",
+                    str(debate_summary.get("reason") or "Candidate evidence was too weak."),
                     False,
                     verdict,
                     rounds,
                     self.graph_path(),
                 )
 
-            selected_candidates = _select_candidates_by_indices(
-                candidates,
-                debate_summary.get("candidate_indices"),
-            )
-            if not selected_candidates and candidates:
-                selected_candidates = candidates[:1]
-            if not selected_candidates:
+            best, alternatives = self._pick_candidate(candidates, debate_summary)
+            if best is None:
+                self.workflow.update(phase="stop_insufficient")
                 return self._response(
-                    "no_new_papers",
-                    "Evidence debate approved download, but no candidate was selected.",
+                    "stop_insufficient",
+                    str(
+                        debate_summary.get("reason")
+                        or "No candidate papers were found to fill the evidence gap."
+                    ),
                     False,
                     verdict,
                     rounds,
                     self.graph_path(),
                 )
 
+            # Interactive gating: pause and ask the user before downloading.
+            paper_candidates = [c for c in [best, *alternatives] if isinstance(c, dict)]
+            candidate_index = next(
+                (index for index, candidate in enumerate(candidates) if candidate is best),
+                0,
+            )
+            approval_token = uuid.uuid4().hex
+            pending = {
+                "kind": "download",
+                "approval_token": approval_token,
+                "verdict": verdict,
+                "missing_topics": list(missing),
+                "candidates": candidates,
+                "candidate_list": paper_candidates,
+                "selected_candidate": best,
+                "alternatives": alternatives,
+                "reason": debate_summary.get("reason") or "",
+                "round_no": round_no,
+                "active_graph_source": active_graph_source,
+            }
+            self.workflow.update(
+                phase="candidate_selected",
+                candidates=paper_candidates,
+            )
+            self._set_pending(pending, phase="awaiting_download_approval")
+            await self._orchestrator_decision(question, emit)
+            pending_payload = self._pending_payload()
             await self._emit(
                 emit,
-                "download_started",
-                "Download agent fetching approved paper",
+                "awaiting_download_decision",
+                "Waiting for you to name a candidate paper in chat",
                 round=round_no,
-                missing_topics=missing,
-                candidate_titles=[
-                    str(c.get("title") or c.get("doi") or c.get("id") or "Untitled")
-                    for c in selected_candidates
-                ],
+                candidate_titles=[c.get("title") for c in paper_candidates if isinstance(c, dict)],
             )
-            dl = await self.download.download_selected(
-                question,
-                missing_topics=missing,
-                target_dir=str(self.coord.pdf_dir),
-                candidates=selected_candidates,
-                max_papers=min(self.cfg.max_papers, len(selected_candidates)),
-            )
-            round_info["download"] = dl
-            downloaded_names = [Path(p).name for p in (dl.get("downloaded") or [])]
-            await self._emit(
-                emit,
-                "download_result",
-                (
-                    f"Downloaded {dl.get('count', 0)} approved PDF(s)"
-                    + (f": {', '.join(downloaded_names)}" if downloaded_names else "")
-                ),
-                round=round_no,
-                count=int(dl.get("count") or 0),
-                titles=downloaded_names,
-                skipped=int(dl.get("skipped") or 0),
-                failed=int(dl.get("failed") or 0),
-            )
-            if dl.get("count", 0) == 0:
-                return self._response(
-                    "no_new_papers",
-                    "The approved open-access paper could not be downloaded.",
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-
-            round_pdf_dir, pending_pdfs = self.coord._stage_unprocessed_pdfs(round_no)
-            round_info["pending_pdfs"] = [p.name for p in pending_pdfs]
-            if not pending_pdfs:
-                return self._response(
-                    "no_unprocessed_pdfs",
-                    "Downloaded papers were already processed; no new evidence was available.",
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-
-            await self._emit(
-                emit,
-                "extraction_started",
-                "Extractor agent reading approved PDFs",
-                round=round_no,
-                pdfs=[p.name for p in pending_pdfs],
-            )
-            ext = await self.extractor.extract(str(round_pdf_dir), str(self.coord.session_terms))
-            round_info["extraction"] = ext
-            if ext.get("status") == "error":
-                return self._response(
-                    "extraction_error",
-                    f"Extraction failed: {ext.get('message') or ext}",
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-            await self._emit(
-                emit,
-                "extraction_result",
-                (
-                    f"Extracted {ext.get('unique_terms', 0)} term(s) "
-                    f"from {ext.get('processed_files', 0)} PDF(s)"
-                ),
-                round=round_no,
-                term_count=int(ext.get("unique_terms") or 0),
-                processed_files=int(ext.get("processed_files") or 0),
-                processed_pages_with_terms=int(ext.get("processed_pages_with_terms") or 0),
-            )
-            self.coord._mark_processed_pdfs(pending_pdfs)
-
-            await self._emit(
-                emit,
-                "kg_rebuild_started",
-                "KG builder updating session graph",
-                round=round_no,
-            )
-            kg = kg_update.rebuild_kg(str(self.coord.session_terms), str(self.coord.session_kg))
-            round_info["kg"] = kg
-            await self._emit(
-                emit,
-                "kg_rebuild_result",
-                f"Rebuilt KG: {kg.get('nodes', 0)} node(s), {kg.get('edges', 0)} edge(s)",
-                round=round_no,
-                node_count=int(kg.get("nodes") or 0),
-                edge_count=int(kg.get("edges") or 0),
-            )
-
-            if self.cfg.kg_mode == "splash":
-                await self._emit(
-                    emit,
-                    "splash_reimport_started",
-                    "Splash importer refreshing graph store",
-                    round=round_no,
-                )
-                splash = kg_update.splash_reimport(
-                    str(self.coord.session_kg),
-                    splash_repo=self.cfg.splash_repo,
-                    allow_wipe=self.cfg.allow_splash_wipe,
-                )
-                round_info["splash"] = splash
-                if splash.get("status") == "error":
-                    return self._response(
-                        "splash_error",
-                        f"Splash reimport failed: {splash.get('message') or splash}",
-                        False,
-                        verdict,
-                        rounds,
-                        self.graph_path(),
-                    )
-                await self._emit(
-                    emit,
-                    "splash_reimport_result",
-                    "Splash graph store refreshed",
-                    round=round_no,
-                    status=str(splash.get("status") or ""),
-                )
-
-            await self._emit(
-                emit,
-                "reload_started",
-                "Retrieval agent reloading updated KG",
-                round=round_no,
-            )
-            reload_res = await self.retrieval.reload_kg(str(self.coord.session_kg))
-            round_info["reload"] = reload_res
-            active_graph_path = self.graph_path()
-            await self._emit(
-                emit,
-                "reload_result",
-                f"Reloaded KG with {reload_res.get('nodes', 0)} node(s)",
-                round=round_no,
-                node_count=int(reload_res.get("nodes") or 0),
-                status=str(reload_res.get("status") or ""),
+            return self._response(
+                "awaiting_download_decision",
+                CANDIDATE_PAPERS_INTRO,
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+                pending=pending_payload,
+                publications_override=[],
             )
 
         return self._response(
@@ -1958,6 +2637,798 @@ class AgentPipelineService:
             self.graph_path(),
         )
 
+    def _pick_candidate(
+        self,
+        candidates: List[Dict[str, Any]],
+        debate_summary: Dict[str, Any],
+    ) -> tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Best candidate (debate pick, else top-ranked) plus a few alternatives."""
+        if not candidates:
+            return None, []
+        selected = _select_candidates_by_indices(candidates, debate_summary.get("candidate_indices"))
+        best = selected[0] if selected else candidates[0]
+        alternatives = [c for c in candidates if c is not best][:3]
+        return best, alternatives
+
+    async def _extract_rebuild_reload(
+        self,
+        *,
+        emit: Optional[ProgressEmitter],
+        question: str,
+        missing: List[str],
+        round_no: int,
+        round_info: Dict[str, Any],
+        verdict: Dict[str, Any],
+        rounds: List[Dict[str, Any]],
+        approved_pdfs: List[Path],
+    ) -> Optional[ChatResponse]:
+        """Stage -> extract -> rebuild -> reload. Returns ChatResponse only on failure/no-op."""
+        round_pdf_dir, pending_pdfs = self.coord._stage_unprocessed_pdfs(
+            round_no,
+            source_pdfs=approved_pdfs,
+        )
+        round_info["pending_pdfs"] = [p.name for p in pending_pdfs]
+        if not pending_pdfs:
+            return self._response(
+                "no_unprocessed_pdfs",
+                "Downloaded papers were already processed; no new evidence was available.",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+            )
+
+        targeted = self.runtime.extraction_mode == "targeted"
+        await self._emit(
+            emit,
+            "extraction_started",
+            "Extractor agent reading targeted pages from approved PDFs"
+            if targeted
+            else "Extractor agent reading approved PDFs",
+            round=round_no,
+            pdfs=[p.name for p in pending_pdfs],
+            mode=self.runtime.extraction_mode,
+            max_pages=self.runtime.targeted_max_pages if targeted else None,
+        )
+        try:
+            if targeted:
+                extraction_action = getattr(self.extractor, "extract_targeted", None)
+                if not callable(extraction_action):
+                    raise RuntimeError("ExtractorAgent does not provide targeted extraction")
+                ext = await extraction_action(
+                    str(round_pdf_dir),
+                    str(self.coord.session_terms),
+                    question,
+                    list(missing),
+                    self.runtime.targeted_max_pages,
+                )
+            else:
+                extraction_action = getattr(self.extractor, "extract", None)
+                if not callable(extraction_action):
+                    raise RuntimeError("ExtractorAgent does not provide full extraction")
+                ext = await extraction_action(str(round_pdf_dir), str(self.coord.session_terms))
+        except Exception as exc:
+            return self._response(
+                "extraction_error",
+                f"Extraction failed safely: {exc}",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+            )
+        round_info["extraction"] = ext
+        if not isinstance(ext, dict) or ext.get("status") == "error":
+            return self._response(
+                "extraction_error",
+                f"Extraction failed: {ext.get('message') or ext}",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+            )
+        await self._emit(
+            emit,
+            "extraction_result",
+            (
+                f"Extracted {ext.get('unique_terms', 0)} term(s) "
+                f"from {ext.get('processed_files', 0)} PDF(s)"
+            ),
+            round=round_no,
+            mode=self.runtime.extraction_mode,
+            term_count=int(ext.get("unique_terms") or 0),
+            processed_files=int(ext.get("processed_files") or 0),
+            processed_pages_total=int(ext.get("processed_pages_total") or 0),
+            processed_pages_with_terms=int(ext.get("processed_pages_with_terms") or 0),
+        )
+        if targeted:
+            self.coord._record_partial_extraction(
+                query=question,
+                missing_topics=list(missing),
+                pdfs=pending_pdfs,
+                result=ext,
+            )
+        else:
+            self.coord._record_full_extraction(pending_pdfs, ext)
+            self.coord._mark_processed_pdfs(pending_pdfs)
+
+        await self._emit(
+            emit,
+            "kg_rebuild_started",
+            "KG builder updating session graph",
+            round=round_no,
+        )
+        try:
+            kg = kg_update.rebuild_kg(str(self.coord.session_terms), str(self.coord.session_kg))
+        except Exception as exc:
+            return self._response(
+                "kg_rebuild_error",
+                f"KG rebuild failed safely: {exc}",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+            )
+        round_info["kg"] = kg
+        await self._emit(
+            emit,
+            "kg_rebuild_result",
+            f"Rebuilt KG: {kg.get('nodes', 0)} node(s), {kg.get('edges', 0)} edge(s)",
+            round=round_no,
+            node_count=int(kg.get("nodes") or 0),
+            edge_count=int(kg.get("edges") or 0),
+        )
+
+        if self.cfg.kg_mode == "splash":
+            await self._emit(
+                emit,
+                "splash_reimport_started",
+                "Splash importer refreshing graph store",
+                round=round_no,
+            )
+            try:
+                splash = kg_update.splash_reimport(
+                    str(self.coord.session_kg),
+                    splash_repo=self.cfg.splash_repo,
+                    allow_wipe=self.cfg.allow_splash_wipe,
+                )
+            except Exception as exc:
+                return self._response(
+                    "splash_error",
+                    f"Splash reimport failed safely: {exc}",
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+            round_info["splash"] = splash
+            if splash.get("status") == "error":
+                return self._response(
+                    "splash_error",
+                    f"Splash reimport failed: {splash.get('message') or splash}",
+                    False,
+                    verdict,
+                    rounds,
+                    self.graph_path(),
+                )
+            await self._emit(
+                emit,
+                "splash_reimport_result",
+                "Splash graph store refreshed",
+                round=round_no,
+                status=str(splash.get("status") or ""),
+            )
+
+        await self._emit(
+            emit,
+            "reload_started",
+            "Retrieval agent reloading updated KG",
+            round=round_no,
+        )
+        try:
+            reload_res = await self.retrieval.reload_kg(str(self.coord.session_kg))
+        except Exception as exc:
+            return self._response(
+                "retrieval_error",
+                f"Updated KG reload failed safely: {exc}",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+            )
+        round_info["reload"] = reload_res
+        await self._emit(
+            emit,
+            "reload_result",
+            f"Reloaded KG with {reload_res.get('nodes', 0)} node(s)",
+            round=round_no,
+            node_count=int(reload_res.get("nodes") or 0),
+            status=str(reload_res.get("status") or ""),
+        )
+        return None
+
+    # ------------------------------------------------------------------
+    # Interactive resume (agentic gating)
+    # ------------------------------------------------------------------
+    def _pending_candidate_list(self) -> List[Dict[str, Any]]:
+        pending = self.pending or {}
+        candidates = [c for c in (pending.get("candidate_list") or []) if isinstance(c, dict)]
+        if candidates:
+            return candidates
+        best = pending.get("selected_candidate")
+        alternatives = pending.get("alternatives") or []
+        return [c for c in [best, *alternatives] if isinstance(c, dict)]
+
+    def _heuristic_pending_download_intent(
+        self,
+        message: str,
+        candidates: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        normalized = _normalize_chat_text(message)
+        wants_download = bool(re.search(r"\b(download|fetch|get|take|choose|select|use|grab)\b", normalized))
+        declines = bool(
+            re.search(
+                r"\b(don't|do not|no download|none|neither|decline|cancel|skip all|skip download)\b",
+                normalized,
+            )
+        )
+        if declines and not re.search(r"\bbut\b.*\bdownload\b", normalized):
+            return {"action": "decline", "candidate_index": None}
+
+        failed = {int(i) for i in ((self.pending or {}).get("failed_candidate_indices") or [])}
+        if normalized in {"yes", "approve", "approved", "go ahead", "continue"}:
+            for index in range(len(candidates)):
+                if index not in failed:
+                    return {"action": "download", "candidate_index": index}
+        if wants_download and re.search(r"\b(another|next|different)\b", normalized):
+            for index in range(len(candidates)):
+                if index not in failed:
+                    return {"action": "download", "candidate_index": index}
+
+        number_match = re.search(r"\b(?:candidate|paper|option)\s*#?\s*([1-9]\d*)\b", normalized)
+        if wants_download and number_match:
+            index = int(number_match.group(1)) - 1
+            if 0 <= index < len(candidates):
+                return {"action": "download", "candidate_index": index}
+
+        recommended_index = next(
+            (index for index in range(len(candidates)) if index not in failed),
+            0,
+        )
+        ordinals = (
+            ("first", 0),
+            ("recommended", recommended_index),
+            ("second", 1),
+            ("third", 2),
+            ("fourth", 3),
+        )
+        if wants_download:
+            for word, index in ordinals:
+                if re.search(rf"\b{word}\b", normalized) and index < len(candidates):
+                    return {"action": "download", "candidate_index": index}
+
+        if wants_download and "arxiv" in normalized:
+            for index, candidate in enumerate(candidates):
+                repository = str(candidate.get("repository") or "").lower()
+                urls = " ".join(str(url) for url in (candidate.get("pdf_urls") or [])).lower()
+                doi = str(candidate.get("doi") or "").lower()
+                if "arxiv" in repository or "arxiv.org" in urls or "10.48550/arxiv" in doi:
+                    return {"action": "download", "candidate_index": index}
+
+        if wants_download:
+            message_tokens = set(normalized.split()) - {
+                "download", "fetch", "get", "take", "choose", "select", "use", "grab",
+                "paper", "candidate", "option", "the", "a", "an", "please",
+            }
+            best_index: Optional[int] = None
+            best_score = 0.0
+            for index, candidate in enumerate(candidates):
+                title_tokens = set(_normalize_chat_text(str(candidate.get("title") or "")).split())
+                if not title_tokens:
+                    continue
+                score = len(message_tokens & title_tokens) / max(1, len(message_tokens))
+                if score > best_score:
+                    best_index, best_score = index, score
+            if best_index is not None and best_score >= 0.5:
+                return {"action": "download", "candidate_index": best_index}
+            if len(candidates) == 1:
+                return {"action": "download", "candidate_index": 0}
+        return None
+
+    async def _interpret_pending_download_message(self, message: str) -> Dict[str, Any]:
+        candidates = self._pending_candidate_list()
+        heuristic = self._heuristic_pending_download_intent(message, candidates)
+        if heuristic is not None:
+            return heuristic
+
+        listing = [
+            {
+                "index": index,
+                "title": candidate.get("title"),
+                "doi": candidate.get("doi"),
+                "repository": candidate.get("repository"),
+                "unavailable": index in {
+                    int(i) for i in ((self.pending or {}).get("failed_candidate_indices") or [])
+                },
+            }
+            for index, candidate in enumerate(candidates)
+        ]
+        prompt = (
+            "Interpret a user's reply to a candidate-paper list. Match meaning, title fragments, "
+            "ordinals, DOI, and repository names. Return ONLY JSON:\n"
+            '{"action":"download|decline|clarify|new_question","candidate_index":integer|null,"reason":string}\n\n'
+            "Use download when the user asks to fetch one listed paper. Use decline when they refuse "
+            "all downloads. Use clarify when download intent is clear but paper identity is ambiguous. "
+            "Use new_question only when the message is unrelated to this candidate decision. Never "
+            "select a candidate marked unavailable if another candidate matches.\n\n"
+            f"{self.memory.memory_section()}\n"
+            f"CANDIDATES:\n{json.dumps(listing, ensure_ascii=False)}\n\n"
+            f"USER_MESSAGE:\n{message}"
+        )
+
+        def run() -> Dict[str, Any]:
+            return _parse_json_object(self._chat_completion(prompt, timeout=60))
+
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, run)
+        except Exception:
+            return {"action": "clarify", "candidate_index": None}
+        action = str(result.get("action") or "clarify").strip().lower()
+        if action not in {"download", "decline", "clarify", "new_question"}:
+            action = "clarify"
+        index = result.get("candidate_index")
+        try:
+            index = int(index) if index is not None else None
+        except (TypeError, ValueError):
+            index = None
+        if action == "download" and (index is None or not 0 <= index < len(candidates)):
+            action = "clarify"
+            index = None
+        return {"action": action, "candidate_index": index}
+
+    async def _handle_pending_download_message(
+        self,
+        message: str,
+        emit: Optional[ProgressEmitter],
+    ) -> Optional[ChatResponse]:
+        intent = await self._interpret_pending_download_message(message)
+        action_name = intent.get("action")
+        if action_name == "decline":
+            return await self._act_locked("no", "download", emit)
+        if action_name == "download":
+            return await self._act_locked(
+                "yes",
+                "download",
+                emit,
+                candidate_index=int(intent["candidate_index"]),
+            )
+
+        verdict = (self.pending or {}).get("verdict") or {}
+        return self._response(
+            "awaiting_download_decision",
+            "Tell me which candidate to download by title, number, DOI, or repository; "
+            "or say that you do not want any paper downloaded.",
+            False,
+            verdict,
+            [],
+            self.graph_path(),
+            pending=self._pending_payload(),
+            publications_override=[],
+        )
+
+    def _no_pending_response(self) -> ChatResponse:
+        return self._response(
+            "no_pending_action",
+            "There is no pending decision to act on. Ask a new question.",
+            False,
+            {},
+            [],
+            self.graph_path(),
+        )
+
+    async def act(self, decision: str, kind: Optional[str] = None, *, candidate_index: Optional[int] = None) -> ChatResponse:
+        async with self.lock:
+            return await self._act_locked(decision, kind, emit=None, candidate_index=candidate_index)
+
+    async def act_with_progress(
+        self,
+        decision: str,
+        emit: ProgressEmitter,
+        kind: Optional[str] = None,
+        *,
+        candidate_index: Optional[int] = None,
+    ) -> ChatResponse:
+        async with self.lock:
+            return await self._act_locked(decision, kind, emit=emit, candidate_index=candidate_index)
+
+    async def _act_locked(
+        self,
+        decision: str,
+        kind: Optional[str],
+        emit: Optional[ProgressEmitter],
+        *,
+        candidate_index: Optional[int] = None,
+    ) -> ChatResponse:
+        pending = self._normalize_pending_state()
+        if not pending:
+            return self._no_pending_response()
+        pending_kind = pending.get("kind")
+        if kind is not None and kind != pending_kind:
+            raise ValueError(f"Pending action is {pending_kind}, not {kind}")
+        verdict = pending.get("verdict") or {}
+        original_question = pending.get("original_question") or ""
+        effective_question = pending.get("effective_question") or original_question
+
+        if decision == "no":
+            self._set_pending(None, phase="stopped_by_user")
+            self.workflow.update(approved_action=None)
+            if pending_kind == "download":
+                message = (
+                    "Okay - I will not download a paper. The current knowledge graph does not "
+                    "have enough direct evidence to answer this question."
+                )
+                publications_override: Optional[List[Dict[str, Any]]] = None
+            else:
+                message = (
+                    "Okay - I downloaded the paper but will not run extraction. Ask again if "
+                    "you would like me to extract from it."
+                )
+                publications_override = []
+            response = self._response(
+                "stopped_by_user",
+                message,
+                False,
+                verdict,
+                [],
+                self.graph_path(),
+                publications_override=publications_override,
+            )
+            await self._finalize_memory(original_question, response, effective_question=effective_question)
+            return response
+
+        if pending_kind == "download":
+            if decision != "yes":
+                raise ValueError("Download actions require decision=yes with a candidate_index")
+            candidate_list = [c for c in (pending.get("candidate_list") or []) if isinstance(c, dict)]
+            if not candidate_list:
+                best = pending.get("selected_candidate")
+                alternatives = pending.get("alternatives") or []
+                candidate_list = [c for c in [best, *alternatives] if isinstance(c, dict)]
+            if candidate_index is None:
+                raise ValueError("candidate_index is required to download a paper")
+            if candidate_index < 0 or candidate_index >= len(candidate_list):
+                raise ValueError("candidate_index is out of range")
+            unavailable = {
+                int(index) for index in self.workflow.data.get("unavailable_candidate_indices") or []
+            }
+            if candidate_index in unavailable:
+                raise ValueError("candidate_index is unavailable")
+            self.workflow.update(
+                approved_action={
+                    "kind": "download",
+                    "approval_token": pending.get("approval_token"),
+                    "candidate_index": candidate_index,
+                }
+            )
+            approved = await self._orchestrator_decision(effective_question, emit)
+            if approved.get("action") != "download_selected":
+                raise ValueError("Download approval did not match the pending action")
+            pending = {**pending, "selected_candidate": candidate_list[candidate_index]}
+            self.workflow.update(approved_action=None, phase="downloading")
+            return await self._resume_download(pending, emit)
+        self.workflow.update(
+            approved_action={
+                "kind": "extraction",
+                "approval_token": pending.get("approval_token"),
+            }
+        )
+        approved = await self._orchestrator_decision(effective_question, emit)
+        if approved.get("action") != "extract_selected":
+            raise ValueError("Extraction approval did not match the pending action")
+        self.workflow.update(approved_action=None, phase="extracting")
+        return await self._resume_extraction(pending, emit)
+
+    async def _resume_download(
+        self,
+        pending: Dict[str, Any],
+        emit: Optional[ProgressEmitter],
+    ) -> ChatResponse:
+        verdict = pending.get("verdict") or {}
+        best = pending.get("selected_candidate")
+        missing = pending.get("missing_topics") or []
+        question = pending.get("effective_question") or pending.get("original_question") or ""
+        original_question = pending.get("original_question") or question
+        round_no = int(pending.get("round_no") or 1)
+        rounds: List[Dict[str, Any]] = [{"round": round_no, "retrieval": verdict}]
+
+        await self._emit(
+            emit,
+            "download_started",
+            "Download agent fetching the approved paper",
+            round=round_no,
+            candidate_titles=[best.get("title")] if isinstance(best, dict) else [],
+        )
+        download_action = getattr(self.download, "download_selected", None)
+        if not callable(download_action):
+            self._set_pending(None, phase="stop_insufficient")
+            return self._response(
+                "agent_unavailable",
+                "DownloadAgent cannot execute the approved download; stopped safely.",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+                publications_override=[],
+            )
+        try:
+            dl = await download_action(
+                question,
+                missing_topics=missing,
+                target_dir=str(self.coord.pdf_dir),
+                candidates=[best] if best else [],
+                max_papers=1,
+                validate_downloads=False,
+                refresh_urls=True,
+            )
+        except Exception as exc:
+            self._set_pending(None, phase="stop_insufficient")
+            return self._response(
+                "download_error",
+                f"The approved download failed safely: {exc}",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+                publications_override=[],
+            )
+        downloaded = dl.get("downloaded") or []
+        downloaded_names = [Path(p).name for p in downloaded]
+        await self._emit(
+            emit,
+            "download_result",
+            f"Downloaded {dl.get('count', 0)} PDF(s)"
+            + (f": {', '.join(downloaded_names)}" if downloaded_names else ""),
+            round=round_no,
+            count=int(dl.get("count") or 0),
+            titles=downloaded_names,
+            skipped=int(dl.get("skipped") or 0),
+            failed=int(dl.get("failed") or 0),
+        )
+        if dl.get("count", 0) == 0:
+            candidate_list = [c for c in (pending.get("candidate_list") or []) if isinstance(c, dict)]
+            selected_index = next(
+                (
+                    index
+                    for index, candidate in enumerate(candidate_list)
+                    if candidate is best
+                    or (
+                        str(candidate.get("id") or candidate.get("doi") or candidate.get("title") or "")
+                        == str((best or {}).get("id") or (best or {}).get("doi") or (best or {}).get("title") or "")
+                    )
+                ),
+                None,
+            )
+            failed_indices = {
+                int(index) for index in (pending.get("failed_candidate_indices") or [])
+            }
+            if selected_index is not None:
+                failed_indices.add(selected_index)
+            next_pending = {
+                **pending,
+                "failed_candidate_indices": sorted(failed_indices),
+            }
+            self.workflow.update(
+                unavailable_candidate_indices=sorted(failed_indices),
+                phase="awaiting_download_approval",
+            )
+            self._set_pending(next_pending)
+            response = self._response(
+                "awaiting_download_decision",
+                self._download_failure_message(dl, best)
+                + " Ask me to download another candidate by title, number, DOI, or repository.",
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+                pending=self._pending_payload(),
+                publications_override=[],
+            )
+            return response
+
+        filename = downloaded_names[0] if downloaded_names else _safe_candidate_filename(best or {})
+        publication = self._candidate_publication(best or {}, filename)
+        paper_id = str((best or {}).get("id") or (best or {}).get("doi") or filename)
+        active_paper = {
+            "paper_id": paper_id,
+            "filename": filename,
+            "path": str(downloaded[0]) if downloaded else str(self.coord.pdf_dir / filename),
+            "title": str((best or {}).get("title") or filename),
+            "topic": question,
+            "status": "downloaded",
+        }
+        next_pending = {
+            "kind": "extraction",
+            "approval_token": uuid.uuid4().hex,
+            "verdict": verdict,
+            "missing_topics": missing,
+            "selected_candidate": best,
+            "downloaded": downloaded,
+            "reason": "",
+            "round_no": round_no,
+            "original_question": original_question,
+            "effective_question": question,
+            "active_graph_source": pending.get("active_graph_source"),
+        }
+        self.workflow.update(active_paper=active_paper, phase="paper_downloaded")
+        self._set_pending(next_pending, phase="awaiting_extraction_approval")
+        await self._orchestrator_decision(question, emit)
+        pending_payload = self._pending_payload()
+        await self._emit(
+            emit,
+            "awaiting_extraction_decision",
+            "Paper downloaded - waiting for your approval to run targeted extraction",
+            round=round_no,
+        )
+        return self._response(
+            "awaiting_extraction_decision",
+            "",
+            False,
+            verdict,
+            rounds,
+            self.graph_path(),
+            pending=pending_payload,
+            publications_override=[],
+        )
+
+    async def _resume_extraction(
+        self,
+        pending: Dict[str, Any],
+        emit: Optional[ProgressEmitter],
+    ) -> ChatResponse:
+        verdict = pending.get("verdict") or {}
+        missing = pending.get("missing_topics") or []
+        question = pending.get("effective_question") or pending.get("original_question") or ""
+        original_question = pending.get("original_question") or question
+        round_no = int(pending.get("round_no") or 1)
+        round_info: Dict[str, Any] = {"round": round_no, "retrieval": verdict}
+        rounds: List[Dict[str, Any]] = [round_info]
+        approved_pdfs = [Path(str(path)) for path in (pending.get("downloaded") or [])]
+
+        failure = await self._extract_rebuild_reload(
+            emit=emit,
+            question=question,
+            missing=list(missing),
+            round_no=round_no,
+            round_info=round_info,
+            verdict=verdict,
+            rounds=rounds,
+            approved_pdfs=approved_pdfs,
+        )
+        if failure is not None:
+            self._set_pending(None, phase=str(failure.status))
+            await self._finalize_memory(original_question, failure, effective_question=question)
+            return failure
+
+        extraction = round_info.get("extraction") or {}
+        pdf_results = [
+            item for item in (extraction.get("pdf_results") or []) if isinstance(item, dict)
+        ]
+        active_paper = dict(self.workflow.data.get("active_paper") or {})
+        active_paper["status"] = "extracted"
+        active_paper["extraction_mode"] = self.runtime.extraction_mode
+        self._set_pending(None, phase="paper_extracted")
+        self.workflow.update(
+            active_paper=active_paper,
+            extraction={
+                "mode": self.runtime.extraction_mode,
+                "processed_pages_total": extraction.get("processed_pages_total"),
+                "processed_pages_with_terms": extraction.get("processed_pages_with_terms"),
+                "selected_pages": pdf_results[0].get("selected_pages") if pdf_results else [],
+            },
+        )
+        decision = await self._orchestrator_decision(question, emit)
+        if decision.get("action") != "retrieve_kg":
+            response = self._response(
+                "orchestration_stopped",
+                str(decision.get("reason") or "Extraction completed, but re-check was stopped."),
+                False,
+                verdict,
+                rounds,
+                self.graph_path(),
+            )
+            await self._finalize_memory(original_question, response, effective_question=question)
+            return response
+
+        active_graph_path = self.graph_path()
+        await self._emit(
+            emit,
+            "retrieval_started",
+            "Retrieval agent re-checking the updated KG",
+            round=round_no,
+        )
+        new_verdict = await self.retrieval.query(question)
+        round_info["retrieval_after"] = new_verdict
+        term_report = summarize_extracted_terms(
+            str(self.coord.session_terms),
+            str(self.coord.extraction_manifest),
+            str(active_paper.get("filename") or ""),
+            max_terms=6,
+        )
+        round_info["extraction_report"] = term_report
+        extraction_answer = _post_extraction_answer(
+            round_info.get("extraction") or {},
+            term_report,
+            question,
+            new_verdict,
+        )
+        selected_count = len(new_verdict.get("selected") or [])
+        await self._emit(
+            emit,
+            "retrieval_result",
+            f"Retrieved {selected_count} KG node(s); "
+            + ("evidence sufficient" if new_verdict.get("sufficient") else "evidence still insufficient"),
+            round=round_no,
+            selected_count=selected_count,
+            sufficient=bool(new_verdict.get("sufficient")),
+            missing_topics=new_verdict.get("missing_topics") or [],
+        )
+
+        selected_ids = [str(n) for n in (new_verdict.get("selected") or [])]
+        if selected_ids:
+            subset = graph_subset_from_file(active_graph_path, selected_ids)
+            await self._emit(
+                emit,
+                "graph_update",
+                f"Mapping {len(subset['nodes'])} node(s) onto the graph",
+                round=round_no,
+                node_ids=selected_ids,
+                graph=subset,
+            )
+
+        if str(new_verdict.get("status", "")).endswith("_error"):
+            self._set_pending(None, phase="retrieval_error")
+            response = self._response(
+                "retrieval_error",
+                extraction_answer,
+                False,
+                new_verdict,
+                rounds,
+                active_graph_path,
+            )
+            await self._finalize_memory(original_question, response, effective_question=question)
+            return response
+
+        if new_verdict.get("sufficient"):
+            self._set_pending(None, phase="answered")
+            self.workflow.update(post_extraction_sufficient=True)
+            if self._last_orchestration:
+                self._last_orchestration["state"] = "answered"
+            response = self._response(
+                "answered",
+                extraction_answer,
+                True,
+                new_verdict,
+                rounds,
+                active_graph_path,
+            )
+            await self._finalize_memory(original_question, response, effective_question=question)
+            return response
+
+        self._set_pending(None, phase="post_extraction_insufficient")
+        self.workflow.update(post_extraction_sufficient=False)
+        if self._last_orchestration:
+            self._last_orchestration["state"] = "post_extraction_insufficient"
+        response = self._response(
+            "insufficient_evidence",
+            extraction_answer,
+            False,
+            new_verdict,
+            rounds,
+            active_graph_path,
+        )
+        await self._finalize_memory(original_question, response, effective_question=question)
+        return response
+
     def _response(
         self,
         status: str,
@@ -1966,23 +3437,122 @@ class AgentPipelineService:
         verdict: Dict[str, Any],
         rounds: List[Dict[str, Any]],
         graph_path: Path,
+        *,
+        pending: Optional[Dict[str, Any]] = None,
+        publications_override: Optional[List[Dict[str, Any]]] = None,
     ) -> ChatResponse:
+        selected_ids = [str(n) for n in (verdict.get("selected") or [])]
+        publications = (
+            publications_override
+            if publications_override is not None
+            else publications_for_selected_nodes(graph_path, selected_ids)
+        )
         return ChatResponse(
             status=status,
             answer=answer,
             sufficient=sufficient,
-            node_ids=[str(n) for n in (verdict.get("selected") or [])],
-            publications=publications_for_selected_nodes(
-                graph_path,
-                [str(n) for n in (verdict.get("selected") or [])],
-            ),
+            node_ids=selected_ids,
+            publications=publications,
             confidence=_confidence(verdict),
             rounds=rounds,
             graph=graph_payload_from_file(graph_path),
             graph_source_requested=verdict.get("graph_source_requested"),
             graph_source_used=verdict.get("graph_source_used"),
             workdir=str(Path(self.cfg.workdir)),
+            pending=pending,
+            orchestration=self._last_orchestration,
         )
+
+    @staticmethod
+    def _candidate_public(
+        candidate: Optional[Dict[str, Any]],
+        *,
+        index: Optional[int] = None,
+        recommended: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        if not isinstance(candidate, dict):
+            return None
+        payload = {
+            "title": str(candidate.get("title") or candidate.get("doi") or candidate.get("id") or "Untitled"),
+            "doi": candidate.get("doi"),
+            "publication_year": candidate.get("publication_year"),
+            "abstract": str(candidate.get("abstract") or "")[:600],
+            "score": float(candidate.get("score") or candidate.get("_score") or 0.0),
+            "repository": candidate.get("repository"),
+        }
+        if index is not None:
+            payload["index"] = index
+        if recommended:
+            payload["recommended"] = True
+        return payload
+
+    def _download_papers_public(self) -> List[Dict[str, Any]]:
+        candidates = self._pending_candidate_list()
+        failed = {int(index) for index in ((self.pending or {}).get("failed_candidate_indices") or [])}
+        recommended_index = next(
+            (index for index in range(len(candidates)) if index not in failed),
+            None,
+        )
+        papers: List[Dict[str, Any]] = []
+        for index, candidate in enumerate(candidates):
+            public = self._candidate_public(
+                candidate,
+                index=index,
+                recommended=index == recommended_index,
+            )
+            if public:
+                if index in failed:
+                    public["unavailable"] = True
+                papers.append(public)
+        return papers
+
+    def _candidate_publication(self, candidate: Dict[str, Any], filename: Optional[str] = None) -> Dict[str, Any]:
+        return {
+            "paper_title": str(candidate.get("title") or "Untitled"),
+            "doi": candidate.get("doi"),
+            "publication_year": candidate.get("publication_year"),
+            "source_paper": filename or _safe_candidate_filename(candidate),
+            "abstract_text": str(candidate.get("abstract") or "")[:1600],
+        }
+
+    @staticmethod
+    def _download_failure_message(
+        dl: Dict[str, Any],
+        candidate: Optional[Dict[str, Any]],
+    ) -> str:
+        title = str((candidate or {}).get("title") or "the selected paper")
+        if int(dl.get("semantic_rejected") or 0) > 0:
+            return (
+                f"Downloaded **{title}**, but it did not pass validation. "
+                "Try another candidate."
+            )
+        if int(dl.get("failed") or 0) > 0:
+            return (
+                f"The open-access PDF for **{title}** could not be retrieved. "
+                "The repository copy may be temporarily unavailable. "
+                "Try another candidate."
+            )
+        return f"The open-access paper **{title}** could not be downloaded."
+
+    def _pending_payload(self) -> Optional[Dict[str, Any]]:
+        if not self.pending:
+            return None
+        kind = self.pending.get("kind")
+        if kind == "download":
+            return {
+                "kind": kind,
+                "papers": self._download_papers_public(),
+            }
+
+        candidate = self._candidate_public(self.pending.get("selected_candidate"))
+        if isinstance(candidate, dict):
+            downloaded = self.pending.get("downloaded") or []
+            if downloaded:
+                candidate["source_paper"] = Path(str(downloaded[0])).name
+        return {
+            "kind": kind,
+            "candidate": candidate,
+        }
 
 
 def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = None) -> FastAPI:
@@ -2004,7 +3574,15 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             "workdir": str(cfg.workdir),
             "kg_mode": service.runtime.graph_source,
             "backend": service.runtime.backend,
+            "model": service._active_model(),
             "workflow_mode": service.runtime.workflow_mode,
+            "extraction_mode": service.runtime.extraction_mode,
+            "targeted_max_pages": service.runtime.targeted_max_pages,
+            "session_memory": str(service.memory.path),
+            "session_memory_has_context": service.memory.has_context(),
+            "workflow_state": str(service.workflow.path),
+            "workflow_phase": service.workflow.data.get("phase"),
+            "pending_approval": (service.pending or {}).get("kind"),
             "max_rounds": cfg.max_rounds,
         }
 
@@ -2018,6 +3596,10 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             return await service.apply_settings(req)
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/session/reset", response_model=SessionResetResponse)
+    async def reset_session() -> SessionResetResponse:
+        return await service.reset_session_context()
 
     @app.get("/graph", response_model=GraphPayload)
     async def graph() -> GraphPayload:
@@ -2055,6 +3637,13 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/chat/action", response_model=ChatResponse)
+    async def chat_action(req: ChatActionRequest) -> ChatResponse:
+        try:
+            return await service.act(req.decision, req.kind, candidate_index=req.candidate_index)
+        except (FileNotFoundError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/publications/search", response_model=PublicationSearchResponse)
     async def publication_search(req: PublicationSearchRequest) -> PublicationSearchResponse:
         try:
@@ -2089,6 +3678,55 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         messages=req.messages,
                         graph_source=req.graph_source,
                         json_graph_path=req.json_graph_path,
+                    )
+                    payload = _model_to_jsonable(response)
+                    if response.status.endswith("_error"):
+                        await queue.put(("error", payload))
+                    else:
+                        await queue.put(("complete", payload))
+                except Exception as exc:  # pragma: no cover - defensive stream boundary
+                    await queue.put(("error", {"status": "stream_error", "message": str(exc)}))
+                finally:
+                    await queue.put(None)
+
+            task = asyncio.create_task(run())
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    event, data = item
+                    yield _sse(event, data)
+            finally:
+                if not task.done():
+                    task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    @app.post("/chat/action/stream")
+    async def chat_action_stream(req: ChatActionRequest) -> StreamingResponse:
+        async def events():
+            queue: asyncio.Queue[Optional[tuple[str, Dict[str, Any]]]] = asyncio.Queue()
+
+            async def emit(event: str, message: str, data: Dict[str, Any]) -> None:
+                await queue.put((
+                    "progress",
+                    {
+                        "phase": event,
+                        "message": message,
+                        **data,
+                    },
+                ))
+
+            async def run() -> None:
+                try:
+                    response = await service.act_with_progress(
+                        req.decision,
+                        emit,
+                        req.kind,
+                        candidate_index=req.candidate_index,
                     )
                     payload = _model_to_jsonable(response)
                     if response.status.endswith("_error"):

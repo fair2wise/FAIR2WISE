@@ -1,23 +1,19 @@
-"""Coordinator: launches the 3 agents and runs the retrieve/grow/retrieve loop.
+"""Coordinator helpers and CLI adapter for the orchestrated KG-RAG workflow.
 
-Flow per question (up to ``max_rounds``):
-  1. RetrievalAgent.query -> if sufficient, answer and stop.
-  2. else DownloadAgent.find_and_download(missing_topics) -> if nothing new, stop.
-  3. ExtractorAgent.extract -> kg_update.rebuild_kg (+ splash reimport in splash
-     mode) -> RetrievalAgent.reload_kg, then repeat.
+The public flow is owned by ``WorkflowOrchestratorAgent``. Candidate metadata
+search can run automatically; PDF download and extraction require explicit
+approval unless the CLI configuration enables ``auto_approve``.
 """
 from __future__ import annotations
 
 import json
 import logging
 import shutil
-from concurrent.futures import ThreadPoolExecutor
+import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-from academy.exchange import LocalExchangeFactory
-from academy.manager import Manager
 
 from . import kg_update
 from .debate_agent import EvidenceDebateAgent
@@ -41,11 +37,31 @@ def default_workers() -> int:
 
 
 def default_workflow_mode() -> str:
-    """Workflow mode (``F2W_WORKFLOW_MODE`` / config / deterministic fallback)."""
+    """Workflow mode (``F2W_WORKFLOW_MODE`` / config / agentic fallback)."""
     from ..project_config import config_value
 
-    value = str(config_value("f2w_agent.workflow_mode", fallback="deterministic") or "").strip().lower()
-    return value if value in {"deterministic", "agentic"} else "deterministic"
+    value = str(config_value("f2w_agent.workflow_mode", fallback="agentic") or "").strip().lower()
+    return value if value in {"deterministic", "agentic"} else "agentic"
+
+
+def default_extraction_mode() -> str:
+    """Extraction mode (``F2W_EXTRACTION_MODE`` / config / full fallback)."""
+    from ..project_config import config_value
+
+    value = str(config_value("f2w_agent.extraction_mode", fallback="targeted") or "").strip().lower()
+    return value if value in {"full", "targeted"} else "targeted"
+
+
+def default_targeted_max_pages() -> int:
+    """Maximum pages per PDF for targeted partial extraction."""
+    from ..project_config import config_value
+
+    value = config_value("f2w_agent.targeted_max_pages", fallback=6, cast=int)
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 6
+    return parsed if parsed > 0 else 6
 
 
 @dataclass
@@ -67,6 +83,10 @@ class CoordinatorConfig:
     validate_downloads: bool = True
     allow_splash_wipe: bool = False
     workflow_mode: str = field(default_factory=default_workflow_mode)
+    extraction_mode: str = field(default_factory=default_extraction_mode)
+    targeted_max_pages: int = field(default_factory=default_targeted_max_pages)
+    max_orchestration_steps: int = 12
+    auto_approve: bool = False
 
 
 def _empty_terms(path: Path) -> None:
@@ -98,18 +118,57 @@ def _save_processed_pdfs(path: Path, processed: set[str]) -> None:
     path.write_text(json.dumps(sorted(processed), indent=2))
 
 
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _load_extraction_manifest(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {"papers": {}}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        logger.warning("Ignoring malformed extraction manifest: %s", path)
+        return {"papers": {}}
+    if not isinstance(data, dict):
+        return {"papers": {}}
+    papers = data.get("papers")
+    if not isinstance(papers, dict):
+        data["papers"] = {}
+    return data
+
+
+def _save_extraction_manifest(path: Path, manifest: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 class Coordinator:
-    """Owns session state and drives the multi-agent loop over one Manager."""
+    """Owns session files; public runs delegate to AgentPipelineService."""
 
     def __init__(self, cfg: CoordinatorConfig) -> None:
         self.cfg = cfg
-        self.cfg.workflow_mode = str(self.cfg.workflow_mode or "deterministic").strip().lower()
+        self.cfg.workflow_mode = str(self.cfg.workflow_mode or "agentic").strip().lower()
         if self.cfg.workflow_mode not in {"deterministic", "agentic"}:
-            self.cfg.workflow_mode = "deterministic"
+            self.cfg.workflow_mode = "agentic"
+        self.cfg.extraction_mode = str(self.cfg.extraction_mode or "targeted").strip().lower()
+        if self.cfg.extraction_mode not in {"full", "targeted"}:
+            self.cfg.extraction_mode = "targeted"
+        try:
+            self.cfg.targeted_max_pages = int(self.cfg.targeted_max_pages)
+        except (TypeError, ValueError):
+            self.cfg.targeted_max_pages = 6
+        if self.cfg.targeted_max_pages <= 0:
+            self.cfg.targeted_max_pages = 6
         self.workdir = Path(cfg.workdir)
         self.pdf_dir = self.workdir / "pdfs"
         self.extract_rounds_dir = self.workdir / "extract_rounds"
         self.processed_pdfs_manifest = self.workdir / "processed_pdfs.json"
+        self.extraction_manifest = self.workdir / "extraction_manifest.json"
         self.session_terms = self.workdir / "terms.json"
         self.session_kg = self.workdir / "kg.json"
         self.workdir.mkdir(parents=True, exist_ok=True)
@@ -138,59 +197,28 @@ class Coordinator:
             self.initial_graph = str(self.session_kg)
 
     async def run(self, questions: List[str]) -> None:
-        """Launch the agents and answer each question through the loop."""
-        async with await Manager.from_exchange_factory(
-            factory=LocalExchangeFactory(),
-            executors=ThreadPoolExecutor(max_workers=max(4, self.cfg.workers)),
-        ) as manager:
-            retrieval = await manager.launch(
-                RetrievalAgent(
-                    graph_file=self.initial_graph,
-                    graph_source=self.cfg.kg_mode,
-                    backend=self.cfg.backend,
-                    model=self.cfg.model,
-                )
-            )
-            download = await manager.launch(
-                DownloadAgent(
-                    backend=self.cfg.backend,
-                    model=self.cfg.model,
-                    download_delay_seconds=self.cfg.download_delay_seconds,
-                    validate_downloads=self.cfg.validate_downloads,
-                )
-            )
-            extractor = await manager.launch(
-                ExtractorAgent(
-                    backend=self.cfg.backend,
-                    model=self.cfg.model,
-                    schema_path=self.cfg.schema_path,
-                    chebi_obo_path=self.cfg.chebi_obo_path,
-                    max_workers=self.cfg.workers,
-                )
-            )
-            debate = None
-            if self.cfg.workflow_mode == "agentic":
-                debate = await manager.launch(
-                    EvidenceDebateAgent(
-                        backend=self.cfg.backend,
-                        model=self.cfg.model,
-                    )
-                )
-            try:
-                for q in questions:
-                    await self._answer(q, retrieval, download, extractor, debate)
-            finally:
-                handles = [retrieval, download, extractor]
-                if debate is not None:
-                    handles.append(debate)
-                for h in handles:
-                    await manager.shutdown(h, blocking=True)
+        """Answer questions through the same persistent orchestrator used by HTTP."""
+        # Lazy import avoids an import cycle: the service reuses Coordinator's
+        # staging and extraction-manifest helpers.
+        from .api import AgentPipelineService
+
+        service = AgentPipelineService(self.cfg)
+        for question in questions:
+            response = await service.ask(question, auto_approve=self.cfg.auto_approve)
+            print(f"\n=== Question: {question} ===")
+            if response.answer:
+                print(f"\n[Answer]\n{response.answer}")
+            if response.pending:
+                kind = response.pending.get("kind")
+                if kind == "download":
+                    print("[approval required] Choose a candidate in a later ask/chat turn.")
+                else:
+                    print("[approval required] Approve extraction in a later ask/chat turn.")
 
     async def _answer(self, question: str, retrieval, download, extractor, debate=None) -> None:
-        if self.cfg.workflow_mode == "agentic":
-            if debate is None:
-                print("[stop] agentic workflow requires EvidenceDebateAgent.")
-                return
+        # Retained only as a low-level legacy test/helper. Public CLI/API entry
+        # points use ``run`` and therefore the canonical orchestrator service.
+        if self.cfg.workflow_mode == "agentic" and debate is not None:
             await self._answer_agentic(question, retrieval, download, extractor, debate)
             return
 
@@ -251,6 +279,7 @@ class Coordinator:
             if ext.get("status") == "error":
                 print(f"[stop] extraction failed: {ext.get('message') or ext}")
                 return
+            self._record_full_extraction(pending_pdfs, ext)
             self._mark_processed_pdfs(pending_pdfs)
             print(f"[round {round_no}] extracted -> {ext.get('unique_terms', '?')} unique terms")
 
@@ -408,17 +437,47 @@ class Coordinator:
             if not pending_pdfs:
                 print("[stop] no unprocessed PDFs available after download.")
                 return
-            print(f"[round {round_no}] extracting {len(pending_pdfs)} approved PDF(s)")
-            try:
-                ext = await extractor.extract(str(round_pdf_dir), str(self.session_terms))
-            except Exception as exc:
-                logger.exception("Extractor agent failed")
-                print(f"[stop] extraction failed: {exc}")
+            if self.cfg.extraction_mode == "targeted":
+                print(
+                    f"[round {round_no}] targeted extraction from {len(pending_pdfs)} approved PDF(s) "
+                    f"(max_pages={self.cfg.targeted_max_pages})"
+                )
+                try:
+                    ext = await extractor.extract_targeted(
+                        str(round_pdf_dir),
+                        str(self.session_terms),
+                        question,
+                        missing,
+                        self.cfg.targeted_max_pages,
+                    )
+                except Exception as exc:
+                    logger.exception("Extractor agent failed")
+                    print(f"[stop] targeted extraction failed: {exc}")
+                    return
+            else:
+                print(f"[round {round_no}] extracting {len(pending_pdfs)} approved PDF(s)")
+                try:
+                    ext = await extractor.extract(str(round_pdf_dir), str(self.session_terms))
+                except Exception as exc:
+                    logger.exception("Extractor agent failed")
+                    print(f"[stop] extraction failed: {exc}")
+                    return
+            if not isinstance(ext, dict):
+                print(f"[stop] extraction failed: {ext}")
                 return
             if ext.get("status") == "error":
                 print(f"[stop] extraction failed: {ext.get('message') or ext}")
                 return
-            self._mark_processed_pdfs(pending_pdfs)
+            if self.cfg.extraction_mode == "targeted":
+                self._record_partial_extraction(
+                    query=question,
+                    missing_topics=list(missing),
+                    pdfs=pending_pdfs,
+                    result=ext,
+                )
+            else:
+                self._record_full_extraction(pending_pdfs, ext)
+                self._mark_processed_pdfs(pending_pdfs)
             print(f"[round {round_no}] extracted -> {ext.get('unique_terms', '?')} unique terms")
 
             try:
@@ -459,11 +518,25 @@ class Coordinator:
 
         print(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
 
-    def _stage_unprocessed_pdfs(self, round_no: int) -> tuple[Path, List[Path]]:
+    def _stage_unprocessed_pdfs(
+        self,
+        round_no: int,
+        source_pdfs: Optional[List[Path]] = None,
+    ) -> tuple[Path, List[Path]]:
         processed = _load_processed_pdfs(self.processed_pdfs_manifest)
+        candidates = (
+            [Path(pdf) for pdf in source_pdfs]
+            if source_pdfs is not None
+            else list(self.pdf_dir.glob("*.pdf"))
+        )
+        by_name = {
+            pdf.name: pdf
+            for pdf in candidates
+            if pdf.is_file() and pdf.suffix.lower() == ".pdf"
+        }
         pending = sorted(
-            p for p in self.pdf_dir.glob("*.pdf")
-            if p.is_file() and p.name not in processed
+            (pdf for name, pdf in by_name.items() if name not in processed),
+            key=lambda pdf: pdf.name,
         )
         round_dir = self.extract_rounds_dir / f"round_{round_no}"
         if round_dir.exists():
@@ -477,3 +550,81 @@ class Coordinator:
         processed = _load_processed_pdfs(self.processed_pdfs_manifest)
         processed.update(pdf.name for pdf in pdfs)
         _save_processed_pdfs(self.processed_pdfs_manifest, processed)
+
+    def _record_full_extraction(self, pdfs: List[Path], result: Dict[str, Any]) -> None:
+        manifest = _load_extraction_manifest(self.extraction_manifest)
+        papers = manifest.setdefault("papers", {})
+        now = datetime.now(timezone.utc).isoformat()
+        for pdf in pdfs:
+            entry = dict(papers.get(pdf.name) or {})
+            entry.update(
+                {
+                    "filename": pdf.name,
+                    "pdf_sha256": _sha256_file(pdf),
+                    "extraction_state": "full",
+                    "timestamp": now,
+                    "terms_json": str(self.session_terms),
+                    "processed_pages_total": result.get("processed_pages_total"),
+                    "processed_pages_with_terms": result.get("processed_pages_with_terms"),
+                }
+            )
+            entry["full"] = {
+                "timestamp": now,
+                "terms_json": str(self.session_terms),
+                "processed_pages_total": result.get("processed_pages_total"),
+                "processed_pages_with_terms": result.get("processed_pages_with_terms"),
+            }
+            papers[pdf.name] = entry
+        _save_extraction_manifest(self.extraction_manifest, manifest)
+
+    def _record_partial_extraction(
+        self,
+        *,
+        query: str,
+        missing_topics: List[str],
+        pdfs: List[Path],
+        result: Dict[str, Any],
+    ) -> None:
+        manifest = _load_extraction_manifest(self.extraction_manifest)
+        papers = manifest.setdefault("papers", {})
+        now = datetime.now(timezone.utc).isoformat()
+        by_name = {
+            str(item.get("filename") or ""): item
+            for item in result.get("pdf_results") or []
+            if isinstance(item, dict)
+        }
+        for pdf in pdfs:
+            pdf_result = by_name.get(pdf.name, {})
+            entry = dict(papers.get(pdf.name) or {})
+            partials = entry.get("partials")
+            if not isinstance(partials, list):
+                partials = []
+            partial_record = {
+                "timestamp": now,
+                "query": query,
+                "missing_topics": missing_topics,
+                "selected_pages": pdf_result.get("selected_pages") or [],
+                "processed_pages_total": pdf_result.get("processed_pages_total"),
+                "processed_pages_with_terms": pdf_result.get("processed_pages_with_terms"),
+                "source_pages_total": pdf_result.get("source_pages_total"),
+                "terms_json": str(self.session_terms),
+            }
+            partials.append(partial_record)
+            entry.update(
+                {
+                    "filename": pdf.name,
+                    "pdf_sha256": _sha256_file(pdf),
+                    "extraction_state": "partial" if entry.get("extraction_state") != "full" else "full",
+                    "timestamp": now,
+                    "query": query,
+                    "missing_topics": missing_topics,
+                    "selected_pages": partial_record["selected_pages"],
+                    "processed_pages_total": partial_record["processed_pages_total"],
+                    "processed_pages_with_terms": partial_record["processed_pages_with_terms"],
+                    "source_pages_total": partial_record["source_pages_total"],
+                    "terms_json": str(self.session_terms),
+                    "partials": partials,
+                }
+            )
+            papers[pdf.name] = entry
+        _save_extraction_manifest(self.extraction_manifest, manifest)

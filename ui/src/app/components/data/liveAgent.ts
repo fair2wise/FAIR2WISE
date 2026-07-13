@@ -60,6 +60,31 @@ export interface PublicationInfo {
   supporting_nodes?: PublicationNodeRef[];
 }
 
+export interface PendingCandidate {
+  index?: number;
+  recommended?: boolean;
+  unavailable?: boolean;
+  title: string;
+  doi?: string | null;
+  publication_year?: number | null;
+  abstract?: string;
+  source_paper?: string | null;
+  score?: number;
+  repository?: string | null;
+}
+
+export type PendingActionKind = 'download' | 'extraction';
+
+export interface PendingAction {
+  kind: PendingActionKind;
+  prompt?: string;
+  reason?: string;
+  round?: number;
+  papers?: PendingCandidate[];
+  candidate?: PendingCandidate | null;
+  alternatives?: PendingCandidate[];
+}
+
 export interface AgentChatResponse {
   status: string;
   answer: string;
@@ -72,6 +97,13 @@ export interface AgentChatResponse {
   graph_source_requested?: string | null;
   graph_source_used?: string | null;
   workdir: string;
+  pending?: PendingAction | null;
+  orchestration?: {
+    action: string;
+    agent: string;
+    reason: string;
+    state: string;
+  } | null;
 }
 
 export interface AgentChatHistoryMessage {
@@ -92,6 +124,12 @@ export interface PublicationSearchResponse {
   source: 'kg' | 'kg+openalex' | string;
 }
 
+export interface AgentSessionResetResponse {
+  status: 'reset' | string;
+  session_memory: string;
+  session_memory_has_context: boolean;
+}
+
 export interface ChatProgressEvent {
   phase: string;
   message: string;
@@ -106,10 +144,16 @@ export interface ChatProgressEvent {
   candidate_titles?: string[];
   selected_action?: string;
   reason?: string;
+  action?: string;
+  agent?: string;
+  state?: string;
+  mode?: 'full' | 'targeted' | string;
+  max_pages?: number | null;
   skipped?: number;
   failed?: number;
   term_count?: number;
   processed_files?: number;
+  processed_pages_total?: number;
   processed_pages_with_terms?: number;
   node_count?: number;
   edge_count?: number;
@@ -133,16 +177,24 @@ export { AGENT_API_BASE };
 
 export interface AgentSettingsApiResponse {
   backend: 'cborg' | 'ollama';
+  model: string;
   graph_source: 'splash' | 'json';
   workflow_mode: 'deterministic' | 'agentic';
+  extraction_mode: 'full' | 'targeted';
+  targeted_max_pages: number;
   json_graph_path: string | null;
   available_json_graphs: string[];
+  available_cborg_models: string[];
+  default_ollama_model: string;
 }
 
 export interface AgentSettingsApiUpdate {
   backend?: 'cborg' | 'ollama';
+  model?: string;
   graph_source?: 'splash' | 'json';
   workflow_mode?: 'deterministic' | 'agentic';
+  extraction_mode?: 'full' | 'targeted';
+  targeted_max_pages?: number;
   json_graph_path?: string | null;
 }
 
@@ -197,6 +249,10 @@ export async function queryLiveAgent(message: string, signal?: AbortSignal): Pro
   return queryLiveAgentWithHistory(message, signal, []);
 }
 
+function nonEmptyHistory(messages: AgentChatHistoryMessage[]): AgentChatHistoryMessage[] {
+  return messages.filter(item => item.content.trim().length > 0);
+}
+
 export async function queryLiveAgentWithHistory(
   message: string,
   signal?: AbortSignal,
@@ -205,7 +261,7 @@ export async function queryLiveAgentWithHistory(
   const response = await fetch(`${AGENT_API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, messages }),
+    body: JSON.stringify({ message, messages: nonEmptyHistory(messages) }),
     signal,
   });
 
@@ -244,6 +300,24 @@ export async function searchPublications(
   return response.json();
 }
 
+export async function resetAgentSession(signal?: AbortSignal): Promise<AgentSessionResetResponse> {
+  const response = await fetch(`${AGENT_API_BASE}/session/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    if (response.status === 404) {
+      throw new Error('Session reset endpoint not found. Restart the FAIR2WISE agent backend so the new API route is loaded.');
+    }
+    throw new Error(detail || `Agent API returned ${response.status}`);
+  }
+
+  return response.json();
+}
+
 function parseSseBlock(block: string): { event: string; data: unknown } | null {
   let event = 'message';
   const dataLines: string[] = [];
@@ -272,7 +346,7 @@ export async function queryLiveAgentStream(
     const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, messages }),
+      body: JSON.stringify({ message, messages: nonEmptyHistory(messages) }),
       signal,
     });
 
@@ -320,6 +394,90 @@ export async function queryLiveAgentStream(
     }
     if (!sawStreamEvent) {
       return queryLiveAgentWithHistory(message, signal, messages);
+    }
+    throw error;
+  }
+}
+
+export async function queryAgentActionStream(
+  decision: 'yes' | 'no',
+  kind: PendingActionKind,
+  onProgress: (event: ChatProgressEvent) => void,
+  signal?: AbortSignal,
+  candidateIndex?: number,
+): Promise<AgentChatResponse> {
+  let sawStreamEvent = false;
+  const payload: Record<string, unknown> = { decision, kind };
+  if (candidateIndex !== undefined) {
+    payload.candidate_index = candidateIndex;
+  }
+
+  const runFallback = async (): Promise<AgentChatResponse> => {
+    const response = await fetch(`${AGENT_API_BASE}/chat/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal,
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `Agent API returned ${response.status}`);
+    }
+    return response.json();
+  };
+
+  try {
+    const response = await fetch(`${AGENT_API_BASE}/chat/action/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `Agent API returned ${response.status}`);
+    }
+    if (!response.body) {
+      throw new Error('Agent API returned no stream body');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+      const blocks = buffer.split(/\n\n/);
+      buffer = blocks.pop() ?? '';
+
+      for (const block of blocks) {
+        const parsed = parseSseBlock(block.trim());
+        if (!parsed) continue;
+        sawStreamEvent = true;
+
+        if (parsed.event === 'progress') {
+          onProgress(parsed.data as ChatProgressEvent);
+        } else if (parsed.event === 'complete') {
+          return parsed.data as AgentChatResponse;
+        } else if (parsed.event === 'error') {
+          const data = parsed.data as Partial<AgentChatResponse> & { message?: string };
+          throw new Error(data.answer || data.message || data.status || 'Agent stream failed');
+        }
+      }
+
+      if (done) break;
+    }
+
+    throw new Error('Agent stream ended without a complete event');
+  } catch (error) {
+    if (signal?.aborted) {
+      throw error;
+    }
+    if (!sawStreamEvent) {
+      return runFallback();
     }
     throw error;
   }

@@ -126,6 +126,54 @@ def test_extractor_agent_returns_orchestrator_error(tmp_path, monkeypatch):
     assert result == {"status": "error", "message": f"Directory not found: {missing_dir}"}
 
 
+def test_extractor_agent_targeted_delegates_to_orchestrator(tmp_path, monkeypatch):
+    calls = []
+
+    class FakeOrchestrator:
+        def __init__(self, **kwargs):
+            self.output_file = kwargs["output_file"]
+            calls.append(kwargs)
+
+        def process_directory_targeted(self, data_dir, *, query, missing_topics=None, max_pages=6):
+            calls[-1].update(
+                {
+                    "data_dir": data_dir,
+                    "query": query,
+                    "missing_topics": missing_topics,
+                    "max_pages": max_pages,
+                }
+            )
+            return {
+                "status": "success",
+                "extraction_mode": "targeted",
+                "processed_files": 1,
+                "processed_pages_total": 2,
+                "processed_pages_with_terms": 1,
+                "unique_terms": 3,
+                "output_file": self.output_file,
+            }
+
+    monkeypatch.setattr(term_extractor, "Orchestrator", FakeOrchestrator)
+
+    agent = ExtractorAgent(backend="ollama", model="test-model", max_workers=8)
+    result = asyncio.run(
+        agent.extract_targeted(
+            str(tmp_path / "pdfs"),
+            str(tmp_path / "terms.json"),
+            "query",
+            ["gap"],
+            max_pages=4,
+            max_workers=2,
+        )
+    )
+
+    assert result["extraction_mode"] == "targeted"
+    assert calls[0]["query"] == "query"
+    assert calls[0]["missing_topics"] == ["gap"]
+    assert calls[0]["max_pages"] == 4
+    assert calls[0]["max_workers"] == 2
+
+
 def test_extractor_agent_real_orchestrator_handles_empty_directory(tmp_path, monkeypatch):
     monkeypatch.delenv("CBORG_API_KEY", raising=False)
     monkeypatch.delenv("CBORG_BASE_URL", raising=False)
@@ -151,6 +199,74 @@ def test_extractor_agent_real_orchestrator_handles_empty_directory(tmp_path, mon
     payload = json.loads(terms_json.read_text(encoding="utf-8"))
     assert payload["terms"] == []
     assert payload["code_snippets"] == []
+
+
+def test_orchestrator_select_relevant_pages_respects_max_pages(tmp_path):
+    orch = Orchestrator.__new__(Orchestrator)
+    pages = [
+        "This page discusses unrelated calibration details.",
+        "Adaptive hello interval routing improves FANET link stability.",
+        "Another page about adaptive hello dissemination and routing overhead.",
+        "Battery materials are unrelated to the query.",
+    ]
+
+    selected = orch.select_relevant_pages(
+        pages,
+        "How does adaptive hello interval routing work?",
+        ["hello interval"],
+        max_pages=1,
+    )
+
+    assert selected == [1]
+
+
+def test_orchestrator_targeted_pdf_extracts_metadata_and_selected_pages_only(tmp_path, monkeypatch):
+    import fitz
+
+    pdf_path = tmp_path / "paper.pdf"
+    doc = fitz.open()
+    doc.new_page().insert_text((72, 72), "Unrelated introduction about detector setup and calibration.")
+    doc.new_page().insert_text(
+        (72, 72),
+        "Adaptive hello interval routing improves FANET link stability and reduces overhead.",
+    )
+    doc.new_page().insert_text((72, 72), "Unrelated conclusion about future work.")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    metadata_calls = []
+    processed_pages = []
+    monkeypatch.setattr(
+        provenance,
+        "extract_pub_metadata",
+        lambda doc, pdf_path: metadata_calls.append((doc.page_count, pdf_path)) or {"paper_title": "Paper"},
+    )
+
+    orch = Orchestrator.__new__(Orchestrator)
+    orch.store = TermStore(str(tmp_path / "terms.json"))
+    orch.max_workers = 1
+    orch.temperature = 0.0
+    orch._snippet_client = SimpleNamespace()
+    orch.schema_helper = SimpleNamespace()
+
+    def fake_process_page(text, filename, page_num):
+        processed_pages.append(page_num)
+        return True
+
+    orch.process_page = fake_process_page
+
+    result = orch.process_pdf_targeted(
+        str(pdf_path),
+        query="adaptive hello interval routing",
+        missing_topics=["FANET link stability"],
+        max_pages=1,
+    )
+
+    assert result["status"] == "success"
+    assert result["extraction_state"] == "partial"
+    assert result["selected_pages"] == [2]
+    assert processed_pages == [1]
+    assert metadata_calls == [(3, str(pdf_path))]
 
 
 def test_orchestrator_process_page_persists_json_response_terms(tmp_path, monkeypatch):

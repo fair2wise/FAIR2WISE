@@ -58,9 +58,14 @@ def test_settings_get_returns_defaults(tmp_path, monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["backend"] == "cborg"
+    assert body["model"] == "lbl/cborg-chat"
     assert body["graph_source"] == "splash"
-    assert body["workflow_mode"] == "deterministic"
+    assert body["workflow_mode"] == "agentic"
+    assert body["extraction_mode"] == "targeted"
+    assert body["targeted_max_pages"] == 6
     assert body["available_json_graphs"] == []
+    assert "lbl/cborg-chat" in body["available_cborg_models"]
+    assert body["default_ollama_model"]
 
 
 def test_settings_update_backend_only(tmp_path, monkeypatch):
@@ -73,13 +78,44 @@ def test_settings_update_backend_only(tmp_path, monkeypatch):
     body = response.json()
     assert body["backend"] == "ollama"
     assert body["graph_source"] == "splash"
+    assert body["model"]
     assert len(TrackingRetrieval.created) > initial_agents
     assert TrackingRetrieval.created[-1]["kwargs"]["backend"] == "ollama"
 
     health = client.get("/health").json()
     assert health["backend"] == "ollama"
+    assert health["model"]
     assert health["kg_mode"] == "splash"
-    assert health["workflow_mode"] == "deterministic"
+    assert health["workflow_mode"] == "agentic"
+    assert health["extraction_mode"] == "targeted"
+
+
+def test_settings_update_model_rebuilds_agents(tmp_path, monkeypatch):
+    client = _settings_client(tmp_path, monkeypatch, kg_mode="splash")
+    initial_agents = len(TrackingRetrieval.created)
+
+    response = client.put("/settings", json={"model": "gemini-flash"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model"] == "gemini-flash"
+    assert len(TrackingRetrieval.created) > initial_agents
+    assert TrackingRetrieval.created[-1]["kwargs"]["model"] == "gemini-flash"
+    assert client.get("/health").json()["model"] == "gemini-flash"
+
+
+def test_settings_normalizes_legacy_gemini_model_ids(tmp_path, monkeypatch):
+    client = _settings_client(tmp_path, monkeypatch)
+
+    cases = {
+        "google/gemini-flash": "gemini-flash",
+        "google/gemini-flash-lite": "gemini-2.5-flash-lite",
+        "google/gemini-pro": "gemini-pro",
+    }
+    for raw, expected in cases.items():
+        response = client.put("/settings", json={"model": raw})
+        assert response.status_code == 200
+        assert response.json()["model"] == expected
 
 
 def test_settings_update_workflow_mode(tmp_path, monkeypatch):
@@ -90,6 +126,20 @@ def test_settings_update_workflow_mode(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.json()["workflow_mode"] == "agentic"
     assert client.get("/health").json()["workflow_mode"] == "agentic"
+
+
+def test_settings_update_extraction_mode(tmp_path, monkeypatch):
+    client = _settings_client(tmp_path, monkeypatch)
+
+    response = client.put("/settings", json={"extraction_mode": "targeted", "targeted_max_pages": 4})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["extraction_mode"] == "targeted"
+    assert body["targeted_max_pages"] == 4
+    health = client.get("/health").json()
+    assert health["extraction_mode"] == "targeted"
+    assert health["targeted_max_pages"] == 4
 
 
 def test_settings_switch_json_graph_and_back_to_splash(tmp_path, monkeypatch):

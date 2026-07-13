@@ -2,8 +2,64 @@ import type { LiveGraphNode, PublicationInfo } from './data/liveAgent';
 import { parseArxivId, parseCrossrefDoi } from './publicationLinks';
 
 const KG_CITATION_RE = /\[KG:\s*([^\]]+?)\s*\]/gi;
+const MARKDOWN_BOLD_RE = /\*\*([^*]+)\*\*/g;
 const CODE_FENCE_RE = /```[\s\S]*?```/g;
 const PDF_FILENAME_RE = /\b([A-Za-z0-9][A-Za-z0-9._-]*\.pdf)\b/gi;
+
+export type AnswerHighlightSegment = { text: string; bold: boolean };
+
+/** Split answer text into plain/bold segments for KG citations, PDF filenames, and markdown bold. */
+export function splitAnswerHighlightSegments(text: string): AnswerHighlightSegment[] {
+  type Span = { start: number; end: number };
+  const spans: Span[] = [];
+
+  MARKDOWN_BOLD_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = MARKDOWN_BOLD_RE.exec(text)) !== null) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  KG_CITATION_RE.lastIndex = 0;
+  while ((match = KG_CITATION_RE.exec(text)) !== null) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  PDF_FILENAME_RE.lastIndex = 0;
+  while ((match = PDF_FILENAME_RE.exec(text)) !== null) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  if (spans.length === 0) return [{ text, bold: false }];
+
+  spans.sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: Span[] = [];
+  for (const span of spans) {
+    const last = merged[merged.length - 1];
+    if (!last || span.start > last.end) {
+      merged.push({ ...span });
+    } else if (span.end > last.end) {
+      last.end = span.end;
+    }
+  }
+
+  const segments: AnswerHighlightSegment[] = [];
+  let cursor = 0;
+  for (const span of merged) {
+    if (cursor < span.start) {
+      segments.push({ text: text.slice(cursor, span.start), bold: false });
+    }
+    let boldText = text.slice(span.start, span.end);
+    if (boldText.startsWith('**') && boldText.endsWith('**')) {
+      boldText = boldText.slice(2, -2);
+    }
+    if (boldText) segments.push({ text: boldText, bold: true });
+    cursor = span.end;
+  }
+  if (cursor < text.length) {
+    segments.push({ text: text.slice(cursor), bold: false });
+  }
+  return segments.length > 0 ? segments : [{ text, bold: false }];
+}
 const DOI_URL_PREFIX_RE = /^https?:\/\/(?:dx\.)?doi\.org\//i;
 
 function escapeRegExp(value: string): string {

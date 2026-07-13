@@ -1,8 +1,8 @@
-"""CLI for the FAIR2WISE 3-agent KG-RAG pipeline.
+"""CLI for the FAIR2WISE orchestrated KG-RAG pipeline.
 
 Subcommands:
     api    FastAPI bridge for the prototype web UI
-    ask    one-shot question through the retrieve/grow/retrieve loop
+    ask    one-shot question or approval turn through the orchestrator
     chat   interactive loop
     status print resolved configuration
 """
@@ -15,7 +15,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .coordinator import Coordinator, CoordinatorConfig, default_workers, default_workflow_mode
+from .coordinator import (
+    Coordinator,
+    CoordinatorConfig,
+    default_extraction_mode,
+    default_targeted_max_pages,
+    default_workers,
+    default_workflow_mode,
+)
 
 load_dotenv()
 
@@ -40,14 +47,16 @@ def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
         validate_downloads=not args.no_download_validation,
         allow_splash_wipe=args.allow_splash_wipe,
         workflow_mode=workflow_mode,
+        extraction_mode=args.extraction_mode,
+        targeted_max_pages=args.targeted_max_pages,
+        max_orchestration_steps=args.max_orchestration_steps,
+        auto_approve=args.auto_approve,
     )
 
 
 async def _run_chat(cfg: CoordinatorConfig) -> None:
     coord = Coordinator(cfg)
-    print("FAIR2WISE 3-agent KG-RAG chat. Type 'exit' to quit.")
-    # One Manager session for the whole chat: re-launch per question is wasteful,
-    # so we drive the loop through repeated Coordinator.run calls.
+    print("FAIR2WISE orchestrated KG-RAG chat. Type 'exit' to quit.")
     while True:
         try:
             q = input("\nAsk> ").strip()
@@ -61,7 +70,7 @@ async def _run_chat(cfg: CoordinatorConfig) -> None:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="f2w-agent",
-        description="FAIR2WISE 3-agent KG-RAG pipeline (retrieval, download, extractor).",
+        description="FAIR2WISE orchestrated KG-RAG pipeline.",
     )
     p.add_argument("--backend", default="cborg", choices=["cborg", "cborg-openai", "ollama"])
     p.add_argument("--model", default=None, help="LLM model name")
@@ -76,6 +85,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--candidate-pool", type=int, default=25)
     p.add_argument("--workflow-mode", choices=["deterministic", "agentic"], default=default_workflow_mode())
     p.add_argument("--agentic", action="store_true", help="Alias for --workflow-mode agentic")
+    p.add_argument(
+        "--auto-approve",
+        action="store_true",
+        help="Approve download and extraction automatically (intended for scripted CLI runs)",
+    )
+    p.add_argument("--max-orchestration-steps", type=int, default=12)
+    p.add_argument("--extraction-mode", choices=["full", "targeted"], default=default_extraction_mode())
+    p.add_argument("--targeted-max-pages", type=int, default=default_targeted_max_pages())
     p.add_argument("--download-delay", type=float, default=1.0, help="Seconds to wait between PDF download attempts")
     p.add_argument(
         "--no-download-validation",
@@ -121,6 +138,10 @@ def main(argv=None) -> int:
             "validate_downloads": cfg.validate_downloads,
             "allow_splash_wipe": cfg.allow_splash_wipe,
             "workflow_mode": cfg.workflow_mode,
+            "extraction_mode": cfg.extraction_mode,
+            "targeted_max_pages": cfg.targeted_max_pages,
+            "max_orchestration_steps": cfg.max_orchestration_steps,
+            "auto_approve": cfg.auto_approve,
         }, indent=2))
         return 0
 

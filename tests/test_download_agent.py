@@ -47,7 +47,7 @@ def test_search_candidates_action_does_not_write_pdfs(tmp_path, monkeypatch):
         "doi": "https://doi.org/10.1234/example",
         "title": "Relevant abstract paper",
         "abstract_inverted_index": {"Relevant": [0], "abstract": [1]},
-        "best_oa_location": {"pdf_url": "https://example.test/paper.pdf"},
+        "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00001"},
         "_score": 0.82,
     }
 
@@ -66,9 +66,33 @@ def test_search_candidates_action_does_not_write_pdfs(tmp_path, monkeypatch):
     assert result["count"] == 1
     assert result["candidates"][0]["title"] == "Relevant abstract paper"
     assert result["candidates"][0]["abstract"] == "Relevant abstract"
-    assert result["candidates"][0]["pdf_urls"] == ["https://example.test/paper.pdf"]
+    assert result["candidates"][0]["pdf_urls"] == ["https://arxiv.org/pdf/2401.00001"]
+    assert result["candidates"][0]["repository"] == "arXiv"
     assert not list(tmp_path.rglob("*.pdf"))
     assert not (tmp_path / "downloads.jsonl").exists()
+
+
+def test_search_candidates_excludes_publisher_only_urls(monkeypatch):
+    agent = DownloadAgent(backend="ollama", model="test", download_delay_seconds=0)
+    candidates = [
+        {
+            "id": "Wpublisher",
+            "title": "Publisher copy",
+            "pdf_urls": ["https://onlinelibrary.wiley.com/doi/pdf/10.1002/example"],
+        },
+        {
+            "id": "Warxiv",
+            "title": "Repository copy",
+            "pdf_urls": ["https://arxiv.org/pdf/2401.00004"],
+        },
+    ]
+    monkeypatch.setattr(agent, "_search_candidates", lambda query, missing, pool: candidates)
+    monkeypatch.setattr(agent, "_rank", lambda query, items: items)
+
+    result = asyncio.run(agent.search_candidates("question", candidate_pool=5))
+
+    assert [candidate["title"] for candidate in result["candidates"]] == ["Repository copy"]
+    assert result["candidates"][0]["repository"] == "arXiv"
 
 
 class FakeWorks:
@@ -103,8 +127,8 @@ def test_download_agent_does_not_count_invalid_download(tmp_path, monkeypatch):
         "id": "https://openalex.org/W123",
         "doi": "https://doi.org/10.1234/example",
         "title": "Relevant paper",
-        "best_oa_location": {"pdf_url": "https://example.test/not-a-pdf"},
-        "open_access": {"oa_url": "https://example.test/landing"},
+        "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/not-a-pdf"},
+        "open_access": {"oa_url": "https://europepmc.org/articles/PMC123?pdf=render"},
     }
 
     monkeypatch.setattr(agent, "_search_candidates", lambda query, missing, pool: [candidate])
@@ -127,10 +151,10 @@ def test_download_agent_does_not_count_invalid_download(tmp_path, monkeypatch):
     assert Path(result["manifest"]).exists()
     records = [json.loads(line) for line in Path(result["manifest"]).read_text().splitlines()]
     assert records[-1]["status"] == "failed"
-    assert records[-1]["attempted_urls"] == [
-        "https://example.test/not-a-pdf",
-        "https://example.test/landing",
-    ]
+    assert set(records[-1]["attempted_urls"]) == {
+        "https://arxiv.org/pdf/not-a-pdf",
+        "https://europepmc.org/articles/PMC123?pdf=render",
+    }
     assert not list(target.glob("*.pdf"))
 
 
@@ -157,14 +181,15 @@ def test_search_candidates_merges_missing_topic_queries(monkeypatch):
     FakeWorks.fail_oa = False
     FakeWorks.data = {
         "How measure scattering peak fitting": [
-            {"id": "W1", "title": "broad", "best_oa_location": {"pdf_url": "u1"}},
+            {"id": "W1", "title": "broad", "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00001"}},
         ],
         "peak fitting": [
-            {"id": "W1", "title": "duplicate", "best_oa_location": {"pdf_url": "u1"}},
-            {"id": "W2", "title": "focused", "best_oa_location": {"pdf_url": "u2"}},
+            {"id": "W1", "title": "duplicate", "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00001"}},
+            {"id": "W2", "title": "focused", "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00002"}},
         ],
     }
     monkeypatch.setattr(pyalex, "Works", FakeWorks)
+    monkeypatch.setattr(agent, "_search_arxiv_candidates", lambda query, missing, pool: [])
 
     candidates = agent._search_candidates("How measure scattering", ["peak fitting"], 10)
 
@@ -194,8 +219,8 @@ def test_download_agent_rate_limits_between_failed_urls(tmp_path, monkeypatch):
     candidate = {
         "id": "W123",
         "title": "Relevant paper",
-        "best_oa_location": {"pdf_url": "https://example.test/not-a-pdf"},
-        "open_access": {"oa_url": "https://example.test/landing"},
+        "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/not-a-pdf"},
+        "open_access": {"oa_url": "https://europepmc.org/articles/PMC123?pdf=render"},
     }
     sleeps = []
 
@@ -212,6 +237,42 @@ def test_download_agent_rate_limits_between_failed_urls(tmp_path, monkeypatch):
     assert sleeps == [0.25, 0.25]
 
 
+def test_download_agent_skips_existing_valid_pdf(tmp_path, monkeypatch):
+    agent = DownloadAgent(
+        backend="ollama",
+        model="test",
+        download_delay_seconds=0,
+        validate_downloads=False,
+    )
+    target = tmp_path / "pdfs"
+    target.mkdir(parents=True, exist_ok=True)
+    existing = target / "10.1234_example.pdf"
+    existing.write_bytes(b"%PDF-1.4\nbody")
+    candidate = {
+        "id": "W123",
+        "doi": "https://doi.org/10.1234/example",
+        "title": "Existing paper",
+        "pdf_urls": ["https://example.test/paper.pdf"],
+        "score": 0.9,
+    }
+
+    monkeypatch.setattr(download_pdfs, "download_pdf", lambda url, dest: False)
+
+    result = agent._download_candidates(
+        "question",
+        ["missing"],
+        str(target),
+        [candidate],
+        max_papers=1,
+        validate_downloads=False,
+    )
+
+    assert result["count"] == 1
+    assert result["downloaded"] == [str(existing)]
+    assert result["skipped"] == 1
+    assert result["failed"] == 0
+
+
 def test_download_agent_rejects_semantically_invalid_pdf(tmp_path, monkeypatch):
     agent = DownloadAgent(
         backend="ollama",
@@ -223,7 +284,7 @@ def test_download_agent_rejects_semantically_invalid_pdf(tmp_path, monkeypatch):
     candidate = {
         "id": "W123",
         "title": "Unrelated paper",
-        "best_oa_location": {"pdf_url": "https://example.test/paper.pdf"},
+        "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2401.00003"},
     }
 
     def fake_download(url, dest):

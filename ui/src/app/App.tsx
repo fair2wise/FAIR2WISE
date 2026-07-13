@@ -80,8 +80,11 @@ export default function App() {
         const synced = settingsFromApiResponse(response);
         saveAgentSettings({
           backend: local.backend,
+          model: local.model,
           graphSource: local.graphSource,
           workflowMode: local.workflowMode,
+          extractionMode: local.extractionMode,
+          targetedMaxPages: local.targetedMaxPages,
           jsonGraphPath: synced.jsonGraphPath,
         });
         const nextGraph = await fetchLiveGraph();

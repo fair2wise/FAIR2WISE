@@ -18,6 +18,9 @@ MAX_ROUNDS="${F2W_MAX_ROUNDS:-3}"
 MAX_PAPERS="${F2W_MAX_PAPERS:-1}"
 CANDIDATE_POOL="${F2W_CANDIDATE_POOL:-25}"
 WORKERS="${F2W_WORKERS:-8}"
+WORKFLOW_MODE="${F2W_WORKFLOW_MODE:-agentic}"
+EXTRACTION_MODE="${F2W_EXTRACTION_MODE:-targeted}"
+TARGETED_MAX_PAGES="${F2W_TARGETED_MAX_PAGES:-6}"
 
 if [[ "$KG_MODE" != "splash" ]]; then
   echo "warning: F2W_KG_MODE=$KG_MODE overrides backend default splash" >&2
@@ -49,6 +52,9 @@ ARGS=(
   --max-papers "$MAX_PAPERS"
   --candidate-pool "$CANDIDATE_POOL"
   --workers "$WORKERS"
+  --workflow-mode "$WORKFLOW_MODE"
+  --extraction-mode "$EXTRACTION_MODE"
+  --targeted-max-pages "$TARGETED_MAX_PAGES"
   --allow-splash-wipe
 )
 if [[ -n "$SEED_TERMS" ]]; then
@@ -65,5 +71,8 @@ echo "  workdir: $WORKDIR"
 echo "  max_rounds: $MAX_ROUNDS"
 echo "  max_papers: $MAX_PAPERS"
 echo "  workers: $WORKERS"
+echo "  workflow_mode: $WORKFLOW_MODE"
+echo "  extraction_mode: $EXTRACTION_MODE"
+echo "  targeted_max_pages: $TARGETED_MAX_PAGES"
 
 exec "${ARGS[@]}"

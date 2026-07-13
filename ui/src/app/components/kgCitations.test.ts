@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseKgCitationNodeIds } from './kgCitations';
+import { parseKgCitationNodeIds, splitAnswerHighlightSegments } from './kgCitations';
 import type { LiveGraphNode } from './data/liveAgent';
 
 const nodes: LiveGraphNode[] = [
@@ -21,6 +21,29 @@ def find_scattering_peaks(q, intensity):
     peaks, props = find_peaks(y)
     return peaks, props`,
 };
+
+describe('splitAnswerHighlightSegments', () => {
+  it('bolds KG citations and PDF filenames', () => {
+    const segments = splitAnswerHighlightSegments(
+      'P3HT [KG: P3HT] is discussed in XRAY1.pdf.',
+    );
+    expect(segments).toEqual([
+      { text: 'P3HT ', bold: false },
+      { text: '[KG: P3HT]', bold: true },
+      { text: ' is discussed in ', bold: false },
+      { text: 'XRAY1.pdf', bold: true },
+      { text: '.', bold: false },
+    ]);
+  });
+
+  it('preserves markdown bold segments', () => {
+    const segments = splitAnswerHighlightSegments('**Important** note.');
+    expect(segments).toEqual([
+      { text: 'Important', bold: true },
+      { text: ' note.', bold: false },
+    ]);
+  });
+});
 
 describe('kgCitations', () => {
   it('extracts cited node ids in answer order', () => {

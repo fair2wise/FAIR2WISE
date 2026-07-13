@@ -44,7 +44,7 @@ export function AppBookmarksButton() {
                 <div className="mb-1 text-xs text-slate-500">
                   {publications.length} bookmarked publication{publications.length === 1 ? '' : 's'}
                 </div>
-                <PublicationList publications={publications} intro={null} />
+                <PublicationList publications={publications} intro={null} divided className="mt-2" />
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-"""FAIR2WISE 3-agent KG-RAG pipeline.
+"""FAIR2WISE orchestrated KG-RAG pipeline.
 
 Academy agents coordinate a retrieve -> (download -> extract -> update KG)
 -> retrieve loop:
@@ -6,7 +6,9 @@ Academy agents coordinate a retrieve -> (download -> extract -> update KG)
 - RetrievalAgent: KG retrieval + strict sufficiency judgement / answer.
 - DownloadAgent:  OpenAlex relevance search + PDF download.
 - ExtractorAgent: term extraction (copied branch term_extractor) + KG update.
-- EvidenceDebateAgent: opt-in agentic evidence gate before download/extraction.
+- EvidenceDebateAgent: candidate-ranking specialist selected by the orchestrator.
+- WorkflowOrchestratorAgent: persistent, constrained pipeline controller.
+- PaperEvidenceAgent: manifest-bounded answers from the active extracted PDF.
 """
 from __future__ import annotations
 
@@ -26,6 +28,8 @@ __all__ = [
     "DownloadAgent",
     "ExtractorAgent",
     "EvidenceDebateAgent",
+    "WorkflowOrchestratorAgent",
+    "PaperEvidenceAgent",
 ]
 
 
@@ -46,4 +50,12 @@ def __getattr__(name: str):  # lazy exports to keep import light
         from .debate_agent import EvidenceDebateAgent
 
         return EvidenceDebateAgent
+    if name == "WorkflowOrchestratorAgent":
+        from .orchestrator_agent import WorkflowOrchestratorAgent
+
+        return WorkflowOrchestratorAgent
+    if name == "PaperEvidenceAgent":
+        from .paper_evidence_agent import PaperEvidenceAgent
+
+        return PaperEvidenceAgent
     raise AttributeError(name)

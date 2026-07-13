@@ -50,6 +50,7 @@ export function PublicationList({
   showFavorite = true,
   collapseLimit,
   className = '',
+  divided = false,
   renderActions,
 }: {
   publications: PublicationInfo[];
@@ -59,6 +60,7 @@ export function PublicationList({
   /** When set, show this many publications until expanded. */
   collapseLimit?: number;
   className?: string;
+  divided?: boolean;
   renderActions?: (publication: PublicationInfo, index: number) => ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -73,7 +75,13 @@ export function PublicationList({
   return (
     <div className={cn('mt-4 space-y-3', className)}>
       {intro && <p className="text-xs leading-relaxed text-slate-700">{intro}</p>}
-      <div className="space-y-3">
+      <div
+        className={cn(
+          divided
+            ? 'divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200'
+            : 'space-y-3',
+        )}
+      >
         {visiblePublications.map((publication, index) => {
           const title = publication.paper_title || publication.source_paper || 'Untitled publication';
           const authors = formatAuthors(publication.authors);
@@ -90,7 +98,13 @@ export function PublicationList({
           const actions = renderActions?.(publication, index);
 
           return (
-            <div key={`${title}-${index}`} className="text-xs leading-relaxed text-slate-700">
+            <div
+              key={`${title}-${index}`}
+              className={cn(
+                'text-xs leading-relaxed text-slate-700',
+                divided && 'bg-white px-3 py-3',
+              )}
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 font-bold text-slate-800">
                   {links.primaryUrl ? (

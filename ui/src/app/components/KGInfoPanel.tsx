@@ -1,46 +1,17 @@
 import type { CSSProperties, RefObject } from 'react';
 
-type NodeBucket =
-  | 'material'
-  | 'property'
-  | 'application'
-  | 'process'
-  | 'compound'
-  | 'code'
-  | 'other';
-
 export interface KGInfoNode {
   id: string;
   label: string;
   type: string;
   description: string;
-  bucket: NodeBucket;
+  color: string;
 }
 
 export type KGHoverTarget =
   | { kind: 'node'; node: KGInfoNode }
   | { kind: 'edge'; sourceLabel: string; targetLabel: string; predicate: string }
   | null;
-
-const NODE_COLORS: Record<NodeBucket, string> = {
-  material: '#2563eb',
-  property: '#059669',
-  application: '#d97706',
-  process: '#7c3aed',
-  compound: '#dc2626',
-  code: '#0891b2',
-  other: '#64748b',
-};
-
-const NODE_TYPE_LABELS: Record<NodeBucket, string> = {
-  material: 'Material',
-  property: 'Property',
-  application: 'Application',
-  process: 'Process',
-  compound: 'Compound',
-  code: 'Code',
-  other: 'Other',
-};
 
 export function KGHoverPopup({
   hoverTarget,
@@ -62,13 +33,13 @@ export function KGHoverPopup({
           <div className="flex min-w-0 items-center gap-2">
             <div
               className="h-2 w-2 shrink-0 rounded-full"
-              style={{ background: NODE_COLORS[hoverTarget.node.bucket] }}
+              style={{ background: hoverTarget.node.color }}
             />
             <span
               className="shrink-0 font-medium"
-              style={{ color: NODE_COLORS[hoverTarget.node.bucket] }}
+              style={{ color: hoverTarget.node.color }}
             >
-              {hoverTarget.node.type || NODE_TYPE_LABELS[hoverTarget.node.bucket]}
+              {hoverTarget.node.type || 'Node'}
             </span>
             <span className="min-w-0 font-medium text-slate-800">{hoverTarget.node.label}</span>
           </div>

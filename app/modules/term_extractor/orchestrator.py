@@ -5,7 +5,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import fitz
 from langchain_core.messages import HumanMessage
@@ -24,6 +24,34 @@ from .store import TermStore
 from .tools import ToolState, build_tools
 
 logger = logging.getLogger(__name__)
+
+_PAGE_STOPWORDS = {
+    "about",
+    "after",
+    "also",
+    "between",
+    "could",
+    "from",
+    "have",
+    "into",
+    "paper",
+    "papers",
+    "relevant",
+    "show",
+    "shows",
+    "that",
+    "their",
+    "there",
+    "these",
+    "this",
+    "using",
+    "what",
+    "when",
+    "where",
+    "which",
+    "with",
+    "without",
+}
 
 
 def _short_error(exc: Exception, *, limit: int = 800) -> str:
@@ -60,6 +88,63 @@ def _context_for_term(text: str, term: str) -> str:
         if term_lower in sentence.lower():
             return sentence.strip()
     return text.strip()[:500]
+
+
+def _keyword_tokens(values: Sequence[str]) -> List[str]:
+    tokens: List[str] = []
+    seen = set()
+    for value in values:
+        for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9_\-]{2,}", str(value).lower()):
+            if token in _PAGE_STOPWORDS or token in seen:
+                continue
+            seen.add(token)
+            tokens.append(token)
+    return tokens
+
+
+def _focus_phrases(values: Sequence[str]) -> List[str]:
+    phrases: List[str] = []
+    seen = set()
+    for value in values:
+        text = re.sub(r"\s+", " ", str(value).strip().lower())
+        if len(text) < 4:
+            continue
+        if text not in seen:
+            seen.add(text)
+            phrases.append(text)
+    return phrases
+
+
+def _score_page_relevance(text: str, tokens: Sequence[str], phrases: Sequence[str]) -> float:
+    if not text or not text.strip():
+        return 0.0
+    lower = text.lower()
+    score = 0.0
+    for phrase in phrases:
+        if len(phrase.split()) > 1 and phrase in lower:
+            score += 4.0
+    for token in tokens:
+        if re.search(rf"\b{re.escape(token)}\b", lower):
+            score += 1.0
+    if re.search(r"(?im)^\s*(abstract|introduction|methods?|results?|discussion|conclusions?)\b", text):
+        score += 0.5
+    return score
+
+
+def _looks_code_like(text: str) -> bool:
+    if not text:
+        return False
+    patterns = (
+        r"```",
+        r"\bdef\s+\w+\s*\(",
+        r"\bclass\s+\w+",
+        r"\bfunction\s+\w*\s*\(",
+        r"\bimport\s+\w+",
+        r"\bfor\s+\w+\s+in\s+",
+        r"github\.com/[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+",
+        r">>>\s*\w+",
+    )
+    return any(re.search(pattern, text) for pattern in patterns)
 
 
 class Orchestrator:
@@ -322,6 +407,198 @@ class Orchestrator:
         self.store.increment("processed_pages_with_terms", pages_with_terms)
         logger.info("Finished '%s': %d/%d pages yielded terms", filename, pages_with_terms, total_pages)
         return pages_with_terms
+
+    def select_relevant_pages(
+        self,
+        page_texts: Sequence[str],
+        query: str,
+        missing_topics: Optional[Sequence[str]] = None,
+        *,
+        max_pages: int = 6,
+    ) -> List[int]:
+        """Return zero-based page indices most relevant to the query/missing topics."""
+        if max_pages <= 0:
+            return []
+        focus_values = [query, *(missing_topics or [])]
+        tokens = _keyword_tokens(focus_values)
+        phrases = _focus_phrases(focus_values)
+        scored = [
+            (idx, _score_page_relevance(text, tokens, phrases))
+            for idx, text in enumerate(page_texts)
+            if text and text.strip()
+        ]
+        if not scored:
+            return []
+        positives = [item for item in scored if item[1] > 0]
+        pool = positives if positives else scored[: min(3, len(scored))]
+        pool = sorted(pool, key=lambda item: (-item[1], item[0]))[:max_pages]
+        return sorted(idx for idx, _score in pool)
+
+    def process_pdf_targeted(
+        self,
+        pdf_path: str,
+        *,
+        query: str,
+        missing_topics: Optional[Sequence[str]] = None,
+        max_pages: int = 6,
+    ) -> Dict[str, Any]:
+        """Process query-relevant pages from one PDF while always extracting publication metadata."""
+        try:
+            doc = fitz.open(pdf_path)
+        except Exception as e:
+            logger.error("Cannot open PDF %s: %s", pdf_path, e)
+            return {
+                "status": "error",
+                "message": f"Cannot open PDF {pdf_path}: {e}",
+                "filename": os.path.basename(pdf_path),
+            }
+
+        filename = os.path.basename(pdf_path)
+        total_pages = doc.page_count
+
+        try:
+            pub_meta = provenance.extract_pub_metadata(doc, pdf_path)
+        except Exception as e:
+            logger.warning("Pub-metadata extraction failed for %s: %s", filename, e)
+            pub_meta = {}
+
+        page_texts = [doc.load_page(i).get_text() for i in range(total_pages)]
+        selected_pages = self.select_relevant_pages(
+            page_texts,
+            query,
+            missing_topics or [],
+            max_pages=max_pages,
+        )
+        focus_values = [query, *(missing_topics or [])]
+        tokens = _keyword_tokens(focus_values)
+        phrases = _focus_phrases(focus_values)
+        selected_scores = [
+            _score_page_relevance(page_texts[page], tokens, phrases)
+            for page in selected_pages
+        ]
+        low_confidence = bool(page_texts and (not selected_scores or max(selected_scores) <= 0))
+        selected_one_based = [page + 1 for page in selected_pages]
+        pages_with_terms = 0
+
+        logger.info(
+            "Targeted processing '%s': selected %d/%d page(s): %s",
+            filename,
+            len(selected_pages),
+            total_pages,
+            selected_one_based,
+        )
+        self.store.increment("processed_pages_total", len(selected_pages))
+
+        def _process(page_num: int) -> bool:
+            text = page_texts[page_num]
+            added = self.process_page(text, filename, page_num)
+            snips_added = False
+            if _looks_code_like(text):
+                try:
+                    snips = provenance.extract_code_snippets(
+                        text,
+                        self._snippet_client,
+                        self.schema_helper,
+                        source_paper=filename,
+                        page=page_num + 1,
+                        temperature=self.temperature,
+                    )
+                    snips_added = self.store.add_code_snippets(snips, pub_meta=pub_meta)
+                except Exception as e:
+                    logger.warning("Code-snippet pass failed on %s page %d: %s", filename, page_num + 1, e)
+            return bool(added or snips_added)
+
+        if selected_pages:
+            with ThreadPoolExecutor(max_workers=min(self.max_workers, len(selected_pages))) as exe:
+                futures = {exe.submit(_process, page_num): page_num for page_num in selected_pages}
+                for fut in as_completed(futures):
+                    page_i = futures[fut]
+                    try:
+                        if fut.result():
+                            pages_with_terms += 1
+                            logger.debug("Targeted page %d/%d of %s yielded terms", page_i + 1, total_pages, filename)
+                    except Exception as e:
+                        logger.error("Error on targeted page %d of %s: %s", page_i + 1, filename, e)
+
+        self.store.stamp_source_metadata(filename, pub_meta)
+        self.store.save()
+        self.store.increment("processed_files")
+        self.store.increment("processed_pages_with_terms", pages_with_terms)
+        self.store.increment("partial_processed_files")
+        logger.info(
+            "Finished targeted '%s': %d/%d selected pages yielded terms",
+            filename,
+            pages_with_terms,
+            len(selected_pages),
+        )
+        return {
+            "status": "success",
+            "filename": filename,
+            "extraction_state": "partial",
+            "source_pages_total": total_pages,
+            "selected_pages": selected_one_based,
+            "selected_page_count": len(selected_pages),
+            "processed_pages_total": len(selected_pages),
+            "processed_pages_with_terms": pages_with_terms,
+            "unique_terms": len(self.store),
+            "output_file": self.store.output_file,
+            "low_confidence": low_confidence,
+        }
+
+    def process_directory_targeted(
+        self,
+        data_dir: str,
+        *,
+        query: str,
+        missing_topics: Optional[Sequence[str]] = None,
+        max_pages: int = 6,
+    ) -> Dict[str, Any]:
+        """Walk data_dir and partially process PDFs against one query."""
+        if not os.path.isdir(data_dir):
+            msg = f"Directory not found: {data_dir}"
+            logger.error(msg)
+            return {"status": "error", "message": msg}
+
+        pdfs = sorted(f for f in os.listdir(data_dir) if f.lower().endswith(".pdf"))
+        if not pdfs:
+            logger.warning("No PDFs in %s", data_dir)
+
+        pdf_results: List[Dict[str, Any]] = []
+        for idx, fname in enumerate(pdfs, start=1):
+            logger.info("[%d/%d] Targeted processing: %s", idx, len(pdfs), fname)
+            result = self.process_pdf_targeted(
+                os.path.join(data_dir, fname),
+                query=query,
+                missing_topics=missing_topics or [],
+                max_pages=max_pages,
+            )
+            pdf_results.append(result)
+
+        self.store.assign_importance()
+        self.store.save()
+
+        processed_files = sum(1 for item in pdf_results if item.get("status") == "success")
+        processed_pages_total = sum(int(item.get("processed_pages_total") or 0) for item in pdf_results)
+        processed_pages_with_terms = sum(int(item.get("processed_pages_with_terms") or 0) for item in pdf_results)
+        source_pages_total = sum(int(item.get("source_pages_total") or 0) for item in pdf_results)
+        logger.info(
+            "Targeted done. Files: %d, Selected pages: %d, Pages w/ terms: %d, Unique terms: %d",
+            processed_files,
+            processed_pages_total,
+            processed_pages_with_terms,
+            len(self.store),
+        )
+        return {
+            "status": "success",
+            "extraction_mode": "targeted",
+            "processed_files": processed_files,
+            "processed_pages_total": processed_pages_total,
+            "source_pages_total": source_pages_total,
+            "processed_pages_with_terms": processed_pages_with_terms,
+            "unique_terms": len(self.store),
+            "output_file": self.store.output_file,
+            "pdf_results": pdf_results,
+        }
 
     def process_directory(self, data_dir: str) -> Dict[str, Any]:
         """Walk data_dir, process all PDFs, assign importance scores, save final output."""
