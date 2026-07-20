@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.modules.f2w_agent import api as api_mod
@@ -38,6 +39,9 @@ class FakeRetrieval:
 
     async def reload_kg(self, graph_file, graph_source=None):
         return {"status": "reloaded", "graph_source_requested": "json", "graph_source_used": "json"}
+
+    async def search_node_scores(self, query, limit=10):
+        return {"retrieval_backend": "lexical", "matches": []}
 
 
 class FakeDownload:
@@ -495,6 +499,75 @@ def test_session_reset_endpoint_clears_backend_memory(tmp_path, monkeypatch):
     assert memory["summary"] == ""
     assert memory["recent_turns"] == []
     assert memory["kg_growth"] == []
+
+
+def test_named_chat_sessions_isolate_memory_workflow_and_pending(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    service._activate_session("chat-a")
+    service.memory.record_turn(
+        user_message="Question A",
+        effective_question="Question A",
+        answer="Answer A",
+        status="direct_response",
+        sufficient=False,
+        rounds=[],
+    )
+    service.workflow.update(phase="awaiting_extraction_approval", pending={"kind": "extraction"})
+    service.pending = service.workflow.pending
+
+    service._activate_session("chat-b")
+    assert service.memory.has_context() is False
+    assert service.workflow.data["phase"] == "idle"
+    assert service.pending is None
+    service.memory.record_turn(
+        user_message="Question B",
+        effective_question="Question B",
+        answer="Answer B",
+        status="direct_response",
+        sufficient=False,
+        rounds=[],
+    )
+
+    service._activate_session("chat-a")
+    assert "Question A" in service.memory.data["summary"]
+    assert "Question B" not in service.memory.data["summary"]
+    assert service.workflow.data["phase"] == "awaiting_extraction_approval"
+    assert service.pending == {"kind": "extraction"}
+
+    asyncio.run(service.reset_session_context("chat-b"))
+    service._activate_session("chat-a")
+    assert service.memory.has_context() is True
+    assert service.pending == {"kind": "extraction"}
+
+    assert (tmp_path / "chat_sessions" / "chat-a" / "session_memory.json").exists()
+    assert (tmp_path / "chat_sessions" / "chat-b" / "session_memory.json").exists()
+
+
+def test_session_endpoints_validate_and_reset_named_session(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+    client = TestClient(api_mod.create_app(CoordinatorConfig(workdir=tmp_path, max_rounds=1)))
+
+    response = client.post("/session/reset", json={"session_id": "chat-123"})
+    assert response.status_code == 200
+    assert response.json()["session_memory"].endswith(
+        "chat_sessions/chat-123/session_memory.json"
+    )
+    session_dir = tmp_path / "chat_sessions" / "chat-123"
+    assert session_dir.exists()
+
+    deleted = client.delete("/session/chat-123")
+    assert deleted.status_code == 200
+    assert deleted.json() == {"status": "deleted", "session_id": "chat-123"}
+    assert session_dir.exists() is False
+
+    invalid = client.post("/session/reset", json={"session_id": "../escape"})
+    assert invalid.status_code == 422
 
 
 def test_session_memory_topic_segmentation(tmp_path):
@@ -1633,3 +1706,473 @@ def test_settings_update_switches_json_graph(tmp_path, monkeypatch):
     graph_body = graph_response.json()
     assert graph_body["source_path"].endswith("storage/kg/selected.json")
     assert graph_body["nodes"][0]["id"] == "n1"
+
+
+def test_patch_graph_node_requires_splash_mode(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [{"id": "n1", "name": "Node", "category": "Thing"}], "associations": []}),
+        encoding="utf-8",
+    )
+    app = api_mod.create_app(
+        CoordinatorConfig(graph=str(graph_path), workdir=tmp_path / "run", kg_mode="json")
+    )
+    client = TestClient(app)
+    client.put("/settings", json={"graph_source": "json", "json_graph_path": str(graph_path)})
+
+    response = client.patch("/graph/node/n1", json={"label": "Renamed"})
+    assert response.status_code == 400
+    assert "splash" in response.json()["detail"].lower()
+
+
+def test_graph_node_search_ranks_active_graph_and_filters_unknown(tmp_path, monkeypatch):
+    class SearchRetrieval(FakeRetrieval):
+        async def search_node_scores(self, query, limit=10):
+            assert query == "battery interface"
+            assert limit == 9
+            return {
+                "retrieval_backend": "semantic",
+                "matches": [
+                    {"id": "unknown", "score": 0.99},
+                    {"id": "n2", "score": 0.91},
+                    {"id": "n1", "score": 0.83},
+                ],
+            }
+
+    monkeypatch.setattr(api_mod, "RetrievalAgent", SearchRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps(
+            {
+                "things": [
+                    {"id": "n1", "name": "Electrode", "category": "Component"},
+                    {"id": "n2", "name": "Solid interface", "category": "Interface"},
+                    {"id": "unknown", "name": "Unknown", "category": "Unknown"},
+                ],
+                "associations": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    app = api_mod.create_app(
+        CoordinatorConfig(graph=str(graph_path), workdir=tmp_path / "run", kg_mode="json")
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/graph/nodes/search",
+        json={"query": "battery interface", "limit": 3},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["retrieval_backend"] == "semantic"
+    assert [result["node"]["id"] for result in body["results"]] == ["n2", "n1"]
+    assert body["results"][0]["score"] == pytest.approx(0.91)
+
+
+def test_relationship_updates_are_directed_idempotent_and_persisted(monkeypatch):
+    data = {
+        "things": [
+            {"id": "n1", "name": "One", "category": "Thing"},
+            {"id": "n2", "name": "Two", "category": "Thing"},
+        ],
+        "associations": [],
+    }
+    entities = {
+        "n1": {"id": "s1", "uri": "n1"},
+        "n2": {"id": "s2", "uri": "n2"},
+    }
+    links = []
+
+    monkeypatch.setattr(
+        api_mod.kg_update,
+        "splash_find_entity_by_matkg_id",
+        lambda node_id: entities.get(node_id),
+    )
+
+    def find_links(*, subject_id=None, predicate=None, object_id=None, **kwargs):
+        return [
+            link for link in links
+            if (not subject_id or link["subjectId"] == subject_id)
+            and (not predicate or link["predicate"] == predicate)
+            and (not object_id or link["objectId"] == object_id)
+        ]
+
+    def create_link(*, subject_id, predicate, object_id, **kwargs):
+        link = {
+            "id": f"link-{len(links) + 1}",
+            "subjectId": subject_id,
+            "predicate": predicate,
+            "objectId": object_id,
+        }
+        links.append(link)
+        return link
+
+    def delete_link(link_id, **kwargs):
+        links[:] = [link for link in links if link["id"] != link_id]
+        return True
+
+    monkeypatch.setattr(api_mod.kg_update, "splash_find_links", find_links)
+    monkeypatch.setattr(api_mod.kg_update, "splash_create_link", create_link)
+    monkeypatch.setattr(api_mod.kg_update, "splash_delete_link", delete_link)
+    service = object.__new__(api_mod.AgentPipelineService)
+    add = api_mod.GraphRelationshipUpdate(
+        action="add", source="n2", predicate="Used In", target="n1"
+    )
+
+    service._apply_relationship_updates(data, edited_node_id="n1", updates=[add])
+    service._apply_relationship_updates(data, edited_node_id="n1", updates=[add])
+
+    assert data["associations"] == [
+        {"subject": "n2", "predicate": "rel:used_in", "object": "n1"}
+    ]
+    assert len(links) == 1
+    remove = api_mod.GraphRelationshipUpdate(
+        action="remove", source="n2", predicate="rel:used_in", target="n1"
+    )
+    service._apply_relationship_updates(data, edited_node_id="n1", updates=[remove])
+    assert data["associations"] == []
+    assert links == []
+
+    with pytest.raises(ValueError, match="involve the edited node"):
+        service._apply_relationship_updates(
+            data,
+            edited_node_id="n1",
+            updates=[api_mod.GraphRelationshipUpdate(
+                action="add", source="n2", predicate="rel:related_to", target="n3"
+            )],
+        )
+
+
+def test_patch_graph_node_updates_label_description_pubs_and_snippets(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    source_graph = tmp_path / "source_kg.json"
+    source_graph.write_text(
+        json.dumps(
+            {
+                "things": [
+                    {
+                        "id": "matkg:TermA",
+                        "name": "Term A",
+                        "category": "Technique",
+                        "description": "old desc",
+                        "publications": [{"source_paper": "old.pdf", "paper_title": "Old"}],
+                        "source_papers": ["old.pdf"],
+                    },
+                    {
+                        "id": "matkg:Code1",
+                        "name": "gamma snippet",
+                        "category": "CodeSnippet",
+                        "function_name": "gamma",
+                        "code_language": "python",
+                        "code_snippet": "def gamma(): pass",
+                    },
+                    {
+                        "id": "matkg:Other",
+                        "name": "Other node",
+                        "category": "Thing",
+                    },
+                ],
+                "associations": [
+                    {
+                        "subject": "matkg:TermA",
+                        "predicate": "rel:has_code_snippet",
+                        "object": "matkg:Code1",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    entities = {
+        "splash-term": {
+            "id": "splash-term",
+            "entityType": "Technique",
+            "name": "Term A",
+            "uri": "matkg:TermA",
+            "properties": {"matkg_id": "matkg:TermA", "description": "old desc"},
+        },
+        "splash-code": {
+            "id": "splash-code",
+            "entityType": "CodeSnippet",
+            "name": "gamma snippet",
+            "uri": "matkg:Code1",
+            "properties": {"matkg_id": "matkg:Code1", "code_snippet": "def gamma(): pass"},
+        },
+        "splash-other": {
+            "id": "splash-other",
+            "entityType": "Thing",
+            "name": "Other node",
+            "uri": "matkg:Other",
+            "properties": {"matkg_id": "matkg:Other"},
+        },
+    }
+    links = [
+        {
+            "id": "link-1",
+            "subjectId": "splash-term",
+            "predicate": "rel:has_code_snippet",
+            "objectId": "splash-code",
+        }
+    ]
+    created = {"entities": 0, "links": 0}
+
+    def find_entity(matkg_id, **kwargs):
+        for entity in entities.values():
+            props = entity.get("properties") or {}
+            if entity.get("uri") == matkg_id or props.get("matkg_id") == matkg_id or entity["id"] == matkg_id:
+                return dict(entity)
+        return None
+
+    def update_entity(entity_id, *, name=None, entity_type=None, properties=None, **kwargs):
+        entity = entities[entity_id]
+        if name is not None:
+            entity["name"] = name
+        if entity_type is not None:
+            entity["entityType"] = entity_type
+        if properties:
+            props = dict(entity.get("properties") or {})
+            props.update(properties)
+            entity["properties"] = props
+        return dict(entity)
+
+    def create_entity(*, entity_type, name, uri=None, properties=None, **kwargs):
+        created["entities"] += 1
+        entity_id = f"splash-new-{created['entities']}"
+        entity = {
+            "id": entity_id,
+            "entityType": entity_type,
+            "name": name,
+            "uri": uri,
+            "properties": dict(properties or {}),
+        }
+        entities[entity_id] = entity
+        return dict(entity)
+
+    def create_link(*, subject_id, predicate, object_id, **kwargs):
+        created["links"] += 1
+        link = {
+            "id": f"link-new-{created['links']}",
+            "subjectId": subject_id,
+            "predicate": predicate,
+            "objectId": object_id,
+        }
+        links.append(link)
+        return dict(link)
+
+    def find_links(*, subject_id=None, predicate=None, object_id=None, **kwargs):
+        out = []
+        for link in links:
+            if subject_id and link["subjectId"] != subject_id:
+                continue
+            if predicate and link["predicate"] != predicate:
+                continue
+            if object_id and link["objectId"] != object_id:
+                continue
+            out.append(dict(link))
+        return out
+
+    def delete_link(link_id, **kwargs):
+        before = len(links)
+        links[:] = [link for link in links if link["id"] != link_id]
+        return len(links) < before
+
+    monkeypatch.setattr(api_mod.kg_update, "splash_find_entity_by_matkg_id", find_entity)
+    monkeypatch.setattr(api_mod.kg_update, "splash_update_entity", update_entity)
+    monkeypatch.setattr(api_mod.kg_update, "splash_create_entity", create_entity)
+    monkeypatch.setattr(api_mod.kg_update, "splash_create_link", create_link)
+    monkeypatch.setattr(api_mod.kg_update, "splash_find_links", find_links)
+    monkeypatch.setattr(api_mod.kg_update, "splash_delete_link", delete_link)
+    monkeypatch.setattr(
+        api_mod.kg_update,
+        "load_splash_graph",
+        lambda **kwargs: json.loads(source_graph.read_text(encoding="utf-8")),
+    )
+
+    workdir = tmp_path / "run"
+    app = api_mod.create_app(
+        CoordinatorConfig(graph=str(source_graph), workdir=workdir, kg_mode="splash")
+    )
+    client = TestClient(app)
+    session_kg = workdir / "kg.json"
+
+    response = client.patch(
+        "/graph/node/matkg:TermA",
+        json={
+            "label": "Term A edited",
+            "type": "Material",
+            "description": "new desc",
+            "publications": [
+                {
+                    "paper_title": "New Paper",
+                    "authors": ["Ada"],
+                    "doi": "10.1/new",
+                    "source_paper": "new.pdf",
+                    "journal": "Nature",
+                    "publication_year": 2024,
+                }
+            ],
+            "linked_code_snippets": [
+                {
+                    "id": "matkg:Code1",
+                    "label": "gamma snippet edited",
+                    "function_name": "gamma",
+                    "code_language": "python",
+                    "code_snippet": "def gamma():\n    return 1",
+                    "_action": "upsert",
+                },
+                {
+                    "label": "beta snippet",
+                    "function_name": "beta",
+                    "code_language": "python",
+                    "code_snippet": "def beta():\n    return 2",
+                    "_action": "upsert",
+                },
+            ],
+            "relationship_updates": [
+                {
+                    "action": "add",
+                    "source": "matkg:Other",
+                    "predicate": "Affects",
+                    "target": "matkg:TermA",
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["label"] == "Term A edited"
+    assert body["type"] == "Material"
+    assert body["description"] == "new desc"
+    assert body["publications"][0]["paper_title"] == "New Paper"
+    assert body["publications"][0]["doi"] == "10.1/new"
+    assert len(body["linked_code_snippets"]) == 2
+    by_fn = {s["function_name"]: s for s in body["linked_code_snippets"]}
+    assert by_fn["gamma"]["code_snippet"] == "def gamma():\n    return 1"
+    assert by_fn["beta"]["code_snippet"] == "def beta():\n    return 2"
+
+    saved = json.loads(session_kg.read_text(encoding="utf-8"))
+    term = next(t for t in saved["things"] if t["id"] == "matkg:TermA")
+    assert term["name"] == "Term A edited"
+    assert term["category"] == "Material"
+    assert term["type"] == "matkg:Material"
+    assert term["description"] == "new desc"
+    assert term["publications"][0]["paper_title"] == "New Paper"
+    assert entities["splash-term"]["name"] == "Term A edited"
+    assert entities["splash-term"]["entityType"] == "Material"
+    assert entities["splash-term"]["properties"]["description"] == "new desc"
+    assert entities["splash-code"]["properties"]["code_snippet"] == "def gamma():\n    return 1"
+    assert created["entities"] == 1
+    assert created["links"] == 2
+    assert any(
+        association
+        for association in saved["associations"]
+        if association["subject"] == "matkg:Other"
+        and association["predicate"] == "rel:affects"
+        and association["object"] == "matkg:TermA"
+    )
+    assert any(
+        link
+        for link in links
+        if link["subjectId"] == "splash-other"
+        and link["predicate"] == "rel:affects"
+        and link["objectId"] == "splash-term"
+    )
+
+    response = client.patch(
+        "/graph/node/matkg:TermA",
+        json={
+            "linked_code_snippets": [
+                {
+                    "id": by_fn["beta"]["id"],
+                    "label": "beta snippet",
+                    "function_name": "beta",
+                    "code_language": "python",
+                    "code_snippet": "def beta():\n    return 2",
+                    "_action": "upsert",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert len(body["linked_code_snippets"]) == 1
+    assert body["linked_code_snippets"][0]["function_name"] == "beta"
+    assert not any(
+        link
+        for link in links
+        if link["subjectId"] == "splash-term" and link["objectId"] == "splash-code"
+    )
+
+    response = client.patch(
+        "/graph/node/matkg:TermA",
+        json={
+            "relationship_updates": [
+                {
+                    "action": "remove",
+                    "source": "matkg:Other",
+                    "predicate": "rel:affects",
+                    "target": "matkg:TermA",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+    saved = json.loads(session_kg.read_text(encoding="utf-8"))
+    assert not any(
+        association
+        for association in saved["associations"]
+        if association["subject"] == "matkg:Other"
+        and association["predicate"] == "rel:affects"
+        and association["object"] == "matkg:TermA"
+    )
+    assert not any(link for link in links if link["predicate"] == "rel:affects")
+
+
+def test_splash_startup_syncs_session_kg_from_splash(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "RetrievalAgent", FakeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    source_graph = tmp_path / "source.json"
+    source_graph.write_text(
+        json.dumps(
+            {
+                "things": [{"id": "n1", "name": "Old", "category": "Thing", "description": "seed"}],
+                "associations": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        api_mod.kg_update,
+        "load_splash_graph",
+        lambda **kwargs: {
+            "things": [{"id": "n1", "name": "Old", "category": "Thing", "description": "from splash"}],
+            "associations": [],
+        },
+    )
+
+    workdir = tmp_path / "run"
+    app = api_mod.create_app(
+        CoordinatorConfig(graph=str(source_graph), workdir=workdir, kg_mode="splash")
+    )
+    client = TestClient(app)
+
+    response = client.get("/graph/node/n1")
+    assert response.status_code == 200
+    assert response.json()["description"] == "from splash"
+
+    saved = json.loads((workdir / "kg.json").read_text(encoding="utf-8"))
+    assert saved["things"][0]["description"] == "from splash"

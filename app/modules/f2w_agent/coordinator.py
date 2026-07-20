@@ -183,10 +183,15 @@ class Coordinator:
         else:
             if not self.session_terms.exists():
                 _empty_terms(self.session_terms)
-            # No seed terms means configured graph is source of truth. Keep the
-            # session graph in sync so UI-highlighted retrieved node IDs render.
+            # No seed terms means configured graph is source of truth for JSON mode.
+            # Splash mode treats splash-links as durable storage — only seed the session
+            # file when missing so restart does not wipe property edits.
             if configured_graph and configured_graph.exists():
-                shutil.copy2(configured_graph, self.session_kg)
+                if self.cfg.kg_mode == "splash":
+                    if not self.session_kg.exists():
+                        shutil.copy2(configured_graph, self.session_kg)
+                else:
+                    shutil.copy2(configured_graph, self.session_kg)
 
         # Initial graph the retrieval agent reads.
         if configured_graph and configured_graph.exists():

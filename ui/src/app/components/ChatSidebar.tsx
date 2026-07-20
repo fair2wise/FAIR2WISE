@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
 import { ArrowUp, Check, Copy, Share2 } from 'lucide-react';
 import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
@@ -8,6 +8,7 @@ import { GraphMockup } from './GraphMockup';
 import { parseKgCitationNodeIds, splitAnswerHighlightSegments } from './kgCitations';
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
+import type { ChatMessage } from './chatSessions';
 import {
   AgentChatHistoryMessage,
   AgentChatResponse,
@@ -19,7 +20,6 @@ import {
   ThinkingStep,
   queryAgentActionStream,
   queryLiveAgentStream,
-  resetAgentSession,
 } from './data/liveAgent';
 
 function PaperDetails({ paper }: { paper: PendingCandidate }) {
@@ -289,28 +289,12 @@ function ThinkingStatus({ status, elapsedSeconds }: { status: string; elapsedSec
 interface Props {
   graph: GraphPayload;
   activeQuery: ExampleQuery;
-  chatResetSignal: number;
+  sessionId: string;
+  messages: ChatMessage[];
+  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   onGraphUpdate: (graph: GraphPayload) => void;
   onSelect: (q: ExampleQuery) => void;
 }
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  question?: string;
-  highlightNodeIds?: string[];
-  retrievedNodeIds?: string[];
-  confidence?: number;
-  status?: string;
-  graphSourceUsed?: string | null;
-  elapsedSeconds?: number;
-  publications?: PublicationInfo[];
-  pending?: PendingAction | null;
-}
-
-const CHAT_STORAGE_KEY = 'fair2wise.chat.messages.v1';
-const MAX_STORED_MESSAGES = 80;
 const MAX_REQUEST_HISTORY_MESSAGES = 8;
 
 function requestHistoryFromMessages(messages: ChatMessage[]): AgentChatHistoryMessage[] {
@@ -326,62 +310,6 @@ function requestHistoryFromMessages(messages: ChatMessage[]): AgentChatHistoryMe
     }));
 }
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-}
-
-function asPublicationArray(value: unknown): PublicationInfo[] {
-  return Array.isArray(value) ? value.filter((item): item is PublicationInfo => Boolean(item) && typeof item === 'object') : [];
-}
-
-function normalizeChatMessage(value: unknown): ChatMessage | null {
-  if (!value || typeof value !== 'object') return null;
-  const candidate = value as Partial<ChatMessage>;
-  if (
-    typeof candidate.id !== 'string' ||
-    (candidate.role !== 'user' && candidate.role !== 'assistant') ||
-    typeof candidate.content !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    id: candidate.id,
-    role: candidate.role,
-    content: candidate.content,
-    question: typeof candidate.question === 'string' ? candidate.question : undefined,
-    highlightNodeIds: asStringArray(candidate.highlightNodeIds),
-    retrievedNodeIds: asStringArray(candidate.retrievedNodeIds),
-    confidence: typeof candidate.confidence === 'number' && Number.isFinite(candidate.confidence)
-      ? candidate.confidence
-      : undefined,
-    status: typeof candidate.status === 'string' ? candidate.status : undefined,
-    graphSourceUsed: typeof candidate.graphSourceUsed === 'string' ? candidate.graphSourceUsed : null,
-    elapsedSeconds: typeof candidate.elapsedSeconds === 'number' && Number.isInteger(candidate.elapsedSeconds)
-      ? candidate.elapsedSeconds
-      : undefined,
-    publications: asPublicationArray(candidate.publications),
-    pending: candidate.pending && typeof candidate.pending === 'object'
-      ? (candidate.pending as PendingAction)
-      : null,
-  };
-}
-
-function loadStoredMessages(): ChatMessage[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeChatMessage)
-      .filter((message): message is ChatMessage => Boolean(message))
-      .slice(-MAX_STORED_MESSAGES);
-  } catch {
-    return [];
-  }
-}
 
 interface MessageExchange {
   key: string;
@@ -410,9 +338,8 @@ function groupMessageExchanges(messages: ChatMessage[]): MessageExchange[] {
   return exchanges;
 }
 
-export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate, onSelect }: Props) {
+export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessages, onGraphUpdate, onSelect }: Props) {
   const [inputValue, setInputValue] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadStoredMessages());
   const [isThinking, setIsThinking] = useState(false);
   const [steps, setSteps] = useState<ThinkingStep[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -422,16 +349,16 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   const [streamNodeIds, setStreamNodeIds] = useState<string[]>([]);
   const [pinnedViewId, setPinnedViewId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [isResettingSession, setIsResettingSession] = useState(false);
+  const [isKgViewer, setIsKgViewer] = useState(false);
+  const [kgViewerNodeLimit, setKgViewerNodeLimit] = useState<number | 'all'>(100);
   const endRef = useRef<HTMLDivElement>(null);
-  const restoredSelectionRef = useRef(false);
   const activeRequestRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
   const requestStartedAtRef = useRef<number | null>(null);
   const stepsRef = useRef<ThinkingStep[]>([]);
 
   const canStop = isThinking || streamingId !== null;
-  const isBusy = canStop || isResettingSession;
+  const isBusy = canStop;
   const canSubmit = inputValue.trim().length > 0 && !isBusy;
   const thinkingStatus = steps.length > 0
     ? steps[steps.length - 1].label
@@ -463,11 +390,6 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   }, [streamingId, streamedLen, messages]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
-  }, [messages]);
-
-  useEffect(() => {
     if (!isThinking || requestStartedAtRef.current === null) return;
 
     const updateElapsed = () => {
@@ -482,16 +404,20 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   }, [isThinking]);
 
   useEffect(() => {
-    if (restoredSelectionRef.current) return;
-    restoredSelectionRef.current = true;
+    stopGeneration();
+    setInputValue('');
+    setCopiedMessageId(null);
+    setPinnedViewId(null);
     const lastAssistant = [...messages].reverse().find(message => message.role === 'assistant');
     if (lastAssistant) {
       if ((lastAssistant.highlightNodeIds?.length ?? 0) > 0) {
         setPinnedViewId(lastAssistant.id);
       }
       applyAssistantSelection(lastAssistant);
+    } else {
+      onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
     }
-  }, []);
+  }, [sessionId]);
 
   useEffect(() => {
     return () => {
@@ -629,6 +555,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
         makeProgressHandler(requestId, controller),
         controller.signal,
         requestHistory,
+        sessionId,
       );
       if (requestSeqRef.current !== requestId || controller.signal.aborted) return;
       applyResult(result, question);
@@ -697,6 +624,8 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
         'extraction',
         makeProgressHandler(requestId, controller),
         controller.signal,
+        undefined,
+        sessionId,
       );
       if (requestSeqRef.current !== requestId || controller.signal.aborted) return;
       applyResult(result, echo.content);
@@ -770,43 +699,6 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
     applyAssistantSelection(message);
   }
 
-  async function resetBackendSessionContext() {
-    setIsResettingSession(true);
-    try {
-      await resetAgentSession();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setMessages([
-        {
-          id: `agent-session-reset-error-${Date.now()}`,
-          role: 'assistant',
-          content: `Agent run failed: Could not reset session context: ${message}`,
-          highlightNodeIds: [],
-          retrievedNodeIds: [],
-          confidence: 0,
-          status: 'api_error',
-        },
-      ]);
-    } finally {
-      setIsResettingSession(false);
-    }
-  }
-
-  function newChat() {
-    stopGeneration();
-    setMessages([]);
-    setInputValue('');
-    setPinnedViewId(null);
-    setCopiedMessageId(null);
-    onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
-    void resetBackendSessionContext();
-  }
-
-  useEffect(() => {
-    if (!chatResetSignal) return;
-    newChat();
-  }, [chatResetSignal]);
-
   function onInputKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -819,12 +711,24 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
       stopGeneration();
       return;
     }
-    if (isResettingSession) return;
     submit(inputValue);
   }
 
   const messageExchanges = groupMessageExchanges(messages);
-  const displayGraph = streamGraph ?? graph;
+  const displayGraph = useMemo(() => {
+    if (!streamGraph) return graph;
+    const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+    for (const node of streamGraph.nodes) nodes.set(node.id, node);
+    const edgeKey = (edge: { source: string; target: string; predicate: string }) =>
+      `${edge.source}\u0000${edge.predicate}\u0000${edge.target}`;
+    const edges = new Map(graph.edges.map(edge => [edgeKey(edge), edge]));
+    for (const edge of streamGraph.edges) edges.set(edgeKey(edge), edge);
+    return {
+      nodes: Array.from(nodes.values()),
+      edges: Array.from(edges.values()),
+      source_path: graph.source_path || streamGraph.source_path,
+    };
+  }, [graph, streamGraph]);
   const citationMessageId = activeQuery.id !== 'idle' ? activeQuery.id : null;
   const citationAnswerText = useMemo(() => {
     if (!citationMessageId) return '';
@@ -862,11 +766,55 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
   ]);
   const citationAnimationKey = citationMessageId && citedNodeIds.length > 0 ? citationMessageId : '';
 
+  function handleGraphNodeUpdated(updated: GraphPayload['nodes'][number], refreshedGraph?: GraphPayload) {
+    if (refreshedGraph) {
+      onGraphUpdate(refreshedGraph);
+      return;
+    }
+    onGraphUpdate({
+      ...graph,
+      nodes: graph.nodes.map(node => (
+        node.id === updated.id
+          ? {
+              ...node,
+              label: updated.label,
+              type: updated.type,
+              description: updated.description,
+              publications: updated.publications,
+              code_snippet: updated.code_snippet,
+              code_language: updated.code_language,
+              function_name: updated.function_name,
+              linked_code_snippets: updated.linked_code_snippets,
+            }
+          : node
+      )),
+    });
+  }
+
+  const graphView = (
+    <GraphMockup
+      graph={displayGraph}
+      highlightedNodeIds={isThinking && streamNodeIds.length ? streamNodeIds : activeQuery.nodeIds}
+      citedNodeIds={citedNodeIds}
+      citationAnimationKey={citationAnimationKey}
+      isKgViewer={isKgViewer}
+      kgViewerNodeLimit={kgViewerNodeLimit}
+      onToggleKgViewer={() => setIsKgViewer(value => !value)}
+      onKgViewerNodeLimitChange={setKgViewerNodeLimit}
+      onNodeUpdated={handleGraphNodeUpdated}
+    />
+  );
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-white">
       {/* Chat (left) + KG (right) with a draggable divider */}
       <div className="min-h-0 flex-1">
-        <ResizablePanelGroup direction="horizontal">
+        {isKgViewer ? (
+          <div className="flex h-full min-h-0 w-full">
+            {graphView}
+          </div>
+        ) : (
+          <ResizablePanelGroup direction="horizontal">
           <ResizablePanel defaultSize={36} minSize={24}>
             <div className="flex h-full min-h-0 flex-col">
               <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
@@ -949,7 +897,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
                                       )}
                                     </div>
                                     {showPublications && (
-                                      <div className="border-t border-slate-200 bg-white/60 px-4 py-3">
+                                      <div className="px-4 py-3">
                                         <p className="mb-2 text-sm font-bold text-slate-800">
                                           {alternativePublications
                                             ? 'Alternative Publications and Sources:'
@@ -1021,7 +969,7 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
                     aria-label={isBusy ? 'Stop' : 'Send question'}
                     title={canStop ? 'Stop' : 'Send'}
                     onClick={onActionClick}
-                    disabled={isResettingSession || (!canStop && !canSubmit)}
+                    disabled={!canStop && !canSubmit}
                     className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-sky-500`}
                   >
                     {canStop ? (
@@ -1039,15 +987,11 @@ export function ChatSidebar({ graph, activeQuery, chatResetSignal, onGraphUpdate
 
           <ResizablePanel defaultSize={64} minSize={25}>
             <div className="flex h-full min-h-0 w-full">
-              <GraphMockup
-                graph={displayGraph}
-                highlightedNodeIds={isThinking && streamNodeIds.length ? streamNodeIds : activeQuery.nodeIds}
-                citedNodeIds={citedNodeIds}
-                citationAnimationKey={citationAnimationKey}
-              />
+              {graphView}
             </div>
           </ResizablePanel>
-        </ResizablePanelGroup>
+          </ResizablePanelGroup>
+        )}
       </div>
     </div>
   );

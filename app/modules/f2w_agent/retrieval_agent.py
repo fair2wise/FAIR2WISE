@@ -141,6 +141,21 @@ class RetrievalAgent(Agent):
             "graph_source_used": getattr(self._kg, "graph_source_used", self._graph_source),
         }
 
+    async def search_node_scores(self, query: str, limit: int = 10) -> Dict[str, Any]:
+        """Rank nodes in the active KG without invoking the answer-generation workflow."""
+        loop = asyncio.get_event_loop()
+        if self._kg is None:
+            self._kg = await loop.run_in_executor(None, self._build_kg)
+        kg = self._kg
+        hits = await loop.run_in_executor(None, kg.semantic_search, query, limit)
+        return {
+            "retrieval_backend": getattr(kg, "retrieval_backend", "lexical"),
+            "matches": [
+                {"id": str(hit.id), "score": float(hit.score)}
+                for hit in hits
+            ],
+        }
+
     @action
     async def query(self, question: str) -> Dict[str, Any]:
         """Retrieve context for ``question`` and judge whether it suffices to answer."""

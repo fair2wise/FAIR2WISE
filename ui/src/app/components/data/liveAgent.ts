@@ -25,6 +25,15 @@ export interface LiveGraphEdge {
   predicate: string;
 }
 
+export type GraphRelationshipAction = 'add' | 'remove';
+
+export interface GraphRelationshipUpdate {
+  action: GraphRelationshipAction;
+  source: string;
+  predicate: string;
+  target: string;
+}
+
 export interface GraphPayload {
   nodes: LiveGraphNode[];
   edges: LiveGraphEdge[];
@@ -36,6 +45,17 @@ export const EMPTY_GRAPH: GraphPayload = {
   edges: [],
   source_path: '',
 };
+
+export interface GraphNodeSearchResult {
+  node: LiveGraphNode;
+  score: number;
+}
+
+export interface GraphNodeSearchResponse {
+  query: string;
+  retrieval_backend: 'semantic' | 'lexical' | string;
+  results: GraphNodeSearchResult[];
+}
 
 export interface PublicationNodeRef {
   id: string;
@@ -257,11 +277,16 @@ export async function queryLiveAgentWithHistory(
   message: string,
   signal?: AbortSignal,
   messages: AgentChatHistoryMessage[] = [],
+  sessionId?: string,
 ): Promise<AgentChatResponse> {
   const response = await fetch(`${AGENT_API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, messages: nonEmptyHistory(messages) }),
+    body: JSON.stringify({
+      message,
+      messages: nonEmptyHistory(messages),
+      session_id: sessionId,
+    }),
     signal,
   });
 
@@ -300,10 +325,14 @@ export async function searchPublications(
   return response.json();
 }
 
-export async function resetAgentSession(signal?: AbortSignal): Promise<AgentSessionResetResponse> {
+export async function resetAgentSession(
+  signal?: AbortSignal,
+  sessionId?: string,
+): Promise<AgentSessionResetResponse> {
   const response = await fetch(`${AGENT_API_BASE}/session/reset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: sessionId ? JSON.stringify({ session_id: sessionId }) : undefined,
     signal,
   });
 
@@ -316,6 +345,17 @@ export async function resetAgentSession(signal?: AbortSignal): Promise<AgentSess
   }
 
   return response.json();
+}
+
+export async function deleteAgentSession(sessionId: string): Promise<void> {
+  const response = await fetch(
+    `${AGENT_API_BASE}/session/${encodeURIComponent(sessionId)}`,
+    { method: 'DELETE' },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Agent API returned ${response.status}`);
+  }
 }
 
 function parseSseBlock(block: string): { event: string; data: unknown } | null {
@@ -339,6 +379,7 @@ export async function queryLiveAgentStream(
   onProgress: (event: ChatProgressEvent) => void,
   signal?: AbortSignal,
   messages: AgentChatHistoryMessage[] = [],
+  sessionId?: string,
 ): Promise<AgentChatResponse> {
   let sawStreamEvent = false;
 
@@ -346,7 +387,11 @@ export async function queryLiveAgentStream(
     const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, messages: nonEmptyHistory(messages) }),
+      body: JSON.stringify({
+        message,
+        messages: nonEmptyHistory(messages),
+        session_id: sessionId,
+      }),
       signal,
     });
 
@@ -393,7 +438,7 @@ export async function queryLiveAgentStream(
       throw error;
     }
     if (!sawStreamEvent) {
-      return queryLiveAgentWithHistory(message, signal, messages);
+      return queryLiveAgentWithHistory(message, signal, messages, sessionId);
     }
     throw error;
   }
@@ -405,9 +450,10 @@ export async function queryAgentActionStream(
   onProgress: (event: ChatProgressEvent) => void,
   signal?: AbortSignal,
   candidateIndex?: number,
+  sessionId?: string,
 ): Promise<AgentChatResponse> {
   let sawStreamEvent = false;
-  const payload: Record<string, unknown> = { decision, kind };
+  const payload: Record<string, unknown> = { decision, kind, session_id: sessionId };
   if (candidateIndex !== undefined) {
     payload.candidate_index = candidateIndex;
   }
@@ -494,6 +540,26 @@ export async function fetchLiveGraph(): Promise<GraphPayload> {
   return response.json();
 }
 
+export async function searchGraphNodes(
+  query: string,
+  limit = 10,
+  signal?: AbortSignal,
+): Promise<GraphNodeSearchResponse> {
+  const response = await fetch(`${AGENT_API_BASE}/graph/nodes/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, limit }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Agent API returned ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function fetchGraphNodeDetail(
   nodeId: string,
   jsonGraphPath?: string,
@@ -505,6 +571,44 @@ export async function fetchGraphNodeDetail(
   const query = params.toString();
   const response = await fetch(
     `${AGENT_API_BASE}/graph/node/${encodeURIComponent(nodeId)}${query ? `?${query}` : ''}`,
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Agent API returned ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export interface GraphNodeUpdatePayload {
+  label?: string;
+  type?: string;
+  description?: string;
+  code_snippet?: string;
+  publications?: PublicationInfo[];
+  linked_code_snippets?: Array<{
+    id?: string;
+    label?: string;
+    function_name?: string | null;
+    code_language?: string | null;
+    code_snippet?: string;
+    _action?: 'upsert' | 'unlink';
+  }>;
+  relationship_updates?: GraphRelationshipUpdate[];
+}
+
+export async function updateGraphNode(
+  nodeId: string,
+  update: GraphNodeUpdatePayload,
+): Promise<LiveGraphNode> {
+  const response = await fetch(
+    `${AGENT_API_BASE}/graph/node/${encodeURIComponent(nodeId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+    },
   );
 
   if (!response.ok) {

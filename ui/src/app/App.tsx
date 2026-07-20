@@ -1,5 +1,5 @@
 import '@blueskyproject/finch/style.css';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -12,8 +12,18 @@ import { Share2 } from 'lucide-react';
 import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
 import { AppPaperSearchButton } from './components/AppPaperSearchButton';
+import { AppSearchChatsButton } from './components/AppSearchChatsButton';
 import { AppSettingsButton } from './components/AppSettingsButton';
 import { ChatSidebar } from './components/ChatSidebar';
+import {
+  createChatSession,
+  loadChatSessionStore,
+  MAX_STORED_MESSAGES,
+  NEW_CHAT_TITLE,
+  saveChatSessionStore,
+  titleFromFirstPrompt,
+  type ChatMessage,
+} from './components/chatSessions';
 import { ExampleQuery } from './components/data/mockupData';
 import {
   loadAgentSettings,
@@ -21,7 +31,13 @@ import {
   settingsFromApiResponse,
   settingsToApiPayload,
 } from './components/agentSettings';
-import { EMPTY_GRAPH, fetchLiveGraph, GraphPayload, updateAgentSettings } from './components/data/liveAgent';
+import {
+  deleteAgentSession,
+  EMPTY_GRAPH,
+  fetchLiveGraph,
+  GraphPayload,
+  updateAgentSettings,
+} from './components/data/liveAgent';
 
 const queryClient = new QueryClient();
 const EMPTY_QUERY: ExampleQuery = {
@@ -35,7 +51,9 @@ const EMPTY_QUERY: ExampleQuery = {
 interface AgentKGViewProps {
   graph: GraphPayload;
   activeQuery: ExampleQuery;
-  chatResetSignal: number;
+  sessionId: string;
+  messages: ChatMessage[];
+  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   onGraphUpdate: (graph: GraphPayload) => void;
   onSelect: (query: ExampleQuery) => void;
 }
@@ -43,7 +61,9 @@ interface AgentKGViewProps {
 function AgentKGView({
   graph,
   activeQuery,
-  chatResetSignal,
+  sessionId,
+  messages,
+  setMessages,
   onGraphUpdate,
   onSelect,
 }: AgentKGViewProps) {
@@ -52,7 +72,9 @@ function AgentKGView({
       <ChatSidebar
         graph={graph}
         activeQuery={activeQuery}
-        chatResetSignal={chatResetSignal}
+        sessionId={sessionId}
+        messages={messages}
+        setMessages={setMessages}
         onGraphUpdate={onGraphUpdate}
         onSelect={onSelect}
       />
@@ -63,7 +85,64 @@ function AgentKGView({
 export default function App() {
   const [activeQuery, setActiveQuery] = useState<ExampleQuery>(EMPTY_QUERY);
   const [graph, setGraph] = useState(EMPTY_GRAPH);
-  const [chatResetSignal, setChatResetSignal] = useState(0);
+  const [chatStore, setChatStore] = useState(() => loadChatSessionStore());
+  const activeSession = chatStore.sessions.find(session => session.id === chatStore.activeSessionId)
+    ?? chatStore.sessions[0];
+
+  useEffect(() => {
+    saveChatSessionStore(chatStore);
+  }, [chatStore]);
+
+  const setActiveSessionMessages = useCallback<Dispatch<SetStateAction<ChatMessage[]>>>((update) => {
+    const sessionId = activeSession.id;
+    setChatStore(store => ({
+      ...store,
+      sessions: store.sessions.map(session => {
+        if (session.id !== sessionId) return session;
+        const nextMessages = typeof update === 'function' ? update(session.messages) : update;
+        const messages = nextMessages.slice(-MAX_STORED_MESSAGES);
+        const firstUser = messages.find(message => message.role === 'user');
+        return {
+          ...session,
+          title: session.title === NEW_CHAT_TITLE && firstUser
+            ? titleFromFirstPrompt(firstUser.content)
+            : session.title,
+          updatedAt: Date.now(),
+          messages,
+        };
+      }),
+    }));
+  }, [activeSession.id]);
+
+  function selectSession(sessionId: string) {
+    if (sessionId === chatStore.activeSessionId) return;
+    setActiveQuery(EMPTY_QUERY);
+    setChatStore(store => ({ ...store, activeSessionId: sessionId }));
+  }
+
+  function createNewChat() {
+    const session = createChatSession();
+    setActiveQuery(EMPTY_QUERY);
+    setChatStore(store => ({
+      activeSessionId: session.id,
+      sessions: [...store.sessions, session],
+    }));
+  }
+
+  function deleteChat(sessionId: string) {
+    if (sessionId === chatStore.activeSessionId) setActiveQuery(EMPTY_QUERY);
+    void deleteAgentSession(sessionId).catch(error => {
+      console.warn('Failed to delete backend chat context', error);
+    });
+    setChatStore(store => {
+      let sessions = store.sessions.filter(session => session.id !== sessionId);
+      if (sessions.length === 0) sessions = [createChatSession()];
+      const activeSessionId = store.activeSessionId === sessionId
+        ? [...sessions].sort((a, b) => b.updatedAt - a.updatedAt)[0].id
+        : store.activeSessionId;
+      return { activeSessionId, sessions };
+    });
+  }
 
   const reloadGraph = useCallback(async () => {
     const nextGraph = await fetchLiveGraph();
@@ -108,7 +187,9 @@ export default function App() {
         <AgentKGView
           graph={graph}
           activeQuery={activeQuery}
-          chatResetSignal={chatResetSignal}
+          sessionId={activeSession.id}
+          messages={activeSession.messages}
+          setMessages={setActiveSessionMessages}
           onGraphUpdate={setGraph}
           onSelect={setActiveQuery}
         />
@@ -139,7 +220,13 @@ export default function App() {
               logoIcon={headerLogoIcon}
               rightSlot={
                 <div className="mr-6 flex items-center gap-2">
-                  <AppNewChatButton onClick={() => setChatResetSignal(signal => signal + 1)} />
+                  <AppNewChatButton onClick={createNewChat} />
+                  <AppSearchChatsButton
+                    sessions={chatStore.sessions}
+                    activeSessionId={activeSession.id}
+                    onSelect={selectSession}
+                    onDelete={deleteChat}
+                  />
                   <AppPaperSearchButton />
                   <AppBookmarksButton />
                   <AppSettingsButton onSettingsApplied={reloadGraph} />

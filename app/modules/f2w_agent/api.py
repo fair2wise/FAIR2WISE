@@ -4,8 +4,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import re
+import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +16,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import kg_update
 from .coordinator import Coordinator, CoordinatorConfig
@@ -39,6 +41,8 @@ from app.modules.project_config import config_value, get_config
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
+logger = logging.getLogger(__name__)
+
 
 class ChatMessageInput(BaseModel):
     role: str = Field(..., pattern="^(user|assistant)$")
@@ -50,6 +54,12 @@ class ChatMessageInput(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     messages: List[ChatMessageInput] = Field(default_factory=list)
+    session_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
+    )
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     json_graph_path: Optional[str] = None
 
@@ -108,6 +118,12 @@ class ChatActionRequest(BaseModel):
     kind: Optional[str] = Field(default=None, pattern="^(download|extraction)$")
     candidate_index: Optional[int] = Field(default=None, ge=0)
     messages: List[ChatMessageInput] = Field(default_factory=list)
+    session_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
+    )
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     json_graph_path: Optional[str] = None
 
@@ -121,6 +137,50 @@ class GraphUploadResponse(BaseModel):
     graph: GraphPayload
     graph_path: str
     filename: str
+
+
+class GraphNodeSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=500)
+    limit: int = Field(default=10, ge=1, le=25)
+
+
+class GraphNodeSearchResult(BaseModel):
+    node: GraphNode
+    score: float
+
+
+class GraphNodeSearchResponse(BaseModel):
+    query: str
+    retrieval_backend: str
+    results: List[GraphNodeSearchResult] = Field(default_factory=list)
+
+
+class LinkedCodeSnippetUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: Optional[str] = None
+    label: Optional[str] = None
+    function_name: Optional[str] = None
+    code_language: Optional[str] = None
+    code_snippet: Optional[str] = None
+    action: str = Field(default="upsert", alias="_action", pattern="^(upsert|unlink)$")
+
+
+class GraphRelationshipUpdate(BaseModel):
+    action: str = Field(..., pattern="^(add|remove)$")
+    source: str = Field(..., min_length=1)
+    predicate: str = Field(..., min_length=1)
+    target: str = Field(..., min_length=1)
+
+
+class GraphNodeUpdateRequest(BaseModel):
+    label: Optional[str] = None
+    type: Optional[str] = None
+    description: Optional[str] = None
+    code_snippet: Optional[str] = None
+    publications: Optional[List[Dict[str, Any]]] = None
+    linked_code_snippets: Optional[List[LinkedCodeSnippetUpdate]] = None
+    relationship_updates: Optional[List[GraphRelationshipUpdate]] = None
 
 
 class PublicationSearchRequest(BaseModel):
@@ -143,6 +203,15 @@ class SessionResetResponse(BaseModel):
     session_memory_has_context: bool
     workflow_state: Optional[str] = None
     workflow_phase: str = "idle"
+
+
+class SessionResetRequest(BaseModel):
+    session_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
+    )
 
 
 class AgentSettingsResponse(BaseModel):
@@ -241,6 +310,14 @@ class RuntimeSettings:
     extraction_mode: str = "targeted"
     targeted_max_pages: int = 6
     json_graph_path: Optional[str] = None
+
+
+@dataclass
+class ChatSessionContext:
+    memory: SessionMemory
+    workflow: WorkflowStateStore
+    pending: Optional[Dict[str, Any]] = None
+    last_orchestration: Optional[Dict[str, Any]] = None
 
 
 def default_runtime_model(backend: str, configured: Optional[str] = None) -> str:
@@ -355,6 +432,7 @@ def _publication_key(publication: Dict[str, Any]) -> str:
 
 def _node_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
     publications: List[Dict[str, Any]] = []
+    has_explicit_publications = "publications" in raw and isinstance(raw.get("publications"), list)
     for pub in raw.get("publications") or []:
         if not isinstance(pub, dict):
             continue
@@ -362,8 +440,13 @@ def _node_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
         source = clean.get("source_paper")
         if source and not clean.get("doi"):
             clean = {**_publication_from_source_identifier(str(source)), **clean}
+        pages = pub.get("pages")
+        if isinstance(pages, list) and pages:
+            clean["pages"] = pages
         if clean:
             publications.append(clean)
+    if has_explicit_publications:
+        return publications
     if publications:
         return publications
 
@@ -579,6 +662,177 @@ def graph_node_from_file(
                 graph_data=data,
             )
     return None
+
+
+def _clean_publication_entry(publication: Dict[str, Any]) -> Dict[str, Any]:
+    clean = {
+        field: publication.get(field)
+        for field in _PUBLICATION_FIELDS
+        if publication.get(field) not in (None, "", [])
+    }
+    pages = publication.get("pages")
+    if isinstance(pages, list) and pages:
+        clean["pages"] = pages
+    source = clean.get("source_paper")
+    if source and not clean.get("doi"):
+        clean = {**_publication_from_source_identifier(str(source)), **clean}
+    return clean
+
+
+def _is_temp_snippet_id(snippet_id: Optional[str]) -> bool:
+    if not snippet_id:
+        return True
+    lowered = snippet_id.lower()
+    return lowered.startswith("temp:") or lowered.startswith("new:")
+
+
+def _new_snippet_matkg_id(*, label: str = "", function_name: str = "", code: str = "") -> str:
+    seed = function_name or label or "snippet"
+    slug = re.sub(r"[^a-zA-Z0-9]+", "", seed)[:40] or "snippet"
+    code_hash = uuid.uuid5(uuid.NAMESPACE_URL, code or slug).hex[:8]
+    return f"matkg:snippet{slug}{code_hash}"
+
+
+def _load_session_graph(graph_path: Path) -> Dict[str, Any]:
+    if not graph_path.exists():
+        return {"things": [], "associations": []}
+    try:
+        data = json.loads(graph_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"things": [], "associations": []}
+    if not isinstance(data, dict):
+        return {"things": [], "associations": []}
+    data.setdefault("things", [])
+    data.setdefault("associations", [])
+    return data
+
+
+def _save_session_graph(graph_path: Path, data: Dict[str, Any]) -> None:
+    graph_path.parent.mkdir(parents=True, exist_ok=True)
+    graph_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _find_thing(data: Dict[str, Any], node_id: str) -> Optional[Dict[str, Any]]:
+    things = data.get("things") or []
+    if not isinstance(things, list):
+        return None
+    for raw in things:
+        if isinstance(raw, dict) and _string_value(raw.get("id")) == node_id:
+            return raw
+    return None
+
+
+def _normalize_node_type(value: str) -> str:
+    cleaned = _string_value(value).replace("matkg:", "").replace("rel:", "").strip()
+    if not cleaned:
+        raise ValueError("Node type cannot be empty")
+    # Preserve common PascalCase schema names; otherwise keep user casing/spacing trimmed.
+    return cleaned
+
+
+_RELATIONSHIP_CURIE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*:[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+def _normalize_relationship_predicate(value: str) -> str:
+    cleaned = _string_value(value)
+    if not cleaned:
+        raise ValueError("Relationship predicate cannot be empty")
+    if ":" in cleaned:
+        if not _RELATIONSHIP_CURIE_RE.fullmatch(cleaned):
+            raise ValueError(f"Invalid relationship predicate: {value}")
+        return cleaned
+    local_name = re.sub(r"[^A-Za-z0-9]+", "_", cleaned).strip("_").lower()
+    if not local_name or not re.match(r"^[a-z0-9]", local_name):
+        raise ValueError(f"Invalid relationship predicate: {value}")
+    return f"rel:{local_name}"
+
+
+def _apply_node_field_updates(
+    thing: Dict[str, Any],
+    *,
+    label: Optional[str],
+    node_type: Optional[str],
+    description: Optional[str],
+    code_snippet: Optional[str],
+    publications: Optional[List[Dict[str, Any]]],
+) -> Dict[str, Any]:
+    """Apply editable fields onto a MatKG thing dict; return splash property patch."""
+    splash_props: Dict[str, Any] = {}
+    if label is not None:
+        thing["name"] = label
+    if node_type is not None:
+        previous = _string_value(thing.get("category") or thing.get("type"))
+        if previous and previous != node_type and "raw_category" not in thing:
+            thing["raw_category"] = previous
+            splash_props["raw_category"] = previous
+        thing["category"] = node_type
+        thing["type"] = f"matkg:{node_type}"
+        splash_props["category"] = node_type
+        splash_props["type"] = f"matkg:{node_type}"
+    if description is not None:
+        thing["description"] = description
+        splash_props["description"] = description
+        if _is_code_snippet_raw(thing):
+            thing["code_description"] = description
+            splash_props["code_description"] = description
+    if code_snippet is not None:
+        thing["code_snippet"] = code_snippet
+        splash_props["code_snippet"] = code_snippet
+    if publications is not None:
+        cleaned = [_clean_publication_entry(pub) for pub in publications if isinstance(pub, dict)]
+        cleaned = [pub for pub in cleaned if pub]
+        thing["publications"] = cleaned
+        splash_props["publications"] = cleaned
+        for field in _PUBLICATION_FIELDS:
+            if field == "source_paper":
+                continue
+            if field in thing and field not in {"authors", "institutions", "keywords"}:
+                # Clear conflicting single-source fallback scalars when replacing the list.
+                if field in (
+                    "publication_year",
+                    "paper_title",
+                    "doi",
+                    "journal",
+                    "volume",
+                    "issue",
+                    "pages_range",
+                    "abstract_text",
+                ):
+                    thing[field] = None
+        sources = sorted(
+            {
+                str(pub.get("source_paper") or "").strip()
+                for pub in cleaned
+                if str(pub.get("source_paper") or "").strip()
+            }
+        )
+        thing["source_papers"] = sources
+        splash_props["source_papers"] = sources
+    return splash_props
+
+
+def _snippet_thing_payload(
+    *,
+    snippet_id: str,
+    label: str,
+    function_name: Optional[str],
+    code_language: Optional[str],
+    code_snippet: str,
+) -> Dict[str, Any]:
+    return {
+        "id": snippet_id,
+        "name": label or function_name or snippet_id,
+        "category": "CodeSnippet",
+        "type": "matkg:CodeSnippet",
+        "description": "",
+        "function_name": function_name,
+        "code_language": code_language,
+        "code_snippet": code_snippet,
+        "publications": [],
+        "source_papers": [],
+        "context_snippets": [],
+        "properties": [],
+    }
 
 
 def graph_payload_from_file(graph_path: Path) -> GraphPayload:
@@ -1097,6 +1351,14 @@ class AgentPipelineService:
         # Pending approvals survive backend and one-shot CLI restarts.
         self.pending: Optional[Dict[str, Any]] = self.workflow.pending
         self._last_orchestration: Optional[Dict[str, Any]] = None
+        self._active_session_key = "__legacy__"
+        self._session_contexts: Dict[str, ChatSessionContext] = {
+            self._active_session_key: ChatSessionContext(
+                memory=self.memory,
+                workflow=self.workflow,
+                pending=self.pending,
+            )
+        }
         available_json_graphs = list_storage_kg_json_files()
         initial_graph_source = "json" if cfg.graph and cfg.kg_mode == "json" else "splash"
         initial_backend = cfg.backend if cfg.backend in {"cborg", "ollama"} else "cborg"
@@ -1115,6 +1377,62 @@ class AgentPipelineService:
         )
         self.cfg.model = initial_model
         self._rebuild_agents()
+        if self.runtime.graph_source == "splash":
+            self._sync_session_graph_from_splash()
+
+    @staticmethod
+    def _session_key(session_id: Optional[str]) -> str:
+        if session_id is None:
+            return "__legacy__"
+        value = session_id.strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", value):
+            raise ValueError("Invalid session ID")
+        return value
+
+    def _store_active_session(self) -> None:
+        self._session_contexts[self._active_session_key] = ChatSessionContext(
+            memory=self.memory,
+            workflow=self.workflow,
+            pending=self.pending,
+            last_orchestration=self._last_orchestration,
+        )
+
+    def _activate_session(self, session_id: Optional[str]) -> None:
+        key = self._session_key(session_id)
+        if key == self._active_session_key:
+            return
+        self._store_active_session()
+        context = self._session_contexts.get(key)
+        if context is None:
+            context_dir = self.coord.workdir / "chat_sessions" / key
+            memory = SessionMemory(context_dir / "session_memory.json")
+            workflow = WorkflowStateStore(context_dir / "workflow_state.json")
+            context = ChatSessionContext(
+                memory=memory,
+                workflow=workflow,
+                pending=workflow.pending,
+            )
+            self._session_contexts[key] = context
+        self._active_session_key = key
+        self.memory = context.memory
+        self.workflow = context.workflow
+        self.pending = context.pending
+        self._last_orchestration = context.last_orchestration
+
+    def _sync_session_graph_from_splash(self) -> bool:
+        """Refresh session MatKG JSON from splash so UI reads survive restarts."""
+        try:
+            data = kg_update.load_splash_graph(timeout=5)
+            if not (data.get("things") or []):
+                logger.info("Skipping splash→session sync: splash graph is empty")
+                return False
+            dest = self._session_graph_path()
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            return True
+        except Exception as exc:
+            logger.warning("Failed to sync session KG from splash: %s", exc)
+            return False
 
     def _active_model(self) -> str:
         return default_runtime_model(self.runtime.backend, self.runtime.model)
@@ -1245,6 +1563,9 @@ class AgentPipelineService:
             else:
                 active_graph_path = self._session_graph_path()
                 active_graph_source = "splash"
+                if graph_changed:
+                    self._sync_session_graph_from_splash()
+                    active_graph_path = self._session_graph_path()
 
             if backend_changed or model_changed:
                 self._rebuild_agents()
@@ -1259,6 +1580,379 @@ class AgentPipelineService:
 
     def graph_payload(self) -> GraphPayload:
         return graph_payload_from_file(self.graph_path())
+
+    async def search_graph_nodes(self, query: str, limit: int = 10) -> GraphNodeSearchResponse:
+        query = query.strip()
+        if not query:
+            raise ValueError("Search query is required")
+        # Ask for extra candidates because unresolved Unknown stubs are not useful in the UI.
+        ranked = await self.retrieval.search_node_scores(query, min(25, max(limit * 3, limit)))
+        graph_path = self.graph_path()
+        results: List[GraphNodeSearchResult] = []
+        for match in ranked.get("matches") or []:
+            node = graph_node_from_file(graph_path, _string_value(match.get("id")))
+            if node is None or node.type.strip().lower() == "unknown":
+                continue
+            results.append(
+                GraphNodeSearchResult(node=node, score=float(match.get("score") or 0.0))
+            )
+            if len(results) >= limit:
+                break
+        return GraphNodeSearchResponse(
+            query=query,
+            retrieval_backend=_string_value(ranked.get("retrieval_backend"), "lexical"),
+            results=results,
+        )
+
+    async def update_graph_node(self, node_id: str, update: GraphNodeUpdateRequest) -> GraphNode:
+        if self.runtime.graph_source == "json":
+            raise ValueError("Editing node properties requires splash graph mode")
+
+        graph_path = self.graph_path()
+        data = _load_session_graph(graph_path)
+        thing = _find_thing(data, node_id)
+        if thing is None:
+            raise FileNotFoundError(f"Node not found: {node_id}")
+
+        splash_entity = kg_update.splash_find_entity_by_matkg_id(node_id)
+        if splash_entity is None:
+            raise FileNotFoundError(f"Splash entity not found for node: {node_id}")
+
+        if update.relationship_updates is not None:
+            self._validate_relationship_updates(
+                data,
+                edited_node_id=node_id,
+                updates=update.relationship_updates,
+            )
+
+        normalized_type = _normalize_node_type(update.type) if update.type is not None else None
+        will_be_snippet = (
+            normalized_type.lower() == "codesnippet"
+            if normalized_type is not None
+            else _is_code_snippet_raw(thing)
+        )
+        if update.code_snippet is not None and not will_be_snippet:
+            raise ValueError("code_snippet can only be set on CodeSnippet nodes")
+
+        splash_props = _apply_node_field_updates(
+            thing,
+            label=update.label,
+            node_type=normalized_type,
+            description=update.description,
+            code_snippet=update.code_snippet,
+            publications=update.publications,
+        )
+
+        kg_update.splash_update_entity(
+            splash_entity["id"],
+            name=update.label if update.label is not None else None,
+            entity_type=normalized_type,
+            properties=splash_props or None,
+        )
+
+        if update.linked_code_snippets is not None:
+            await self._apply_linked_snippet_updates(
+                data,
+                subject_node_id=node_id,
+                subject_splash_id=str(splash_entity["id"]),
+                updates=update.linked_code_snippets,
+            )
+
+        if update.relationship_updates is not None:
+            self._apply_relationship_updates(
+                data,
+                edited_node_id=node_id,
+                updates=update.relationship_updates,
+            )
+
+        _save_session_graph(graph_path, data)
+        await self.retrieval.reload_kg(str(graph_path), graph_source="splash")
+
+        node = graph_node_from_file(graph_path, node_id)
+        if node is None:
+            raise FileNotFoundError(f"Node not found after update: {node_id}")
+        return node
+
+    @staticmethod
+    def _validate_relationship_updates(
+        data: Dict[str, Any],
+        *,
+        edited_node_id: str,
+        updates: List[GraphRelationshipUpdate],
+    ) -> None:
+        for update in updates:
+            source = update.source.strip()
+            target = update.target.strip()
+            _normalize_relationship_predicate(update.predicate)
+            if edited_node_id not in {source, target}:
+                raise ValueError("Relationship update must involve the edited node")
+            if source == target:
+                raise ValueError("Self relationships are not supported")
+            if _find_thing(data, source) is None:
+                raise FileNotFoundError(f"Relationship source node not found: {source}")
+            if _find_thing(data, target) is None:
+                raise FileNotFoundError(f"Relationship target node not found: {target}")
+
+    def _apply_relationship_updates(
+        self,
+        data: Dict[str, Any],
+        *,
+        edited_node_id: str,
+        updates: List[GraphRelationshipUpdate],
+    ) -> None:
+        associations = data.setdefault("associations", [])
+        if not isinstance(associations, list):
+            associations = []
+            data["associations"] = associations
+
+        self._validate_relationship_updates(
+            data,
+            edited_node_id=edited_node_id,
+            updates=updates,
+        )
+
+        for update in updates:
+            source = update.source.strip()
+            target = update.target.strip()
+            predicate = _normalize_relationship_predicate(update.predicate)
+            source_entity = kg_update.splash_find_entity_by_matkg_id(source)
+            target_entity = kg_update.splash_find_entity_by_matkg_id(target)
+            if source_entity is None:
+                raise FileNotFoundError(f"Splash entity not found for node: {source}")
+            if target_entity is None:
+                raise FileNotFoundError(f"Splash entity not found for node: {target}")
+
+            def is_exact(raw: Any) -> bool:
+                if not isinstance(raw, dict):
+                    return False
+                return (
+                    _string_value(raw.get("subject") or raw.get("source")) == source
+                    and _string_value(raw.get("predicate"), "rel:related_to") == predicate
+                    and _string_value(raw.get("object") or raw.get("target")) == target
+                )
+
+            splash_links = kg_update.splash_find_links(
+                subject_id=str(source_entity["id"]),
+                predicate=predicate,
+                object_id=str(target_entity["id"]),
+            )
+            if update.action == "add":
+                if not any(is_exact(raw) for raw in associations):
+                    associations.append(
+                        {"subject": source, "predicate": predicate, "object": target}
+                    )
+                if not splash_links:
+                    kg_update.splash_create_link(
+                        subject_id=str(source_entity["id"]),
+                        predicate=predicate,
+                        object_id=str(target_entity["id"]),
+                    )
+                continue
+
+            associations[:] = [raw for raw in associations if not is_exact(raw)]
+            for link in splash_links:
+                kg_update.splash_delete_link(str(link["id"]))
+
+    async def _apply_linked_snippet_updates(
+        self,
+        data: Dict[str, Any],
+        *,
+        subject_node_id: str,
+        subject_splash_id: str,
+        updates: List[LinkedCodeSnippetUpdate],
+    ) -> None:
+        current = {
+            snippet.id: snippet
+            for snippet in _linked_code_snippets_from_data(data, subject_node_id)
+        }
+        desired_ids: set[str] = set()
+        associations = data.setdefault("associations", [])
+        if not isinstance(associations, list):
+            associations = []
+            data["associations"] = associations
+        things = data.setdefault("things", [])
+        if not isinstance(things, list):
+            things = []
+            data["things"] = things
+
+        def unlink_snippet(snippet_id: str) -> None:
+            kept = [
+                assoc
+                for assoc in associations
+                if not (
+                    isinstance(assoc, dict)
+                    and _string_value(assoc.get("predicate"), "rel:related_to") == "rel:has_code_snippet"
+                    and (
+                        (
+                            _string_value(assoc.get("subject") or assoc.get("source")) == subject_node_id
+                            and _string_value(assoc.get("object") or assoc.get("target")) == snippet_id
+                        )
+                        or (
+                            _string_value(assoc.get("object") or assoc.get("target")) == subject_node_id
+                            and _string_value(assoc.get("subject") or assoc.get("source")) == snippet_id
+                        )
+                    )
+                )
+            ]
+            associations[:] = kept
+            snippet_entity = kg_update.splash_find_entity_by_matkg_id(snippet_id)
+            if snippet_entity is None:
+                return
+            for link in kg_update.splash_find_links(
+                subject_id=subject_splash_id,
+                predicate="rel:has_code_snippet",
+                object_id=str(snippet_entity["id"]),
+            ):
+                kg_update.splash_delete_link(str(link["id"]))
+            for link in kg_update.splash_find_links(
+                subject_id=str(snippet_entity["id"]),
+                predicate="rel:has_code_snippet",
+                object_id=subject_splash_id,
+            ):
+                kg_update.splash_delete_link(str(link["id"]))
+
+        for item in updates:
+            if item.action == "unlink":
+                if item.id:
+                    unlink_snippet(item.id)
+                continue
+
+            code_text = item.code_snippet
+            if code_text is None and item.id and item.id in current:
+                code_text = current[item.id].code_snippet
+            code_text = str(code_text or "").strip()
+            if not code_text:
+                raise ValueError("linked code snippets require a code_snippet body")
+
+            label = (item.label or "").strip()
+            function_name = (item.function_name or "").strip() or None
+            code_language = (item.code_language or "").strip() or None
+            if not label:
+                label = function_name or "code snippet"
+
+            if item.id and not _is_temp_snippet_id(item.id):
+                snippet_id = item.id
+                existing = _find_thing(data, snippet_id)
+                if existing is None:
+                    existing = _snippet_thing_payload(
+                        snippet_id=snippet_id,
+                        label=label,
+                        function_name=function_name,
+                        code_language=code_language,
+                        code_snippet=code_text,
+                    )
+                    things.append(existing)
+                else:
+                    existing["name"] = label
+                    existing["function_name"] = function_name
+                    existing["code_language"] = code_language
+                    existing["code_snippet"] = code_text
+                    existing["category"] = "CodeSnippet"
+
+                splash_snippet = kg_update.splash_find_entity_by_matkg_id(snippet_id)
+                snippet_props = {
+                    "matkg_id": snippet_id,
+                    "code_snippet": code_text,
+                    "function_name": function_name,
+                    "code_language": code_language,
+                }
+                if splash_snippet is None:
+                    splash_snippet = kg_update.splash_create_entity(
+                        entity_type="CodeSnippet",
+                        name=label,
+                        uri=snippet_id,
+                        properties=snippet_props,
+                    )
+                    kg_update.splash_create_link(
+                        subject_id=subject_splash_id,
+                        predicate="rel:has_code_snippet",
+                        object_id=str(splash_snippet["id"]),
+                    )
+                    associations.append(
+                        {
+                            "subject": subject_node_id,
+                            "predicate": "rel:has_code_snippet",
+                            "object": snippet_id,
+                        }
+                    )
+                else:
+                    kg_update.splash_update_entity(
+                        str(splash_snippet["id"]),
+                        name=label,
+                        properties=snippet_props,
+                    )
+                    linked = any(
+                        isinstance(assoc, dict)
+                        and _string_value(assoc.get("predicate"), "rel:related_to") == "rel:has_code_snippet"
+                        and (
+                            (
+                                _string_value(assoc.get("subject") or assoc.get("source")) == subject_node_id
+                                and _string_value(assoc.get("object") or assoc.get("target")) == snippet_id
+                            )
+                            or (
+                                _string_value(assoc.get("object") or assoc.get("target")) == subject_node_id
+                                and _string_value(assoc.get("subject") or assoc.get("source")) == snippet_id
+                            )
+                        )
+                        for assoc in associations
+                    )
+                    if not linked:
+                        kg_update.splash_create_link(
+                            subject_id=subject_splash_id,
+                            predicate="rel:has_code_snippet",
+                            object_id=str(splash_snippet["id"]),
+                        )
+                        associations.append(
+                            {
+                                "subject": subject_node_id,
+                                "predicate": "rel:has_code_snippet",
+                                "object": snippet_id,
+                            }
+                        )
+                desired_ids.add(snippet_id)
+                continue
+
+            snippet_id = _new_snippet_matkg_id(
+                label=label,
+                function_name=function_name or "",
+                code=code_text,
+            )
+            things.append(
+                _snippet_thing_payload(
+                    snippet_id=snippet_id,
+                    label=label,
+                    function_name=function_name,
+                    code_language=code_language,
+                    code_snippet=code_text,
+                )
+            )
+            associations.append(
+                {
+                    "subject": subject_node_id,
+                    "predicate": "rel:has_code_snippet",
+                    "object": snippet_id,
+                }
+            )
+            splash_snippet = kg_update.splash_create_entity(
+                entity_type="CodeSnippet",
+                name=label,
+                uri=snippet_id,
+                properties={
+                    "matkg_id": snippet_id,
+                    "code_snippet": code_text,
+                    "function_name": function_name,
+                    "code_language": code_language,
+                },
+            )
+            kg_update.splash_create_link(
+                subject_id=subject_splash_id,
+                predicate="rel:has_code_snippet",
+                object_id=str(splash_snippet["id"]),
+            )
+            desired_ids.add(snippet_id)
+
+        for stale_id in set(current) - desired_ids:
+            unlink_snippet(stale_id)
 
     async def search_publications(
         self,
@@ -1351,12 +2045,14 @@ class AgentPipelineService:
         question: str,
         *,
         messages: Optional[List[ChatMessageInput]] = None,
+        session_id: Optional[str] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         original_question = question.strip()
         async with self.lock:
+            self._activate_session(session_id)
             if self.pending:
                 pending_response = await self._handle_pending_message(original_question, emit=None)
                 if pending_response is not None:
@@ -1428,12 +2124,14 @@ class AgentPipelineService:
         emit: ProgressEmitter,
         *,
         messages: Optional[List[ChatMessageInput]] = None,
+        session_id: Optional[str] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         original_question = question.strip()
         async with self.lock:
+            self._activate_session(session_id)
             if self.pending:
                 pending_response = await self._handle_pending_message(original_question, emit=emit)
                 if pending_response is not None:
@@ -1783,8 +2481,9 @@ class AgentPipelineService:
         self.pending.setdefault("json_graph_path", json_graph_path)
         self._set_pending(self.pending)
 
-    async def reset_session_context(self) -> SessionResetResponse:
+    async def reset_session_context(self, session_id: Optional[str] = None) -> SessionResetResponse:
         async with self.lock:
+            self._activate_session(session_id)
             self.memory.clear()
             self.workflow.clear()
             self.pending = None
@@ -1796,6 +2495,19 @@ class AgentPipelineService:
                 workflow_state=str(self.workflow.path),
                 workflow_phase=str(self.workflow.data.get("phase") or "idle"),
             )
+
+    async def delete_session_context(self, session_id: str) -> Dict[str, str]:
+        key = self._session_key(session_id)
+        if key == "__legacy__":
+            raise ValueError("Legacy session cannot be deleted")
+        async with self.lock:
+            if key == self._active_session_key:
+                self._activate_session(None)
+            self._session_contexts.pop(key, None)
+            context_dir = self.coord.workdir / "chat_sessions" / key
+            if context_dir.exists():
+                shutil.rmtree(context_dir)
+            return {"status": "deleted", "session_id": key}
 
     async def _prepare_chat_question(
         self,
@@ -3026,8 +3738,16 @@ class AgentPipelineService:
             self.graph_path(),
         )
 
-    async def act(self, decision: str, kind: Optional[str] = None, *, candidate_index: Optional[int] = None) -> ChatResponse:
+    async def act(
+        self,
+        decision: str,
+        kind: Optional[str] = None,
+        *,
+        candidate_index: Optional[int] = None,
+        session_id: Optional[str] = None,
+    ) -> ChatResponse:
         async with self.lock:
+            self._activate_session(session_id)
             return await self._act_locked(decision, kind, emit=None, candidate_index=candidate_index)
 
     async def act_with_progress(
@@ -3037,8 +3757,10 @@ class AgentPipelineService:
         kind: Optional[str] = None,
         *,
         candidate_index: Optional[int] = None,
+        session_id: Optional[str] = None,
     ) -> ChatResponse:
         async with self.lock:
+            self._activate_session(session_id)
             return await self._act_locked(decision, kind, emit=emit, candidate_index=candidate_index)
 
     async def _act_locked(
@@ -3598,12 +4320,28 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/session/reset", response_model=SessionResetResponse)
-    async def reset_session() -> SessionResetResponse:
-        return await service.reset_session_context()
+    async def reset_session(req: Optional[SessionResetRequest] = None) -> SessionResetResponse:
+        return await service.reset_session_context(req.session_id if req else None)
+
+    @app.delete("/session/{session_id}")
+    async def delete_session(session_id: str) -> Dict[str, str]:
+        try:
+            return await service.delete_session_context(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/graph", response_model=GraphPayload)
     async def graph() -> GraphPayload:
         return service.graph_payload()
+
+    @app.post("/graph/nodes/search", response_model=GraphNodeSearchResponse)
+    async def search_graph_nodes(req: GraphNodeSearchRequest) -> GraphNodeSearchResponse:
+        try:
+            return await service.search_graph_nodes(req.query, req.limit)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Node search failed: {exc}") from exc
 
     @app.get("/graph/node/{node_id}", response_model=GraphNode)
     async def graph_node(
@@ -3618,6 +4356,17 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
         return node
 
+    @app.patch("/graph/node/{node_id}", response_model=GraphNode)
+    async def patch_graph_node(node_id: str, req: GraphNodeUpdateRequest) -> GraphNode:
+        try:
+            return await service.update_graph_node(node_id, req)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Splash update failed: {exc}") from exc
+
     @app.post("/graph/upload", response_model=GraphUploadResponse)
     async def upload_graph(req: GraphUploadRequest) -> GraphUploadResponse:
         try:
@@ -3631,6 +4380,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             return await service.ask(
                 req.message,
                 messages=req.messages,
+                session_id=req.session_id,
                 graph_source=req.graph_source,
                 json_graph_path=req.json_graph_path,
             )
@@ -3640,7 +4390,12 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
     @app.post("/chat/action", response_model=ChatResponse)
     async def chat_action(req: ChatActionRequest) -> ChatResponse:
         try:
-            return await service.act(req.decision, req.kind, candidate_index=req.candidate_index)
+            return await service.act(
+                req.decision,
+                req.kind,
+                candidate_index=req.candidate_index,
+                session_id=req.session_id,
+            )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -3676,6 +4431,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         req.message,
                         emit,
                         messages=req.messages,
+                        session_id=req.session_id,
                         graph_source=req.graph_source,
                         json_graph_path=req.json_graph_path,
                     )
@@ -3727,6 +4483,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         emit,
                         req.kind,
                         candidate_index=req.candidate_index,
+                        session_id=req.session_id,
                     )
                     payload = _model_to_jsonable(response)
                     if response.status.endswith("_error"):

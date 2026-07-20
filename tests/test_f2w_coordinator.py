@@ -78,6 +78,43 @@ def test_configured_graph_syncs_session_kg_without_seed_terms(tmp_path):
     assert [node["id"] for node in session["things"]] == ["matkg:solutionprocessing"]
 
 
+def test_splash_mode_preserves_existing_session_kg_on_restart(tmp_path):
+    graph_path = tmp_path / "configured.json"
+    graph_path.write_text(
+        json.dumps(
+            {
+                "things": [{"id": "matkg:configured", "name": "configured", "description": "from file"}],
+                "associations": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workdir = tmp_path / "run"
+    workdir.mkdir()
+    session_kg = workdir / "kg.json"
+    session_kg.write_text(
+        json.dumps(
+            {
+                "things": [{"id": "matkg:configured", "name": "configured", "description": "edited"}],
+                "associations": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    Coordinator(
+        CoordinatorConfig(
+            graph=str(graph_path),
+            workdir=workdir,
+            seed_terms=None,
+            kg_mode="splash",
+        )
+    )
+
+    session = json.loads(session_kg.read_text(encoding="utf-8"))
+    assert session["things"][0]["description"] == "edited"
+
+
 def test_answer_stops_on_retrieval_error(tmp_path, capsys):
     coord = _coord(tmp_path)
     retrieval = FakeRetrieval([RuntimeError("retrieval boom")])
