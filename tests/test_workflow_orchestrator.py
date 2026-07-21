@@ -3,6 +3,7 @@ import json
 
 from app.modules.f2w_agent.orchestrator_agent import (
     WorkflowOrchestratorAgent,
+    _direct_download_request,
     _extracted_terms_followup,
     _paper_reference_followup,
 )
@@ -49,6 +50,22 @@ def test_pending_approval_overrides_proposed_action():
     approved = asyncio.run(agent.decide("yes", state))
     assert approved["action"] == "download_selected"
     assert approved["candidate_index"] == 0
+
+
+def test_fresh_download_request_routes_directly_to_candidate_search():
+    agent = WorkflowOrchestratorAgent(max_steps=12)
+    state = {
+        "phase": "idle",
+        "orchestration_steps": 0,
+        "pending": None,
+        "approved_action": None,
+    }
+
+    decision = asyncio.run(agent.decide("Download a paper about GISAXS from arXiv", state))
+
+    assert decision["action"] == "search_candidates"
+    assert decision["agent"] == "DownloadAgent"
+    assert _direct_download_request("How can I download a paper?") is False
 
 
 def test_unavailable_candidate_and_action_loop_fail_closed():

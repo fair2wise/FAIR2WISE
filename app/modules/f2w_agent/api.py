@@ -949,6 +949,69 @@ CANDIDATE_PAPERS_INTRO = (
     "I could not answer this query reliably from the retrieved context. "
     "Below is a list of papers that might be relevant to the subject."
 )
+DIRECT_DOWNLOAD_PAPERS_INTRO = (
+    "I found these open-access paper matches. Tell me which paper to download "
+    "by title, number, DOI, or repository."
+)
+
+
+def _direct_download_query(message: str, fallback_topic: str = "") -> str:
+    """Extract a paper title/topic from an explicit download command."""
+    text = re.sub(r"\s+", " ", str(message or "").strip())
+    arxiv_match = re.search(
+        r"(?:arxiv\.org/(?:abs|pdf)/|arxiv\s*:\s*)(\d{4}\.\d{4,5}(?:v\d+)?)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if arxiv_match:
+        return arxiv_match.group(1)
+    doi_match = re.search(r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+", text, flags=re.IGNORECASE)
+    if doi_match:
+        return doi_match.group(0).rstrip(".,;)")
+
+    query = re.sub(
+        r"^(?:please\s+)?(?:"
+        r"(?:(?:can|could|would|will)\s+you\s+)(?:please\s+)?|"
+        r"i\s+(?:want|need)\s+(?:you\s+)?to\s+|"
+        r"i(?:'d|\s+would)\s+like\s+(?:you\s+)?to\s+"
+        r")?"
+        r"(?:download|fetch|grab)\s+",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    query = re.sub(r"\b(?:from|on)\s+arxiv\b", " ", query, flags=re.IGNORECASE)
+    query = re.sub(r"\b(?:via|using|through)\s+openalex\b", " ", query, flags=re.IGNORECASE)
+    query = re.sub(
+        r"^(?:another|a\s+different)\s+(?:paper|article)\s+(?:about|on|titled)\s+",
+        "",
+        query,
+        flags=re.IGNORECASE,
+    )
+    query = re.sub(r"^(?:a|an|the)\s+(?:paper|article)\s+(?:about|on|titled)\s+", "", query, flags=re.IGNORECASE)
+    query = re.sub(r"^(?:a|an|the)\s+(?:paper|article)\s*", "", query, flags=re.IGNORECASE)
+    query = re.sub(r"\s+", " ", query).strip(" \t\r\n.,;:?!'\"")
+    generic = {
+        "", "another", "another one", "another paper", "another article",
+        "a different one", "different one", "a different paper", "a different article", "one",
+        "it", "that", "the recommended", "recommended", "the recommended one",
+        "the recommended paper", "recommended paper",
+    }
+    return str(fallback_topic or "").strip() if query.casefold() in generic else query
+
+
+def _is_arxiv_candidate(candidate: Dict[str, Any]) -> bool:
+    repository = str(candidate.get("repository") or "").casefold()
+    urls = " ".join(str(url) for url in (candidate.get("pdf_urls") or [])).casefold()
+    doi = str(candidate.get("doi") or "").casefold()
+    identifier = str(candidate.get("id") or "").casefold()
+    return bool(
+        "arxiv" in repository
+        or "arxiv.org" in urls
+        or "arxiv.org" in identifier
+        or "10.48550/arxiv" in doi
+        or doi.startswith("arxiv:")
+    )
 
 
 def _extraction_outcome_text(result: Dict[str, Any]) -> str:
@@ -2098,12 +2161,18 @@ class AgentPipelineService:
                     await self._finalize_memory(original_question, response, effective_question=original_question)
                     return response
             effective_question = str(prepared.get("question") or original_question)
-            response = await self._ask_locked(
-                effective_question,
-                emit=None,
-                graph_source=graph_source,
-                json_graph_path=json_graph_path,
-            )
+            if prepared.get("status") == "direct_download_search":
+                response = await self._start_direct_download_search(original_question, emit=None)
+                effective_question = str(
+                    (self.pending or {}).get("effective_question") or effective_question
+                )
+            else:
+                response = await self._ask_locked(
+                    effective_question,
+                    emit=None,
+                    graph_source=graph_source,
+                    json_graph_path=json_graph_path,
+                )
             self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
             auto_finalized = False
             while auto_approve and response.pending:
@@ -2177,12 +2246,18 @@ class AgentPipelineService:
                     await self._finalize_memory(original_question, response, effective_question=original_question)
                     return response
             effective_question = str(prepared.get("question") or original_question)
-            response = await self._ask_locked(
-                effective_question,
-                emit=emit,
-                graph_source=graph_source,
-                json_graph_path=json_graph_path,
-            )
+            if prepared.get("status") == "direct_download_search":
+                response = await self._start_direct_download_search(original_question, emit=emit)
+                effective_question = str(
+                    (self.pending or {}).get("effective_question") or effective_question
+                )
+            else:
+                response = await self._ask_locked(
+                    effective_question,
+                    emit=emit,
+                    graph_source=graph_source,
+                    json_graph_path=json_graph_path,
+                )
             self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
             auto_finalized = False
             while auto_approve and response.pending:
@@ -2562,6 +2637,8 @@ class AgentPipelineService:
             return {"status": "query_extracted_paper", "question": question}
         if action_name == "report_extraction":
             return {"status": "report_extraction", "question": question}
+        if action_name == "search_candidates":
+            return {"status": "direct_download_search", "question": question}
         if action_name != "retrieve_kg":
             return {
                 "status": "direct_response",
@@ -2575,6 +2652,144 @@ class AgentPipelineService:
             return {"status": "kg_question", "question": question}
         rewritten = await self._rewrite_standalone_question(question, history)
         return {"status": "kg_question", "question": rewritten or question}
+
+    async def _start_direct_download_search(
+        self,
+        message: str,
+        emit: Optional[ProgressEmitter],
+    ) -> ChatResponse:
+        active_paper = self.workflow.data.get("active_paper") or {}
+        fallback_topic = str(active_paper.get("topic") or "") if isinstance(active_paper, dict) else ""
+        query = _direct_download_query(message, fallback_topic)
+        if not query:
+            self.workflow.update(phase="idle")
+            return self._response(
+                "download_query_needed",
+                "Tell me the paper title, arXiv ID, DOI, or topic you want me to search for.",
+                False,
+                {},
+                [],
+                self.graph_path(),
+                publications_override=[],
+            )
+
+        search_action = getattr(self.download, "search_candidates", None)
+        if not callable(search_action):
+            self.workflow.update(phase="stop_insufficient")
+            return self._response(
+                "agent_unavailable",
+                "DownloadAgent does not provide paper search; stopped safely.",
+                False,
+                {},
+                [],
+                self.graph_path(),
+                publications_override=[],
+            )
+
+        await self._emit(
+            emit,
+            "candidate_search_started",
+            "Literature scout searching arXiv and OpenAlex",
+            round=1,
+            preflight=1,
+            query=query,
+            missing_topics=[],
+        )
+        try:
+            search = await search_action(
+                query,
+                missing_topics=[],
+                candidate_pool=self.cfg.candidate_pool,
+            )
+        except Exception as exc:
+            self.workflow.update(phase="stop_insufficient")
+            return self._response(
+                "candidate_search_error",
+                f"Paper search failed safely: {exc}",
+                False,
+                {},
+                [],
+                self.graph_path(),
+                publications_override=[],
+            )
+
+        raw_candidates = [
+            candidate for candidate in (search.get("candidates") or [])
+            if isinstance(candidate, dict)
+        ]
+        # DownloadAgent already ranks by relevance. Stable partition keeps that
+        # ordering inside each repository group while preferring arXiv copies.
+        candidates = (
+            [candidate for candidate in raw_candidates if _is_arxiv_candidate(candidate)]
+            + [candidate for candidate in raw_candidates if not _is_arxiv_candidate(candidate)]
+        )[:5]
+        titles = [
+            str(candidate.get("title") or candidate.get("doi") or candidate.get("id") or "Untitled")
+            for candidate in candidates
+        ]
+        await self._emit(
+            emit,
+            "candidate_search_result",
+            f"Literature scout found {len(candidates)} candidate(s)",
+            round=1,
+            preflight=1,
+            count=len(candidates),
+            candidate_titles=titles,
+            scores=[float(c.get("score") or c.get("_score") or 0.0) for c in candidates],
+        )
+        if not candidates:
+            self.workflow.update(phase="idle", candidates=[], unavailable_candidate_indices=[])
+            return self._response(
+                "no_download_candidates",
+                f"I could not find a reliable open-access paper matching **{query}**.",
+                False,
+                {},
+                [{"candidate_search": search}],
+                self.graph_path(),
+                publications_override=[],
+            )
+
+        pending = {
+            "kind": "download",
+            "approval_token": uuid.uuid4().hex,
+            "verdict": {},
+            "missing_topics": [],
+            "candidates": candidates,
+            "candidate_list": candidates,
+            "selected_candidate": candidates[0],
+            "alternatives": candidates[1:],
+            "reason": "Direct paper download request",
+            "round_no": 1,
+            "original_question": message,
+            "effective_question": query,
+            "direct_download": True,
+        }
+        self.workflow.update(
+            phase="candidate_selected",
+            current_query=query,
+            current_topic=query,
+            candidates=candidates,
+            unavailable_candidate_indices=[],
+        )
+        self._set_pending(pending, phase="awaiting_download_approval")
+        await self._orchestrator_decision(query, emit)
+        await self._emit(
+            emit,
+            "awaiting_download_decision",
+            "Waiting for you to name a candidate paper in chat",
+            round=1,
+            candidate_titles=titles,
+        )
+        return self._response(
+            "awaiting_download_decision",
+            DIRECT_DOWNLOAD_PAPERS_INTRO,
+            False,
+            {},
+            [{"candidate_search": search}],
+            self.graph_path(),
+            pending=self._pending_payload(),
+            publications_override=[],
+        )
 
     async def _judge_agent_requirement(
         self,

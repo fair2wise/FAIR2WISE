@@ -187,6 +187,19 @@ def test_blank_pending_history_message_is_accepted_and_ignored():
     assert api_mod._history_payload(request.messages) == []
 
 
+def test_direct_download_query_extracts_topics_and_identifiers():
+    assert api_mod._direct_download_query(
+        "Could you please download a paper about thin film scattering from arXiv via OpenAlex?"
+    ) == "thin film scattering"
+    assert api_mod._direct_download_query(
+        "Download https://arxiv.org/abs/2401.01234v2"
+    ) == "2401.01234v2"
+    assert api_mod._direct_download_query(
+        "Fetch DOI 10.1234/example.paper"
+    ) == "10.1234/example.paper"
+    assert api_mod._direct_download_query("Download another paper", "prior topic") == "prior topic"
+
+
 class NoCallRetrieval:
     reload_calls = 0
     query_calls = 0
@@ -883,6 +896,104 @@ def test_skipping_extraction_omits_publications(tmp_path, monkeypatch):
 
     assert response.status == "stopped_by_user"
     assert response.publications == []
+
+
+def test_direct_download_search_works_again_after_skipping_extraction(tmp_path, monkeypatch):
+    class DirectDownload(AgenticDownload):
+        async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+            await super().search_candidates(query, missing_topics, candidate_pool)
+            return {
+                "status": "success",
+                "count": 3,
+                "candidates": [
+                    {
+                        "id": "https://openalex.org/Wpmc",
+                        "title": "Repository fallback",
+                        "repository": "PMC",
+                        "score": 0.99,
+                        "pdf_urls": ["https://europepmc.org/articles/PMC123?pdf=render"],
+                    },
+                    {
+                        "id": "https://arxiv.org/abs/2401.00001",
+                        "title": "Relevant arXiv paper",
+                        "repository": "arXiv",
+                        "score": 0.90,
+                        "pdf_urls": ["https://arxiv.org/pdf/2401.00001"],
+                    },
+                    {
+                        "id": "https://arxiv.org/abs/2401.00002",
+                        "title": "Second arXiv paper",
+                        "repository": "arXiv",
+                        "score": 0.75,
+                        "pdf_urls": ["https://arxiv.org/pdf/2401.00002"],
+                    },
+                ],
+            }
+
+        async def download_selected(
+            self,
+            query,
+            missing_topics=None,
+            target_dir="pdfs",
+            candidates=None,
+            max_papers=1,
+            **kwargs,
+        ):
+            await super().download_selected(
+                query,
+                missing_topics,
+                target_dir,
+                candidates,
+                max_papers,
+                **kwargs,
+            )
+            target = Path(target_dir)
+            target.mkdir(parents=True, exist_ok=True)
+            pdf = target / "2401.00001.pdf"
+            pdf.write_bytes(b"%PDF-1.4\nbody")
+            return {
+                "status": "success",
+                "count": 1,
+                "downloaded": [str(pdf)],
+                "failed": 0,
+                "skipped": 0,
+            }
+
+    NoCallRetrieval.reset()
+    DirectDownload.instances = []
+    monkeypatch.setattr(api_mod, "RetrievalAgent", NoCallRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", DirectDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(workdir=tmp_path, max_rounds=1, workflow_mode="agentic")
+    )
+    force_agent_router(service)
+
+    async def run():
+        candidates = await service.ask(
+            "Download a paper about thin film scattering from arXiv via OpenAlex"
+        )
+        downloaded = await service.ask("Download paper 1")
+        skipped = await service.ask("skip")
+        searched_again = await service.ask("Download another paper")
+        return candidates, downloaded, skipped, searched_again
+
+    candidates, downloaded, skipped, searched_again = asyncio.run(run())
+
+    assert candidates.status == "awaiting_download_decision"
+    assert [paper["repository"] for paper in candidates.pending["papers"]] == [
+        "arXiv", "arXiv", "PMC",
+    ]
+    assert downloaded.status == "awaiting_extraction_decision"
+    assert downloaded.pending["candidate"]["title"] == "Relevant arXiv paper"
+    assert skipped.status == "stopped_by_user"
+    assert searched_again.status == "awaiting_download_decision"
+    assert [call["query"] for call in DirectDownload.instances[0].search_calls] == [
+        "thin film scattering",
+        "thin film scattering",
+    ]
+    assert NoCallRetrieval.query_calls == 0
 
 
 def test_agentic_path_downloads_only_approved_candidate_then_answers(tmp_path, monkeypatch):

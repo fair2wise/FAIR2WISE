@@ -57,6 +57,14 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _direct_download_request(message: str) -> bool:
+    """Return whether a fresh turn explicitly asks to fetch a paper."""
+    text = re.sub(r"\s+", " ", str(message or "").strip().casefold())
+    if not text or re.search(r"\bhow\s+(?:do|can|could|would)\s+.*\bdownload\b", text):
+        return False
+    return bool(re.search(r"\b(download|fetch|grab)\b", text))
+
+
 def _paper_reference_followup(message: str, state: Dict[str, Any]) -> bool:
     paper = state.get("active_paper")
     if not isinstance(paper, dict) or paper.get("status") != "extracted":
@@ -230,6 +238,8 @@ class WorkflowOrchestratorAgent(Agent):
             normalized,
         ):
             return _decision("direct_response", "A conversational or UI turn needs no evidence agents.")
+        if _direct_download_request(normalized):
+            return _decision("search_candidates", "The user explicitly requested a paper download search.")
         return _decision("retrieve_kg", "The scientific question should be checked against the KG first.")
 
     def _llm_decide(self, user_turn: str, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -256,12 +266,13 @@ class WorkflowOrchestratorAgent(Agent):
             "You are the workflow orchestrator for FAIR2WISE. Classify a fresh user turn. "
             "Conversation/workflow memory may resolve references but is never scientific evidence.\n"
             "Return ONLY JSON with keys action, agent, reason, paper_id, candidate_index.\n"
-            "For fresh turns choose only direct_response, retrieve_kg, query_extracted_paper, "
-            "report_extraction, or clarify. "
+            "For fresh turns choose only direct_response, retrieve_kg, search_candidates, "
+            "query_extracted_paper, report_extraction, or clarify. "
             "Use direct_response for greetings/meta/UI/general chat; retrieve_kg for scientific claims, "
             "papers, citations, or KG requests; query_extracted_paper only for a clear reference to the "
             "active extracted paper; report_extraction for requests to list or summarize terms produced "
-            "by that extraction.\n\n"
+            "by that extraction. Use search_candidates only when the user explicitly asks to download, "
+            "fetch, or grab a paper. A question about how downloading works is direct_response.\n\n"
             f"STATE: {json.dumps(public_state, ensure_ascii=False)}\n"
             f"USER_TURN: {user_turn}"
         )
@@ -304,7 +315,7 @@ class WorkflowOrchestratorAgent(Agent):
                 return None
 
         phase_actions = {
-            "idle": {"direct_response", "retrieve_kg", "query_extracted_paper", "report_extraction", "clarify", "stop_insufficient"},
+            "idle": {"direct_response", "retrieve_kg", "search_candidates", "query_extracted_paper", "report_extraction", "clarify", "stop_insufficient"},
             "retrieval_insufficient": {"search_candidates", "stop_insufficient"},
             "candidates_found": {"consult_debate", "stop_insufficient"},
             "candidate_selected": {"request_download_approval", "stop_insufficient"},
@@ -374,7 +385,9 @@ class WorkflowOrchestratorAgent(Agent):
     ) -> Dict[str, Any]:
         """Return a validated strict-JSON-shaped next action."""
         fallback = self._safe_fallback(user_turn, state, route_hint)
-        if fallback.get("action") in {"direct_response", "query_extracted_paper", "report_extraction"}:
+        if fallback.get("action") in {
+            "direct_response", "search_candidates", "query_extracted_paper", "report_extraction"
+        }:
             validated = self.validate(fallback, state, available_agents=available_agents)
             if validated:
                 return validated
