@@ -7,7 +7,10 @@ cd "$ROOT_DIR"
 CURRENT_KG="${CURRENT_KG:-}"
 LARGE_KG="${LARGE_KG:-storage/kg/matkg_qwen3_235b_580papers.json}"
 OUTPUT_KG="${OUTPUT_KG:-storage/kg/matkg_with_code.json}"
-SPLASH_REPO="${SPLASH_LINKS_REPO:-/Users/mateo/Desktop/splash_links}"
+SPLASH_REPO="${SPLASH_LINKS_REPO:-$ROOT_DIR/splash_links}"
+if [[ "$SPLASH_REPO" != /* ]]; then
+  SPLASH_REPO="$ROOT_DIR/$SPLASH_REPO"
+fi
 SPLASH_URI="${KG_RAG_SPLASH_URI:-splash://localhost:8081}"
 START_SPLASH="${START_SPLASH:-1}"
 

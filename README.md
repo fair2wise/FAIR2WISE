@@ -17,6 +17,7 @@ This repository builds materials-science knowledge graphs from research papers (
 ## Prerequisites
 
 - Python 3.10+ (Python 3.12 recommended; Python 3.14 supported with lexical retrieval only)
+- [Pixi](https://pixi.sh/latest/installation/) for the vendored `splash_links` database server
 - A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend). CBORG requires LBLnet/VPN or an authorized IP — see [CBORG IP authorization](https://api.cborg.lbl.gov/key/manage).
 - Optional: [Ollama](https://ollama.com/) running locally for offline inference
 - For the 3-agent pipeline: `academy-py`, `langgraph`, `langchain-core`, `langchain-openai` (included in `requirements.txt`)
@@ -37,6 +38,16 @@ cd FAIRtoWISE-FORUM-AI
 ```bash
 pip3 install -r requirements.txt
 ```
+
+Install Pixi and initialize the `splash_links` environment once:
+
+```bash
+./scripts/install_pixi.sh
+```
+
+The script leaves an existing Pixi installation untouched. If Pixi is missing,
+it downloads the official installer from `pixi.sh`, installs Pixi, and runs
+`pixi install` against `splash_links/pixi.toml`.
 
 ### 3. Configure environment
 
@@ -72,7 +83,8 @@ PYSTOW_HOME=.cache/pystow
 OPENALEX_EMAIL=you@example.com
 
 # Optional — splash_links repo path (3-agent splash mode)
-SPLASH_LINKS_REPO=../splash_links
+SPLASH_LINKS_REPO=splash_links
+SPLASH_LINKS_DB=links.sqlite
 ```
 
 > **Note:** runtime environment variables and CLI flags override `.env`; `.env` overrides `config.yml` defaults.
@@ -271,24 +283,36 @@ python3 app/modules/json2kg.py \
 
 KG-RAG loads from the `splash_links` graph database by default (`KG_RAG_GRAPH_SOURCE=splash`). **After every KG JSON rebuild or metadata fix, you must re-import into splash_links and restart KG-RAG.** The splash DB is not updated automatically when `storage/kg/*.json` changes.
 
-`splash_links` is a separate repo (sibling checkout is typical):
+The vendored [`splash_links`](splash_links/) service is the graph persistence
+layer used by FAIR2WISE. It stores nodes as entities and relationships as
+directed, predicate-labelled links in `splash_links/links.sqlite`, then exposes
+them through FastAPI and GraphQL at `/splash_links/graphql`. KG-RAG reads this
+service through `splash://localhost:8081`; the JSON graph remains the configured
+fallback when the service is unavailable.
+
+Initialize its Pixi environment once from the FAIR2WISE root:
 
 ```bash
-git clone https://github.com/als-computing/splash_links
-cd splash_links
-pixi install
+./scripts/install_pixi.sh
 ```
 
 ### 4a. Start the splash-links server
 
-In a dedicated terminal (keep it running):
+The combined launcher starts Splash first, waits for its health endpoint, and
+then starts the agent backend and frontend:
 
 ```bash
-cd /path/to/splash_links
+./scripts/start_all.sh
+```
+
+For database-only development, run it directly from the vendored workspace:
+
+```bash
+cd splash_links
 pixi run serve
 ```
 
-Server listens on `http://localhost:8081`. Verify:
+The server listens on `http://localhost:8081`. Verify:
 
 ```bash
 curl -s http://localhost:8081/docs -o /dev/null -w "%{http_code}\n"
@@ -300,18 +324,17 @@ curl -s http://localhost:8081/docs -o /dev/null -w "%{http_code}\n"
 If you are re-importing after a metadata or schema fix, clear the existing splash graph so stale entities (missing `source_metadata`, `code_snippet`, etc.) do not linger:
 
 ```bash
-cd /path/to/splash_links
-# stop the server first if you plan to delete links.sqlite manually
-rm -f links.sqlite
-pixi run serve
+cd /path/to/f2wlocal
+./scripts/wipe_splash_db.sh
+./scripts/start_all.sh
 ```
 
-> **Why wipe?** `import_kg.py` creates new entities; it does not delete old ones. A partial or pre-fix import leaves duplicate/stale records that KG-RAG may still load. The 3-agent pipeline now does this safely through GraphQL, so you usually do not need to delete `links.sqlite` by hand.
+> **Why wipe?** `import_kg.py` creates new entities; it does not delete old ones. A partial or pre-fix import leaves duplicate/stale records that KG-RAG may still load. The guarded reset script refuses to run while Splash is active and requires typed confirmation before deleting the database.
 
 ### 4c. Import the MatKG JSON
 
 ```bash
-cd /path/to/splash_links
+cd /path/to/f2wlocal/splash_links
 pixi run python scripts/import_kg.py /path/to/f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
 ```
 
@@ -376,8 +399,8 @@ python3 app/modules/kg_rag_api.py --api --backend cborg --graph-source splash
 Use these scripts from `f2wlocal` when you want the automated download/extract/rebuild loop:
 
 ```bash
-# Start splash-links in the sibling repo
-cd /Users/mateo/Desktop/splash_links
+# Start splash-links from the vendored workspace
+cd splash_links
 pixi run serve
 
 # Start the backend API used by the colocated UI
@@ -389,6 +412,16 @@ cd /Users/mateo/Desktop/f2wlocal
 ./scripts/start_agent_frontend.sh
 ```
 
+Or manage splash-links, the agent backend, and the frontend together:
+
+```bash
+./scripts/start_all.sh
+```
+
+To permanently reset the local Splash database, first stop the stack and run
+`./scripts/wipe_splash_db.sh`. The utility prints the exact database path and
+requires typed confirmation before deleting it.
+
 Defaults used by `start_agent_backend.sh`:
 
 - `F2W_KG_MODE=splash`
@@ -396,7 +429,8 @@ Defaults used by `start_agent_backend.sh`:
 - `F2W_WORKERS=1`
 - `F2W_DOWNLOAD_DELAY=0`
 - `F2W_WORKDIR=runs/ui_session_splash`
-- `SPLASH_LINKS_REPO=/Users/mateo/Desktop/splash_links`
+- `SPLASH_LINKS_REPO=splash_links`
+- `SPLASH_LINKS_DB=links.sqlite`
 
 Override them for heavier runs:
 
@@ -685,7 +719,7 @@ python3 f2w_agent.py ask --help   # (global flags go before subcommand)
 | `--workers` | `4` | Page-level extraction parallelism |
 | `--schema` | `storage/schema/matkg_schema.yaml` | LinkML schema for extraction |
 | `--chebi` | — | Optional ChEBI `.obo` path |
-| `--splash-repo` | `../splash_links` | Path to splash_links checkout (`--kg-mode splash`) |
+| `--splash-repo` | `splash_links` | Path to the vendored splash_links workspace (`--kg-mode splash`) |
 | `--allow-splash-wipe` | off | Permit `--kg-mode splash` to delete `links.sqlite` before re-import |
 
 ### KG update modes

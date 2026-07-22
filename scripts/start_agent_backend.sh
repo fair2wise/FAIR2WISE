@@ -12,7 +12,10 @@ KG_MODE="${F2W_KG_MODE:-splash}"
 GRAPH="${F2W_GRAPH:-storage/kg/matkg_with_code.json}"
 SEED_TERMS="${F2W_SEED_TERMS:-}"
 WORKDIR="${F2W_WORKDIR:-runs/ui_session_splash}"
-SPLASH_REPO="${SPLASH_LINKS_REPO:-/Users/mateo/Desktop/splash_links}"
+SPLASH_REPO="${SPLASH_LINKS_REPO:-$ROOT_DIR/splash_links}"
+if [[ "$SPLASH_REPO" != /* ]]; then
+  SPLASH_REPO="$ROOT_DIR/$SPLASH_REPO"
+fi
 DOWNLOAD_DELAY="${F2W_DOWNLOAD_DELAY:-0}"
 MAX_ROUNDS="${F2W_MAX_ROUNDS:-3}"
 MAX_PAPERS="${F2W_MAX_PAPERS:-1}"

@@ -18,6 +18,12 @@ paths:
     env: CHEBI_OBO_PATH
     default: storage/ontologies/chebi.obo
   pystow_home: .cache/pystow
+  splash_links_repo:
+    env: SPLASH_LINKS_REPO
+    default: splash_links
+  splash_links_db:
+    env: SPLASH_LINKS_DB
+    default: links.sqlite
 
 kg_rag:
   backend:

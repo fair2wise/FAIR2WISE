@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional
 from urllib import request
 from urllib.parse import urlparse
 
+from ..project_config import PROJECT_ROOT, config_value
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,9 +33,7 @@ def _splash_base_url(uri: str) -> str:
 
 
 def _splash_db_path(repo: Path) -> Optional[Path]:
-    raw = os.environ.get("SPLASH_LINKS_DB")
-    if not raw:
-        return repo / "links.sqlite"
+    raw = str(config_value("paths.splash_links_db", fallback="links.sqlite"))
     if raw in {":memory:", "sqlite:///:memory:"}:
         return None
     if raw.startswith("sqlite:///"):
@@ -117,7 +117,11 @@ def splash_reimport(
     Wiping is done through GraphQL. Do not unlink ``links.sqlite`` while the
     splash server is running; SQLite can keep a stale readonly file handle.
     """
-    repo = Path(splash_repo or os.environ.get("SPLASH_LINKS_REPO", "../splash_links")).resolve()
+    configured_repo = config_value("paths.splash_links_repo", fallback="splash_links")
+    repo = Path(splash_repo or configured_repo)
+    if not repo.is_absolute():
+        repo = PROJECT_ROOT / repo
+    repo = repo.resolve()
     uri = splash_uri or os.environ.get("KG_RAG_SPLASH_URI", "splash://localhost:8081")
     if not repo.is_dir():
         return {"status": "error", "message": f"splash_links repo not found: {repo}"}

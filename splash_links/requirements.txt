@@ -1,0 +1,9 @@
+# External requirement: the standalone Pixi CLI is required (it is not a pip
+# package). From the FAIR2WISE root, run ./scripts/install_pixi.sh once.
+# Python dependencies are managed by pixi.
+# See pixi.toml (environment + tasks) and pyproject.toml (package metadata + runtime deps).
+#
+# Quick start:
+#   pixi install       # resolve and install the environment
+#   pixi run test      # run tests
+#   pixi run serve     # start the dev server
