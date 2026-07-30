@@ -949,9 +949,21 @@ CANDIDATE_PAPERS_INTRO = (
     "I could not answer this query reliably from the retrieved context. "
     "Below is a list of papers that might be relevant to the subject."
 )
+CANDIDATE_PAPERS_UNRANKED_INTRO = (
+    "I could not answer this query reliably from the retrieved context. "
+    "The literature search found the candidate papers below, but the evidence review "
+    "did not identify a strong recommendation. Review the papers and name one if you "
+    "want it downloaded."
+)
 DIRECT_DOWNLOAD_PAPERS_INTRO = (
     "I found these open-access paper matches. Tell me which paper to download "
     "by title, number, DOI, or repository."
+)
+DOMAIN_KNOWLEDGE_FALLBACK_DISCLAIMER = (
+    "⚠️ DOMAIN KNOWLEDGE FALLBACK — NOT SUPPORTED BY RETRIEVED KG/PAPER EVIDENCE\n\n"
+    "The knowledge graph and newly extracted paper did not contain sufficient evidence. "
+    "The following answer comes from general model knowledge, may be incomplete or "
+    "inaccurate, and should be independently verified."
 )
 
 
@@ -1043,17 +1055,20 @@ def _post_extraction_answer(
     verdict: Dict[str, Any],
 ) -> str:
     """Combine extraction facts with an explicit original-query verdict."""
-    sections = [_extraction_outcome_text(extraction)]
-    if term_report.get("sufficient"):
-        sections.append(str(term_report.get("answer") or "").strip())
-    else:
-        sections.append(
-            "Extracted-term summary unavailable: "
-            + str(term_report.get("answer") or "no page-grounded terms were recorded.")
-        )
+    extraction_summary = _extraction_outcome_text(extraction)
+    term_summary = str(
+        term_report.get("answer")
+        or "No page-grounded extracted terms were available for the initial query."
+    ).strip()
+    sections = [
+        f"## Extraction Summary\n{extraction_summary}",
+        f"## Relevant Extracted Terms\n{term_summary}",
+    ]
 
     if str(verdict.get("status") or "").endswith("_error"):
         sections.append(
+            "## Evidence Assessment\n"
+            "**Could Not Determine**\n\n"
             "Support for original query: not evaluated.\n"
             "Why: the updated knowledge graph could not be checked against the original query "
             f'“{question}”: {verdict.get("error") or verdict.get("status")}.'
@@ -1066,6 +1081,8 @@ def _post_extraction_answer(
         if direct_count:
             reason += f" across {direct_count} evidence-bearing KG node{'s' if direct_count != 1 else ''}"
         sections.append(
+            "## Evidence Assessment\n"
+            "**Sufficient**\n\n"
             "Support for original query: yes.\n"
             f"Why: {reason}. The updated knowledge graph now contains enough direct evidence "
             "to answer the original query.\n\n"
@@ -1082,12 +1099,16 @@ def _post_extraction_answer(
         reason = "updated retrieval found no direct evidence that answers the original query."
     missing_text = "\n".join(f"- {topic}" for topic in missing) if missing else "- Complete grounded answer"
     sections.append(
+        "## Evidence Assessment\n"
+        "**More Evidence Needed**\n\n"
         "Support for original query: no.\n"
         f"Why: {reason}\n"
         "Missing topics:\n"
         f"{missing_text}\n\n"
         "The updated knowledge graph still does not contain enough direct evidence to answer "
-        "the original query reliably. No additional paper search was started."
+        "the original query reliably. Refer to **Relevant Publications and Sources — More "
+        "Evidence Needed** below for the closest available evidence. No additional paper "
+        "search was started."
     )
     return "\n\n".join(section for section in sections if section)
 
@@ -2355,6 +2376,8 @@ class AgentPipelineService:
             "reason": decision["reason"],
             "state": phase,
         }
+        if decision.get("classification"):
+            self._last_orchestration["classification"] = decision["classification"]
         self.workflow.update(
             last_route=decision,
             orchestration_steps=steps,
@@ -2367,6 +2390,7 @@ class AgentPipelineService:
             agent=decision["agent"],
             reason=decision["reason"],
             state=phase,
+            classification=decision.get("classification"),
         )
         return decision
 
@@ -2626,24 +2650,25 @@ class AgentPipelineService:
         decision = await self._orchestrator_decision(question, emit, route_hint=route_hint)
         action_name = str(decision.get("action") or "stop_insufficient")
         if action_name == "direct_response":
+            classification = str(
+                decision.get("classification") or "mundane_conversation"
+            )
             answer = await self._generate_direct_response(question, history)
             return {
                 "status": "direct_response",
                 "question": question,
                 "answer": answer,
                 "reason": str(decision.get("reason") or "Direct response selected."),
+                "classification": classification,
             }
         if action_name == "query_extracted_paper":
             return {"status": "query_extracted_paper", "question": question}
         if action_name == "report_extraction":
             return {"status": "report_extraction", "question": question}
-        if action_name == "search_candidates":
-            return {"status": "direct_download_search", "question": question}
         if action_name != "retrieve_kg":
             return {
-                "status": "direct_response",
+                "status": "kg_question",
                 "question": question,
-                "answer": str(decision.get("reason") or "The workflow stopped safely."),
                 "reason": str(decision.get("reason") or "Invalid initial transition."),
             }
         if not _needs_history_rewrite(question, history) and not (
@@ -2832,12 +2857,27 @@ class AgentPipelineService:
         self,
         question: str,
         history: List[Dict[str, str]],
+        classification: Optional[str] = None,
     ) -> str:
+        classification = classification or str(
+            (self._last_orchestration or {}).get("classification")
+            or "mundane_conversation"
+        )
+        if classification == "irrelevant_non_scientific":
+            behavior = (
+                "The request is clearly outside science and FAIR2WISE's materials-science "
+                "scope. Briefly state that it is not relevant to materials science and invite "
+                "a materials/scientific question. Do NOT answer or fulfill the unrelated request."
+            )
+        else:
+            behavior = (
+                "The message is mundane conversation, UI/help/meta-chat, a greeting, thanks, "
+                "or a test. Respond conversationally and briefly."
+            )
         prompt = (
-            "You are FAIR2WISE, a concise materials-science assistant. The router has "
-            "determined that the retrieval/download/extraction agents are not needed. "
-            "Answer conversationally and briefly. Do not claim to have searched the KG "
-            "or papers.\n\n"
+            "You are FAIR2WISE, a concise materials-science assistant. Retrieval agents were "
+            "not needed for this message. "
+            f"{behavior} Do not claim to have searched the KG or papers.\n\n"
             f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"USER_MESSAGE:\n{question}"
@@ -2850,8 +2890,46 @@ class AgentPipelineService:
             loop = asyncio.get_event_loop()
             answer = await loop.run_in_executor(None, run)
         except Exception:
-            answer = "I'm here. Ask a materials question when you want me to use the knowledge graph."
-        return answer or "I'm here. Ask a materials question when you want me to use the knowledge graph."
+            answer = ""
+        fallback = (
+            "That request is not relevant to materials science. Ask a scientific or "
+            "materials-science question and I will check the knowledge graph."
+            if classification == "irrelevant_non_scientific"
+            else "I'm here. Ask a materials question when you want me to use the knowledge graph."
+        )
+        return answer or fallback
+
+    async def _generate_domain_knowledge_fallback(
+        self,
+        question: str,
+        missing_topics: List[str],
+    ) -> str:
+        prompt = (
+            "You are FAIR2WISE's last-resort scientific domain-knowledge responder. "
+            "The knowledge graph was searched, a relevant paper was downloaded with user "
+            "approval, that paper was extracted into the graph, and the updated graph still "
+            "did not contain sufficient evidence for the original question. Answer the "
+            "original question concisely from general model knowledge only. Do not claim the "
+            "answer came from the KG or paper. Do not include KG/PDF citations, publication "
+            "metadata, or invented references. Do not write a disclaimer; the application "
+            "adds one programmatically.\n\n"
+            f"ORIGINAL_QUESTION:\n{question}\n\n"
+            f"MISSING_EVIDENCE_TOPICS:\n{json.dumps(missing_topics, ensure_ascii=False)}"
+        )
+
+        def run() -> str:
+            return str(self._chat_completion(prompt, timeout=60) or "").strip()
+
+        try:
+            loop = asyncio.get_event_loop()
+            answer = await loop.run_in_executor(None, run)
+        except Exception as exc:
+            logger.warning("Domain-knowledge fallback failed: %s", exc)
+            answer = ""
+        return answer or (
+            "A domain-knowledge answer could not be generated. The evidence remains "
+            "insufficient to answer the question."
+        )
 
     def _chat_completion(self, prompt: str, *, timeout: int) -> str:
         from app.modules.term_extractor.clients import make_chat_client
@@ -3483,39 +3561,18 @@ class AgentPipelineService:
                     active_graph_path,
                 )
 
-            if action_name != "download_selected":
-                self.workflow.update(phase="stop_insufficient")
-                await self._orchestrator_decision(question, emit)
-                return self._response(
-                    "stop_insufficient",
-                    str(debate_summary.get("reason") or "Candidate evidence was too weak."),
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-
-            best, alternatives = self._pick_candidate(candidates, debate_summary)
-            if best is None:
-                self.workflow.update(phase="stop_insufficient")
-                return self._response(
-                    "stop_insufficient",
-                    str(
-                        debate_summary.get("reason")
-                        or "No candidate papers were found to fill the evidence gap."
-                    ),
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
+            has_recommendation = action_name == "download_selected"
+            best, alternatives = (
+                self._pick_candidate(candidates, debate_summary)
+                if has_recommendation
+                else (None, candidates[:4])
+            )
+            if has_recommendation and best is None:
+                has_recommendation = False
+                alternatives = candidates[:4]
 
             # Interactive gating: pause and ask the user before downloading.
             paper_candidates = [c for c in [best, *alternatives] if isinstance(c, dict)]
-            candidate_index = next(
-                (index for index, candidate in enumerate(candidates) if candidate is best),
-                0,
-            )
             approval_token = uuid.uuid4().hex
             pending = {
                 "kind": "download",
@@ -3526,6 +3583,7 @@ class AgentPipelineService:
                 "candidate_list": paper_candidates,
                 "selected_candidate": best,
                 "alternatives": alternatives,
+                "recommended_candidate_index": 0 if has_recommendation else None,
                 "reason": debate_summary.get("reason") or "",
                 "round_no": round_no,
                 "active_graph_source": active_graph_source,
@@ -3546,7 +3604,11 @@ class AgentPipelineService:
             )
             return self._response(
                 "awaiting_download_decision",
-                CANDIDATE_PAPERS_INTRO,
+                (
+                    CANDIDATE_PAPERS_INTRO
+                    if has_recommendation
+                    else CANDIDATE_PAPERS_UNRANKED_INTRO
+                ),
                 False,
                 verdict,
                 rounds,
@@ -3785,6 +3847,24 @@ class AgentPipelineService:
         alternatives = pending.get("alternatives") or []
         return [c for c in [best, *alternatives] if isinstance(c, dict)]
 
+    def _pending_recommended_candidate_index(
+        self,
+        candidates: List[Dict[str, Any]],
+        failed: set[int],
+    ) -> Optional[int]:
+        pending = self.pending or {}
+        if "recommended_candidate_index" in pending:
+            value = pending.get("recommended_candidate_index")
+            try:
+                index = int(value)
+            except (TypeError, ValueError):
+                return None
+            return index if 0 <= index < len(candidates) and index not in failed else None
+        return next(
+            (index for index in range(len(candidates)) if index not in failed),
+            None,
+        )
+
     def _heuristic_pending_download_intent(
         self,
         message: str,
@@ -3802,10 +3882,11 @@ class AgentPipelineService:
             return {"action": "decline", "candidate_index": None}
 
         failed = {int(i) for i in ((self.pending or {}).get("failed_candidate_indices") or [])}
+        recommended_index = self._pending_recommended_candidate_index(candidates, failed)
         if normalized in {"yes", "approve", "approved", "go ahead", "continue"}:
-            for index in range(len(candidates)):
-                if index not in failed:
-                    return {"action": "download", "candidate_index": index}
+            if recommended_index is None:
+                return {"action": "clarify", "candidate_index": None}
+            return {"action": "download", "candidate_index": recommended_index}
         if wants_download and re.search(r"\b(another|next|different)\b", normalized):
             for index in range(len(candidates)):
                 if index not in failed:
@@ -3817,17 +3898,14 @@ class AgentPipelineService:
             if 0 <= index < len(candidates):
                 return {"action": "download", "candidate_index": index}
 
-        recommended_index = next(
-            (index for index in range(len(candidates)) if index not in failed),
-            0,
-        )
-        ordinals = (
+        ordinals = [
             ("first", 0),
-            ("recommended", recommended_index),
             ("second", 1),
             ("third", 2),
             ("fourth", 3),
-        )
+        ]
+        if recommended_index is not None:
+            ordinals.append(("recommended", recommended_index))
         if wants_download:
             for word, index in ordinals:
                 if re.search(rf"\b{word}\b", normalized) and index < len(candidates):
@@ -4263,7 +4341,11 @@ class AgentPipelineService:
                 "selected_pages": pdf_results[0].get("selected_pages") if pdf_results else [],
             },
         )
-        decision = await self._orchestrator_decision(question, emit)
+        decision = await self._orchestrator_decision(
+            question,
+            emit,
+            route_hint="retrieve_kg",
+        )
         if decision.get("action") != "retrieve_kg":
             response = self._response(
                 "orchestration_stopped",
@@ -4285,11 +4367,30 @@ class AgentPipelineService:
         )
         new_verdict = await self.retrieval.query(question)
         round_info["retrieval_after"] = new_verdict
+        selected_ids = [str(n) for n in (new_verdict.get("selected") or [])]
+        subset = (
+            graph_subset_from_file(active_graph_path, selected_ids)
+            if selected_ids
+            else {"nodes": [], "edges": []}
+        )
+        relevant_node_names = [
+            str(node.get("label") or node.get("name") or "").strip()
+            for node in (subset.get("nodes") or [])
+            if isinstance(node, dict)
+            and str(node.get("label") or node.get("name") or "").strip()
+        ]
         term_report = summarize_extracted_terms(
             str(self.coord.session_terms),
             str(self.coord.extraction_manifest),
             str(active_paper.get("filename") or ""),
             max_terms=6,
+            query=question,
+            missing_topics=[
+                str(topic)
+                for topic in (new_verdict.get("missing_topics") or [])
+                if str(topic).strip()
+            ],
+            relevant_node_names=relevant_node_names,
         )
         round_info["extraction_report"] = term_report
         extraction_answer = _post_extraction_answer(
@@ -4310,9 +4411,7 @@ class AgentPipelineService:
             missing_topics=new_verdict.get("missing_topics") or [],
         )
 
-        selected_ids = [str(n) for n in (new_verdict.get("selected") or [])]
         if selected_ids:
-            subset = graph_subset_from_file(active_graph_path, selected_ids)
             await self._emit(
                 emit,
                 "graph_update",
@@ -4320,6 +4419,21 @@ class AgentPipelineService:
                 round=round_no,
                 node_ids=selected_ids,
                 graph=subset,
+            )
+
+        post_extraction_publications = publications_for_selected_nodes(
+            active_graph_path,
+            selected_ids,
+        )
+        selected_candidate = pending.get("selected_candidate")
+        if isinstance(selected_candidate, dict):
+            approved_publication = self._candidate_publication(
+                selected_candidate,
+                str(active_paper.get("filename") or "") or None,
+            )
+            post_extraction_publications = _merge_publications_prefer_existing(
+                post_extraction_publications,
+                [approved_publication],
             )
 
         if str(new_verdict.get("status", "")).endswith("_error"):
@@ -4331,6 +4445,7 @@ class AgentPipelineService:
                 new_verdict,
                 rounds,
                 active_graph_path,
+                publications_override=post_extraction_publications,
             )
             await self._finalize_memory(original_question, response, effective_question=question)
             return response
@@ -4347,6 +4462,7 @@ class AgentPipelineService:
                 new_verdict,
                 rounds,
                 active_graph_path,
+                publications_override=post_extraction_publications,
             )
             await self._finalize_memory(original_question, response, effective_question=question)
             return response
@@ -4355,6 +4471,19 @@ class AgentPipelineService:
         self.workflow.update(post_extraction_sufficient=False)
         if self._last_orchestration:
             self._last_orchestration["state"] = "post_extraction_insufficient"
+        domain_answer = await self._generate_domain_knowledge_fallback(
+            question,
+            [
+                str(topic).strip()
+                for topic in (new_verdict.get("missing_topics") or [])
+                if str(topic).strip()
+            ],
+        )
+        extraction_answer = (
+            f"{extraction_answer}\n\n"
+            f"{DOMAIN_KNOWLEDGE_FALLBACK_DISCLAIMER}\n\n"
+            f"{domain_answer}"
+        )
         response = self._response(
             "insufficient_evidence",
             extraction_answer,
@@ -4362,6 +4491,7 @@ class AgentPipelineService:
             new_verdict,
             rounds,
             active_graph_path,
+            publications_override=post_extraction_publications,
         )
         await self._finalize_memory(original_question, response, effective_question=question)
         return response
@@ -4416,20 +4546,16 @@ class AgentPipelineService:
             "abstract": str(candidate.get("abstract") or "")[:600],
             "score": float(candidate.get("score") or candidate.get("_score") or 0.0),
             "repository": candidate.get("repository"),
+            "recommended": bool(recommended),
         }
         if index is not None:
             payload["index"] = index
-        if recommended:
-            payload["recommended"] = True
         return payload
 
     def _download_papers_public(self) -> List[Dict[str, Any]]:
         candidates = self._pending_candidate_list()
         failed = {int(index) for index in ((self.pending or {}).get("failed_candidate_indices") or [])}
-        recommended_index = next(
-            (index for index in range(len(candidates)) if index not in failed),
-            None,
-        )
+        recommended_index = self._pending_recommended_candidate_index(candidates, failed)
         papers: List[Dict[str, Any]] = []
         for index, candidate in enumerate(candidates):
             public = self._candidate_public(

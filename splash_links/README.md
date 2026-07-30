@@ -28,6 +28,8 @@ Example: `(Experiment "SAXS run 42") --[produced]--> (Dataset "raw_001.h5")`
 
 [Install pixi](https://pixi.sh/latest/#installation), then:
 
+Python 3.12 is required and is provisioned inside the Pixi environment.
+
 ```bash
 pixi install          # resolve and install the environment (first time only)
 pixi run serve        # start the dev server at http://localhost:8081

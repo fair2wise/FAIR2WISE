@@ -47,8 +47,9 @@ class TestRagSystemPrompt:
     def test_mentions_pdf_citation_format(self):
         assert "[PDF:" in kg_rag_api.RAG_SYSTEM
 
-    def test_mentions_domain_knowledge_marker(self):
-        assert "[Domain Knowledge]" in kg_rag_api.RAG_SYSTEM
+    def test_forbids_domain_knowledge(self):
+        assert "Never add outside or domain knowledge" in kg_rag_api.RAG_SYSTEM
+        assert "state the gap instead of answering from memory" in kg_rag_api.RAG_SYSTEM
 
     def test_guideline_7_forbids_invented_publication_metadata(self):
         assert "STRICTLY FORBIDDEN" in kg_rag_api.RAG_SYSTEM
@@ -79,9 +80,10 @@ class TestBuildRagPrompt:
         assert "[KG: ...]" in prompt or "[KG:" in prompt
         assert "[PDF: ...]" in prompt or "[PDF:" in prompt
 
-    def test_contains_domain_knowledge_instruction(self):
+    def test_contains_strict_grounding_instruction(self):
         prompt = kg_rag_api.build_rag_prompt("Q?", "ctx")
-        assert "[Domain Knowledge]" in prompt
+        assert "do not add outside or domain knowledge" in prompt
+        assert "state the evidence gap instead of answering from memory" in prompt
 
     def test_contains_publication_metadata_grounding_rule(self):
         prompt = kg_rag_api.build_rag_prompt("Q?", "ctx")

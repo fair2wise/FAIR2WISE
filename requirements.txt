@@ -1,3 +1,6 @@
+# External frontend tools: Node.js 20+ with npm is required. npm installs the
+# local Vite 6 dependency from ui/package.json with: cd ui && npm ci
+#
 # Runtime dependencies
 # External runtime tool: Pixi is required to run the vendored splash_links
 # server. Pixi is not a Python package; install it and initialize the service

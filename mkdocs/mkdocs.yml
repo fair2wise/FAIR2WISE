@@ -1,30 +1,94 @@
-# Project Information
-site_name: ALS Computing MkDocs Template
-site_description: ALS Computing MkDocs Template
-site_author: ALS Computing
-site_url: "https://als-computing.github.io/project_template/"
-repo_name: project_template
-repo_url: https://github.com/als-computing/project_template
-edit_uri: blob/main/docs/
+site_name: FAIR2WISE Documentation
+site_description: Architecture, development, API, and operations guide for FAIR2WISE
+site_author: FAIR2WISE contributors
+site_url: https://matesuu.github.io/FAIRtoWISE-FORUM-AI/
+repo_name: matesuu/FAIRtoWISE-FORUM-AI
+repo_url: https://github.com/matesuu/FAIRtoWISE-FORUM-AI
+edit_uri: edit/main/mkdocs/docs/
 
-# Navigation
+docs_dir: docs
+site_dir: site
+
 nav:
-- Home: index.md
-- About: about.md
-- Test: test.md
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture:
+      - System architecture: architecture.md
+      - Core data model: core_model.md
+      - Agent workflow: agent-workflow.md
+      - Terminology extraction: term-extraction.md
+      - Knowledge graph: knowledge-graph.md
+      - Retrieval and RAG: retrieval.md
+  - Services:
+      - Agent API: agent-api.md
+      - Web application: frontend.md
+      - Splash Links: splash-links.md
+  - Development:
+      - Configuration: configuration.md
+      - Scripts and entry points: scripts.md
+      - Testing: testing.md
+      - Repository reference: repository-reference.md
+      - Legacy code: legacy.md
+  - Operations:
+      - Local and Docker operation: operations.md
+      - NERSC and remote extraction: nersc.md
+  - About: about.md
 
-# Theme and Plugins
 theme:
   name: material
-  custom_dir: overrides
-extra_css:
-- assets/als_style.css
-extra:
-  favicon: overrides/assets/images/favicon.png
-  social:
-  - icon: fontawesome/brands/github
-    link: https://github.com/als-computing
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Use dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Use light mode
 
 plugins:
-- mermaid2
-- search
+  - search
+
+extra_javascript:
+  - javascripts/mermaid.mjs
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+watch:
+  - ../app
+  - ../scripts
+  - ../splash_links/src
+  - ../ui/src

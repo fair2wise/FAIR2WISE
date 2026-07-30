@@ -2,6 +2,10 @@
 .env
 .venv
 .venv-open-webui
+.pixi
+**/.pixi
+node_modules
+**/node_modules
 .cache
 .pytest_cache
 __pycache__
@@ -11,3 +15,5 @@ __pycache__
 .codex
 skills-lock.json
 storage/knowledge_gaps
+.run
+.docker-data

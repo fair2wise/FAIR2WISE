@@ -1444,7 +1444,8 @@ RAG_SYSTEM = (
     "When citing a KG node, use the entity's name as it appears, "
     "not a placeholder like [KG: NodeName]. "
     "3) If the context adds important details, weave them naturally into your explanation. "
-    "4) If something is missing, briefly note the gap or add minimal domain knowledge, marked as [Domain Knowledge]. "
+    "4) Use ONLY the Retrieved Context for scientific claims. Never add outside or domain knowledge. "
+    "If evidence is missing, state the gap instead of answering from memory. "
     "5) Avoid rigid templates—write as you would in a scientific review article, with a mix of paragraphs and short lists. "
     "6) If sources disagree, mention the discrepancy briefly. "
     "7) Publication metadata is STRICTLY FORBIDDEN unless it literally appears in the "
@@ -1495,8 +1496,9 @@ def build_rag_prompt(q: str, ctx: str) -> str:
         "When you include a code block from a CodeSnippet node, append this exact "
         f"disclaimer immediately after the closing fence on its own line: "
         f"{CODE_SNIPPET_DISCLAIMER} "
-        "Skip irrelevant context unless it highlights a limitation. "
-        "Note any gaps or minimal fallback knowledge under [Domain Knowledge]."
+        "Use only the Retrieved Context for scientific claims; do not add outside or "
+        "domain knowledge. Skip irrelevant context unless it highlights a limitation. "
+        "If the context is insufficient, state the evidence gap instead of answering from memory."
     )
 
 # ───────────────────── main Q&A loop ─────────────────────

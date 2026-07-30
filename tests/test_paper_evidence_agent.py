@@ -211,3 +211,50 @@ def test_extracted_term_summary_is_deterministic_and_page_bounded(tmp_path):
     assert "Eligible term" in result["answer"]
     assert "[PDF: paper.pdf p.2]" in result["answer"]
     assert "Unprocessed term" not in result["answer"]
+
+
+def test_extracted_term_summary_prioritizes_initial_query_relevance(tmp_path):
+    manifest = tmp_path / "extraction_manifest.json"
+    terms = tmp_path / "terms.json"
+    _manifest(
+        manifest,
+        "paper.pdf",
+        {"extraction_state": "partial", "selected_pages": [2]},
+    )
+    terms.write_text(
+        json.dumps(
+            {
+                "terms": [
+                    {
+                        "term": "Ionic conductivity",
+                        "definition": "Ion transport property in battery electrolytes.",
+                        "category": "Property",
+                        "pages": [2],
+                        "source_papers": ["paper.pdf"],
+                    },
+                    {
+                        "term": "Sample holder",
+                        "definition": "Hardware used during measurement.",
+                        "category": "Equipment",
+                        "pages": [2],
+                        "source_papers": ["paper.pdf"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = summarize_extracted_terms(
+        str(terms),
+        str(manifest),
+        "paper.pdf",
+        query="How does ionic conductivity affect battery electrolytes?",
+        relevant_node_names=["Ionic conductivity"],
+    )
+
+    assert result["relevance_mode"] == "matched"
+    assert result["relevant_term_count"] == 1
+    assert "Ionic conductivity" in result["answer"]
+    assert "Sample holder" not in result["answer"]
+    assert "[PDF: paper.pdf p.2]" in result["answer"]

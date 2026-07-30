@@ -13,6 +13,18 @@ if [[ ! -d "$UI_DIR" ]]; then
   exit 1
 fi
 
+if ! command -v npm >/dev/null 2>&1; then
+  echo "error: npm is required to install and run the FAIR2WISE UI" >&2
+  echo "install Node.js 20+ (which includes npm), then run: cd ui && npm ci" >&2
+  exit 1
+fi
+
+if [[ ! -x "$UI_DIR/node_modules/.bin/vite" ]]; then
+  echo "error: UI dependencies are not installed; local Vite is missing" >&2
+  echo "run: cd \"$UI_DIR\" && npm ci" >&2
+  exit 1
+fi
+
 cd "$UI_DIR"
 
 echo "Starting FAIR2WISE UI"

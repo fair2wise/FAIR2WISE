@@ -152,10 +152,12 @@ skills-lock.json
 # Local run/cache artifacts
 .cache/
 runs/
+.docker-data/
 storage/knowledge_gaps/
 node_modules/
 ui/node_modules/
 ui/dist/
+mkdocs/site/
 
 # Local generated/reference notes
 HANDOFF.md

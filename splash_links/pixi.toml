@@ -38,7 +38,8 @@ client = ["client"]
 tiled = ["client", "tiled"]
 
 [tasks]
-serve   = "uvicorn splash_links.main:app --host 0.0.0.0 --port 8081 --reload"
+serve   = "uvicorn splash_links.main:app --host 0.0.0.0 --port 8081"
+serve-dev = "uvicorn splash_links.main:app --host 0.0.0.0 --port 8081 --reload"
 test    = "pytest --cov=splash_links --cov-report=term-missing --cov-fail-under=90"
 lint    = "ruff check src _tests"
 fmt     = "ruff format src _tests"

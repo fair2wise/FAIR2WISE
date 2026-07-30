@@ -52,8 +52,12 @@ def test_pending_approval_overrides_proposed_action():
     assert approved["candidate_index"] == 0
 
 
-def test_fresh_download_request_routes_directly_to_candidate_search():
+def test_fresh_download_request_routes_to_kg_first():
     agent = WorkflowOrchestratorAgent(max_steps=12)
+    agent._llm_classify = lambda user_turn, state: {
+        "classification": "scientific_or_uncertain",
+        "reason": "Paper requests must check the KG first.",
+    }
     state = {
         "phase": "idle",
         "orchestration_steps": 0,
@@ -63,9 +67,58 @@ def test_fresh_download_request_routes_directly_to_candidate_search():
 
     decision = asyncio.run(agent.decide("Download a paper about GISAXS from arXiv", state))
 
-    assert decision["action"] == "search_candidates"
-    assert decision["agent"] == "DownloadAgent"
+    assert decision["action"] == "retrieve_kg"
+    assert decision["agent"] == "RetrievalAgent"
+    assert decision["classification"] == "scientific_or_uncertain"
     assert _direct_download_request("How can I download a paper?") is False
+
+
+def test_fresh_turn_classifier_maps_only_non_scientific_classes_to_direct_response():
+    agent = WorkflowOrchestratorAgent(max_steps=12)
+    state = {
+        "phase": "idle",
+        "orchestration_steps": 0,
+        "pending": None,
+        "approved_action": None,
+    }
+
+    for label in ("mundane_conversation", "irrelevant_non_scientific"):
+        agent._llm_classify = lambda user_turn, current_state, label=label: {
+            "classification": label,
+            "reason": "test classification",
+        }
+        decision = asyncio.run(agent.decide("user turn", state))
+        assert decision["action"] == "direct_response"
+        assert decision["classification"] == label
+
+    agent._llm_classify = lambda user_turn, current_state: {
+        "classification": "scientific_or_uncertain",
+        "reason": "Any science discipline requires retrieval.",
+    }
+    decision = asyncio.run(agent.decide("How does DNA replication work?", state))
+    assert decision["action"] == "retrieve_kg"
+
+
+def test_invalid_fresh_turn_classification_fails_closed_to_kg():
+    agent = WorkflowOrchestratorAgent(max_steps=12)
+    agent._llm_classify = lambda user_turn, state: {
+        "classification": "general_knowledge",
+        "reason": "unsupported label",
+    }
+    decision = asyncio.run(
+        agent.decide(
+            "Ambiguous technical request",
+            {
+                "phase": "idle",
+                "orchestration_steps": 0,
+                "pending": None,
+                "approved_action": None,
+            },
+        )
+    )
+
+    assert decision["action"] == "retrieve_kg"
+    assert decision["classification"] == "scientific_or_uncertain"
 
 
 def test_unavailable_candidate_and_action_loop_fail_closed():
@@ -169,6 +222,36 @@ def test_active_paper_followup_routes_to_paper_agent_not_download(tmp_path):
     assert response.status == "paper_answered"
     assert response.orchestration["agent"] == "PaperEvidenceAgent"
     assert len(service.paper_evidence.calls) == 1
+
+
+def test_post_extraction_retrieval_hint_beats_active_paper_reference():
+    agent = WorkflowOrchestratorAgent(max_steps=12)
+    state = {
+        "phase": "paper_extracted",
+        "orchestration_steps": 1,
+        "pending": None,
+        "approved_action": None,
+        "current_topic": "x-ray scattering calibration",
+        "active_paper": {
+            "paper_id": "active",
+            "status": "extracted",
+            "filename": "scattering.pdf",
+            "title": "X-ray scattering calibration",
+            "topic": "x-ray scattering calibration",
+        },
+    }
+
+    decision = asyncio.run(
+        agent.decide(
+            "What did X-ray scattering calibration find?",
+            state,
+            route_hint="retrieve_kg",
+        )
+    )
+
+    assert decision["action"] == "retrieve_kg"
+    assert decision["agent"] == "RetrievalAgent"
+    assert "active extracted paper" not in decision["reason"]
 
 
 def test_extracted_term_request_routes_to_deterministic_report():

@@ -44,6 +44,11 @@ ACTION_AGENTS = {
 }
 
 DEFAULT_MAX_STEPS = 12
+FRESH_TURN_CLASSES = {
+    "mundane_conversation",
+    "irrelevant_non_scientific",
+    "scientific_or_uncertain",
+}
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
@@ -118,14 +123,24 @@ def _extracted_terms_followup(message: str, state: Dict[str, Any]) -> bool:
     }
 
 
-def _decision(action_name: str, reason: str, *, paper_id: Any = None, candidate_index: Any = None) -> Dict[str, Any]:
-    return {
+def _decision(
+    action_name: str,
+    reason: str,
+    *,
+    paper_id: Any = None,
+    candidate_index: Any = None,
+    classification: Any = None,
+) -> Dict[str, Any]:
+    decision = {
         "action": action_name,
         "agent": ACTION_AGENTS[action_name],
         "reason": str(reason or ""),
         "paper_id": paper_id,
         "candidate_index": candidate_index,
     }
+    if classification is not None:
+        decision["classification"] = str(classification)
+    return decision
 
 
 class WorkflowOrchestratorAgent(Agent):
@@ -188,6 +203,15 @@ class WorkflowOrchestratorAgent(Agent):
                     paper_id=paper.get("paper_id"),
                 )
 
+        if (
+            route_hint == "retrieve_kg"
+            and str(state.get("phase") or "idle") == "paper_extracted"
+        ):
+            return _decision(
+                "retrieve_kg",
+                "Extraction completed; re-check the original query against the updated KG.",
+            )
+
         if route_hint == "report_extraction" or _extracted_terms_followup(user_turn, state):
             paper = state.get("active_paper") or {}
             return _decision(
@@ -230,19 +254,30 @@ class WorkflowOrchestratorAgent(Agent):
             return _decision("retrieve_kg", "Re-check the original query against the updated KG.")
 
         if route_hint == "direct_response":
-            return _decision("direct_response", "The turn does not require scientific evidence agents.")
+            return _decision(
+                "direct_response",
+                "The turn does not require scientific evidence agents.",
+                classification="mundane_conversation",
+            )
         normalized = re.sub(r"\s+", " ", str(user_turn or "").strip().casefold())
-        if re.match(
-            r"^(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening)|"
-            r"how are you|testing|test|help|what can you do|how do i change settings)\b",
+        if re.fullmatch(
+            r"(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening)|"
+            r"how are you|testing|test|help|what can you do|how do i change settings)"
+            r"[\s!?.]*",
             normalized,
         ):
-            return _decision("direct_response", "A conversational or UI turn needs no evidence agents.")
-        if _direct_download_request(normalized):
-            return _decision("search_candidates", "The user explicitly requested a paper download search.")
-        return _decision("retrieve_kg", "The scientific question should be checked against the KG first.")
+            return _decision(
+                "direct_response",
+                "A mundane conversational or UI turn needs no evidence agents.",
+                classification="mundane_conversation",
+            )
+        return _decision(
+            "retrieve_kg",
+            "Any scientific or uncertain turn must be checked against the KG first.",
+            classification="scientific_or_uncertain",
+        )
 
-    def _llm_decide(self, user_turn: str, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _llm_classify(self, user_turn: str, state: Dict[str, Any]) -> Dict[str, Any]:
         from app.modules.term_extractor.clients import make_chat_client
 
         client = make_chat_client(
@@ -263,20 +298,40 @@ class WorkflowOrchestratorAgent(Agent):
             else None,
         }
         prompt = (
-            "You are the workflow orchestrator for FAIR2WISE. Classify a fresh user turn. "
+            "You classify fresh turns for FAIR2WISE. Do not select workflow actions. "
             "Conversation/workflow memory may resolve references but is never scientific evidence.\n"
-            "Return ONLY JSON with keys action, agent, reason, paper_id, candidate_index.\n"
-            "For fresh turns choose only direct_response, retrieve_kg, search_candidates, "
-            "query_extracted_paper, report_extraction, or clarify. "
-            "Use direct_response for greetings/meta/UI/general chat; retrieve_kg for scientific claims, "
-            "papers, citations, or KG requests; query_extracted_paper only for a clear reference to the "
-            "active extracted paper; report_extraction for requests to list or summarize terms produced "
-            "by that extraction. Use search_candidates only when the user explicitly asks to download, "
-            "fetch, or grab a paper. A question about how downloading works is direct_response.\n\n"
+            "Return ONLY JSON with keys classification and reason.\n"
+            "classification must be exactly one of:\n"
+            "- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help/meta questions.\n"
+            "- irrelevant_non_scientific: requests clearly unrelated to science or FAIR2WISE. These will receive "
+            "a short relevance refusal, not an answer to the unrelated request.\n"
+            "- scientific_or_uncertain: EVERY scientific question in ANY discipline, every materials-science "
+            "question, scientific code or methods, papers/citations/evidence, KG requests, requests to download "
+            "or fetch papers, technical factual questions, contextual scientific follow-ups, and every ambiguous "
+            "turn that might be scientific.\n"
+            "Hard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as "
+            "mundane or irrelevant merely because general model knowledge could answer it.\n\n"
             f"STATE: {json.dumps(public_state, ensure_ascii=False)}\n"
             f"USER_TURN: {user_turn}"
         )
         return _parse_json_object(client.chat(prompt, temperature=0.0, timeout=60))
+
+    @staticmethod
+    def _fresh_turn_decision(classification: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        label = str(classification.get("classification") or "").strip()
+        if label not in FRESH_TURN_CLASSES:
+            return None
+        reason = str(classification.get("reason") or "Classified fresh user turn.")
+        action_name = (
+            "direct_response"
+            if label in {"mundane_conversation", "irrelevant_non_scientific"}
+            else "retrieve_kg"
+        )
+        return _decision(
+            action_name,
+            reason,
+            classification=label,
+        )
 
     def validate(
         self,
@@ -315,7 +370,7 @@ class WorkflowOrchestratorAgent(Agent):
                 return None
 
         phase_actions = {
-            "idle": {"direct_response", "retrieve_kg", "search_candidates", "query_extracted_paper", "report_extraction", "clarify", "stop_insufficient"},
+            "idle": {"direct_response", "retrieve_kg", "query_extracted_paper", "report_extraction", "clarify", "stop_insufficient"},
             "retrieval_insufficient": {"search_candidates", "stop_insufficient"},
             "candidates_found": {"consult_debate", "stop_insufficient"},
             "candidate_selected": {"request_download_approval", "stop_insufficient"},
@@ -373,6 +428,7 @@ class WorkflowOrchestratorAgent(Agent):
             str(proposed.get("reason") or "Validated orchestration decision."),
             paper_id=proposed.get("paper_id"),
             candidate_index=proposed.get("candidate_index"),
+            classification=proposed.get("classification"),
         )
 
     @action
@@ -386,7 +442,7 @@ class WorkflowOrchestratorAgent(Agent):
         """Return a validated strict-JSON-shaped next action."""
         fallback = self._safe_fallback(user_turn, state, route_hint)
         if fallback.get("action") in {
-            "direct_response", "search_candidates", "query_extracted_paper", "report_extraction"
+            "direct_response", "query_extracted_paper", "report_extraction"
         }:
             validated = self.validate(fallback, state, available_agents=available_agents)
             if validated:
@@ -400,9 +456,14 @@ class WorkflowOrchestratorAgent(Agent):
             )
         loop = asyncio.get_event_loop()
         try:
-            proposed = await loop.run_in_executor(None, self._llm_decide, user_turn, state)
+            classification = await loop.run_in_executor(
+                None, self._llm_classify, user_turn, state
+            )
         except Exception as exc:
             logger.warning("Orchestrator LLM failed (%s); using safe fallback", exc)
+            classification = {}
+        proposed = self._fresh_turn_decision(classification)
+        if proposed is None:
             proposed = {}
         validated = self.validate(proposed, state, available_agents=available_agents)
         if validated:

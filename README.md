@@ -16,7 +16,8 @@ This repository builds materials-science knowledge graphs from research papers (
 
 ## Prerequisites
 
-- Python 3.10+ (Python 3.12 recommended; Python 3.14 supported with lexical retrieval only)
+- Python 3.14 (the latest supported Python release)
+- Node.js 20+ (including npm); npm installs the pinned local Vite 6 toolchain from `ui/package.json`
 - [Pixi](https://pixi.sh/latest/installation/) for the vendored `splash_links` database server
 - A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend). CBORG requires LBLnet/VPN or an authorized IP — see [CBORG IP authorization](https://api.cborg.lbl.gov/key/manage).
 - Optional: [Ollama](https://ollama.com/) running locally for offline inference
@@ -36,7 +37,14 @@ cd FAIRtoWISE-FORUM-AI
 ### 2. Install dependencies
 
 ```bash
-pip3 install -r requirements.txt
+python3 --version  # should report Python 3.14
+python3 -m pip install -r requirements.txt
+
+# Install the UI dependencies, including Vite.
+npm --version
+cd ui
+npm ci
+cd ..
 ```
 
 Install Pixi and initialize the `splash_links` environment once:
@@ -314,6 +322,9 @@ pixi run serve
 
 The server listens on `http://localhost:8081`. Verify:
 
+Use `pixi run serve-dev` instead when developing `splash_links` itself and you
+want Uvicorn to reload automatically after source changes.
+
 ```bash
 curl -s http://localhost:8081/docs -o /dev/null -w "%{http_code}\n"
 # expect: 200
@@ -498,6 +509,9 @@ Install UI dependencies once:
 cd /Users/mateo/Desktop/f2wlocal/ui
 npm ci
 ```
+
+Vite 6 is declared in [`ui/package.json`](ui/package.json) and installed locally
+by `npm ci`; no global Vite installation is required.
 
 Run it with:
 
@@ -902,98 +916,102 @@ curl -X POST http://localhost:11435/api/chat \
 
 ## Docker
 
-The container runs the KG-RAG FastAPI server on port `11435` using Python 3.12 (avoids Python 3.14 native ML stack instability). CBORG is the default backend. `storage/` is mounted as a volume so KG files and outputs persist outside the container.
+The image contains Python 3.12, Node.js 20 with npm/Vite, and Pixi. Its default
+command runs the complete FAIR2WISE stack:
+
+- UI: `http://localhost:5173`
+- Agent API: `http://localhost:8090`
+- Splash Links: `http://localhost:8081`
 
 ### 1. Build the image
 
 ```bash
-docker build -t kg-rag-api .
+docker build -t fair2wise .
 ```
 
-### 2. Run the API server
+### 2. Run FAIR2WISE
+
+Create the persistent Splash Links data directory once:
+
+```bash
+mkdir -p .docker-data/splash-links
+```
+
+The included launcher performs the required checks, creates the persistent
+directories, and starts or restarts the container:
+
+```bash
+./scripts/run_docker.sh
+```
+
+The image must already exist; build it with `docker build -t fair2wise .` after
+cloning or whenever the Docker dependencies change.
+
+The equivalent manual command is shown below. The explicit `SPLASH_LINKS_DB`
+override stores its SQLite database on the mounted host directory instead of
+inside the disposable container layer.
 
 ```bash
 docker run -d \
-  --name kg-rag \
-  -p 11435:11435 \
-  -e CBORG_API_KEY=your-cborg-api-key \
-  -v $(pwd)/storage:/app/storage \
-  kg-rag-api
+  --name fair2wise \
+  --env-file .env \
+  -e SPLASH_LINKS_DB=/app/data/splash-links/links.sqlite \
+  -p 5173:5173 \
+  -p 8090:8090 \
+  -p 8081:8081 \
+  -v "$(pwd)/storage:/app/storage" \
+  -v "$(pwd)/runs:/app/runs" \
+  -v "$(pwd)/.docker-data/splash-links:/app/data/splash-links" \
+  fair2wise
 ```
 
-Verify it is running:
+If you do not use `.env`, replace `--env-file .env` with the required `-e`
+options, such as `-e CBORG_API_KEY=your-cborg-api-key`.
+
+Verify all three services:
 
 ```bash
-curl http://localhost:11435/api/tags
+curl -fsS http://localhost:5173/ >/dev/null
+curl -fsS http://localhost:8090/health
+curl -fsS http://localhost:8081/splash_links/health
 ```
 
-Expected:
-
-```json
-{"models":[{"name":"kg-rag:latest","model":"kg-rag:latest","modified_at":"2025-09-17T00:00:00Z"}]}
-```
-
-### 3. Run a one-shot question
+### 3. Run a one-shot command
 
 ```bash
 docker run --rm \
-  -e CBORG_API_KEY=your-cborg-api-key \
-  -v $(pwd)/storage:/app/storage \
-  kg-rag-api \
+  --env-file .env \
+  -v "$(pwd)/storage:/app/storage" \
+  fair2wise \
   python3 app/modules/kg_rag_api.py \
     --question "What is P3HT?" \
     --timeout 60
 ```
 
-### 4. Run term extraction pipeline
+The command after the image name replaces the default full-stack launcher.
+
+### 4. Run the term extraction pipeline
 
 ```bash
 docker run --rm \
-  -e CBORG_API_KEY=your-cborg-api-key \
-  -v $(pwd)/storage:/app/storage \
-  -v $(pwd)/polymer_papers:/app/polymer_papers \
-  kg-rag-api \
+  --env-file .env \
+  -v "$(pwd)/storage:/app/storage" \
+  -v "$(pwd)/polymer_papers:/app/polymer_papers" \
+  fair2wise \
   python3 app/run_pipeline_cborg.py
 ```
 
-### 5. Override defaults
-
-All `KG_RAG_*` env vars can be overridden at runtime:
+### 5. View logs
 
 ```bash
-docker run -d \
-  --name kg-rag \
-  -p 11435:11435 \
-  -e CBORG_API_KEY=your-cborg-api-key \
-  -e KG_RAG_CBORG_MODEL=nova-micro \
-  -e KG_RAG_CTX_CHARS=3000 \
-  -e KG_RAG_LLM_TIMEOUT=60 \
-  -v $(pwd)/storage:/app/storage \
-  kg-rag-api
+docker logs -f fair2wise
 ```
 
-### 6. Mount ChEBI ontology (optional)
+### 6. Stop and remove
 
 ```bash
-docker run -d \
-  --name kg-rag \
-  -p 11435:11435 \
-  -e CBORG_API_KEY=your-cborg-api-key \
-  -v $(pwd)/storage:/app/storage \
-  -v $(pwd)/storage/ontologies:/app/storage/ontologies \
-  kg-rag-api
-```
-
-### 7. View logs
-
-```bash
-docker logs -f kg-rag
-```
-
-### 8. Stop and remove
-
-```bash
-docker stop kg-rag && docker rm kg-rag
+docker stop fair2wise
+docker rm fair2wise
 ```
 
 ---

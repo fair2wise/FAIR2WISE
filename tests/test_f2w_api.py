@@ -285,6 +285,30 @@ def test_direct_response_stream_completes_without_progress(tmp_path, monkeypatch
     assert NoCallRetrieval.query_calls == 0
 
 
+def test_irrelevant_direct_response_refuses_unrelated_request(tmp_path, monkeypatch):
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    prompts = []
+
+    def fake_completion(prompt, *, timeout):
+        prompts.append(prompt)
+        return "That request is not relevant to materials science."
+
+    service._chat_completion = fake_completion
+    answer = asyncio.run(
+        service._generate_direct_response(
+            "Write a restaurant review.",
+            [],
+            "irrelevant_non_scientific",
+        )
+    )
+
+    assert answer == "That request is not relevant to materials science."
+    assert "Do NOT answer or fulfill the unrelated request" in prompts[0]
+    assert "Do not claim to have searched the KG or papers" in prompts[0]
+
+
 def test_followup_history_rewrites_before_retrieval(tmp_path, monkeypatch):
     class RecordingRetrieval:
         queries = []
@@ -782,12 +806,20 @@ def test_agentic_path_prompts_before_download_and_respects_decline(tmp_path, mon
     )
     force_agent_router(service)
 
-    response = asyncio.run(service.ask("question"))
+    async def run():
+        response = await service.ask("question")
+        ambiguous = await service.ask("yes")
+        return response, ambiguous
 
-    # The debate specialist can stop weak candidates before an approval prompt.
-    assert response.status == "stop_insufficient"
-    assert response.pending is None
-    assert response.answer == "Weak OpenAlex candidates"
+    response, ambiguous = asyncio.run(run())
+
+    # Weak candidates remain visible and selectable, but none is recommended.
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["papers"][0]["title"] == "Unrelated abstract"
+    assert response.pending["papers"][0]["recommended"] is False
+    assert "did not identify a strong recommendation" in response.answer
+    assert ambiguous.status == "awaiting_download_decision"
+    assert "which candidate to download" in ambiguous.answer
     assert WeakDownload.instances[0].download_calls == []
     assert AgenticExtractor.instances[0].calls == []
 
@@ -898,7 +930,29 @@ def test_skipping_extraction_omits_publications(tmp_path, monkeypatch):
     assert response.publications == []
 
 
-def test_direct_download_search_works_again_after_skipping_extraction(tmp_path, monkeypatch):
+def test_kg_first_download_search_works_again_after_skipping_extraction(tmp_path, monkeypatch):
+    class InsufficientRetrieval:
+        query_calls = 0
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 0}
+
+        async def query(self, question):
+            type(self).query_calls += 1
+            return {
+                "status": "success",
+                "sufficient": False,
+                "missing_topics": ["thin film scattering"],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": True,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
     class DirectDownload(AgenticDownload):
         async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
             await super().search_candidates(query, missing_topics, candidate_pool)
@@ -959,9 +1013,27 @@ def test_direct_download_search_works_again_after_skipping_extraction(tmp_path, 
                 "skipped": 0,
             }
 
-    NoCallRetrieval.reset()
+    InsufficientRetrieval.query_calls = 0
     DirectDownload.instances = []
-    monkeypatch.setattr(api_mod, "RetrievalAgent", NoCallRetrieval)
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Candidate can fill gap",
+            "objections": [],
+            "selected_action": "download_selected",
+            "reason": "Relevant arXiv paper selected",
+            "candidate_titles": ["Relevant arXiv paper"],
+            "candidate_indices": [1],
+        },
+        {
+            "hypothesis": "Candidate can fill gap",
+            "objections": [],
+            "selected_action": "download_selected",
+            "reason": "Relevant arXiv paper selected",
+            "candidate_titles": ["Relevant arXiv paper"],
+            "candidate_indices": [1],
+        },
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", InsufficientRetrieval)
     monkeypatch.setattr(api_mod, "DownloadAgent", DirectDownload)
     monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
     monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
@@ -983,17 +1055,16 @@ def test_direct_download_search_works_again_after_skipping_extraction(tmp_path, 
 
     assert candidates.status == "awaiting_download_decision"
     assert [paper["repository"] for paper in candidates.pending["papers"]] == [
-        "arXiv", "arXiv", "PMC",
+        "arXiv", "PMC", "arXiv",
     ]
     assert downloaded.status == "awaiting_extraction_decision"
     assert downloaded.pending["candidate"]["title"] == "Relevant arXiv paper"
     assert skipped.status == "stopped_by_user"
     assert searched_again.status == "awaiting_download_decision"
-    assert [call["query"] for call in DirectDownload.instances[0].search_calls] == [
-        "thin film scattering",
-        "thin film scattering",
-    ]
-    assert NoCallRetrieval.query_calls == 0
+    search_queries = [call["query"] for call in DirectDownload.instances[0].search_calls]
+    assert search_queries[0] == "Download a paper about thin film scattering from arXiv via OpenAlex"
+    assert "thin film scattering" in search_queries[1].casefold()
+    assert InsufficientRetrieval.query_calls == 2
 
 
 def test_agentic_path_downloads_only_approved_candidate_then_answers(tmp_path, monkeypatch):
@@ -1144,10 +1215,17 @@ def test_agentic_path_downloads_only_approved_candidate_then_answers(tmp_path, m
     assert len(ApprovedDownload.instances[0].download_calls[0]["candidates"]) == 1
     # Step 3: approving extraction rebuilds the KG and answers.
     assert response.status == "answered"
+    assert "## Extraction Summary" in response.answer
+    assert "## Relevant Extracted Terms" in response.answer
+    assert "## Evidence Assessment" in response.answer
+    assert "**Sufficient**" in response.answer
     assert "Extraction completed: processed 1 paper" in response.answer
     assert "Support for original query: yes." in response.answer
     assert "now contains enough direct evidence" in response.answer
     assert response.answer.endswith("answer after reload")
+    assert response.orchestration["action"] == "retrieve_kg"
+    assert "active extracted paper" not in response.answer
+    assert any(pub.get("paper_title") == "Approved paper" for pub in response.publications)
     assert AgenticExtractor.instances[0].calls
     extracted_dir = Path(AgenticExtractor.instances[0].calls[0][0])
     assert sorted(p.name for p in extracted_dir.glob("*.pdf")) == ["approved.pdf"]
@@ -1212,6 +1290,13 @@ def test_agentic_extraction_reports_insufficient_result_without_searching_again(
             extraction_mode="targeted",
         )
     )
+    service._generate_domain_knowledge_fallback = lambda question, missing_topics: asyncio.sleep(
+        0,
+        result=(
+            "Beamline selection generally depends on source energy, geometry, "
+            "sample environment, and detector requirements."
+        ),
+    )
     pdf = service.coord.pdf_dir / "approved.pdf"
     pdf.parent.mkdir(parents=True, exist_ok=True)
     pdf.write_bytes(b"%PDF-1.4\nbody")
@@ -1235,9 +1320,17 @@ def test_agentic_extraction_reports_insufficient_result_without_searching_again(
     assert "[PDF: approved.pdf p.2]" in response.answer
     assert "1 page yielded extractable terms" in response.answer
     assert "Support for original query: no." in response.answer
+    assert "**More Evidence Needed**" in response.answer
     assert "Missing topics:\n- beamline-specific scattering evidence" in response.answer
     assert "still does not contain enough direct evidence" in response.answer
+    assert "Relevant Publications and Sources — More Evidence Needed" in response.answer
     assert "No additional paper search was started" in response.answer
+    assert api_mod.DOMAIN_KNOWLEDGE_FALLBACK_DISCLAIMER in response.answer
+    assert response.answer.count(api_mod.DOMAIN_KNOWLEDGE_FALLBACK_DISCLAIMER) == 1
+    assert "Beamline selection generally depends" in response.answer
+    assert response.sufficient is False
+    assert response.orchestration["action"] == "retrieve_kg"
+    assert any(pub.get("paper_title") == "Approved paper" for pub in response.publications)
     assert AgenticDownload.instances[0].search_calls == []
 
 
@@ -1438,8 +1531,9 @@ def test_agentic_progress_events_include_debate_candidate_and_action(tmp_path, m
 
     response = asyncio.run(run())
 
-    assert response.status == "stop_insufficient"
-    assert response.pending is None
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["papers"][0]["title"] == "Candidate paper"
+    assert response.pending["papers"][0]["recommended"] is False
     phases = [event for event, _ in events]
     assert phases.count("orchestrator_decision") >= 4
     assert [phase for phase in phases if phase != "orchestrator_decision"] == [
@@ -1450,6 +1544,7 @@ def test_agentic_progress_events_include_debate_candidate_and_action(tmp_path, m
         "debate_started",
         "debate_result",
         "action_selected",
+        "awaiting_download_decision",
     ]
     assert next(data for event, data in events if event == "candidate_search_result")["candidate_titles"] == ["Candidate paper"]
     assert next(data for event, data in events if event == "debate_result")["selected_action"] == "stop_insufficient"

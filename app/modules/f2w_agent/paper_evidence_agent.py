@@ -120,8 +120,16 @@ def summarize_extracted_terms(
     filename: str,
     *,
     max_terms: int = 16,
+    query: str = "",
+    missing_topics: Optional[List[str]] = None,
+    relevant_node_names: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Build a deterministic, page-cited summary from extracted term records."""
+    """Build a deterministic, page-cited summary from extracted term records.
+
+    When query context is provided, directly matching extracted terms rank
+    first. Explicit term-summary requests omit query context and retain the
+    complete paper-oriented summary.
+    """
     try:
         entry = _manifest_entry(Path(manifest_path), filename)
         raw = json.loads(Path(terms_path).read_text(encoding="utf-8"))
@@ -167,19 +175,11 @@ def summarize_extracted_terms(
         name = str(term.get("term") or "").strip()
         if name and pages:
             category = str(term.get("category") or term.get("raw_category") or "Term")
-            lowered = name.casefold()
-            priority = (
-                (100 if "microtomography" in lowered else 0)
-                + (40 if "x-ray" in lowered or "x ray" in lowered else 0)
-                + (20 if category == "ExperimentalTechnique" else 0)
-                + (10 if category in {"Method", "ProcessingMethod", "Process"} else 0)
-            )
             records.append({
                 "term": name,
                 "definition": re.sub(r"\s+", " ", str(term.get("definition") or "")).strip(),
                 "category": category,
                 "pages": pages,
-                "priority": priority,
             })
 
     if not records:
@@ -189,20 +189,82 @@ def summarize_extracted_terms(
             "used_pages": [], "missing_topics": ["extracted terms"],
         }
 
-    records.sort(key=lambda item: (min(item["pages"]), -item["priority"], item["term"].casefold()))
     limit = max(1, int(max_terms))
-    buckets = {
-        page: [item for item in records if min(item["pages"]) == page]
-        for page in sorted({min(item["pages"]) for item in records})
-    }
-    shown: List[Dict[str, Any]] = []
-    depth = 0
-    while len(shown) < limit and any(depth < len(items) for items in buckets.values()):
-        for items in buckets.values():
-            if depth < len(items) and len(shown) < limit:
-                shown.append(items[depth])
-        depth += 1
-    lines = [f"Extracted {len(records)} page-grounded terms; key terms:"]
+    focus_text = " ".join(
+        [
+            str(query or ""),
+            *[str(topic) for topic in (missing_topics or [])],
+        ]
+    ).strip()
+    focus_tokens = _tokens(focus_text)
+    node_names = [
+        str(name).strip()
+        for name in (relevant_node_names or [])
+        if str(name).strip()
+    ]
+    normalized_node_names = {re.sub(r"\W+", " ", name.casefold()).strip() for name in node_names}
+
+    for item in records:
+        normalized_term = re.sub(r"\W+", " ", item["term"].casefold()).strip()
+        term_tokens = _tokens(item["term"])
+        definition_tokens = _tokens(item["definition"])
+        category_tokens = _tokens(item["category"])
+        node_match = any(
+            normalized_term == node_name
+            or normalized_term in node_name
+            or node_name in normalized_term
+            for node_name in normalized_node_names
+            if node_name
+        )
+        item["relevance_score"] = (
+            (100 if node_match else 0)
+            + 8 * len(term_tokens & focus_tokens)
+            + 2 * len(definition_tokens & focus_tokens)
+            + len(category_tokens & focus_tokens)
+        )
+
+    relevant = [item for item in records if int(item["relevance_score"]) > 0]
+    query_scoped = bool(focus_text or node_names)
+    if query_scoped:
+        pool = relevant or records
+        pool.sort(
+            key=lambda item: (
+                -int(item["relevance_score"]),
+                min(item["pages"]),
+                item["term"].casefold(),
+            )
+        )
+        shown = pool[:limit if relevant else min(limit, 3)]
+    else:
+        records.sort(key=lambda item: (min(item["pages"]), item["term"].casefold()))
+        buckets = {
+            page: [item for item in records if min(item["pages"]) == page]
+            for page in sorted({min(item["pages"]) for item in records})
+        }
+        shown = []
+        depth = 0
+        while len(shown) < limit and any(depth < len(items) for items in buckets.values()):
+            for items in buckets.values():
+                if depth < len(items) and len(shown) < limit:
+                    shown.append(items[depth])
+            depth += 1
+
+    if query_scoped and relevant:
+        lines = [
+            f"Extracted {len(records)} page-grounded terms; "
+            f"{len(relevant)} matched the initial query. Relevant extracted terms:"
+        ]
+        relevance_mode = "matched"
+    elif query_scoped:
+        lines = [
+            f"Extracted {len(records)} page-grounded terms. No extracted term directly "
+            "matched the initial query; terms from the query-targeted pages:"
+        ]
+        relevance_mode = "query_targeted_pages"
+    else:
+        lines = [f"Extracted {len(records)} page-grounded terms; key terms:"]
+        relevance_mode = "all_terms"
+
     used_pages: set[int] = set()
     for item in shown:
         page = item["pages"][0]
@@ -212,12 +274,16 @@ def summarize_extracted_terms(
             f"- **{item['term']}** ({item['category']}): {definition} "
             f"[PDF: {filename} p.{page}]"
         )
-    if len(records) > len(shown):
-        lines.append(f"- {len(records) - len(shown)} additional terms omitted from this compact summary.")
+    omitted_count = len((relevant or records) if query_scoped else records) - len(shown)
+    if omitted_count > 0:
+        lines.append(f"- {omitted_count} additional terms omitted from this compact summary.")
     return {
         "status": "success", "sufficient": True, "answer": "\n".join(lines),
         "used_pages": sorted(used_pages), "missing_topics": [],
         "term_count": len(records),
+        "relevant_term_count": len(relevant) if query_scoped else len(records),
+        "displayed_term_count": len(shown),
+        "relevance_mode": relevance_mode,
     }
 
 

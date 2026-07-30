@@ -144,6 +144,8 @@ function formatAuthors(authors?: string[]) {
 const PUBLICATIONS_INTRO = 'Here are a list of relevant publications:\n\n';
 const ALTERNATIVE_PUBLICATIONS_INTRO =
   'These references from the knowledge graph are alternative sources that may help answer your question:\n\n';
+const MORE_EVIDENCE_PUBLICATIONS_INTRO =
+  'Relevant Publications and Sources — More Evidence Needed:\n\n';
 
 const INSUFFICIENT_EVIDENCE_STATUSES = new Set([
   'insufficient_json_graph',
@@ -153,9 +155,24 @@ const INSUFFICIENT_EVIDENCE_STATUSES = new Set([
 ]);
 
 function showsAlternativePublications(message: ChatMessage): boolean {
+  if (message.status === 'insufficient_evidence') return false;
   if (INSUFFICIENT_EVIDENCE_STATUSES.has(message.status ?? '')) return true;
   return message.status === 'stopped_by_user'
     && /not enough direct evidence/i.test(message.content);
+}
+
+function showsMoreEvidencePublications(message: ChatMessage): boolean {
+  return message.status === 'insufficient_evidence';
+}
+
+export function publicationSectionHeading(message: ChatMessage): string {
+  if (showsMoreEvidencePublications(message)) {
+    return 'Relevant Publications and Sources — More Evidence Needed:';
+  }
+  if (showsAlternativePublications(message)) {
+    return 'Alternative Publications and Sources:';
+  }
+  return 'Relevant Publications and Sources:';
 }
 
 function isExtractionSkipped(message: ChatMessage): boolean {
@@ -176,7 +193,12 @@ function shouldShowKnowledgeGraph(message: ChatMessage): boolean {
   return true;
 }
 
-function publicationsBlockText(publications: PublicationInfo[], markdown = false, alternative = false): string {
+export function publicationsBlockText(
+  publications: PublicationInfo[],
+  markdown = false,
+  alternative = false,
+  moreEvidenceNeeded = false,
+): string {
   if (!publications.length) return '';
   const entries = publications.map(publication => {
     const title = publication.paper_title || publication.source_paper || 'Untitled publication';
@@ -188,7 +210,11 @@ function publicationsBlockText(publications: PublicationInfo[], markdown = false
       : publication.source_paper;
     return [titleLine, meta, source].filter(Boolean).join('\n');
   });
-  const intro = alternative ? ALTERNATIVE_PUBLICATIONS_INTRO : PUBLICATIONS_INTRO;
+  const intro = moreEvidenceNeeded
+    ? MORE_EVIDENCE_PUBLICATIONS_INTRO
+    : alternative
+      ? ALTERNATIVE_PUBLICATIONS_INTRO
+      : PUBLICATIONS_INTRO;
   return intro + entries.join('\n\n');
 }
 
@@ -199,6 +225,7 @@ function assistantCopyText(message: ChatMessage): string {
       message.publications,
       false,
       showsAlternativePublications(message),
+      showsMoreEvidencePublications(message),
     ));
   }
   return parts.join('\n\n');
@@ -899,9 +926,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                     {showPublications && (
                                       <div className="px-4 py-3">
                                         <p className="mb-2 text-sm font-bold text-slate-800">
-                                          {alternativePublications
-                                            ? 'Alternative Publications and Sources:'
-                                            : 'Relevant Publications and Sources:'}
+                                          {publicationSectionHeading(message)}
                                         </p>
                                         {alternativePublications && (
                                           <p className="mb-4 text-xs leading-relaxed text-slate-600">
