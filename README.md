@@ -1096,6 +1096,7 @@ Run the isolated clean-volume smoke test with:
 | Script | Description |
 |---|---|
 | `scripts/download_pdfs.py` | Download PDFs from arXiv or OpenAlex by DOI/ID |
+| `scripts/run.py` | Run local modular term extraction against a PDF directory |
 | `app.modules.launchers.f2w_agent` | Agent KG-RAG pipeline CLI/API launcher |
 | `scripts/test_chat_apis.py` | Standalone CBORG API connectivity test |
 | `scripts/analyze_kgs.py` | Evaluate KG JSON files: node/edge counts, coverage, growth rates |
@@ -1206,6 +1207,7 @@ that validate ID generation, field retention, and CLI behavior.
 │   ├── analyze_kgs.py
 │   ├── download_pdfs.py
 │   ├── get_pdf_years.py
+│   ├── run.py
 │   ├── test_compose.sh
 │   ├── test_chat_apis.py
 │   └── update_readme_tree.py

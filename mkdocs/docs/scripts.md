@@ -19,7 +19,7 @@ python3 -m app.modules.launchers.f2w_agent status
 
 | File | Use |
 |---|---|
-| `run.py` | Local modular term extraction |
+| `scripts/run.py` | Local modular term extraction |
 | `app/run_pipeline_cborg.py` | Incremental 25/50/75/100-paper evaluation |
 
 Agent launcher subcommands are `status`, `ask`, `chat`, and `api`. Global

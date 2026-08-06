@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """
-run.py — launch the FAIR2WISE term-extraction agent.
+scripts/run.py — launch the FAIR2WISE term-extraction agent.
 
 Usage:
-  python run.py --pdf-dir papers --output storage/terminology/terms.json
-  python run.py --pdf-dir papers --backend ollama --model llama3
-  python run.py --pdf-dir papers --dry-run
+  python3 scripts/run.py --pdf-dir papers --output storage/terminology/terms.json
+  python3 scripts/run.py --pdf-dir papers --backend ollama --model llama3
+  python3 scripts/run.py --pdf-dir papers --dry-run
 """
 
 import argparse
@@ -97,7 +97,8 @@ def main() -> None:
         return
 
     # --- Run ---
-    sys.path.insert(0, str(Path(__file__).parent / "app"))
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root / "app"))
     from modules.term_extractor import run_extraction
 
     result = run_extraction(

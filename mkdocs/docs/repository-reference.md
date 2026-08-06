@@ -17,8 +17,6 @@ change-impact analysis.
 | `requirements/globus.in` / `requirements/globus.txt` | Optional Globus Compute dependency source and lock |
 | `requirements/legacy.in` / `requirements/legacy.txt` | Optional archived-module dependency source and lock |
 | `requirements/semantic.in` | Optional FAISS/SentenceTransformer retrieval inputs |
-| `requirements-semantic.*` | Optional FAISS/SentenceTransformer/Torch dependency source and lock |
-| `run.py` | Local modular extractor CLI |
 | `compose.yaml` | Canonical private-network application stack |
 | `Dockerfile` | Agent and frontend image targets |
 | `pytest.ini` | Root pytest discovery configuration |
@@ -223,7 +221,7 @@ Root tests follow feature ownership:
 | `.github/workflows/publish-image.yml` | Build/publish the agent image target |
 | `.github/dependabot.yml` | Docker, Actions, and pip update groups |
 | `.pre-commit-config.yaml` | Local pre-commit tools |
-| `scripts/` | Local, Docker, KG, and NERSC automation |
+| `scripts/` | Local, Docker, KG, and NERSC automation, including the modular extractor CLI at `scripts/run.py` |
 | `slurm_scripts/` | Batch-system launchers |
 
 ## Tooling directories

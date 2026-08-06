@@ -9,7 +9,7 @@ Two active entry paths share the same conceptual output:
 - `app/modules/extract_terms.py` is the larger standalone extractor retained as
   a supported CLI and exercised heavily by tests.
 
-`run.py` launches the modular extractor. `scripts/build_kg.sh` calls the
+`scripts/run.py` launches the modular extractor. `scripts/build_kg.sh` calls the
 standalone extractor and then `json2kg.py`.
 
 ## Modular pipeline
@@ -117,7 +117,7 @@ processed paper.
 ## Local use
 
 ```bash
-python3 run.py \
+python3 scripts/run.py \
   --pdf-dir papers \
   --output storage/terminology/terms.json \
   --backend cborg \
@@ -128,7 +128,7 @@ python3 run.py \
 Validate configuration without processing:
 
 ```bash
-python3 run.py --pdf-dir papers --dry-run
+python3 scripts/run.py --pdf-dir papers --dry-run
 ```
 
 Build terms and a graph with guarded output promotion:

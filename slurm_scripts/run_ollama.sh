@@ -1,7 +1,7 @@
 #!/bin/bash
 # TEMPLATE — edit the <PLACEHOLDER> values for your HPC account/paths/model
 # before submitting. Starts an Ollama server on a GPU node, waits for it, then
-# runs the local term extractor (run.py) against it.
+# runs the local term extractor (scripts/run.py) against it.
 #SBATCH -J f2w_ollama
 #SBATCH -o out.f2w_ollama_%j
 #SBATCH -e err.f2w_ollama_%j
@@ -28,6 +28,6 @@ until ollama list &>/dev/null; do sleep 1; done
 
 cd $REPO_PATH
 source $REPO_PATH/.venv/bin/activate
-python run.py --backend "ollama" --model "qwen3.5:9b" --workers 2 --log-file f2w_ollama.log
+python scripts/run.py --backend "ollama" --model "qwen3.5:9b" --workers 2 --log-file f2w_ollama.log
 
 kill $OLLAMA_PID
