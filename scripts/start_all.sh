@@ -24,6 +24,7 @@ fi
 
 BACKEND_SCRIPT="$SCRIPT_DIR/start_agent_backend.sh"
 FRONTEND_SCRIPT="$SCRIPT_DIR/start_agent_frontend.sh"
+AGENT_LAUNCHER="$ROOT_DIR/app/modules/launchers/f2w_agent.py"
 SPLASH_PID_FILE="$RUN_DIR/splash_links.pid"
 BACKEND_PID_FILE="$RUN_DIR/agent_backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/agent_frontend.pid"
@@ -141,6 +142,11 @@ fi
 
 if [[ ! -x "$BACKEND_SCRIPT" ]]; then
   echo -e "${RED}Error: missing executable backend script: $BACKEND_SCRIPT${NC}" >&2
+  exit 1
+fi
+
+if [[ ! -f "$AGENT_LAUNCHER" ]]; then
+  echo -e "${RED}Error: missing agent launcher module: $AGENT_LAUNCHER${NC}" >&2
   exit 1
 fi
 

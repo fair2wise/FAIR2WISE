@@ -24,6 +24,7 @@ WORKERS="${F2W_WORKERS:-8}"
 WORKFLOW_MODE="${F2W_WORKFLOW_MODE:-agentic}"
 EXTRACTION_MODE="${F2W_EXTRACTION_MODE:-targeted}"
 TARGETED_MAX_PAGES="${F2W_TARGETED_MAX_PAGES:-6}"
+SPLASH_HEALTH_URL="${F2W_SPLASH_HEALTH_URL:-http://127.0.0.1:8081/splash_links/health}"
 
 if [[ "$KG_MODE" != "splash" ]]; then
   echo "warning: F2W_KG_MODE=$KG_MODE overrides backend default splash" >&2
@@ -36,14 +37,14 @@ if [[ "$KG_MODE" == "splash" && ! -d "$SPLASH_REPO" ]]; then
 fi
 
 if [[ "$KG_MODE" == "splash" ]] && command -v curl >/dev/null 2>&1; then
-  if ! curl -fsS "http://127.0.0.1:8081/docs" >/dev/null 2>&1; then
-    echo "warning: splash-links server not responding at http://127.0.0.1:8081" >&2
+  if ! curl -fsS "$SPLASH_HEALTH_URL" >/dev/null 2>&1; then
+    echo "warning: splash-links server not responding at $SPLASH_HEALTH_URL" >&2
     echo "start it in another terminal: cd \"$SPLASH_REPO\" && pixi run serve" >&2
   fi
 fi
 
 ARGS=(
-  python3 f2w_agent.py
+  python3 -m app.modules.launchers.f2w_agent
   --backend "$BACKEND"
   --model "$MODEL"
   --kg-mode "$KG_MODE"

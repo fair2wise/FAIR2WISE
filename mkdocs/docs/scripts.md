@@ -1,17 +1,28 @@
 # Scripts and entry points
 
-## Root entry points
+## Launcher modules
+
+| Module | Use |
+|---|---|
+| `app.modules.launchers.f2w_agent` | Canonical orchestrated CLI/API entry point |
+| `app.modules.launchers.academy_extractor` | Submit monitored extraction to Globus Compute |
+| `app.modules.launchers.user_agent` | Launch the local Academy dashboard/user agent |
+| `app.modules.launchers.academy_auth` | Authenticate to Academy through Globus |
+
+Run launcher modules from the repository root:
+
+```bash
+python3 -m app.modules.launchers.f2w_agent status
+```
+
+## Other entry points
 
 | File | Use |
 |---|---|
-| `f2w_agent.py` | Canonical orchestrated CLI/API entry point |
 | `run.py` | Local modular term extraction |
-| `run_academy_extractor.py` | Submit monitored extraction to Globus Compute |
-| `user_agent_launcher.py` | Launch the local Academy dashboard/user agent |
 | `app/run_pipeline_cborg.py` | Incremental 25/50/75/100-paper evaluation |
-| `auth.py` | Authentication helper retained at repository root |
 
-`f2w_agent.py` subcommands are `status`, `ask`, `chat`, and `api`. Global
+Agent launcher subcommands are `status`, `ask`, `chat`, and `api`. Global
 options configure the model, graph, session, workflow, literature, and
 extraction behavior.
 
@@ -20,10 +31,10 @@ extraction behavior.
 | Script | Behavior |
 |---|---|
 | `start_all.sh` | Start Splash, agent API, and UI with readiness and cleanup |
-| `start_agent_backend.sh` | Resolve `F2W_*` variables and run `f2w_agent.py api` |
+| `start_agent_backend.sh` | Resolve `F2W_*` variables and run the packaged agent API launcher |
 | `start_agent_frontend.sh` | Validate npm/Vite and run the Vite dev server |
 | `install_pixi.sh` | Install Pixi if absent and initialize Splash |
-| `run_docker.sh` | Start/restart the full-stack Docker container |
+| `test_compose.sh` | Isolated build, health, port-isolation, seed, and persistence smoke test |
 | `wipe_splash_db.sh` | Guarded deletion of the local Splash SQLite database |
 
 ## Data acquisition and graph scripts

@@ -41,3 +41,4 @@ tests/
 # Secret keys or env files (if not required in build)
 .env
 .secrets
+links.sqlite

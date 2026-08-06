@@ -26,16 +26,28 @@ import openai
 import requests
 from colorama import Fore, Style, init as colorama_init
 from dotenv import load_dotenv
-import faiss  # type: ignore
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import fitz  # PyMuPDF
 import numpy as np
 # from nvtx import annotate
 from rapidfuzz import fuzz
-from sentence_transformers import SentenceTransformer
-import torch
 import uvicorn
+
+try:
+    import faiss  # type: ignore
+except ImportError:  # Optional semantic-retrieval dependency.
+    faiss = None  # type: ignore[assignment]
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:  # Optional semantic-retrieval dependency.
+    SentenceTransformer = None  # type: ignore[assignment,misc]
+
+try:
+    import torch
+except ImportError:  # Optional semantic-retrieval dependency.
+    torch = None  # type: ignore[assignment]
 
 try:
     from app.modules.project_config import config_value
@@ -47,12 +59,28 @@ try:
 except ImportError:  # pragma: no cover - direct script execution fallback
     from cborg_limiter import async_slot
 
+try:
+    from app.modules.cborg_http import openai_http_kwargs
+except ImportError:  # pragma: no cover - direct script execution fallback
+    from cborg_http import openai_http_kwargs
+
 load_dotenv()
 
 
 def _load_kg_deps() -> None:
-    """Ensure numeric/ML dependencies are available."""
-    return
+    """Require the optional semantic-retrieval dependency group."""
+    missing = []
+    if faiss is None:
+        missing.append("faiss-cpu")
+    if SentenceTransformer is None:
+        missing.append("sentence-transformers")
+    if torch is None:
+        missing.append("torch")
+    if missing:
+        raise RuntimeError(
+            "Semantic retrieval requires the optional packages listed in requirements-semantic.in; missing: "
+            + ", ".join(missing)
+        )
 
 # ───────────────────── optional noun-phrase extraction ─────────────────────
 _NLTK_OK = False
@@ -88,7 +116,11 @@ PDF_DIR = os.environ.get("KG_RAG_PDF_DIR", "polymer_papers")
 
 DEFAULT_K = int(os.environ.get("KG_RAG_TOPK", "12"))
 EMBED_MODEL = os.environ.get("KG_RAG_EMBED_MODEL", "all-MiniLM-L6-v2")
-DEFAULT_RETRIEVAL_BACKEND = "lexical" if sys.version_info >= (3, 14) else "semantic"
+DEFAULT_RETRIEVAL_BACKEND = (
+    "semantic"
+    if faiss is not None and SentenceTransformer is not None and torch is not None
+    else "lexical"
+)
 RETRIEVAL_BACKEND = os.environ.get("KG_RAG_RETRIEVAL_BACKEND", DEFAULT_RETRIEVAL_BACKEND).lower()
 USER_BATCH_OVERRIDE: Optional[str] = os.environ.get("KG_RAG_BATCH")
 
@@ -1364,6 +1396,7 @@ class CBorgClient:
         self.client = openai.AsyncOpenAI(
             api_key=api_key or os.environ.get("CBORG_API_KEY"),
             base_url=(base_url or CBORG_BASE_URL).rstrip("/"),
+            **openai_http_kwargs(asynchronous=True),
         )
 
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:

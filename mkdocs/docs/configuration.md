@@ -29,6 +29,10 @@ Set `FAIR2WISE_CONFIG` to load a different YAML file.
 
 Never put secret values in `config.yml`.
 
+Compose requires `CBORG_API_KEY` during interpolation. Export it before the
+three project commands, or place it in an untracked `.env` file before running
+`docker compose up`. The host environment takes precedence over `.env`.
+
 ## Service paths
 
 | Variable | Default | Meaning |
@@ -49,6 +53,7 @@ directory by the standard launcher.
 |---|---:|---|
 | `F2W_BACKEND` | `cborg` | `cborg` or `ollama` |
 | `F2W_MODEL` | `lbl/cborg-chat` | Active LLM model |
+| `CBORG_IP_FAMILY` | `ipv6` in Compose | CBORG transport family (`ipv6`, `ipv4`, or `auto`) |
 | `F2W_KG_MODE` | `splash` | Editable Splash graph or JSON snapshot |
 | `F2W_GRAPH` | `storage/kg/matkg_with_code.json` | Initial/fallback graph |
 | `F2W_SEED_TERMS` | empty | Cumulative terms seed |
@@ -66,7 +71,7 @@ directory by the standard launcher.
 | Variable | Default/typical | Meaning |
 |---|---:|---|
 | `KG_RAG_GRAPH_SOURCE` | `splash` | `splash` or `json` |
-| `KG_RAG_RETRIEVAL_BACKEND` | `semantic` before Python 3.14; otherwise `lexical` | Search implementation |
+| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Search implementation; semantic packages are not included in the app image |
 | `KG_RAG_TOPK` | `12` | Final retrieval count |
 | `KG_RAG_EMBED_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model |
 | `KG_RAG_FORCE_CPU` | false | Disable GPU FAISS use |
@@ -109,3 +114,16 @@ dispatcher. Results report whether the active backend is `semantic` or
 
 Vite variables are read in the browser bundle, so the URL must be reachable
 from the browser rather than only from the server process.
+
+## Docker Compose overrides
+
+| Variable | Default | Meaning |
+|---|---:|---|
+| `CBORG_API_KEY` | required | Agent LLM credential |
+| `F2W_UI_PORT` | `5173` | Sole host-published port, bound to loopback |
+| `OPENALEX_EMAIL` | empty | Optional polite-pool identity |
+| `MP_API_KEY` | empty | Optional Materials Project credential |
+| `GITHUB_TOKEN` | empty | Optional GitHub rate-limit credential |
+
+Compose sets the internal agent and Splash hostnames itself. Do not override
+`KG_RAG_SPLASH_URI` with a host-local URL inside the containers.

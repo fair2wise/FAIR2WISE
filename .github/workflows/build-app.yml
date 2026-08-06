@@ -12,18 +12,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: 3.11
+        python-version: '3.12'
         cache: 'pip'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        pip install -r requirements-dev.txt
+        pip check
     - name: Format with Black
-      run: black .
+      run: >-
+        black --check
+        app/modules/launchers
+        app/modules/f2w_agent/kg_update.py
+        splash_links/scripts/import_kg.py
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
@@ -32,6 +36,8 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: pytest
+    - name: Build MkDocs site strictly
+      run: mkdocs build --strict -f mkdocs/mkdocs.yml
     - name: Build MkDocs site
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: mkdocs gh-deploy --force -f mkdocs/mkdocs.yml

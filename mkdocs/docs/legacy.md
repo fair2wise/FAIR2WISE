@@ -22,7 +22,7 @@ reproducibility and reference. They are not imported by the current
 | Term extraction | `app/modules/term_extractor/` or `app/modules/extract_terms.py` |
 | Graph conversion | `app/modules/json2kg.py` |
 | RAG and model clients | `app/modules/kg_rag_api.py` |
-| NERSC agent workflow | `f2w_agent.py` plus `scripts/run_nersc_3agent.sh` |
+| NERSC agent workflow | `app.modules.launchers.f2w_agent` plus `scripts/run_nersc_3agent.sh` |
 | Graph persistence | Vendored `splash_links/` |
 
 ## Change policy

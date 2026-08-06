@@ -16,7 +16,7 @@ if [[ "$F2W_KG_MODE" == "splash" && ! -d "$SPLASH_LINKS_REPO" ]]; then
   exit 1
 fi
 
-python3 f2w_agent.py \
+python3 -m app.modules.launchers.f2w_agent \
   --backend "${F2W_BACKEND:-cborg}" \
   --model "${F2W_MODEL:-lbl/cborg-chat}" \
   --kg-mode "$F2W_KG_MODE" \

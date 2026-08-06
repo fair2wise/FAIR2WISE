@@ -59,11 +59,12 @@ The remote agent scripts source this file when it exists.
 
 ## Academy dashboard
 
-First authenticate through the normal Academy flow so the token cache exists.
-Then start the user agent:
+First authenticate through the normal Academy flow so the token cache exists,
+then start the user agent:
 
 ```bash
-python3 user_agent_launcher.py --port 8000
+python3 -m app.modules.launchers.academy_auth
+python3 -m app.modules.launchers.user_agent --port 8000
 ```
 
 The launcher:
@@ -81,7 +82,7 @@ routes.
 ## Submit extraction
 
 ```bash
-python3 run_academy_extractor.py \
+python3 -m app.modules.launchers.academy_extractor \
   --data-dir /remote/path/pdfs \
   --output /remote/path/terms.json \
   --backend cborg \

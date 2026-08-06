@@ -11,6 +11,8 @@ import fitz
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
+from app.modules.cborg_http import openai_http_kwargs
+
 from app.modules.cborg_limiter import sync_slot
 
 from . import provenance, source_repos
@@ -222,6 +224,7 @@ class Orchestrator:
             api_key=self.cborg_api_key,
             base_url=self.cborg_base,
             temperature=self.temperature,
+            **openai_http_kwargs(asynchronous=False),
         )
 
     # ------------------------------------------------------------------

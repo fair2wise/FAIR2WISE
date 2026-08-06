@@ -34,71 +34,67 @@ Common failures:
 | Semantic model crash/download issue | Use lexical retrieval or verify the Python/ML environment |
 | Splash falls back to JSON | Inspect Splash logs, URI, database, and GraphQL health |
 
-## Docker image
+## Docker Compose operation
 
-The root `Dockerfile` is a multi-stage full-stack image:
-
-- Node.js 20 provides Node and npm;
-- a pinned Pixi image provides the Pixi executable;
-- Python 3.12 slim is the runtime;
-- root Python, UI npm, and Splash Pixi dependencies use separate cacheable
-  layers;
-- the default command is `./scripts/start_all.sh`; and
-- the health check verifies all three services.
-
-Build:
+`compose.yaml` is the canonical deployment. It builds separate frontend,
+agent, and Splash images. A one-shot initializer copies the tracked
+`splash_links/links.sqlite` seed into the persistent volume before Splash and
+the agent start. Export `CBORG_API_KEY`, then use:
 
 ```bash
-docker build -t fair2wise .
+docker compose up -d
+docker compose ps
+docker compose logs -f
 ```
 
-Run with the included launcher:
+Images are local Docker artifacts. A fresh clone rebuilds them from the root
+`Dockerfile` and `splash_links/Containerfile`; it does not require an image
+copied from the machine where FAIR2WISE was developed. Use
+`docker compose up -d --build` after pulling build, source, or dependency
+changes. Compose reads an untracked root `.env` automatically when credentials
+are not exported by the shell.
+
+The frontend is the only published service at `127.0.0.1:5173`. It proxies
+`/api` to the private agent container; the agent communicates with Splash on
+the private default network.
+
+Health checks from the host and inside the private services:
 
 ```bash
-./scripts/run_docker.sh
+curl -fsS http://127.0.0.1:5173/healthz
+curl -fsS http://127.0.0.1:5173/api/health
+docker compose exec agent curl -fsS http://127.0.0.1:8090/health
+docker compose exec splash python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8081/splash_links/health').read().decode())"
 ```
 
-The script:
+Use `docker compose logs agent`, `docker compose logs splash`, or
+`docker compose logs frontend` to narrow diagnostics. Stop containers while
+retaining data with `docker compose down`.
 
-- verifies Docker and the daemon;
-- requires an environment file;
-- verifies that the image exists;
-- creates persistent Splash and run directories;
-- starts a new container or restarts an existing stopped container; and
-- prints all service URLs.
+Compose uses these named volumes:
 
-Override launcher values with:
-
-| Variable | Default |
+| Volume | Contents |
 |---|---|
-| `F2W_DOCKER_IMAGE` | `fair2wise` |
-| `F2W_DOCKER_CONTAINER` | `fair2wise` |
-| `F2W_DOCKER_ENV_FILE` | repository `.env` |
-| `F2W_DOCKER_UI_PORT` | `5173` |
-| `F2W_DOCKER_AGENT_PORT` | `8090` |
-| `F2W_DOCKER_SPLASH_PORT` | `8081` |
-| `F2W_DOCKER_DATA_DIR` | `.docker-data/splash-links` |
-| `F2W_DOCKER_RUNS_DIR` | `runs` |
+| `splash-data` | Writable Splash SQLite graph, initialized from the tracked seed |
+| `agent-runs` | Session PDFs, graphs, memory, and workflow state |
+| `agent-cache` | Model and PyStow caches |
 
-The container mounts:
-
-- `storage/` for graph and terminology artifacts;
-- `runs/` for session state; and
-- `.docker-data/splash-links/` for the SQLite database.
-
-The launcher overrides `SPLASH_LINKS_DB` to
-`/app/data/splash-links/links.sqlite` so the database survives container
-replacement.
-
-View logs and stop:
+To erase all Compose-managed state and force a clean seed copy on the next
+start:
 
 ```bash
-docker logs -f fair2wise
-docker stop fair2wise
-docker rm fair2wise
+docker compose down --volumes
 ```
+
+This is destructive and cannot be recovered unless the Docker volumes were
+backed up first.
 
 ## Splash database lifecycle
+
+The following file-oriented commands apply to local development. Compose owns
+its database in a named volume; manage that lifecycle with Compose commands
+above.
 
 Back up the database only while Splash is stopped:
 

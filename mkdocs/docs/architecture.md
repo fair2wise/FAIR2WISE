@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TB
     Browser[Browser]
-    UI[React + Vite UI :5173]
+    UI[Nginx + React UI host :5173]
     API[Agent FastAPI :8090]
     Splash[Splash Links FastAPI :8081]
     DB[(SQLite / PostgreSQL)]
@@ -15,8 +15,8 @@ flowchart TB
     Arxiv[arXiv]
     Files[(storage/ and runs/)]
 
-    Browser --> UI
-    UI -->|REST + SSE| API
+    Browser -->|only published port| UI
+    UI -->|private /api proxy: REST + SSE| API
     API -->|GraphQL| Splash
     Splash --> DB
     API --> CBORG
@@ -28,11 +28,14 @@ flowchart TB
 
 The UI never accesses Splash Links directly. All graph reads and edits pass
 through the agent API, which normalizes Splash records into the MatKG/UI shape.
+In Compose, the agent and Splash ports are not published to the host. Nginx is
+the only ingress and strips `/api` before forwarding requests to the agent.
 
 ## Python package boundaries
 
 | Package | Responsibility |
 |---|---|
+| `app.modules.launchers` | Executable CLI/API, Academy dashboard, remote extraction, and auth entry points |
 | `app.modules.f2w_agent` | Chat API, workflow routing, agents, session state, KG rebuild/reimport |
 | `app.modules.term_extractor` | PDF processing, schema validation, term merging, code/provenance extraction |
 | `app.modules.kg_rag_api` | KG loading, search, graph expansion, context construction, LLM clients, OpenWebUI proxy |
@@ -45,7 +48,8 @@ through the agent API, which normalizes Splash records into the MatKG/UI shape.
 
 There are two separate FastAPI surfaces:
 
-1. **Agent API** (`f2w_agent api`, normally port `8090`) is used by the current
+1. **Agent API** (`python3 -m app.modules.launchers.f2w_agent api`, normally
+   port `8090`) is used by the current
    React application. It owns workflow state, graph editing, settings,
    publication search, and SSE progress.
 2. **KG-RAG compatibility API** (`kg_rag_api.py --api`, normally port `11435`)
@@ -74,7 +78,8 @@ flowchart LR
   snapshots, competency questions, and missing-node logs.
 - `runs/` contains mutable per-session PDFs, terms, graph snapshots, extraction
   manifests, memory, and workflow state.
-- `splash_links/links.sqlite` is the default local durable graph database.
+- `splash_links/links.sqlite` is the default local durable graph database;
+  Compose stores it in the `splash-data` named volume.
 - `.run/` only contains launcher PID files.
 
 ## Configuration precedence

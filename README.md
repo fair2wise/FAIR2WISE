@@ -10,13 +10,53 @@ This repository builds materials-science knowledge graphs from research papers (
 4. Import the MatKG JSON into `splash_links`
 5. Query the database-backed graph via KG-RAG chat (CLI or Open WebUI)
 
-**Optional — 3-agent automated pipeline:** [`f2w_agent.py`](f2w_agent.py) runs three Academy agents that answer from the KG when evidence suffices, and otherwise download relevant OpenAlex papers, extract terms, rebuild the KG, and re-query in a loop. See **[3-Agent KG-RAG Pipeline](#3-agent-kg-rag-pipeline)**.
+**Optional — automated agent pipeline:** [`app.modules.launchers.f2w_agent`](app/modules/launchers/f2w_agent.py) launches the Academy workflow that answers from the KG when evidence suffices and otherwise searches for papers, requests approval, extracts terms, rebuilds the KG, and re-queries. See **[3-Agent KG-RAG Pipeline](#3-agent-kg-rag-pipeline)**.
+
+---
+
+## Recommended: run with Docker Compose
+
+Docker Compose is the preferred way to run FAIR2WISE. A clone does **not**
+depend on Docker images from the original developer's computer. Each computer
+builds its own application images from the repository's `Dockerfile`,
+`splash_links/Containerfile`, source code, and pinned requirements.
+
+Install Docker Engine or Docker Desktop with Docker Compose v2, authorize the
+computer for CBORG access, and make `CBORG_API_KEY` available in the shell.
+Then the complete application starts in three commands:
+
+```bash
+git clone https://github.com/matesuu/FAIRtoWISE-FORUM-AI.git
+cd FAIRtoWISE-FORUM-AI
+docker compose up --build
+```
+
+Open `http://127.0.0.1:5173`. Only the frontend is exposed on the host; the
+agent API and Splash database remain private inside the Compose network.
+
+Instead of exporting the API key, create an untracked `.env` file before the
+last command:
+
+```bash
+cp .env.example .env
+```
+
+Set `CBORG_API_KEY` in `.env` and never commit that file. The first startup
+builds the images and copies the repository's tracked
+`splash_links/links.sqlite` seed into a writable Docker volume. Later startups
+reuse the built images and persistent data. See [Docker operation](#docker)
+for lifecycle, diagnostics, persistence, and reset commands.
 
 ---
 
 ## Prerequisites
 
-- Python 3.14 (the latest supported Python release)
+- Docker Engine or Docker Desktop with Docker Compose v2 for the three-command setup
+- A CBORG API key supplied through the host environment or an untracked `.env`
+
+For local development without Docker:
+
+- Python 3.12
 - Node.js 20+ (including npm); npm installs the pinned local Vite 6 toolchain from `ui/package.json`
 - [Pixi](https://pixi.sh/latest/installation/) for the vendored `splash_links` database server
 - A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend). CBORG requires LBLnet/VPN or an authorized IP — see [CBORG IP authorization](https://api.cborg.lbl.gov/key/manage).
@@ -26,6 +66,8 @@ This repository builds materials-science knowledge graphs from research papers (
 ---
 
 ## Setup
+
+### Local development setup
 
 ### 1. Clone the repository
 
@@ -37,7 +79,7 @@ cd FAIRtoWISE-FORUM-AI
 ### 2. Install dependencies
 
 ```bash
-python3 --version  # should report Python 3.14
+python3 --version  # should report Python 3.12
 python3 -m pip install -r requirements.txt
 
 # Install the UI dependencies, including Vite.
@@ -62,7 +104,7 @@ it downloads the official installer from `pixi.sh`, installs Pixi, and runs
 Copy the example env file and fill in your credentials:
 
 ```bash
-cp scripts/.env.example .env
+cp .env.example .env
 ```
 
 Required keys in `.env`:
@@ -611,6 +653,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 |---|---|---|
 | `CBORG_API_KEY` | — | CBORG API key (required for cborg backend) |
 | `CBORG_BASE_URL` | `https://api.cborg.lbl.gov` | CBORG API base URL |
+| `CBORG_IP_FAMILY` | `ipv6` in Compose | Force CBORG traffic over the authorized IPv6 address; use `auto` or `ipv4` to override |
 | `KG_RAG_BACKEND` | `cborg` | LLM backend (`cborg` or `ollama`) |
 | `KG_RAG_CBORG_MODEL` | `lbl/cborg-chat` | CBORG model name |
 | `KG_RAG_OLLAMA_MODEL` | `deepseek-r1:70b` | Ollama model name |
@@ -618,7 +661,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 | `KG_RAG_SPLASH_URI` | `splash://localhost:8081` | `splash_links` service URI |
 | `KG_RAG_SPLASH_PAGE_SIZE` | `1000` | GraphQL page size for database graph loading |
 | `KG_RAG_GRAPH` | `storage/kg/matkg_xray_papers_cborg_chat.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` (also splash fallback path) |
-| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` (Python 3.14), `semantic` otherwise | Retrieval method |
+| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Retrieval method; semantic dependencies are not included in the app image |
 | `KG_RAG_CTX_CHARS` | `16000` | Max chars of KG context per prompt |
 | `KG_RAG_LLM_TIMEOUT` | `120` | LLM request timeout in seconds |
 | `KG_RAG_SHOW_BASELINE` | `0` | Set to `1` to enable baseline responses |
@@ -627,7 +670,9 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 ### Implementation details
 
 - Hybrid retrieval: SentenceTransformer embeddings + FAISS IVF-Flat + weighted BFS
-- Lexical retrieval available (no FAISS/Torch) for Python 3.14 stability
+- Lexical retrieval is the lightweight default. `requirements-semantic.in`
+  documents the optional packages for SentenceTransformer/FAISS retrieval;
+  they are not installed by the app image.
 - Multi-factor node scoring: semantic similarity, graph depth, lexical overlap, evidence count
 - Context blocks include per-source `Source_Metadata`, KG triples, formulas, descriptions, and PDF snippets (page-cached)
 - Legacy scalar publication fields suppressed when `source_metadata` exists, or when a node has multiple sources without per-source metadata (prevents metadata smear)
@@ -642,7 +687,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 
 ## 3-Agent KG-RAG Pipeline
 
-[`f2w_agent.py`](f2w_agent.py) is an **Academy-based, self-growing KG-RAG chat** that wraps the manual Steps 1–5 workflow behind three cooperating agents. A user asks a question; if the KG lacks sufficient evidence, the system downloads relevant papers, extracts terms, rebuilds the KG, and retries — up to `--max-rounds` times.
+[`app.modules.launchers.f2w_agent`](app/modules/launchers/f2w_agent.py) launches an **Academy-based, self-growing KG-RAG chat** that wraps the manual Steps 1–5 workflow behind cooperating agents. A user asks a question; if the KG lacks sufficient evidence, the system can search for papers, request approval, download and extract selected evidence, rebuild the KG, and retry — up to `--max-rounds` times.
 
 ### Architecture
 
@@ -670,10 +715,10 @@ Use the repaired xray demo data already in `storage/`:
 
 ```bash
 # Check configuration
-python3 f2w_agent.py status
+python3 -m app.modules.launchers.f2w_agent status
 
 # One-shot question (JSON KG mode — no splash-links server required)
-KG_RAG_GRAPH_SOURCE=json python3 f2w_agent.py \
+KG_RAG_GRAPH_SOURCE=json python3 -m app.modules.launchers.f2w_agent \
   --backend cborg \
   --model lbl/cborg-chat \
   --kg-mode json \
@@ -683,7 +728,7 @@ KG_RAG_GRAPH_SOURCE=json python3 f2w_agent.py \
   ask "What is find_scattering_peaks used for?"
 
 # Interactive chat loop
-KG_RAG_GRAPH_SOURCE=json python3 f2w_agent.py \
+KG_RAG_GRAPH_SOURCE=json python3 -m app.modules.launchers.f2w_agent \
   --graph storage/kg/matkg_xray_papers_cborg_chat.json \
   --seed-terms storage/terminology/extracted_terms_xray_papers_cborg_chat.json \
   --workdir runs/my_session \
@@ -706,8 +751,8 @@ When evidence is missing, the loop downloads papers (default `--max-papers 3` pe
 ### CLI reference
 
 ```bash
-python3 f2w_agent.py --help
-python3 f2w_agent.py ask --help   # (global flags go before subcommand)
+python3 -m app.modules.launchers.f2w_agent --help
+python3 -m app.modules.launchers.f2w_agent ask --help   # global flags go before subcommand
 ```
 
 | Subcommand | Description |
@@ -760,7 +805,7 @@ The extractor agent uses [`app/modules/term_extractor/`](app/modules/term_extrac
 - Code snippets come from embedded PDF code blocks and explicit GitHub repository links found in PDF text; set optional `GITHUB_TOKEN` for higher GitHub API rate limits.
 - KG conversion uses the existing [`json2kg.py`](app/modules/json2kg.py) (preserves `source_metadata` + CodeSnippet nodes).
 
-The legacy standalone extractor [`extract_terms.py`](app/modules/extract_terms.py) remains available for manual/batch runs. The monitored remote `TermExtractorAgent` + dashboard stack in `term_extractor/` is available for standalone Globus/NERSC extraction, but is **not** used by the local `f2w_agent.py` loop.
+The legacy standalone extractor [`extract_terms.py`](app/modules/extract_terms.py) remains available for manual/batch runs. The monitored remote `TermExtractorAgent` + dashboard stack in `term_extractor/` is available for standalone Globus/NERSC extraction, but is **not** used by the local `app.modules.launchers.f2w_agent` loop.
 
 ### NERSC deploy helper
 
@@ -787,7 +832,7 @@ Sync code and PDFs, then restart the endpoint:
 scripts/deploy_nersc.sh --sync-code --sync-pdfs /local/path/to/pdfs --restart-endpoint
 ```
 
-Submit extraction after `python user_agent_launcher.py --port 8000` has written `user_agent_handle.pkl`:
+Submit extraction after `python3 -m app.modules.launchers.user_agent --port 8000` has written `user_agent_handle.pkl`:
 
 ```bash
 scripts/deploy_nersc.sh --submit
@@ -916,102 +961,120 @@ curl -X POST http://localhost:11435/api/chat \
 
 ## Docker
 
-The image contains Python 3.12, Node.js 20 with npm/Vite, and Pixi. Its default
-command runs the complete FAIR2WISE stack:
+The root [`compose.yaml`](compose.yaml) is the canonical FAIR2WISE deployment.
+It runs a private four-service stack:
 
-- UI: `http://localhost:5173`
-- Agent API: `http://localhost:8090`
-- Splash Links: `http://localhost:8081`
+- `splash-db-init` copies the tracked SQLite seed into a new persistent volume;
+- `splash` serves and updates that persistent SQLite graph;
+- `agent` owns chat, retrieval, extraction, and graph updates; and
+- `frontend` serves the React build and reverse-proxies `/api` to the agent.
 
-### 1. Build the image
+The immutable seed is `splash_links/links.sqlite`. Existing Compose volumes are
+preserved after initialization. During migration from the old JSON seed, the
+initializer stores a recoverable `links.pre-seed-*.sqlite` backup inside the
+`splash-data` volume before replacing the legacy database.
+
+### How images work on another computer
+
+Docker images are machine-local build artifacts and are not committed to Git.
+After someone clones this repository, Compose reads the checked-in build files
+and creates equivalent images for that computer:
+
+| Service | Image source | Persistent state |
+|---|---|---|
+| `frontend` | Root `Dockerfile`, `frontend` target | None |
+| `agent` | Root `Dockerfile`, `agent` target | `agent-runs`, `agent-cache` |
+| `splash` | `splash_links/Containerfile` | `splash-data` |
+| `splash-db-init` | `splash_links/Containerfile` | Initializes `splash-data`, then exits |
+
+The tracked `splash_links/links.sqlite` file is essential to fresh-clone
+startup because it is the immutable database seed. It is mounted read-only by
+the initializer and copied into the writable `splash-data` volume; the running
+Splash service never modifies the repository copy.
+
+Builds use the container platform supported by the installed Docker runtime,
+so a developer does not need an image exported from another machine.
+
+### Start, stop, and rebuild
+
+For foreground logs on first startup:
 
 ```bash
-docker build -t fair2wise .
+docker compose up --build
 ```
 
-### 2. Run FAIR2WISE
-
-Create the persistent Splash Links data directory once:
+For normal background operation:
 
 ```bash
-mkdir -p .docker-data/splash-links
+docker compose up -d
+docker compose ps
+docker compose logs -f
 ```
 
-The included launcher performs the required checks, creates the persistent
-directories, and starts or restarts the container:
+Use `docker compose up -d --build` after pulling source or dependency changes.
+Stop the stack without deleting its databases and session data with:
 
 ```bash
-./scripts/run_docker.sh
+docker compose down
 ```
 
-The image must already exist; build it with `docker build -t fair2wise .` after
-cloning or whenever the Docker dependencies change.
+Only `127.0.0.1:5173` is published. Ports `8081` and `8090` are reachable only
+inside the Compose network.
 
-The equivalent manual command is shown below. The explicit `SPLASH_LINKS_DB`
-override stores its SQLite database on the mounted host directory instead of
-inside the disposable container layer.
+### Health and diagnostics
 
 ```bash
-docker run -d \
-  --name fair2wise \
-  --env-file .env \
-  -e SPLASH_LINKS_DB=/app/data/splash-links/links.sqlite \
-  -p 5173:5173 \
-  -p 8090:8090 \
-  -p 8081:8081 \
-  -v "$(pwd)/storage:/app/storage" \
-  -v "$(pwd)/runs:/app/runs" \
-  -v "$(pwd)/.docker-data/splash-links:/app/data/splash-links" \
-  fair2wise
+curl -fsS http://127.0.0.1:5173/healthz
+curl -fsS http://127.0.0.1:5173/api/health
+docker compose logs agent
+docker compose logs splash
+docker compose logs frontend
 ```
 
-If you do not use `.env`, replace `--env-file .env` with the required `-e`
-options, such as `-e CBORG_API_KEY=your-cborg-api-key`.
-
-Verify all three services:
+Splash data, agent sessions, and caches survive `docker compose down` in named
+volumes. Inspect private services without publishing their ports:
 
 ```bash
-curl -fsS http://localhost:5173/ >/dev/null
-curl -fsS http://localhost:8090/health
-curl -fsS http://localhost:8081/splash_links/health
+docker compose exec agent curl -fsS http://127.0.0.1:8090/health
+docker compose exec splash python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8081/splash_links/health').read().decode())"
 ```
 
-### 3. Run a one-shot command
+### Persistent data and clean reset
+
+| Volume | Contents |
+|---|---|
+| `splash-data` | Writable Splash graph initialized from the tracked SQLite seed |
+| `agent-runs` | Session files and workflow state |
+| `agent-cache` | Application and model caches |
+
+To deliberately erase all Compose-managed state and initialize a clean copy of
+the tracked database seed on the next startup:
 
 ```bash
-docker run --rm \
-  --env-file .env \
-  -v "$(pwd)/storage:/app/storage" \
-  fair2wise \
-  python3 app/modules/kg_rag_api.py \
-    --question "What is P3HT?" \
-    --timeout 60
+docker compose down --volumes
+docker compose up -d
 ```
 
-The command after the image name replaces the default full-stack launcher.
+This reset is destructive. Normal `docker compose down` does not erase data.
 
-### 4. Run the term extraction pipeline
+### Configuration notes
 
-```bash
-docker run --rm \
-  --env-file .env \
-  -v "$(pwd)/storage:/app/storage" \
-  -v "$(pwd)/polymer_papers:/app/polymer_papers" \
-  fair2wise \
-  python3 app/run_pipeline_cborg.py
-```
+- Compose automatically reads `.env` from the repository root.
+- `CBORG_API_KEY` is required; optional keys and overrides are documented in
+  [`.env.example`](.env.example).
+- `CBORG_IP_FAMILY` defaults to `ipv6` in Compose for CBORG trusted-network
+  authorization. Set it to `auto` or `ipv4` only when appropriate for the
+  machine's authorized network.
+- Override the sole host port with `F2W_UI_PORT`, for example
+  `F2W_UI_PORT=8080 docker compose up -d`.
+- Do not set container service URLs to `localhost`: Compose supplies the
+  private `splash` and `agent` hostnames internally.
 
-### 5. View logs
-
-```bash
-docker logs -f fair2wise
-```
-
-### 6. Stop and remove
+Run the isolated clean-volume smoke test with:
 
 ```bash
-docker stop fair2wise
-docker rm fair2wise
+./scripts/test_compose.sh
 ```
 
 ---
@@ -1021,7 +1084,7 @@ docker rm fair2wise
 | Script | Description |
 |---|---|
 | `scripts/download_pdfs.py` | Download PDFs from arXiv or OpenAlex by DOI/ID |
-| `f2w_agent.py` | 3-agent KG-RAG pipeline CLI (retrieval → download → extract → reload loop) |
+| `app.modules.launchers.f2w_agent` | Agent KG-RAG pipeline CLI/API launcher |
 | `scripts/test_chat_apis.py` | Standalone CBORG API connectivity test |
 | `scripts/analyze_kgs.py` | Evaluate KG JSON files: node/edge counts, coverage, growth rates |
 | `scripts/get_pdf_years.py` | Estimate publication year for PDFs; writes `pdf_years.csv` |
@@ -1035,7 +1098,9 @@ docker rm fair2wise
 python3 -m pytest
 ```
 
-Tests live in `_tests/`. The `json2kg.py` module also has inline pytest tests that validate ID generation, field retention, and CLI behavior.
+Root tests live in `tests/`; the vendored Splash Links suite lives in
+`splash_links/_tests/`. The `json2kg.py` module also has inline pytest tests
+that validate ID generation, field retention, and CLI behavior.
 
 ---
 
@@ -1063,6 +1128,12 @@ Tests live in `_tests/`. The `json2kg.py` module also has inline pytest tests th
 │   │   │   ├── extractor_agent.py
 │   │   │   ├── kg_update.py
 │   │   │   └── retrieval_agent.py
+│   │   ├── launchers
+│   │   │   ├── __init__.py
+│   │   │   ├── academy_auth.py
+│   │   │   ├── academy_extractor.py
+│   │   │   ├── f2w_agent.py
+│   │   │   └── user_agent.py
 │   │   ├── json2kg.py
 │   │   ├── kg_rag_api.py
 │   │   ├── term_extractor
@@ -1083,6 +1154,9 @@ Tests live in `_tests/`. The `json2kg.py` module also has inline pytest tests th
 │   │       └── kg_rag_ollama.py
 │   └── run_pipeline_cborg.py
 ├── Dockerfile
+├── compose.yaml
+├── docker
+│   └── nginx.conf
 ├── mkdocs
 │   ├── docs
 │   │   ├── about.md
@@ -1105,12 +1179,17 @@ Tests live in `_tests/`. The `json2kg.py` module also has inline pytest tests th
 │   └── *.pdf
 ├── pytest.ini
 ├── README.md
-├── f2w_agent.py
+├── requirements.in
 ├── requirements.txt
+├── requirements-dev.in
+├── requirements-dev.txt
+├── requirements-globus.in
+├── requirements-globus.txt
 ├── scripts
 │   ├── analyze_kgs.py
 │   ├── download_pdfs.py
 │   ├── get_pdf_years.py
+│   ├── test_compose.sh
 │   ├── test_chat_apis.py
 │   └── update_readme_tree.py
 └── storage
@@ -1147,9 +1226,15 @@ mkdocs gh-deploy    # deploy to GitHub Pages (repo must be public)
 
 Pre-configured to exclude venvs, caches, secrets, and generated artifacts.
 
-### `requirements.txt`
+### Python requirements
 
-Runtime includes CBORG/OpenAI clients, PyMuPDF, LinkML, FAISS, splash/KG-RAG stack, and **3-agent pipeline** deps (`academy-py`, `langgraph`, `langchain-core`, `langchain-openai`, `flask`, `psutil`). Optional Globus Compute endpoint deps live in `requirements-globus.txt`. Dev tooling: `black`, `flake8`, `mkdocs`, `mkdocs-material`, `pre-commit`, `pytest`.
+Human-edited `.in` files declare direct dependencies. Their matching `.txt`
+files are Python 3.12 locks generated by pip-tools. `requirements.txt` is the
+application runtime used by Docker; `requirements-dev.txt` adds tests,
+formatting, linting, documentation, and lock tooling. Globus Compute and
+archived-module dependencies have separate optional locks. The heavyweight
+FAISS/SentenceTransformer/Torch inputs are documented in
+`requirements-semantic.in` and are not installed in the lexical container.
 
 ### flake8
 

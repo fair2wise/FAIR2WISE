@@ -14,10 +14,12 @@ compatibility modules.
 | Service | Default address | Implementation | Purpose |
 |---|---:|---|---|
 | Web application | `http://127.0.0.1:5173` | `ui/` | Chat, graph exploration/editing, publication search, settings |
-| Agent API | `http://127.0.0.1:8090` | `app/modules/f2w_agent/api.py` | Sessions, orchestration, KG reads/edits, streaming chat |
-| Splash Links | `http://127.0.0.1:8081` | `splash_links/` | Persistent entities, directed links, and embeddings |
+| Agent API | local `:8090`; Compose-private | `app/modules/f2w_agent/api.py` | Sessions, orchestration, KG reads/edits, streaming chat |
+| Splash Links | local `:8081`; Compose-private | `splash_links/` | Persistent entities, directed links, and embeddings |
 
 `./scripts/start_all.sh` starts all three services and shuts them down together.
+For the recommended container deployment, `docker compose up` starts the stack
+and publishes only the web application.
 
 ## End-to-end data flow
 

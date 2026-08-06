@@ -83,10 +83,19 @@ def import_kg_file(
         logger.warning("File %s is empty — skipping", path.name)
         return 0, 0, 0
 
-    logger.info("Found %d things, %d associations in %s", len(things), len(associations), path.name)
+    logger.info(
+        "Found %d things, %d associations in %s",
+        len(things),
+        len(associations),
+        path.name,
+    )
 
     if dry_run:
-        logger.info("[DRY RUN] Would create %d entities and up to %d links", len(things), len(associations))
+        logger.info(
+            "[DRY RUN] Would create %d entities and up to %d links",
+            len(things),
+            len(associations),
+        )
         return 0, 0, 0
 
     # ------------------------------------------------------------------
@@ -134,7 +143,8 @@ def import_kg_file(
         if not subject_uuid or not object_uuid:
             logger.debug(
                 "Skipping link %s -> %s: missing entity (subject=%s, object=%s)",
-                subject_matkg, object_matkg,
+                subject_matkg,
+                object_matkg,
                 "found" if subject_uuid else "MISSING",
                 "found" if object_uuid else "MISSING",
             )
@@ -154,10 +164,20 @@ def import_kg_file(
         links_created += 1
 
         if i % 500 == 0:
-            logger.info("  links: %d / %d (skipped %d)", links_created, i, links_skipped)
+            logger.info(
+                "  links: %d / %d (skipped %d)", links_created, i, links_skipped
+            )
 
     logger.info("Created %d links, skipped %d", links_created, links_skipped)
     return entities_created, links_created, links_skipped
+
+
+def graph_is_empty(client: LinksClient) -> bool:
+    """Return whether the remote store has no entities."""
+    data = client._execute(
+        "query BootstrapProbe { entities(limit: 1, offset: 0) { id } }"
+    )
+    return not bool(data.get("entities"))
 
 
 def main() -> None:
@@ -180,9 +200,18 @@ def main() -> None:
         action="store_true",
         help="Validate and count without importing",
     )
+    parser.add_argument(
+        "--if-empty",
+        action="store_true",
+        help="Exit successfully without importing when the remote graph already has entities",
+    )
     args = parser.parse_args()
 
     client = from_uri(args.url)
+
+    if args.if_empty and not graph_is_empty(client):
+        logger.info("Remote graph already contains entities; bootstrap import skipped")
+        return
 
     total_entities = 0
     total_links = 0
@@ -201,8 +230,12 @@ def main() -> None:
         total_links += links
         total_skipped += skipped
 
-    logger.info("=== TOTALS: %d entities, %d links created, %d links skipped ===",
-                total_entities, total_links, total_skipped)
+    logger.info(
+        "=== TOTALS: %d entities, %d links created, %d links skipped ===",
+        total_entities,
+        total_links,
+        total_skipped,
+    )
 
 
 if __name__ == "__main__":

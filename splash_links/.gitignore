@@ -145,6 +145,7 @@ sfapi_training.json
 *.duckdb
 *.sqlite
 *.sqlite3
+!links.sqlite
 
 *node_modules/
 examples/testing.ipynb

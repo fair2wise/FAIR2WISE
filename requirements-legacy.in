@@ -1,0 +1,2 @@
+# Optional dependencies used only by archived modules under app/modules/legacy.
+rdflib>=7.6.0

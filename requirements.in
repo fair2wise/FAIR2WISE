@@ -1,0 +1,24 @@
+# FAIR2WISE application runtime (Python 3.12).
+academy-py>=0.5.0
+aiohttp>=3.14.0
+arxiv>=4.0.0
+colorama>=0.4.6
+fastapi>=0.136.3
+flask>=3.1.0
+langchain-core>=1.4.0
+langchain-openai>=1.3.0
+langgraph>=1.2.0
+linkml-runtime>=1.11.1
+mp-api>=0.46.1
+numpy>=2.4.6
+obonet>=1.1.1
+openai>=2.40.0
+psutil>=5.9,<8
+pyalex>=0.21
+pymatgen>=2026.5.4
+PyMuPDF>=1.27.2
+python-dotenv>=1.2.2
+PyYAML>=6.0.3
+rapidfuzz>=3.14.5
+requests>=2.33.1
+uvicorn>=0.48.0

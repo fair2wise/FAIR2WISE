@@ -1,0 +1,105 @@
+name: fair2wise
+
+services:
+  splash-db-init:
+    build:
+      context: ./splash_links
+      dockerfile: Containerfile
+    command:
+      - python
+      - scripts/seed_db.py
+      - /seed/links.sqlite
+      - /data/links.sqlite
+    volumes:
+      - ./splash_links/links.sqlite:/seed/links.sqlite:ro
+      - splash-data:/data
+    restart: "no"
+
+  splash:
+    build:
+      context: ./splash_links
+      dockerfile: Containerfile
+    environment:
+      SPLASH_LINKS_DB: /data/links.sqlite
+    volumes:
+      - splash-data:/data
+    depends_on:
+      splash-db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/splash_links/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      start_period: 15s
+      retries: 24
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent
+    environment:
+      CBORG_API_KEY: "${CBORG_API_KEY:?Export CBORG_API_KEY before running docker compose up}"
+      CBORG_BASE_URL: "${CBORG_BASE_URL:-https://api.cborg.lbl.gov}"
+      CBORG_IP_FAMILY: "${CBORG_IP_FAMILY:-ipv6}"
+      OPENALEX_EMAIL: "${OPENALEX_EMAIL:-}"
+      MP_API_KEY: "${MP_API_KEY:-}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      F2W_AGENT_HOST: 0.0.0.0
+      F2W_AGENT_PORT: 8090
+      F2W_KG_MODE: splash
+      F2W_GRAPH: storage/kg/matkg_with_code.json
+      F2W_WORKDIR: /app/runs/ui_session_splash
+      F2W_SPLASH_HEALTH_URL: http://splash:8081/splash_links/health
+      KG_RAG_GRAPH_SOURCE: splash
+      KG_RAG_SPLASH_URI: splash://splash:8081
+      KG_RAG_RETRIEVAL_BACKEND: lexical
+      SPLASH_LINKS_REPO: /app/splash_links
+      PYSTOW_HOME: /app/.cache/pystow
+    volumes:
+      - agent-runs:/app/runs
+      - agent-cache:/app/.cache
+    depends_on:
+      splash:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/health"]
+      interval: 5s
+      timeout: 5s
+      start_period: 45s
+      retries: 24
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+      args:
+        VITE_F2W_AGENT_API_URL: /api
+    ports:
+      - "127.0.0.1:${F2W_UI_PORT:-5173}:80"
+    depends_on:
+      agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  splash-data:
+  agent-runs:
+  agent-cache:
+
+networks:
+  default:
+    enable_ipv6: true

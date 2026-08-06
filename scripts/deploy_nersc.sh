@@ -32,7 +32,7 @@ Usage:
 Notes:
   - Does not copy .env or secrets.
   - Uses rsync, so uncommitted local agent edits deploy too.
-  - Submit runs locally through run_academy_extractor.py.
+  - Submit runs locally through app.modules.launchers.academy_extractor.
 EOF
 }
 
@@ -178,13 +178,13 @@ fi
 
 if [[ "$SUBMIT" -eq 1 ]]; then
   if [[ ! -f "$LOCAL_REPO/user_agent_handle.pkl" ]]; then
-    echo "Missing user_agent_handle.pkl. Start dashboard first: python user_agent_launcher.py --port 8000" >&2
+    echo "Missing user_agent_handle.pkl. Start dashboard first: python3 -m app.modules.launchers.user_agent --port 8000" >&2
     exit 2
   fi
 
   echo "Submit remote extraction"
   cd "$LOCAL_REPO"
-  python3 run_academy_extractor.py \
+  python3 -m app.modules.launchers.academy_extractor \
     --data-dir "$REMOTE_PDFS" \
     --output "$REMOTE_TERMS" \
     --backend "$F2W_BACKEND" \

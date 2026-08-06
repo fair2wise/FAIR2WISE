@@ -1,0 +1,4 @@
+# Optional Academy/Globus Compute deployment dependencies.
+globus-sdk>=4.8,<5
+globus-compute-sdk==4.13.0
+globus-compute-endpoint==4.13.0

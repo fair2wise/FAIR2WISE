@@ -9,6 +9,21 @@ and frontend Vitest tests.
 python3 -m pytest
 ```
 
+Install the compiled development environment with
+`python3.12 -m pip install -r requirements-dev.txt`. Runtime containers install
+the smaller `requirements.txt` lock.
+
+Regenerate locks after editing an `.in` source file:
+
+```bash
+python3.12 -m piptools compile --strip-extras -o requirements.txt requirements.in
+python3.12 -m piptools compile --strip-extras -o requirements-dev.txt requirements-dev.in
+python3.12 -m piptools compile --strip-extras -o requirements-globus.txt requirements-globus.in
+python3.12 -m piptools compile --strip-extras -o requirements-legacy.txt requirements-legacy.in
+```
+
+Run `python3.12 -m pip check` after installation.
+
 `pytest.ini` sets the repository on `pythonpath` and limits default discovery to
 `tests/`, so the vendored Splash suite does not run implicitly.
 
@@ -100,6 +115,23 @@ mkdocs build -f mkdocs/mkdocs.yml --strict
 Strict mode catches missing navigation pages, unresolved internal links,
 duplicate anchors, and plugin warnings.
 
+## Docker Compose smoke test
+
+With Docker running and `CBORG_API_KEY` exported:
+
+```bash
+./scripts/test_compose.sh
+```
+
+The script uses an isolated Compose project and temporary named volumes. It
+builds and starts the stack, checks the UI and proxied API, confirms the seed
+graph is populated, rejects published agent/Splash ports, recreates the stack
+to verify persistence, and removes only its own test state.
+
+For fresh-computer acceptance, install Docker and export the key on the clean
+machine, then run only clone, `cd`, and `docker compose up`. Confirm a real chat
+request succeeds and ports 8081/8090 are not reachable from the host.
+
 ## Recommended pre-change matrix
 
 | Change | Minimum checks |
@@ -110,7 +142,7 @@ duplicate anchors, and plugin warnings.
 | UI behavior | `npm test` and `npm run build` |
 | Shell scripts | `bash -n scripts/name.sh` and related pytest cases |
 | Documentation | Strict MkDocs build |
-| Dockerfile | `docker build --check .`, then a full build when daemon/network are available |
+| Compose/container changes | `./scripts/test_compose.sh` and strict Compose configuration validation |
 
 External downloads, CBORG, OpenAlex, GitHub, NERSC, Docker registries, and
 Globus should remain mocked in deterministic CI unless a job is explicitly an

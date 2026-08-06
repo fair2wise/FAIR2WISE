@@ -11,14 +11,30 @@ change-impact analysis.
 | `README.md` | User-oriented project overview and operational examples |
 | `config.yml` | Central non-secret defaults and environment mappings |
 | `.env.example` | Local environment template |
-| `requirements.txt` | Root Python runtime/test/documentation dependencies |
-| `f2w_agent.py` | Thin entry point for `app.modules.f2w_agent.cli` |
+| `requirements.in` / `requirements.txt` | Runtime dependency source and compiled Python 3.12 lock |
+| `requirements-dev.in` / `requirements-dev.txt` | Development/tooling source and compiled lock |
+| `requirements-globus.*` | Optional Globus Compute dependency source and lock |
+| `requirements-semantic.*` | Optional FAISS/SentenceTransformer/Torch dependency source and lock |
 | `run.py` | Local modular extractor CLI |
-| `run_academy_extractor.py` | Academy/Globus remote extraction client |
-| `user_agent_launcher.py` | Local Academy user agent/dashboard launcher |
-| `Dockerfile` | Full-stack Python/Node/Pixi image |
+| `compose.yaml` | Canonical private-network application stack |
+| `Dockerfile` | Agent and frontend image targets |
 | `pytest.ini` | Root pytest discovery configuration |
 | `mkdocs/` | This documentation site |
+
+## Launcher package
+
+`app/modules/launchers/`
+
+| File | Responsibility |
+|---|---|
+| `f2w_agent.py` | Module entry point for the orchestrated CLI and Agent API |
+| `user_agent.py` | Local Academy user agent and monitoring dashboard launcher |
+| `academy_extractor.py` | Academy/Globus remote extraction client |
+| `academy_auth.py` | Academy Globus authentication/token-cache helper |
+| `__init__.py` | Launcher package marker |
+
+Run these entry points from the repository root with `python3 -m`, for example
+`python3 -m app.modules.launchers.f2w_agent status`.
 
 ## Agent workflow package
 
@@ -149,6 +165,8 @@ Tests sit beside UI helpers as `*.test.ts`.
 | `splash_links/src/splash_links/client/tiled.py` | Tiled integration |
 | `splash_links/alembic/` | SQL migrations |
 | `splash_links/scripts/import_kg.py` | MatKG importer |
+| `splash_links/scripts/seed_db.py` | Compose volume initializer for the tracked SQLite seed |
+| `splash_links/links.sqlite` | Immutable graph seed used by root Compose deployment |
 | `splash_links/frontend/` | Optional standalone Splash React/Vite frontend |
 | `splash_links/pixi.toml` / `pixi.lock` | Reproducible environment/tasks |
 | `splash_links/pyproject.toml` | Python package metadata |
@@ -157,8 +175,8 @@ Tests sit beside UI helpers as `*.test.ts`.
 | `splash_links/_tests/` | Service, store, CLI, client, and Tiled tests |
 | `splash_links/mkdocs/` | Upstream Splash-local template docs; root docs are canonical for this repo |
 
-`splash_links/links.sqlite`, `.pixi/`, coverage, and cache files are local
-artifacts rather than source.
+`splash_links/links.sqlite` is the tracked Compose seed. Other SQLite files,
+`.pixi/`, coverage, and cache files are local artifacts rather than source.
 
 ## Schema and data
 
@@ -199,7 +217,7 @@ Root tests follow feature ownership:
 | Path | Responsibility |
 |---|---|
 | `.github/workflows/build-app.yml` | Python format/lint/test and MkDocs deployment |
-| `.github/workflows/publish-image.yml` | Build/publish root Docker image |
+| `.github/workflows/publish-image.yml` | Build/publish the agent image target |
 | `.github/dependabot.yml` | Docker, Actions, and pip update groups |
 | `.pre-commit-config.yaml` | Local pre-commit tools |
 | `scripts/` | Local, Docker, KG, and NERSC automation |

@@ -85,8 +85,7 @@ kg_rag:
       default: all-MiniLM-L6-v2
     backend:
       env: KG_RAG_RETRIEVAL_BACKEND
-      default: semantic
-      python_3_14_default: lexical
+      default: lexical
     batch:
       env: KG_RAG_BATCH
       default: null

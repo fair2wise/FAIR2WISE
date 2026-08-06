@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from modules.agents.chebi import ChebiOboLookup
 from modules.agents.chem_checker import ChemicalFormulaValidator
 from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
+from modules.cborg_http import openai_http_kwargs
 # extract tables and images in an agentic way
 # GEMMA 3 27b
 # Llama 3.2 Vision
@@ -78,6 +79,7 @@ class CBorgChatClient(ChatClient):
         self.client = openai.OpenAI(
             api_key=api_key or os.environ.get("CBORG_API_KEY"),
             base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),
+            **openai_http_kwargs(asynchronous=False),
         )
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:

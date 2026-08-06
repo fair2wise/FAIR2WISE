@@ -6,6 +6,7 @@ import openai
 import requests
 
 from app.modules.cborg_limiter import sync_slot
+from app.modules.cborg_http import openai_http_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class CBorgChatClient(ChatClient):
         self.client = openai.OpenAI(
             api_key=api_key or os.environ.get("CBORG_API_KEY"),
             base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),
+            **openai_http_kwargs(asynchronous=False),
         )
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:

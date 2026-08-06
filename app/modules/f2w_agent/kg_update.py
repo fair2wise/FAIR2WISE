@@ -5,6 +5,7 @@
 - ``splash_reimport``: wipe + re-import the cumulative KG into splash-links per
   the HANDOFF runbook (only used in splash mode).
 """
+
 from __future__ import annotations
 
 import json
@@ -44,6 +45,13 @@ def _splash_db_path(repo: Path) -> Optional[Path]:
     return path
 
 
+def _splash_is_local(uri: str) -> bool:
+    """Whether the Splash URI points at the same host as this process."""
+    parsed = urlparse(uri)
+    host = (parsed.hostname or "").lower()
+    return host in {"", "localhost", "127.0.0.1", "::1"}
+
+
 def _splash_graphql(
     splash_uri: str,
     query: str,
@@ -79,7 +87,9 @@ def _wipe_splash_via_graphql(splash_uri: str, *, page_size: int = 500) -> int:
     """
     deleted = 0
     while True:
-        data = _splash_graphql(splash_uri, list_query, {"limit": page_size, "offset": 0})
+        data = _splash_graphql(
+            splash_uri, list_query, {"limit": page_size, "offset": 0}
+        )
         entities = data.get("entities") or []
         if not entities:
             return deleted
@@ -127,13 +137,22 @@ def splash_reimport(
         return {"status": "error", "message": f"splash_links repo not found: {repo}"}
     import_script = repo / "scripts" / "import_kg.py"
     if not import_script.exists():
-        return {"status": "error", "message": f"splash import script not found: {import_script}"}
+        return {
+            "status": "error",
+            "message": f"splash import script not found: {import_script}",
+        }
 
     kg_abspath = str(Path(kg_json).resolve())
     db_path = _splash_db_path(repo)
-    db_path_display = str(db_path) if db_path else os.environ.get("SPLASH_LINKS_DB", ":memory:")
+    db_path_display = (
+        str(db_path) if db_path else os.environ.get("SPLASH_LINKS_DB", ":memory:")
+    )
     if shutil.which("pixi") is None:
-        return {"status": "error", "message": "pixi not found on PATH", "db_path": db_path_display}
+        return {
+            "status": "error",
+            "message": "pixi not found on PATH",
+            "db_path": db_path_display,
+        }
     if wipe:
         if not allow_wipe:
             return {
@@ -141,7 +160,7 @@ def splash_reimport(
                 "message": f"refusing to wipe splash DB without --allow-splash-wipe: {db_path_display}",
                 "db_path": db_path_display,
             }
-        if db_path and not db_path.exists():
+        if _splash_is_local(uri) and db_path and not db_path.exists():
             return {
                 "status": "error",
                 "message": (
@@ -167,16 +186,26 @@ def splash_reimport(
     cmd = ["pixi", "run", "python", "scripts/import_kg.py", "--url", uri, kg_abspath]
     logger.info("splash import: %s (cwd=%s)", " ".join(cmd), repo)
     try:
-        proc = subprocess.run(cmd, cwd=str(repo), capture_output=True, text=True, timeout=900)
+        proc = subprocess.run(
+            cmd, cwd=str(repo), capture_output=True, text=True, timeout=900
+        )
     except Exception as e:
-        return {"status": "error", "message": f"splash import failed: {e}", "db_path": db_path_display}
+        return {
+            "status": "error",
+            "message": f"splash import failed: {e}",
+            "db_path": db_path_display,
+        }
     if proc.returncode != 0:
         return {
             "status": "error",
             "message": proc.stderr.strip()[-2000:] or "import_kg.py failed",
             "db_path": db_path_display,
         }
-    result = {"status": "success", "stdout": proc.stdout.strip()[-2000:], "db_path": db_path_display}
+    result = {
+        "status": "success",
+        "stdout": proc.stdout.strip()[-2000:],
+        "db_path": db_path_display,
+    }
     if wipe:
         result["deleted_entities"] = deleted
     return result
@@ -186,7 +215,11 @@ _ENTITY_FIELDS = "id entityType name uri properties"
 
 
 def splash_uri_default() -> str:
-    return os.environ.get("KG_RAG_SPLASH_URI") or os.environ.get("SPLASH_LINKS_URI") or "splash://localhost:8081"
+    return (
+        os.environ.get("KG_RAG_SPLASH_URI")
+        or os.environ.get("SPLASH_LINKS_URI")
+        or "splash://localhost:8081"
+    )
 
 
 def splash_find_entity_by_matkg_id(
@@ -215,7 +248,12 @@ def splash_find_entity_by_matkg_id(
     }}
     """
     while True:
-        batch = _splash_graphql(uri, list_query, {"limit": page_size, "offset": offset}).get("entities") or []
+        batch = (
+            _splash_graphql(
+                uri, list_query, {"limit": page_size, "offset": offset}
+            ).get("entities")
+            or []
+        )
         for entity in batch:
             props = entity.get("properties") or {}
             if entity.get("uri") == matkg_id or props.get("matkg_id") == matkg_id:
@@ -392,9 +430,15 @@ def load_splash_graph(
     }}
     """
     while True:
-        batch = _splash_graphql(
-            uri, list_entities, {"limit": page_size, "offset": offset}, timeout=timeout
-        ).get("entities") or []
+        batch = (
+            _splash_graphql(
+                uri,
+                list_entities,
+                {"limit": page_size, "offset": offset},
+                timeout=timeout,
+            ).get("entities")
+            or []
+        )
         entities.extend(batch)
         if len(batch) < page_size:
             break
@@ -409,9 +453,12 @@ def load_splash_graph(
     }
     """
     while True:
-        batch = _splash_graphql(
-            uri, list_links, {"limit": page_size, "offset": offset}, timeout=timeout
-        ).get("links") or []
+        batch = (
+            _splash_graphql(
+                uri, list_links, {"limit": page_size, "offset": offset}, timeout=timeout
+            ).get("links")
+            or []
+        )
         links.extend(batch)
         if len(batch) < page_size:
             break
@@ -426,12 +473,14 @@ def load_splash_graph(
         if not subject or not obj:
             continue
         props = link.get("properties") or {}
-        associations.append({
-            "subject": subject,
-            "predicate": link.get("predicate", "rel:related_to"),
-            "object": obj,
-            "has_evidence": props.get("has_evidence"),
-        })
+        associations.append(
+            {
+                "subject": subject,
+                "predicate": link.get("predicate", "rel:related_to"),
+                "object": obj,
+                "has_evidence": props.get("has_evidence"),
+            }
+        )
     return {"things": nodes, "associations": associations}
 
 
@@ -443,7 +492,9 @@ def export_splash_graph_to_json(
     timeout: int = 5,
 ) -> Dict[str, Any]:
     """Write the live splash graph into a MatKG JSON file for UI session reads."""
-    data = load_splash_graph(splash_uri=splash_uri, page_size=page_size, timeout=timeout)
+    data = load_splash_graph(
+        splash_uri=splash_uri, page_size=page_size, timeout=timeout
+    )
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")

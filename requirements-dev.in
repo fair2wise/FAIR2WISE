@@ -1,0 +1,11 @@
+-r requirements.in
+
+# Tests, formatting, linting, documentation, and lock regeneration.
+black>=26.5.1
+flake8>=7.3.0
+mkdocs>=1.6.1
+mkdocs-material>=9.7.6
+mkdocs-mermaid2-plugin>=1.2.3
+pip-tools>=7.5.2
+pre-commit>=4.6.0
+pytest>=9.0.3

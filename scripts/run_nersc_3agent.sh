@@ -31,7 +31,7 @@ Usage:
 
 Remote secrets:
   Put CBORG_API_KEY, OPENALEX_EMAIL, GITHUB_TOKEN, etc. in ~/.f2w_nersc_env
-  on NERSC. This script sources that file before running f2w_agent.py.
+  on NERSC. This script sources that file before running the agent launcher module.
 EOF
 }
 
@@ -91,7 +91,7 @@ SPLASH_LINKS_REPO="${SPLASH_LINKS_REPO:-/pscratch/sd/m/mateo/splash_links}"
 CMD="cd $(shell_quote "$NERSC_REPO")"
 CMD+=" && source .venv/bin/activate"
 CMD+=" && if [[ -f ~/.f2w_nersc_env ]]; then source ~/.f2w_nersc_env; fi"
-CMD+=" && python3 f2w_agent.py"
+CMD+=" && python3 -m app.modules.launchers.f2w_agent"
 CMD+=" --backend $(shell_quote "$F2W_BACKEND")"
 CMD+=" --model $(shell_quote "$F2W_MODEL")"
 CMD+=" --kg-mode $(shell_quote "$F2W_KG_MODE")"
