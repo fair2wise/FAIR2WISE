@@ -102,7 +102,7 @@ SPLASH_LINKS_URI = str(
     config_value("kg_rag.retrieval.splash_uri", "splash://localhost:8081")
 )
 SPLASH_LINKS_PAGE_SIZE = int(config_value("kg_rag.retrieval.splash_page_size", 1000))
-PDF_DIR = os.environ.get("KG_RAG_PDF_DIR", "polymer_papers")
+PDF_DIR = os.environ.get("KG_RAG_PDF_DIR", "papers")
 
 DEFAULT_K = int(os.environ.get("KG_RAG_TOPK", "12"))
 EMBED_MODEL = os.environ.get("KG_RAG_EMBED_MODEL", "all-MiniLM-L6-v2")

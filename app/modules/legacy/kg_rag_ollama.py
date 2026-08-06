@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 kg_rag_ollama.py –– Enhanced KG-RAG integration with Ollama with terminal color,
-now including PDF snippets from any node’s listed source papers in polymer_papers/.
+now including PDF snippets from any node’s listed source papers in papers/.
 """
 import argparse
 import asyncio
@@ -26,7 +26,7 @@ from colorama import init as colorama_init, Fore, Style
 OLLAMA_MODEL     = "gemma3:27b"
 OLLAMA_API_URL   = "http://localhost:11434/api/chat"
 GRAPH_FILE       = "/pscratch/sd/d/dabramov/fair2wise/storage/kg/matkg-jun6.json"
-PDF_DIR          = "polymer_papers"    # directory where the PDFs live
+PDF_DIR          = "papers"    # directory where the PDFs live
 DEFAULT_K        = 4
 DEFAULT_MAX_HOPS = 3
 EMBED_MODEL      = "all-MiniLM-L6-v2"
@@ -114,7 +114,7 @@ class KnowledgeGraph:
             header = Fore.BLUE + f"## {n.get('name')} ({n.get('category')})" + Style.RESET_ALL
             lines = [header]
 
-            # PDF snippets from polymer_papers/
+            # PDF snippets from papers/
             for paper in n.get("source_papers", []):
                 pdf_path = Path(PDF_DIR) / paper
                 try:

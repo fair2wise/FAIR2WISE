@@ -41,7 +41,7 @@ PAPER_FOLDERS = {
     100: ["paper_100"],
 }
 
-DEFAULT_PDF_ROOT = Path("polymer_papers")
+DEFAULT_PDF_ROOT = Path("papers")
 DEFAULT_OLLAMA_URL = "http://localhost:11434"  # unused for cborg but harmless
 DEFAULT_CBORG_BASE = os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov")
 print("Using CBORG_BASE_URL =", DEFAULT_CBORG_BASE)

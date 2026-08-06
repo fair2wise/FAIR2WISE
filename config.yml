@@ -10,8 +10,7 @@ secrets:
     value: null
 
 paths:
-  pdf_dir: polymer_papers
-  xray_pdf_dir: xray_papers
+  pdf_dir: papers
   schema: storage/schema/matkg_schema.yaml
   graph: storage/kg/matkg_qwen3_235b_580papers.json
   chebi_obo:
@@ -76,7 +75,7 @@ kg_rag:
       default: storage/kg/matkg_xray_papers_cborg_chat.json
     pdf_dir:
       env: KG_RAG_PDF_DIR
-      default: polymer_papers
+      default: papers
     top_k:
       env: KG_RAG_TOPK
       default: 12
@@ -163,7 +162,7 @@ extract_terms:
   cborg_base_url:
     env: CBORG_BASE_URL
     default: https://api.cborg.lbl.gov
-  default_pdf_dir: polymer_papers
+  default_pdf_dir: papers
   default_output: storage/terminology/extracted_terms.json
   default_schema: storage/schema/matkg_schema.yaml
   temperature: 0.0
@@ -184,7 +183,7 @@ pipeline:
       - paper_75
     100:
       - paper_100
-  default_pdf_root: polymer_papers
+  default_pdf_root: papers
   default_ollama_url: http://localhost:11434
   default_schema: storage/schema/matkg_schema.yaml
   default_cborg_base:
@@ -192,7 +191,7 @@ pipeline:
     default: https://api.cborg.lbl.gov
 
 build_kg:
-  pdf_dir: xray_papers/
+  pdf_dir: papers/
   terms_output: storage/terminology/extracted_terms_xray_papers_cborg_chat.json
   kg_output: storage/kg/matkg_xray_papers_cborg_chat.json
   backend: cborg
@@ -257,7 +256,7 @@ legacy:
     ollama_model: gemma3:27b
     ollama_api_url: http://localhost:11434/api/chat
     graph_file: /pscratch/sd/d/dabramov/fair2wise/storage/kg/matkg-jun6.json
-    pdf_dir: polymer_papers
+    pdf_dir: papers
     default_k: 4
     default_max_hops: 3
     embed_model: all-MiniLM-L6-v2

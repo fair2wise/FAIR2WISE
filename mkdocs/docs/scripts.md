@@ -53,7 +53,7 @@ Example PDF download:
 ```bash
 python3 scripts/download_pdfs.py \
   --keyword "grazing incidence x-ray scattering polymers" \
-  --target xray_papers \
+  --target papers \
   --max-results 10
 ```
 

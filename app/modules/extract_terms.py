@@ -541,7 +541,7 @@ class LLMTermExtractor:
         model_name: str = "gemma3:27b",  # or "mistral-small3.1:latest"
         ollama_base_url: str = "http://localhost:11434",
         temperature: float = 0.0,
-        data_dir: str = "./polymer_papers",
+        data_dir: str = "./papers",
         output_file: str = "./storage/terminology/extracted_terms.json",
         context_length: int = 50,
         schema_path: str = "matkg_schema.yaml",
@@ -2001,7 +2001,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path("polymer_papers"),
+        default=Path("papers"),
         help="Directory containing PDFs to process.",
     )
     parser.add_argument(

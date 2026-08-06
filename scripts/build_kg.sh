@@ -9,13 +9,13 @@
 #   ./scripts/build_kg.sh [PDF_DIR] [TERMS_OUTPUT] [KG_OUTPUT]
 #
 # Defaults:
-#   PDF_DIR      xray_papers/
+#   PDF_DIR      papers/
 #   TERMS_OUTPUT storage/terminology/extracted_terms_xray_papers_cborg_chat.json
 #   KG_OUTPUT    storage/kg/matkg_xray_papers_cborg_chat.json
 #
 # Examples:
 #   ./scripts/build_kg.sh
-#   ./scripts/build_kg.sh polymer_papers/ \
+#   ./scripts/build_kg.sh papers/ \
 #       storage/terminology/extracted_terms_polymer.json \
 #       storage/kg/matkg_polymer.json
 
@@ -25,7 +25,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # --- args with defaults ---
-PDF_DIR="${1:-xray_papers/}"
+PDF_DIR="${1:-papers/}"
 TERMS_OUT="${2:-storage/terminology/extracted_terms_xray_papers_cborg_chat.json}"
 KG_OUT="${3:-storage/kg/matkg_xray_papers_cborg_chat.json}"
 

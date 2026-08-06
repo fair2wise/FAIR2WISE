@@ -21,6 +21,5 @@ runs
 logs
 tests/results
 tests/deepeval/results
-polymer_papers
-xray_papers
+papers
 splash_links/links.sqlite

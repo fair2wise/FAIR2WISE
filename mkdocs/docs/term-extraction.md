@@ -118,7 +118,7 @@ processed paper.
 
 ```bash
 python3 run.py \
-  --pdf-dir polymer_papers \
+  --pdf-dir papers \
   --output storage/terminology/terms.json \
   --backend cborg \
   --model lbl/cborg-chat \
@@ -128,14 +128,14 @@ python3 run.py \
 Validate configuration without processing:
 
 ```bash
-python3 run.py --pdf-dir polymer_papers --dry-run
+python3 run.py --pdf-dir papers --dry-run
 ```
 
 Build terms and a graph with guarded output promotion:
 
 ```bash
 ./scripts/build_kg.sh \
-  xray_papers/ \
+  papers/ \
   storage/terminology/extracted_terms_xray.json \
   storage/kg/matkg_xray.json
 ```

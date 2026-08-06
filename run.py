@@ -3,9 +3,9 @@
 run.py — launch the FAIR2WISE term-extraction agent.
 
 Usage:
-  python run.py --pdf-dir polymer_papers --output storage/terminology/terms.json
-  python run.py --pdf-dir polymer_papers --backend ollama --model llama3
-  python run.py --pdf-dir polymer_papers --dry-run
+  python run.py --pdf-dir papers --output storage/terminology/terms.json
+  python run.py --pdf-dir papers --backend ollama --model llama3
+  python run.py --pdf-dir papers --dry-run
 """
 
 import argparse

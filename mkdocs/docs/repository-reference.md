@@ -188,7 +188,7 @@ Tests sit beside UI helpers as `*.test.ts`.
 | `storage/competency_questions/` | Evaluation question sets |
 | `storage/knowledge_gaps/` | Missing-node event logs |
 | `storage/ontologies/` | Optional ontology files such as ChEBI |
-| `polymer_papers/`, `xray_papers/` | Input publication collections |
+| `papers/` | Unified input publication collection |
 | `runs/` | Mutable per-session working data |
 
 Large JSON/PDF artifacts should not be read as executable source. Their schemas

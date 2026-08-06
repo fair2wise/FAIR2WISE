@@ -4,7 +4,7 @@
 
 This repository builds materials-science knowledge graphs from research papers (PDFs). The main workflow is:
 
-1. Collect PDFs into a domain folder (e.g. `polymer_papers/`, `xray_papers/`)
+1. Collect PDFs in the unified `papers/` input folder
 2. Extract schema-aligned terminology + publication metadata with an LLM → `storage/terminology/`
 3. Convert extracted terms JSON into a MatKG graph JSON → `storage/kg/`
 4. Import the MatKG JSON into `splash_links`
@@ -162,7 +162,7 @@ CBORG is the default for both term extraction and KG-RAG chat. To use Ollama, pa
 
 ## Step 1 — Collect PDFs
 
-Place research paper PDFs in `polymer_papers/`. To download papers from arXiv or OpenAlex:
+Place all research paper PDFs in `papers/`. To download papers from arXiv or OpenAlex:
 
 ```bash
 python3 scripts/download_pdfs.py --help
@@ -202,7 +202,7 @@ Run the extractor on any PDF folder:
 
 ```bash
 python3 app/modules/extract_terms.py \
-  --pdf-dir polymer_papers/ \
+  --pdf-dir papers/ \
   --output storage/terminology/extracted_terms_polymer.json
 ```
 
@@ -210,7 +210,7 @@ For a dedicated xray KG (or any other domain-specific folder):
 
 ```bash
 python3 app/modules/extract_terms.py \
-  --pdf-dir xray_papers/ \
+  --pdf-dir papers/ \
   --output storage/terminology/extracted_terms_xray_papers_cborg_chat.json
 ```
 
@@ -224,7 +224,7 @@ Target a single PDF by isolating it in a temp folder:
 
 ```bash
 mkdir -p /tmp/single_pdf
-cp xray_papers/XRAY1.pdf /tmp/single_pdf/
+cp papers/XRAY1.pdf /tmp/single_pdf/
 
 python3 app/modules/extract_terms.py \
   --pdf-dir /tmp/single_pdf/ \
@@ -256,8 +256,8 @@ python3 app/run_pipeline_cborg.py --dry-run
 # Organize PDFs into checkpoint folders first
 python3 app/run_pipeline_cborg.py \
   --organize \
-  --source-dir polymer_papers \
-  --pdf-root polymer_papers
+  --source-dir papers \
+  --pdf-root papers
 
 # Run with a specific model
 python3 app/run_pipeline_cborg.py --models google/gemini-flash-lite
@@ -1175,7 +1175,7 @@ that validate ID generation, field retention, and CLI behavior.
 │       │   └── images
 │       │       └── favicon.png
 │       └── main.html
-├── polymer_papers
+├── papers
 │   └── *.pdf
 ├── pytest.ini
 ├── README.md

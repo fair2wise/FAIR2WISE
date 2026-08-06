@@ -130,4 +130,4 @@ def scan_folder(folder: str, output_csv: str = "pdf_years.csv"):
     print(f"\nSaved: {output_csv}")
 
 if __name__ == "__main__":
-    scan_folder("polymer_papers")
+    scan_folder("papers")

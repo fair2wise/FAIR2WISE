@@ -279,7 +279,7 @@ class OllamaTermExtractor:
         ollama_model: str = "gemma3:27b",  # or "mistral-small3.1:latest"
         ollama_base_url: str = "http://localhost:11434",
         temperature: float = 0.0,
-        data_dir: str = "./polymer_papers",
+        data_dir: str = "./papers",
         output_file: str = "./storage/terminology/extracted_terms.json",
         context_length: int = 50,
         schema_path: str = "matkg_schema.yaml",
@@ -963,7 +963,7 @@ if __name__ == "__main__":
         ollama_model="mistral-small3.1:latest",
         ollama_base_url="http://localhost:11434",
         temperature=0.0,
-        data_dir="./polymer_papers",
+        data_dir="./papers",
         output_file="./storage/terminology/extracted_terms.json",
         context_length=50,
         schema_path="matkg_schema.yaml",
