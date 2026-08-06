@@ -10,16 +10,16 @@ python3 -m pytest
 ```
 
 Install the compiled development environment with
-`python3.12 -m pip install -r requirements-dev.txt`. Runtime containers install
-the smaller `requirements.txt` lock.
+`python3.12 -m pip install -r requirements/dev.txt`. Runtime containers install
+the smaller lock through the root `requirements.txt` compatibility file.
 
 Regenerate locks after editing an `.in` source file:
 
 ```bash
-python3.12 -m piptools compile --strip-extras -o requirements.txt requirements.in
-python3.12 -m piptools compile --strip-extras -o requirements-dev.txt requirements-dev.in
-python3.12 -m piptools compile --strip-extras -o requirements-globus.txt requirements-globus.in
-python3.12 -m piptools compile --strip-extras -o requirements-legacy.txt requirements-legacy.in
+python3.12 -m piptools compile --strip-extras -o requirements/runtime.txt requirements/runtime.in
+python3.12 -m piptools compile --strip-extras -o requirements/dev.txt requirements/dev.in
+python3.12 -m piptools compile --strip-extras -o requirements/globus.txt requirements/globus.in
+python3.12 -m piptools compile --strip-extras -o requirements/legacy.txt requirements/legacy.in
 ```
 
 Run `python3.12 -m pip check` after installation.

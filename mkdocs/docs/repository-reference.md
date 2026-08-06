@@ -11,9 +11,12 @@ change-impact analysis.
 | `README.md` | User-oriented project overview and operational examples |
 | `config.yml` | Central non-secret defaults and environment mappings |
 | `.env.example` | Local environment template |
-| `requirements.in` / `requirements.txt` | Runtime dependency source and compiled Python 3.12 lock |
-| `requirements-dev.in` / `requirements-dev.txt` | Development/tooling source and compiled lock |
-| `requirements-globus.*` | Optional Globus Compute dependency source and lock |
+| `requirements.txt` | Compatibility entry point that includes the runtime lock |
+| `requirements/runtime.in` / `requirements/runtime.txt` | Runtime dependency source and compiled Python 3.12 lock |
+| `requirements/dev.in` / `requirements/dev.txt` | Development/tooling source and compiled lock |
+| `requirements/globus.in` / `requirements/globus.txt` | Optional Globus Compute dependency source and lock |
+| `requirements/legacy.in` / `requirements/legacy.txt` | Optional archived-module dependency source and lock |
+| `requirements/semantic.in` | Optional FAISS/SentenceTransformer retrieval inputs |
 | `requirements-semantic.*` | Optional FAISS/SentenceTransformer/Torch dependency source and lock |
 | `run.py` | Local modular extractor CLI |
 | `compose.yaml` | Canonical private-network application stack |

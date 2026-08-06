@@ -64,7 +64,7 @@ cd ..
 ./scripts/install_pixi.sh
 ```
 
-Use `requirements-dev.txt` instead when contributing code or documentation.
+Use `requirements/dev.txt` instead when contributing code or documentation.
 The `.txt` files are compiled Python 3.12 locks; edit their corresponding `.in`
 files and regenerate them with pip-tools rather than hand-editing locks.
 

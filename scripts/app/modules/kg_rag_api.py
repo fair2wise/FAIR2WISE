@@ -68,7 +68,7 @@ def _load_kg_deps() -> None:
         missing.append("torch")
     if missing:
         raise RuntimeError(
-            "Semantic retrieval requires the optional packages listed in requirements-semantic.in; missing: "
+            "Semantic retrieval requires the optional packages listed in requirements/semantic.in; missing: "
             + ", ".join(missing)
         )
 

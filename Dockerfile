@@ -47,6 +47,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY requirements.txt ./
+COPY requirements/runtime.txt ./requirements/runtime.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt

@@ -33,7 +33,7 @@ updates:
 
 # Python dependency updates (grouped into one PR)
 - package-ecosystem: "pip"
-  directory: "/" # Location of requirements files
+  directory: "/requirements" # Location of dependency profiles and locks
   schedule:
     interval: "weekly" # Check for updates weekly
   groups:

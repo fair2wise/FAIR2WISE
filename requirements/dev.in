@@ -1,4 +1,4 @@
--r requirements.in
+-r runtime.in
 
 # Tests, formatting, linting, documentation, and lock regeneration.
 black>=26.5.1
