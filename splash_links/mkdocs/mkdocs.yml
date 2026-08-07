@@ -1,17 +1,20 @@
 # Project Information
-site_name: ALS Computing MkDocs Template
-site_description: ALS Computing MkDocs Template
+site_name: Splash Links
+site_description: SQL-backed entity, relationship, and embedding service
 site_author: ALS Computing
-site_url: "https://als-computing.github.io/project_template/"
-repo_name: project_template
-repo_url: https://github.com/als-computing/project_template
-edit_uri: blob/main/docs/
+repo_name: als-computing/splash_links
+repo_url: https://github.com/als-computing/splash_links
+edit_uri: edit/main/mkdocs/docs/
 
 # Navigation
 nav:
 - Home: index.md
+- Concepts and storage: concepts.md
+- API and clients: api.md
+- Importing MatKG: importing.md
+- Deployment: deployment.md
+- Development and testing: test.md
 - About: about.md
-- Test: test.md
 
 # Theme and Plugins
 theme:
@@ -26,5 +29,4 @@ extra:
     link: https://github.com/als-computing
 
 plugins:
-- mermaid2
 - search

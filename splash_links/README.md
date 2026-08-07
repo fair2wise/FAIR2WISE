@@ -1,16 +1,17 @@
-### splash-ml is now splash_links!
-The older mongo version of splash-ml has been tagged as `v0.1.0`. No new features will be added to this, though bug fixes are possible.
-
-Starting with v1.0.0, splash_links is now based on SQL and has many new features, including native Tiled integration.
-
-
 # splash_links
+
+> `splash-ml` is now `splash_links`. The older MongoDB implementation is
+> tagged as `v0.1.0`; current releases use SQL storage.
 
 A FastAPI service for storing and querying directed, predicate-labeled relationships between arbitrary entities — like a lightweight triplestore, without SPARQL.
 
 Relationships are stored in a SQL database (SQLite by default, PostgreSQL for production) and exposed through a [GraphQL](https://graphql.org/) API built with [Strawberry](https://strawberry.rocks/).
 
-This service stories any link with a `uri`. It is expected to work very well with Tiled.
+This service stores entities with optional stable `uri` values and integrates
+with Tiled nodes.
+
+Full component documentation is in [`mkdocs/docs`](mkdocs/docs/index.md). Serve
+it locally with `pixi run docs`.
 
 ## Concepts
 
@@ -28,7 +29,7 @@ Example: `(Experiment "SAXS run 42") --[produced]--> (Dataset "raw_001.h5")`
 
 [Install pixi](https://pixi.sh/latest/#installation), then:
 
-Python 3.12 is required and is provisioned inside the Pixi environment.
+Python 3.11 or 3.12 is provisioned inside the Pixi environment.
 
 ```bash
 pixi install          # resolve and install the environment (first time only)
@@ -62,7 +63,7 @@ docker run -p 8081:8081 -v $(pwd)/data:/data \
 
 ## Using the API
 
-Open **http://localhost:8081/graphql** in a browser to use the GraphiQL IDE.
+Open **http://localhost:8081/splash_links/graphql** in a browser to use the GraphiQL IDE.
 
 ### Create entities
 
@@ -159,7 +160,7 @@ curl -X DELETE http://localhost:8081/splash_links/embeddings/<embedding-id>
 ### Health check
 
 ```
-GET /health  →  {"status": "ok"}
+GET /splash_links/health  →  {"status": "ok"}
 ```
 
 ## Inspecting the database
@@ -295,14 +296,20 @@ src/splash_links/
     schema.py     — Strawberry GraphQL types, queries, mutations
     app.py        — FastAPI app factory (create_app)
     main.py       — uvicorn entry point
-    cli.py        — Typer CLI (entities, links, shell commands)
+    cli.py        — Typer CLI (entities, links, embeddings, shell, client)
+    client/       — Python client, remote CLI, and optional Tiled integration
 
 _tests/
-    test_service.py  — integration tests (store unit tests + GraphQL HTTP tests)
+    test_service.py      — store and service integration tests
+    test_base_client.py  — Python client tests
+    test_client_cli.py   — remote client CLI tests
+    test_cli.py          — local database CLI tests
 
 pixi.toml        — environment definition and task shortcuts
 pyproject.toml   — package metadata, ruff config, coverage config
-Dockerfile       — two-stage build (pixi build → debian:bookworm-slim runtime)
+Containerfile    — two-stage build (Pixi build → Debian runtime)
+alembic/         — SQL schema migrations
+scripts/         — MatKG import and SQLite seed initialization
 ```
 
 ### Database backends
