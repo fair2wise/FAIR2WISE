@@ -147,3 +147,7 @@ request succeeds and ports 8081/8090 are not reachable from the host.
 External downloads, CBORG, OpenAlex, GitHub, NERSC, Docker registries, and
 Globus should remain mocked in deterministic CI unless a job is explicitly an
 integration test.
+
+See the [Contributor guide](contributing.md) for the complete branch, lock, and
+change-type workflow, and [Release and maintenance](release.md) for the full
+release gate.

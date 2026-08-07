@@ -68,6 +68,11 @@ flowchart LR
   citations, and [Security model](security.md) before exposing the application.
 - Use [Repository reference](repository-reference.md) to locate ownership for a
   feature.
+- Follow the [Contributor guide](contributing.md) for branches, dependency
+  locks, validation, and extension points.
+- Use [Release and maintenance](release.md) for versioning, publishing,
+  upgrades, and database compatibility, and [Performance](performance.md) for
+  graph, retrieval, context, UI, worker, and cache tuning.
 - Consult [Agent API](agent-api.md) and [Splash Links](splash-links.md) when
   changing client/server contracts.
 - Follow [Testing](testing.md) before submitting changes.

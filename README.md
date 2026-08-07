@@ -1245,6 +1245,13 @@ mkdocs serve        # local preview
 mkdocs gh-deploy    # deploy to GitHub Pages (repo must be public)
 ```
 
+Maintainers should use the MkDocs [contributor guide](mkdocs/docs/contributing.md)
+for branch, lock, validation, API/graph/agent/UI extension workflows; the
+[release guide](mkdocs/docs/release.md) for versioning, container publishing,
+dependency upgrades, and database compatibility; and the
+[performance guide](mkdocs/docs/performance.md) for large graphs, retrieval,
+context, workers, bundle size, caches, and volumes.
+
 ### `.gitignore`
 
 Pre-configured to exclude venvs, caches, secrets, and generated artifacts.

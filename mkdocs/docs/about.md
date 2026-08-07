@@ -39,6 +39,9 @@ When a change affects behavior, update the closest page:
 | Secrets/network/access boundaries | `security.md` |
 | User workflow tutorial | `tutorials.md` |
 | Test command/scope | `testing.md` |
+| Contribution workflow or extension point | `contributing.md` |
+| Version, release, publishing, or compatibility | `release.md` |
+| Graph/retrieval/UI/runtime performance | `performance.md` |
 
 Validate with:
 
