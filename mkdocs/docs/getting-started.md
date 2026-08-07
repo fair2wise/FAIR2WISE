@@ -35,7 +35,9 @@ cp .env.example .env
 
 Set the key in that file and do not commit it. See
 [Local and Docker operation](operations.md#docker-compose-operation) for image,
-volume, logging, health-check, and reset details.
+volume, logging, health-check, and reset details. For a new computer, follow
+the complete [fresh-machine deployment](deployment.md) runbook, including
+CBORG IPv6 authorization and first-start expectations.
 
 ## Local-development prerequisites
 

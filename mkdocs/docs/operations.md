@@ -1,5 +1,9 @@
 # Local and Docker operation
 
+For initial installation, complete `.env` setup, CBORG address authorization,
+and upgrade/rollback procedures, use [Fresh-machine deployment](deployment.md).
+This page covers routine operation after installation.
+
 ## Local launcher
 
 ```bash
@@ -133,6 +137,9 @@ To merge the current code-enriched graph with the larger corpus and reimport:
 ```
 
 Read the script's environment defaults before using it against valuable data.
+For the provenance consequences of rebuild/reimport and the security boundary
+around graph mutation, see [Data provenance](provenance.md) and
+[Security model](security.md).
 
 ## Logs and mutable outputs
 

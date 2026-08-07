@@ -12,16 +12,25 @@ site_dir: site
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Tutorials:
+      - End-to-end workflows: tutorials.md
   - Architecture:
       - System architecture: architecture.md
       - Core data model: core_model.md
+      - Data provenance: provenance.md
       - Agent workflow: agent-workflow.md
       - Terminology extraction: term-extraction.md
       - Knowledge graph: knowledge-graph.md
       - Retrieval and RAG: retrieval.md
   - Services:
       - Agent API: agent-api.md
-      - Web application: frontend.md
+      - Web UI:
+          - Overview: frontend.md
+          - User guide: ui-user-guide.md
+          - Knowledge graph UI: ui-knowledge-graph.md
+          - UI architecture: ui-architecture.md
+          - Agent API integration: ui-api.md
+          - Development and testing: ui-development.md
       - Splash Links: splash-links.md
   - Development:
       - Configuration: configuration.md
@@ -30,7 +39,9 @@ nav:
       - Repository reference: repository-reference.md
       - Legacy code: legacy.md
   - Operations:
+      - Fresh-machine deployment: deployment.md
       - Local and Docker operation: operations.md
+      - Security model: security.md
       - NERSC and remote extraction: nersc.md
   - About: about.md
 

@@ -13,7 +13,7 @@ compatibility modules.
 
 | Service | Default address | Implementation | Purpose |
 |---|---:|---|---|
-| Web application | `http://127.0.0.1:5173` | `ui/` | Chat, graph exploration/editing, publication search, settings |
+| [Web UI](frontend.md) | `http://127.0.0.1:5173` | `ui/` | Chat, graph exploration/editing, publication search, settings |
 | Agent API | local `:8090`; Compose-private | `app/modules/f2w_agent/api.py` | Sessions, orchestration, KG reads/edits, streaming chat |
 | Splash Links | local `:8081`; Compose-private | `splash_links/` | Persistent entities, directed links, and embeddings |
 
@@ -58,8 +58,14 @@ flowchart LR
 ## Documentation paths
 
 - Start with [Getting started](getting-started.md).
+- Follow [Fresh-machine deployment](deployment.md) for `.env`, CBORG/IPv6,
+  first start, upgrades, and rollback.
+- Use the [end-to-end tutorials](tutorials.md) to move from a grounded question
+  through approved extraction and graph inspection.
 - Read [System architecture](architecture.md) before changing service
   boundaries.
+- Read [Data provenance](provenance.md) before merging corpora or relying on
+  citations, and [Security model](security.md) before exposing the application.
 - Use [Repository reference](repository-reference.md) to locate ownership for a
   feature.
 - Consult [Agent API](agent-api.md) and [Splash Links](splash-links.md) when

@@ -45,7 +45,11 @@ Set `CBORG_API_KEY` in `.env` and never commit that file. The first startup
 builds the images and copies the repository's tracked
 `splash_links/links.sqlite` seed into a writable Docker volume. Later startups
 reuse the built images and persistent data. See [Docker operation](#docker)
-for lifecycle, diagnostics, persistence, and reset commands.
+for lifecycle, diagnostics, persistence, and reset commands. The MkDocs
+[fresh-machine deployment](mkdocs/docs/deployment.md) runbook covers complete
+`.env` setup, CBORG IPv6 authorization, first start, upgrades, and rollback;
+review the [security model](mkdocs/docs/security.md) before changing the
+loopback bind.
 
 ---
 

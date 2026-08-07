@@ -117,6 +117,9 @@ gracefully when their external datasets/APIs are unavailable.
 
 `ui/src/`
 
+The maintained UI guide begins at [Web UI overview](frontend.md). Detailed
+component/state ownership is documented in [UI architecture](ui-architecture.md).
+
 | Path | Responsibility |
 |---|---|
 | `main.tsx` | React root |
