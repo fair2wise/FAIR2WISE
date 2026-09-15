@@ -13,13 +13,14 @@ compatibility modules.
 
 | Service | Default address | Implementation | Purpose |
 |---|---:|---|---|
-| [Web UI](frontend.md) | `http://127.0.0.1:5173` | `ui/` | Chat, graph exploration/editing, publication search, settings |
-| Agent API | local `:8090`; Compose-private | `app/modules/f2w_agent/api.py` | Sessions, orchestration, KG reads/edits, streaming chat |
+| [Web UI](frontend.md) | `http://127.0.0.1:5175` (Compose); `5173` CORS-allowed | `ui/` | Chat, graph exploration/editing, publication search, settings |
+| Agent API | `http://127.0.0.1:8090` | `app/modules/f2w_agent/api.py` | Sessions, orchestration, KG reads/edits, streaming chat |
 | Splash Links | local `:8081`; Compose-private | `splash_links/` | Persistent entities, directed links, and embeddings |
 
-`./scripts/start_all.sh` starts all three services and shuts them down together.
-For the recommended container deployment, `docker compose up` starts the stack
-and publishes only the web application.
+`./scripts/start_all.sh` starts Splash, agent, and UI together.
+`./scripts/start_rsoxs_stack.sh` daemonizes the JSON-KG agent+UI (ports 5175/8090)
+without touching paper extract. For the recommended container deployment,
+`docker compose up` starts agent+UI. **Never bind host 5174.**
 
 ## End-to-end data flow
 
@@ -73,8 +74,9 @@ flowchart LR
 - Use [Release and maintenance](release.md) for versioning, publishing,
   upgrades, and database compatibility, and [Performance](performance.md) for
   graph, retrieval, context, UI, worker, and cache tuning.
-- Consult [Agent API](agent-api.md) and [Splash Links](splash-links.md) when
-  changing client/server contracts.
+- Consult [Agent API](agent-api.md), [Splash Links](splash-links.md), and the
+  [GraphQL cookbook](graphql-cookbook.md) when changing client/server contracts
+  or validating an extracted graph.
 - Follow [Testing](testing.md) before submitting changes.
 
 !!! note "Source of truth"

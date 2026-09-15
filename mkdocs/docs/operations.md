@@ -40,16 +40,17 @@ Common failures:
 
 ## Docker Compose operation
 
-`compose.yaml` is the canonical deployment. It builds separate frontend,
-agent, and Splash images. A one-shot initializer copies the tracked
-`splash_links/links.sqlite` seed into the persistent volume before Splash and
-the agent start. Export `CBORG_API_KEY`, then use:
+`compose.yaml` is the product agent+UI stack (`docker compose up`, ports 5175
+and 8090). Secrets come from host `.env` via `env_file:`. The Splash stack is
+`docker compose -f compose.splash.yaml up`. On Darwin, prefer
+`./scripts/start_rsoxs_stack.sh` for CBorg IPv6.
 
 ```bash
 docker compose up -d
 docker compose ps
 docker compose logs -f
 ```
+
 
 Images are local Docker artifacts. A fresh clone rebuilds them from the root
 `Dockerfile` and `splash_links/Containerfile`; it does not require an image

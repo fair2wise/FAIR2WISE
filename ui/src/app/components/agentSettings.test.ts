@@ -2,7 +2,11 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import {
   DEFAULT_AGENT_SETTINGS,
   DEFAULT_CBORG_MODEL,
+  DEFAULT_JSON_GRAPH_PATHS,
   DEFAULT_OLLAMA_MODEL,
+  KG_QUERY_HOPS_PRESETS,
+  MAX_KG_QUERY_HOPS,
+  clampKgQueryHops,
   defaultModelForBackend,
   graphSourceFromApi,
   graphSourceToApi,
@@ -23,6 +27,9 @@ const baseResponse = {
   extraction_mode: 'targeted' as const,
   targeted_max_pages: 6,
   json_graph_path: null,
+  json_graph_paths: [] as string[],
+  kg_query_max_nodes: 100,
+  kg_query_hops: 1,
   available_json_graphs: [] as string[],
   available_cborg_models: [DEFAULT_CBORG_MODEL, 'google/gemini-flash'],
   default_ollama_model: DEFAULT_OLLAMA_MODEL,
@@ -59,6 +66,9 @@ describe('agentSettings', () => {
       extractionMode: 'full',
       targetedMaxPages: 6,
       jsonGraphPath: 'storage/kg/ignored.json',
+      jsonGraphPaths: ['storage/kg/ignored.json'],
+      kgQueryMaxNodes: 100,
+      kgQueryHops: 1,
     };
     expect(settingsToApiPayload(settings)).toEqual({
       backend: 'cborg',
@@ -68,10 +78,13 @@ describe('agentSettings', () => {
       extraction_mode: 'full',
       targeted_max_pages: 6,
       json_graph_path: null,
+      json_graph_paths: [],
+      kg_query_max_nodes: 100,
+      kg_query_hops: 1,
     });
   });
 
-  it('builds json payload with selected graph path', () => {
+  it('builds json payload with selected graph paths', () => {
     const settings: AgentSettings = {
       backend: 'ollama',
       model: 'qwen3.5:9b',
@@ -80,6 +93,9 @@ describe('agentSettings', () => {
       extractionMode: 'targeted',
       targetedMaxPages: 4,
       jsonGraphPath: 'storage/kg/alpha.json',
+      jsonGraphPaths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
+      kgQueryMaxNodes: 250,
+      kgQueryHops: 2,
     };
     expect(settingsToApiPayload(settings)).toEqual({
       backend: 'ollama',
@@ -89,6 +105,9 @@ describe('agentSettings', () => {
       extraction_mode: 'targeted',
       targeted_max_pages: 4,
       json_graph_path: 'storage/kg/alpha.json',
+      json_graph_paths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
+      kg_query_max_nodes: 250,
+      kg_query_hops: 2,
     });
   });
 
@@ -102,6 +121,9 @@ describe('agentSettings', () => {
       extraction_mode: 'targeted',
       targeted_max_pages: 4,
       json_graph_path: 'storage/kg/alpha.json',
+      json_graph_paths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
+      kg_query_max_nodes: 250,
+      kg_query_hops: 2,
       available_json_graphs: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
     });
     expect(settings).toEqual({
@@ -112,7 +134,20 @@ describe('agentSettings', () => {
       extractionMode: 'targeted',
       targetedMaxPages: 4,
       jsonGraphPath: 'storage/kg/alpha.json',
+      jsonGraphPaths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
+      kgQueryMaxNodes: 250,
+      kgQueryHops: 2,
     });
+  });
+
+  it('defaults API hydration to rsoxs + bl1101, not x-ray', () => {
+    const settings = settingsFromApiResponse({
+      ...baseResponse,
+      graph_source: 'json',
+    });
+    expect(settings.jsonGraphPaths).toEqual([...DEFAULT_JSON_GRAPH_PATHS]);
+    expect(settings.jsonGraphPath).toBe(DEFAULT_JSON_GRAPH_PATHS[0]);
+    expect(settings.jsonGraphPaths.join(' ')).not.toContain('matkg_xray_papers_cborg_chat');
   });
 
   it('persists settings in localStorage', () => {
@@ -124,6 +159,9 @@ describe('agentSettings', () => {
       extractionMode: 'targeted',
       targetedMaxPages: 4,
       jsonGraphPath: 'storage/kg/custom.json',
+      jsonGraphPaths: ['storage/kg/custom.json'],
+      kgQueryMaxNodes: 50,
+      kgQueryHops: 3,
     };
     saveAgentSettings(settings);
     expect(loadAgentSettings()).toEqual(settings);
@@ -139,6 +177,9 @@ describe('agentSettings', () => {
       extractionMode: DEFAULT_AGENT_SETTINGS.extractionMode,
       targetedMaxPages: DEFAULT_AGENT_SETTINGS.targetedMaxPages,
       jsonGraphPath: DEFAULT_AGENT_SETTINGS.jsonGraphPath,
+      jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
+      kgQueryMaxNodes: DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
+      kgQueryHops: DEFAULT_AGENT_SETTINGS.kgQueryHops,
     });
   });
 
@@ -151,6 +192,9 @@ describe('agentSettings', () => {
       extractionMode: 'full',
       targetedMaxPages: 6,
       jsonGraphPath: DEFAULT_AGENT_SETTINGS.jsonGraphPath,
+      jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
+      kgQueryMaxNodes: 100,
+      kgQueryHops: 1,
     };
     expect(settingsEqual(base, { ...base })).toBe(true);
     expect(settingsEqual(base, { ...base, backend: 'ollama' })).toBe(false);
@@ -159,10 +203,29 @@ describe('agentSettings', () => {
     expect(settingsEqual(base, { ...base, workflowMode: 'agentic' })).toBe(false);
     expect(settingsEqual(base, { ...base, extractionMode: 'targeted' })).toBe(false);
     expect(settingsEqual(base, { ...base, targetedMaxPages: 4 })).toBe(false);
+    expect(settingsEqual(base, { ...base, kgQueryHops: 2 })).toBe(false);
+    expect(settingsEqual(base, { ...base, kgQueryMaxNodes: 250 })).toBe(false);
   });
 
   it('picks backend-specific default models', () => {
     expect(defaultModelForBackend('cborg', baseResponse)).toBe(DEFAULT_CBORG_MODEL);
     expect(defaultModelForBackend('ollama', baseResponse)).toBe(DEFAULT_OLLAMA_MODEL);
+  });
+
+  it('exposes hop presets through 20 and hydrates a saved 20-hop setting', () => {
+    expect(KG_QUERY_HOPS_PRESETS[0]).toBe(1);
+    expect(KG_QUERY_HOPS_PRESETS).toContain(3);
+    expect(KG_QUERY_HOPS_PRESETS[KG_QUERY_HOPS_PRESETS.length - 1]).toBe(20);
+    expect(KG_QUERY_HOPS_PRESETS).toHaveLength(MAX_KG_QUERY_HOPS);
+    expect(clampKgQueryHops(21)).toBe(20);
+    expect(clampKgQueryHops(0)).toBe(1);
+
+    const settings = settingsFromApiResponse({
+      ...baseResponse,
+      kg_query_hops: 20,
+    });
+    expect(settings.kgQueryHops).toBe(20);
+    saveAgentSettings(settings);
+    expect(loadAgentSettings().kgQueryHops).toBe(20);
   });
 });

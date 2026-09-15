@@ -4,7 +4,10 @@ import { ButtonWithIcon } from '@blueskyproject/finch';
 import { Check, ChevronDown, Info, Save, Settings } from 'lucide-react';
 import {
   DEFAULT_AGENT_SETTINGS,
+  DEFAULT_JSON_GRAPH_PATHS,
   DEFAULT_OLLAMA_MODEL,
+  KG_QUERY_HOPS_PRESETS,
+  KG_QUERY_MAX_NODES_PRESETS,
   defaultModelForBackend,
   loadAgentSettings,
   saveAgentSettings,
@@ -48,71 +51,11 @@ function formatCborgModelLabel(model: string): string {
   return slash === -1 ? model : model.slice(slash + 1);
 }
 
-function JsonGraphPickerDialog({
-  open,
-  onOpenChange,
-  value,
-  options,
-  onChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  value: string;
-  options: string[];
-  onChange: (path: string) => void;
-}) {
-  function handlePick(path: string) {
-    onChange(path);
-    onOpenChange(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal>
-      <DialogContent
-        overlayClassName="z-[200] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-        className="z-[201] top-[88px] left-1/2 flex max-h-[calc(100vh-7rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 translate-y-0 flex-col gap-0 overflow-hidden border border-slate-200 bg-white p-0 text-slate-800 shadow-xl"
-      >
-        <DialogHeader className="border-b border-slate-200 bg-white px-5 py-5 text-left">
-          <DialogTitle className="text-slate-900">Choose JSON graph</DialogTitle>
-          <DialogDescription className="text-slate-500">
-            Select a MatKG JSON file from storage/kg.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white p-4">
-          {options.map(path => {
-            const selected = path === value;
-            return (
-              <button
-                key={path}
-                type="button"
-                onClick={() => handlePick(path)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-4 py-3.5 text-left text-sm transition hover:bg-slate-50',
-                  selected && 'bg-sky-50 ring-1 ring-sky-200',
-                )}
-              >
-                <span
-                  className={cn(
-                    'flex size-4 shrink-0 items-center justify-center rounded-full border border-slate-300',
-                    selected && 'border-sky-500 bg-sky-500 text-white',
-                  )}
-                  aria-hidden="true"
-                >
-                  {selected && <Check size={12} strokeWidth={3} />}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate font-medium text-slate-800">
-                    {formatJsonGraphLabel(path)}
-                  </span>
-                  <span className="mt-1 block truncate text-xs text-slate-500">{path}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+function graphHint(path: string): string {
+  if (path.includes('matkg_rsoxs_v1')) return 'literature / science';
+  if (path.includes('matkg_bl1101')) return '11.0.1.2 ops';
+  if (path.includes('matkg_xray_papers_cborg_chat')) return 'x-ray demo (opt-in)';
+  return 'catalog graph';
 }
 
 function CborgModelPickerDialog({
@@ -179,31 +122,6 @@ function CborgModelPickerDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function JsonGraphFilePicker({
-  value,
-  disabled,
-  onOpenPicker,
-}: {
-  value: string;
-  disabled?: boolean;
-  onOpenPicker: () => void;
-}) {
-  const selectedLabel = value ? formatJsonGraphLabel(value) : 'Select a JSON graph';
-
-  return (
-    <button
-      type="button"
-      id="json-graph-select"
-      disabled={disabled}
-      onClick={onOpenPicker}
-      className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <span className="truncate font-medium">{selectedLabel}</span>
-      <ChevronDown size={16} className="shrink-0 text-slate-500" aria-hidden="true" />
-    </button>
   );
 }
 
@@ -275,7 +193,6 @@ export function AppSettingsButton({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [errorTitle, setErrorTitle] = useState('Settings update failed');
-  const [jsonPickerOpen, setJsonPickerOpen] = useState(false);
   const [cborgPickerOpen, setCborgPickerOpen] = useState(false);
 
   const hasUnsavedChanges = !settingsEqual(draftSettings, savedSettings);
@@ -345,6 +262,11 @@ export function AppSettingsButton({
         jsonGraphPath: draftSettings.graphSource === 'json'
           ? draftSettings.jsonGraphPath
           : synced.jsonGraphPath,
+        jsonGraphPaths: draftSettings.graphSource === 'json'
+          ? draftSettings.jsonGraphPaths
+          : synced.jsonGraphPaths,
+        kgQueryMaxNodes: draftSettings.kgQueryMaxNodes,
+        kgQueryHops: draftSettings.kgQueryHops,
       };
       setSavedSettings(saved);
       setDraftSettings(saved);
@@ -353,7 +275,6 @@ export function AppSettingsButton({
       setAvailableCborgModels(response.available_cborg_models ?? []);
       setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
       await onSettingsApplied?.();
-      setJsonPickerOpen(false);
       setCborgPickerOpen(false);
       setOpen(false);
     } catch (err) {
@@ -381,10 +302,18 @@ export function AppSettingsButton({
   }
 
   function updateGraphSource(graphSource: AgentGraphSource) {
-    const jsonGraphPath = draftSettings.jsonGraphPath
-      || availableJsonGraphs[0]
-      || DEFAULT_AGENT_SETTINGS.jsonGraphPath;
-    setDraftSettings(prev => ({ ...prev, graphSource, jsonGraphPath }));
+    const jsonGraphPaths = draftSettings.jsonGraphPaths.length
+      ? draftSettings.jsonGraphPaths
+      : availableJsonGraphs.filter(path => DEFAULT_JSON_GRAPH_PATHS.includes(path as typeof DEFAULT_JSON_GRAPH_PATHS[number]));
+    const fallback = jsonGraphPaths.length
+      ? jsonGraphPaths
+      : [...DEFAULT_AGENT_SETTINGS.jsonGraphPaths];
+    setDraftSettings(prev => ({
+      ...prev,
+      graphSource,
+      jsonGraphPaths: fallback,
+      jsonGraphPath: fallback.includes(prev.jsonGraphPath) ? prev.jsonGraphPath : fallback[0],
+    }));
   }
 
   function updateWorkflowMode(workflowMode: AgentWorkflowMode) {
@@ -405,8 +334,24 @@ export function AppSettingsButton({
     }));
   }
 
-  function updateJsonGraphPath(jsonGraphPath: string) {
-    setDraftSettings(prev => ({ ...prev, graphSource: 'json', jsonGraphPath }));
+  function toggleJsonGraphPath(path: string) {
+    setDraftSettings(prev => {
+      const selected = prev.jsonGraphPaths.includes(path)
+        ? prev.jsonGraphPaths.filter(item => item !== path)
+        : [...prev.jsonGraphPaths, path];
+      if (!selected.length) return prev;
+      const jsonGraphPath = selected.includes(prev.jsonGraphPath) ? prev.jsonGraphPath : selected[0];
+      return { ...prev, graphSource: 'json', jsonGraphPaths: selected, jsonGraphPath };
+    });
+  }
+
+  function updateDisplayGraph(jsonGraphPath: string) {
+    setDraftSettings(prev => {
+      const jsonGraphPaths = prev.jsonGraphPaths.includes(jsonGraphPath)
+        ? prev.jsonGraphPaths
+        : [...prev.jsonGraphPaths, jsonGraphPath];
+      return { ...prev, graphSource: 'json', jsonGraphPath, jsonGraphPaths };
+    });
   }
 
   return (
@@ -573,24 +518,101 @@ export function AppSettingsButton({
                   <AlertTitle className="text-amber-950">Retrieval only</AlertTitle>
                   <AlertDescription className="text-amber-900">
                     JSON mode is strictly for retrieval. The download and extraction agents will not run.
+                    Chat queries every checked graph (fan-out × N). Selecting more KGs can slow queries.
                   </AlertDescription>
                 </Alert>
 
                 <div className="space-y-2">
-                <Label htmlFor="json-graph-select" className="text-xs font-medium text-slate-500">
-                  JSON graph file
+                <Label className="text-xs font-medium text-slate-500">
+                  JSON graphs (multi-select)
                 </Label>
                 {availableJsonGraphs.length > 0 ? (
-                  <JsonGraphFilePicker
-                    value={draftSettings.jsonGraphPath}
-                    disabled={loading || saving}
-                    onOpenPicker={() => setJsonPickerOpen(true)}
-                  />
+                  <div className="space-y-1 rounded-lg border border-slate-200 p-2">
+                    {availableJsonGraphs.map(path => {
+                      const checked = draftSettings.jsonGraphPaths.includes(path);
+                      const isViewer = draftSettings.jsonGraphPath === path;
+                      return (
+                        <div key={path} className="flex items-start gap-3 rounded-md px-2 py-2 hover:bg-slate-50">
+                          <input
+                            id={`json-graph-${path}`}
+                            type="checkbox"
+                            className="mt-1 size-4 accent-sky-600"
+                            checked={checked}
+                            disabled={loading || saving}
+                            onChange={() => toggleJsonGraphPath(path)}
+                          />
+                          <label htmlFor={`json-graph-${path}`} className="min-w-0 flex-1 cursor-pointer">
+                            <span className="block truncate text-sm font-medium text-slate-800">
+                              {formatJsonGraphLabel(path)}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-slate-500">{graphHint(path)}</span>
+                          </label>
+                          <button
+                            type="button"
+                            disabled={loading || saving || !checked}
+                            onClick={() => updateDisplayGraph(path)}
+                            className={cn(
+                              'shrink-0 rounded px-2 py-1 text-[10px] uppercase tracking-wide',
+                              isViewer ? 'bg-sky-100 text-sky-700' : 'text-slate-400 hover:text-slate-600',
+                            )}
+                          >
+                            {isViewer ? 'Viewer' : 'View'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     {loading ? 'Loading available JSON graphs…' : 'No JSON graph files found in storage/kg.'}
                   </div>
                 )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="kg-query-hops" className="text-xs font-medium text-slate-500">
+                    Query neighborhood hops
+                  </Label>
+                  <select
+                    id="kg-query-hops"
+                    value={draftSettings.kgQueryHops}
+                    disabled={loading || saving}
+                    onChange={event => setDraftSettings(prev => ({
+                      ...prev,
+                      kgQueryHops: Number.parseInt(event.target.value, 10) || 1,
+                    }))}
+                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {KG_QUERY_HOPS_PRESETS.map(hops => (
+                      <option key={hops} value={hops}>{hops} hop{hops === 1 ? '' : 's'}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500">
+                    BFS depth used when gathering LLM context (`graph.neighborhood`). Not the viewer dump cap.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="kg-query-max-nodes" className="text-xs font-medium text-slate-500">
+                    Query max nodes
+                  </Label>
+                  <select
+                    id="kg-query-max-nodes"
+                    value={draftSettings.kgQueryMaxNodes}
+                    disabled={loading || saving}
+                    onChange={event => setDraftSettings(prev => ({
+                      ...prev,
+                      kgQueryMaxNodes: Number.parseInt(event.target.value, 10) || 100,
+                    }))}
+                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {KG_QUERY_MAX_NODES_PRESETS.map(count => (
+                      <option key={count} value={count}>{count} nodes</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500">
+                    More nodes can enrich answers; too many can blow the context window or add latency. Viewer 1k/10k stays separate.
+                  </p>
                 </div>
               </div>
             )}
@@ -618,13 +640,6 @@ export function AppSettingsButton({
           </div>
         </SheetContent>
       </Sheet>
-      <JsonGraphPickerDialog
-        open={jsonPickerOpen}
-        onOpenChange={setJsonPickerOpen}
-        value={draftSettings.jsonGraphPath}
-        options={availableJsonGraphs}
-        onChange={updateJsonGraphPath}
-      />
       <CborgModelPickerDialog
         open={cborgPickerOpen}
         onOpenChange={setCborgPickerOpen}

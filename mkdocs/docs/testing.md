@@ -10,8 +10,9 @@ python3 -m pytest
 ```
 
 Install the compiled development environment with
-`python3.12 -m pip install -r requirements/dev.txt`. Runtime containers install
-the smaller lock through the root `requirements.txt` compatibility file.
+`python3.12 -m pip install -r requirements.txt -r requirements/dev.txt`.
+Runtime containers install the runtime lock plus `requirements/semantic.in`
+through the root `requirements.txt` compatibility file.
 
 Regenerate locks after editing an `.in` source file:
 
@@ -33,7 +34,7 @@ Major coverage areas:
 |---|---|
 | Agent API and workflow | `test_f2w_api.py`, `test_workflow_orchestrator.py`, `test_f2w_coordinator.py` |
 | Download/extraction | `test_download_agent.py`, `test_extractor_agent.py`, `test_extract_terms*.py` |
-| KG conversion/retrieval | `test_json2kg*.py`, `test_kg_rag_api*.py`, `test_build_context_filtering.py` |
+| KG conversion/retrieval | `test_json2kg*.py`, `test_bl1101_ingest.py`, `test_kg_rag_api*.py`, `test_build_context_filtering.py` |
 | Splash integration | `test_splash_helpers.py`, `test_splash_fallback.py`, `test_kg_update.py` |
 | Settings/sessions | `test_agent_settings.py`, session cases in `test_f2w_api.py` |
 | Utilities/safety | `test_project_config.py`, `test_cborg_limiter.py`, `test_wipe_splash_db_script.py` |

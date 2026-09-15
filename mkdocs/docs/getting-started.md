@@ -5,39 +5,31 @@
 For the recommended Compose deployment:
 
 - Docker Engine or Docker Desktop with Docker Compose v2;
-- a valid `CBORG_API_KEY` exported before startup.
+- `CBORG_API_KEY` in an untracked `.env` (runtime inject, never baked into the image).
 
 ## Three-command Docker startup
 
-With those machine prerequisites already configured:
+With Docker Compose v2 and a CBORG key in `.env`:
 
 ```bash
 git clone https://github.com/matesuu/FAIRtoWISE-FORUM-AI.git
 cd FAIRtoWISE-FORUM-AI
+cp .env.example .env
 docker compose up
 ```
 
-Open `http://127.0.0.1:5173`. The first run builds the images and imports the
-seed knowledge graph, so it takes longer than later starts. Only the frontend
-port is published; `/api` is its same-origin gateway to the private agent API.
+Set `CBORG_API_KEY` in `.env` and leave `CBORG_IPV6_BIND` unset (the process
+probes a live global IPv6). Never commit `.env` or bake keys into the image.
 
-The images are built locally on each computer from the files in the clone;
-they are not copied from or tied to the original developer's machine. The
-tracked `splash_links/links.sqlite` file initializes a writable named volume,
-so no separate graph import is required on a fresh clone.
+Open `http://127.0.0.1:5175`. The browser calls the agent at
+`http://127.0.0.1:8090`. **Never bind host 5174** (SSH).
 
-If `CBORG_API_KEY` is not exported in the shell, create an untracked `.env`
-before startup:
+On macOS Docker Desktop, CBorg IPv6 from a container is usually blocked; use
+`./scripts/start_rsoxs_stack.sh` instead (daemonized agent+UI; does not stop
+paper extract). Linux Docker should enable IPv6 on the Compose network.
 
-```bash
-cp .env.example .env
-```
+The Splash stack remains `docker compose -f compose.splash.yaml up` (UI on 5173).
 
-Set the key in that file and do not commit it. See
-[Local and Docker operation](operations.md#docker-compose-operation) for image,
-volume, logging, health-check, and reset details. For a new computer, follow
-the complete [fresh-machine deployment](deployment.md) runbook, including
-CBORG IPv6 authorization and first-start expectations.
 
 ## Local-development prerequisites
 
@@ -66,9 +58,11 @@ cd ..
 ./scripts/install_pixi.sh
 ```
 
-Use `requirements/dev.txt` instead when contributing code or documentation.
-The `.txt` files are compiled Python 3.12 locks; edit their corresponding `.in`
-files and regenerate them with pip-tools rather than hand-editing locks.
+Use `python3.12 -m pip install -r requirements.txt -r requirements/dev.txt`
+when contributing code or documentation. The `.txt` files are compiled Python
+3.12 locks; edit their corresponding `.in` files and regenerate them with
+pip-tools rather than hand-editing locks. `requirements/semantic.in` is
+included by `requirements.txt` and is not compiled.
 
 Set `CBORG_API_KEY` in `.env` when using CBORG. For Ollama, set the backend and
 model variables described in [Configuration](configuration.md).
@@ -90,6 +84,17 @@ The launcher:
 7. records managed PIDs in `.run/`.
 
 Press **Ctrl+C** in the launcher terminal to stop all managed processes.
+
+For the RSoXS JSON demo without Splash, prefer Docker or the daemonized host stack
+(survives Cursor session exit; does not stop `scripts/run.py` extract):
+
+```bash
+./scripts/start_rsoxs_stack.sh
+```
+
+UI is `http://127.0.0.1:5175`, agent `http://127.0.0.1:8090`. Stop with
+`./scripts/start_rsoxs_stack.sh stop`.
+
 
 ## Verify local-development services
 

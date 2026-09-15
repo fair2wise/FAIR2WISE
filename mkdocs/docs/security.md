@@ -17,7 +17,11 @@ flowchart LR
     S --> D[(Splash volume)]
 ```
 
-Compose publishes only:
+Compose publishes loopback ports **5175** (UI) and **8090** (agent). Never
+bind host **5174** (SSH). The browser calls `http://127.0.0.1:8090` even when
+the UI is served from the same Compose project.
+
+The optional Splash stack (`compose.splash.yaml`) publishes only:
 
 ```text
 127.0.0.1:${F2W_UI_PORT:-5173} -> frontend:80
@@ -35,7 +39,8 @@ Keep secrets in the root `.env` or a process-level environment:
 - `.env` and `.env.*` are ignored by Git;
 - `.dockerignore` excludes them from image build contexts while allowing the
   placeholder `.env.example`;
-- Compose injects only the variables declared in `compose.yaml`; and
+- Compose injects host `.env` at runtime with `env_file:` (do not `COPY .env`
+  or ARG the API key); and
 - the React/Vite build receives no API secrets.
 
 Never place a key in `VITE_*`, `config.yml`, source code, screenshots, issue
@@ -66,8 +71,8 @@ and keep agent/Splash private. Changing the Compose binding to `0.0.0.0` without
 adding authentication exposes both the UI and its proxied control plane.
 
 CORS is not authentication. The agent's default local-development origins are
-`http://localhost:5173` and `http://127.0.0.1:5173`, while Compose uses the
-same-origin Nginx proxy. Non-browser clients are not stopped by CORS.
+`http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:5175`, and
+`http://127.0.0.1:5175`. Non-browser clients are not stopped by CORS.
 
 The private Compose network has IPv6 enabled to support CBORG egress. Private
 service ports and outbound internet access are separate controls: not

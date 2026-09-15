@@ -69,6 +69,9 @@ class CoordinatorConfig:
     backend: str = "cborg"
     model: Optional[str] = None
     graph: Optional[str] = None
+    graphs: List[str] = field(default_factory=list)
+    kg_query_max_nodes: int = 100
+    kg_query_hops: int = 1
     seed_terms: Optional[str] = None
     kg_mode: str = "json"  # "json" | "splash"
     workdir: Path = field(default_factory=lambda: Path("runs/session"))

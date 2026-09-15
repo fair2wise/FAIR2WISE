@@ -1,0 +1,14 @@
+# Linux overlay: source CBorg from the host's IPv6 stack.
+#   docker compose -f compose.yaml -f compose.hostnet.yaml up
+#
+# Docker Desktop on Darwin still uses a Linux VM, so host networking does
+# not give the Mac's authorized global IPv6. Use ./scripts/start_rsoxs_stack.sh
+# on macOS instead.
+
+services:
+  agent:
+    network_mode: host
+    ports: !reset []
+    environment:
+      F2W_AGENT_HOST: 0.0.0.0
+      F2W_AGENT_PORT: "8090"

@@ -93,6 +93,33 @@ def test_build_graph_skips_empty_short_and_unbalanced_code_snippets():
     assert graph == {"things": [], "associations": []}
 
 
+def test_build_graph_passthrough_rsoxs_slots():
+    graph = json2kg.build_graph(
+        [
+            {
+                "term": "RSoXS",
+                "category": "RSoXSMeasurement",
+                "definition": "Resonant soft X-ray scattering.",
+                "importance": "high",
+                "photon_energy_eV": 285.0,
+                "absorption_edge": "C K-edge",
+                "scattering_technique": "RSoXS",
+                "polarization": "linear",
+                "technique_type": "rsoxs",
+            }
+        ]
+    )
+
+    node = graph["things"][0]
+    assert node["category"] == "RSoXSMeasurement"
+    assert node["importance"] == "high"
+    assert node["photon_energy_eV"] == 285.0
+    assert node["absorption_edge"] == "C K-edge"
+    assert node["scattering_technique"] == "RSoXS"
+    assert node["polarization"] == "linear"
+    assert node["technique_type"] == "rsoxs"
+
+
 def test_build_graph_remaps_removed_xray_category():
     graph = json2kg.build_graph([{"term": "GIWAXS", "category": "XRayScatteringAnalysis"}])
 

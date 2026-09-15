@@ -9,8 +9,26 @@ PORT="${F2W_AGENT_PORT:-8090}"
 BACKEND="${F2W_BACKEND:-cborg}"
 MODEL="${F2W_MODEL:-lbl/cborg-chat}"
 KG_MODE="${F2W_KG_MODE:-splash}"
-GRAPH="${F2W_GRAPH:-storage/kg/matkg_with_code.json}"
+if [[ "$KG_MODE" == "json" ]]; then
+  LATEST_OPS="storage/kg/matkg_bl1101_v1.json"
+  best=-1
+  for f in "$ROOT_DIR"/storage/kg/matkg_bl1101_v*.json; do
+    base="$(basename "$f")"
+    [[ "$base" == *bak* ]] && continue
+    n="${base#matkg_bl1101_v}"
+    n="${n%.json}"
+    [[ "$n" =~ ^[0-9]+$ ]] || continue
+    if (( n > best )); then
+      best=$n
+      LATEST_OPS="storage/kg/${base}"
+    fi
+  done
+  GRAPH="${F2W_GRAPHS:-${F2W_GRAPH:-storage/kg/matkg_rsoxs_v1.json,${LATEST_OPS}}}"
+else
+  GRAPH="${F2W_GRAPHS:-${F2W_GRAPH:-storage/kg/matkg_with_code.json}}"
+fi
 SEED_TERMS="${F2W_SEED_TERMS:-}"
+SCHEMA="${F2W_SCHEMA:-storage/schema/matkg_schema.yaml}"
 WORKDIR="${F2W_WORKDIR:-runs/ui_session_splash}"
 SPLASH_REPO="${SPLASH_LINKS_REPO:-$ROOT_DIR/splash_links}"
 if [[ "$SPLASH_REPO" != /* ]]; then
@@ -26,7 +44,28 @@ EXTRACTION_MODE="${F2W_EXTRACTION_MODE:-targeted}"
 TARGETED_MAX_PAGES="${F2W_TARGETED_MAX_PAGES:-6}"
 SPLASH_HEALTH_URL="${F2W_SPLASH_HEALTH_URL:-http://127.0.0.1:8081/splash_links/health}"
 
-if [[ "$KG_MODE" != "splash" ]]; then
+# CBorg allowlists a global IPv6. Probe at process start; never keep a stale bind.
+export CBORG_FORCE_IPV6="${CBORG_FORCE_IPV6:-1}"
+export CBORG_IP_FAMILY="${CBORG_IP_FAMILY:-ipv6}"
+if [[ -n "${CBORG_IPV6_BIND:-}" ]]; then
+  if ! python3 -c 'import os, socket, ipaddress
+addr = os.environ.get("CBORG_IPV6_BIND", "").split("%", 1)[0]
+try:
+    ipaddress.IPv6Address(addr)
+    sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    sock.bind((addr, 0))
+    sock.close()
+except OSError:
+    raise SystemExit(1)
+except ValueError:
+    raise SystemExit(1)
+'; then
+    echo "warning: CBORG_IPV6_BIND is not assigned on this host; probing a current global IPv6" >&2
+    unset CBORG_IPV6_BIND
+  fi
+fi
+
+if [[ "$KG_MODE" != "splash" && "$KG_MODE" != "json" ]]; then
   echo "warning: F2W_KG_MODE=$KG_MODE overrides backend default splash" >&2
 fi
 
@@ -48,7 +87,7 @@ ARGS=(
   --backend "$BACKEND"
   --model "$MODEL"
   --kg-mode "$KG_MODE"
-  --graph "$GRAPH"
+  --schema "$SCHEMA"
   --workdir "$WORKDIR"
   --splash-repo "$SPLASH_REPO"
   --download-delay "$DOWNLOAD_DELAY"
@@ -61,15 +100,31 @@ ARGS=(
   --targeted-max-pages "$TARGETED_MAX_PAGES"
   --allow-splash-wipe
 )
+IFS=',' read -ra GRAPH_LIST <<< "$GRAPH"
+for g in "${GRAPH_LIST[@]}"; do
+  g="${g#"${g%%[![:space:]]*}"}"
+  g="${g%"${g##*[![:space:]]}"}"
+  if [[ -n "$g" ]]; then
+    ARGS+=(--graph "$g")
+  fi
+done
 if [[ -n "$SEED_TERMS" ]]; then
   ARGS+=(--seed-terms "$SEED_TERMS")
 fi
 ARGS+=(api --host "$HOST" --port "$PORT")
+# Vite defaults to 5173; RSoXS UI uses 5175 when 5173 is taken.
+ARGS+=(
+  --cors-origin "http://127.0.0.1:5175"
+  --cors-origin "http://localhost:5175"
+  --cors-origin "http://127.0.0.1:5173"
+  --cors-origin "http://localhost:5173"
+)
 
 echo "Starting FAIR2WISE agent API"
 echo "  url: http://$HOST:$PORT"
 echo "  kg_mode: $KG_MODE"
 echo "  graph: $GRAPH"
+echo "  schema: $SCHEMA"
 echo "  seed_terms: ${SEED_TERMS:-<none>}"
 echo "  workdir: $WORKDIR"
 echo "  max_rounds: $MAX_ROUNDS"

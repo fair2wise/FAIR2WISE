@@ -5,6 +5,15 @@ export interface LinkedCodeSnippet {
   code_language?: string | null;
   code_snippet: string;
   publications?: PublicationInfo[];
+  source_type?: string | null;
+  repo_url?: string | null;
+  repo_owner?: string | null;
+  repo_name?: string | null;
+  repo_commit_sha?: string | null;
+  source_file_path?: string | null;
+  source_file_url?: string | null;
+  source_start_line?: number | null;
+  source_end_line?: number | null;
 }
 
 export interface LiveGraphNode {
@@ -17,6 +26,22 @@ export interface LiveGraphNode {
   code_language?: string | null;
   function_name?: string | null;
   linked_code_snippets?: LinkedCodeSnippet[];
+  graph_id?: string | null;
+  graph_label?: string | null;
+  formula?: string | null;
+  source_papers?: string[];
+  properties?: Array<Record<string, unknown>>;
+  extra_fields?: Record<string, unknown>;
+  source_type?: string | null;
+  repo_url?: string | null;
+  repo_owner?: string | null;
+  repo_name?: string | null;
+  repo_commit_sha?: string | null;
+  source_file_path?: string | null;
+  source_file_url?: string | null;
+  source_start_line?: number | null;
+  source_end_line?: number | null;
+  repository_license?: string | null;
 }
 
 export interface LiveGraphEdge {
@@ -203,6 +228,9 @@ export interface AgentSettingsApiResponse {
   extraction_mode: 'full' | 'targeted';
   targeted_max_pages: number;
   json_graph_path: string | null;
+  json_graph_paths?: string[];
+  kg_query_max_nodes?: number;
+  kg_query_hops?: number;
   available_json_graphs: string[];
   available_cborg_models: string[];
   default_ollama_model: string;
@@ -216,6 +244,9 @@ export interface AgentSettingsApiUpdate {
   extraction_mode?: 'full' | 'targeted';
   targeted_max_pages?: number;
   json_graph_path?: string | null;
+  json_graph_paths?: string[];
+  kg_query_max_nodes?: number;
+  kg_query_hops?: number;
 }
 
 import { agentNetworkErrorMessage, settingsApiErrorMessage } from '../agentApiErrors';

@@ -32,6 +32,7 @@ nav:
           - Agent API integration: ui-api.md
           - Development and testing: ui-development.md
       - Splash Links: splash-links.md
+      - GraphQL cookbook: graphql-cookbook.md
   - Development:
       - Contributor guide: contributing.md
       - Configuration: configuration.md

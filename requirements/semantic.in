@@ -1,0 +1,6 @@
+# FAISS / SentenceTransformer / Torch retrieval stack.
+# Included in the default install via requirements.txt (runtime lock + this file).
+# No compiled .txt lock: wheels are platform-specific (CPU/GPU, macOS/Linux).
+faiss-cpu>=1.14.2
+sentence-transformers>=5.5.1
+torch>=2.12.0

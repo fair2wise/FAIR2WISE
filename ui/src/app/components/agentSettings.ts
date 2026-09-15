@@ -11,6 +11,9 @@ export interface AgentSettings {
   extractionMode: AgentExtractionMode;
   targetedMaxPages: number;
   jsonGraphPath: string;
+  jsonGraphPaths: string[];
+  kgQueryMaxNodes: number;
+  kgQueryHops: number;
 }
 
 export interface AgentSettingsResponse {
@@ -21,6 +24,9 @@ export interface AgentSettingsResponse {
   extraction_mode: AgentExtractionMode;
   targeted_max_pages: number;
   json_graph_path: string | null;
+  json_graph_paths?: string[];
+  kg_query_max_nodes?: number;
+  kg_query_hops?: number;
   available_json_graphs: string[];
   available_cborg_models: string[];
   default_ollama_model: string;
@@ -45,6 +51,23 @@ export function normalizeCborgModel(model: string): string {
 export const DEFAULT_CBORG_MODEL = 'lbl/cborg-chat';
 export const DEFAULT_OLLAMA_MODEL = 'deepseek-r1:70b';
 
+export const DEFAULT_JSON_GRAPH_PATHS = [
+  'storage/kg/matkg_rsoxs_v1.json',
+  'storage/kg/matkg_bl1101_v1.json',
+] as const;
+export const XRAY_DEMO_GRAPH = 'storage/kg/matkg_xray_papers_cborg_chat.json';
+export const KG_QUERY_MAX_NODES_PRESETS = [50, 100, 250, 500, 1000] as const;
+export const MAX_KG_QUERY_HOPS = 20;
+export const KG_QUERY_HOPS_PRESETS = Array.from(
+  { length: MAX_KG_QUERY_HOPS },
+  (_, index) => index + 1,
+);
+
+export function clampKgQueryHops(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(MAX_KG_QUERY_HOPS, Math.max(1, Math.floor(value)));
+}
+
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   backend: 'cborg',
   model: DEFAULT_CBORG_MODEL,
@@ -52,8 +75,24 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   workflowMode: 'agentic',
   extractionMode: 'targeted',
   targetedMaxPages: 6,
-  jsonGraphPath: 'storage/kg/matkg_xray_papers_cborg_chat.json',
+  jsonGraphPath: DEFAULT_JSON_GRAPH_PATHS[0],
+  jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
+  kgQueryMaxNodes: 100,
+  kgQueryHops: 1,
 };
+
+function isXrayDemo(path: string): boolean {
+  return path.replace(/\\/g, '/').endsWith('matkg_xray_papers_cborg_chat.json');
+}
+
+function normalizeJsonGraphPaths(value: unknown, fallbackPath?: string): string[] {
+  const fromList = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  if (fromList.length) return Array.from(new Set(fromList));
+  if (fallbackPath && !isXrayDemo(fallbackPath)) return [fallbackPath];
+  return [...DEFAULT_JSON_GRAPH_PATHS];
+}
 
 function normalizeModel(value: unknown, backend: AgentBackend): string {
   if (typeof value === 'string' && value.trim()) {
@@ -76,6 +115,14 @@ export function loadAgentSettings(): AgentSettings {
     if (!raw) return { ...DEFAULT_AGENT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<AgentSettings>;
     const backend: AgentBackend = parsed.backend === 'ollama' ? 'ollama' : 'cborg';
+    const storedPath = parsed.jsonGraphPath || '';
+    const jsonGraphPaths = normalizeJsonGraphPaths(
+      parsed.jsonGraphPaths,
+      storedPath && !isXrayDemo(storedPath) ? storedPath : undefined,
+    );
+    const storedJsonPath = jsonGraphPaths.includes(storedPath)
+      ? storedPath
+      : (jsonGraphPaths[0] || DEFAULT_AGENT_SETTINGS.jsonGraphPath);
     return {
       backend,
       model: normalizeModel(parsed.model, backend),
@@ -85,7 +132,14 @@ export function loadAgentSettings(): AgentSettings {
       targetedMaxPages: typeof parsed.targetedMaxPages === 'number' && parsed.targetedMaxPages > 0
         ? parsed.targetedMaxPages
         : DEFAULT_AGENT_SETTINGS.targetedMaxPages,
-      jsonGraphPath: parsed.jsonGraphPath || DEFAULT_AGENT_SETTINGS.jsonGraphPath,
+      jsonGraphPath: storedJsonPath,
+      jsonGraphPaths,
+      kgQueryMaxNodes: typeof parsed.kgQueryMaxNodes === 'number'
+        ? Math.min(1000, Math.max(10, parsed.kgQueryMaxNodes))
+        : DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
+      kgQueryHops: typeof parsed.kgQueryHops === 'number'
+        ? clampKgQueryHops(parsed.kgQueryHops)
+        : DEFAULT_AGENT_SETTINGS.kgQueryHops,
     };
   } catch {
     return { ...DEFAULT_AGENT_SETTINGS };
@@ -116,6 +170,9 @@ export function settingsToApiPayload(settings: AgentSettings) {
     extraction_mode: settings.extractionMode,
     targeted_max_pages: settings.targetedMaxPages,
     json_graph_path: settings.graphSource === 'json' ? settings.jsonGraphPath : null,
+    json_graph_paths: settings.graphSource === 'json' ? settings.jsonGraphPaths : [],
+    kg_query_max_nodes: settings.kgQueryMaxNodes,
+    kg_query_hops: settings.kgQueryHops,
   };
 }
 
@@ -123,8 +180,13 @@ export function settingsFromApiResponse(response: AgentSettingsResponse): AgentS
   const graphSource = graphSourceFromApi(response.graph_source);
   const backend: AgentBackend = response.backend === 'ollama' ? 'ollama' : 'cborg';
   const available = response.available_json_graphs ?? [];
+  const jsonGraphPaths = normalizeJsonGraphPaths(
+    response.json_graph_paths,
+    response.json_graph_path || undefined,
+  );
   const jsonGraphPath = response.json_graph_path
-    || available[0]
+    || jsonGraphPaths[0]
+    || available.find(path => !isXrayDemo(path))
     || DEFAULT_AGENT_SETTINGS.jsonGraphPath;
   return {
     backend,
@@ -134,6 +196,15 @@ export function settingsFromApiResponse(response: AgentSettingsResponse): AgentS
     extractionMode: normalizeExtractionMode(response.extraction_mode),
     targetedMaxPages: response.targeted_max_pages || DEFAULT_AGENT_SETTINGS.targetedMaxPages,
     jsonGraphPath,
+    jsonGraphPaths: jsonGraphPaths.includes(jsonGraphPath)
+      ? jsonGraphPaths
+      : [jsonGraphPath, ...jsonGraphPaths],
+    kgQueryMaxNodes: typeof response.kg_query_max_nodes === 'number'
+      ? Math.min(1000, Math.max(10, response.kg_query_max_nodes))
+      : DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
+    kgQueryHops: typeof response.kg_query_hops === 'number'
+      ? clampKgQueryHops(response.kg_query_hops)
+      : DEFAULT_AGENT_SETTINGS.kgQueryHops,
   };
 }
 
@@ -144,7 +215,10 @@ export function settingsEqual(a: AgentSettings, b: AgentSettings): boolean {
     && a.workflowMode === b.workflowMode
     && a.extractionMode === b.extractionMode
     && a.targetedMaxPages === b.targetedMaxPages
-    && a.jsonGraphPath === b.jsonGraphPath;
+    && a.jsonGraphPath === b.jsonGraphPath
+    && a.jsonGraphPaths.join('|') === b.jsonGraphPaths.join('|')
+    && a.kgQueryMaxNodes === b.kgQueryMaxNodes
+    && a.kgQueryHops === b.kgQueryHops;
 }
 
 export function defaultModelForBackend(

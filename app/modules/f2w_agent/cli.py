@@ -23,16 +23,19 @@ from .coordinator import (
     default_workers,
     default_workflow_mode,
 )
+from .multi_kg import collect_graph_paths, primary_json_graph_path
 
 load_dotenv()
 
 
 def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
     workflow_mode = "agentic" if args.agentic else args.workflow_mode
+    graphs = collect_graph_paths(getattr(args, "graphs", None), getattr(args, "graph", None))
     return CoordinatorConfig(
         backend=args.backend,
         model=args.model,
-        graph=args.graph,
+        graph=primary_json_graph_path(graphs),
+        graphs=graphs,
         seed_terms=args.seed_terms,
         kg_mode=args.kg_mode,
         workdir=Path(args.workdir),
@@ -74,7 +77,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--backend", default="cborg", choices=["cborg", "cborg-openai", "ollama"])
     p.add_argument("--model", default=None, help="LLM model name")
-    p.add_argument("--graph", default=None, help="Initial KG JSON for retrieval")
+    p.add_argument(
+        "--graph",
+        action="append",
+        default=None,
+        help="KG JSON for retrieval (repeat or comma-separated)",
+    )
+    p.add_argument(
+        "--graphs",
+        action="append",
+        default=None,
+        help="Alias for --graph; extra corpora for fan-out retrieve",
+    )
     p.add_argument("--seed-terms", default=None, help="Seed extracted-terms JSON (cumulative base)")
     p.add_argument("--kg-mode", default="splash", choices=["json", "splash"], help="KG update/reload mode")
     p.add_argument("--workdir", default="runs/session", help="Session working directory")
@@ -132,6 +146,7 @@ def main(argv=None) -> int:
         import json
         print(json.dumps({
             "backend": cfg.backend, "model": cfg.model, "graph": cfg.graph,
+            "graphs": cfg.graphs,
             "seed_terms": cfg.seed_terms, "kg_mode": cfg.kg_mode,
             "workdir": str(cfg.workdir), "max_rounds": cfg.max_rounds,
             "max_papers": cfg.max_papers, "download_delay": cfg.download_delay_seconds,

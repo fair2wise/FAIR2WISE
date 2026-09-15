@@ -9,9 +9,9 @@ import os
 import re
 import shutil
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +36,30 @@ from .orchestrator_agent import (
     _paper_reference_followup,
 )
 from .paper_evidence_agent import PaperEvidenceAgent, summarize_extracted_terms
-from .retrieval_agent import RetrievalAgent
+from .retrieval_agent import (
+    RetrievalAgent,
+    _is_conceptual_question,
+    _is_numeric_claim,
+    _is_ops_layout_question,
+)
+from app.modules.f2w_agent.multi_kg import (
+    DEFAULT_JSON_GRAPH,
+    DEFAULT_JSON_GRAPH_PATHS,
+    DEFAULT_KG_QUERY_HOPS,
+    DEFAULT_KG_QUERY_MAX_NODES,
+    MAX_KG_QUERY_HOPS,
+    XRAY_DEMO_GRAPH,
+    clamp_kg_query_hops,
+    clamp_kg_query_max_nodes,
+    collect_graph_paths,
+    default_json_graph_paths,
+    graph_id_for_path,
+    graph_label_for_id,
+    is_xray_demo_graph,
+    normalize_graph_path,
+    primary_json_graph_path,
+    unique_graph_paths,
+)
 from app.modules.project_config import config_value, get_config
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
@@ -62,6 +85,7 @@ class ChatRequest(BaseModel):
     )
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     json_graph_path: Optional[str] = None
+    json_graph_paths: Optional[List[str]] = None
 
 
 class LinkedCodeSnippet(BaseModel):
@@ -71,6 +95,15 @@ class LinkedCodeSnippet(BaseModel):
     code_language: Optional[str] = None
     code_snippet: str
     publications: List[Dict[str, Any]] = Field(default_factory=list)
+    source_type: Optional[str] = None
+    repo_url: Optional[str] = None
+    repo_owner: Optional[str] = None
+    repo_name: Optional[str] = None
+    repo_commit_sha: Optional[str] = None
+    source_file_path: Optional[str] = None
+    source_file_url: Optional[str] = None
+    source_start_line: Optional[int] = None
+    source_end_line: Optional[int] = None
 
 
 class GraphNode(BaseModel):
@@ -83,6 +116,22 @@ class GraphNode(BaseModel):
     code_language: Optional[str] = None
     function_name: Optional[str] = None
     linked_code_snippets: List[LinkedCodeSnippet] = Field(default_factory=list)
+    graph_id: Optional[str] = None
+    graph_label: Optional[str] = None
+    formula: Optional[str] = None
+    source_papers: List[str] = Field(default_factory=list)
+    properties: List[Dict[str, Any]] = Field(default_factory=list)
+    extra_fields: Dict[str, Any] = Field(default_factory=dict)
+    source_type: Optional[str] = None
+    repo_url: Optional[str] = None
+    repo_owner: Optional[str] = None
+    repo_name: Optional[str] = None
+    repo_commit_sha: Optional[str] = None
+    source_file_path: Optional[str] = None
+    source_file_url: Optional[str] = None
+    source_start_line: Optional[int] = None
+    source_end_line: Optional[int] = None
+    repository_license: Optional[str] = None
 
 
 class GraphEdge(BaseModel):
@@ -222,6 +271,9 @@ class AgentSettingsResponse(BaseModel):
     extraction_mode: str = "targeted"
     targeted_max_pages: int = 6
     json_graph_path: Optional[str] = None
+    json_graph_paths: List[str] = Field(default_factory=list)
+    kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
+    kg_query_hops: int = DEFAULT_KG_QUERY_HOPS
     available_json_graphs: List[str] = Field(default_factory=list)
     available_cborg_models: List[str] = Field(default_factory=list)
     default_ollama_model: str = "deepseek-r1:70b"
@@ -235,11 +287,12 @@ class AgentSettingsUpdate(BaseModel):
     extraction_mode: Optional[str] = Field(default=None, pattern="^(full|targeted)$")
     targeted_max_pages: Optional[int] = Field(default=None, ge=1, le=100)
     json_graph_path: Optional[str] = None
+    json_graph_paths: Optional[List[str]] = None
+    kg_query_max_nodes: Optional[int] = Field(default=None, ge=10, le=1000)
+    kg_query_hops: Optional[int] = Field(default=None, ge=1, le=MAX_KG_QUERY_HOPS)
 
 
 ProgressEmitter = Callable[[str, str, Dict[str, Any]], Awaitable[None]]
-
-DEFAULT_JSON_GRAPH = "storage/kg/matkg_xray_papers_cborg_chat.json"
 
 # Legacy CBORG ids that still appear in old env/localStorage values.
 _CBORG_MODEL_ALIASES = {
@@ -286,19 +339,14 @@ def default_json_graph_path(
     *,
     configured_graph: Optional[str],
     available: Optional[List[str]] = None,
+    configured_graphs: Optional[Sequence[str]] = None,
 ) -> Optional[str]:
-    options = available if available is not None else list_storage_kg_json_files()
-    if configured_graph:
-        normalized = configured_graph.replace("\\", "/")
-        if normalized in options:
-            return normalized
-        configured_name = Path(configured_graph).name
-        for option in options:
-            if Path(option).name == configured_name:
-                return option
-    if DEFAULT_JSON_GRAPH.replace("\\", "/") in options:
-        return DEFAULT_JSON_GRAPH
-    return options[0] if options else configured_graph
+    paths = default_json_graph_paths(
+        configured_graphs=configured_graphs,
+        configured_graph=configured_graph,
+        available=available if available is not None else list_storage_kg_json_files(),
+    )
+    return primary_json_graph_path(paths) or configured_graph
 
 
 @dataclass
@@ -310,6 +358,9 @@ class RuntimeSettings:
     extraction_mode: str = "targeted"
     targeted_max_pages: int = 6
     json_graph_path: Optional[str] = None
+    json_graph_paths: List[str] = field(default_factory=list)
+    kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
+    kg_query_hops: int = DEFAULT_KG_QUERY_HOPS
 
 
 @dataclass
@@ -369,6 +420,173 @@ def _string_value(value: Any, default: str = "") -> str:
         return default
     text = str(value).strip()
     return text or default
+
+
+def _optional_int(value: Any) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number
+
+
+_CORE_NODE_KEYS = {
+    "id",
+    "name",
+    "label",
+    "category",
+    "type",
+    "description",
+    "definition",
+    "code_description",
+    "publications",
+    "source_papers",
+    "source_metadata",
+    "context_snippets",
+    "code_snippet",
+    "code_language",
+    "function_name",
+    "authors",
+    "paper_authors",
+    "institutions",
+    "doi",
+    "journal",
+    "volume",
+    "issue",
+    "pages_range",
+    "abstract_text",
+    "keywords",
+    "publication_year",
+    "paper_title",
+    "pages",
+    "formula",
+    "formula_validation",
+    "properties",
+    "relations",
+    "graph_id",
+    "graph_label",
+    "repo_url",
+    "repo_owner",
+    "repo_name",
+    "repo_default_branch",
+    "repo_commit_sha",
+    "source_file_path",
+    "source_file_url",
+    "source_start_line",
+    "source_end_line",
+    "source_type",
+    "repository_license",
+    "license_warning",
+    "source_score",
+}
+
+
+def _source_paper_list(raw: Dict[str, Any]) -> List[str]:
+    papers = raw.get("source_papers") or []
+    if not isinstance(papers, list):
+        papers = [papers]
+    values: List[str] = []
+    seen: set[str] = set()
+    for paper in papers:
+        text = _string_value(paper)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        values.append(text)
+    return values
+
+
+def _property_entries(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]] = []
+    for item in raw.get("properties") or []:
+        if isinstance(item, dict) and item:
+            entries.append(item)
+    return entries
+
+
+def _node_extra_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
+    extra: Dict[str, Any] = {}
+    for key, value in raw.items():
+        if key in _CORE_NODE_KEYS or value in (None, "", [], {}):
+            continue
+        if isinstance(value, str):
+            extra[key] = value[:800] + "…" if len(value) > 800 else value
+            continue
+        if isinstance(value, (int, float, bool)):
+            extra[key] = value
+            continue
+        if isinstance(value, list) and len(value) <= 24:
+            extra[key] = value
+            continue
+        if isinstance(value, dict) and len(value) <= 16:
+            extra[key] = value
+    return extra
+
+
+def _provenance_kwargs(raw: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "source_type": _string_value(raw.get("source_type")) or None,
+        "repo_url": _string_value(raw.get("repo_url")) or None,
+        "repo_owner": _string_value(raw.get("repo_owner")) or None,
+        "repo_name": _string_value(raw.get("repo_name")) or None,
+        "repo_commit_sha": _string_value(raw.get("repo_commit_sha")) or None,
+        "source_file_path": _string_value(raw.get("source_file_path")) or None,
+        "source_file_url": _string_value(raw.get("source_file_url")) or None,
+        "source_start_line": _optional_int(raw.get("source_start_line")),
+        "source_end_line": _optional_int(raw.get("source_end_line")),
+    }
+
+
+def _split_display_node_id(node_id: str, graph_ids: Sequence[str]) -> tuple[Optional[str], str]:
+    cleaned = str(node_id or "").strip()
+    for gid in sorted((str(item) for item in graph_ids if str(item)), key=len, reverse=True):
+        prefix = f"{gid}:"
+        if cleaned.startswith(prefix) and len(cleaned) > len(prefix):
+            return gid, cleaned[len(prefix):]
+    return None, cleaned
+
+
+def _tag_graph_node(node: GraphNode, graph_path: Path, graph_id: Optional[str] = None) -> GraphNode:
+    gid = _string_value(graph_id) or graph_id_for_path(str(graph_path))
+    node.graph_id = node.graph_id or gid
+    node.graph_label = node.graph_label or graph_label_for_id(str(node.graph_id))
+    return node
+
+
+def resolve_graph_node(
+    node_id: str,
+    *,
+    fallback_path: Path,
+    graph_paths_by_id: Optional[Dict[str, Path]] = None,
+) -> Optional[GraphNode]:
+    mapping = dict(graph_paths_by_id or {})
+    fallback_id = graph_id_for_path(str(fallback_path))
+    if fallback_id not in mapping:
+        mapping[fallback_id] = fallback_path
+    gid, raw_id = _split_display_node_id(node_id, list(mapping.keys()))
+    search_order: List[tuple[str, Path, str]] = []
+    if gid and gid in mapping:
+        search_order.append((gid, mapping[gid], raw_id))
+    search_order.append((fallback_id, fallback_path, node_id))
+    if raw_id != node_id:
+        search_order.append((fallback_id, fallback_path, raw_id))
+    for other_id, path in mapping.items():
+        search_order.append((other_id, path, raw_id))
+        if raw_id != node_id:
+            search_order.append((other_id, path, node_id))
+    seen: set[tuple[str, str]] = set()
+    for graph_key, path, lookup_id in search_order:
+        key = (str(path), lookup_id)
+        if key in seen or not lookup_id:
+            continue
+        seen.add(key)
+        node = graph_node_from_file(path, lookup_id)
+        if node is None:
+            continue
+        return _tag_graph_node(node, path, graph_key)
+    return None
 
 
 def _safe_candidate_filename(candidate: Dict[str, Any]) -> str:
@@ -588,6 +806,7 @@ def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[
                 code_language=_string_value(raw.get("code_language")) or None,
                 code_snippet=code,
                 publications=_publications_for_graph_node(raw),
+                **_provenance_kwargs(raw),
             )
         )
     return snippets
@@ -609,19 +828,19 @@ def _graph_node_from_raw(
         or raw.get("code_description")
     )
     code_snippet: Optional[str] = None
-    code_language: Optional[str] = None
-    function_name: Optional[str] = None
+    code_language = _string_value(raw.get("code_language")) or None
+    function_name = _string_value(raw.get("function_name")) or None
     if include_code:
         code_text = str(raw.get("code_snippet") or "").strip()
         if code_text:
             code_snippet = code_text
-            code_language = _string_value(raw.get("code_language")) or None
-            function_name = _string_value(raw.get("function_name")) or None
 
     linked_code_snippets: List[LinkedCodeSnippet] = []
     if include_linked_code and graph_data is not None:
         linked_code_snippets = _linked_code_snippets_from_data(graph_data, node_id)
 
+    formula = _string_value(raw.get("formula")) or None
+    provenance = _provenance_kwargs(raw)
     return GraphNode(
         id=node_id,
         label=label,
@@ -632,6 +851,12 @@ def _graph_node_from_raw(
         code_language=code_language,
         function_name=function_name,
         linked_code_snippets=linked_code_snippets,
+        formula=formula,
+        source_papers=_source_paper_list(raw),
+        properties=_property_entries(raw),
+        extra_fields=_node_extra_fields(raw),
+        repository_license=_string_value(raw.get("repository_license")) or None,
+        **provenance,
     )
 
 
@@ -655,11 +880,14 @@ def graph_node_from_file(
         if not isinstance(raw, dict):
             continue
         if _string_value(raw.get("id")) == node_id:
-            return _graph_node_from_raw(
-                raw,
-                include_code=True,
-                include_linked_code=include_linked_code,
-                graph_data=data,
+            return _tag_graph_node(
+                _graph_node_from_raw(
+                    raw,
+                    include_code=True,
+                    include_linked_code=include_linked_code,
+                    graph_data=data,
+                ),
+                graph_path,
             )
     return None
 
@@ -852,7 +1080,8 @@ def graph_payload_from_file(graph_path: Path) -> GraphPayload:
             node_id = _string_value(raw.get("id"))
             if not node_id:
                 continue
-            nodes.append(_graph_node_from_raw(raw))
+            node = _graph_node_from_raw(raw)
+            nodes.append(_tag_graph_node(node, graph_path))
 
     if isinstance(raw_edges, list):
         for raw in raw_edges:
@@ -932,6 +1161,120 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
                 )
 
     return {"nodes": nodes, "edges": edges}
+
+
+def query_graph_payload(
+    *,
+    selected_ids: Sequence[str],
+    selected_hits: Optional[Sequence[Any]] = None,
+    graph_path: Path,
+    graph_paths_by_id: Optional[Dict[str, Path]] = None,
+) -> GraphPayload:
+    """Induced query subgraph across selected KGs — never a concatenated full dump.
+
+    Identity is ``(graph_id, node id)``. Duplicate ids from two graphs are
+    qualified as ``{graph_id}:{id}`` so the viewer can show both.
+    """
+    path_map = dict(graph_paths_by_id or {})
+    fallback_id = graph_id_for_path(str(graph_path))
+    fallback_label = graph_label_for_id(fallback_id)
+    if fallback_id not in path_map:
+        path_map[fallback_id] = graph_path
+
+    hits: List[Dict[str, str]] = []
+    if isinstance(selected_hits, list) and selected_hits:
+        for raw in selected_hits:
+            if not isinstance(raw, dict):
+                continue
+            node_id = _string_value(raw.get("id"))
+            if not node_id:
+                continue
+            gid = _string_value(raw.get("graph_id")) or fallback_id
+            hits.append(
+                {
+                    "id": node_id,
+                    "graph_id": gid,
+                    "graph_label": _string_value(raw.get("graph_label"))
+                    or graph_label_for_id(gid),
+                }
+            )
+    else:
+        for node_id in selected_ids:
+            cleaned = str(node_id).strip()
+            if not cleaned:
+                continue
+            hits.append(
+                {
+                    "id": cleaned,
+                    "graph_id": fallback_id,
+                    "graph_label": fallback_label,
+                }
+            )
+
+    if not hits:
+        return GraphPayload(nodes=[], edges=[], source_path=f"query:{graph_path}")
+
+    id_counts: Dict[str, int] = {}
+    for hit in hits:
+        id_counts[hit["id"]] = id_counts.get(hit["id"], 0) + 1
+    colliding = {node_id for node_id, count in id_counts.items() if count > 1}
+
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    for hit in hits:
+        grouped.setdefault(hit["graph_id"], []).append(hit)
+
+    remap: Dict[tuple[str, str], str] = {}
+    nodes_by_display: Dict[str, Dict[str, Any]] = {}
+    edges: List[Dict[str, Any]] = []
+    seen_edges: set[tuple[str, str, str]] = set()
+    source_names: List[str] = []
+
+    for gid, group in grouped.items():
+        path = path_map.get(gid) or graph_path
+        source_names.append(str(path))
+        wanted = [hit["id"] for hit in group]
+        subset = graph_subset_from_file(path, wanted)
+        label = group[0]["graph_label"]
+        for node in subset.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            orig = _string_value(node.get("id"))
+            if not orig:
+                continue
+            display = f"{gid}:{orig}" if orig in colliding else orig
+            remap[(gid, orig)] = display
+            tagged = dict(node)
+            tagged["id"] = display
+            tagged["graph_id"] = gid
+            tagged["graph_label"] = label
+            nodes_by_display.setdefault(display, tagged)
+        for edge in subset.get("edges") or []:
+            if not isinstance(edge, dict):
+                continue
+            source = remap.get((gid, _string_value(edge.get("source"))))
+            target = remap.get((gid, _string_value(edge.get("target"))))
+            predicate = _string_value(edge.get("predicate"), "rel:related_to")
+            if not source or not target:
+                continue
+            key = (source, predicate, target)
+            if key in seen_edges:
+                continue
+            seen_edges.add(key)
+            edges.append({"source": source, "target": target, "predicate": predicate})
+
+    ordered_ids: List[str] = []
+    seen_display: set[str] = set()
+    for hit in hits:
+        display = remap.get((hit["graph_id"], hit["id"]))
+        if not display or display in seen_display:
+            continue
+        seen_display.add(display)
+        ordered_ids.append(display)
+
+    nodes = [nodes_by_display[node_id] for node_id in ordered_ids if node_id in nodes_by_display]
+    unique_sources = unique_graph_paths(source_names) or [str(graph_path)]
+    source_path = unique_sources[0] if len(unique_sources) == 1 else f"query:{','.join(unique_sources)}"
+    return GraphPayload(nodes=nodes, edges=edges, source_path=source_path)
 
 
 def _model_to_jsonable(model: BaseModel) -> Dict[str, Any]:
@@ -1048,6 +1391,49 @@ def _extraction_outcome_text(result: Dict[str, Any]) -> str:
     return "Extraction completed: " + "; ".join(parts) + "."
 
 
+JSON_GRAPH_NO_EVIDENCE_REFUSAL = (
+    "The selected JSON graph did not contain enough direct evidence to answer this question."
+)
+
+
+def _json_graph_insufficient_answer(verdict: Dict[str, Any]) -> str:
+    """Canned refusal for empty retrieval or invented-number gaps.
+
+    On-topic hits that lack a numeric slot/snippet get a missing-topics message
+    instead of pretending the graph had nothing to teach. Conceptual / how-to
+    questions must not use this path when nodes exist.
+    """
+    selected = [str(node).strip() for node in (verdict.get("selected") or []) if str(node).strip()]
+    if verdict.get("no_evidence") or not selected:
+        return JSON_GRAPH_NO_EVIDENCE_REFUSAL
+    missing = [
+        str(topic).strip()
+        for topic in (verdict.get("missing_topics") or [])
+        if str(topic).strip()
+    ]
+    missing_text = (
+        "\n".join(f"- {topic}" for topic in missing)
+        if missing
+        else "- a specific grounded measurement fact"
+    )
+    return (
+        "Retrieved knowledge-graph nodes are related to the question, but they do not "
+        "contain the specific measurement facts needed (numeric slots, photon energy, or "
+        "a cited snippet). Missing:\n"
+        f"{missing_text}"
+    )
+
+
+def _json_graph_should_use_canned_refusal(question: str, verdict: Dict[str, Any]) -> bool:
+    """Canned insufficient_json_graph only for empty retrieval or numeric-slot gaps."""
+    selected = [str(node).strip() for node in (verdict.get("selected") or []) if str(node).strip()]
+    if verdict.get("no_evidence") or not selected:
+        return True
+    if _is_conceptual_question(question):
+        return False
+    return _is_numeric_claim(question)
+
+
 def _post_extraction_answer(
     extraction: Dict[str, Any],
     term_report: Dict[str, Any],
@@ -1152,9 +1538,74 @@ def _history_payload(messages: Optional[List[ChatMessageInput]]) -> List[Dict[st
     return history
 
 
+_META_GROUNDING_RE = re.compile(
+    r"\b("
+    r"more general|less strict|less rigid|try again|"
+    r"be (?:more )?general|loosen|not so strict|"
+    r"you can be more|answer more (?:broadly|generally)|"
+    r"don't be so (?:strict|literal)|without (?:being )?so strict|"
+    r"be looser|less literal"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_meta_grounding_instruction(question: str) -> bool:
+    """True when the turn asks to re-answer with looser grounding, not a new topic."""
+    return bool(_META_GROUNDING_RE.search(_normalize_chat_text(question)))
+
+
+def _is_pure_greeting(question: str) -> bool:
+    normalized = _normalize_chat_text(question)
+    return bool(
+        re.fullmatch(
+            r"(hi|hello|hey|thanks|thank you|good (morning|afternoon|evening)|"
+            r"how are you|testing|test|help|what can you do|how do i change settings)"
+            r"[\s!?.]*",
+            normalized,
+        )
+    )
+
+
+def _pending_scientific_question(history: List[Dict[str, str]]) -> str:
+    """Last user scientific/code ask that is not a meta-instruction or greeting."""
+    for message in reversed(history or []):
+        if str(message.get("role") or "").strip() != "user":
+            continue
+        content = str(message.get("content") or "").strip()
+        if not content:
+            continue
+        if _looks_meta_grounding_instruction(content) or _is_pure_greeting(content):
+            continue
+        return content
+    return ""
+
+
+def _compose_history_aware_question(question: str, history: List[Dict[str, str]]) -> str:
+    """Deterministic rewrite so follow-ups keep the pending scientific question."""
+    pending = _pending_scientific_question(history)
+    current = (question or "").strip()
+    if not pending:
+        return current
+    if _looks_meta_grounding_instruction(current):
+        return (
+            f"{pending} "
+            f"(Follow-up instruction: {current}. Re-answer that previous request with "
+            "looser grounding. Do not treat this as a new topic. Keep any pending "
+            "code, analysis, or how-to ask.)"
+        )
+    if _looks_contextual_followup(current):
+        return f"{current} (Continuing from previous question: {pending})"
+    return current
+
+
 def _needs_history_rewrite(question: str, history: List[Dict[str, str]]) -> bool:
     if not history:
         return False
+    if _is_pure_greeting(question):
+        return False
+    if _looks_meta_grounding_instruction(question):
+        return True
     return _looks_contextual_followup(question)
 
 
@@ -1167,6 +1618,10 @@ def _looks_contextual_followup(question: str) -> bool:
         r"\b(first|second|third|last|previous|latter|former)\b",
         r"\b(one|ones|same|other|another)\b",
         r"^what about\b",
+        r"^what kind\b",
+        r"^what type\b",
+        r"^what does\b",
+        r"^which samples\b",
         r"^how about\b",
         r"^compare\b",
         r"^and\b",
@@ -1179,8 +1634,15 @@ def _looks_contextual_followup(question: str) -> bool:
         r"^find more\b",
         r"^give me more\b",
         r"^show more\b",
+        r"^show (me )?(an )?example\b",
+        r"^give (me )?(an )?example\b",
         r"\bsame topic\b",
         r"\bthis topic\b",
+        r"\bkind of samples\b",
+        r"\bexample code\b",
+        r"\btry again\b",
+        r"\bmore general\b",
+        r"\bless strict\b",
     )
     return any(re.search(pattern, normalized) for pattern in followup_patterns)
 
@@ -1444,9 +1906,18 @@ class AgentPipelineService:
             )
         }
         available_json_graphs = list_storage_kg_json_files()
-        initial_graph_source = "json" if cfg.graph and cfg.kg_mode == "json" else "splash"
+        initial_graph_source = "json" if (cfg.graph or getattr(cfg, "graphs", None)) and cfg.kg_mode == "json" else "splash"
         initial_backend = cfg.backend if cfg.backend in {"cborg", "ollama"} else "cborg"
         initial_model = default_runtime_model(initial_backend, cfg.model)
+        configured_graphs = collect_graph_paths(getattr(cfg, "graphs", None), cfg.graph)
+        if initial_graph_source == "json":
+            initial_paths = default_json_graph_paths(
+                configured_graphs=configured_graphs or None,
+                configured_graph=cfg.graph if not configured_graphs else None,
+                available=available_json_graphs,
+            )
+        else:
+            initial_paths = default_json_graph_paths(available=available_json_graphs)
         self.runtime = RuntimeSettings(
             backend=initial_backend,
             model=initial_model,
@@ -1454,10 +1925,12 @@ class AgentPipelineService:
             workflow_mode=cfg.workflow_mode if cfg.workflow_mode in {"deterministic", "agentic"} else "agentic",
             extraction_mode=cfg.extraction_mode if cfg.extraction_mode in {"full", "targeted"} else "targeted",
             targeted_max_pages=cfg.targeted_max_pages if cfg.targeted_max_pages > 0 else 6,
-            json_graph_path=cfg.graph if cfg.graph and initial_graph_source == "json" else default_json_graph_path(
-                configured_graph=cfg.graph,
-                available=available_json_graphs,
+            json_graph_path=primary_json_graph_path(initial_paths),
+            json_graph_paths=list(initial_paths),
+            kg_query_max_nodes=clamp_kg_query_max_nodes(
+                getattr(cfg, "kg_query_max_nodes", DEFAULT_KG_QUERY_MAX_NODES)
             ),
+            kg_query_hops=clamp_kg_query_hops(getattr(cfg, "kg_query_hops", DEFAULT_KG_QUERY_HOPS)),
         )
         self.cfg.model = initial_model
         self._rebuild_agents()
@@ -1526,9 +1999,12 @@ class AgentPipelineService:
         graph_file = str(self.graph_path())
         self.retrieval = RetrievalAgent(
             graph_file=graph_file,
+            graph_files=self._runtime_json_paths() if self.runtime.graph_source == "json" else [graph_file],
             graph_source=self.runtime.graph_source,
             backend=self.runtime.backend,
             model=model,
+            kg_query_hops=self.runtime.kg_query_hops,
+            kg_query_max_nodes=self.runtime.kg_query_max_nodes,
         )
         self.download = DownloadAgent(
             backend=self.runtime.backend,
@@ -1562,19 +2038,31 @@ class AgentPipelineService:
             return self.coord.session_kg
         return Path(self.coord.initial_graph)
 
+    def _runtime_json_paths(self) -> List[str]:
+        paths = unique_graph_paths(self.runtime.json_graph_paths or [])
+        if self.runtime.json_graph_path and self.runtime.json_graph_path not in paths:
+            paths = unique_graph_paths([self.runtime.json_graph_path, *paths])
+        return paths
+
     def graph_path(self) -> Path:
-        if self.runtime.graph_source == "json" and self.runtime.json_graph_path:
-            return self._resolve_runtime_json_graph_path(self.runtime.json_graph_path)
+        if self.runtime.graph_source == "json":
+            for path in self._runtime_json_paths():
+                resolved = self._try_resolve_runtime_json_graph_path(path)
+                if resolved is not None:
+                    return resolved
         return self._session_graph_path()
 
     def settings_response(self) -> AgentSettingsResponse:
         available = list_storage_kg_json_files()
-        json_graph_path = self.runtime.json_graph_path
-        if self.runtime.graph_source == "json" and not json_graph_path:
-            json_graph_path = default_json_graph_path(
+        paths = self._runtime_json_paths()
+        if self.runtime.graph_source == "json" and not paths:
+            paths = default_json_graph_paths(
+                configured_graphs=getattr(self.cfg, "graphs", None),
                 configured_graph=self.cfg.graph,
                 available=available,
             )
+            self.runtime.json_graph_paths = list(paths)
+            self.runtime.json_graph_path = primary_json_graph_path(paths)
         return AgentSettingsResponse(
             backend=self.runtime.backend,
             model=self._active_model(),
@@ -1582,7 +2070,10 @@ class AgentPipelineService:
             workflow_mode=self.runtime.workflow_mode,
             extraction_mode=self.runtime.extraction_mode,
             targeted_max_pages=self.runtime.targeted_max_pages,
-            json_graph_path=json_graph_path,
+            json_graph_path=self.runtime.json_graph_path or primary_json_graph_path(paths),
+            json_graph_paths=paths,
+            kg_query_max_nodes=self.runtime.kg_query_max_nodes,
+            kg_query_hops=self.runtime.kg_query_hops,
             available_json_graphs=available,
             available_cborg_models=list_cborg_models(current_model=self.runtime.model),
             default_ollama_model=default_ollama_model_name(),
@@ -1627,43 +2118,106 @@ class AgentPipelineService:
                 self.runtime.targeted_max_pages = int(update.targeted_max_pages)
                 self.cfg.targeted_max_pages = int(update.targeted_max_pages)
 
+            if update.kg_query_max_nodes is not None:
+                self.runtime.kg_query_max_nodes = clamp_kg_query_max_nodes(update.kg_query_max_nodes)
+            if update.kg_query_hops is not None:
+                self.runtime.kg_query_hops = clamp_kg_query_hops(update.kg_query_hops)
+            setter = getattr(self.retrieval, "set_query_limits", None)
+            if callable(setter):
+                setter(
+                    hops=self.runtime.kg_query_hops,
+                    max_nodes=self.runtime.kg_query_max_nodes,
+                )
+
+            if update.json_graph_paths is not None:
+                normalized_paths = unique_graph_paths(update.json_graph_paths)
+                if normalized_paths != self._runtime_json_paths():
+                    self.runtime.json_graph_paths = normalized_paths
+                    if update.json_graph_path is None:
+                        self.runtime.json_graph_path = primary_json_graph_path(normalized_paths)
+                    graph_changed = True
+
             if update.json_graph_path is not None:
-                normalized = update.json_graph_path.replace("\\", "/")
-                if normalized != (self.runtime.json_graph_path or "").replace("\\", "/"):
+                normalized = normalize_graph_path(update.json_graph_path)
+                if normalized != (self.runtime.json_graph_path or ""):
                     self.runtime.json_graph_path = normalized
                     graph_changed = True
+                if update.json_graph_paths is None:
+                    self.runtime.json_graph_paths = [normalized] if normalized else []
 
             available = list_storage_kg_json_files()
             if self.runtime.graph_source == "json":
-                if not self.runtime.json_graph_path:
-                    self.runtime.json_graph_path = default_json_graph_path(
+                if not self._runtime_json_paths():
+                    self.runtime.json_graph_paths = default_json_graph_paths(
+                        configured_graphs=getattr(self.cfg, "graphs", None),
                         configured_graph=self.cfg.graph,
                         available=available,
                     )
-                if not self.runtime.json_graph_path:
+                    self.runtime.json_graph_path = primary_json_graph_path(self.runtime.json_graph_paths)
+                if not self._runtime_json_paths() and not available:
                     raise ValueError("No JSON knowledge graph files found in storage/kg")
-                active_graph_path = self._resolve_runtime_json_graph_path(self.runtime.json_graph_path)
+                active_graph_path = self.graph_path()
                 active_graph_source = "json"
+                active_graph_files = [
+                    str(resolved)
+                    for path in self._runtime_json_paths()
+                    if (resolved := self._try_resolve_runtime_json_graph_path(path)) is not None
+                ]
             else:
                 active_graph_path = self._session_graph_path()
                 active_graph_source = "splash"
+                active_graph_files = [str(active_graph_path)]
                 if graph_changed:
                     self._sync_session_graph_from_splash()
                     active_graph_path = self._session_graph_path()
+                    active_graph_files = [str(active_graph_path)]
 
             if backend_changed or model_changed:
                 self._rebuild_agents()
 
             if backend_changed or graph_changed:
-                await self.retrieval.reload_kg(
+                await self._reload_retrieval(
                     str(active_graph_path),
                     graph_source=active_graph_source,
+                    graph_files=active_graph_files,
                 )
 
             return self.settings_response()
 
     def graph_payload(self) -> GraphPayload:
-        return graph_payload_from_file(self.graph_path())
+        path = self.graph_path()
+        if not path.exists():
+            return GraphPayload(nodes=[], edges=[], source_path=str(path))
+        return graph_payload_from_file(path)
+
+    def _retrieval_graph_paths(self, fallback: Path) -> Dict[str, Path]:
+        mapping: Dict[str, Path] = {}
+        graphs = getattr(self.retrieval, "_graphs", None) or {}
+        if isinstance(graphs, dict):
+            for gid, kg in graphs.items():
+                raw = getattr(kg, "graph_path", None)
+                if raw:
+                    mapping[str(gid)] = Path(str(raw))
+        if not mapping:
+            mapping[graph_id_for_path(str(fallback))] = fallback
+        return mapping
+
+    def _query_graph_payload(self, verdict: Dict[str, Any], graph_path: Path) -> GraphPayload:
+        selected_ids = [str(node) for node in (verdict.get("selected") or []) if str(node).strip()]
+        selected_hits = verdict.get("selected_hits") or []
+        return query_graph_payload(
+            selected_ids=selected_ids,
+            selected_hits=selected_hits if isinstance(selected_hits, list) else [],
+            graph_path=graph_path,
+            graph_paths_by_id=self._retrieval_graph_paths(graph_path),
+        )
+
+    def _query_graph_event(self, payload: GraphPayload) -> Dict[str, Any]:
+        dumped = _model_to_jsonable(payload)
+        return {
+            "nodes": dumped.get("nodes") or [],
+            "edges": dumped.get("edges") or [],
+        }
 
     async def search_graph_nodes(self, query: str, limit: int = 10) -> GraphNodeSearchResponse:
         query = query.strip()
@@ -1673,10 +2227,17 @@ class AgentPipelineService:
         ranked = await self.retrieval.search_node_scores(query, min(25, max(limit * 3, limit)))
         graph_path = self.graph_path()
         results: List[GraphNodeSearchResult] = []
+        graphs = getattr(self.retrieval, "_graphs", {}) or {}
         for match in ranked.get("matches") or []:
-            node = graph_node_from_file(graph_path, _string_value(match.get("id")))
+            gid = _string_value(match.get("graph_id")) or None
+            kg = graphs.get(gid) if gid else None
+            match_path = Path(getattr(kg, "graph_path", "") or graph_path)
+            node = graph_node_from_file(match_path, _string_value(match.get("id")))
             if node is None or node.type.strip().lower() == "unknown":
                 continue
+            if gid:
+                node.graph_id = gid
+                node.graph_label = graph_label_for_id(gid)
             results.append(
                 GraphNodeSearchResult(node=node, score=float(match.get("score") or 0.0))
             )
@@ -2112,17 +2673,59 @@ class AgentPipelineService:
             raise FileNotFoundError(f"JSON graph not found: {path}")
         return graph_path
 
-    def _resolve_runtime_json_graph_path(self, path: str) -> Path:
+    def _configured_graph_paths(self) -> List[Path]:
+        roots: List[Path] = []
+        for raw in collect_graph_paths(getattr(self.cfg, "graphs", None), self.cfg.graph):
+            candidate = Path(raw)
+            if not candidate.is_absolute():
+                candidate = (project_root() / candidate).resolve()
+            else:
+                candidate = candidate.resolve()
+            roots.append(candidate)
+        return roots
+
+    def _try_resolve_runtime_json_graph_path(self, path: str) -> Optional[Path]:
+        try:
+            return self._resolve_runtime_json_graph_path(path, missing_ok=True)
+        except FileNotFoundError:
+            logger.warning("Skipping missing JSON graph %s", path)
+            return None
+        except ValueError:
+            raise
+
+    def _resolve_runtime_json_graph_path(self, path: str, *, missing_ok: bool = False) -> Path:
         graph_path = Path(path)
         if not graph_path.is_absolute():
             graph_path = (project_root() / graph_path).resolve()
         else:
             graph_path = graph_path.resolve()
-        if self.cfg.graph and graph_path == Path(self.cfg.graph).resolve():
+        if any(graph_path == configured for configured in self._configured_graph_paths()):
             if not graph_path.exists():
+                if missing_ok:
+                    raise FileNotFoundError(f"JSON graph not found: {path}")
                 raise FileNotFoundError(f"JSON graph not found: {path}")
+            if graph_path.stat().st_size == 0:
+                if missing_ok:
+                    raise FileNotFoundError(f"JSON graph empty: {path}")
+                raise FileNotFoundError(f"JSON graph empty: {path}")
             return graph_path
-        return self._resolve_json_graph_path(path)
+        resolved = self._resolve_json_graph_path(path)
+        if resolved.stat().st_size == 0:
+            raise FileNotFoundError(f"JSON graph empty: {path}")
+        return resolved
+
+    async def _reload_retrieval(
+        self,
+        graph_file: str,
+        *,
+        graph_source: str,
+        graph_files: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        reload = self.retrieval.reload_kg
+        try:
+            return await reload(graph_file, graph_source=graph_source, graph_files=graph_files)
+        except TypeError:
+            return await reload(graph_file, graph_source=graph_source)
 
     async def ask(
         self,
@@ -2132,6 +2735,7 @@ class AgentPipelineService:
         session_id: Optional[str] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
+        json_graph_paths: Optional[List[str]] = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         original_question = question.strip()
@@ -2182,6 +2786,7 @@ class AgentPipelineService:
                     await self._finalize_memory(original_question, response, effective_question=original_question)
                     return response
             effective_question = str(prepared.get("question") or original_question)
+            history = _history_payload(messages)
             if prepared.get("status") == "direct_download_search":
                 response = await self._start_direct_download_search(original_question, emit=None)
                 effective_question = str(
@@ -2193,6 +2798,8 @@ class AgentPipelineService:
                     emit=None,
                     graph_source=graph_source,
                     json_graph_path=json_graph_path,
+                    json_graph_paths=json_graph_paths,
+                    history=history,
                 )
             self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
             auto_finalized = False
@@ -2217,6 +2824,7 @@ class AgentPipelineService:
         session_id: Optional[str] = None,
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
+        json_graph_paths: Optional[List[str]] = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         original_question = question.strip()
@@ -2267,6 +2875,7 @@ class AgentPipelineService:
                     await self._finalize_memory(original_question, response, effective_question=original_question)
                     return response
             effective_question = str(prepared.get("question") or original_question)
+            history = _history_payload(messages)
             if prepared.get("status") == "direct_download_search":
                 response = await self._start_direct_download_search(original_question, emit=emit)
                 effective_question = str(
@@ -2278,6 +2887,8 @@ class AgentPipelineService:
                     emit=emit,
                     graph_source=graph_source,
                     json_graph_path=json_graph_path,
+                    json_graph_paths=json_graph_paths,
+                    history=history,
                 )
             self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
             auto_finalized = False
@@ -2614,8 +3225,20 @@ class AgentPipelineService:
         messages: Optional[List[ChatMessageInput]],
     ) -> Dict[str, str]:
         history = _history_payload(messages)
-        route = await self._judge_agent_requirement(question, history)
+        pending = _pending_scientific_question(history)
+        effective = question
+        if _needs_history_rewrite(question, history) or (
+            self.memory.has_context() and _looks_contextual_followup(question)
+        ) or (_looks_meta_grounding_instruction(question) and pending):
+            rewritten = await self._rewrite_standalone_question(question, history)
+            effective = rewritten or _compose_history_aware_question(question, history) or question
+        route = await self._judge_agent_requirement(effective, history)
         if not route.get("requires_agents", True):
+            if pending and (
+                _looks_meta_grounding_instruction(question)
+                or _looks_contextual_followup(question)
+            ):
+                return {"status": "kg_question", "question": effective}
             answer = await self._generate_direct_response(question, history)
             return {
                 "status": "direct_response",
@@ -2623,12 +3246,7 @@ class AgentPipelineService:
                 "answer": answer,
                 "reason": str(route.get("reason") or "LLM router determined agents are not needed."),
             }
-        if not _needs_history_rewrite(question, history) and not (
-            self.memory.has_context() and _looks_contextual_followup(question)
-        ):
-            return {"status": "kg_question", "question": question}
-        rewritten = await self._rewrite_standalone_question(question, history)
-        return {"status": "kg_question", "question": rewritten or question}
+        return {"status": "kg_question", "question": effective}
 
     async def _prepare_orchestrated_question(
         self,
@@ -2641,15 +3259,35 @@ class AgentPipelineService:
         ``_judge_agent_requirement`` is no longer part of production routing. A
         monkeypatched instance method is honored as a compatibility hint for
         older integrations while they migrate.
+
+        Conversation history is applied *before* classification so follow-ups
+        and meta-instructions ("be more general", "try again") are not treated
+        as a new mundane chat.
         """
         history = _history_payload(messages)
+        pending = _pending_scientific_question(history)
+        effective = question
+        if _needs_history_rewrite(question, history) or (
+            self.memory.has_context() and _looks_contextual_followup(question)
+        ) or (_looks_meta_grounding_instruction(question) and pending):
+            rewritten = await self._rewrite_standalone_question(question, history)
+            effective = rewritten or _compose_history_aware_question(question, history) or question
+
+        if _looks_meta_grounding_instruction(question) and pending:
+            return {"status": "kg_question", "question": effective}
+
         route_hint: Optional[str] = None
         if "_judge_agent_requirement" in self.__dict__:
-            legacy = await self._judge_agent_requirement(question, history)
+            legacy = await self._judge_agent_requirement(effective, history)
             route_hint = "retrieve_kg" if legacy.get("requires_agents", True) else "direct_response"
-        decision = await self._orchestrator_decision(question, emit, route_hint=route_hint)
+        decision = await self._orchestrator_decision(effective, emit, route_hint=route_hint)
         action_name = str(decision.get("action") or "stop_insufficient")
         if action_name == "direct_response":
+            if pending and (
+                _looks_meta_grounding_instruction(question)
+                or _looks_contextual_followup(question)
+            ):
+                return {"status": "kg_question", "question": effective}
             classification = str(
                 decision.get("classification") or "mundane_conversation"
             )
@@ -2668,15 +3306,10 @@ class AgentPipelineService:
         if action_name != "retrieve_kg":
             return {
                 "status": "kg_question",
-                "question": question,
+                "question": effective,
                 "reason": str(decision.get("reason") or "Invalid initial transition."),
             }
-        if not _needs_history_rewrite(question, history) and not (
-            self.memory.has_context() and _looks_contextual_followup(question)
-        ):
-            return {"status": "kg_question", "question": question}
-        rewritten = await self._rewrite_standalone_question(question, history)
-        return {"status": "kg_question", "question": rewritten or question}
+        return {"status": "kg_question", "question": effective}
 
     async def _start_direct_download_search(
         self,
@@ -2950,7 +3583,11 @@ class AgentPipelineService:
         prompt = (
             "Rewrite the current user turn into a standalone materials-science question "
             "using the conversation history. Do not answer. Preserve technical terms. "
-            "Return only the rewritten question.\n\n"
+            "If the current turn is a meta-instruction (more general, try again, less "
+            "strict, looser grounding), rewrite it as a re-ask of the previous scientific, "
+            "code, or analysis question with looser grounding. Never drop a pending code "
+            "or analysis request. Never treat those meta-instructions as a new greeting "
+            "or empty topic. Return only the rewritten question.\n\n"
             f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"CURRENT_USER_TURN:\n{question}"
@@ -2963,9 +3600,86 @@ class AgentPipelineService:
             loop = asyncio.get_event_loop()
             rewritten = await loop.run_in_executor(None, run)
         except Exception:
-            return question
+            return _compose_history_aware_question(question, history) or question
         rewritten = re.sub(r"^['\"]|['\"]$", "", rewritten.strip())
-        return rewritten if rewritten else question
+        composed = _compose_history_aware_question(question, history)
+        if not rewritten:
+            return composed or question
+        if _looks_meta_grounding_instruction(question) and _looks_meta_grounding_instruction(rewritten):
+            return composed or rewritten
+        return rewritten
+
+    async def _generate_json_graph_leeway_answer(
+        self,
+        question: str,
+        verdict: Dict[str, Any],
+        history: Optional[List[Dict[str, str]]] = None,
+    ) -> str:
+        """Elaborate when JSON-KG nodes exist but numeric slots / code objects do not."""
+        missing = [
+            str(topic).strip()
+            for topic in (verdict.get("missing_topics") or [])
+            if str(topic).strip()
+        ]
+        selected = [
+            str(node).strip()
+            for node in (verdict.get("selected") or [])
+            if str(node).strip()
+        ]
+        layout = _is_ops_layout_question(question)
+        if layout:
+            preamble = (
+                "If directed beam-path topology is thin, say so first, then answer from "
+                "11.0.1.2 ops nodes (motors, detectors, AXIS-SXR-40, BeamlineStage) as an "
+                "ordered list. Do not use CyRSoXS, NRSS, YBCO, or cuprate papers.\n"
+            )
+            prompt = (
+                "You are FAIR2WISE answering a hardware-layout / beam-path question for ALS "
+                "Beamline 11.0.1.2. Use only ops KG nodes. Return an ordered path along "
+                "directed edges (beam_path_next, upstream_of, feeds, connected_to). Cite the "
+                "Gabe blueprint and GitHub sources. Never elaborate with science-KG techniques.\n\n"
+                f"QUESTION:\n{question}\n\n"
+                f"HISTORY:\n{json.dumps((history or [])[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
+                f"RETRIEVED_NODE_IDS:\n{json.dumps(selected, ensure_ascii=False)}\n\n"
+                f"MISSING_TOPICS:\n{json.dumps(missing, ensure_ascii=False)}\n\n"
+                "Write the ordered hardware path now."
+            )
+        else:
+            preamble = (
+                "The knowledge graph does not currently contain a beamline-ops graph, "
+                "executable analysis-code objects, or filled numeric energy slots for this "
+                "kind of question"
+                + (f". Missing from retrieved nodes: {', '.join(missing)}" if missing else ".")
+                + "\n\nThe following is elaborated from retrieved nodes, publication titles, "
+                "related techniques (NRSS, CyRSoXS, Nika, P-RSoXS), the conversation so far, "
+                "and high-level domain knowledge; it is not a KG measurement fact.\n"
+            )
+            prompt = (
+                "You are FAIR2WISE answering a conceptual / how-to / specialty / sample-class "
+                "/ analysis-workflow / example-code question against a vocabulary/relation "
+                "JSON knowledge graph. The graph may lack numeric slots and code objects. "
+                "Do not invent eV, q, temperature, or other measurement numbers. "
+                "Do not invent papers, authors, or DOIs. "
+                "Mark high-level domain knowledge as not a KG measurement fact. "
+                "If the question is hardware layout / beam path / connected in order, do not "
+                "use NRSS/CyRSoXS/science elaboration; answer from ops nodes as an ordered path.\n\n"
+                f"QUESTION:\n{question}\n\n"
+                f"HISTORY:\n{json.dumps((history or [])[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
+                f"RETRIEVED_NODE_IDS:\n{json.dumps(selected, ensure_ascii=False)}\n\n"
+                f"MISSING_TOPICS:\n{json.dumps(missing, ensure_ascii=False)}\n\n"
+                "Write the elaboration now."
+            )
+
+        def run() -> str:
+            return str(self._chat_completion(prompt, timeout=60) or "").strip()
+
+        try:
+            loop = asyncio.get_event_loop()
+            body = await loop.run_in_executor(None, run)
+        except Exception as exc:
+            logger.warning("JSON-graph leeway answer failed: %s", exc)
+            body = ""
+        return preamble + (body or "Related retrieved nodes and technique vocabulary are on-topic, but the graph does not encode a full how-to or measurement record.")
 
     async def _retired_deterministic_locked(
         self,
@@ -3019,7 +3733,10 @@ class AgentPipelineService:
                 round=round_no,
             )
             try:
-                verdict = await self.retrieval.query(question)
+                try:
+                    verdict = await self.retrieval.query(question, history=history)
+                except TypeError:
+                    verdict = await self.retrieval.query(question)
             except Exception as exc:
                 self.workflow.update(phase="retrieval_error")
                 return self._response(
@@ -3054,7 +3771,9 @@ class AgentPipelineService:
 
             selected_ids = [str(n) for n in (verdict.get("selected") or [])]
             if selected_ids:
-                subset = graph_subset_from_file(active_graph_path, selected_ids)
+                subset_payload = self._query_graph_payload(verdict, active_graph_path)
+                subset = self._query_graph_event(subset_payload)
+                selected_ids = [node.id for node in subset_payload.nodes] or selected_ids
                 await self._emit(
                     emit,
                     "graph_update",
@@ -3088,7 +3807,7 @@ class AgentPipelineService:
             if active_graph_source == "json":
                 return self._response(
                     "insufficient_json_graph",
-                    "The selected JSON graph did not contain enough direct evidence to answer this question.",
+                    _json_graph_insufficient_answer(verdict),
                     False,
                     verdict,
                     rounds,
@@ -3261,23 +3980,42 @@ class AgentPipelineService:
         *,
         graph_source: Optional[str],
         json_graph_path: Optional[str],
+        json_graph_paths: Optional[List[str]] = None,
+        history: Optional[List[Dict[str, str]]] = None,
     ) -> ChatResponse:
         rounds: List[Dict[str, Any]] = []
         last_verdict: Dict[str, Any] = {}
         effective_graph_source = (graph_source or self.runtime.graph_source).lower()
 
         if effective_graph_source == "json":
-            selected_path = json_graph_path or self.runtime.json_graph_path
-            if not selected_path:
+            if json_graph_paths:
+                selected_paths = unique_graph_paths([*json_graph_paths, json_graph_path or ""])
+            elif json_graph_path:
+                selected_paths = unique_graph_paths([json_graph_path])
+            else:
+                selected_paths = self._runtime_json_paths()
+            if not selected_paths:
                 raise ValueError("JSON graph mode requires a graph file")
-            active_graph_path = self._resolve_runtime_json_graph_path(selected_path)
+            resolved_files: List[str] = []
+            for path in selected_paths:
+                resolved = self._try_resolve_runtime_json_graph_path(path)
+                if resolved is None:
+                    logger.warning("Skipping missing/empty selected JSON graph %s", path)
+                    continue
+                resolved_files.append(str(resolved))
+            active_graph_path = Path(resolved_files[0]) if resolved_files else self.graph_path()
             active_graph_source = "json"
         else:
             active_graph_path = self._session_graph_path()
             active_graph_source = "splash"
+            resolved_files = [str(active_graph_path)]
 
         try:
-            await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
+            await self._reload_retrieval(
+                str(active_graph_path),
+                graph_source=active_graph_source,
+                graph_files=resolved_files,
+            )
         except Exception as exc:
             self.workflow.update(phase="retrieval_error")
             return self._response(
@@ -3297,7 +4035,10 @@ class AgentPipelineService:
                 round=round_no,
             )
             try:
-                verdict = await self.retrieval.query(question)
+                try:
+                    verdict = await self.retrieval.query(question, history=history)
+                except TypeError:
+                    verdict = await self.retrieval.query(question)
             except Exception as exc:
                 self.workflow.update(phase="retrieval_error")
                 return self._response(
@@ -3332,7 +4073,9 @@ class AgentPipelineService:
 
             selected_ids = [str(n) for n in (verdict.get("selected") or [])]
             if selected_ids:
-                subset = graph_subset_from_file(active_graph_path, selected_ids)
+                subset_payload = self._query_graph_payload(verdict, active_graph_path)
+                subset = self._query_graph_event(subset_payload)
+                selected_ids = [node.id for node in subset_payload.nodes] or selected_ids
                 await self._emit(
                     emit,
                     "graph_update",
@@ -3374,13 +4117,33 @@ class AgentPipelineService:
                 )
 
             if active_graph_source == "json":
-                self.workflow.update(phase="stop_insufficient")
-                await self._orchestrator_decision(question, emit)
+                if _json_graph_should_use_canned_refusal(question, verdict):
+                    self.workflow.update(phase="stop_insufficient")
+                    await self._orchestrator_decision(question, emit)
+                    return self._response(
+                        "insufficient_json_graph",
+                        _json_graph_insufficient_answer(verdict),
+                        False,
+                        verdict,
+                        rounds,
+                        active_graph_path,
+                    )
+                leeway = str(verdict.get("answer") or "").strip()
+                if not leeway:
+                    leeway = await self._generate_json_graph_leeway_answer(
+                        question, verdict, history
+                    )
+                self.workflow.update(
+                    phase="answered",
+                    post_extraction_sufficient=self.workflow.data.get("post_extraction_sufficient"),
+                )
+                if self._last_orchestration:
+                    self._last_orchestration["state"] = "answered"
                 return self._response(
-                    "insufficient_json_graph",
-                    "The selected JSON graph did not contain enough direct evidence to answer this question.",
-                    False,
-                    verdict,
+                    "answered",
+                    leeway,
+                    True,
+                    {**verdict, "sufficient": True, "answer": leeway, "leeway": True},
                     rounds,
                     active_graph_path,
                 )
@@ -4368,11 +5131,9 @@ class AgentPipelineService:
         new_verdict = await self.retrieval.query(question)
         round_info["retrieval_after"] = new_verdict
         selected_ids = [str(n) for n in (new_verdict.get("selected") or [])]
-        subset = (
-            graph_subset_from_file(active_graph_path, selected_ids)
-            if selected_ids
-            else {"nodes": [], "edges": []}
-        )
+        subset_payload = self._query_graph_payload(new_verdict, active_graph_path)
+        subset = self._query_graph_event(subset_payload)
+        display_ids = [node.id for node in subset_payload.nodes] or selected_ids
         relevant_node_names = [
             str(node.get("label") or node.get("name") or "").strip()
             for node in (subset.get("nodes") or [])
@@ -4411,13 +5172,13 @@ class AgentPipelineService:
             missing_topics=new_verdict.get("missing_topics") or [],
         )
 
-        if selected_ids:
+        if display_ids:
             await self._emit(
                 emit,
                 "graph_update",
                 f"Mapping {len(subset['nodes'])} node(s) onto the graph",
                 round=round_no,
-                node_ids=selected_ids,
+                node_ids=display_ids,
                 graph=subset,
             )
 
@@ -4509,6 +5270,8 @@ class AgentPipelineService:
         publications_override: Optional[List[Dict[str, Any]]] = None,
     ) -> ChatResponse:
         selected_ids = [str(n) for n in (verdict.get("selected") or [])]
+        query_graph = self._query_graph_payload(verdict, graph_path)
+        display_ids = [node.id for node in query_graph.nodes] or selected_ids
         publications = (
             publications_override
             if publications_override is not None
@@ -4518,11 +5281,11 @@ class AgentPipelineService:
             status=status,
             answer=answer,
             sufficient=sufficient,
-            node_ids=selected_ids,
+            node_ids=display_ids,
             publications=publications,
             confidence=_confidence(verdict),
             rounds=rounds,
-            graph=graph_payload_from_file(graph_path),
+            graph=query_graph,
             graph_source_requested=verdict.get("graph_source_requested"),
             graph_source_used=verdict.get("graph_source_used"),
             workdir=str(Path(self.cfg.workdir)),
@@ -4618,13 +5381,21 @@ class AgentPipelineService:
         }
 
 
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+]
+
+
 def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = None) -> FastAPI:
     app = FastAPI(title="FAIR2WISE Agent Pipeline API")
     service = AgentPipelineService(cfg)
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins or ["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=cors_origins or list(DEFAULT_CORS_ORIGINS),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -4690,9 +5461,19 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         json_graph_path: Optional[str] = None,
     ) -> GraphNode:
         graph_path = service.graph_path()
+        uploaded = bool(json_graph_path)
         if json_graph_path:
             graph_path = service._resolve_json_graph_path(json_graph_path)
-        node = graph_node_from_file(graph_path, node_id)
+        if uploaded:
+            node = graph_node_from_file(graph_path, node_id)
+            if node is not None:
+                node = _tag_graph_node(node, graph_path)
+        else:
+            node = resolve_graph_node(
+                node_id,
+                fallback_path=graph_path,
+                graph_paths_by_id=service._retrieval_graph_paths(graph_path),
+            )
         if node is None:
             raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
         return node
@@ -4724,6 +5505,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                 session_id=req.session_id,
                 graph_source=req.graph_source,
                 json_graph_path=req.json_graph_path,
+                json_graph_paths=req.json_graph_paths,
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -4775,6 +5557,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         session_id=req.session_id,
                         graph_source=req.graph_source,
                         json_graph_path=req.json_graph_path,
+                        json_graph_paths=req.json_graph_paths,
                     )
                     payload = _model_to_jsonable(response)
                     if response.status.endswith("_error"):

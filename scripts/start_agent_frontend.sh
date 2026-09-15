@@ -5,7 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UI_DIR="${FAIR2WISE_UI_DIR:-$ROOT_DIR/ui}"
 API_URL="${VITE_F2W_AGENT_API_URL:-http://127.0.0.1:8090}"
 HOST="${F2W_UI_HOST:-127.0.0.1}"
-PORT="${F2W_UI_PORT:-5173}"
+PORT="${F2W_UI_PORT:-5175}"
+
+if [[ "$PORT" == "5174" ]]; then
+  echo "error: host port 5174 is reserved for SSH; use F2W_UI_PORT=5175 (or 5173)" >&2
+  exit 1
+fi
 
 if [[ ! -d "$UI_DIR" ]]; then
   echo "error: FAIR2WISE UI directory not found: $UI_DIR" >&2

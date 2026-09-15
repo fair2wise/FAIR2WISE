@@ -1,0 +1,319 @@
+id: https://w3id.org/matkg/beamline/bl1101
+name: bl1101
+title: Beamline 11.0.1.2 ops overlay
+description: >
+  Beamline-operations overlay on storage/schema/matkg_schema.yaml for ALS
+  BL 11.0.1.2 (RSoXS / reflectometer endstation). Instances live in the
+  beamline: namespace and must not be merged into matkg_rsoxs_v1.json or
+  the x-ray demo KG. Bridge classes (Beamline, ExperimentalTechnique,
+  Measurement, Detector, Polarization, PhotonEnergy, AbsorptionEdge,
+  ScatteringGeometry, Software, Sample) are shared names with the science
+  KG; ops records stay distinct by namespace.
+license: MIT
+version: bl1101_v2
+
+prefixes:
+  matkg: https://w3id.org/matkg/
+  beamline: https://w3id.org/matkg/beamline/
+  bl1101: https://w3id.org/matkg/beamline/bl1101/
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+
+default_prefix: beamline
+default_range: string
+
+imports:
+  - matkg_schema
+
+classes:
+  Beamline:
+    is_a: Thing
+    description: >
+      A synchrotron beamline facility instance (here ALS 11.0.1.2).
+    slots:
+      - hasEndstation
+      - hasDetector
+      - hasMotor
+      - hasPV
+      - runsSoftware
+      - supportsGeometry
+      - implementsPlan
+      - usesTechnique
+      - feeds
+      - upstream_of
+      - beam_path_next
+      - connected_to
+
+  Endstation:
+    is_a: Device
+    description: Experimental endstation attached to a beamline (e.g. reflectometer).
+    slots:
+      - part_of
+      - hasDetector
+      - hasMotor
+      - feeds
+      - upstream_of
+      - beam_path_next
+      - connected_to
+
+  BeamlineStage:
+    is_a: Component
+    description: Named optical or mechanical stage along the beam path (EPU, mono, slits, sample).
+    slots:
+      - part_of
+      - hasMotor
+      - hasPV
+      - feeds
+      - upstream_of
+      - beam_path_next
+      - connected_to
+      - beam_path_index
+
+  Motor:
+    is_a: Device
+    description: A motion axis (ophyd motor / EPICS motor record).
+    slots:
+      - part_of
+      - hasPV
+      - configured_by
+
+  AnalogInput:
+    is_a: Device
+    description: An analog input channel (photodiode, I0, beam current, temperature).
+    slots:
+      - part_of
+      - hasPV
+
+  DigitalIO:
+    is_a: Device
+    description: A digital input or output (shutter, inhibit, status bit).
+    slots:
+      - part_of
+      - hasPV
+
+  Detector:
+    is_a: Device
+    description: >
+      A detector used at the beamline. Shared bridge class with the science KG.
+      Ops instance: AXIS-SXR-40 / sim_det, not a literature Measurement node.
+    slots:
+      - part_of
+      - hasPV
+      - configured_by
+      - feeds
+      - upstream_of
+      - beam_path_next
+      - connected_to
+
+  ProcessVariable:
+    is_a: Parameter
+    description: An EPICS process variable (PV) name served by an IOC.
+    slots:
+      - part_of
+
+  OphydDevice:
+    is_a: Device
+    description: An ophyd / ophyd-async device class or Bluesky handle (d.motors["sample_x"]).
+    slots:
+      - hasPV
+      - part_of
+      - has_code_snippet
+
+  BlueskyPlan:
+    is_a: Method
+    description: A Bluesky plan function (count, scan, energy scan, replay), not a generic file-level Method.
+    slots:
+      - implementsPlan
+      - has_code_snippet
+      - configured_by
+
+  Software:
+    is_a: Method
+    description: >
+      A software system used to run the beamline (Bluesky, ophyd, EPICS, LabVIEW, Finch, Tiled).
+      Shared bridge class name with the science KG; ops instances use beamline: IDs.
+    slots:
+      - runsSoftware
+      - configured_by
+      - implementsPlan
+
+  ComposeService:
+    is_a: Software
+    description: A Docker Compose service in the beamline software stack.
+    slots:
+      - part_of
+      - configured_by
+
+  DataPath:
+    is_a: Thing
+    description: A documented data directory, Tiled URI, or file layout (not array payloads).
+    slots:
+      - part_of
+      - configured_by
+
+  Polarization:
+    is_a: Parameter
+    description: X-ray polarization state (linear H–V, left/right circular). Bridge class.
+    slots:
+      - part_of
+
+  PhotonEnergy:
+    is_a: Parameter
+    description: Incident photon energy or energy range in eV. Bridge class.
+    slots:
+      - part_of
+
+  AbsorptionEdge:
+    is_a: Parameter
+    description: Absorption edge used for resonant contrast (C/N/O K-edge). Bridge class.
+    slots:
+      - part_of
+
+  ScatteringGeometry:
+    is_a: Structure
+    description: Measurement geometry (transmission, grazing incidence, reflectivity). Bridge class.
+    slots:
+      - part_of
+
+  Sample:
+    is_a: Material
+    description: A sample class accepted at the endstation (bridge class; ops catalog, not a paper polymer node).
+    slots:
+      - part_of
+
+  Person:
+    is_a: Thing
+    description: >
+      A named person documented on the ALS 11.0.1.2 page or Gabe blueprint.
+      Ops-only (beamline:); not a science-KG retrieval hub.
+    slots:
+      - hasRole
+      - supports
+
+  Role:
+    is_a: Thing
+    description: A staff or operational role at the beamline (not a literature author role).
+
+  BeamlineScientist:
+    is_a: Role
+    description: Beamline scientist / primary scientific contact for 11.0.1.2.
+
+slots:
+  hasEndstation:
+    description: Beamline hosts this endstation
+    domain: Beamline
+    range: Endstation
+    multivalued: true
+    slot_uri: beamline:hasEndstation
+
+  hasDetector:
+    description: Subject uses or mounts this detector
+    domain: Thing
+    range: Detector
+    multivalued: true
+    slot_uri: beamline:hasDetector
+
+  hasMotor:
+    description: Subject includes this motion axis
+    domain: Thing
+    range: Motor
+    multivalued: true
+    slot_uri: beamline:hasMotor
+
+  hasPV:
+    description: Subject is addressed by this EPICS process variable
+    domain: Thing
+    range: ProcessVariable
+    multivalued: true
+    slot_uri: beamline:hasPV
+
+  runsSoftware:
+    description: Subject is operated or implemented by this software system
+    domain: Thing
+    range: Software
+    multivalued: true
+    slot_uri: beamline:runsSoftware
+
+  supportsGeometry:
+    description: Beamline or endstation supports this scattering geometry
+    domain: Thing
+    range: ScatteringGeometry
+    multivalued: true
+    slot_uri: beamline:supportsGeometry
+
+  implementsPlan:
+    description: Subject implements or exposes this Bluesky plan
+    domain: Thing
+    range: BlueskyPlan
+    multivalued: true
+    slot_uri: beamline:implementsPlan
+
+  usesTechnique:
+    description: Beamline or endstation offers this experimental technique
+    domain: Thing
+    range: ExperimentalTechnique
+    multivalued: true
+    slot_uri: beamline:usesTechnique
+
+  feeds:
+    description: >
+      Directed optical/hardware feed: the subject sends beam (or a connected
+      signal) into the object, which is immediately downstream.
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: beamline:feeds
+
+  upstream_of:
+    description: >
+      Directed: the subject sits optically or mechanically upstream of the
+      object along the documented 11.0.1.2 beam path.
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: beamline:upstream_of
+
+  beam_path_next:
+    description: >
+      Directed successor along the documented optical beam path
+      (source → EPU/optics → M103 → exit slits → … → sample → detector).
+      Hardware topology lives in the beamline: namespace only.
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: beamline:beam_path_next
+
+  connected_to:
+    description: >
+      Directed hardware connection (subject → object). Direction follows the
+      beam or the documented cable/control feed, never an undirected dump.
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: beamline:connected_to
+
+  beam_path_index:
+    description: 1-based sequence number along the documented optical beam path (not Sheet E inventory order).
+    range: integer
+    slot_uri: beamline:beam_path_index
+
+  hasRole:
+    description: Person holds this operational role (e.g. BeamlineScientist).
+    domain: Person
+    range: Role
+    multivalued: true
+    slot_uri: beamline:hasRole
+
+  supports:
+    description: Person supports or is a documented contact for this beamline.
+    domain: Person
+    range: Beamline
+    multivalued: true
+    slot_uri: beamline:supports
+
+  configured_by:
+    description: Subject is configured by this file, compose service, or sim-config
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: beamline:configured_by

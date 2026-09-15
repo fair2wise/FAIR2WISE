@@ -451,3 +451,46 @@ def test_orchestrator_process_pdf_adds_github_snippets(tmp_path, monkeypatch):
     assert orch.store.code_snippets[0]["source_type"] == "github"
     assert orch.store.code_snippets[0]["source_paper"] == "paper.pdf"
     assert orch.store.metadata["github_code_snippets"] == 1
+
+
+def test_register_term_stamps_thread_local_page_context(tmp_path):
+    from app.modules.term_extractor.tools import ToolState, build_tools
+
+    store = TermStore(str(tmp_path / "terms.json"))
+    schema = SchemaHelper("storage/schema/matkg_schema.yaml")
+    state = ToolState(store=store, schema=schema, services=SimpleNamespace(chebi_lookup=None))
+    tools = {t.name: t for t in build_tools(state)}
+
+    state.set_page_context("rsoxs-paper.pdf", 4)
+    tools["register_term"].invoke(
+        {
+            "term": "P-RSoXS",
+            "definition": "Polarized resonant soft X-ray scattering.",
+            "category": "ExperimentalTechnique",
+            "relations": [{"relation": "measures", "related_term": "molecular orientation"}],
+            "context": "P-RSoXS measures molecular orientation in P3HT films.",
+        }
+    )
+    record = store.get("p-rsoxs")
+    assert record is not None
+    assert record.source_papers == ["rsoxs-paper.pdf"]
+    assert record.pages == [4]
+    assert record.relations
+    assert record.relations[0].related_term == "molecular orientation"
+    assert record.context_snippets[0].source_paper == "rsoxs-paper.pdf"
+
+    # Tools may run on a worker thread that never saw set_page_context.
+    state.clear_page_context()
+    state.current_source_paper = "rsoxs-paper.pdf"
+    tools["register_term"].invoke(
+        {
+            "term": "RSoXS",
+            "definition": "Resonant soft X-ray scattering.",
+            "category": "ExperimentalTechnique",
+            "relations": [{"relation": "measures", "related_term": "domain spacing"}],
+            "context": "RSoXS measures domain spacing.",
+        }
+    )
+    rsoxs = store.get("rsoxs")
+    assert rsoxs is not None
+    assert rsoxs.source_papers == ["rsoxs-paper.pdf"]

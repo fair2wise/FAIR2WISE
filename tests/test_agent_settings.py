@@ -181,7 +181,7 @@ def test_settings_switch_json_graph_and_back_to_splash(tmp_path, monkeypatch):
     assert TrackingRetrieval.reload_calls[-1]["graph_source"] == "splash"
 
 
-def test_settings_rejects_missing_json_file(tmp_path, monkeypatch):
+def test_settings_skips_missing_json_file(tmp_path, monkeypatch):
     kg_dir = tmp_path / "storage" / "kg"
     kg_dir.mkdir(parents=True)
     _make_kg_graph(kg_dir / "exists.json")
@@ -193,11 +193,15 @@ def test_settings_rejects_missing_json_file(tmp_path, monkeypatch):
         json={
             "graph_source": "json",
             "json_graph_path": "storage/kg/missing.json",
+            "json_graph_paths": ["storage/kg/missing.json", "storage/kg/exists.json"],
         },
     )
 
-    assert response.status_code == 400
-    assert "not found" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    body = response.json()
+    assert body["json_graph_paths"] == ["storage/kg/missing.json", "storage/kg/exists.json"]
+    assert body["kg_query_hops"] == 1
+    assert body["kg_query_max_nodes"] == 100
 
 
 def test_settings_rejects_json_path_outside_storage(tmp_path, monkeypatch):
@@ -269,6 +273,20 @@ def test_settings_accepts_frontend_json_payload(tmp_path, monkeypatch):
     assert body["graph_source"] == "json"
     assert body["json_graph_path"] == "storage/kg/ui_pick.json"
     assert client.get("/graph").json()["nodes"][0]["id"] == "picked"
+
+
+def test_settings_persists_kg_query_hops_up_to_20(tmp_path, monkeypatch):
+    client = _settings_client(tmp_path, monkeypatch)
+
+    too_high = client.put("/settings", json={"kg_query_hops": 21})
+    assert too_high.status_code == 422
+
+    response = client.put("/settings", json={"kg_query_hops": 20, "kg_query_max_nodes": 250})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kg_query_hops"] == 20
+    assert body["kg_query_max_nodes"] == 250
+    assert client.get("/settings").json()["kg_query_hops"] == 20
 
 
 def test_settings_lists_json_files_sorted(tmp_path, monkeypatch):

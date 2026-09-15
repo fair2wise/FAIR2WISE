@@ -36,18 +36,68 @@ _PUB_FIELDS = (
     "abstract_text",
     "keywords",
 )
+# Overlay slots (e.g. RSoXS) and extractor extras that are not core MatKG node keys.
+_PASSTHROUGH_SLOTS = (
+    "importance",
+    "photon_energy_eV",
+    "absorption_edge",
+    "scattering_technique",
+    "polarization",
+    "technique_type",
+)
+_TERM_INPUT_ONLY = {
+    "term",
+    "name",
+    "definition",
+    "relations",
+    "source_paper",
+    "paper_authors",
+    "id_prefix",
+    "related_id",
+}
+_KNOWN_ID_PREFIXES = ("matkg:", "beamline:")
 
 
-def make_id(term: str) -> str:
+def copy_passthrough_slots(term: Dict[str, Any], node: Dict[str, Any]) -> None:
+    """Copy overlay/extra term fields onto a node without overwriting core keys."""
+    for key in _PASSTHROUGH_SLOTS:
+        if key in node:
+            continue
+        value = term.get(key)
+        if value not in (None, "", [], {}):
+            node[key] = value
+    for key, value in term.items():
+        if key in node or key in _TERM_INPUT_ONLY or key in _PUB_FIELDS:
+            continue
+        if value not in (None, "", [], {}):
+            node[key] = value
+
+
+def split_curie(value: str) -> Tuple[str, str] | None:
+    """Return (prefix, local) if value already uses a known graph prefix."""
+    text = (value or "").strip()
+    for curie in _KNOWN_ID_PREFIXES:
+        if text.startswith(curie):
+            return curie[:-1], text[len(curie):]
+    return None
+
+
+def make_id(term: str, prefix: str = "matkg") -> str:
     """
-    Convert a human-readable term into a MatKG node ID.
+    Convert a human-readable term into a graph node ID.
 
-    - Prepends "matkg:"
+    - Prepends ``prefix`` (default ``matkg``)
+    - Preserves ``matkg:`` / ``beamline:`` CURIEs
     - Removes all characters except letters, digits, and hyphens
     - Removes spaces
     """
+    parsed = split_curie(term)
+    if parsed:
+        prefix, term = parsed
+        cleaned = _CLEAN_PATTERN.sub("", term.replace(" ", "").replace("_", "-"))
+        return f"{prefix}:{cleaned}"
     cleaned = _CLEAN_PATTERN.sub("", term.replace(" ", ""))
-    return f"matkg:{cleaned}"
+    return f"{prefix}:{cleaned}"
 
 
 def ensure_list(val: Any) -> List[Any]:
@@ -131,7 +181,27 @@ def normalize_publications(record: Dict[str, Any]) -> List[Dict[str, Any]]:
     return []
 
 
-def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
+def _accept_code_snippet(snip: Dict[str, Any], code_body: str, strict: bool) -> bool:
+    """Return True when a code snippet should become a graph node."""
+    if not code_body:
+        return False
+    if snip.get("curated"):
+        return True
+    has_anchor = bool(
+        snip.get("function_name")
+        or re.search(r"\b(def |class |import )", code_body)
+    )
+    if len(code_body) < 150 or not has_anchor:
+        return False
+    if not strict:
+        return True
+    return (
+        code_body.count("(") == code_body.count(")")
+        and code_body.count("[") == code_body.count("]")
+    )
+
+
+def make_code_snippet_node(snip: Dict[str, Any], prefix: str = "matkg") -> Dict[str, Any]:
     """
     Build a CodeSnippet node from a code_snippets entry.
 
@@ -141,8 +211,12 @@ def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
     paper = snip.get("source_paper", "unknown")
     page = snip.get("page", 0)
     code_hash = hashlib.md5((snip.get("code_snippet") or "").encode()).hexdigest()[:8]
-    raw_id = f"snippet_{fn_name}_{paper}_p{page}_{code_hash}" if fn_name else f"snippet_{paper}_p{page}_{code_hash}"
-    node_id = make_id(raw_id)
+    explicit = snip.get("id")
+    if explicit:
+        node_id = make_id(str(explicit), prefix=snip.get("id_prefix") or prefix)
+    else:
+        raw_id = f"snippet_{fn_name}_{paper}_p{page}_{code_hash}" if fn_name else f"snippet_{paper}_p{page}_{code_hash}"
+        node_id = make_id(raw_id, prefix=snip.get("id_prefix") or prefix)
     name = f"{fn_name} snippet" if fn_name else f"code snippet ({paper} p.{page})"
 
     return {
@@ -189,6 +263,9 @@ def make_code_snippet_node(snip: Dict[str, Any]) -> Dict[str, Any]:
 def build_graph(
     raw_terms: Iterable[Dict[str, Any]],
     code_snippets: List[Dict[str, Any]] | None = None,
+    *,
+    default_id_prefix: str = "matkg",
+    strict_snippets: bool = True,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Build a MatKG-compatible graph from raw term records and (optionally)
@@ -207,28 +284,18 @@ def build_graph(
     snippets_by_paper_page: Dict[Tuple[str, int], List[str]] = {}
     for snip in (code_snippets or []):
         code_body = (snip.get("code_snippet") or "").strip()
-        if not code_body:
-            continue
-        has_anchor = bool(
-            snip.get("function_name")
-            or re.search(r"\b(def |class |import )", code_body)
-        )
-        if len(code_body) < 150 or not has_anchor:
-            logging.debug("Skipping fragment snippet (len=%d, anchor=%s): %r",
-                          len(code_body), has_anchor, code_body[:60])
-            continue
-        # Reject truncated snippets: unbalanced parens/brackets indicate
-        # the PDF text extraction cut off mid-line (page boundary).
-        balanced = (
-            code_body.count("(") == code_body.count(")")
-            and code_body.count("[") == code_body.count("]")
-        )
-        if not balanced:
-            logging.debug("Skipping truncated snippet (unbalanced delimiters): %s",
-                          snip.get("function_name", code_body[:40]))
+        if not _accept_code_snippet(snip, code_body, strict_snippets):
+            logging.debug(
+                "Skipping snippet (curated=%s, len=%d): %r",
+                bool(snip.get("curated")),
+                len(code_body),
+                code_body[:60],
+            )
             continue
 
-        snippet_node = make_code_snippet_node(snip)
+        snippet_node = make_code_snippet_node(
+            snip, prefix=snip.get("id_prefix") or default_id_prefix
+        )
         if snippet_node["id"] not in nodes:
             nodes[snippet_node["id"]] = snippet_node
         paper = snip.get("source_paper", "")
@@ -239,7 +306,8 @@ def build_graph(
 
     for term in raw_terms:
         name = term.get("term") or term.get("name") or "UNKNOWN"
-        tid = make_id(name)
+        term_prefix = str(term.get("id_prefix") or default_id_prefix)
+        tid = make_id(str(term.get("id") or name), prefix=term_prefix)
 
         # Terms mis-categorized as CodeSnippet by the LLM: demote to Unknown.
         # Real CodeSnippet nodes come exclusively from code_snippets.
@@ -281,13 +349,35 @@ def build_graph(
                 "abstract_text": term.get("abstract_text"),
                 "keywords": ensure_list(term.get("keywords")),
             }
+            copy_passthrough_slots(term, nodes[tid])
+        else:
+            existing = nodes[tid]
+            incoming = term.get("category", "Unknown")
+            if existing.get("category") in (None, "", "Unknown") and incoming not in (None, "", "Unknown"):
+                existing["category"] = incoming
+                if term.get("raw_category"):
+                    existing["raw_category"] = term.get("raw_category")
+            if name and (
+                not existing.get("name")
+                or existing.get("name") == "UNKNOWN"
+                or split_curie(str(existing.get("name") or ""))
+            ):
+                existing["name"] = name
+            definition = term.get("definition") or ""
+            if definition and existing.get("description") in (None, "", "N/A"):
+                existing["description"] = definition
+            papers = existing.setdefault("source_papers", [])
+            for paper in ensure_list(term.get("source_papers")):
+                if paper not in papers:
+                    papers.append(paper)
+            copy_passthrough_slots(term, existing)
 
         # Process relations
         for rel in ensure_list(term.get("relations")):
-            tgt = rel.get("related_term")
+            tgt = rel.get("related_id") or rel.get("related_term")
             if not tgt:
                 continue
-            rid = make_id(tgt)
+            rid = make_id(str(tgt), prefix=term_prefix)
 
             # stub for unseen target
             if rid not in nodes:
@@ -380,7 +470,13 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any
 
     terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
     snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
-    graph = build_graph(terms, code_snippets=snippets)
+    meta = data.get("metadata") if isinstance(data, dict) else None
+    prefix = "matkg"
+    if isinstance(meta, dict) and meta.get("id_prefix"):
+        prefix = str(meta["id_prefix"])
+    graph = build_graph(terms, code_snippets=snippets, default_id_prefix=prefix)
+    if isinstance(meta, dict) and meta:
+        graph["metadata"] = meta
 
     output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
     return graph
@@ -417,7 +513,13 @@ def main() -> None:
             data = json.load(f)
         terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
         snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
-        graph = build_graph(terms, code_snippets=snippets)
+        meta = data.get("metadata") if isinstance(data, dict) else None
+        prefix = "matkg"
+        if isinstance(meta, dict) and meta.get("id_prefix"):
+            prefix = str(meta["id_prefix"])
+        graph = build_graph(terms, code_snippets=snippets, default_id_prefix=prefix)
+        if isinstance(meta, dict) and meta:
+            graph["metadata"] = meta
         args.output_json.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         logging.info(
             "Wrote %d nodes (%d snippets) and %d edges → %s",

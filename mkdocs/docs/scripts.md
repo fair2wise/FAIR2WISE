@@ -31,10 +31,11 @@ extraction behavior.
 | Script | Behavior |
 |---|---|
 | `start_all.sh` | Start Splash, agent API, and UI with readiness and cleanup |
+| `start_rsoxs_stack.sh` | Daemonize RSoXS JSON agent+UI (5175/8090); `stop` does not kill extract |
 | `start_agent_backend.sh` | Resolve `F2W_*` variables and run the packaged agent API launcher |
-| `start_agent_frontend.sh` | Validate npm/Vite and run the Vite dev server |
+| `start_agent_frontend.sh` | Validate npm/Vite and run the Vite dev server (default port 5175) |
 | `install_pixi.sh` | Install Pixi if absent and initialize Splash |
-| `test_compose.sh` | Isolated build, health, port-isolation, seed, and persistence smoke test |
+| `test_compose.sh` | Isolated Splash-stack smoke test (`compose.splash.yaml`) |
 | `wipe_splash_db.sh` | Guarded deletion of the local Splash SQLite database |
 
 ## Data acquisition and graph scripts
@@ -42,6 +43,8 @@ extraction behavior.
 | Script | Behavior |
 |---|---|
 | `download_pdfs.py` | Search arXiv or OpenAlex and validate downloaded PDFs |
+| `harvest_rsoxs.py` | Harvest OA RSoXS PDFs into `papers/rsoxs/` (does not write the KG) |
+| `ingest_bl1101.py` | Replay BL 11.0.1.2 ops KG into `storage/kg/matkg_bl1101_vN.json` |
 | `build_kg.sh` | Extract terms and convert to graph using temp files/backups |
 | `reimport_merged_kg.sh` | Merge two graphs, start Splash if needed, and reimport |
 | `get_pdf_years.py` | Infer PDF year from arXiv filename, metadata, then text |
@@ -59,6 +62,12 @@ python3 scripts/download_pdfs.py \
 
 `download_pdfs.py` rejects HTML/empty responses even when a URL claims to be a
 PDF.
+
+Replay the BL 11.0.1.2 ops graph (appends `storage/kg/matkg_bl1101_vN.json`):
+
+```bash
+python3 scripts/ingest_bl1101.py --from-scratch
+```
 
 ## Documentation/repository utility
 

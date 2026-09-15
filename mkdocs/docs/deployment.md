@@ -58,7 +58,7 @@ container deployment:
 | `OPENALEX_EMAIL` | Recommended | Identifies polite OpenAlex/Unpaywall traffic |
 | `MP_API_KEY` | No | Enables Materials Project validation |
 | `GITHUB_TOKEN` | No | Raises GitHub API limits for linked source-code extraction |
-| `F2W_UI_PORT` | No | Changes the sole loopback-published port from `5173` |
+| `F2W_UI_PORT` | No | UI loopback port, default `5175`. Never `5174` (SSH). |
 
 Globus and Academy values in `.env.example` are for the optional NERSC path;
 the standard Compose stack does not pass them into its services. See
@@ -84,9 +84,16 @@ the `agent` container makes the actual CBORG request.
 
 Compose handles the common IPv6 mismatch in two places:
 
-1. the default Compose network has IPv6 enabled; and
-2. `CBORG_IP_FAMILY=ipv6` tells the CBORG HTTP client to resolve and connect
-   with IPv6.
+1. the default Compose network has IPv6 enabled;
+2. `CBORG_FORCE_IPV6=1` and `CBORG_IP_FAMILY=ipv6` pin the client to IPv6; and
+3. the process probes a currently assigned global IPv6. **Do not set
+   `CBORG_IPV6_BIND`** — a stale address fails with "Can't assign requested
+   address".
+
+Docker Desktop on **macOS** does not give containers the Mac host's authorized
+IPv6. Use `./scripts/start_rsoxs_stack.sh` on Darwin, or Linux Docker. Optional
+Linux host-network overlay: `docker compose -f compose.yaml -f compose.hostnet.yaml up`.
+
 
 After the stack starts, inspect the address visible from the agent container:
 

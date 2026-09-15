@@ -10,6 +10,8 @@ from typing import Any, Dict, Iterable, Optional
 
 from academy.agent import Agent, action
 
+from app.modules.f2w_agent.retrieval_agent import _is_ops_layout_question
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +50,7 @@ FRESH_TURN_CLASSES = {
     "mundane_conversation",
     "irrelevant_non_scientific",
     "scientific_or_uncertain",
+    "ops_layout",
 }
 
 
@@ -271,6 +274,12 @@ class WorkflowOrchestratorAgent(Agent):
                 "A mundane conversational or UI turn needs no evidence agents.",
                 classification="mundane_conversation",
             )
+        if _is_ops_layout_question(user_turn):
+            return _decision(
+                "retrieve_kg",
+                "Hardware layout / beam-path questions use the 11.0.1.2 ops KG first.",
+                classification="ops_layout",
+            )
         return _decision(
             "retrieve_kg",
             "Any scientific or uncertain turn must be checked against the KG first.",
@@ -302,15 +311,22 @@ class WorkflowOrchestratorAgent(Agent):
             "Conversation/workflow memory may resolve references but is never scientific evidence.\n"
             "Return ONLY JSON with keys classification and reason.\n"
             "classification must be exactly one of:\n"
-            "- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help/meta questions.\n"
+            "- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions "
+            "that are not follow-ups to a scientific ask.\n"
             "- irrelevant_non_scientific: requests clearly unrelated to science or FAIR2WISE. These will receive "
             "a short relevance refusal, not an answer to the unrelated request.\n"
             "- scientific_or_uncertain: EVERY scientific question in ANY discipline, every materials-science "
             "question, scientific code or methods, papers/citations/evidence, KG requests, requests to download "
             "or fetch papers, technical factual questions, contextual scientific follow-ups, and every ambiguous "
-            "turn that might be scientific.\n"
+            "turn that might be scientific — except hardware-layout questions, which are ops_layout.\n"
+            "- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline "
+            "layout, what comes after a device, or optical topology. These retrieve the ops KG first and must "
+            "not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\n"
             "Hard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as "
-            "mundane or irrelevant merely because general model knowledge could answer it.\n\n"
+            "mundane or irrelevant merely because general model knowledge could answer it.\n"
+            "Hard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that "
+            "continue a prior scientific, code, or analysis question are scientific_or_uncertain, not mundane. "
+            "They mean re-answer the previous question with looser grounding.\n\n"
             f"STATE: {json.dumps(public_state, ensure_ascii=False)}\n"
             f"USER_TURN: {user_turn}"
         )
@@ -462,6 +478,14 @@ class WorkflowOrchestratorAgent(Agent):
         except Exception as exc:
             logger.warning("Orchestrator LLM failed (%s); using safe fallback", exc)
             classification = {}
+        if _is_ops_layout_question(user_turn):
+            classification = {
+                "classification": "ops_layout",
+                "reason": str(
+                    classification.get("reason")
+                    or "Hardware layout / beam-path questions use the 11.0.1.2 ops KG first."
+                ),
+            }
         proposed = self._fresh_turn_decision(classification)
         if proposed is None:
             proposed = {}

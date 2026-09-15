@@ -21,9 +21,6 @@ import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
-
-import requests
 
 from academy.agent import Agent, action
 
@@ -32,18 +29,9 @@ logger = logging.getLogger(__name__)
 
 MAX_SEARCH_QUERIES = 5
 
-RELIABLE_PDF_HOSTS = (
-    "arxiv.org",
-    "biorxiv.org",
-    "chemrxiv.org",
-    "europepmc.org",
-    "hal.archives-ouvertes.fr",
-    "hal.science",
-    "medrxiv.org",
-    "ncbi.nlm.nih.gov",
-    "plos.org",
-    "zenodo.org",
-)
+import download_pdfs as _dl
+
+RELIABLE_PDF_HOSTS = _dl.RELIABLE_PDF_HOSTS
 
 
 def _sanitize_openalex_search(text: str) -> str:
@@ -150,23 +138,19 @@ def _openalex_work_id(candidate: Dict[str, Any]) -> Optional[str]:
 
 def _is_reliable_pdf_url(url: str) -> bool:
     """True for direct full-text repositories that tolerate automated fetches."""
-    try:
-        parsed = urlparse(str(url).strip())
-    except ValueError:
-        return False
-    host = (parsed.hostname or "").lower()
-    if not host:
-        return False
-    if not any(host == suffix or host.endswith(f".{suffix}") for suffix in RELIABLE_PDF_HOSTS):
-        return False
-    lowered = str(url).lower()
-    if "ncbi.nlm.nih.gov" in host:
-        return "/pmc/" in lowered or "/articles/pmc" in lowered
-    return True
+    return _dl.is_reliable_pdf_url(url)
 
 
 def _reliable_pdf_urls(work: Dict[str, Any]) -> List[str]:
-    return [url for url in _prefer_pdf_urls(_pdf_urls(work)) if _is_reliable_pdf_url(url)]
+    selected, _, _ = _dl.select_openalex_oa_pdfs(work)
+    if selected:
+        return _prefer_pdf_urls(selected)
+    rewritten = []
+    for url in _pdf_urls(work):
+        mapped = _dl.rewrite_oa_pdf_url(url)
+        if mapped:
+            rewritten.append(mapped)
+    return _prefer_pdf_urls(rewritten)
 
 
 def _prefer_pdf_urls(urls: List[str]) -> List[str]:
@@ -182,11 +166,13 @@ def _prefer_pdf_urls(urls: List[str]) -> List[str]:
             return (3, url)
         if any(host in lowered for host in ("biorxiv.org", "medrxiv.org", "chemrxiv.org")):
             return (4, url)
-        if any(host in lowered for host in ("hal.science", "hal.archives-ouvertes.fr", "zenodo.org")):
+        if "osti.gov" in lowered:
             return (5, url)
-        if lowered.endswith(".pdf") or "/pdf" in lowered:
+        if any(host in lowered for host in ("hal.science", "hal.archives-ouvertes.fr", "zenodo.org", "escholarship.org")):
             return (6, url)
-        return (7, url)
+        if lowered.endswith(".pdf") or "/pdf" in lowered:
+            return (7, url)
+        return (8, url)
 
     return sorted(urls, key=rank)
 
@@ -233,6 +219,10 @@ def _repository_name(urls: List[str]) -> str:
         return "PLOS"
     if "hal.science" in joined or "hal.archives-ouvertes.fr" in joined:
         return "HAL"
+    if "osti.gov" in joined:
+        return "OSTI"
+    if "escholarship.org" in joined:
+        return "eScholarship"
     if "zenodo.org" in joined:
         return "Zenodo"
     return "Open repository"
@@ -537,6 +527,8 @@ class DownloadAgent(Agent):
                 work = Works()[work_id]
                 if isinstance(work, dict):
                     urls.extend(_pdf_urls(work))
+                    selected, _, _ = _dl.select_openalex_oa_pdfs(work)
+                    urls.extend(selected)
                     refreshed["title"] = refreshed.get("title") or work.get("title") or work.get("display_name") or ""
                     refreshed["abstract"] = refreshed.get("abstract") or _candidate_abstract(work)
                     refreshed["doi"] = refreshed.get("doi") or work.get("doi")
@@ -550,28 +542,14 @@ class DownloadAgent(Agent):
 
         doi = str(refreshed.get("doi") or "").strip()
         if doi and self._mailto:
-            try:
-                doi_clean = re.sub(r"^https?://(dx\.)?doi\.org/", "", doi, flags=re.IGNORECASE)
-                response = requests.get(
-                    f"https://api.unpaywall.org/v2/{doi_clean}",
-                    params={"email": self._mailto},
-                    timeout=15,
-                )
-                if response.ok:
-                    body = response.json()
-                    best_oa = body.get("best_oa_location") or {}
-                    for key in ("url_for_pdf", "url"):
-                        url = best_oa.get(key)
-                        if url:
-                            urls.append(str(url))
-            except Exception as exc:
-                logger.warning("Unpaywall lookup failed for %s (%s)", doi, exc)
+            upw_urls, _ = _dl.fetch_unpaywall_oa_pdfs(doi, self._mailto)
+            urls.extend(upw_urls)
 
         deduped: List[str] = []
         seen = set()
         for url in _prefer_pdf_urls(urls):
-            cleaned = str(url).strip()
-            if cleaned and _is_reliable_pdf_url(cleaned) and cleaned not in seen:
+            cleaned = _dl.rewrite_oa_pdf_url(str(url).strip())
+            if cleaned and cleaned not in seen:
                 seen.add(cleaned)
                 deduped.append(cleaned)
         refreshed["pdf_urls"] = deduped

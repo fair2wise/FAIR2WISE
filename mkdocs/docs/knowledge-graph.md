@@ -128,6 +128,33 @@ normalized to the `rel:` namespace.
 Editing is blocked in JSON mode. In Splash mode, the API updates SQL records,
 refreshes the session graph, and returns the normalized node.
 
+After a graph is imported to Tiled’s entity/link graph (`/api/graphql`), use
+the [GraphQL cookbook](graphql-cookbook.md) to inventory entity types, hunt
+`Unknown` stubs, and ask RSoXS neighborhood questions. The same checks can be
+run on `storage/kg/*.json` before promotion. The F2W agent gains a Tiled
+pager (`KG_RAG_GRAPH_SOURCE=tiled`) so retrieval can load that graph the same
+way it pages Splash today.
+
+RSoXS 11.0.1.2 identity, relevance dimensions, extraction confidence,
+SimilarityDocument, and versioning are locked in the Cursor RSoXS pipeline
+plan, not in this page. Do not let a single `rsoxs_v1` label or an ALS
+boolean stand in for those contracts.
+
+## Beamline ops KG (bl1101)
+
+The literature graph (`storage/kg/matkg_rsoxs_v1.json`, `matkg:` IDs) is
+separate from the beamline-operations graph (`storage/kg/matkg_bl1101_vN.json`,
+`beamline:` IDs). Do not merge them. Replay:
+
+```bash
+python3 scripts/ingest_bl1101.py --from-scratch
+```
+
+Each successful full run appends the next `vN` snapshot (v1 is never
+overwritten). Schema: `storage/schema/bl1101_schema.yaml`. The agent on port
+8090 continues to load the literature KG unless you point Settings at the ops
+JSON; multi-KG fan-out is not implemented.
+
 ## Generated graph collections
 
 `storage/kg/` contains checkpoint graphs produced by multiple models and paper

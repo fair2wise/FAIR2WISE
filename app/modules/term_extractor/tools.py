@@ -1,8 +1,9 @@
 import json
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from langchain_core.tools import tool
 
@@ -20,6 +21,27 @@ class ToolState:
     schema: SchemaHelper
     services: Services
     llm_invoke: Optional[Callable[[str], str]] = field(default=None, repr=False)
+    current_source_paper: Optional[str] = None
+    _tls: threading.local = field(default_factory=threading.local, repr=False)
+
+    def set_page_context(self, source_paper: str, page: int) -> None:
+        """Record the PDF being extracted.
+
+        ``current_source_paper`` is shared (all workers of one PDF). Page is
+        thread-local because LangGraph may run tools on another thread than
+        ``process_page``.
+        """
+        self.current_source_paper = source_paper
+        self._tls.source_paper = source_paper
+        self._tls.page = page
+
+    def clear_page_context(self) -> None:
+        self._tls.source_paper = None
+        self._tls.page = None
+
+    def page_context(self) -> Tuple[Optional[str], Optional[int]]:
+        paper = getattr(self._tls, "source_paper", None) or self.current_source_paper
+        return paper, getattr(self._tls, "page", None)
 
 
 def build_tools(state: ToolState) -> list:
@@ -215,10 +237,16 @@ as "{name}"?  If none match, respond with `None`.
         page: Optional[int] = None,
         context: Optional[str] = None,
     ) -> str:
-        """Register an extracted materials-science term into the knowledge base.
-        Call check_existing_term then fuzzy_merge_term first to avoid duplicates.
+        """Register or update an extracted materials-science term.
+        Call even when check_existing_term or fuzzy_merge_term found a match so
+        relations, context, and paper provenance can be merged onto the existing term.
         Relations must use exact predicate names from the schema.
-        Pass a short context sentence (the sentence where the term appears) as 'context'."""
+        Pass a short context sentence as 'context'. source_paper and page default
+        to the PDF page currently being processed."""
+        ctx_paper, ctx_page = state.page_context()
+        source_paper = source_paper or ctx_paper
+        if page is None:
+            page = ctx_page
         logger.info("register_term: '%s' category=%s", term, category)
         raw = {
             "term": term,
@@ -262,7 +290,7 @@ as "{name}"?  If none match, respond with `None`.
             raw_category=fixed.get("raw_category"),
             formula=fixed.get("formula"),
             relations=[RelationRecord.from_dict(r) for r in fixed.get("relations", [])],
-            pages=[page] if page else [],
+            pages=[page] if page is not None else [],
             source_papers=[source_paper] if source_paper else [],
             context_snippets=[snippet] if snippet else [],
         )

@@ -69,9 +69,9 @@ def main() -> None:
         log.error("PDF directory not found: %s", args.pdf_dir)
         sys.exit(1)
 
-    pdfs = list(args.pdf_dir.glob("*.pdf"))
+    pdfs = sorted(p for p in args.pdf_dir.rglob("*.pdf") if p.is_file())
     if not pdfs:
-        log.error("No PDFs found in %s", args.pdf_dir)
+        log.error("No PDFs found in %s (searched recursively)", args.pdf_dir)
         sys.exit(1)
 
     cborg_api_key = os.environ.get("CBORG_API_KEY")
@@ -86,6 +86,12 @@ def main() -> None:
     # --- Print config ---
     log.info("Backend  : %s", args.backend)
     log.info("Model    : %s", args.model)
+    if args.backend == "cborg":
+        log.info(
+            "CBORG IP : family=%s force_ipv6=%s (allowlist host IPv6 2601:647:c103:b76d:b8b5:513f:11ea:18cc)",
+            os.environ.get("CBORG_IP_FAMILY", "auto"),
+            os.environ.get("CBORG_FORCE_IPV6", ""),
+        )
     log.info("PDFs     : %d files in %s", len(pdfs), args.pdf_dir)
     log.info("Output   : %s", args.output)
     log.info("Workers  : %d", args.workers)
@@ -98,6 +104,7 @@ def main() -> None:
 
     # --- Run ---
     repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root))
     sys.path.insert(0, str(repo_root / "app"))
     from modules.term_extractor import run_extraction
 

@@ -83,7 +83,7 @@ embedding model download, and is the easiest baseline to reproduce.
 
 | Setting | Default | Effect and tradeoff |
 |---|---:|---|
-| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` in app deployment | `semantic` needs the optional semantic stack and an embedding-model download |
+| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` in app deployment | `semantic` uses the default install's FAISS/SentenceTransformer/Torch stack and an embedding-model download |
 | `KG_RAG_TOPK` | `12` | Final nodes considered; higher values increase ranking/context work and can dilute relevance |
 | `KG_RAG_ENABLE_BFS` | `1` | Expands seed hits through outgoing links |
 | `KG_RAG_BFS_TOPK` | `2 × top-k` | Number of seeds expanded |
@@ -107,8 +107,9 @@ Semantic mode uses `KG_RAG_EMBED_MODEL`, a device-dependent encoding batch
 (`KG_RAG_BATCH`, normally 16 on CUDA or 32 on CPU), and FAISS. Set
 `KG_RAG_FORCE_CPU=1` for predictable CPU behavior or GPU troubleshooting.
 Lower the batch size after out-of-memory failures; raising it can improve
-throughput only when device memory permits. The standard Docker image excludes
-the semantic requirements, so enabling the variable alone is insufficient.
+throughput only when device memory permits. The default `requirements.txt`
+install and agent image include `requirements/semantic.in`, so enabling
+`KG_RAG_RETRIEVAL_BACKEND=semantic` does not need a second pip extra.
 
 Search results are cached in memory by exact query string. The cache has no
 configured size bound and lives until the graph object is replaced or the

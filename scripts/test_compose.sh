@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_NAME="fair2wise-smoke-$$"
 UI_PORT="${F2W_SMOKE_UI_PORT:-15173}"
-COMPOSE=(docker compose --project-name "$PROJECT_NAME" --project-directory "$ROOT_DIR")
+COMPOSE=(docker compose -f "$ROOT_DIR/compose.splash.yaml" --project-name "$PROJECT_NAME" --project-directory "$ROOT_DIR")
 
 cleanup() {
   "${COMPOSE[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true

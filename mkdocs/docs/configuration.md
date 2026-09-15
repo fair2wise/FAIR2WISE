@@ -29,9 +29,10 @@ Set `FAIR2WISE_CONFIG` to load a different YAML file.
 
 Never put secret values in `config.yml`.
 
-Compose requires `CBORG_API_KEY` during interpolation. Export it before the
-three project commands, or place it in an untracked `.env` file before running
-`docker compose up`. The host environment takes precedence over `.env`.
+Compose requires `CBORG_API_KEY` in the host `.env` (`env_file:`). Do not ARG
+or `COPY .env` into the image. Leave `CBORG_IPV6_BIND` unset. The host
+environment takes precedence over `.env` for interpolation only; secrets are
+injected at container start.
 
 ## Service paths
 
@@ -54,6 +55,8 @@ directory by the standard launcher.
 | `F2W_BACKEND` | `cborg` | `cborg` or `ollama` |
 | `F2W_MODEL` | `lbl/cborg-chat` | Active LLM model |
 | `CBORG_IP_FAMILY` | `ipv6` in Compose | CBORG transport family (`ipv6`, `ipv4`, or `auto`) |
+| `CBORG_FORCE_IPV6` | `1` in Compose | Pin the HTTP client to IPv6 |
+| `CBORG_IPV6_BIND` | unset (probe) | Optional source address; ignored if not assigned on the host |
 | `F2W_KG_MODE` | `splash` | Editable Splash graph or JSON snapshot |
 | `F2W_GRAPH` | `storage/kg/matkg_with_code.json` | Initial/fallback graph |
 | `F2W_SEED_TERMS` | empty | Cumulative terms seed |
@@ -71,7 +74,7 @@ directory by the standard launcher.
 | Variable | Default/typical | Meaning |
 |---|---:|---|
 | `KG_RAG_GRAPH_SOURCE` | `splash` | `splash` or `json` |
-| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Search implementation; semantic packages are not included in the app image |
+| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Search implementation (`lexical` or `semantic`; semantic packages ship in the default install) |
 | `KG_RAG_TOPK` | `12` | Final retrieval count |
 | `KG_RAG_EMBED_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model |
 | `KG_RAG_FORCE_CPU` | false | Disable GPU FAISS use |
@@ -109,7 +112,7 @@ dispatcher. Results report whether the active backend is `semantic` or
 |---|---:|---|
 | `VITE_F2W_AGENT_API_URL` | `http://127.0.0.1:8090` | Browser-visible agent API |
 | `F2W_AGENT_HOST` / `F2W_AGENT_PORT` | `127.0.0.1` / `8090` | Agent bind address |
-| `F2W_UI_HOST` / `F2W_UI_PORT` | `127.0.0.1` / `5173` | Vite bind address |
+| `F2W_UI_HOST` / `F2W_UI_PORT` | `127.0.0.1` / `5175` | Vite/UI bind; **never 5174** (SSH). 5173 is CORS-allowed |
 | `FAIR2WISE_UI_DIR` | repository `ui/` | Alternate UI workspace |
 
 Vite variables are read in the browser bundle, so the URL must be reachable
@@ -119,8 +122,9 @@ from the browser rather than only from the server process.
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `CBORG_API_KEY` | required | Agent LLM credential |
-| `F2W_UI_PORT` | `5173` | Sole host-published port, bound to loopback |
+| `CBORG_API_KEY` | required | Agent LLM credential (host `.env` via `env_file:`; not baked into the image) |
+| `F2W_UI_PORT` | `5175` | UI loopback port; never `5174` |
+| `F2W_AGENT_PORT` | `8090` | Agent loopback port (browser origin) |
 | `OPENALEX_EMAIL` | empty | Optional polite-pool identity |
 | `MP_API_KEY` | empty | Optional Materials Project credential |
 | `GITHUB_TOKEN` | empty | Optional GitHub rate-limit credential |

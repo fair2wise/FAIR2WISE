@@ -99,7 +99,27 @@ def test_fresh_turn_classifier_maps_only_non_scientific_classes_to_direct_respon
     assert decision["action"] == "retrieve_kg"
 
 
-def test_invalid_fresh_turn_classification_fails_closed_to_kg():
+def test_layout_question_classifies_as_ops_layout():
+    agent = WorkflowOrchestratorAgent(max_steps=12)
+    agent._llm_classify = lambda user_turn, state: {
+        "classification": "scientific_or_uncertain",
+        "reason": "LLM would have called this science.",
+    }
+    decision = asyncio.run(
+        agent.decide(
+            "how is all of the hardware connected at 11.0.1.2, in order",
+            {
+                "phase": "idle",
+                "orchestration_steps": 0,
+                "pending": None,
+                "approved_action": None,
+            },
+        )
+    )
+    assert decision["action"] == "retrieve_kg"
+    assert decision["classification"] == "ops_layout"
+    assert "science" not in str(decision["classification"])
+
     agent = WorkflowOrchestratorAgent(max_steps=12)
     agent._llm_classify = lambda user_turn, state: {
         "classification": "general_knowledge",

@@ -56,12 +56,13 @@ Record at least:
 
 Human-edited dependency inputs live in `requirements/*.in`. Generated
 `requirements/*.txt` files are Python 3.12 locks and must not be hand-edited.
-The root `requirements.txt` is only a compatibility include for
-`requirements/runtime.txt`.
+The root `requirements.txt` includes `requirements/runtime.txt` and
+`requirements/semantic.in`.
 
 Use Python 3.12 and pip-tools from the development environment:
 
 ```bash
+python3.12 -m pip install -r requirements.txt
 python3.12 -m pip install -r requirements/dev.txt
 python3.12 -m piptools compile --strip-extras \
   -o requirements/runtime.txt requirements/runtime.in
@@ -81,10 +82,12 @@ python3.12 -m piptools compile --strip-extras \
   -o requirements/legacy.txt requirements/legacy.in
 ```
 
-`requirements/semantic.in` intentionally has no compiled lock. It is an
-optional heavyweight FAISS/SentenceTransformer/Torch profile and is not part
-of the runtime image. A change there requires an explicit semantic-retrieval
-test environment and a note in the pull request.
+`requirements/semantic.in` has no compiled lock because torch/faiss wheels are
+platform-specific. It is part of the default install: `requirements.txt`
+includes the runtime lock and `semantic.in`, and the agent image copies that
+file. Do not compile it into `runtime.txt` unless you intend a large
+cross-platform lock update. A change there should note the retrieval-stack
+impact in the pull request.
 
 Inspect lock diffs for unexpected transitive upgrades. A direct dependency
 removal is incomplete until imports, Docker installation, tests, and relevant

@@ -6,7 +6,8 @@ WORKDIR /build/ui
 COPY ui/package.json ui/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY ui/ ./
-ARG VITE_F2W_AGENT_API_URL=/api
+# Browser-visible API URL only. Do not pass LLM credentials as build args.
+ARG VITE_F2W_AGENT_API_URL=http://127.0.0.1:8090
 ENV VITE_F2W_AGENT_API_URL=${VITE_F2W_AGENT_API_URL}
 RUN npm run build
 
@@ -29,6 +30,9 @@ FROM ghcr.io/prefix-dev/pixi:0.70.2 AS pixi
 
 FROM python:3.12-slim AS agent
 
+# Runtime secrets are injected by Compose env_file from the host dotenv file.
+# Do not pass LLM credentials as build args or bake dotenv files into layers.
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -48,6 +52,7 @@ WORKDIR /app
 
 COPY requirements.txt ./
 COPY requirements/runtime.txt ./requirements/runtime.txt
+COPY requirements/semantic.in ./requirements/semantic.in
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip && \
     python -m pip install -r requirements.txt

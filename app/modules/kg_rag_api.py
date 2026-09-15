@@ -68,7 +68,7 @@ load_dotenv()
 
 
 def _load_kg_deps() -> None:
-    """Require the optional semantic-retrieval dependency group."""
+    """Require the semantic-retrieval packages from requirements/semantic.in."""
     missing = []
     if faiss is None:
         missing.append("faiss-cpu")
@@ -78,7 +78,7 @@ def _load_kg_deps() -> None:
         missing.append("torch")
     if missing:
         raise RuntimeError(
-            "Semantic retrieval requires the optional packages listed in requirements/semantic.in; missing: "
+            "Semantic retrieval requires the packages listed in requirements/semantic.in; missing: "
             + ", ".join(missing)
         )
 
@@ -741,7 +741,6 @@ def load_pdf_text(path: str) -> str:
     if not Path(path).exists():
         logger.debug("PDF missing, skipping evidence lookup: %s", path)
         return ""
-    _load_kg_deps()
     try:
         doc = fitz.open(path)
     except Exception as exc:  # pragma: no cover
@@ -983,6 +982,10 @@ class KnowledgeGraph:
 
     #  Weighted BFS ---------------------------------------------------------
     # @annotate('KnowledgeGraph::weighted_bfs')
+    def neighborhood(self, seeds: Sequence[NodeScore], hops: int) -> List[NodeScore]:
+        """BFS neighborhood around seed nodes (graph.neighborhood contract)."""
+        return self.weighted_bfs(seeds, hops=hops)
+
     def weighted_bfs(self, seeds: Sequence[NodeScore], hops: int) -> List[NodeScore]:
         """Expand seed nodes via weighted breadth-first search over KG edges."""
         if not seeds:
@@ -1236,14 +1239,23 @@ def decompose(q: str) -> List[str]:
 
 
 # @annotate('retrieve_nodes')
-def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
+def retrieve_nodes(
+    q: str,
+    kg: KnowledgeGraph,
+    *,
+    hops: Optional[int] = None,
+    max_nodes: Optional[int] = None,
+) -> List[NodeInfo]:
     """Retrieve and rank KG nodes relevant to query, including BFS expansion."""
+    hop_count = MAX_BFS_HOPS if hops is None else max(0, int(hops))
+    limit = DEFAULT_K if max_nodes is None else max(1, int(max_nodes))
+    seed_k = max(limit, DEFAULT_K)
     ents = extract_query_entities(q)
-    seeds = kg.semantic_search(q)[: DEFAULT_K * 2]
+    seeds = kg.semantic_search(q)[: seed_k * 2]
 
     if STEPWISE:
         for sub in decompose(q)[:STEPWISE_MAX_STEPS]:
-            seeds.extend(kg.semantic_search(sub)[:DEFAULT_K])
+            seeds.extend(kg.semantic_search(sub)[:seed_k])
 
     #  keep highest score per node
     s_map: Dict[str, NodeScore] = {}
@@ -1254,10 +1266,11 @@ def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
     sem = list(s_map.values())
 
     graph: List[NodeScore] = []
-    if ENABLE_BFS:
-        graph = kg.weighted_bfs(
-            sorted(sem, key=lambda x: x.score, reverse=True)[:BFS_SEED_TOPK],
-            hops=MAX_BFS_HOPS,
+    if ENABLE_BFS and hop_count > 0:
+        expand = getattr(kg, "neighborhood", kg.weighted_bfs)
+        graph = expand(
+            sorted(sem, key=lambda x: x.score, reverse=True)[: max(BFS_SEED_TOPK, seed_k)],
+            hops=hop_count,
         )
 
     infos = kg.build_nodeinfo(sem, graph, ents)
@@ -1278,7 +1291,7 @@ def retrieve_nodes(q: str, kg: KnowledgeGraph) -> List[NodeInfo]:
             if code_ct > MAX_SNIPPETS:
                 continue
         capped.append(ni)
-        if len(capped) >= DEFAULT_K:
+        if len(capped) >= limit:
             break
 
     return capped

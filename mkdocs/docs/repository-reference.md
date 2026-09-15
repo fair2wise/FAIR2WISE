@@ -11,13 +11,15 @@ change-impact analysis.
 | `README.md` | User-oriented project overview and operational examples |
 | `config.yml` | Central non-secret defaults and environment mappings |
 | `.env.example` | Local environment template |
-| `requirements.txt` | Compatibility entry point that includes the runtime lock |
+| `requirements.txt` | Compatibility entry point that includes the runtime lock and semantic.in |
 | `requirements/runtime.in` / `requirements/runtime.txt` | Runtime dependency source and compiled Python 3.12 lock |
 | `requirements/dev.in` / `requirements/dev.txt` | Development/tooling source and compiled lock |
 | `requirements/globus.in` / `requirements/globus.txt` | Optional Globus Compute dependency source and lock |
 | `requirements/legacy.in` / `requirements/legacy.txt` | Optional archived-module dependency source and lock |
-| `requirements/semantic.in` | Optional FAISS/SentenceTransformer retrieval inputs |
-| `compose.yaml` | Canonical private-network application stack |
+| `requirements/semantic.in` | FAISS/SentenceTransformer/Torch retrieval inputs included by the default install |
+| `compose.yaml` | Product agent+UI Compose stack (JSON KG, ports 5175/8090) |
+| `compose.splash.yaml` | Optional Splash + agent + Nginx `/api` stack |
+| `compose.hostnet.yaml` | Linux overlay: agent `network_mode: host` for IPv6 |
 | `Dockerfile` | Agent and frontend image targets |
 | `pytest.ini` | Root pytest discovery configuration |
 | `mkdocs/` | This documentation site |
@@ -67,6 +69,7 @@ move into a focused module rather than expanding route handlers.
 |---|---|
 | `app/modules/kg_rag_api.py` | KG loader/search/ranking/context, LLM clients, compatibility API/CLI |
 | `app/modules/json2kg.py` | Extracted term/code JSON to MatKG graph |
+| `app/modules/bl1101_ingest.py` | ALS 11.0.1.2 ops ingest (blueprint, ALS page, pinned GitHub cache) |
 | `app/modules/project_config.py` | Cached YAML/env configuration helpers |
 | `app/modules/cborg_limiter.py` | Shared synchronous/asynchronous CBORG concurrency cap |
 | `app/modules/extract_terms.py` | Standalone schema-aware extraction pipeline |
@@ -186,7 +189,7 @@ Tests sit beside UI helpers as `*.test.ts`.
 
 | Directory | Contents |
 |---|---|
-| `storage/schema/` | LinkML MatKG schema |
+| `storage/schema/` | LinkML MatKG schema plus overlays (`rsoxs_schema.yaml`, `bl1101_schema.yaml`) |
 | `storage/terminology/` | Extracted term datasets/checkpoints |
 | `storage/kg/` | MatKG graph snapshots/checkpoints and HTML viewer |
 | `storage/competency_questions/` | Evaluation question sets |
@@ -224,7 +227,7 @@ Root tests follow feature ownership:
 | `.github/workflows/publish-image.yml` | Build/publish the agent image target |
 | `.github/dependabot.yml` | Docker, Actions, and pip update groups |
 | `.pre-commit-config.yaml` | Local pre-commit tools |
-| `scripts/` | Local, Docker, KG, and NERSC automation, including the modular extractor CLI at `scripts/run.py` |
+| `scripts/` | Local, Docker, KG, and NERSC automation, including `scripts/run.py` and `scripts/ingest_bl1101.py` |
 | `slurm_scripts/` | Batch-system launchers |
 
 ## Tooling directories

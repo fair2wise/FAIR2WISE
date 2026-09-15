@@ -4,7 +4,7 @@ import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
 import { ExampleQuery } from './data/mockupData';
-import { GraphMockup } from './GraphMockup';
+import { GraphMockup, inducedSubgraph } from './GraphMockup';
 import { parseKgCitationNodeIds, splitAnswerHighlightSegments } from './kgCitations';
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
@@ -365,6 +365,27 @@ function groupMessageExchanges(messages: ChatMessage[]): MessageExchange[] {
   return exchanges;
 }
 
+export function queryGraphFromResult(result: AgentChatResponse): GraphPayload | null {
+  const ids = result.node_ids ?? [];
+  const payload = result.graph;
+  if (!payload || ids.length === 0) return null;
+  if (payload.nodes.length === 0) return null;
+  const present = new Set(payload.nodes.map(node => node.id));
+  const matched = ids.filter(id => present.has(id));
+  if (matched.length === 0) return inducedSubgraph(payload, ids);
+  // Already the retrieve neighborhood (or a close subset) — keep dual-KG tags.
+  if (payload.nodes.length <= Math.max(matched.length, ids.length)) return payload;
+  return inducedSubgraph(payload, ids);
+}
+
+export function raiseViewerLimit(
+  previous: number | 'all',
+  queriedCount: number,
+): number | 'all' {
+  if (previous === 'all' || queriedCount <= 0) return previous;
+  return previous < queriedCount ? 'all' : previous;
+}
+
 export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessages, onGraphUpdate, onSelect }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -374,6 +395,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   const [streamedLen, setStreamedLen] = useState(0);
   const [streamGraph, setStreamGraph] = useState<GraphPayload | null>(null);
   const [streamNodeIds, setStreamNodeIds] = useState<string[]>([]);
+  const [queryGraph, setQueryGraph] = useState<GraphPayload | null>(null);
   const [pinnedViewId, setPinnedViewId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isKgViewer, setIsKgViewer] = useState(false);
@@ -516,7 +538,11 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
       ? undefined
       : Math.max(1, Math.round((Date.now() - requestStartedAtRef.current) / 1000));
     const highlightNodeIds = result.node_ids ?? [];
-    onGraphUpdate(result.graph);
+    const nextQueryGraph = queryGraphFromResult(result);
+    if (nextQueryGraph) {
+      setQueryGraph(nextQueryGraph);
+      setKgViewerNodeLimit(previous => raiseViewerLimit(previous, nextQueryGraph.nodes.length));
+    }
     const assistantMessage: ChatMessage = {
       id: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       role: 'assistant',
@@ -568,6 +594,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
     setSteps([]);
     setStreamGraph(null);
     setStreamNodeIds([]);
+    setQueryGraph(null);
     setPinnedViewId(null);
     onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
     const controller = new AbortController();
@@ -638,6 +665,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
     setSteps([]);
     setStreamGraph(null);
     setStreamNodeIds([]);
+    setQueryGraph(null);
     setPinnedViewId(null);
     const controller = new AbortController();
     const requestId = requestSeqRef.current + 1;
@@ -743,19 +771,11 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
 
   const messageExchanges = groupMessageExchanges(messages);
   const displayGraph = useMemo(() => {
-    if (!streamGraph) return graph;
-    const nodes = new Map(graph.nodes.map(node => [node.id, node]));
-    for (const node of streamGraph.nodes) nodes.set(node.id, node);
-    const edgeKey = (edge: { source: string; target: string; predicate: string }) =>
-      `${edge.source}\u0000${edge.predicate}\u0000${edge.target}`;
-    const edges = new Map(graph.edges.map(edge => [edgeKey(edge), edge]));
-    for (const edge of streamGraph.edges) edges.set(edgeKey(edge), edge);
-    return {
-      nodes: Array.from(nodes.values()),
-      edges: Array.from(edges.values()),
-      source_path: graph.source_path || streamGraph.source_path,
-    };
-  }, [graph, streamGraph]);
+    if (streamGraph) return streamGraph;
+    const queryIds = isThinking && streamNodeIds.length ? streamNodeIds : activeQuery.nodeIds;
+    if (queryIds.length > 0 && queryGraph) return queryGraph;
+    return graph;
+  }, [activeQuery.nodeIds, graph, isThinking, queryGraph, streamGraph, streamNodeIds]);
   const citationMessageId = activeQuery.id !== 'idle' ? activeQuery.id : null;
   const citationAnswerText = useMemo(() => {
     if (!citationMessageId) return '';
@@ -804,14 +824,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
         node.id === updated.id
           ? {
               ...node,
-              label: updated.label,
-              type: updated.type,
-              description: updated.description,
-              publications: updated.publications,
-              code_snippet: updated.code_snippet,
-              code_language: updated.code_language,
-              function_name: updated.function_name,
-              linked_code_snippets: updated.linked_code_snippets,
+              ...updated,
             }
           : node
       )),

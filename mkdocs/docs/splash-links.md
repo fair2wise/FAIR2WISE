@@ -75,6 +75,12 @@ The GraphQL endpoint and GraphiQL IDE are:
 http://127.0.0.1:8081/splash_links/graphql
 ```
 
+RSoXS / Tiled Graph recipes (inventory, extraction QA, agent lookups, and
+catalog `nodeId` joins) are in the [GraphQL cookbook](graphql-cookbook.md).
+Named operations: `splash_links/examples/rsoxs_v1_cookbook.graphql`. Those
+operations target Tiled `/api/graphql`; Splash is the F2W local demo graph
+only and has no `nodeId` or namespace registry.
+
 Queries:
 
 - `entity(id)` and paginated `entities(entityType)`;

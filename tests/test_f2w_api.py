@@ -9,6 +9,66 @@ from app.modules.f2w_agent import api as api_mod
 from app.modules.f2w_agent.coordinator import CoordinatorConfig
 
 
+def test_json_graph_refusal_only_when_retrieval_empty():
+    canned = api_mod.JSON_GRAPH_NO_EVIDENCE_REFUSAL
+    assert canned == (
+        "The selected JSON graph did not contain enough direct evidence to answer this question."
+    )
+    empty = api_mod._json_graph_insufficient_answer(
+        {"no_evidence": True, "selected": [], "missing_topics": ["unobtanium"]}
+    )
+    off_topic = api_mod._json_graph_insufficient_answer(
+        {"no_evidence": True, "selected": ["n1"], "missing_topics": ["unobtanium"]}
+    )
+    assert empty == canned
+    assert off_topic == canned
+
+    on_topic_numeric_gap = api_mod._json_graph_insufficient_answer(
+        {
+            "no_evidence": False,
+            "selected": ["matkg:RSoXS"],
+            "missing_topics": ["photon_energy_eV"],
+        }
+    )
+    assert canned not in on_topic_numeric_gap
+    assert "photon_energy_eV" in on_topic_numeric_gap
+    assert api_mod._json_graph_should_use_canned_refusal(
+        "what is the photon energy for this RSoXS measurement",
+        {
+            "no_evidence": False,
+            "selected": ["matkg:RSoXS"],
+            "missing_topics": ["photon_energy_eV"],
+        },
+    )
+    assert not api_mod._json_graph_should_use_canned_refusal(
+        "what does the ALS RSoXS beamline specialize in",
+        {
+            "no_evidence": False,
+            "selected": ["matkg:RSoXS"],
+            "missing_topics": ["photon_energy_eV"],
+        },
+    )
+
+
+def test_compose_followup_keeps_pending_scientific_question():
+    history = [
+        {"role": "user", "content": "give an example of analysis code"},
+        {"role": "assistant", "content": "I need a more specific measurement fact."},
+    ]
+    composed = api_mod._compose_history_aware_question("You can be more general", history)
+    assert "analysis code" in composed.lower()
+    assert "more general" in composed.lower()
+    assert api_mod._looks_meta_grounding_instruction("You can be more general")
+    assert api_mod._looks_contextual_followup("what kind of samples are typically studied")
+    assert api_mod._needs_history_rewrite(
+        "what kind of samples are typically studied",
+        [
+            {"role": "user", "content": "Give me a summary of RSoXS."},
+            {"role": "assistant", "content": "RSoXS is resonant soft X-ray scattering."},
+        ],
+    )
+
+
 class FakeRetrieval:
     def __init__(self, *args, **kwargs):
         self.verdicts = [
@@ -359,6 +419,182 @@ def test_followup_history_rewrites_before_retrieval(tmp_path, monkeypatch):
 
     assert response.status == "answered"
     assert RecordingRetrieval.queries == ["What evidence supports the second candidate material?"]
+
+
+def test_followup_sample_question_after_rsoxs_summary_uses_history(tmp_path, monkeypatch):
+    class RecordingRetrieval:
+        queries = []
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question, history=None):
+            type(self).queries.append(question)
+            return {
+                "status": "success",
+                "sufficient": True,
+                "answer": "RSoXS is used on structured soft-matter samples.",
+                "selected": ["matkg:RSoXS"],
+                "direct_evidence_count": 1,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
+    RecordingRetrieval.queries = []
+    monkeypatch.setattr(api_mod, "RetrievalAgent", RecordingRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    force_agent_router(service)
+
+    async def fake_rewrite(question, history):
+        assert "what kind of samples" in question.lower()
+        assert any("RSoXS" in item["content"] for item in history)
+        return "What kinds of samples are typically studied with RSoXS?"
+
+    service._rewrite_standalone_question = fake_rewrite
+    response = asyncio.run(
+        service.ask(
+            "what kind of samples are typically studied?",
+            messages=[
+                {"role": "user", "content": "Give me a summary of RSoXS."},
+                {
+                    "role": "assistant",
+                    "content": "RSoXS is resonant soft X-ray scattering used for structured soft matter.",
+                },
+            ],
+        )
+    )
+
+    assert response.status == "answered"
+    assert RecordingRetrieval.queries == ["What kinds of samples are typically studied with RSoXS?"]
+    assert response.status != "direct_response"
+
+
+def test_more_general_keeps_pending_analysis_code_question(tmp_path, monkeypatch):
+    class RecordingRetrieval:
+        queries = []
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question, history=None):
+            type(self).queries.append(question)
+            return {
+                "status": "success",
+                "sufficient": True,
+                "answer": "Example Nika/CyRSoXS analysis workflow (not a KG measurement fact).",
+                "selected": ["matkg:RSoXS"],
+                "direct_evidence_count": 1,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash",
+            }
+
+    RecordingRetrieval.queries = []
+    monkeypatch.setattr(api_mod, "RetrievalAgent", RecordingRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
+    service.orchestrator._llm_classify = lambda user_turn, state: {
+        "classification": "mundane_conversation",
+        "reason": "Looks like meta-chat.",
+    }
+
+    async def fake_rewrite(question, history):
+        assert "more general" in question.lower()
+        assert any("analysis code" in item["content"].lower() for item in history)
+        return (
+            "Give an example of analysis code for RSoXS, answering more generally "
+            "with looser grounding."
+        )
+
+    service._rewrite_standalone_question = fake_rewrite
+    response = asyncio.run(
+        service.ask(
+            "You can be more general",
+            messages=[
+                {"role": "user", "content": "give an example of analysis code"},
+                {"role": "assistant", "content": "I need a more specific measurement fact."},
+            ],
+        )
+    )
+
+    assert response.status != "direct_response"
+    assert response.status == "answered"
+    assert RecordingRetrieval.queries
+    assert "analysis code" in RecordingRetrieval.queries[0].lower()
+
+
+def test_beamline_specialty_skips_canned_slots_when_nodes_exist(tmp_path, monkeypatch):
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [{"id": "n1", "name": "RSoXS"}], "associations": []}),
+        encoding="utf-8",
+    )
+
+    class ConceptualInsufficientRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question, history=None):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "answer": None,
+                "missing_topics": ["photon_energy_eV"],
+                "selected": ["matkg:RSoXS"],
+                "direct_evidence_count": 1,
+                "no_evidence": False,
+                "graph_source_requested": "json",
+                "graph_source_used": "json",
+            }
+
+    monkeypatch.setattr(api_mod, "RetrievalAgent", ConceptualInsufficientRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            workdir=tmp_path / "run",
+            max_rounds=1,
+            kg_mode="json",
+            graph=str(graph_path),
+        )
+    )
+    force_agent_router(service)
+    service._generate_json_graph_leeway_answer = lambda question, verdict, history=None: asyncio.sleep(
+        0,
+        result=(
+            "ALS RSoXS specializes in resonant soft X-ray scattering of structured "
+            "soft matter. Not a KG measurement fact."
+        ),
+    )
+    canned = api_mod._json_graph_insufficient_answer(
+        {
+            "no_evidence": False,
+            "selected": ["matkg:RSoXS"],
+            "missing_topics": ["photon_energy_eV"],
+        }
+    )
+    response = asyncio.run(
+        service.ask("what does the ALS RSoXS beamline specialize in")
+    )
+
+    assert response.status != "insufficient_json_graph"
+    assert response.status == "answered"
+    assert canned not in response.answer
+    assert "numeric slots, photon energy, or a cited snippet" not in response.answer
 
 
 def test_session_memory_rewrites_followup_without_frontend_history(tmp_path, monkeypatch):
@@ -1674,6 +1910,160 @@ def test_graph_subset_from_file_handles_missing_file_or_ids(tmp_path):
     graph_path = tmp_path / "kg.json"
     graph_path.write_text(json.dumps({"things": [], "associations": []}), encoding="utf-8")
     assert api_mod.graph_subset_from_file(graph_path, []) == {"nodes": [], "edges": []}
+
+
+def test_query_graph_payload_merges_dual_kg_without_concat(tmp_path):
+    science = tmp_path / "matkg_rsoxs_v1.json"
+    ops = tmp_path / "matkg_bl1101_v1.json"
+    science.write_text(
+        json.dumps(
+            {
+                "things": [
+                    {"id": "shared", "name": "Lit shared", "category": "Material"},
+                    {"id": "only_lit", "name": "Paper", "category": "Material"},
+                    {"id": "ignored_lit", "name": "Ignore", "category": "Material"},
+                ],
+                "associations": [
+                    {"subject": "shared", "predicate": "rel:related_to", "object": "only_lit"},
+                    {"subject": "only_lit", "predicate": "rel:related_to", "object": "ignored_lit"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    ops.write_text(
+        json.dumps(
+            {
+                "things": [
+                    {"id": "shared", "name": "Ops shared", "category": "Beamline"},
+                    {"id": "only_ops", "name": "Motor", "category": "Motor"},
+                ],
+                "associations": [
+                    {"subject": "shared", "predicate": "rel:part_of", "object": "only_ops"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = api_mod.query_graph_payload(
+        selected_ids=["shared", "only_lit", "only_ops"],
+        selected_hits=[
+            {"id": "shared", "graph_id": "rsoxs_v1", "graph_label": "science"},
+            {"id": "only_lit", "graph_id": "rsoxs_v1", "graph_label": "science"},
+            {"id": "shared", "graph_id": "bl1101", "graph_label": "11.0.1.2 ops"},
+            {"id": "only_ops", "graph_id": "bl1101", "graph_label": "11.0.1.2 ops"},
+        ],
+        graph_path=science,
+        graph_paths_by_id={"rsoxs_v1": science, "bl1101": ops},
+    )
+
+    ids = {node.id for node in payload.nodes}
+    assert "only_lit" in ids
+    assert "only_ops" in ids
+    assert "ignored_lit" not in ids
+    assert "rsoxs_v1:shared" in ids
+    assert "bl1101:shared" in ids
+    labels = {node.id: node.graph_id for node in payload.nodes}
+    assert labels["only_lit"] == "rsoxs_v1"
+    assert labels["only_ops"] == "bl1101"
+    assert len(payload.nodes) == 4
+    edge_pairs = {(edge.source, edge.target) for edge in payload.edges}
+    assert ("rsoxs_v1:shared", "only_lit") in edge_pairs
+    assert ("bl1101:shared", "only_ops") in edge_pairs
+    assert ("only_lit", "ignored_lit") not in edge_pairs
+
+
+def test_graph_node_from_raw_keeps_definition_github_and_extra_fields(tmp_path):
+    graph_path = tmp_path / "matkg_bl1101_v1.json"
+    graph_path.write_text(
+        json.dumps(
+            {
+                "things": [
+                    {
+                        "id": "beamline:fn-load-beamline-config",
+                        "name": "load_beamline_config",
+                        "category": "Method",
+                        "definition": "Method in sim_ophyd/_config.py.",
+                        "source_papers": ["bcs2sim-ophyd:_config.py:load_beamline_config"],
+                        "source_file_path": "sim_ophyd/_config.py",
+                        "source_start_line": 358,
+                        "source_end_line": 365,
+                        "repo_commit_sha": "729686c05f6c39208f4ed034abc3229f63d7ac23",
+                        "pv": "unused-on-method",
+                        "ophyd_name": "config",
+                    },
+                    {
+                        "id": "matkg:snippetFit",
+                        "name": "fit snippet",
+                        "category": "CodeSnippet",
+                        "code_snippet": "def fit(): pass",
+                        "code_language": "python",
+                        "function_name": "fit",
+                        "source_type": "github",
+                        "repo_url": "https://github.com/example/peaks",
+                        "repo_owner": "example",
+                        "repo_name": "peaks",
+                        "repo_commit_sha": "abc123",
+                        "source_file_path": "src/peaks.py",
+                        "source_file_url": "https://github.com/example/peaks/blob/abc123/src/peaks.py",
+                        "source_start_line": 10,
+                        "source_end_line": 20,
+                    },
+                ],
+                "associations": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = api_mod.graph_payload_from_file(graph_path)
+    method = next(node for node in payload.nodes if node.id.endswith("load-beamline-config"))
+    assert method.description == "Method in sim_ophyd/_config.py."
+    assert method.graph_id == "bl1101"
+    assert method.graph_label == "11.0.1.2 ops"
+    assert method.source_file_path == "sim_ophyd/_config.py"
+    assert method.repo_commit_sha.startswith("729686c")
+    assert method.extra_fields["ophyd_name"] == "config"
+    assert method.code_snippet is None
+
+    snippet = api_mod.graph_node_from_file(graph_path, "matkg:snippetFit")
+    assert snippet is not None
+    assert snippet.repo_url == "https://github.com/example/peaks"
+    assert snippet.source_file_url.endswith("src/peaks.py")
+    assert snippet.code_snippet == "def fit(): pass"
+
+
+def test_resolve_graph_node_uses_dual_kg_display_ids(tmp_path):
+    science = tmp_path / "matkg_rsoxs_v1.json"
+    ops = tmp_path / "matkg_bl1101_v1.json"
+    science.write_text(
+        json.dumps({"things": [{"id": "shared", "name": "Lit", "category": "Material", "definition": "from papers"}]}),
+        encoding="utf-8",
+    )
+    ops.write_text(
+        json.dumps({"things": [{"id": "shared", "name": "Ops", "category": "Beamline", "definition": "from ingest"}]}),
+        encoding="utf-8",
+    )
+
+    lit = api_mod.resolve_graph_node(
+        "rsoxs_v1:shared",
+        fallback_path=science,
+        graph_paths_by_id={"rsoxs_v1": science, "bl1101": ops},
+    )
+    ops_node = api_mod.resolve_graph_node(
+        "bl1101:shared",
+        fallback_path=science,
+        graph_paths_by_id={"rsoxs_v1": science, "bl1101": ops},
+    )
+    assert lit is not None
+    assert lit.label == "Lit"
+    assert lit.graph_id == "rsoxs_v1"
+    assert lit.graph_label == "science"
+    assert ops_node is not None
+    assert ops_node.label == "Ops"
+    assert ops_node.graph_id == "bl1101"
+    assert ops_node.graph_label == "11.0.1.2 ops"
 
 
 def test_node_publications_derives_identifiers_from_pdf_filenames():

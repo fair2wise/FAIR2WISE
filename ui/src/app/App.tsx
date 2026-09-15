@@ -26,17 +26,15 @@ import {
 } from './components/chatSessions';
 import { ExampleQuery } from './components/data/mockupData';
 import {
-  loadAgentSettings,
   saveAgentSettings,
   settingsFromApiResponse,
-  settingsToApiPayload,
 } from './components/agentSettings';
 import {
   deleteAgentSession,
   EMPTY_GRAPH,
+  fetchAgentSettings,
   fetchLiveGraph,
   GraphPayload,
-  updateAgentSettings,
 } from './components/data/liveAgent';
 
 const queryClient = new QueryClient();
@@ -154,18 +152,8 @@ export default function App() {
 
     async function boot() {
       try {
-        const local = loadAgentSettings();
-        const response = await updateAgentSettings(settingsToApiPayload(local));
-        const synced = settingsFromApiResponse(response);
-        saveAgentSettings({
-          backend: local.backend,
-          model: local.model,
-          graphSource: local.graphSource,
-          workflowMode: local.workflowMode,
-          extractionMode: local.extractionMode,
-          targetedMaxPages: local.targetedMaxPages,
-          jsonGraphPath: synced.jsonGraphPath,
-        });
+        const response = await fetchAgentSettings();
+        saveAgentSettings(settingsFromApiResponse(response));
         const nextGraph = await fetchLiveGraph();
         if (!cancelled) setGraph(nextGraph);
       } catch (error) {

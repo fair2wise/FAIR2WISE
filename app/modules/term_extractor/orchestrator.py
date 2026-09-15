@@ -201,13 +201,13 @@ class Orchestrator:
             from langchain_core.messages import HumanMessage
             return llm_base.invoke([HumanMessage(content=prompt)]).content or ""
 
-        state = ToolState(
+        self._tool_state = ToolState(
             store=self.store,
             schema=self.schema_helper,
             services=self.services,
             llm_invoke=_llm_invoke,
         )
-        return build_tools(state)
+        return build_tools(self._tool_state)
 
     def _build_llm(self) -> ChatOpenAI:
         if self.backend == "ollama":
@@ -240,15 +240,22 @@ class Orchestrator:
         schema_ctx = self.schema_helper.get_schema_context_for_llm()
         prompt = build_page_prompt(schema_ctx, filename, page_num, text)
         terms_before = len(self.store)
+        tool_state = getattr(self, "_tool_state", None)
+        if tool_state is not None:
+            tool_state.set_page_context(filename, page_num + 1)
         try:
-            with sync_slot(enabled=getattr(self, "backend", "cborg") == "cborg"):
-                result = self.graph.invoke({"messages": [HumanMessage(content=prompt)]})
-        except Exception as e:
-            logger.error("Agent failed on %s page %d: %s", filename, page_num + 1, _short_error(e))
-            added = self._fallback_json_extract(text, filename, page_num, schema_ctx)
-            if added:
-                self.store.save()
-            return added
+            try:
+                with sync_slot(enabled=getattr(self, "backend", "cborg") == "cborg"):
+                    result = self.graph.invoke({"messages": [HumanMessage(content=prompt)]})
+            except Exception as e:
+                logger.error("Agent failed on %s page %d: %s", filename, page_num + 1, _short_error(e))
+                added = self._fallback_json_extract(text, filename, page_num, schema_ctx)
+                if added:
+                    self.store.save()
+                return added
+        finally:
+            if tool_state is not None:
+                tool_state.clear_page_context()
         added = len(self.store) > terms_before
         if not added:
             added = self._register_json_terms_from_result(result, filename, page_num, text)
@@ -349,6 +356,9 @@ class Orchestrator:
         total_pages = doc.page_count
         self.store.increment("processed_pages_total", total_pages)
         pages_with_terms = 0
+        tool_state = getattr(self, "_tool_state", None)
+        if tool_state is not None:
+            tool_state.current_source_paper = filename
 
         # PDF-derived publication metadata (never from the term LLM).
         try:
@@ -409,6 +419,8 @@ class Orchestrator:
         self.store.increment("processed_files")
         self.store.increment("processed_pages_with_terms", pages_with_terms)
         logger.info("Finished '%s': %d/%d pages yielded terms", filename, pages_with_terms, total_pages)
+        if tool_state is not None:
+            tool_state.current_source_paper = None
         return pages_with_terms
 
     def select_relevant_pages(
@@ -562,15 +574,15 @@ class Orchestrator:
             logger.error(msg)
             return {"status": "error", "message": msg}
 
-        pdfs = sorted(f for f in os.listdir(data_dir) if f.lower().endswith(".pdf"))
+        pdfs = sorted(p for p in Path(data_dir).rglob("*.pdf") if p.is_file())
         if not pdfs:
             logger.warning("No PDFs in %s", data_dir)
 
         pdf_results: List[Dict[str, Any]] = []
-        for idx, fname in enumerate(pdfs, start=1):
-            logger.info("[%d/%d] Targeted processing: %s", idx, len(pdfs), fname)
+        for idx, pdf_path in enumerate(pdfs, start=1):
+            logger.info("[%d/%d] Targeted processing: %s", idx, len(pdfs), pdf_path.name)
             result = self.process_pdf_targeted(
-                os.path.join(data_dir, fname),
+                str(pdf_path),
                 query=query,
                 missing_topics=missing_topics or [],
                 max_pages=max_pages,
@@ -610,13 +622,13 @@ class Orchestrator:
             logger.error(msg)
             return {"status": "error", "message": msg}
 
-        pdfs = sorted(f for f in os.listdir(data_dir) if f.lower().endswith(".pdf"))
+        pdfs = sorted(p for p in Path(data_dir).rglob("*.pdf") if p.is_file())
         if not pdfs:
             logger.warning("No PDFs in %s", data_dir)
 
-        for idx, fname in enumerate(pdfs, start=1):
-            logger.info("[%d/%d] Processing: %s", idx, len(pdfs), fname)
-            self.process_pdf(os.path.join(data_dir, fname))
+        for idx, pdf_path in enumerate(pdfs, start=1):
+            logger.info("[%d/%d] Processing: %s", idx, len(pdfs), pdf_path.name)
+            self.process_pdf(str(pdf_path))
 
         self.store.assign_importance()
         self.store.save()

@@ -1,0 +1,254 @@
+# RSoXS v1 GraphQL cookbook
+#
+# Beamline target (Tiled entity/link graph):
+#   POST http://<tiled>/api/graphql
+#   Header: Authorization: Apikey <key>
+#   Missing auth returns empty lists, not errors.
+#
+# F2W local demo only:
+#   http://127.0.0.1:8081/splash_links/graphql  (no nodeId / namespaces)
+#
+# Wire names are camelCase. Run one named operation at a time in GraphiQL.
+# Filter by entityType and link predicate only; page then match properties.
+# See mkdocs/docs/graphql-cookbook.md.
+
+fragment EntityCore on Entity {
+  id
+  entityType
+  name
+  uri
+  properties
+}
+
+fragment EntityTiled on Entity {
+  id
+  entityType
+  name
+  uri
+  nodeId
+  properties
+}
+
+fragment LinkHop on Link {
+  id
+  predicate
+  properties
+  subject {
+    id
+    name
+    entityType
+    uri
+  }
+  object {
+    id
+    name
+    entityType
+    uri
+  }
+}
+
+# Tiled /api/graphql only — Splash has no nodeId field.
+fragment LinkHopTiled on Link {
+  id
+  predicate
+  properties
+  subject {
+    ...EntityTiled
+  }
+  object {
+    ...EntityTiled
+  }
+}
+
+# --- Inventory (extraction QA) ---
+
+query InventoryUntyped($limit: Int = 100, $offset: Int = 0) {
+  entities(limit: $limit, offset: $offset) {
+    ...EntityCore
+  }
+}
+
+query PageUnknownStubs($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "Unknown", limit: $limit, offset: $offset) {
+    ...EntityCore
+    incomingLinks(limit: 20) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageRSoXSMeasurements($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "RSoXSMeasurement", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(limit: 50) {
+      ...LinkHop
+    }
+    incomingLinks(limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageExperimentalTechniques($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "ExperimentalTechnique", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageMaterials($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "Material", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(predicate: "rel:has_property", limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageConjugatedPolymers($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "ConjugatedPolymer", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageCodeSnippets($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "CodeSnippet", limit: $limit, offset: $offset) {
+    ...EntityCore
+    incomingLinks(predicate: "rel:has_code_snippet", limit: 20) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageBeamlines($limit: Int = 50, $offset: Int = 0) {
+  entities(entityType: "Beamline", limit: $limit, offset: $offset) {
+    ...EntityCore
+    incomingLinks(limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+# Splash leftover: entityType "tiled" was splash_links.create_link to a catalog node.
+# 11.0.1.2 run indexer should create entityType BlueskyRun with nodeId instead.
+query PageTiledNodes($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "tiled", limit: $limit, offset: $offset) {
+    ...EntityCore
+    incomingLinks(limit: 50) {
+      ...LinkHop
+    }
+    outgoingLinks(limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageBlueskyRuns($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "BlueskyRun", limit: $limit, offset: $offset) {
+    ...EntityTiled
+    incomingLinks(limit: 50) {
+      ...LinkHopTiled
+    }
+    outgoingLinks(limit: 50) {
+      ...LinkHopTiled
+    }
+  }
+}
+
+# --- Traversal (agent neighborhood) ---
+
+query Neighborhood($id: ID!, $limit: Int = 50) {
+  entity(id: $id) {
+    ...EntityCore
+    outgoingLinks(limit: $limit) {
+      ...LinkHop
+    }
+    incomingLinks(limit: $limit) {
+      ...LinkHop
+    }
+  }
+}
+
+query LinksByPredicate($predicate: String!, $limit: Int = 100, $offset: Int = 0) {
+  links(predicate: $predicate, limit: $limit, offset: $offset) {
+    ...LinkHop
+  }
+}
+
+query MeasuresLinks($limit: Int = 100, $offset: Int = 0) {
+  links(predicate: "rel:measures", limit: $limit, offset: $offset) {
+    ...LinkHop
+  }
+}
+
+query HasPropertyLinks($limit: Int = 100, $offset: Int = 0) {
+  links(predicate: "rel:has_property", limit: $limit, offset: $offset) {
+    ...LinkHop
+  }
+}
+
+query CodeSnippetLinks($limit: Int = 100, $offset: Int = 0) {
+  links(predicate: "rel:has_code_snippet", limit: $limit, offset: $offset) {
+    ...LinkHop
+  }
+}
+
+# Filled by the Bluesky run indexer (start + plan), not by literature extract.
+# Tiled only: uses nodeId. On Splash this query returns empty, not an error.
+query MeasuredFromRun($limit: Int = 100, $offset: Int = 0) {
+  links(predicate: "prov:wasDerivedFrom", limit: $limit, offset: $offset) {
+    ...LinkHopTiled
+  }
+}
+
+# --- Tiled catalog join (Tiled /api/graphql only) ---
+
+query CatalogNodeId($path: [String!]!) {
+  catalogNodeId(path: $path)
+}
+
+query ListNamespaces {
+  namespaces {
+    prefix
+    uri
+  }
+}
+
+mutation UpsertRsoxsNamespaces {
+  matkg: upsertNamespace(prefix: "matkg", uri: "https://w3id.org/matkg/") {
+    prefix
+    uri
+  }
+  prov: upsertNamespace(prefix: "prov", uri: "http://www.w3.org/ns/prov#") {
+    prefix
+    uri
+  }
+  ro: upsertNamespace(prefix: "ro", uri: "http://purl.obolibrary.org/obo/ro.owl") {
+    prefix
+    uri
+  }
+}
+
+mutation CreateMeasuredFromLink($measurementId: ID!, $runEntityId: ID!) {
+  createLink(
+    input: {
+      subjectId: $measurementId
+      predicate: "prov:wasDerivedFrom"
+      objectId: $runEntityId
+    }
+  ) {
+    id
+    predicate
+    subject {
+      ...EntityTiled
+    }
+    object {
+      ...EntityTiled
+    }
+  }
+}

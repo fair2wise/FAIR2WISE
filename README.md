@@ -16,47 +16,55 @@ This repository builds materials-science knowledge graphs from research papers (
 
 ## Recommended: run with Docker Compose
 
-Docker Compose is the preferred way to run FAIR2WISE. A clone does **not**
-depend on Docker images from the original developer's computer. Each computer
-builds its own application images from the repository's `Dockerfile`,
-`splash_links/Containerfile`, source code, and pinned requirements.
-
-Install Docker Engine or Docker Desktop with Docker Compose v2, authorize the
-computer for CBORG access, and make `CBORG_API_KEY` available in the shell.
-Then the complete application starts in three commands:
+Docker Compose is the preferred way to run FAIR2WISE. One command starts the
+agent API and UI. Secrets stay in a gitignored host `.env` and are injected at
+**runtime** (`env_file:`). They are never copied into the image.
 
 ```bash
 git clone https://github.com/matesuu/FAIRtoWISE-FORUM-AI.git
 cd FAIRtoWISE-FORUM-AI
-docker compose up --build
+cp .env.example .env   # set CBORG_API_KEY; leave CBORG_IPV6_BIND unset
+docker compose up
 ```
 
-Open `http://127.0.0.1:5173`. Only the frontend is exposed on the host; the
-agent API and Splash database remain private inside the Compose network.
+Open `http://127.0.0.1:5175`. The browser talks to the agent at
+`http://127.0.0.1:8090`. **Never bind host port 5174** (SSH). 5173 is CORS-allowed
+if you override `F2W_UI_PORT`.
 
-Instead of exporting the API key, create an untracked `.env` file before the
-last command:
+Defaults: CBORG (`lbl/cborg-chat`), JSON KG
+`storage/kg/matkg_rsoxs_v1.json`, schema `storage/schema/rsoxs_schema.yaml`.
+CBorg uses `CBORG_FORCE_IPV6=1` / `CBORG_IP_FAMILY=ipv6` and probes a currently
+assigned global IPv6 at process start. Do not persist `CBORG_IPV6_BIND`.
+
+On **macOS / Docker Desktop**, containers usually cannot source the Mac's
+authorized IPv6. Use `./scripts/start_rsoxs_stack.sh` for CBorg on Darwin, or
+Linux Docker with IPv6 enabled. Optional Linux host-network overlay:
+`docker compose -f compose.yaml -f compose.hostnet.yaml up`.
+
+The Splash database stack remains available as
+`docker compose -f compose.splash.yaml up` (UI on 5173, `/api` gateway).
+
+See [Docker operation](#docker) for lifecycle details. The MkDocs
+[fresh-machine deployment](mkdocs/docs/deployment.md) runbook covers `.env`
+setup and CBORG IPv6 authorization.
+
+### Beamline 11.0.1.2 ops KG (separate from literature)
+
+Replay the versioned ops graph (`beamline:` namespace, not `matkg_rsoxs_v1.json`):
 
 ```bash
-cp .env.example .env
+python3 scripts/ingest_bl1101.py --from-scratch
 ```
 
-Set `CBORG_API_KEY` in `.env` and never commit that file. The first startup
-builds the images and copies the repository's tracked
-`splash_links/links.sqlite` seed into a writable Docker volume. Later startups
-reuse the built images and persistent data. See [Docker operation](#docker)
-for lifecycle, diagnostics, persistence, and reset commands. The MkDocs
-[fresh-machine deployment](mkdocs/docs/deployment.md) runbook covers complete
-`.env` setup, CBORG IPv6 authorization, first start, upgrades, and rollback;
-review the [security model](mkdocs/docs/security.md) before changing the
-loopback bind.
+Writes the next snapshot `storage/kg/matkg_bl1101_vN.json` (v1, then v2, …; never overwrites an existing `vN`). Schema: `storage/schema/bl1101_schema.yaml`. 8090 keeps the literature KG by default; to inspect ops later, pick the new JSON under Settings → JSON graph (multi-KG fan-out is not implemented).
 
 ---
 
 ## Prerequisites
 
-- Docker Engine or Docker Desktop with Docker Compose v2 for the three-command setup
-- A CBORG API key supplied through the host environment or an untracked `.env`
+- Docker Engine or Docker Desktop with Docker Compose v2 for `docker compose up`
+- A CBORG API key in an untracked `.env` (never baked into the image)
+
 
 For local development without Docker:
 
@@ -89,10 +97,11 @@ python3 --version  # should report Python 3.12
 python3 -m pip install -r requirements.txt
 ```
 
-Contributors can install the runtime plus test, lint, formatting, lock, and
-documentation tooling from the development lock instead:
+Contributors should install the default runtime (including semantic retrieval)
+and then the development lock for tests, lint, formatting, and docs tooling:
 
 ```bash
+python3 -m pip install -r requirements.txt
 python3 -m pip install -r requirements/dev.txt
 ```
 
@@ -677,7 +686,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 | `KG_RAG_SPLASH_URI` | `splash://localhost:8081` | `splash_links` service URI |
 | `KG_RAG_SPLASH_PAGE_SIZE` | `1000` | GraphQL page size for database graph loading |
 | `KG_RAG_GRAPH` | `storage/kg/matkg_xray_papers_cborg_chat.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` (also splash fallback path) |
-| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Retrieval method; semantic dependencies are not included in the app image |
+| `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Retrieval method (`lexical` or `semantic`; semantic packages ship in the default install) |
 | `KG_RAG_CTX_CHARS` | `16000` | Max chars of KG context per prompt |
 | `KG_RAG_LLM_TIMEOUT` | `120` | LLM request timeout in seconds |
 | `KG_RAG_SHOW_BASELINE` | `0` | Set to `1` to enable baseline responses |
@@ -686,9 +695,9 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 ### Implementation details
 
 - Hybrid retrieval: SentenceTransformer embeddings + FAISS IVF-Flat + weighted BFS
-- Lexical retrieval is the lightweight default. `requirements/semantic.in`
-  documents the optional packages for SentenceTransformer/FAISS retrieval;
-  they are not installed by the app image.
+- Lexical retrieval is the default backend. `requirements/semantic.in` lists
+  SentenceTransformer/FAISS/Torch and is included by `requirements.txt`, so the
+  default install and app image can enable `KG_RAG_RETRIEVAL_BACKEND=semantic`.
 - Multi-factor node scoring: semantic similarity, graph depth, lexical overlap, evidence count
 - Context blocks include per-source `Source_Metadata`, KG triples, formulas, descriptions, and PDF snippets (page-cached)
 - Legacy scalar publication fields suppressed when `source_metadata` exists, or when a node has multiple sources without per-source metadata (prevents metadata smear)
@@ -977,18 +986,17 @@ curl -X POST http://localhost:11435/api/chat \
 
 ## Docker
 
-The root [`compose.yaml`](compose.yaml) is the canonical FAIR2WISE deployment.
-It runs a private four-service stack:
+The root [`compose.yaml`](compose.yaml) is the product stack: **agent + UI**
+with the RSoXS JSON knowledge graph. `docker compose up` publishes loopback
+ports **5175** (UI) and **8090** (agent). Secrets come from host `.env` via
+`env_file:` and are never baked into the image.
 
-- `splash-db-init` copies the tracked SQLite seed into a new persistent volume;
-- `splash` serves and updates that persistent SQLite graph;
-- `agent` owns chat, retrieval, extraction, and graph updates; and
-- `frontend` serves the React build and reverse-proxies `/api` to the agent.
+The Splash database stack is optional:
 
-The immutable seed is `splash_links/links.sqlite`. Existing Compose volumes are
-preserved after initialization. During migration from the old JSON seed, the
-initializer stores a recoverable `links.pre-seed-*.sqlite` backup inside the
-`splash-data` volume before replacing the legacy database.
+```bash
+docker compose -f compose.splash.yaml up
+```
+
 
 ### How images work on another computer
 
@@ -1034,33 +1042,24 @@ Stop the stack without deleting its databases and session data with:
 docker compose down
 ```
 
-Only `127.0.0.1:5173` is published. Ports `8081` and `8090` are reachable only
-inside the Compose network.
+Only `127.0.0.1:5175` (UI) and `127.0.0.1:8090` (agent) are published. Never
+bind host **5174** (SSH). Override the UI with `F2W_UI_PORT` (5173 is CORS-allowed).
+
 
 ### Health and diagnostics
 
 ```bash
-curl -fsS http://127.0.0.1:5173/healthz
-curl -fsS http://127.0.0.1:5173/api/health
+curl -fsS http://127.0.0.1:5175/healthz
+curl -fsS http://127.0.0.1:8090/health
 docker compose logs agent
-docker compose logs splash
 docker compose logs frontend
 ```
 
-Splash data, agent sessions, and caches survive `docker compose down` in named
-volumes. Inspect private services without publishing their ports:
-
-```bash
-docker compose exec agent curl -fsS http://127.0.0.1:8090/health
-docker compose exec splash python -c \
-  "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8081/splash_links/health').read().decode())"
-```
 
 ### Persistent data and clean reset
 
 | Volume | Contents |
 |---|---|
-| `splash-data` | Writable Splash graph initialized from the tracked SQLite seed |
 | `agent-runs` | Session files and workflow state |
 | `agent-cache` | Application and model caches |
 
@@ -1076,16 +1075,18 @@ This reset is destructive. Normal `docker compose down` does not erase data.
 
 ### Configuration notes
 
-- Compose automatically reads `.env` from the repository root.
-- `CBORG_API_KEY` is required; optional keys and overrides are documented in
+- Compose reads secrets from the host `.env` via `env_file:` at container start.
+  Do not `COPY .env` or ARG the API key into the image.
+- `CBORG_API_KEY` is required in `.env`; optional keys are listed in
   [`.env.example`](.env.example).
-- `CBORG_IP_FAMILY` defaults to `ipv6` in Compose for CBORG trusted-network
-  authorization. Set it to `auto` or `ipv4` only when appropriate for the
-  machine's authorized network.
-- Override the sole host port with `F2W_UI_PORT`, for example
-  `F2W_UI_PORT=8080 docker compose up -d`.
-- Do not set container service URLs to `localhost`: Compose supplies the
-  private `splash` and `agent` hostnames internally.
+- `CBORG_FORCE_IPV6=1` and `CBORG_IP_FAMILY=ipv6` are set by Compose. Leave
+  `CBORG_IPV6_BIND` unset so the agent probes a live global IPv6. A stale bind
+  fails with "Can't assign requested address".
+- Default UI port is `5175`. Never use `5174`. Example:
+  `F2W_UI_PORT=5173 docker compose up -d`.
+- On Darwin, Docker Desktop typically cannot source the Mac's authorized IPv6;
+  run `./scripts/start_rsoxs_stack.sh` for CBorg, or use Linux Docker.
+
 
 Run the isolated clean-volume smoke test with:
 
@@ -1102,6 +1103,8 @@ Run the isolated clean-volume smoke test with:
 | `scripts/download_pdfs.py` | Download PDFs from arXiv or OpenAlex by DOI/ID |
 | `scripts/run.py` | Run local modular term extraction against a PDF directory |
 | `app.modules.launchers.f2w_agent` | Agent KG-RAG pipeline CLI/API launcher |
+| `scripts/start_rsoxs_stack.sh` | Daemonize RSoXS JSON agent+UI (5175/8090); does not stop extract |
+| `scripts/start_agent_backend.sh` | Start the agent API used by the UI |
 | `scripts/test_chat_apis.py` | Standalone CBORG API connectivity test |
 | `scripts/analyze_kgs.py` | Evaluate KG JSON files: node/edge counts, coverage, growth rates |
 | `scripts/get_pdf_years.py` | Estimate publication year for PDFs; writes `pdf_years.csv` |
@@ -1260,20 +1263,19 @@ Pre-configured to exclude venvs, caches, secrets, and generated artifacts.
 
 Dependency profiles live in `requirements/`. Human-edited `.in` files declare
 direct dependencies, and their matching `.txt` files are Python 3.12 locks
-generated by pip-tools. The root `requirements.txt` is a compatibility shim to
-`requirements/runtime.txt`, so standard installation commands and Docker keep
-working.
+generated by pip-tools. The root `requirements.txt` is a compatibility shim that includes
+`requirements/runtime.txt` and `requirements/semantic.in`, so standard
+installation commands and Docker keep working and get the retrieval stack.
 
 | Profile | Install command | Purpose |
 |---|---|---|
-| Runtime | `python3 -m pip install -r requirements.txt` | FAIR2WISE application and Docker runtime |
-| Development | `python3 -m pip install -r requirements/dev.txt` | Runtime plus tests, linting, formatting, MkDocs, and pip-tools |
+| Runtime | `python3 -m pip install -r requirements.txt` | FAIR2WISE application, Docker runtime, and FAISS/SentenceTransformer/Torch retrieval |
+| Development | `python3 -m pip install -r requirements.txt -r requirements/dev.txt` | Runtime plus tests, linting, formatting, MkDocs, and pip-tools |
 | Globus | `python3 -m pip install -r requirements/globus.txt` | Optional Academy/Globus Compute endpoint dependencies |
 | Legacy | `python3 -m pip install -r requirements/legacy.txt` | Optional dependencies for archived modules |
-| Semantic | `python3 -m pip install -r requirements/semantic.in` | Optional unpinned FAISS, SentenceTransformer, and Torch retrieval stack |
 
-Docker installs only the runtime profile. Globus, legacy, development, and
-semantic packages are not added to the application image.
+Docker installs the runtime lock plus `requirements/semantic.in`. Globus,
+legacy, and development tooling are not added to the application image.
 
 To change dependencies, edit the appropriate `.in` file and regenerate its
 lock from the repository root:
@@ -1289,9 +1291,9 @@ python3.12 -m piptools compile --strip-extras \
   -o requirements/legacy.txt requirements/legacy.in
 ```
 
-Do not hand-edit generated `.txt` locks. `requirements/semantic.in` currently
-has no compiled lock because the heavyweight semantic stack is optional; the
-default lexical container does not use it.
+Do not hand-edit generated `.txt` locks. `requirements/semantic.in` has no
+compiled lock because torch/faiss wheels are platform-specific; pip resolves
+them at install time from the default `requirements.txt` entry point.
 
 ### flake8
 

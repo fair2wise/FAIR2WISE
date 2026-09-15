@@ -167,3 +167,18 @@ ref.md
 schema.md
 schema_prompt.md
 .webui_secret_key
+
+# Don't push papers to the repo to avoid any licensing issues
+papers/
+
+logs/
+
+# Local process pid files (outside logs/)
+.run/
+*.pid
+
+# Generated KG / terminology harvest JSON (keep storage/schema/*.yaml)
+storage/kg/*.json
+storage/kg/*.json.bak
+storage/terminology/*.json
+storage/terminology/*.json.bak

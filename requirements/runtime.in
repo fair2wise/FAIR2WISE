@@ -1,4 +1,6 @@
 # FAIR2WISE application runtime (Python 3.12).
+# Semantic retrieval (faiss-cpu, sentence-transformers, torch) is declared in
+# semantic.in and installed by the default requirements.txt entry point.
 academy-py>=0.5.0
 aiohttp>=3.14.0
 arxiv>=4.0.0

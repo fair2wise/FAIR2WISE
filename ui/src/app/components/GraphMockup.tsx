@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, Loader2, Maximize2, Pencil, Plus, Search, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Crosshair, ExternalLink, Loader2, Maximize2, Pencil, Plus, Search, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
 import { KGHoverPopup, KGHoverTarget } from './KGInfoPanel';
@@ -18,6 +18,15 @@ import {
   updateGraphNode,
 } from './data/liveAgent';
 import { getNodeColor, isUnknownNodeCategory, SCHEMA_NODE_CLASSES } from './kgNodeColors';
+import {
+  collectNodeSourceLinks,
+  graphDisplayName,
+  isLiteraturePublication,
+  nodeDefinition,
+  remainingNodeProperties,
+  snippetProvenance,
+  type NodeSourceLink,
+} from './nodeCardDetails';
 
 const W = 900;
 const H = 640;
@@ -97,6 +106,19 @@ export function oneHopNodeIds(graph: GraphPayload, nodeId: string): string[] {
     if (edge.target === nodeId) ids.add(edge.source);
   }
   return Array.from(ids);
+}
+
+export function inducedSubgraph(graph: GraphPayload, nodeIds: string[]): GraphPayload {
+  const wanted = new Set(nodeIds);
+  const nodes = graph.nodes.filter(
+    node => wanted.has(node.id) && !isUnknownNodeCategory(node.type),
+  );
+  const visibleIds = new Set(nodes.map(node => node.id));
+  return {
+    nodes,
+    edges: graph.edges.filter(edge => visibleIds.has(edge.source) && visibleIds.has(edge.target)),
+    source_path: graph.source_path,
+  };
 }
 
 export function connectedGraphSubset(graph: GraphPayload, requestedLimit: number): GraphPayload {
@@ -413,6 +435,45 @@ function isCodeSnippetNode(node: Pick<LiveGraphNode, 'type' | 'code_snippet'>): 
   return String(node.type || '').toLowerCase() === 'codesnippet' || Boolean(node.code_snippet?.trim());
 }
 
+function SourceLinkList({ links }: { links: NodeSourceLink[] }) {
+  if (links.length === 0) return null;
+  return (
+    <ul className="space-y-1.5">
+      {links.map(link => (
+        <li key={`${link.kind}:${link.url || link.label}`} className="text-xs text-slate-600">
+          {link.url ? (
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-start gap-1 text-sky-700 hover:text-sky-800 hover:underline"
+            >
+              <span>{link.label}</span>
+              <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
+            </a>
+          ) : (
+            <span>{link.label}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PropertyRows({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  if (rows.length === 0) return null;
+  return (
+    <dl className="space-y-2">
+      {rows.map(row => (
+        <div key={row.label}>
+          <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{row.label}</dt>
+          <dd className="mt-0.5 whitespace-pre-wrap break-words text-xs text-slate-700">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function NodeSearchControl({
   activeNodeId,
   onSelect,
@@ -518,7 +579,12 @@ function NodeSearchControl({
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-medium text-slate-700">{result.node.label}</span>
-                    <span className="block truncate text-[10px] text-slate-400">{result.node.type}</span>
+                    <span className="block truncate text-[10px] text-slate-400">
+                      {result.node.type}
+                      {result.node.graph_label || result.node.graph_id
+                        ? ` · ${result.node.graph_label || result.node.graph_id}`
+                        : ''}
+                    </span>
                   </span>
                   <span className="text-[10px] tabular-nums text-slate-400">
                     {Math.round(result.score * 100)}%
@@ -793,6 +859,9 @@ function NodeDetailPanel({
             ) : (
               <div className="text-xs font-medium" style={{ color: getNodeColor(display.type || node.type) }}>
                 {display.type || node.type || 'Node'}
+                {graphDisplayName(display) || graphDisplayName(node)
+                  ? ` · ${graphDisplayName(display) || graphDisplayName(node)}`
+                  : ''}
               </div>
             )}
             <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-sky-600">
@@ -1187,47 +1256,72 @@ function NodeDetailPanel({
           </div>
         ) : (
           <>
-            {(display.description || node.id || publications.length > 0 || display.code_snippet) && (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
-                {(display.description || node.id || display.code_snippet) && (
-                  <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
-                    {(display.description || node.id) && (
-                      <p className="whitespace-pre-wrap font-semibold text-slate-700">
-                        {display.description || node.id}
+            {(() => {
+              const definition = nodeDefinition(display);
+              const sourceLinks = collectNodeSourceLinks(display);
+              const literature = publications.filter(isLiteraturePublication);
+              const extraRows = remainingNodeProperties(display);
+              return (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+                  {definition && (
+                    <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
+                      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Definition</p>
+                      <p className="whitespace-pre-wrap font-semibold text-slate-700">{definition}</p>
+                    </div>
+                  )}
+                  {sourceLinks.length > 0 && (
+                    <div className={`${definition ? 'border-t border-slate-200' : ''} bg-white/60 px-4 py-3`}>
+                      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        Source materials
                       </p>
-                    )}
-                    {display.code_snippet && (
-                      <div className={display.description || node.id ? 'mt-4 space-y-2' : 'space-y-2'}>
-                        {(display.function_name || display.code_language) && (
-                          <div className="text-xs text-slate-500">
-                            {[display.function_name, display.code_language].filter(Boolean).join(' · ')}
-                          </div>
-                        )}
-                        <CodeBlock content={display.code_snippet} />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {publications.length > 0 && (
-                  <div className="border-t border-slate-200 bg-white/60 px-4 py-3">
-                    <p className="mb-8 text-sm font-bold text-slate-800">
-                      Relevant Publications and Sources:
-                    </p>
-                    <PublicationList
-                      publications={publications}
-                      intro={null}
-                      collapseLimit={3}
-                      className="mt-0"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+                      <SourceLinkList links={sourceLinks} />
+                    </div>
+                  )}
+                  {literature.length > 0 && (
+                    <div className="border-t border-slate-200 bg-white/60 px-4 py-3">
+                      <p className="mb-8 text-sm font-bold text-slate-800">
+                        Relevant Publications and Sources:
+                      </p>
+                      <PublicationList
+                        publications={literature}
+                        intro={null}
+                        collapseLimit={3}
+                        className="mt-0"
+                      />
+                    </div>
+                  )}
+                  {extraRows.length > 0 && (
+                    <div className="border-t border-slate-200 px-4 py-3">
+                      <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        Properties
+                      </p>
+                      <PropertyRows rows={extraRows} />
+                    </div>
+                  )}
+                  {display.code_snippet && (
+                    <div className="border-t border-slate-200 px-4 py-3.5">
+                      {(display.function_name || display.code_language) && (
+                        <div className="mb-2 text-xs text-slate-500">
+                          {[display.function_name, display.code_language].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                      <CodeBlock content={display.code_snippet} />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {linkedSnippets.length > 0 && (
               <div className="mt-4 space-y-4">
                 <p className="text-xs leading-relaxed text-slate-700">Related code snippets:</p>
                 {linkedSnippets.map((snippet: LinkedCodeSnippet) => {
-                  const snippetPublications = (snippet.publications ?? []) as PublicationInfo[];
+                  const snippetPublications = ((snippet.publications ?? []) as PublicationInfo[])
+                    .filter(isLiteraturePublication);
+                  const snippetLinks = collectNodeSourceLinks({
+                    id: snippet.id,
+                    publications: snippet.publications,
+                    ...snippetProvenance(snippet),
+                  });
                   return (
                     <div key={snippet.id} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
                       <div className="space-y-2 px-4 py-3.5">
@@ -1239,6 +1333,7 @@ function NodeDetailPanel({
                             {[snippet.function_name, snippet.code_language].filter(Boolean).join(' · ')}
                           </div>
                         )}
+                        {snippetLinks.length > 0 && <SourceLinkList links={snippetLinks} />}
                         <CodeBlock content={snippet.code_snippet} />
                       </div>
                       {snippetPublications.length > 0 && (
@@ -1296,18 +1391,21 @@ function NodeHoverPreview({ node }: { node: LayoutNode }) {
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium" style={{ color }}>
             {node.type || 'Node'}
+            {graphDisplayName(node) ? ` · ${graphDisplayName(node)}` : ''}
           </div>
           <div className="mt-0.5 text-sm font-semibold text-slate-800">{node.label}</div>
         </div>
         <span className="shrink-0 text-[10px] text-slate-400">Click to pin</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        {(node.description || node.id) && (
+        {(nodeDefinition(node) || graphDisplayName(node)) && (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
             <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
-              <p className="whitespace-pre-wrap font-semibold text-slate-700">
-                {node.description || node.id}
-              </p>
+              {nodeDefinition(node) && (
+                <p className="whitespace-pre-wrap font-semibold text-slate-700">
+                  {nodeDefinition(node)}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -1467,6 +1565,14 @@ export function GraphMockup({
         source_path: graph.source_path,
       };
     }
+    if (highlightedNodeIds.length > 0) {
+      const queried = inducedSubgraph(graph, highlightedNodeIds);
+      if (!isKgViewer) return queried;
+      if (kgViewerNodeLimit === 'all' || kgViewerNodeLimit >= queried.nodes.length) {
+        return queried;
+      }
+      return connectedGraphSubset(queried, kgViewerNodeLimit);
+    }
     if (isKgViewer) {
       if (kgViewerNodeLimit === 'all') return graph;
       return connectedGraphSubset(
@@ -1474,20 +1580,8 @@ export function GraphMockup({
         kgViewerNodeLimit,
       );
     }
-    if (highlightedNodeIds.length === 0) {
-      return { nodes: [], edges: [], source_path: graph.source_path };
-    }
-    // Drop Unknown stubs from the top-k set — they are unresolved placeholders.
-    const nodes = graph.nodes.filter(
-      node => highlighted.has(node.id) && !isUnknownNodeCategory(node.type),
-    );
-    const visibleNodeIds = new Set(nodes.map(node => node.id));
-    return {
-      nodes,
-      edges: graph.edges.filter(edge => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)),
-      source_path: graph.source_path,
-    };
-  }, [graph, highlighted, highlightedNodeIds.length, isKgViewer, kgViewerNodeLimit, searchedNodeId]);
+    return { nodes: [], edges: [], source_path: graph.source_path };
+  }, [graph, highlightedNodeIds, isKgViewer, kgViewerNodeLimit, searchedNodeId]);
   const layout = useMemo(() => layoutGraph(displayGraph), [displayGraph]);
   const nodes = layout.nodes;
   const nodeMap = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
@@ -1697,6 +1791,14 @@ export function GraphMockup({
     </button>
   ) : null;
 
+  const kgViewerLimitOptions = useMemo(() => {
+    const presets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 1000, 10000];
+    if (typeof kgViewerNodeLimit === 'number' && !presets.includes(kgViewerNodeLimit)) {
+      return [...presets, kgViewerNodeLimit].sort((left, right) => left - right);
+    }
+    return presets;
+  }, [kgViewerNodeLimit]);
+
   const kgViewerLimitControl = isKgViewer && onKgViewerNodeLimitChange ? (
     <label className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-500">
       Nodes
@@ -1710,7 +1812,7 @@ export function GraphMockup({
         className="bg-transparent text-sm font-medium text-slate-700 outline-none"
       >
         <option value="all">All</option>
-        {Array.from({ length: 10 }, (_, index) => (index + 1) * 10).map(limit => (
+        {kgViewerLimitOptions.map(limit => (
           <option key={limit} value={limit}>{limit}</option>
         ))}
       </select>

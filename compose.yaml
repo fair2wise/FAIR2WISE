@@ -1,72 +1,57 @@
 name: fair2wise
 
+# Product stack: agent API + UI. One command: docker compose up
+# Secrets come from the host .env at runtime (env_file). Never COPY/.ARG keys.
+# Do not set CBORG_IPV6_BIND here — a stale address fails with
+# "Can't assign requested address". cborg_http probes a live global IPv6.
+#
+# Ports (loopback only):
+#   UI    127.0.0.1:5175  (never 5174 — that port is SSH)
+#   Agent 127.0.0.1:8090  (browser uses VITE_F2W_AGENT_API_URL)
+#
+# Darwin / Docker Desktop: IPv6 egress to api.cborg.lbl.gov is unreliable
+# because the Mac host GUA is not the Linux VM's source address. On macOS
+# use ./scripts/start_rsoxs_stack.sh for CBorg, or Linux Docker with IPv6.
+# Optional Linux host-network overlay: compose.hostnet.yaml
+
 services:
-  splash-db-init:
-    build:
-      context: ./splash_links
-      dockerfile: Containerfile
-    command:
-      - python
-      - scripts/seed_db.py
-      - /seed/links.sqlite
-      - /data/links.sqlite
-    volumes:
-      - ./splash_links/links.sqlite:/seed/links.sqlite:ro
-      - splash-data:/data
-    restart: "no"
-
-  splash:
-    build:
-      context: ./splash_links
-      dockerfile: Containerfile
-    environment:
-      SPLASH_LINKS_DB: /data/links.sqlite
-    volumes:
-      - splash-data:/data
-    depends_on:
-      splash-db-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/splash_links/health', timeout=3)"
-      interval: 5s
-      timeout: 5s
-      start_period: 15s
-      retries: 24
-    restart: unless-stopped
-
   agent:
     build:
       context: .
       dockerfile: Dockerfile
       target: agent
+    env_file:
+      - path: .env
+        required: false
     environment:
-      CBORG_API_KEY: "${CBORG_API_KEY:?Export CBORG_API_KEY before running docker compose up}"
-      CBORG_BASE_URL: "${CBORG_BASE_URL:-https://api.cborg.lbl.gov}"
-      CBORG_IP_FAMILY: "${CBORG_IP_FAMILY:-ipv6}"
-      OPENALEX_EMAIL: "${OPENALEX_EMAIL:-}"
-      MP_API_KEY: "${MP_API_KEY:-}"
-      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      CBORG_BASE_URL: https://api.cborg.lbl.gov
+      CBORG_IP_FAMILY: ipv6
+      CBORG_FORCE_IPV6: "1"
+      CBORG_IPV6_BIND: ""
       F2W_AGENT_HOST: 0.0.0.0
-      F2W_AGENT_PORT: 8090
-      F2W_KG_MODE: splash
-      F2W_GRAPH: storage/kg/matkg_with_code.json
-      F2W_WORKDIR: /app/runs/ui_session_splash
-      F2W_SPLASH_HEALTH_URL: http://splash:8081/splash_links/health
-      KG_RAG_GRAPH_SOURCE: splash
-      KG_RAG_SPLASH_URI: splash://splash:8081
+      F2W_AGENT_PORT: "8090"
+      F2W_BACKEND: cborg
+      F2W_MODEL: lbl/cborg-chat
+      F2W_KG_MODE: json
+      F2W_GRAPH: storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json
+      F2W_SCHEMA: storage/schema/rsoxs_schema.yaml
+      F2W_WORKDIR: /app/runs/ui_session_rsoxs
+      KG_RAG_BACKEND: cborg
+      KG_RAG_CBORG_MODEL: lbl/cborg-chat
+      KG_RAG_GRAPH_SOURCE: json
+      KG_RAG_GRAPH: storage/kg/matkg_rsoxs_v1.json
       KG_RAG_RETRIEVAL_BACKEND: lexical
-      SPLASH_LINKS_REPO: /app/splash_links
       PYSTOW_HOME: /app/.cache/pystow
+    ports:
+      - "127.0.0.1:8090:8090"
     volumes:
+      - ./storage/kg/matkg_rsoxs_v1.json:/app/storage/kg/matkg_rsoxs_v1.json:ro
+      - ./storage/kg/matkg_bl1101_v1.json:/app/storage/kg/matkg_bl1101_v1.json:ro
+      - ./storage/kg/matkg_bl1101_v2.json:/app/storage/kg/matkg_bl1101_v2.json:ro
+      - ./storage/schema/rsoxs_schema.yaml:/app/storage/schema/rsoxs_schema.yaml:ro
+      - ./storage/schema/bl1101_schema.yaml:/app/storage/schema/bl1101_schema.yaml:ro
       - agent-runs:/app/runs
       - agent-cache:/app/.cache
-    depends_on:
-      splash:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8090/health"]
       interval: 5s
@@ -81,9 +66,10 @@ services:
       dockerfile: Dockerfile
       target: frontend
       args:
-        VITE_F2W_AGENT_API_URL: /api
+        # Browser origin, not an in-container hostname. Map host 8090.
+        VITE_F2W_AGENT_API_URL: http://127.0.0.1:8090
     ports:
-      - "127.0.0.1:${F2W_UI_PORT:-5173}:80"
+      - "127.0.0.1:${F2W_UI_PORT:-5175}:80"
     depends_on:
       agent:
         condition: service_healthy
@@ -96,10 +82,13 @@ services:
     restart: unless-stopped
 
 volumes:
-  splash-data:
   agent-runs:
   agent-cache:
 
 networks:
   default:
     enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.30.91.0/24
+        - subnet: fd5a:f210:a1d0::/64

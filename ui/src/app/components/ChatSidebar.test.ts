@@ -3,7 +3,10 @@ import type { ChatMessage } from './chatSessions';
 import {
   publicationSectionHeading,
   publicationsBlockText,
+  queryGraphFromResult,
+  raiseViewerLimit,
 } from './ChatSidebar';
+import type { AgentChatResponse } from './data/liveAgent';
 
 describe('post-extraction publication labels', () => {
   const message: ChatMessage = {
@@ -29,5 +32,43 @@ describe('post-extraction publication labels', () => {
 
     expect(text).toContain('Relevant Publications and Sources — More Evidence Needed:');
     expect(text).toContain('Relevant paper');
+  });
+});
+
+describe('query viewer binding', () => {
+  it('raises the render cap to All when the queried set exceeds the current limit', () => {
+    expect(raiseViewerLimit(100, 150)).toBe('all');
+    expect(raiseViewerLimit(100, 80)).toBe(100);
+    expect(raiseViewerLimit('all', 400)).toBe('all');
+  });
+
+  it('uses the retrieve subgraph instead of a truncated full-KG dump', () => {
+    const result: AgentChatResponse = {
+      status: 'answered',
+      answer: 'ok',
+      sufficient: true,
+      node_ids: ['a', 'b'],
+      confidence: 1,
+      rounds: [],
+      graph: {
+        source_path: 'query:dual',
+        nodes: [
+          { id: 'a', label: 'A', type: 'Material', description: '', graph_id: 'rsoxs_v1' },
+          { id: 'b', label: 'B', type: 'Beamline', description: '', graph_id: 'bl1101' },
+          { id: 'c', label: 'C', type: 'Material', description: '' },
+        ],
+        edges: [
+          { source: 'a', predicate: 'rel:related_to', target: 'b' },
+          { source: 'a', predicate: 'rel:related_to', target: 'c' },
+        ],
+      },
+      workdir: 'runs/session',
+    };
+
+    const queried = queryGraphFromResult(result);
+    expect(queried?.nodes.map(node => node.id)).toEqual(['a', 'b']);
+    expect(queried?.edges).toEqual([
+      { source: 'a', predicate: 'rel:related_to', target: 'b' },
+    ]);
   });
 });
