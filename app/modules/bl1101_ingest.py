@@ -5,9 +5,13 @@ Produces versioned snapshots ``storage/kg/matkg_bl1101_vN.json`` in the
 ``beamline:`` namespace. Does not merge into ``matkg_rsoxs_v1.json``.
 Each successful full run appends the next ``vN``; existing snapshots are kept.
 
+JSON-first motor linking (v4): copy an existing snapshot and apply
+``storage/schema/bl1101_motor_stage_map.yaml`` without refetching GitHub/ALS.
+
 Usage (from repo root):
   python3 scripts/ingest_bl1101.py
   python3 scripts/ingest_bl1101.py --from-scratch
+  python3 scripts/ingest_bl1101.py --from-graph storage/kg/matkg_bl1101_v3.json --snapshot 4
 """
 
 from __future__ import annotations
@@ -38,6 +42,7 @@ LOGGER = logging.getLogger("ingest_bl1101")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO_ROOT / "storage/schema/bl1101_schema.yaml"
+MOTOR_STAGE_MAP_PATH = REPO_ROOT / "storage/schema/bl1101_motor_stage_map.yaml"
 BLUEPRINT_PATH = (
     REPO_ROOT / "papers/rsoxs/beamline_blueprint/blueprint_bl11012_version09092026.html"
 )
@@ -50,7 +55,7 @@ PAGES_DIR = CACHE_DIR / "pages"
 WORK_DIR = CACHE_DIR / "work"
 
 SCHEMA_VERSION = "bl1101_v2"
-INGEST_VERSION = "1.1.0"
+INGEST_VERSION = "1.2.0"
 NAMESPACE = "beamline"
 BEAMLINE_ID = "beamline:BL-11-0-1-2"
 ALS_PAGE_URL = "https://als.lbl.gov/beamlines/11-0-1-2/"
@@ -328,11 +333,26 @@ def next_snapshot_version(kg_dir: Path) -> int:
     return (max(versions) + 1) if versions else 1
 
 
-def snapshot_paths(version: int) -> Tuple[Path, Path]:
+def snapshot_paths(
+    version: int,
+    *,
+    kg_dir: Optional[Path] = None,
+    terms_dir: Optional[Path] = None,
+) -> Tuple[Path, Path]:
+    kg_dir = kg_dir or KG_DIR
+    terms_dir = terms_dir or TERMS_DIR
     return (
-        KG_DIR / f"matkg_bl1101_v{version}.json",
-        TERMS_DIR / f"extracted_terms_bl1101_v{version}.json",
+        kg_dir / f"matkg_bl1101_v{version}.json",
+        terms_dir / f"extracted_terms_bl1101_v{version}.json",
     )
+
+
+def _rel_to_repo(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def is_secret_path(path: Path) -> bool:
@@ -1578,6 +1598,332 @@ def sort_graph(graph: Dict[str, Any]) -> Dict[str, Any]:
     return graph
 
 
+# ---------------------------------------------------------------------------
+# v4 motor → stage linking (JSON-first; mapping file is the source of truth)
+# ---------------------------------------------------------------------------
+
+def load_motor_stage_map(path: Optional[Path] = None) -> Dict[str, Any]:
+    """Load ophyd_name → stage assignments. Missing file → empty map."""
+    dest = path or MOTOR_STAGE_MAP_PATH
+    if not dest.exists():
+        LOGGER.warning("Motor-stage map missing: %s", dest)
+        return {"version": 0, "motors": {}, "aliases": {}, "leave_on_beamline": {}}
+    data = yaml.safe_load(dest.read_text(encoding="utf-8")) or {}
+    motors: Dict[str, str] = {}
+    for key, value in (data.get("motors") or {}).items():
+        if isinstance(value, dict):
+            stage = value.get("stage") or ""
+        else:
+            stage = str(value or "")
+        name = canonical_stage_name(stage)
+        if key and name:
+            motors[str(key)] = name
+    aliases = {str(k): str(v) for k, v in (data.get("aliases") or {}).items() if k and v}
+    leave = data.get("leave_on_beamline") or {}
+    if isinstance(leave, list):
+        leave = {str(item): "" for item in leave}
+    else:
+        leave = {str(k): str(v or "") for k, v in leave.items()}
+    return {
+        "version": data.get("version") or 0,
+        "source": data.get("source") or dest.name,
+        "path": _rel_to_repo(dest),
+        "motors": motors,
+        "aliases": aliases,
+        "leave_on_beamline": leave,
+    }
+
+
+def _stage_id_by_name(nodes: Iterable[Dict[str, Any]]) -> Dict[str, str]:
+    ids: Dict[str, str] = {}
+    for node in nodes:
+        if node.get("category") != "BeamlineStage":
+            continue
+        name = canonical_stage_name(node.get("name") or "")
+        if not name:
+            continue
+        # Prefer the short synoptic names; skip the concatenated .stages DOM blob.
+        if " " in name and name.count(" ") > 4:
+            continue
+        ids[name.casefold()] = node["id"]
+    return ids
+
+
+def _motor_by_ophyd(nodes: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    found: Dict[str, Dict[str, Any]] = {}
+    for node in nodes:
+        if node.get("category") != "Motor":
+            continue
+        ophyd = node.get("ophyd_name") or ""
+        if ophyd:
+            found[str(ophyd)] = node
+    return found
+
+
+def _stage_of_motor(
+    motor_id: str,
+    *,
+    part_of: Dict[str, List[str]],
+    stage_ids: set[str],
+) -> Optional[str]:
+    for obj in part_of.get(motor_id, []):
+        if obj in stage_ids:
+            return obj
+    return None
+
+
+def _append_term_rel(term: Dict[str, Any], relation: str, related_id: str, evidence: str) -> bool:
+    rels = term.setdefault("relations", [])
+    seen = {(r.get("relation"), r.get("related_id") or r.get("related_term")) for r in rels}
+    key = (relation, related_id)
+    if key in seen:
+        return False
+    rels.append(_rel(term["id"], relation, related_id, evidence))
+    return True
+
+
+def apply_motor_stage_map_to_terms(
+    terms: List[Dict[str, Any]],
+    mapping: Optional[Dict[str, Any]] = None,
+    *,
+    evidence: str = "bl1101_motor_stage_map.yaml",
+) -> int:
+    """Add Motor `part_of` stage (and alias `related_to`) onto term records."""
+    mapping = mapping or load_motor_stage_map()
+    stage_ids = _stage_id_by_name(terms)
+    motors = _motor_by_ophyd(terms)
+    added = 0
+    for ophyd, stage_name in (mapping.get("motors") or {}).items():
+        motor = motors.get(ophyd)
+        sid = stage_ids.get(stage_name.casefold())
+        if not motor or not sid:
+            continue
+        if _append_term_rel(motor, "part_of", sid, f"{evidence}: {ophyd} → {stage_name}"):
+            added += 1
+    for alias, canonical in (mapping.get("aliases") or {}).items():
+        motor = motors.get(alias)
+        if not motor:
+            continue
+        canon = motors.get(canonical)
+        if canon:
+            if _append_term_rel(
+                motor,
+                "related_to",
+                canon["id"],
+                f"{evidence}: {alias} aliases {canonical}",
+            ):
+                added += 1
+            sid = None
+            for rel in canon.get("relations") or []:
+                if rel.get("relation") != "part_of":
+                    continue
+                obj = rel.get("related_id") or rel.get("related_term") or ""
+                if obj in stage_ids.values():
+                    sid = obj
+                    break
+            if not sid:
+                mapped = (mapping.get("motors") or {}).get(canonical)
+                sid = stage_ids.get((mapped or "").casefold()) if mapped else None
+            if sid and _append_term_rel(
+                motor,
+                "part_of",
+                sid,
+                f"{evidence}: {alias} aliases {canonical}",
+            ):
+                added += 1
+    return added
+
+
+def apply_motor_stage_map_to_graph(
+    graph: Dict[str, Any],
+    mapping: Optional[Dict[str, Any]] = None,
+    *,
+    evidence: str = "bl1101_motor_stage_map.yaml",
+) -> Tuple[Dict[str, Any], Dict[str, int]]:
+    """JSON-first: add `rel:part_of` (and alias `rel:related_to`) on an ops KG."""
+    mapping = mapping or load_motor_stage_map()
+    things = list(graph.get("things") or [])
+    assocs = list(graph.get("associations") or [])
+    seen = {(e.get("subject"), e.get("predicate"), e.get("object")) for e in assocs}
+    stage_ids_map = _stage_id_by_name(things)
+    stage_id_set = set(stage_ids_map.values())
+    motors = _motor_by_ophyd(things)
+    part_of: Dict[str, List[str]] = {}
+    for edge in assocs:
+        if edge.get("predicate") == "rel:part_of":
+            part_of.setdefault(edge["subject"], []).append(edge["object"])
+
+    def add_edge(subject: str, predicate: str, obj: str, note: str) -> bool:
+        sig = (subject, predicate, obj)
+        if sig in seen:
+            return False
+        seen.add(sig)
+        assocs.append(
+            {
+                "subject": subject,
+                "predicate": predicate,
+                "object": obj,
+                "has_evidence": note,
+            }
+        )
+        if predicate == "rel:part_of":
+            part_of.setdefault(subject, []).append(obj)
+        return True
+
+    linked = 0
+    aliased = 0
+    skipped_unknown = 0
+    for ophyd, stage_name in (mapping.get("motors") or {}).items():
+        motor = motors.get(ophyd)
+        sid = stage_ids_map.get(stage_name.casefold())
+        if not motor or not sid:
+            skipped_unknown += 1
+            LOGGER.warning("Motor-stage map skip %s → %s (motor or stage missing)", ophyd, stage_name)
+            continue
+        if add_edge(motor["id"], "rel:part_of", sid, f"{evidence}: {ophyd} → {stage_name}"):
+            linked += 1
+    for alias, canonical in (mapping.get("aliases") or {}).items():
+        motor = motors.get(alias)
+        canon = motors.get(canonical)
+        if not motor or not canon:
+            skipped_unknown += 1
+            LOGGER.warning("Motor alias skip %s → %s (missing node)", alias, canonical)
+            continue
+        if add_edge(
+            motor["id"],
+            "rel:related_to",
+            canon["id"],
+            f"{evidence}: {alias} aliases {canonical}",
+        ):
+            aliased += 1
+        sid = _stage_of_motor(canon["id"], part_of=part_of, stage_ids=stage_id_set)
+        if not sid:
+            mapped = (mapping.get("motors") or {}).get(canonical)
+            sid = stage_ids_map.get((mapped or "").casefold()) if mapped else None
+        if sid and add_edge(
+            motor["id"],
+            "rel:part_of",
+            sid,
+            f"{evidence}: {alias} aliases {canonical}",
+        ):
+            linked += 1
+    graph = dict(graph)
+    graph["things"] = things
+    graph["associations"] = assocs
+    sort_graph(graph)
+    stats = {
+        "linked": linked,
+        "aliased": aliased,
+        "skipped_unknown": skipped_unknown,
+        "motors": len(motors),
+    }
+    return graph, stats
+
+
+def _terms_snapshot_for_kg(kg_path: Path) -> Path:
+    match = SNAPSHOT_RE.match(kg_path.name)
+    if not match:
+        return TERMS_DIR / f"{kg_path.stem.replace('matkg_', 'extracted_terms_')}.json"
+    return TERMS_DIR / f"extracted_terms_bl1101_v{match.group(1)}.json"
+
+
+def write_kg_snapshot(
+    graph: Dict[str, Any],
+    version: int,
+    *,
+    kg_dir: Optional[Path] = None,
+) -> Path:
+    kg_path, _ = snapshot_paths(version, kg_dir=kg_dir)
+    kg_path.parent.mkdir(parents=True, exist_ok=True)
+    meta = graph.setdefault("metadata", {})
+    snap = meta.setdefault("graph_snapshot", {})
+    snap.update(
+        {
+            "name": f"matkg_bl1101_v{version}",
+            "version": version,
+            "written_at": utc_now(),
+            "path": _rel_to_repo(kg_path),
+        }
+    )
+    meta["ingest_version"] = INGEST_VERSION
+    meta["extraction_version"] = INGEST_VERSION
+    tmp = kg_path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
+    digest = sha256_file(tmp)
+    snap["sha256"] = digest
+    snap["nodes"] = len(graph.get("things") or [])
+    snap["edges"] = len(graph.get("associations") or [])
+    tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(kg_path)
+    return kg_path
+
+
+def run_motor_link_promote(
+    *,
+    source_kg: Path,
+    version: Optional[int] = None,
+    map_path: Optional[Path] = None,
+    kg_dir: Optional[Path] = None,
+    terms_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Copy an existing ops KG, apply the motor-stage map, write vN. Does not touch literature."""
+    source_kg = source_kg.resolve()
+    if not source_kg.exists():
+        raise FileNotFoundError(source_kg)
+    out_kg_dir = kg_dir or KG_DIR
+    out_terms_dir = terms_dir or TERMS_DIR
+    version = version if version is not None else next_snapshot_version(out_kg_dir)
+    dest_kg, dest_terms = snapshot_paths(version, kg_dir=out_kg_dir, terms_dir=out_terms_dir)
+    if dest_kg.resolve() == source_kg:
+        raise ValueError(f"Refusing to overwrite source snapshot {source_kg}")
+    mapping = load_motor_stage_map(map_path)
+    graph = json.loads(source_kg.read_text(encoding="utf-8"))
+    graph, stats = apply_motor_stage_map_to_graph(graph, mapping)
+    meta = graph.setdefault("metadata", {})
+    meta["schema_version"] = meta.get("schema_version") or SCHEMA_VERSION
+    promote = {
+        "kind": "motor_stage_links",
+        "source_graph": _rel_to_repo(source_kg),
+        "motor_stage_map": mapping.get("path") or _rel_to_repo(MOTOR_STAGE_MAP_PATH),
+        "map_version": mapping.get("version"),
+        "linked": stats["linked"],
+        "aliased": stats["aliased"],
+    }
+    meta["promote"] = promote
+    kg_path = write_kg_snapshot(graph, version, kg_dir=out_kg_dir)
+
+    src_terms = _terms_snapshot_for_kg(source_kg)
+    if src_terms.exists():
+        records = json.loads(src_terms.read_text(encoding="utf-8"))
+        terms = list(records.get("terms") or [])
+        apply_motor_stage_map_to_terms(terms, mapping)
+        records["terms"] = terms
+        rec_meta = records.setdefault("metadata", {})
+        rec_meta["ingest_version"] = INGEST_VERSION
+        rec_meta["promote"] = promote
+        rec_meta["graph_snapshot"] = dict(graph.get("metadata", {}).get("graph_snapshot") or {})
+        dest_terms.parent.mkdir(parents=True, exist_ok=True)
+        dest_terms.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
+    LOGGER.info(
+        "Promoted %s → %s (+%d part_of, +%d alias related_to)",
+        source_kg,
+        kg_path,
+        stats["linked"],
+        stats["aliased"],
+    )
+    return {
+        "kg_path": kg_path,
+        "terms_path": dest_terms if dest_terms.exists() else None,
+        "version": version,
+        "nodes": len(graph.get("things") or []),
+        "edges": len(graph.get("associations") or []),
+        "stats": stats,
+        "graph": graph,
+        "sources_landed": [promote],
+        "sources_skipped": [],
+    }
+
+
 def terms_from_people(
     als: Dict[str, Any],
     blueprint: Dict[str, Any],
@@ -1699,8 +2045,10 @@ def ingest_records(
     for pid in plan_ids:
         beam["relations"].append(_rel(BEAMLINE_ID, "implementsPlan", pid, "bluesky plans"))
 
+    merged = merge_terms([terms])
+    apply_motor_stage_map_to_terms(merged, load_motor_stage_map())
     return {
-        "terms": merge_terms([terms]),
+        "terms": merged,
         "code_snippets": snippets,
     }
 
@@ -1990,6 +2338,22 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Do not fetch the ALS page or git-clone; use .cache/bl1101 if present",
     )
+    parser.add_argument(
+        "--from-graph",
+        type=Path,
+        help="JSON-first: copy an existing ops KG and apply the motor-stage map (no network)",
+    )
+    parser.add_argument(
+        "--snapshot",
+        type=int,
+        help="Write this vN (default: next unused). --from-graph never overwrites the source file",
+    )
+    parser.add_argument(
+        "--motor-stage-map",
+        type=Path,
+        default=None,
+        help="Override storage/schema/bl1101_motor_stage_map.yaml",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     return parser.parse_args(argv)
 
@@ -2001,6 +2365,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s: %(message)s",
     )
+    if args.from_graph:
+        result = run_motor_link_promote(
+            source_kg=args.from_graph,
+            version=args.snapshot,
+            map_path=args.motor_stage_map,
+        )
+        print(
+            f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
+        )
+        print(
+            "motor links:",
+            f"+{result['stats']['linked']} part_of,",
+            f"+{result['stats']['aliased']} alias related_to",
+        )
+        return 0
     result = run_ingest(from_scratch=args.from_scratch, offline=args.offline)
     print(
         f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"

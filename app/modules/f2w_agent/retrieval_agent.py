@@ -403,6 +403,7 @@ def _beam_path_nodeinfos(kg: Any) -> List[Any]:
                 id=nid,
                 name=str(raw.get("name") or nid),
                 category=str(raw.get("category") or "BeamlineStage"),
+                description=str(raw.get("description") or ""),
                 score_prp=2.0 + max(0, 50 - index) / 50.0,
                 evidence_ct=max(1, int(raw.get("evidence_ct") or 1)),
             )

@@ -330,3 +330,54 @@ def test_layout_retrieve_returns_ops_path_nodes(tmp_path, monkeypatch):
     assert "m103" in names
     assert any("exit slit" in name for name in names)
     assert "cyrsoxs" not in names
+    ctx = agent._build_merged_context(EVAL_LAYOUT_Q, hits, agent._graphs)
+    assert "M103" in ctx
+    assert "exit slit" in ctx.lower()
+
+
+def test_layout_user_prompts_are_ops_layout():
+    assert _is_ops_layout_question("how is the hardware connected at the RSoXS beamline")
+    assert _is_ops_layout_question("how is the hardware connected at 11.01.12")
+
+
+def test_build_context_accepts_namespace_without_description(tmp_path, monkeypatch):
+    from app.modules import kg_rag_api as krag
+
+    monkeypatch.setattr(krag, "RETRIEVAL_BACKEND", "lexical")
+    path = tmp_path / "ops.json"
+    path.write_text(
+        '{"things":[{"id":"beamline:stage-M103","name":"M103","category":"BeamlineStage",'
+        '"description":"KB pair"}],"associations":[]}',
+        encoding="utf-8",
+    )
+    kg = krag.KnowledgeGraph(str(path), graph_source="json")
+    stub = SimpleNamespace(id="beamline:stage-M103", name="M103", category="BeamlineStage", score_prp=2.1)
+    assert not hasattr(stub, "description")
+    ctx = kg.build_context([stub], include_structured=False, char_budget=2000, hint_terms=["hardware"])
+    assert "M103" in ctx
+    assert "KB pair" in ctx
+
+
+def test_v4_layout_question_builds_context_without_attributeerror(monkeypatch):
+    from pathlib import Path
+
+    from app.modules import kg_rag_api as krag
+
+    v4 = Path(__file__).resolve().parents[1] / "storage/kg/matkg_bl1101_v4.json"
+    if not v4.exists():
+        return
+    monkeypatch.setattr(krag, "RETRIEVAL_BACKEND", "lexical")
+    agent = RetrievalAgent(
+        graph_files=[str(v4)],
+        graph_source="json",
+        kg_query_hops=3,
+        kg_query_max_nodes=50,
+    )
+    asyncio.run(agent.reload_kg(graph_files=agent._graph_files))
+    question = "how is the hardware connected at the RSoXS beamline"
+    hits = agent._fanout_hits(question, agent._graphs)
+    assert hits
+    ctx = agent._build_merged_context(question, hits, agent._graphs)
+    assert ctx
+    assert "M103" in ctx or "m103" in ctx.lower()
+    assert "exit slit" in ctx.lower()

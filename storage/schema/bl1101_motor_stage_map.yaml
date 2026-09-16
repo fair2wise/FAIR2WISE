@@ -1,0 +1,96 @@
+# Motor → BeamlineStage assignments for ALS 11.0.1.2 ops KG v4.
+#
+# v3 linked 24/90 motors via blueprint stage-card hrefs. The remaining ~66
+# hang only off the beamline. This map is the reproducible source for v4
+# `rel:part_of` edges. Stage names must match existing BeamlineStage nodes
+# (Gabe blueprint Sheet A / A′ / B). Do not invent a second beam path.
+#
+# Keys are ophyd / LabVIEW motor handles (`ophyd_name`).
+# Replay: python3 scripts/ingest_bl1101.py --from-graph storage/kg/matkg_bl1101_v3.json --snapshot 4
+
+version: 4
+source: "Gabe blueprint Sheet A/A′/B synoptic + LabVIEW/GALIL aliases"
+
+# Motors with no synoptic stage (sim leftovers / analog outs / undocumented piezos).
+leave_on_beamline:
+  fake_motor: "Sim placeholder, not a physical axis on the synoptic."
+  ao_0: "Analog output exposed as a LabVIEW motor; not a named stage."
+  ao_1: "Analog output exposed as a LabVIEW motor; not a named stage."
+  osp_adjustment: "Undocumented leftover; no stage on Sheet A/B."
+  piezo_horiz: "No documented stage (distinct from PiezoShutter Trans); do not guess."
+  piezo_vertical: "No documented stage (distinct from PiezoShutter Trans); do not guess."
+
+# GALIL / SmarAct / scaled names for a canonical motor already on a stage.
+# Aliases inherit that motor's stage; they do not float on the beamline.
+aliases:
+  beam_stop_x_galil_f: beam_stop_x
+  beam_stop_x_smaract: beam_stop_x
+  ccd_theta_galil_e: ccd_theta
+  sample_z_galil_c: sample_z
+  sample_y_scaled: sample_y
+  beamline_energy_goal: beamline_energy
+
+motors:
+  # --- JJ slits (Sheet A: upstream / middle on the beam path; in-chamber = Scatter slits) ---
+  upstream_jj_vert_aperture: Upstream slits (JJ)
+  upstream_jj_vert_trans: Upstream slits (JJ)
+  upstream_jj_horz_aperture: Upstream slits (JJ)
+  upstream_jj_horz_trans: Upstream slits (JJ)
+  middle_jj_vert_aperture: Middle slits (JJ)
+  middle_jj_vert_trans: Middle slits (JJ)
+  middle_jj_horz_aperture: Middle slits (JJ)
+  middle_jj_horz_trans: Middle slits (JJ)
+  in_chamber_jj_vert_aperture: Scatter slits (JJ)
+  in_chamber_jj_vert_trans: Scatter slits (JJ)
+  in_chamber_jj_horz_aperture: Scatter slits (JJ)
+  in_chamber_jj_horz_trans: Scatter slits (JJ)
+
+  # --- Exit-slit jaws / positions (Sheet A.5; already has Size motors in v3) ---
+  exit_slit_top: Exit slits
+  exit_slit_bottom: Exit slits
+  exit_slit_left: Exit slits
+  exit_slit_right: Exit slits
+  horizontal_exit_slit_position: Exit slits
+  vertical_exit_slit_position: Exit slits
+  horizontal_slit_position: Exit slits
+  horizontal_slit_size: Exit slits
+  vertical_slit_position: Exit slits
+  vertical_slit_size: Exit slits
+
+  # --- Sample rotations and sample-bar extras (Sheet B.2) ---
+  sample_azimuthal_rotation: Sample stage
+  samplerot0: Sample stage
+  samplerot1: Sample stage
+  samplerot2: Sample stage
+  samplerot3: Sample stage
+  samplerot4: Sample stage
+  mcs_axis0: Sample stage
+  mcs_axis1: Sample stage
+  mcs_axis2: Sample stage
+  mcs_axis3: Sample stage
+  mcs_axis4: Sample stage
+  sample_number: Sample stage
+  t_2t: Sample stage
+  coolstage: Sample stage
+  temperature_controller: Sample stage
+
+  # --- Mono entrance slit + grating/energy (Sheet A.4; entrance ≠ exit) ---
+  entrance_slit_width: Mono 101
+  entrance_slit_width_2: Mono 101
+  mono_101_grating: Mono 101
+  mono_energy: Mono 101
+
+  # --- Other named stages ---
+  epu_polarization: EPU
+  m101_feedback: M101
+  ccd_shutter_control: Detector
+  camera_roi_height: Detector
+  camera_roi_width: Detector
+  camera_roi_x: Detector
+  camera_roi_x_bin: Detector
+  camera_roi_y: Detector
+  camera_roi_y_bin: Detector
+  camera_temp_setpoint: Detector
+  pollux_ccd_x: Detector
+  pollux_ccd_y: Detector
+  ccd_camera_shutter_inhibit: Shutters

@@ -1,11 +1,16 @@
 """Tests for BL 11.0.1.2 ops schema and replayable ingest."""
 
+import hashlib
+import json
+import shutil
 from pathlib import Path
 
 from app.modules import json2kg
 from app.modules.bl1101_ingest import (
     ALS_PAGE_URL,
+    apply_motor_stage_map_to_graph,
     ingest_fixture,
+    load_motor_stage_map,
     next_snapshot_version,
     parse_als_contact_people,
     parse_als_page,
@@ -13,6 +18,7 @@ from app.modules.bl1101_ingest import (
     parse_blueprint_people,
     records_to_graph,
     resolve_beam_path_order,
+    run_motor_link_promote,
 )
 from app.modules.term_extractor.schema import SchemaHelper
 
@@ -372,3 +378,311 @@ def test_ingest_kg_contains_beamline_scientists():
     for pid in person_ids:
         assert (pid, "rel:hasRole", role_id) in rels
         assert (pid, "rel:supports", "beamline:BL-11-0-1-2") in rels
+
+
+V3_PATH = ROOT / "storage/kg/matkg_bl1101_v3.json"
+V4_PATH = ROOT / "storage/kg/matkg_bl1101_v4.json"
+V3_FILE_SHA256 = "91792ff3dce2deba1723240866872045c0609c6c1b572fe368719ca13ca2201c"
+
+MOTOR_LINK_HTML = """
+<html>
+<div class="stages">
+  <div class="stage">
+    <div class="stage-name">Upstream slits (JJ)<span class="stage-id">§A.13</span></div>
+    <div class="stage-what">First JJ set after the gold mesh.</div>
+  </div>
+  <div class="stage">
+    <div class="stage-name">Sample stage<span class="stage-id">§B.2</span></div>
+    <div class="stage-what">Four-axis manipulator.</div>
+    <div class="stage-range"><a href="#dev-sample_z">Sample Z</a></div>
+  </div>
+  <div class="stage">
+    <div class="stage-name">Beam stop<span class="stage-id">§B.4</span></div>
+    <div class="stage-what">Hides the direct beam.</div>
+    <div class="stage-range"><a href="#dev-beam_stop_x">Beam Stop X</a></div>
+  </div>
+  <div class="stage">
+    <div class="stage-name">Exit slits<span class="stage-id">§A.5</span></div>
+    <div class="stage-what">Downstream of M103.</div>
+  </div>
+</div>
+<table id="corr">
+  <tr id="dev-upstream_jj_vert_aperture">
+    <td class="drawn">A</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;Vertical opening.&lt;/span&gt;">Upstream JJ Vert Aperture</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:upstream_jj_vert_aperture</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;upstream_jj_vert_aperture&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/upstream_jj.md</td>
+  </tr>
+  <tr id="dev-exit_slit_top">
+    <td class="drawn">A</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;Top jaw.&lt;/span&gt;">Exit Slit Top</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:exit_slit_top</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;exit_slit_top&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/exit_slit_top.md</td>
+  </tr>
+  <tr id="dev-samplerot0">
+    <td class="drawn">B</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;Sample rotation axis 0.&lt;/span&gt;">SampleRot0</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:samplerot0</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;samplerot0&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/samplerot0.md</td>
+  </tr>
+  <tr id="dev-sample_z">
+    <td class="drawn">B</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;Sample Z.&lt;/span&gt;">Sample Z</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:sample_z</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;sample_z&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/sample_z.md</td>
+  </tr>
+  <tr id="dev-sample_z_galil_c">
+    <td class="drawn">B</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;GALIL alias.&lt;/span&gt;">Sample Z GALIL C</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:sample_z_galil_c</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;sample_z_galil_c&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/sample_z_galil_c.md</td>
+  </tr>
+  <tr id="dev-beam_stop_x">
+    <td class="drawn">B</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;Beam stop X.&lt;/span&gt;">Beam Stop X</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:beam_stop_x</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;beam_stop_x&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/beam_stop_x.md</td>
+  </tr>
+  <tr id="dev-fake_motor">
+    <td class="drawn">—</td>
+    <td class="name"><span class="hot" data-tip="&lt;span class=&quot;tip-k&quot;&gt;motor&lt;/span&gt;&lt;span class=&quot;tip-m&quot;&gt;Placeholder.&lt;/span&gt;">Fake Motor</span></td>
+    <td class="cls">SimMotorRecord</td>
+    <td class="pvcell"><span class="pv">SIM11012:fake_motor</span></td>
+    <td class="pvcell"><span class="hd">d.motors[&quot;fake_motor&quot;]</span></td>
+    <td class="cls">EpicsSimMotor</td>
+    <td class="src">motors/fake_motor.md</td>
+  </tr>
+</table>
+</html>
+"""
+
+
+def _stage_id(nodes, name: str) -> str:
+    return next(nid for nid, node in nodes.items() if node.get("name") == name)
+
+
+def _ophyd_id(nodes, ophyd: str) -> str:
+    return next(nid for nid, node in nodes.items() if node.get("ophyd_name") == ophyd)
+
+
+def _motor_stage_links(graph):
+    nodes = {node["id"]: node for node in graph["things"]}
+    stage_ids = {nid for nid, node in nodes.items() if node.get("category") == "BeamlineStage"}
+    part_of = {}
+    for edge in graph["associations"]:
+        if edge["predicate"] != "rel:part_of":
+            continue
+        part_of.setdefault(edge["subject"], []).append(edge["object"])
+    motors = [node for node in graph["things"] if node.get("category") == "Motor"]
+    linked = []
+    hanging = []
+    for motor in motors:
+        stages = [obj for obj in part_of.get(motor["id"], []) if obj in stage_ids]
+        (linked if stages else hanging).append(motor)
+    return nodes, linked, hanging, part_of, stage_ids
+
+
+def test_motor_stage_map_targets_existing_v3_stages():
+    mapping = load_motor_stage_map()
+    assert mapping["motors"]
+    assert mapping["aliases"]["sample_z_galil_c"] == "sample_z"
+    if not V3_PATH.exists():
+        return
+    graph = json.loads(V3_PATH.read_text(encoding="utf-8"))
+    stage_names = {
+        node["name"]
+        for node in graph["things"]
+        if node.get("category") == "BeamlineStage"
+    }
+    for ophyd, stage in mapping["motors"].items():
+        assert stage in stage_names, f"{ophyd} → missing stage {stage!r}"
+    ophyds = {
+        node.get("ophyd_name")
+        for node in graph["things"]
+        if node.get("category") == "Motor"
+    }
+    for ophyd in mapping["motors"]:
+        assert ophyd in ophyds
+    for alias, canonical in mapping["aliases"].items():
+        assert alias in ophyds
+        assert canonical in ophyds
+
+
+def test_ingest_applies_map_to_hanging_jj_sample_galil_and_jaws():
+    records = ingest_fixture(MOTOR_LINK_HTML, [])
+    graph = records_to_graph(records, {"schema_version": "bl1101_v2", "id_prefix": "beamline"})
+    nodes = {node["id"]: node for node in graph["things"]}
+    rels = {(e["subject"], e["predicate"], e["object"]) for e in graph["associations"]}
+    jj = _ophyd_id(nodes, "upstream_jj_vert_aperture")
+    jaws = _ophyd_id(nodes, "exit_slit_top")
+    rot = _ophyd_id(nodes, "samplerot0")
+    galil = _ophyd_id(nodes, "sample_z_galil_c")
+    canon = _ophyd_id(nodes, "sample_z")
+    fake = _ophyd_id(nodes, "fake_motor")
+    assert (jj, "rel:part_of", _stage_id(nodes, "Upstream slits (JJ)")) in rels
+    assert (jaws, "rel:part_of", _stage_id(nodes, "Exit slits")) in rels
+    assert (rot, "rel:part_of", _stage_id(nodes, "Sample stage")) in rels
+    assert (galil, "rel:part_of", _stage_id(nodes, "Sample stage")) in rels
+    assert (galil, "rel:related_to", canon) in rels
+    assert not any(
+        e["subject"] == fake and e["predicate"] == "rel:part_of" and nodes.get(e["object"], {}).get("category") == "BeamlineStage"
+        for e in graph["associations"]
+    )
+
+
+def test_apply_motor_stage_map_is_idempotent_and_keeps_beam_path():
+    mapping = {
+        "motors": {"upstream_jj_vert_aperture": "Upstream slits (JJ)"},
+        "aliases": {"sample_z_galil_c": "sample_z"},
+        "leave_on_beamline": {},
+    }
+    graph = {
+        "things": [
+            {"id": "beamline:Motor-jj", "name": "JJ", "category": "Motor", "ophyd_name": "upstream_jj_vert_aperture"},
+            {"id": "beamline:Motor-z", "name": "Z", "category": "Motor", "ophyd_name": "sample_z"},
+            {"id": "beamline:Motor-z-galil", "name": "Z GALIL", "category": "Motor", "ophyd_name": "sample_z_galil_c"},
+            {"id": "beamline:stage-Upstream-slits-JJ", "name": "Upstream slits (JJ)", "category": "BeamlineStage"},
+            {"id": "beamline:stage-Sample-stage", "name": "Sample stage", "category": "BeamlineStage"},
+            {"id": "beamline:stage-M103", "name": "M103", "category": "BeamlineStage"},
+            {"id": "beamline:stage-Exit-slits", "name": "Exit slits", "category": "BeamlineStage"},
+        ],
+        "associations": [
+            {
+                "subject": "beamline:stage-M103",
+                "predicate": "rel:beam_path_next",
+                "object": "beamline:stage-Exit-slits",
+                "has_evidence": "v3",
+            },
+            {
+                "subject": "beamline:Motor-z",
+                "predicate": "rel:part_of",
+                "object": "beamline:stage-Sample-stage",
+                "has_evidence": "v3",
+            },
+        ],
+    }
+    once, stats = apply_motor_stage_map_to_graph(graph, mapping)
+    twice, stats2 = apply_motor_stage_map_to_graph(once, mapping)
+    assert stats["linked"] >= 2
+    assert stats2["linked"] == 0
+    bpn = [
+        (e["subject"], e["object"])
+        for e in twice["associations"]
+        if e["predicate"] == "rel:beam_path_next"
+    ]
+    assert bpn == [("beamline:stage-M103", "beamline:stage-Exit-slits")]
+
+
+def test_promote_writes_v4_without_touching_source(tmp_path: Path):
+    if not V3_PATH.exists():
+        return
+    src = tmp_path / "matkg_bl1101_v3.json"
+    shutil.copyfile(V3_PATH, src)
+    before = hashlib.sha256(src.read_bytes()).hexdigest()
+    result = run_motor_link_promote(source_kg=src, version=4, kg_dir=tmp_path, terms_dir=tmp_path)
+    assert result["kg_path"].name == "matkg_bl1101_v4.json"
+    assert hashlib.sha256(src.read_bytes()).hexdigest() == before
+    graph = json.loads(result["kg_path"].read_text(encoding="utf-8"))
+    nodes, linked, hanging, part_of, stage_ids = _motor_stage_links(graph)
+    assert len([n for n in graph["things"] if n.get("category") == "Motor"]) == 90
+    assert len(linked) >= 80
+    assert len(hanging) <= 10
+    v3 = json.loads(V3_PATH.read_text(encoding="utf-8"))
+    v3_bpn = {
+        (e["subject"], e["object"])
+        for e in v3["associations"]
+        if e["predicate"] == "rel:beam_path_next"
+    }
+    v4_bpn = {
+        (e["subject"], e["object"])
+        for e in graph["associations"]
+        if e["predicate"] == "rel:beam_path_next"
+    }
+    assert v4_bpn == v3_bpn
+    assert len(v4_bpn) == 15
+    sample_stage = _stage_id(nodes, "Sample stage")
+    exit_stage = _stage_id(nodes, "Exit slits")
+    up_jj = _stage_id(nodes, "Upstream slits (JJ)")
+    mid_jj = _stage_id(nodes, "Middle slits (JJ)")
+    scatter = _stage_id(nodes, "Scatter slits (JJ)")
+    beam_stop = _stage_id(nodes, "Beam stop")
+    detector = _stage_id(nodes, "Detector")
+    by_ophyd = {n.get("ophyd_name"): n for n in graph["things"] if n.get("category") == "Motor"}
+    for ophyd, stage in (
+        ("upstream_jj_vert_aperture", up_jj),
+        ("middle_jj_horz_trans", mid_jj),
+        ("in_chamber_jj_vert_aperture", scatter),
+        ("exit_slit_top", exit_stage),
+        ("exit_slit_left", exit_stage),
+        ("samplerot0", sample_stage),
+        ("sample_azimuthal_rotation", sample_stage),
+        ("sample_z_galil_c", sample_stage),
+        ("beam_stop_x_galil_f", beam_stop),
+        ("ccd_theta_galil_e", detector),
+    ):
+        assert stage in part_of[by_ophyd[ophyd]["id"]], ophyd
+    fake_id = by_ophyd["fake_motor"]["id"]
+    assert not any(obj in stage_ids for obj in part_of.get(fake_id, []))
+
+
+def test_v3_snapshot_file_unchanged():
+    if not V3_PATH.exists():
+        return
+    digest = hashlib.sha256(V3_PATH.read_bytes()).hexdigest()
+    assert digest == V3_FILE_SHA256
+
+
+def test_v4_snapshot_preserves_v3_beam_path_and_links_motors():
+    if not (V3_PATH.exists() and V4_PATH.exists()):
+        return
+    v3 = json.loads(V3_PATH.read_text(encoding="utf-8"))
+    v4 = json.loads(V4_PATH.read_text(encoding="utf-8"))
+    assert v3["metadata"]["graph_snapshot"]["version"] == 3
+    assert v4["metadata"]["graph_snapshot"]["version"] == 4
+    assert len(v3["things"]) == len(v4["things"])
+    motors_v3 = [n for n in v3["things"] if n.get("category") == "Motor"]
+    motors_v4 = [n for n in v4["things"] if n.get("category") == "Motor"]
+    assert len(motors_v3) == len(motors_v4) == 90
+    v3_bpn = {
+        (e["subject"], e["object"])
+        for e in v3["associations"]
+        if e["predicate"] == "rel:beam_path_next"
+    }
+    v4_bpn = {
+        (e["subject"], e["object"])
+        for e in v4["associations"]
+        if e["predicate"] == "rel:beam_path_next"
+    }
+    assert v4_bpn == v3_bpn
+    _, linked, hanging, part_of, _ = _motor_stage_links(v4)
+    assert len(linked) >= 80
+    assert len(hanging) <= 10
+    nodes = {n["id"]: n for n in v4["things"]}
+    by_ophyd = {n.get("ophyd_name"): n for n in motors_v4}
+    sample = _stage_id(nodes, "Sample stage")
+    assert sample in part_of[by_ophyd["samplerot2"]["id"]]
+    assert sample in part_of[by_ophyd["sample_z_galil_c"]["id"]]
+    related = {
+        (e["subject"], e["object"])
+        for e in v4["associations"]
+        if e["predicate"] == "rel:related_to"
+    }
+    assert (by_ophyd["sample_z_galil_c"]["id"], by_ophyd["sample_z"]["id"]) in related

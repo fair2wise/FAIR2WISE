@@ -4,6 +4,7 @@
 Replay from repo root:
   python3 scripts/ingest_bl1101.py
   python3 scripts/ingest_bl1101.py --from-scratch
+  python3 scripts/ingest_bl1101.py --from-graph storage/kg/matkg_bl1101_v3.json --snapshot 4
 """
 
 from __future__ import annotations

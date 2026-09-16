@@ -1105,13 +1105,22 @@ class KnowledgeGraph:
             chars += len(blk)
 
         for ni in nodes:
-            raw = self.nodes[ni.id]
+            nid = getattr(ni, "id", None)
+            if not nid or nid not in self.nodes:
+                continue
+            raw = self.nodes[nid]
+            name = getattr(ni, "name", None) or raw.get("name", nid)
+            category = getattr(ni, "category", None) or raw.get("category", "?")
+            score = float(getattr(ni, "score_prp", 0.0) or 0.0)
+            desc = getattr(ni, "description", None)
+            if desc is None:
+                desc = raw.get("description", "") or ""
             lines = [
-                f"## {ni.name} ({ni.category})",
-                f"Combined_Score: {ni.score_prp:.3f}",
+                f"## {name} ({category})",
+                f"Combined_Score: {score:.3f}",
             ]
-            if ni.description:
-                lines.append(f"Description: {ni.description}")
+            if desc:
+                lines.append(f"Description: {desc}")
             if raw.get("formula"):
                 lines.append(f"Formula: {raw['formula']}")
             source_papers = _unique_sources(raw.get("source_papers") or [])
