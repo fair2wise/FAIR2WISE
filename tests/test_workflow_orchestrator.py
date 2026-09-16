@@ -73,7 +73,7 @@ def test_fresh_download_request_routes_to_kg_first():
     assert _direct_download_request("How can I download a paper?") is False
 
 
-def test_fresh_turn_classifier_maps_only_non_scientific_classes_to_direct_response():
+def test_fresh_turn_classifier_maps_only_mundane_to_direct_response():
     agent = WorkflowOrchestratorAgent(max_steps=12)
     state = {
         "phase": "idle",
@@ -82,14 +82,21 @@ def test_fresh_turn_classifier_maps_only_non_scientific_classes_to_direct_respon
         "approved_action": None,
     }
 
-    for label in ("mundane_conversation", "irrelevant_non_scientific"):
-        agent._llm_classify = lambda user_turn, current_state, label=label: {
-            "classification": label,
-            "reason": "test classification",
-        }
-        decision = asyncio.run(agent.decide("user turn", state))
-        assert decision["action"] == "direct_response"
-        assert decision["classification"] == label
+    agent._llm_classify = lambda user_turn, current_state: {
+        "classification": "mundane_conversation",
+        "reason": "test classification",
+    }
+    decision = asyncio.run(agent.decide("hi", state))
+    assert decision["action"] == "direct_response"
+    assert decision["classification"] == "mundane_conversation"
+
+    agent._llm_classify = lambda user_turn, current_state: {
+        "classification": "irrelevant_non_scientific",
+        "reason": "Off-topic still searches papers.",
+    }
+    decision = asyncio.run(agent.decide("tell me about dogs", state))
+    assert decision["action"] == "retrieve_kg"
+    assert decision["classification"] == "irrelevant_non_scientific"
 
     agent._llm_classify = lambda user_turn, current_state: {
         "classification": "scientific_or_uncertain",

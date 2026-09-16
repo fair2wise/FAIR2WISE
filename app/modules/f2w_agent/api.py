@@ -32,6 +32,7 @@ from .download_agent import (
 from .extractor_agent import ExtractorAgent
 from .orchestrator_agent import (
     WorkflowOrchestratorAgent,
+    _direct_download_request,
     _extracted_terms_followup,
     _paper_reference_followup,
 )
@@ -1432,6 +1433,192 @@ def _json_graph_should_use_canned_refusal(question: str, verdict: Dict[str, Any]
     if _is_conceptual_question(question):
         return False
     return _is_numeric_claim(question)
+
+
+_FIND_PAPER_RE = re.compile(
+    r"\b(?:find|search(?:\s+for)?|look\s+up|locate)\s+"
+    r"(?:(?:a|an|the|some|more|relevant|related)\s+)*"
+    r"(?:open[- ]access\s+)?"
+    r"(?:paper|papers|article|articles|pdf|publication|publications)\b",
+    re.IGNORECASE,
+)
+
+
+def _json_graph_wants_paper_ingest(question: str) -> bool:
+    """True when the user explicitly asks to download or find a paper."""
+    text = re.sub(r"\s+", " ", str(question or "").strip())
+    if not text:
+        return False
+    if _direct_download_request(text):
+        return True
+    folded = text.casefold()
+    if re.search(r"\bhow\s+(?:do|can|could|would)\s+.*\b(?:find|search|look\s+up|locate)\b", folded):
+        return False
+    return bool(_FIND_PAPER_RE.search(text))
+
+
+_JSON_GRAPH_QUERY_STOPWORDS = {
+    "tell", "me", "about", "the", "a", "an", "of", "and", "or", "to", "in", "on",
+    "for", "is", "are", "was", "were", "what", "does", "do", "how", "with",
+    "from", "this", "that", "these", "those", "please", "give", "kind",
+    "typically", "studied", "your", "you", "can", "could", "would", "should",
+    "materials", "material", "science", "scientific", "question", "questions",
+    "most", "more", "some", "any", "into", "using",
+}
+_JSON_GRAPH_SLOT_WORDS = {
+    "beamline", "ops", "numeric", "energy", "slot", "slots", "code", "photon",
+    "snippet", "measurement", "executable", "analysis",
+}
+_JSON_GRAPH_SLOT_GAP_RE = re.compile(
+    r"(photon[_\s-]?energy|\beV\b|q-?range|temperature|kelvin|"
+    r"numeric|energy slot|code(?:s)?(?:\s+objects?)?|beamline-?ops|"
+    r"analysis.?code|cited snippet|measurement fact|executable)",
+    re.IGNORECASE,
+)
+_COMPARATIVE_OPTIMIZATION_RE = re.compile(
+    r"\b("
+    r"most efficient|more efficient|highest (?:pce|efficiency)|"
+    r"\bbest\b|optimal|optimize|optimi[sz]ation|"
+    r"compare|comparison|versus|\bvs\.?\b|configuration"
+    r")\b",
+    re.IGNORECASE,
+)
+_LACKS_CONCEPT_RE = re.compile(
+    r"(lacks?|does not (?:currently )?contain|do not contain|"
+    r"no (?:nodes?|information|evidence|concept)|"
+    r"not (?:present|found|available) in|cannot answer|"
+    r"not relevant to)",
+    re.IGNORECASE,
+)
+
+
+def _json_graph_stem_token(token: str) -> str:
+    text = str(token or "").casefold()
+    if text.endswith("s") and len(text) > 3:
+        return text[:-1]
+    return text
+
+
+def _json_graph_node_tokens(value: str) -> set[str]:
+    text = str(value or "")
+    tokens: set[str] = set()
+    compact = re.sub(r"[^a-z0-9]+", " ", text.casefold())
+    for raw in compact.split():
+        if len(raw) < 3:
+            continue
+        tokens.add(raw)
+        tokens.add(_json_graph_stem_token(raw))
+    split = re.sub(r"([a-z])([A-Z])", r"\1 \2", text)
+    split = split.replace(":", " ").replace("_", " ").replace("-", " ")
+    for raw in re.findall(r"[a-z0-9]{3,}", split.casefold()):
+        tokens.add(raw)
+        tokens.add(_json_graph_stem_token(raw))
+    return tokens
+
+
+def _significant_question_tokens(question: str) -> set[str]:
+    tokens = set()
+    for raw in re.findall(r"[a-z0-9]{3,}", str(question or "").casefold()):
+        if raw in _JSON_GRAPH_QUERY_STOPWORDS:
+            continue
+        tokens.add(raw)
+        tokens.add(_json_graph_stem_token(raw))
+    return tokens
+
+
+def _is_comparative_or_optimization_question(question: str) -> bool:
+    return bool(_COMPARATIVE_OPTIMIZATION_RE.search(question or ""))
+
+
+def _json_graph_selected_ids(verdict: Dict[str, Any]) -> List[str]:
+    return [str(node).strip() for node in (verdict.get("selected") or []) if str(node).strip()]
+
+
+def _json_graph_selected_tokens(verdict: Dict[str, Any]) -> set[str]:
+    tokens: set[str] = set()
+    for node in _json_graph_selected_ids(verdict):
+        tokens |= _json_graph_node_tokens(node)
+    for hit in verdict.get("selected_hits") or []:
+        if not isinstance(hit, dict):
+            continue
+        for key in ("id", "name", "label"):
+            tokens |= _json_graph_node_tokens(str(hit.get(key) or ""))
+        payload = hit.get("payload")
+        if isinstance(payload, dict):
+            for key in ("name", "label", "id"):
+                tokens |= _json_graph_node_tokens(str(payload.get(key) or ""))
+    return tokens
+
+
+def _json_graph_nodes_on_topic(question: str, verdict: Dict[str, Any]) -> bool:
+    asked = _significant_question_tokens(question)
+    if not asked:
+        return False
+    return bool(asked & _json_graph_selected_tokens(verdict))
+
+
+def _json_graph_missing_is_slot_gap(missing: List[str]) -> bool:
+    if not missing:
+        return True
+    return all(_JSON_GRAPH_SLOT_GAP_RE.search(topic) or _is_numeric_claim(topic) for topic in missing)
+
+
+def _json_graph_answer_admits_missing_asked_concept(question: str, verdict: Dict[str, Any]) -> bool:
+    answer = str(verdict.get("answer") or "")
+    if not answer or not _LACKS_CONCEPT_RE.search(answer):
+        return False
+    asked = _significant_question_tokens(question) - _JSON_GRAPH_SLOT_WORDS
+    missing_from_nodes = asked - _json_graph_selected_tokens(verdict)
+    if not missing_from_nodes:
+        return False
+    folded = answer.casefold()
+    return any(re.search(rf"\b{re.escape(token)}\b", folded) for token in missing_from_nodes)
+
+
+def _json_graph_nodes_address_question(question: str, verdict: Dict[str, Any]) -> bool:
+    """True only when selected JSON-KG nodes actually teach or answer the ask."""
+    selected = _json_graph_selected_ids(verdict)
+    if verdict.get("no_evidence") or not selected:
+        return False
+    if not _json_graph_nodes_on_topic(question, verdict):
+        return False
+    missing = [
+        str(topic).strip()
+        for topic in (verdict.get("missing_topics") or [])
+        if str(topic).strip()
+    ]
+    comparative = _is_comparative_or_optimization_question(question)
+    genuine = bool(verdict.get("sufficient")) and not verdict.get("leeway")
+    if genuine:
+        if _json_graph_answer_admits_missing_asked_concept(question, verdict):
+            return False
+        return True
+    if comparative:
+        return False
+    if missing and not _json_graph_missing_is_slot_gap(missing):
+        return False
+    if _json_graph_answer_admits_missing_asked_concept(question, verdict):
+        return False
+    return _is_conceptual_question(question) or _is_ops_layout_question(question)
+
+
+def _json_graph_search_missing_topics(question: str, verdict: Dict[str, Any]) -> List[str]:
+    """Keep candidate search aligned with the asked question, not off-query slots."""
+    if not _json_graph_nodes_address_question(question, verdict):
+        return [question]
+    missing = [
+        str(topic).strip()
+        for topic in (verdict.get("missing_topics") or [])
+        if str(topic).strip()
+    ]
+    return missing or [question]
+
+
+def _json_graph_should_search_candidates(question: str, verdict: Dict[str, Any]) -> bool:
+    """JSON mode offers paper ingest unless on-topic nodes actually answer the ask."""
+    if _json_graph_wants_paper_ingest(question):
+        return True
+    return not _json_graph_nodes_address_question(question, verdict)
 
 
 def _post_extraction_answer(
@@ -3283,14 +3470,16 @@ class AgentPipelineService:
         decision = await self._orchestrator_decision(effective, emit, route_hint=route_hint)
         action_name = str(decision.get("action") or "stop_insufficient")
         if action_name == "direct_response":
+            classification = str(
+                decision.get("classification") or "mundane_conversation"
+            )
+            if classification == "irrelevant_non_scientific":
+                return {"status": "kg_question", "question": effective}
             if pending and (
                 _looks_meta_grounding_instruction(question)
                 or _looks_contextual_followup(question)
             ):
                 return {"status": "kg_question", "question": effective}
-            classification = str(
-                decision.get("classification") or "mundane_conversation"
-            )
             answer = await self._generate_direct_response(question, history)
             return {
                 "status": "direct_response",
@@ -3460,11 +3649,11 @@ class AgentPipelineService:
             "agent workflow over a materials knowledge graph and scientific papers.\n\n"
             "Return ONLY JSON with this schema:\n"
             '{"requires_agents": true|false, "reason": string}\n\n'
-            "Set requires_agents=false for greetings, tests, thanks, meta-chat, UI/help "
-            "questions, or general conversation that can be answered without KG/paper evidence.\n"
-            "Set requires_agents=true for materials-science questions, requests for citations, "
-            "papers, evidence, code snippets from the KG, or follow-ups that need prior "
-            "KG-grounded context.\n\n"
+            "Set requires_agents=false only for greetings, tests, thanks, meta-chat, or UI/help "
+            "questions that can be answered without KG/paper evidence.\n"
+            "Set requires_agents=true for every topical question — materials-science or off-topic — "
+            "plus citations, papers, evidence, code snippets from the KG, or follow-ups that need "
+            "prior KG-grounded context. Never refuse a question as out of scope.\n\n"
             f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"USER_MESSAGE:\n{question}"
@@ -3497,20 +3686,16 @@ class AgentPipelineService:
             or "mundane_conversation"
         )
         if classification == "irrelevant_non_scientific":
-            behavior = (
-                "The request is clearly outside science and FAIR2WISE's materials-science "
-                "scope. Briefly state that it is not relevant to materials science and invite "
-                "a materials/scientific question. Do NOT answer or fulfill the unrelated request."
-            )
-        else:
-            behavior = (
-                "The message is mundane conversation, UI/help/meta-chat, a greeting, thanks, "
-                "or a test. Respond conversationally and briefly."
-            )
+            classification = "mundane_conversation"
+        behavior = (
+            "The message is mundane conversation, UI/help/meta-chat, a greeting, thanks, "
+            "or a test. Respond conversationally and briefly."
+        )
         prompt = (
             "You are FAIR2WISE, a concise materials-science assistant. Retrieval agents were "
             "not needed for this message. "
-            f"{behavior} Do not claim to have searched the KG or papers.\n\n"
+            f"{behavior} Do not claim to have searched the KG or papers. Never refuse a "
+            "topical question as out of scope; those must go through KG search and paper ingest.\n\n"
             f"{self.memory.memory_section()}\n"
             f"HISTORY:\n{json.dumps(history[-MAX_HISTORY_MESSAGES:], ensure_ascii=False)}\n\n"
             f"USER_MESSAGE:\n{question}"
@@ -3524,13 +3709,9 @@ class AgentPipelineService:
             answer = await loop.run_in_executor(None, run)
         except Exception:
             answer = ""
-        fallback = (
-            "That request is not relevant to materials science. Ask a scientific or "
-            "materials-science question and I will check the knowledge graph."
-            if classification == "irrelevant_non_scientific"
-            else "I'm here. Ask a materials question when you want me to use the knowledge graph."
+        return answer or (
+            "I'm here. Ask a question when you want me to search the knowledge graph and papers."
         )
-        return answer or fallback
 
     async def _generate_domain_knowledge_fallback(
         self,
@@ -4098,7 +4279,11 @@ class AgentPipelineService:
                     active_graph_path,
                 )
 
-            if verdict.get("sufficient"):
+            json_needs_ingest = (
+                active_graph_source == "json"
+                and _json_graph_should_search_candidates(question, verdict)
+            )
+            if verdict.get("sufficient") and not json_needs_ingest:
                 self.workflow.update(
                     phase="answered",
                     post_extraction_sufficient=True
@@ -4116,7 +4301,7 @@ class AgentPipelineService:
                     active_graph_path,
                 )
 
-            if active_graph_source == "json":
+            if active_graph_source == "json" and not json_needs_ingest:
                 if _json_graph_should_use_canned_refusal(question, verdict):
                     self.workflow.update(phase="stop_insufficient")
                     await self._orchestrator_decision(question, emit)
@@ -4148,7 +4333,11 @@ class AgentPipelineService:
                     active_graph_path,
                 )
 
-            missing = verdict.get("missing_topics") or [question]
+            missing = (
+                _json_graph_search_missing_topics(question, verdict)
+                if active_graph_source == "json"
+                else (verdict.get("missing_topics") or [question])
+            )
             self.workflow.update(
                 phase="retrieval_insufficient",
                 current_query=question,
@@ -4314,7 +4503,11 @@ class AgentPipelineService:
                 candidate_titles=debate_summary.get("candidate_titles") or [],
             )
 
-            if action_name == "answer_from_kg" and verdict.get("sufficient"):
+            if (
+                action_name == "answer_from_kg"
+                and verdict.get("sufficient")
+                and not json_needs_ingest
+            ):
                 return self._response(
                     "answered",
                     str(verdict.get("answer") or ""),

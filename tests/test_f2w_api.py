@@ -48,6 +48,46 @@ def test_json_graph_refusal_only_when_retrieval_empty():
             "missing_topics": ["photon_energy_eV"],
         },
     )
+    empty_verdict = {"no_evidence": True, "selected": []}
+    on_topic = {
+        "no_evidence": False,
+        "selected": ["matkg:RSoXS"],
+        "missing_topics": ["photon_energy_eV"],
+    }
+    assert api_mod._json_graph_should_search_candidates("what is RSoXS", empty_verdict)
+    assert not api_mod._json_graph_should_search_candidates(
+        "what does the ALS RSoXS beamline specialize in", on_topic
+    )
+    assert api_mod._json_graph_should_search_candidates(
+        "download a paper about RSoXS", on_topic
+    )
+    assert api_mod._json_graph_should_search_candidates(
+        "find a paper about thin film scattering", on_topic
+    )
+    assert api_mod._json_graph_should_search_candidates(
+        "tell me about dogs",
+        {
+            "no_evidence": False,
+            "selected": ["matkg:YBCO", "matkg:Cuprate"],
+            "missing_topics": ["dogs"],
+            "sufficient": False,
+        },
+    )
+    assert api_mod._json_graph_should_search_candidates(
+        "what is the most efficient OPV configuration",
+        {
+            "no_evidence": False,
+            "selected": ["matkg:Manganite", "matkg:LSMO"],
+            "missing_topics": ["OPV", "power conversion efficiency"],
+            "sufficient": True,
+            "answer": (
+                "The knowledge graph lacks OPV. Related retrieved nodes discuss "
+                "manganite films."
+            ),
+        },
+    )
+    assert api_mod._json_graph_wants_paper_ingest("Fetch a paper on GISAXS")
+    assert not api_mod._json_graph_wants_paper_ingest("How can I find a paper?")
 
 
 def test_compose_followup_keeps_pending_scientific_question():
@@ -345,7 +385,7 @@ def test_direct_response_stream_completes_without_progress(tmp_path, monkeypatch
     assert NoCallRetrieval.query_calls == 0
 
 
-def test_irrelevant_direct_response_refuses_unrelated_request(tmp_path, monkeypatch):
+def test_irrelevant_classification_still_retrieves_instead_of_refusing(tmp_path, monkeypatch):
     monkeypatch.setattr(api_mod, "DownloadAgent", FakeDownload)
     monkeypatch.setattr(api_mod, "ExtractorAgent", FakeExtractor)
     service = api_mod.AgentPipelineService(CoordinatorConfig(workdir=tmp_path, max_rounds=1))
@@ -353,19 +393,19 @@ def test_irrelevant_direct_response_refuses_unrelated_request(tmp_path, monkeypa
 
     def fake_completion(prompt, *, timeout):
         prompts.append(prompt)
-        return "That request is not relevant to materials science."
+        return "Hi. What would you like to explore?"
 
     service._chat_completion = fake_completion
     answer = asyncio.run(
         service._generate_direct_response(
-            "Write a restaurant review.",
+            "hello",
             [],
             "irrelevant_non_scientific",
         )
     )
 
-    assert answer == "That request is not relevant to materials science."
-    assert "Do NOT answer or fulfill the unrelated request" in prompts[0]
+    assert "not relevant to materials science" not in answer.lower()
+    assert "Never refuse a topical question as out of scope" in prompts[0]
     assert "Do not claim to have searched the KG or papers" in prompts[0]
 
 
@@ -595,6 +635,174 @@ def test_beamline_specialty_skips_canned_slots_when_nodes_exist(tmp_path, monkey
     assert response.status == "answered"
     assert canned not in response.answer
     assert "numeric slots, photon energy, or a cited snippet" not in response.answer
+
+
+def _json_one_candidate_download():
+    class OneCandidateDownload(AgenticDownload):
+        async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+            await super().search_candidates(query, missing_topics, candidate_pool)
+            return {
+                "status": "success",
+                "count": 1,
+                "candidates": [
+                    {
+                        "id": "W1",
+                        "title": "Query-aligned candidate paper",
+                        "abstract": "Matches the asked question.",
+                        "score": 0.8,
+                        "pdf_urls": ["https://example.test/paper.pdf"],
+                    }
+                ],
+            }
+
+    return OneCandidateDownload
+
+
+def test_json_off_topic_dogs_offers_ingest_not_topic_refusal(tmp_path, monkeypatch):
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [{"id": "n1", "name": "YBCO"}], "associations": []}),
+        encoding="utf-8",
+    )
+
+    class OffTopicRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question, history=None):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "answer": None,
+                "missing_topics": ["dogs"],
+                "selected": ["matkg:YBCO", "matkg:Cuprate"],
+                "direct_evidence_count": 1,
+                "no_evidence": False,
+                "graph_source_requested": "json",
+                "graph_source_used": "json",
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Need papers about dogs",
+            "objections": [],
+            "selected_action": "download_selected",
+            "reason": "KG does not cover the asked topic",
+            "candidate_titles": ["Query-aligned candidate paper"],
+            "candidate_indices": [0],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", OffTopicRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", _json_one_candidate_download())
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            workdir=tmp_path / "run",
+            max_rounds=1,
+            kg_mode="json",
+            graph=str(graph_path),
+        )
+    )
+    service.orchestrator._llm_classify = lambda user_turn, state: {
+        "classification": "irrelevant_non_scientific",
+        "reason": "Dogs are not materials science.",
+    }
+
+    async def boom_leeway(question, verdict, history=None):
+        raise AssertionError("off-topic questions must not take JSON leeway")
+
+    service._generate_json_graph_leeway_answer = boom_leeway
+    response = asyncio.run(service.ask("tell me about dogs"))
+
+    assert response.status != "direct_response"
+    assert "not relevant to materials science" not in response.answer.lower()
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["kind"] == "download"
+    assert response.pending["papers"]
+    search = AgenticDownload.instances[0].search_calls[0]
+    assert "dogs" in search["query"].lower()
+    assert search["missing_topics"] == ["tell me about dogs"]
+
+
+def test_json_insufficient_opv_offers_ingest_not_leeway(tmp_path, monkeypatch):
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [{"id": "n1", "name": "LSMO"}], "associations": []}),
+        encoding="utf-8",
+    )
+
+    class OffQueryRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question, history=None):
+            return {
+                "status": "success",
+                "sufficient": True,
+                "answer": (
+                    "The knowledge graph lacks OPV. Related retrieved nodes discuss "
+                    "manganite films and cuprate RSXS. Not a KG measurement fact."
+                ),
+                "missing_topics": ["OPV", "power conversion efficiency"],
+                "selected": ["matkg:Manganite", "matkg:LSMO"],
+                "direct_evidence_count": 2,
+                "no_evidence": False,
+                "graph_source_requested": "json",
+                "graph_source_used": "json",
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Need OPV papers",
+            "objections": [],
+            "selected_action": "download_selected",
+            "reason": "KG nodes do not answer the OPV question",
+            "candidate_titles": ["Query-aligned candidate paper"],
+            "candidate_indices": [0],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", OffQueryRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", _json_one_candidate_download())
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            workdir=tmp_path / "run",
+            max_rounds=1,
+            kg_mode="json",
+            graph=str(graph_path),
+        )
+    )
+    force_agent_router(service)
+
+    async def boom_leeway(question, verdict, history=None):
+        raise AssertionError("unmet OPV questions must not take JSON leeway")
+
+    service._generate_json_graph_leeway_answer = boom_leeway
+    response = asyncio.run(service.ask("what is the most efficient OPV configuration"))
+
+    assert response.status != "answered"
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["kind"] == "download"
+    assert response.pending["papers"][0]["title"] == "Query-aligned candidate paper"
+    search = AgenticDownload.instances[0].search_calls[0]
+    assert "opv" in search["query"].lower()
+    assert search["missing_topics"] == ["what is the most efficient OPV configuration"]
 
 
 def test_session_memory_rewrites_followup_without_frontend_history(tmp_path, monkeypatch):
@@ -1785,6 +1993,106 @@ def test_agentic_progress_events_include_debate_candidate_and_action(tmp_path, m
     assert next(data for event, data in events if event == "candidate_search_result")["candidate_titles"] == ["Candidate paper"]
     assert next(data for event, data in events if event == "debate_result")["selected_action"] == "stop_insufficient"
     assert next(data for event, data in events if event == "action_selected")["reason"] == "Testing stop after event emission"
+
+
+def test_json_insufficient_graph_offers_download_cta(tmp_path, monkeypatch):
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [], "associations": []}),
+        encoding="utf-8",
+    )
+
+    class InsufficientRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 0}
+
+        async def query(self, question):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "missing_topics": ["missing topic"],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": True,
+                "graph_source_requested": "json",
+                "graph_source_used": "json",
+            }
+
+    class OneCandidateDownload(AgenticDownload):
+        async def search_candidates(self, query, missing_topics=None, candidate_pool=25):
+            await super().search_candidates(query, missing_topics, candidate_pool)
+            return {
+                "status": "success",
+                "count": 1,
+                "candidates": [
+                    {
+                        "id": "W1",
+                        "title": "Candidate paper",
+                        "abstract": "Fills missing topic.",
+                        "score": 0.7,
+                        "pdf_urls": ["https://example.test/paper.pdf"],
+                    }
+                ],
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Candidate enough to download",
+            "objections": [],
+            "selected_action": "stop_insufficient",
+            "reason": "Testing stop after event emission",
+            "candidate_titles": ["Candidate paper"],
+            "candidate_indices": [],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", InsufficientRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", OneCandidateDownload)
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            workdir=tmp_path / "run",
+            max_rounds=1,
+            kg_mode="json",
+            graph=str(graph_path),
+            workflow_mode="agentic",
+        )
+    )
+    force_agent_router(service)
+    events = []
+
+    async def run():
+        async def emit(event, message, data):
+            events.append((event, data))
+
+        return await service.ask_with_progress("question", emit)
+
+    response = asyncio.run(run())
+
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["kind"] == "download"
+    assert response.pending["papers"]
+    assert response.pending["papers"][0]["title"] == "Candidate paper"
+    assert response.pending["papers"][0]["recommended"] is False
+    phases = [event for event, _ in events]
+    assert phases.count("orchestrator_decision") >= 4
+    assert [phase for phase in phases if phase != "orchestrator_decision"] == [
+        "retrieval_started",
+        "retrieval_result",
+        "candidate_search_started",
+        "candidate_search_result",
+        "debate_started",
+        "debate_result",
+        "action_selected",
+        "awaiting_download_decision",
+    ]
 
 
 def test_graph_payload_from_file_normalizes_matkg(tmp_path):

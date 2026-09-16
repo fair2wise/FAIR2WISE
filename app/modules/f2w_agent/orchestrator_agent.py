@@ -312,16 +312,18 @@ class WorkflowOrchestratorAgent(Agent):
             "Return ONLY JSON with keys classification and reason.\n"
             "classification must be exactly one of:\n"
             "- mundane_conversation: greetings, thanks, tests, casual chat, or FAIR2WISE UI/help questions "
-            "that are not follow-ups to a scientific ask.\n"
-            "- irrelevant_non_scientific: requests clearly unrelated to science or FAIR2WISE. These will receive "
-            "a short relevance refusal, not an answer to the unrelated request.\n"
-            "- scientific_or_uncertain: EVERY scientific question in ANY discipline, every materials-science "
-            "question, scientific code or methods, papers/citations/evidence, KG requests, requests to download "
-            "or fetch papers, technical factual questions, contextual scientific follow-ups, and every ambiguous "
-            "turn that might be scientific — except hardware-layout questions, which are ops_layout.\n"
+            "that are not follow-ups to a scientific ask. Not used for topical questions, including off-topic ones.\n"
+            "- irrelevant_non_scientific: a topical question that is clearly outside materials science "
+            "(for example pets, restaurants, sports). This still retrieves the KG and offers paper ingest; "
+            "never refuse or topic-police. Prefer scientific_or_uncertain when unsure.\n"
+            "- scientific_or_uncertain: EVERY question that asks about a topic — any discipline, materials "
+            "science, off-graph concepts, scientific code or methods, papers/citations/evidence, KG requests, "
+            "requests to download or fetch papers, technical factual questions, contextual follow-ups, and every "
+            "ambiguous turn that might need evidence — except hardware-layout questions, which are ops_layout.\n"
             "- ops_layout: questions about how 11.0.1.2 hardware is connected in order, beam path, beamline "
             "layout, what comes after a device, or optical topology. These retrieve the ops KG first and must "
             "not be treated as literature/science (cuprate RSXS, CyRSoXS) questions.\n"
+            "Hard rule: never refuse a user question as out of scope. Off-topic asks still search the KG and papers.\n"
             "Hard rule: when uncertain, choose scientific_or_uncertain. Never classify a scientific question as "
             "mundane or irrelevant merely because general model knowledge could answer it.\n"
             "Hard rule: follow-up instructions such as 'be more general', 'try again', or 'be less strict' that "
@@ -338,11 +340,7 @@ class WorkflowOrchestratorAgent(Agent):
         if label not in FRESH_TURN_CLASSES:
             return None
         reason = str(classification.get("reason") or "Classified fresh user turn.")
-        action_name = (
-            "direct_response"
-            if label in {"mundane_conversation", "irrelevant_non_scientific"}
-            else "retrieve_kg"
-        )
+        action_name = "direct_response" if label == "mundane_conversation" else "retrieve_kg"
         return _decision(
             action_name,
             reason,

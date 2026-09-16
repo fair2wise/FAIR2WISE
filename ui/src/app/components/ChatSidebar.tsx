@@ -220,7 +220,7 @@ export function publicationsBlockText(
 
 function assistantCopyText(message: ChatMessage): string {
   const parts = [message.content];
-  if (message.publications?.length) {
+  if (message.publications?.length && !message.pending) {
     parts.push(publicationsBlockText(
       message.publications,
       false,
