@@ -225,11 +225,15 @@ export function AppSettingsButton({
           ...prev,
           useLiveTiled: synced.useLiveTiled,
           tiledUri: synced.tiledUri || prev.tiledUri,
+          availableGraphs: synced.availableGraphs,
+          selectedGraphIds: synced.selectedGraphIds,
         }));
         setSavedSettings(prev => ({
           ...prev,
           useLiveTiled: synced.useLiveTiled,
           tiledUri: synced.tiledUri || prev.tiledUri,
+          availableGraphs: synced.availableGraphs,
+          selectedGraphIds: synced.selectedGraphIds,
         }));
         if (!response.available_json_graphs?.includes(saved.jsonGraphPath) && synced.jsonGraphPath) {
           setDraftSettings(prev => ({
@@ -281,6 +285,8 @@ export function AppSettingsButton({
         jsonGraphPaths: draftSettings.graphSource === 'json'
           ? draftSettings.jsonGraphPaths
           : synced.jsonGraphPaths,
+        availableGraphs: synced.availableGraphs,
+        selectedGraphIds: synced.selectedGraphIds,
         kgQueryMaxNodes: draftSettings.kgQueryMaxNodes,
         kgQueryHops: draftSettings.kgQueryHops,
         sourceRag: draftSettings.sourceRag,
@@ -363,7 +369,10 @@ export function AppSettingsButton({
         : [...prev.jsonGraphPaths, path];
       if (!selected.length) return prev;
       const jsonGraphPath = selected.includes(prev.jsonGraphPath) ? prev.jsonGraphPath : selected[0];
-      return { ...prev, graphSource: 'json', jsonGraphPaths: selected, jsonGraphPath };
+      const pathToId: Record<string, string> = {};
+      for (const g of prev.availableGraphs) pathToId[g.path] = g.graphId;
+      const selectedGraphIds = selected.map(p => pathToId[p]).filter((id): id is string => Boolean(id));
+      return { ...prev, graphSource: 'json', jsonGraphPaths: selected, jsonGraphPath, selectedGraphIds };
     });
   }
 
@@ -588,6 +597,11 @@ export function AppSettingsButton({
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     {loading ? 'Loading available JSON graphs…' : 'No JSON graph files found in storage/kg.'}
                   </div>
+                )}
+                {draftSettings.jsonGraphPaths.length > 3 && (
+                  <p className="text-xs text-amber-700">
+                    ⚠ More than 3 KGs checked — fan-out queries may be slower.
+                  </p>
                 )}
                 </div>
 

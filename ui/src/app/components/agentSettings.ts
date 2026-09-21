@@ -3,6 +3,12 @@ export type AgentGraphSource = 'splash_links' | 'json';
 export type AgentWorkflowMode = 'deterministic' | 'agentic';
 export type AgentExtractionMode = 'full' | 'targeted';
 
+export interface GraphMeta {
+  path: string;
+  graphId: string;
+  label: string;
+}
+
 export interface AgentSettings {
   backend: AgentBackend;
   model: string;
@@ -12,6 +18,10 @@ export interface AgentSettings {
   targetedMaxPages: number;
   jsonGraphPath: string;
   jsonGraphPaths: string[];
+  /** Richer metadata for every KG in storage/kg, populated from the API. */
+  availableGraphs: GraphMeta[];
+  /** IDs of currently selected graphs (subset of availableGraphs). */
+  selectedGraphIds: string[];
   kgQueryMaxNodes: number;
   kgQueryHops: number;
   sourceRag: boolean;
@@ -37,6 +47,10 @@ export interface AgentSettingsResponse {
   tiled_status?: string;
   tiled_error?: string | null;
   available_json_graphs: string[];
+  /** Richer per-graph metadata (path, graph_id, label). */
+  available_graphs?: { path: string; graph_id: string; label: string }[];
+  /** IDs of currently selected graphs. */
+  selected_graph_ids?: string[];
   available_cborg_models: string[];
   default_ollama_model: string;
 }
@@ -86,6 +100,8 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   targetedMaxPages: 6,
   jsonGraphPath: DEFAULT_JSON_GRAPH_PATHS[0],
   jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
+  availableGraphs: [],
+  selectedGraphIds: [],
   kgQueryMaxNodes: 100,
   kgQueryHops: 1,
   sourceRag: false,
@@ -146,6 +162,8 @@ export function loadAgentSettings(): AgentSettings {
         : DEFAULT_AGENT_SETTINGS.targetedMaxPages,
       jsonGraphPath: storedJsonPath,
       jsonGraphPaths,
+      availableGraphs: Array.isArray(parsed.availableGraphs) ? parsed.availableGraphs : [],
+      selectedGraphIds: Array.isArray(parsed.selectedGraphIds) ? parsed.selectedGraphIds : [],
       kgQueryMaxNodes: typeof parsed.kgQueryMaxNodes === 'number'
         ? Math.min(1000, Math.max(10, parsed.kgQueryMaxNodes))
         : DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
@@ -186,6 +204,9 @@ export function settingsToApiPayload(settings: AgentSettings) {
     targeted_max_pages: settings.targetedMaxPages,
     json_graph_path: settings.graphSource === 'json' ? settings.jsonGraphPath : null,
     json_graph_paths: settings.graphSource === 'json' ? settings.jsonGraphPaths : [],
+    selected_graph_ids: settings.graphSource === 'json' && settings.selectedGraphIds.length > 0
+      ? settings.selectedGraphIds
+      : undefined,
     kg_query_max_nodes: settings.kgQueryMaxNodes,
     kg_query_hops: settings.kgQueryHops,
     source_rag: settings.sourceRag,
@@ -206,6 +227,22 @@ export function settingsFromApiResponse(response: AgentSettingsResponse): AgentS
     || jsonGraphPaths[0]
     || available.find(path => !isXrayDemo(path))
     || DEFAULT_AGENT_SETTINGS.jsonGraphPath;
+
+  // Richer graph metadata from the new API fields.
+  const availableGraphs: GraphMeta[] = (response.available_graphs ?? []).map(g => ({
+    path: g.path,
+    graphId: g.graph_id,
+    label: g.label,
+  }));
+  // Derive selectedGraphIds: prefer the explicit API field; fall back to IDs
+  // for the currently selected json_graph_paths via availableGraphs.
+  const pathToGraphId: Record<string, string> = {};
+  for (const g of availableGraphs) {
+    pathToGraphId[g.path] = g.graphId;
+  }
+  const selectedGraphIds: string[] = response.selected_graph_ids
+    ?? jsonGraphPaths.map(p => pathToGraphId[p]).filter((id): id is string => Boolean(id));
+
   return {
     backend,
     model: normalizeModel(response.model, backend),
@@ -217,6 +254,8 @@ export function settingsFromApiResponse(response: AgentSettingsResponse): AgentS
     jsonGraphPaths: jsonGraphPaths.includes(jsonGraphPath)
       ? jsonGraphPaths
       : [jsonGraphPath, ...jsonGraphPaths],
+    availableGraphs,
+    selectedGraphIds,
     kgQueryMaxNodes: typeof response.kg_query_max_nodes === 'number'
       ? Math.min(1000, Math.max(10, response.kg_query_max_nodes))
       : DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
@@ -238,6 +277,7 @@ export function settingsEqual(a: AgentSettings, b: AgentSettings): boolean {
     && a.targetedMaxPages === b.targetedMaxPages
     && a.jsonGraphPath === b.jsonGraphPath
     && a.jsonGraphPaths.join('|') === b.jsonGraphPaths.join('|')
+    && a.selectedGraphIds.join('|') === b.selectedGraphIds.join('|')
     && a.kgQueryMaxNodes === b.kgQueryMaxNodes
     && a.kgQueryHops === b.kgQueryHops
     && a.sourceRag === b.sourceRag
