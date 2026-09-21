@@ -18,6 +18,7 @@ DEFAULT_JSON_GRAPH = DEFAULT_JSON_GRAPH_PATHS[0]
 XRAY_DEMO_GRAPH = "storage/kg/matkg_xray_papers_cborg_chat.json"
 XRAY_DEMO_NAME = "matkg_xray_papers_cborg_chat.json"
 _BL1101_SNAPSHOT_RE = re.compile(r"^matkg_bl1101_v(\d+)\.json$")
+_RSOXS_SNAPSHOT_RE = re.compile(r"^matkg_rsoxs_v(\d+)\.json$")
 
 _GRAPH_ID_BY_NAME = {
     "matkg_rsoxs_v1.json": "rsoxs_v1",
@@ -29,6 +30,7 @@ _GRAPH_LABEL_BY_ID = {
     "rsoxs_v1": "science",
     "bl1101": "11.0.1.2 ops",
     "xray_demo": "x-ray demo",
+    "tiled": "Tiled Graph",
 }
 
 _SCHEMA_BY_NAME = {
@@ -88,6 +90,8 @@ def graph_id_for_path(path: str) -> str:
         return _GRAPH_ID_BY_NAME[name]
     if _BL1101_SNAPSHOT_RE.match(name):
         return "bl1101"
+    if _RSOXS_SNAPSHOT_RE.match(name):
+        return "rsoxs_v1"
     stem = Path(name).stem or "graph"
     if stem.startswith("matkg_"):
         return stem[len("matkg_") :]
@@ -119,16 +123,17 @@ def schema_path_for_graph(path: str) -> Optional[str]:
         return _SCHEMA_BY_NAME[name]
     if _BL1101_SNAPSHOT_RE.match(name) or name.startswith("matkg_bl1101"):
         return "storage/schema/bl1101_schema.yaml"
+    if _RSOXS_SNAPSHOT_RE.match(name) or name.startswith("matkg_rsoxs"):
+        return "storage/schema/rsoxs_schema.yaml"
     return None
 
 
-def latest_bl1101_path(available: Sequence[str]) -> Optional[str]:
-    """Pick the highest matkg_bl1101_vN.json from *available* (v1 is never deleted)."""
+def _latest_snapshot_path(available: Sequence[str], pattern: re.Pattern[str]) -> Optional[str]:
     best: Optional[str] = None
     best_n = -1
     for raw in available:
         path = normalize_graph_path(raw)
-        match = _BL1101_SNAPSHOT_RE.match(graph_filename(path))
+        match = pattern.match(graph_filename(path))
         if not match:
             continue
         version = int(match.group(1))
@@ -136,6 +141,16 @@ def latest_bl1101_path(available: Sequence[str]) -> Optional[str]:
             best_n = version
             best = path
     return best
+
+
+def latest_bl1101_path(available: Sequence[str]) -> Optional[str]:
+    """Pick the highest matkg_bl1101_vN.json from *available* (v1 is never deleted)."""
+    return _latest_snapshot_path(available, _BL1101_SNAPSHOT_RE)
+
+
+def latest_rsoxs_path(available: Sequence[str]) -> Optional[str]:
+    """Pick the highest matkg_rsoxs_vN.json from *available* (v1 is never deleted)."""
+    return _latest_snapshot_path(available, _RSOXS_SNAPSHOT_RE)
 
 
 def default_json_graph_paths(
@@ -163,13 +178,17 @@ def default_json_graph_paths(
         return unique_graph_paths(resolved)
 
     selected: List[str] = []
-    rsoxs = DEFAULT_JSON_GRAPH_PATHS[0]
-    if rsoxs in options:
+    rsoxs = latest_rsoxs_path(options)
+    if rsoxs:
         selected.append(rsoxs)
     else:
-        match = option_names.get(Path(rsoxs).name)
-        if match:
-            selected.append(match)
+        fallback_rsoxs = DEFAULT_JSON_GRAPH_PATHS[0]
+        if fallback_rsoxs in options:
+            selected.append(fallback_rsoxs)
+        else:
+            match = option_names.get(Path(fallback_rsoxs).name)
+            if match:
+                selected.append(match)
     ops = latest_bl1101_path(options)
     if ops:
         selected.append(ops)

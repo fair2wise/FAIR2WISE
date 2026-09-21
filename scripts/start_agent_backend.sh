@@ -23,7 +23,20 @@ if [[ "$KG_MODE" == "json" ]]; then
       LATEST_OPS="storage/kg/${base}"
     fi
   done
-  GRAPH="${F2W_GRAPHS:-${F2W_GRAPH:-storage/kg/matkg_rsoxs_v1.json,${LATEST_OPS}}}"
+  LATEST_SCIENCE="storage/kg/matkg_rsoxs_v1.json"
+  best_s=-1
+  for f in "$ROOT_DIR"/storage/kg/matkg_rsoxs_v*.json; do
+    base="$(basename "$f")"
+    [[ "$base" == *bak* ]] && continue
+    n="${base#matkg_rsoxs_v}"
+    n="${n%.json}"
+    [[ "$n" =~ ^[0-9]+$ ]] || continue
+    if (( n > best_s )); then
+      best_s=$n
+      LATEST_SCIENCE="storage/kg/${base}"
+    fi
+  done
+  GRAPH="${F2W_GRAPHS:-${F2W_GRAPH:-${LATEST_SCIENCE},${LATEST_OPS}}}"
 else
   GRAPH="${F2W_GRAPHS:-${F2W_GRAPH:-storage/kg/matkg_with_code.json}}"
 fi

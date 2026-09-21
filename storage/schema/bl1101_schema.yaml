@@ -181,6 +181,41 @@ classes:
     slots:
       - part_of
 
+  ESAF:
+    is_a: Thing
+    description: >
+      An Experiment Safety Approval Form / experiment identity at ALS 11.0.1.2.
+      Mirrors Tiled Graph entityType ESAF (not a live Hub record). Simulated
+      instances live in beamline: only.
+    slots:
+      - part_of
+      - hasProposal
+      - wasAttributedTo
+
+  Proposal:
+    is_a: Thing
+    description: >
+      A Tiled proposal catalog under an ESAF. GraphQL entityType Proposal;
+      catalog path segment used by catalogNodeId(["<proposal>", "<uid>"]).
+    slots:
+      - part_of
+      - hasSample
+      - hasScan
+
+  BlueskyRun:
+    is_a: Thing
+    description: >
+      A Bluesky run / scan as a Tiled Graph entity (entityType BlueskyRun with
+      optional nodeId). Not a live tiled.client document. Properties carry the
+      RunCard whitelist (uid, scan_id, plan_name, start_time).
+    slots:
+      - part_of
+      - hasMotor
+      - hasDetector
+      - implementsPlan
+      - runsSoftware
+      - configured_by
+
   Person:
     is_a: Thing
     description: >
@@ -317,3 +352,33 @@ slots:
     range: Thing
     multivalued: true
     slot_uri: beamline:configured_by
+
+  hasProposal:
+    description: ESAF contains this Tiled proposal catalog
+    domain: ESAF
+    range: Proposal
+    multivalued: true
+    slot_uri: beamline:hasProposal
+
+  hasScan:
+    description: Proposal (or ESAF) contains this BlueskyRun / scan entity
+    domain: Proposal
+    range: BlueskyRun
+    multivalued: true
+    slot_uri: beamline:hasScan
+
+  hasSample:
+    description: Proposal includes this endstation sample
+    domain: Proposal
+    range: Sample
+    multivalued: true
+    slot_uri: beamline:hasSample
+
+  wasAttributedTo:
+    description: >
+      PROV-O wasAttributedTo. ESAF/Proposal attributed to a beamline scientist
+      (ops Person), not a literature author hub.
+    domain: Thing
+    range: Person
+    multivalued: true
+    slot_uri: http://www.w3.org/ns/prov#wasAttributedTo

@@ -61,6 +61,17 @@ from app.modules.f2w_agent.multi_kg import (
     primary_json_graph_path,
     unique_graph_paths,
 )
+from app.modules.hybrid_rag.pipeline import hybrid_rag_enabled
+from app.modules.tiled_graph import (
+    CITE_FOCUS_HOPS,
+    TILED_GRAPH_ID,
+    coerce_local_tiled_uri,
+    load_tiled_config,
+    lookup_experiment_identity,
+    probe_tiled_status,
+    resolve_tiled_node_id,
+    tiled_neighborhood_ids,
+)
 from app.modules.project_config import config_value, get_config
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
@@ -87,6 +98,8 @@ class ChatRequest(BaseModel):
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     json_graph_path: Optional[str] = None
     json_graph_paths: Optional[List[str]] = None
+    source_rag: Optional[bool] = None
+    use_live_tiled: Optional[bool] = None
 
 
 class LinkedCodeSnippet(BaseModel):
@@ -275,6 +288,12 @@ class AgentSettingsResponse(BaseModel):
     json_graph_paths: List[str] = Field(default_factory=list)
     kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
     kg_query_hops: int = DEFAULT_KG_QUERY_HOPS
+    source_rag: bool = False
+    use_live_tiled: bool = False
+    tiled_uri: Optional[str] = None
+    tiled_api_key_set: bool = False
+    tiled_status: str = "disabled"
+    tiled_error: Optional[str] = None
     available_json_graphs: List[str] = Field(default_factory=list)
     available_cborg_models: List[str] = Field(default_factory=list)
     default_ollama_model: str = "deepseek-r1:70b"
@@ -291,6 +310,9 @@ class AgentSettingsUpdate(BaseModel):
     json_graph_paths: Optional[List[str]] = None
     kg_query_max_nodes: Optional[int] = Field(default=None, ge=10, le=1000)
     kg_query_hops: Optional[int] = Field(default=None, ge=1, le=MAX_KG_QUERY_HOPS)
+    source_rag: Optional[bool] = None
+    use_live_tiled: Optional[bool] = None
+    tiled_uri: Optional[str] = None
 
 
 ProgressEmitter = Callable[[str, str, Dict[str, Any]], Awaitable[None]]
@@ -362,6 +384,9 @@ class RuntimeSettings:
     json_graph_paths: List[str] = field(default_factory=list)
     kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
     kg_query_hops: int = DEFAULT_KG_QUERY_HOPS
+    source_rag: bool = False
+    use_live_tiled: bool = False
+    tiled_uri: Optional[str] = None
 
 
 @dataclass
@@ -481,6 +506,9 @@ _CORE_NODE_KEYS = {
     "repository_license",
     "license_warning",
     "source_score",
+    "haystack",
+    "outgoingLinks",
+    "relations",
 }
 
 
@@ -500,11 +528,51 @@ def _source_paper_list(raw: Dict[str, Any]) -> List[str]:
 
 
 def _property_entries(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Normalize MatKG property lists and Tiled GraphQL property dicts."""
     entries: List[Dict[str, Any]] = []
-    for item in raw.get("properties") or []:
+    props = raw.get("properties")
+    if isinstance(props, dict):
+        for key, value in props.items():
+            name = _string_value(key)
+            if not name or name in {"haystack", "outgoingLinks", "relations"}:
+                continue
+            if value in (None, "", [], {}):
+                continue
+            if isinstance(value, dict) and {"property", "value"} <= set(value):
+                entries.append(value)
+                continue
+            entries.append({"property": name, "value": value})
+        return entries
+    for item in props or []:
         if isinstance(item, dict) and item:
             entries.append(item)
     return entries
+
+
+_IDENTITY_EXTRA_KEYS = (
+    "entityType",
+    "entity_type",
+    "esaf",
+    "esaf_number",
+    "esaf_id",
+    "scientist",
+    "co_scientist",
+    "proposal",
+    "proposal_code",
+    "proposal_id",
+    "sample",
+    "sample_code",
+    "sample_id",
+    "sample_name",
+    "scan",
+    "scan_id",
+    "plan_name",
+    "uid",
+    "uri",
+    "graphql_id",
+    "nodeId",
+    "node_id",
+)
 
 
 def _node_extra_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -523,6 +591,30 @@ def _node_extra_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if isinstance(value, dict) and len(value) <= 16:
             extra[key] = value
+    props = raw.get("properties")
+    identity_source: Dict[str, Any] = {}
+    if isinstance(props, dict):
+        identity_source.update(props)
+    elif isinstance(props, list):
+        for item in props:
+            if not isinstance(item, dict):
+                continue
+            name = _string_value(item.get("property") or item.get("name"))
+            if name:
+                identity_source[name] = item.get("value")
+    for key in _IDENTITY_EXTRA_KEYS:
+        if extra.get(key) not in (None, "", [], {}):
+            continue
+        value = raw.get(key)
+        if value in (None, "", [], {}):
+            value = identity_source.get(key)
+        if value in (None, "", [], {}):
+            continue
+        extra[key] = value
+    if extra.get("entityType") in (None, "", [], {}):
+        category = _string_value(raw.get("category") or raw.get("type"))
+        if category in {"ESAF", "Proposal", "Sample", "BlueskyRun"}:
+            extra["entityType"] = category
     return extra
 
 
@@ -847,6 +939,8 @@ def _graph_node_from_raw(
         label=label,
         type=node_type,
         description=description,
+        graph_id=_string_value(raw.get("graph_id")) or None,
+        graph_label=_string_value(raw.get("graph_label")) or None,
         publications=_publications_for_graph_node(raw),
         code_snippet=code_snippet,
         code_language=code_language,
@@ -861,6 +955,28 @@ def _graph_node_from_raw(
     )
 
 
+_GRAPH_JSON_CACHE: Dict[str, tuple[float, int, Dict[str, Any]]] = {}
+
+
+def _read_graph_json(graph_path: Path) -> Optional[Dict[str, Any]]:
+    try:
+        stat = graph_path.stat()
+    except OSError:
+        return None
+    key = str(graph_path)
+    cached = _GRAPH_JSON_CACHE.get(key)
+    if cached and cached[0] == stat.st_mtime and cached[1] == stat.st_size:
+        return cached[2]
+    try:
+        data = json.loads(graph_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    _GRAPH_JSON_CACHE[key] = (stat.st_mtime, stat.st_size, data)
+    return data
+
+
 def graph_node_from_file(
     graph_path: Path,
     node_id: str,
@@ -869,9 +985,8 @@ def graph_node_from_file(
 ) -> Optional[GraphNode]:
     if not graph_path.exists() or not node_id:
         return None
-    try:
-        data = json.loads(graph_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    data = _read_graph_json(graph_path)
+    if data is None:
         return None
 
     raw_nodes = data.get("things") or []
@@ -925,10 +1040,7 @@ def _new_snippet_matkg_id(*, label: str = "", function_name: str = "", code: str
 def _load_session_graph(graph_path: Path) -> Dict[str, Any]:
     if not graph_path.exists():
         return {"things": [], "associations": []}
-    try:
-        data = json.loads(graph_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {"things": [], "associations": []}
+    data = _read_graph_json(graph_path)
     if not isinstance(data, dict):
         return {"things": [], "associations": []}
     data.setdefault("things", [])
@@ -939,6 +1051,7 @@ def _load_session_graph(graph_path: Path) -> Dict[str, Any]:
 def _save_session_graph(graph_path: Path, data: Dict[str, Any]) -> None:
     graph_path.parent.mkdir(parents=True, exist_ok=True)
     graph_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    _GRAPH_JSON_CACHE.pop(str(graph_path), None)
 
 
 def _find_thing(data: Dict[str, Any], node_id: str) -> Optional[Dict[str, Any]]:
@@ -1164,12 +1277,82 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
     return {"nodes": nodes, "edges": edges}
 
 
+def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> Dict[str, Any]:
+    """Serialize an in-memory lookup graph (Tiled) into the UI node contract."""
+    wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
+    empty: Dict[str, Any] = {"nodes": [], "edges": []}
+    nodes_map = getattr(kg, "nodes", {}) or {}
+    if not wanted_ids or not isinstance(nodes_map, dict):
+        return empty
+
+    expanded = tiled_neighborhood_ids(kg, wanted_ids, hops=CITE_FOCUS_HOPS)
+    if not expanded:
+        expanded = []
+        seen: set[str] = set()
+        for node_id in wanted_ids:
+            resolved = resolve_tiled_node_id(kg, node_id) or (node_id if node_id in nodes_map else None)
+            if not resolved or resolved in seen:
+                continue
+            seen.add(resolved)
+            expanded.append(resolved)
+    if not expanded:
+        return empty
+
+    nodes: List[Dict[str, Any]] = []
+    for node_id in expanded:
+        raw = nodes_map.get(node_id)
+        if not isinstance(raw, dict):
+            continue
+        payload = dict(raw)
+        payload.setdefault("id", node_id)
+        payload.setdefault("graph_id", getattr(kg, "graph_id", TILED_GRAPH_ID))
+        payload.setdefault("graph_label", getattr(kg, "graph_label", "Tiled Graph"))
+        node = _graph_node_from_raw(payload)
+        dumped = _model_to_jsonable(node)
+        dumped["graph_id"] = dumped.get("graph_id") or payload.get("graph_id")
+        dumped["graph_label"] = dumped.get("graph_label") or payload.get("graph_label")
+        nodes.append(dumped)
+
+    present = {node["id"] for node in nodes}
+    edges: List[Dict[str, Any]] = []
+    for source, outgoing in (getattr(kg, "out_edges", {}) or {}).items():
+        if source not in present:
+            continue
+        if not isinstance(outgoing, list):
+            continue
+        for edge in outgoing:
+            if not isinstance(edge, dict):
+                continue
+            target = _string_value(edge.get("object") or edge.get("target"))
+            if target not in present:
+                continue
+            edges.append(
+                {
+                    "source": source,
+                    "target": target,
+                    "predicate": _string_value(edge.get("predicate"), "rel:related_to"),
+                }
+            )
+    return {"nodes": nodes, "edges": edges}
+
+
+def graph_neighborhood_from_lookup(kg: Any, node_id: str) -> GraphPayload:
+    """3-hop Tiled identity subgraph for cite-click / node select."""
+    subset = graph_subset_from_lookup(kg, [node_id])
+    return GraphPayload(
+        nodes=subset.get("nodes") or [],
+        edges=subset.get("edges") or [],
+        source_path="tiled://graphql",
+    )
+
+
 def query_graph_payload(
     *,
     selected_ids: Sequence[str],
     selected_hits: Optional[Sequence[Any]] = None,
     graph_path: Path,
     graph_paths_by_id: Optional[Dict[str, Path]] = None,
+    graphs_by_id: Optional[Dict[str, Any]] = None,
 ) -> GraphPayload:
     """Induced query subgraph across selected KGs — never a concatenated full dump.
 
@@ -1230,12 +1413,22 @@ def query_graph_payload(
     seen_edges: set[tuple[str, str, str]] = set()
     source_names: List[str] = []
 
+    live_graphs = dict(graphs_by_id or {})
+
     for gid, group in grouped.items():
-        path = path_map.get(gid) or graph_path
-        source_names.append(str(path))
+        kg = live_graphs.get(gid)
         wanted = [hit["id"] for hit in group]
-        subset = graph_subset_from_file(path, wanted)
         label = group[0]["graph_label"]
+        tiled_lookup = gid == TILED_GRAPH_ID or (
+            kg is not None and str(getattr(kg, "graph_path", "")).startswith("tiled:")
+        )
+        if tiled_lookup:
+            subset = graph_subset_from_lookup(kg, wanted) if kg is not None else {"nodes": [], "edges": []}
+            source_names.append("tiled://graphql")
+        else:
+            path = path_map.get(gid) or graph_path
+            source_names.append(str(path))
+            subset = graph_subset_from_file(path, wanted)
         for node in subset.get("nodes") or []:
             if not isinstance(node, dict):
                 continue
@@ -1249,6 +1442,14 @@ def query_graph_payload(
             tagged["graph_id"] = gid
             tagged["graph_label"] = label
             nodes_by_display.setdefault(display, tagged)
+        if tiled_lookup and kg is not None:
+            for hit in group:
+                resolved = resolve_tiled_node_id(kg, hit["id"])
+                if not resolved:
+                    continue
+                display = remap.get((gid, resolved))
+                if display:
+                    remap[(gid, hit["id"])] = display
         for edge in subset.get("edges") or []:
             if not isinstance(edge, dict):
                 continue
@@ -1268,6 +1469,11 @@ def query_graph_payload(
     for hit in hits:
         display = remap.get((hit["graph_id"], hit["id"]))
         if not display or display in seen_display:
+            continue
+        seen_display.add(display)
+        ordered_ids.append(display)
+    for display in nodes_by_display:
+        if display in seen_display:
             continue
         seen_display.add(display)
         ordered_ids.append(display)
@@ -2097,6 +2303,7 @@ class AgentPipelineService:
         initial_backend = cfg.backend if cfg.backend in {"cborg", "ollama"} else "cborg"
         initial_model = default_runtime_model(initial_backend, cfg.model)
         configured_graphs = collect_graph_paths(getattr(cfg, "graphs", None), cfg.graph)
+        tiled_cfg = load_tiled_config()
         if initial_graph_source == "json":
             initial_paths = default_json_graph_paths(
                 configured_graphs=configured_graphs or None,
@@ -2118,6 +2325,9 @@ class AgentPipelineService:
                 getattr(cfg, "kg_query_max_nodes", DEFAULT_KG_QUERY_MAX_NODES)
             ),
             kg_query_hops=clamp_kg_query_hops(getattr(cfg, "kg_query_hops", DEFAULT_KG_QUERY_HOPS)),
+            source_rag=hybrid_rag_enabled(),
+            use_live_tiled=tiled_cfg.enabled,
+            tiled_uri=tiled_cfg.uri,
         )
         self.cfg.model = initial_model
         self._rebuild_agents()
@@ -2192,6 +2402,9 @@ class AgentPipelineService:
             model=model,
             kg_query_hops=self.runtime.kg_query_hops,
             kg_query_max_nodes=self.runtime.kg_query_max_nodes,
+            source_rag=self.runtime.source_rag,
+            live_tiled=self.runtime.use_live_tiled,
+            tiled_uri=self.runtime.tiled_uri,
         )
         self.download = DownloadAgent(
             backend=self.runtime.backend,
@@ -2250,6 +2463,7 @@ class AgentPipelineService:
             )
             self.runtime.json_graph_paths = list(paths)
             self.runtime.json_graph_path = primary_json_graph_path(paths)
+        tiled = self._tiled_status_snapshot()
         return AgentSettingsResponse(
             backend=self.runtime.backend,
             model=self._active_model(),
@@ -2261,10 +2475,28 @@ class AgentPipelineService:
             json_graph_paths=paths,
             kg_query_max_nodes=self.runtime.kg_query_max_nodes,
             kg_query_hops=self.runtime.kg_query_hops,
+            source_rag=self.runtime.source_rag,
+            use_live_tiled=self.runtime.use_live_tiled,
+            tiled_uri=self.runtime.tiled_uri,
+            tiled_api_key_set=tiled["tiled_api_key_set"],
+            tiled_status=tiled["tiled_status"],
+            tiled_error=tiled["tiled_error"],
             available_json_graphs=available,
             available_cborg_models=list_cborg_models(current_model=self.runtime.model),
             default_ollama_model=default_ollama_model_name(),
         )
+
+    def _tiled_status_snapshot(self) -> Dict[str, Any]:
+        snap = probe_tiled_status(
+            uri=self.runtime.tiled_uri,
+            enabled=self.runtime.use_live_tiled,
+        )
+        last = getattr(getattr(self, "retrieval", None), "_last_tiled_meta", None) or {}
+        if last.get("status") and last.get("status") not in {"disabled", "skipped"}:
+            snap["tiled_status"] = str(last.get("status") or snap["tiled_status"])
+            if last.get("error"):
+                snap["tiled_error"] = last.get("error")
+        return snap
 
     async def apply_settings(self, update: AgentSettingsUpdate) -> AgentSettingsResponse:
         async with self.lock:
@@ -2309,12 +2541,28 @@ class AgentPipelineService:
                 self.runtime.kg_query_max_nodes = clamp_kg_query_max_nodes(update.kg_query_max_nodes)
             if update.kg_query_hops is not None:
                 self.runtime.kg_query_hops = clamp_kg_query_hops(update.kg_query_hops)
+            if update.source_rag is not None:
+                self.runtime.source_rag = bool(update.source_rag)
+            if update.use_live_tiled is not None:
+                self.runtime.use_live_tiled = bool(update.use_live_tiled)
+            if update.tiled_uri is not None:
+                cleaned = str(update.tiled_uri).strip()
+                fallback = self.runtime.tiled_uri or "http://127.0.0.1:8000"
+                self.runtime.tiled_uri = (
+                    coerce_local_tiled_uri(cleaned, default=fallback) if cleaned else None
+                )
             setter = getattr(self.retrieval, "set_query_limits", None)
             if callable(setter):
                 setter(
                     hops=self.runtime.kg_query_hops,
                     max_nodes=self.runtime.kg_query_max_nodes,
                 )
+            rag_setter = getattr(self.retrieval, "set_source_rag", None)
+            if callable(rag_setter):
+                rag_setter(self.runtime.source_rag)
+            tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
+            if callable(tiled_setter):
+                tiled_setter(self.runtime.use_live_tiled, uri=self.runtime.tiled_uri)
 
             if update.json_graph_paths is not None:
                 normalized_paths = unique_graph_paths(update.json_graph_paths)
@@ -2382,9 +2630,14 @@ class AgentPipelineService:
         graphs = getattr(self.retrieval, "_graphs", None) or {}
         if isinstance(graphs, dict):
             for gid, kg in graphs.items():
+                if str(gid) == TILED_GRAPH_ID:
+                    continue
                 raw = getattr(kg, "graph_path", None)
-                if raw:
-                    mapping[str(gid)] = Path(str(raw))
+                if not raw or str(raw).startswith("tiled:"):
+                    continue
+                path = Path(str(raw))
+                if path.exists():
+                    mapping[str(gid)] = path
         if not mapping:
             mapping[graph_id_for_path(str(fallback))] = fallback
         return mapping
@@ -2397,6 +2650,7 @@ class AgentPipelineService:
             selected_hits=selected_hits if isinstance(selected_hits, list) else [],
             graph_path=graph_path,
             graph_paths_by_id=self._retrieval_graph_paths(graph_path),
+            graphs_by_id=getattr(self.retrieval, "_graphs", None),
         )
 
     def _query_graph_event(self, payload: GraphPayload) -> Dict[str, Any]:
@@ -2420,6 +2674,10 @@ class AgentPipelineService:
             kg = graphs.get(gid) if gid else None
             match_path = Path(getattr(kg, "graph_path", "") or graph_path)
             node = graph_node_from_file(match_path, _string_value(match.get("id")))
+            if node is None and kg is not None:
+                raw = getattr(kg, "nodes", {}).get(_string_value(match.get("id")))
+                if isinstance(raw, dict):
+                    node = _graph_node_from_raw(raw)
             if node is None or node.type.strip().lower() == "unknown":
                 continue
             if gid:
@@ -2435,6 +2693,32 @@ class AgentPipelineService:
             retrieval_backend=_string_value(ranked.get("retrieval_backend"), "lexical"),
             results=results,
         )
+
+    def ensure_tiled_lookup(self, node_id: str) -> Any:
+        """Reuse the in-memory Tiled graph; only page GraphQL when it is empty."""
+        graphs = getattr(self.retrieval, "_graphs", None)
+        if not isinstance(graphs, dict):
+            self.retrieval._graphs = {}
+            graphs = self.retrieval._graphs
+        kg = graphs.get(TILED_GRAPH_ID)
+        if kg is not None and getattr(kg, "nodes", None):
+            return kg
+        pack = lookup_experiment_identity(
+            node_id,
+            uri=getattr(self.retrieval, "_tiled_uri", None),
+            enabled=True,
+            include_catalog=False,
+        )
+        if pack.graph is not None and pack.graph.nodes:
+            graphs[TILED_GRAPH_ID] = pack.graph
+            return pack.graph
+        return kg
+
+    def tiled_neighborhood_payload(self, node_id: str) -> GraphPayload:
+        kg = self.ensure_tiled_lookup(node_id)
+        if kg is None:
+            return GraphPayload(nodes=[], edges=[], source_path="tiled://graphql")
+        return graph_neighborhood_from_lookup(kg, node_id)
 
     async def update_graph_node(self, node_id: str, update: GraphNodeUpdateRequest) -> GraphNode:
         if self.runtime.graph_source == "json":
@@ -2914,6 +3198,30 @@ class AgentPipelineService:
         except TypeError:
             return await reload(graph_file, graph_source=graph_source)
 
+    async def _query_retrieval(
+        self,
+        question: str,
+        *,
+        history: Optional[List[Dict[str, str]]] = None,
+        source_rag: Optional[bool] = None,
+        use_live_tiled: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        enabled = self.runtime.source_rag if source_rag is None else bool(source_rag)
+        tiled_enabled = (
+            self.runtime.use_live_tiled if use_live_tiled is None else bool(use_live_tiled)
+        )
+        tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
+        if callable(tiled_setter):
+            tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
+        query = self.retrieval.query
+        try:
+            return await query(question, history=history, source_rag=enabled)
+        except TypeError:
+            try:
+                return await query(question, history=history)
+            except TypeError:
+                return await query(question)
+
     async def ask(
         self,
         question: str,
@@ -2923,6 +3231,8 @@ class AgentPipelineService:
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
         json_graph_paths: Optional[List[str]] = None,
+        source_rag: Optional[bool] = None,
+        use_live_tiled: Optional[bool] = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         original_question = question.strip()
@@ -2987,6 +3297,8 @@ class AgentPipelineService:
                     json_graph_path=json_graph_path,
                     json_graph_paths=json_graph_paths,
                     history=history,
+                    source_rag=source_rag,
+                    use_live_tiled=use_live_tiled,
                 )
             self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
             auto_finalized = False
@@ -3012,6 +3324,8 @@ class AgentPipelineService:
         graph_source: Optional[str] = None,
         json_graph_path: Optional[str] = None,
         json_graph_paths: Optional[List[str]] = None,
+        source_rag: Optional[bool] = None,
+        use_live_tiled: Optional[bool] = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         original_question = question.strip()
@@ -3076,6 +3390,8 @@ class AgentPipelineService:
                     json_graph_path=json_graph_path,
                     json_graph_paths=json_graph_paths,
                     history=history,
+                    source_rag=source_rag,
+                    use_live_tiled=use_live_tiled,
                 )
             self._remember_pending_meta(original_question, effective_question, graph_source, json_graph_path)
             auto_finalized = False
@@ -4163,6 +4479,8 @@ class AgentPipelineService:
         json_graph_path: Optional[str],
         json_graph_paths: Optional[List[str]] = None,
         history: Optional[List[Dict[str, str]]] = None,
+        source_rag: Optional[bool] = None,
+        use_live_tiled: Optional[bool] = None,
     ) -> ChatResponse:
         rounds: List[Dict[str, Any]] = []
         last_verdict: Dict[str, Any] = {}
@@ -4216,10 +4534,9 @@ class AgentPipelineService:
                 round=round_no,
             )
             try:
-                try:
-                    verdict = await self.retrieval.query(question, history=history)
-                except TypeError:
-                    verdict = await self.retrieval.query(question)
+                verdict = await self._query_retrieval(
+                    question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled
+                )
             except Exception as exc:
                 self.workflow.update(phase="retrieval_error")
                 return self._response(
@@ -5321,7 +5638,7 @@ class AgentPipelineService:
             "Retrieval agent re-checking the updated KG",
             round=round_no,
         )
-        new_verdict = await self.retrieval.query(question)
+        new_verdict = await self._query_retrieval(question)
         round_info["retrieval_after"] = new_verdict
         selected_ids = [str(n) for n in (new_verdict.get("selected") or [])]
         subset_payload = self._query_graph_payload(new_verdict, active_graph_path)
@@ -5648,25 +5965,64 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Node search failed: {exc}") from exc
 
+    @app.get("/graph/neighborhood/{node_id:path}", response_model=GraphPayload)
+    async def graph_neighborhood(node_id: str, hops: int = CITE_FOCUS_HOPS) -> GraphPayload:
+        cleaned = str(node_id or "").strip()
+        if not cleaned:
+            raise HTTPException(status_code=400, detail="Node id is required")
+        payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned)
+        if payload.nodes:
+            return payload
+        raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
+
+    def _tiled_graph_node(node_id: str) -> Optional[GraphNode]:
+        tiled_kg = (getattr(service.retrieval, "_graphs", {}) or {}).get(TILED_GRAPH_ID)
+        if tiled_kg is None:
+            return None
+        resolved = resolve_tiled_node_id(tiled_kg, node_id)
+        nodes_map = getattr(tiled_kg, "nodes", {}) or {}
+        raw = nodes_map.get(resolved) if resolved and isinstance(nodes_map, dict) else None
+        if not isinstance(raw, dict):
+            return None
+        payload = dict(raw)
+        payload.setdefault("id", raw.get("id") or resolved or node_id)
+        payload.setdefault("graph_id", TILED_GRAPH_ID)
+        payload.setdefault("graph_label", "Tiled Graph")
+        node = _graph_node_from_raw(payload)
+        node.graph_id = node.graph_id or TILED_GRAPH_ID
+        node.graph_label = node.graph_label or "Tiled Graph"
+        return node
+
     @app.get("/graph/node/{node_id}", response_model=GraphNode)
     async def graph_node(
         node_id: str,
         json_graph_path: Optional[str] = None,
     ) -> GraphNode:
+        tiled_first = bool(
+            str(node_id or "").lower().startswith("tiled:")
+            or str(node_id or "").lower().startswith("beamline:")
+        )
+        if tiled_first:
+            node = _tiled_graph_node(node_id)
+            if node is not None:
+                return node
         graph_path = service.graph_path()
         uploaded = bool(json_graph_path)
         if json_graph_path:
             graph_path = service._resolve_json_graph_path(json_graph_path)
         if uploaded:
-            node = graph_node_from_file(graph_path, node_id)
+            node = await asyncio.to_thread(graph_node_from_file, graph_path, node_id)
             if node is not None:
                 node = _tag_graph_node(node, graph_path)
         else:
-            node = resolve_graph_node(
+            node = await asyncio.to_thread(
+                resolve_graph_node,
                 node_id,
                 fallback_path=graph_path,
                 graph_paths_by_id=service._retrieval_graph_paths(graph_path),
             )
+        if node is None:
+            node = _tiled_graph_node(node_id)
         if node is None:
             raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
         return node
@@ -5699,6 +6055,8 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                 graph_source=req.graph_source,
                 json_graph_path=req.json_graph_path,
                 json_graph_paths=req.json_graph_paths,
+                source_rag=req.source_rag,
+                use_live_tiled=req.use_live_tiled,
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -5751,6 +6109,8 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         graph_source=req.graph_source,
                         json_graph_path=req.json_graph_path,
                         json_graph_paths=req.json_graph_paths,
+                        source_rag=req.source_rag,
+                        use_live_tiled=req.use_live_tiled,
                     )
                     payload = _model_to_jsonable(response)
                     if response.status.endswith("_error"):

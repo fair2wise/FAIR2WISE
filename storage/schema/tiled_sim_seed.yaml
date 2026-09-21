@@ -1,0 +1,151 @@
+# Simulated Tiled Graph / ESAF identity overlay for bl1101.
+# RNG seed is documented so tests and `scripts/ingest_tiled_sim.py` stay reproducible.
+# Experiment templates use names that already exist on matkg_rsoxs_v1/v2 and
+# matkg_bl1101_v4 — not generic materials-science filler.
+
+seed: 20260916
+n_esafs: 5
+proposals_per_esaf: [0, 10]
+scans_per_proposal: [0, 20]
+samples_per_proposal: [1, 20]
+
+beamline_id: beamline:BL-11-0-1-2
+facility: ALS
+beamline_name: "11.0.1.2"
+endstation: Reflectometer
+
+# GraphQL / Tiled Graph conventions mirrored as JSON `category` (entityType):
+#   ESAF, Proposal, Sample, BlueskyRun
+# Splash leftover entityType "tiled" is not used; runs are BlueskyRun with a
+# simulated catalog nodeId. SimilarityDocument and live Tiled auth are out of scope.
+
+esafs:
+  - esaf_number: "2026-00041"
+    title: "P3HT OPV P-RSoXS at the carbon edge"
+    scientist: Cheng Wang
+    scientist_id: beamline:Person-Cheng-Wang
+    theme: p3ht_opv
+  - esaf_number: "2026-00042"
+    title: "Hydrocarbon-vacuum contrast, transmission RSoXS"
+    scientist: Thomas Ferron
+    scientist_id: beamline:Person-Thomas-Ferron
+    theme: contrast_transmission
+  - esaf_number: "2026-00043"
+    title: "PVD glasses and TPD-DO37 contrast, GI-RSoXS"
+    scientist: Cheng Wang
+    scientist_id: beamline:Person-Cheng-Wang
+    theme: pvd_glasses
+  - esaf_number: "2026-00044"
+    title: "Radial, transverse, and azimuth P-RSoXS scans"
+    scientist: Thomas Ferron
+    scientist_id: beamline:Person-Thomas-Ferron
+    theme: azimuth_geometry
+  - esaf_number: "2026-00045"
+    title: "All-polymer OPV, NEXAFS plus P-RSoXS"
+    scientist: Cheng Wang
+    scientist_id: beamline:Person-Cheng-Wang
+    co_scientist: Thomas Ferron
+    co_scientist_id: beamline:Person-Thomas-Ferron
+    theme: all_polymer
+
+themes:
+  p3ht_opv:
+    materials:
+      - P3HT
+      - P3HT:PCBM blend
+      - regioregular P3HT
+      - organic photovoltaic (OPV) devices
+    techniques:
+      - P-RSoXS
+      - polarized resonant soft X-ray scattering (P-RSoXS)
+      - RSoXS
+    edges: [C K-edge, carbon K-edge]
+    contrast: [composition contrast, scattering contrast]
+    geometries: [transmission]
+    scan_modes: [azimuth scan]
+  contrast_transmission:
+    materials: [conjugated polymers, polymer blends]
+    techniques: [RSoXS, Resonant scattering]
+    edges: [C K-edge, carbon edge]
+    contrast: [hydrocarbon-vacuum contrast, compositional contrast]
+    geometries: [transmission]
+    scan_modes: [radial scan]
+  pvd_glasses:
+    materials: [PVD glasses, PVD-grown film, TPD-DO37 contrast]
+    techniques: [RSoXS, GISAXS]
+    edges: [C K-edge]
+    contrast: [TPD-DO37 contrast, hydrocarbon-hydrocarbon contrast]
+    geometries: [grazing incidence]
+    scan_modes: [azimuth scan]
+  azimuth_geometry:
+    materials: [P3HT, crystalline P3HT, amorphous P3HT]
+    techniques: [P-RSoXS, RSoXS]
+    edges: [C K-edge]
+    contrast: [scattering anisotropy of P3HT]
+    geometries: [transmission, grazing incidence]
+    scan_modes: [radial scan, transverse scan, azimuth scan]
+  all_polymer:
+    materials: [conjugated polymers, OPV blends]
+    techniques:
+      - P-RSoXS
+      - Near Edge X-ray Absorption Fine Structure (NEXAFS) spectroscopy
+      - RSoXS
+    edges: [C K-edge, N K-edge]
+    contrast: [domain purity, scattering contrast]
+    geometries: [transmission]
+    scan_modes: [azimuth scan]
+
+# Bluesky start/plan names already in the ops KG (scan-replay + bcs2sim).
+plans:
+  - id: beamline:plan-labview-energy-scan
+    name: labview_energy_scan
+    region: CEdge_short
+    repo_id: beamline:repo-bl11012-scan-replay
+  - id: beamline:plan-labview-ccd-only-scan
+    name: labview_ccd_only_scan
+    region: CEdge_Long
+    repo_id: beamline:repo-bl11012-scan-replay
+  - id: beamline:plan-labview-replay-scan
+    name: labview_replay_scan
+    region: TBlock6_89858
+    repo_id: beamline:repo-bl11012-scan-replay
+  - id: beamline:plan-count
+    name: count
+    region: null
+    repo_id: beamline:repo-bl11012-bluesky
+  - id: beamline:plan-scan
+    name: scan
+    region: null
+    repo_id: beamline:repo-bcs2sim-ophyd
+
+motors:
+  - beamline:Motor-sample-x
+  - beamline:Motor-sample-y
+  - beamline:Motor-sample-z
+  - beamline:Motor-sample-theta
+  - beamline:Motor-sample-azimuthal-rotation
+  - beamline:Motor-samplerot0
+
+detector_id: beamline:Detector-AXIS-SXR-40
+sample_stage_id: beamline:stage-Sample-stage
+tiled_software_id: beamline:Software-Tiled
+bluesky_software_id: beamline:Software-Bluesky
+finch_repo_id: beamline:repo-bl11012-finch
+axis_repo_id: beamline:repo-ADAxisSXR40
+tiled_repo_id: beamline:repo-tiled
+
+energy_eV:
+  C K-edge: [280.0, 292.0]
+  carbon K-edge: [280.0, 292.0]
+  carbon edge: [280.0, 292.0]
+  N K-edge: [395.0, 410.0]
+  O K-edge: [525.0, 545.0]
+  default: [165.0, 1500.0]
+
+polarizations:
+  - id: beamline:Polarization-linear-polarization
+    name: linear polarization
+  - id: beamline:Polarization-left-circular-polarization
+    name: left circular polarization
+  - id: beamline:Polarization-right-circular-polarization
+    name: right circular polarization

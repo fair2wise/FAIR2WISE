@@ -10,6 +10,7 @@ from app.modules.f2w_agent.multi_kg import (
     default_json_graph_paths,
     graph_id_for_path,
     latest_bl1101_path,
+    latest_rsoxs_path,
     merge_hits,
 )
 from app.modules.f2w_agent.retrieval_agent import RetrievalAgent
@@ -61,6 +62,22 @@ def test_default_paths_prefer_latest_bl1101_snapshot():
     ]
     assert latest_bl1101_path(available) == "storage/kg/matkg_bl1101_v2.json"
     assert graph_id_for_path("storage/kg/matkg_bl1101_v2.json") == "bl1101"
+
+
+def test_default_paths_prefer_latest_rsoxs_snapshot():
+    available = [
+        "storage/kg/matkg_rsoxs_v1.json",
+        "storage/kg/matkg_rsoxs_v2.json",
+        "storage/kg/matkg_bl1101_v4.json",
+        XRAY_DEMO_GRAPH,
+    ]
+    paths = default_json_graph_paths(available=available)
+    assert paths == [
+        "storage/kg/matkg_rsoxs_v2.json",
+        "storage/kg/matkg_bl1101_v4.json",
+    ]
+    assert latest_rsoxs_path(available) == "storage/kg/matkg_rsoxs_v2.json"
+    assert graph_id_for_path("storage/kg/matkg_rsoxs_v2.json") == "rsoxs_v1"
 
 
 def test_xray_is_opt_in_only_when_configured():

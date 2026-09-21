@@ -66,6 +66,7 @@ def test_settings_get_returns_defaults(tmp_path, monkeypatch):
     assert body["available_json_graphs"] == []
     assert "lbl/cborg-chat" in body["available_cborg_models"]
     assert body["default_ollama_model"]
+    assert body["source_rag"] is False
 
 
 def test_settings_update_backend_only(tmp_path, monkeypatch):
@@ -302,3 +303,53 @@ def test_settings_lists_json_files_sorted(tmp_path, monkeypatch):
         "storage/kg/alpha.json",
         "storage/kg/zeta.json",
     ]
+
+
+def test_settings_source_rag_round_trip(tmp_path, monkeypatch):
+    client = _settings_client(tmp_path, monkeypatch)
+    assert client.get("/settings").json()["source_rag"] is False
+
+    response = client.put("/settings", json={"source_rag": True})
+    assert response.status_code == 200
+    assert response.json()["source_rag"] is True
+    assert client.get("/settings").json()["source_rag"] is True
+
+    response = client.put("/settings", json={"source_rag": False})
+    assert response.status_code == 200
+    assert response.json()["source_rag"] is False
+
+
+def test_settings_live_tiled_round_trip(tmp_path, monkeypatch):
+    monkeypatch.delenv("TILED_API_KEY", raising=False)
+    monkeypatch.delenv("F2W_LIVE_TILED", raising=False)
+    monkeypatch.delenv("TILED_URI", raising=False)
+    client = _settings_client(tmp_path, monkeypatch)
+    body = client.get("/settings").json()
+    assert body["use_live_tiled"] is False
+    assert body["tiled_api_key_set"] is False
+
+    response = client.put(
+        "/settings",
+        json={"use_live_tiled": True, "tiled_uri": "http://127.0.0.1:8000"},
+    )
+    assert response.status_code == 200
+    assert response.json()["use_live_tiled"] is True
+    assert response.json()["tiled_uri"] == "http://127.0.0.1:8000"
+
+    response = client.put("/settings", json={"use_live_tiled": False})
+    assert response.status_code == 200
+    assert response.json()["use_live_tiled"] is False
+
+
+def test_chat_request_accepts_source_rag_flag():
+    req = api_mod.ChatRequest(message="what is RSoXS", source_rag=True)
+    assert req.source_rag is True
+    omitted = api_mod.ChatRequest(message="what is RSoXS")
+    assert omitted.source_rag is None
+
+
+def test_chat_request_accepts_use_live_tiled_flag():
+    req = api_mod.ChatRequest(message="ESAF 2026-00041", use_live_tiled=True)
+    assert req.use_live_tiled is True
+    omitted = api_mod.ChatRequest(message="ESAF 2026-00041")
+    assert omitted.use_live_tiled is None

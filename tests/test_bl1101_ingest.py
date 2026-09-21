@@ -90,6 +90,10 @@ def test_bl1101_schema_loads():
         "Person",
         "Role",
         "BeamlineScientist",
+        "ESAF",
+        "Proposal",
+        "BlueskyRun",
+        "Sample",
     ):
         assert cls in helper.classes
     for slot in (
@@ -106,6 +110,10 @@ def test_bl1101_schema_loads():
         "connected_to",
         "hasRole",
         "supports",
+        "hasProposal",
+        "hasScan",
+        "hasSample",
+        "wasAttributedTo",
     ):
         assert slot in helper.slots
 

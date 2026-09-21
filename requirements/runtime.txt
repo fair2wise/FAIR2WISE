@@ -457,6 +457,8 @@ uuid-utils==0.17.0
     #   langsmith
 uvicorn==0.52.1
     # via -r requirements/runtime.in
+watchdog==6.0.0
+    # via -r requirements/runtime.in
 websockets==15.0.1
     # via
     #   langgraph-sdk

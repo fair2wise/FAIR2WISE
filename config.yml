@@ -70,6 +70,12 @@ kg_rag:
     splash_page_size:
       env: KG_RAG_SPLASH_PAGE_SIZE
       default: 1000
+    tiled_uri:
+      env: TILED_URI
+      default: http://127.0.0.1:8000
+    live_tiled:
+      env: F2W_LIVE_TILED
+      default: false
     graph_file:
       env: KG_RAG_GRAPH
       default: storage/kg/matkg_xray_papers_cborg_chat.json

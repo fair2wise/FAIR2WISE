@@ -1,0 +1,12 @@
+{
+  "live_terms": "storage/terminology/extracted_terms_rsoxs_v1.json",
+  "live_file_written": false,
+  "terms_snapshot": "storage/terminology/extracted_terms_rsoxs_v1_20260917T044424Z.json",
+  "kg_path": "storage/kg/matkg_rsoxs_v2.json",
+  "written_at": "2026-09-17T04:51:12Z",
+  "sha256": "7608e22456a67951839c6b5b3aeaa8860c744407bae1a00baf7062a4f2d58e1f",
+  "nodes": 12014,
+  "edges": 27919,
+  "unique_papers": 135,
+  "term_count": 10011
+}

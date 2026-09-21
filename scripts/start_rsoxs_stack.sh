@@ -104,7 +104,20 @@ for f in "$ROOT_DIR"/storage/kg/matkg_bl1101_v*.json; do
     LATEST_OPS="storage/kg/${base}"
   fi
 done
-export F2W_GRAPH="${F2W_GRAPH:-storage/kg/matkg_rsoxs_v1.json,${LATEST_OPS}}"
+LATEST_SCIENCE="storage/kg/matkg_rsoxs_v1.json"
+best_s=-1
+for f in "$ROOT_DIR"/storage/kg/matkg_rsoxs_v*.json; do
+  base="$(basename "$f")"
+  [[ "$base" == *bak* ]] && continue
+  n="${base#matkg_rsoxs_v}"
+  n="${n%.json}"
+  [[ "$n" =~ ^[0-9]+$ ]] || continue
+  if (( n > best_s )); then
+    best_s=$n
+    LATEST_SCIENCE="storage/kg/${base}"
+  fi
+done
+export F2W_GRAPH="${F2W_GRAPH:-${LATEST_SCIENCE},${LATEST_OPS}}"
 export F2W_SCHEMA="${F2W_SCHEMA:-storage/schema/rsoxs_schema.yaml}"
 export F2W_WORKDIR="${F2W_WORKDIR:-runs/ui_session_rsoxs}"
 export F2W_AGENT_HOST="${F2W_AGENT_HOST:-127.0.0.1}"
@@ -113,6 +126,12 @@ export F2W_UI_HOST="${F2W_UI_HOST:-127.0.0.1}"
 export F2W_UI_PORT="$UI_PORT"
 export VITE_F2W_AGENT_API_URL="${VITE_F2W_AGENT_API_URL:-http://127.0.0.1:${AGENT_PORT}}"
 export PYTHONUNBUFFERED="${PYTHONUNBUFFERED:-1}"
+# Local Tiled only. Never follow ALS production hosts from a leftover .env.
+if [[ "${TILED_URI:-}" == *als.lbl.gov* ]]; then
+  echo "warning: ignoring ALS TILED_URI; using http://127.0.0.1:8000" >&2
+  unset TILED_URI
+fi
+export TILED_URI="${TILED_URI:-http://127.0.0.1:8000}"
 
 stop_pidfile "$FRONTEND_PID_FILE" "RSoXS UI"
 stop_pidfile "$BACKEND_PID_FILE" "RSoXS agent"

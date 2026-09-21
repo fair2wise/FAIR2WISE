@@ -2282,6 +2282,139 @@ def test_query_graph_payload_merges_dual_kg_without_concat(tmp_path):
     assert ("only_lit", "ignored_lit") not in edge_pairs
 
 
+def test_property_entries_flattens_tiled_dict():
+    raw = {
+        "id": "tiled:ESAF:2026-00045",
+        "name": "ESAF 2026-00045",
+        "category": "ESAF",
+        "description": "P3HT carbon-edge ESAF",
+        "uri": "tiled:esaf:2026-00045",
+        "haystack": "should not appear",
+        "properties": {
+            "esaf_number": "2026-00045",
+            "scientist": "Ada Lovelace",
+            "plan_name": "rsoxs_nexafs",
+            "uid": "abc-uid-1",
+        },
+    }
+    node = api_mod._graph_node_from_raw(raw)
+    names = {item.get("property") for item in node.properties}
+    assert names == {"esaf_number", "scientist", "plan_name", "uid"}
+    assert node.extra_fields.get("uri") == "tiled:esaf:2026-00045"
+    assert node.extra_fields.get("scientist") == "Ada Lovelace"
+    assert node.extra_fields.get("esaf_number") == "2026-00045"
+    assert node.extra_fields.get("entityType") == "ESAF"
+    assert node.type == "ESAF"
+    assert "haystack" not in node.extra_fields
+
+
+def test_query_graph_payload_includes_tiled_lookup_nodes(tmp_path):
+    from app.modules.tiled_graph import TILED_GRAPH_ID, TiledLookupGraph
+
+    science = tmp_path / "matkg_rsoxs_v1.json"
+    science.write_text(
+        json.dumps({"things": [{"id": "matkg:P3HT", "name": "P3HT", "category": "Material", "definition": "polymer"}], "associations": []}),
+        encoding="utf-8",
+    )
+    tiled = TiledLookupGraph()
+    tiled.add_node(
+        {
+            "id": "tiled:ESAF:2026-00045",
+            "name": "ESAF 2026-00045",
+            "category": "ESAF",
+            "description": "P3HT carbon-edge ESAF",
+            "uri": "tiled:esaf:2026-00045",
+            "properties": {
+                "esaf_number": "2026-00045",
+                "scientist": "Ada Lovelace",
+                "uid": "abc-uid-1",
+            },
+        }
+    )
+    tiled.add_node(
+        {
+            "id": "tiled:Proposal:P202600045-01",
+            "name": "Proposal P202600045-01",
+            "category": "Proposal",
+            "description": "Linked proposal",
+            "properties": {"proposal_code": "P202600045-01"},
+        }
+    )
+    tiled.add_edge("tiled:ESAF:2026-00045", "rel:hasProposal", "tiled:Proposal:P202600045-01")
+    payload = api_mod.query_graph_payload(
+        selected_ids=["tiled:ESAF:2026-00045", "matkg:P3HT"],
+        selected_hits=[
+            {"id": "tiled:ESAF:2026-00045", "graph_id": TILED_GRAPH_ID, "graph_label": "Tiled Graph"},
+            {"id": "matkg:P3HT", "graph_id": "rsoxs_v1", "graph_label": "science"},
+        ],
+        graph_path=science,
+        graph_paths_by_id={"rsoxs_v1": science},
+        graphs_by_id={TILED_GRAPH_ID: tiled},
+    )
+    by_id = {node.id: node for node in payload.nodes}
+    assert set(by_id) == {"tiled:ESAF:2026-00045", "tiled:Proposal:P202600045-01", "matkg:P3HT"}
+    esaf = by_id["tiled:ESAF:2026-00045"]
+    assert esaf.type == "ESAF"
+    assert esaf.description.startswith("P3HT")
+    assert esaf.graph_id == TILED_GRAPH_ID
+    props = {item.get("property"): item.get("value") for item in esaf.properties}
+    assert props["esaf_number"] == "2026-00045"
+    assert props["scientist"] == "Ada Lovelace"
+    assert esaf.extra_fields.get("scientist") == "Ada Lovelace"
+    assert by_id["tiled:Proposal:P202600045-01"].type == "Proposal"
+    assert any(edge.source == "tiled:ESAF:2026-00045" and edge.target == "tiled:Proposal:P202600045-01" for edge in payload.edges)
+    assert by_id["matkg:P3HT"].description == "polymer"
+
+
+def test_graph_neighborhood_from_lookup_walks_tiled_identity_edges():
+    from app.modules.tiled_graph import TiledLookupGraph
+
+    kg = TiledLookupGraph()
+    kg.add_node(
+        {
+            "id": "beamline:ESAF-2026-00043",
+            "name": "ESAF 2026-00043",
+            "category": "ESAF",
+            "properties": {"esaf_number": "2026-00043"},
+        }
+    )
+    kg.add_node(
+        {
+            "id": "beamline:Proposal-P202600043-01",
+            "name": "Proposal P202600043-01",
+            "category": "Proposal",
+        }
+    )
+    kg.add_node(
+        {
+            "id": "beamline:Sample-S01",
+            "name": "Sample S01",
+            "category": "Sample",
+        }
+    )
+    kg.add_node(
+        {
+            "id": "beamline:scan:run-1",
+            "name": "BlueskyRun run-1",
+            "category": "BlueskyRun",
+        }
+    )
+    kg.add_edge("beamline:ESAF-2026-00043", "rel:hasProposal", "beamline:Proposal-P202600043-01")
+    kg.add_edge("beamline:Proposal-P202600043-01", "rel:hasSample", "beamline:Sample-S01")
+    kg.add_edge("beamline:Sample-S01", "rel:hasScan", "beamline:scan:run-1")
+    payload = api_mod.graph_neighborhood_from_lookup(kg, "ESAF-2026-00043")
+    assert {node.id for node in payload.nodes} == {
+        "beamline:ESAF-2026-00043",
+        "beamline:Proposal-P202600043-01",
+        "beamline:Sample-S01",
+        "beamline:scan:run-1",
+    }
+    assert {edge.predicate for edge in payload.edges} == {"rel:hasProposal", "rel:hasSample", "rel:hasScan"}
+    assert payload.source_path == "tiled://graphql"
+    remapped = api_mod.graph_neighborhood_from_lookup(kg, "tiled:beamline:ESAF-2026-00043")
+    assert {node.id for node in remapped.nodes} == {node.id for node in payload.nodes}
+
+
 def test_graph_node_from_raw_keeps_definition_github_and_extra_fields(tmp_path):
     graph_path = tmp_path / "matkg_bl1101_v1.json"
     graph_path.write_text(

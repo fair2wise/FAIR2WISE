@@ -1069,6 +1069,7 @@ class KnowledgeGraph:
         include_structured: bool,
         char_budget: int,
         hint_terms: Sequence[str] | None,
+        include_pdf_snippets: bool = True,
     ) -> str:
         """Assemble retrieved context string from ranked nodes for LLM prompt injection.
 
@@ -1212,12 +1213,13 @@ class KnowledgeGraph:
                     lines.append(f"Domain_Features:\n{domain_features}")
                 lang = raw.get("code_language") or ""
                 lines.append(f"Code ({lang}):\n```{lang}\n{raw['code_snippet']}\n```")
-            for pdf in source_papers:
-                path = str(Path(PDF_DIR) / pdf)
-                txt = load_pdf_text(path)
-                snip = snippet_text(txt, PDF_SNIPPET_LEN, hint_terms)
-                if snip:
-                    lines.append(f"[PDF {pdf}]\n{snip}")
+            if include_pdf_snippets:
+                for pdf in source_papers:
+                    path = str(Path(PDF_DIR) / pdf)
+                    txt = load_pdf_text(path)
+                    snip = snippet_text(txt, PDF_SNIPPET_LEN, hint_terms)
+                    if snip:
+                        lines.append(f"[PDF {pdf}]\n{snip}")
             if self.out_edges.get(ni.id):
                 rel_lines: List[str] = []
                 for e in sorted(self.out_edges[ni.id], key=lambda x: x["predicate"]):

@@ -160,6 +160,35 @@ query PageBlueskyRuns($limit: Int = 100, $offset: Int = 0) {
   }
 }
 
+# Simulated JSON KG uses the same entityType strings. Live Tiled /api/graphql
+# is not required for the sim overlay (matkg_bl1101_v5).
+query PageESAFs($limit: Int = 50, $offset: Int = 0) {
+  entities(entityType: "ESAF", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(predicate: "rel:hasProposal", limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageProposals($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "Proposal", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(limit: 50) {
+      ...LinkHop
+    }
+  }
+}
+
+query PageSamples($limit: Int = 100, $offset: Int = 0) {
+  entities(entityType: "Sample", limit: $limit, offset: $offset) {
+    ...EntityCore
+    incomingLinks(predicate: "rel:hasSample", limit: 20) {
+      ...LinkHop
+    }
+  }
+}
+
 # --- Traversal (agent neighborhood) ---
 
 query Neighborhood($id: ID!, $limit: Int = 50) {
