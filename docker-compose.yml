@@ -1,0 +1,76 @@
+# docker-compose.yml — dev convenience: F2W agent API + Vite hot-reload UI.
+#
+# NOTE: compose.yaml (nginx static build) is the primary compose file and takes
+# precedence when both files are present. To use this hot-reload dev variant:
+#
+#   docker compose -f docker-compose.yml up
+#
+# ── Extract process note ──────────────────────────────────────────────────────
+# scripts/run.py (paper extraction) is NOT managed here and must be started
+# separately so it survives agent/UI restarts and terminal closure:
+#
+#   nohup python scripts/run.py ...  &   # background in current shell
+#   # — or —
+#   tmux new-session -d -s extract 'python scripts/run.py ...'
+#
+# `docker compose down` stops agent+UI only; extraction is unaffected.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Secrets: loaded at runtime from .env (env_file). CBORG_API_KEY is never
+# baked into the image. Copy .env.example → .env and fill in your key.
+
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent
+    # Runtime secrets (CBORG_API_KEY, etc.) come from .env on the host.
+    # They are never committed and never baked into the image layer.
+    env_file: .env
+    environment:
+      F2W_KG_MODE: json
+      F2W_BACKEND: cborg
+      F2W_MODEL: lbl/cborg-chat
+      # Force outbound IPv6 to api.cborg.lbl.gov. The CBorg allowlist is IPv6-only.
+      CBORG_FORCE_IPV6: "1"
+      CBORG_IP_FAMILY: ipv6
+      F2W_AGENT_HOST: "0.0.0.0"
+      F2W_AGENT_PORT: "8090"
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+    networks:
+      - f2w
+
+  ui:
+    # Vite dev server with hot-reload. For a static production build use:
+    #   docker build --target frontend -t f2w-ui .
+    image: node:20-bookworm-slim
+    working_dir: /app
+    volumes:
+      - ./ui:/app
+      # Named volume keeps node_modules inside the container filesystem so
+      # macOS bind-mount performance issues do not slow down the dev server.
+      - ui_node_modules:/app/node_modules
+    command:
+      - sh
+      - -c
+      - "npm ci --prefer-offline && npm run dev -- --host 0.0.0.0 --port 5175"
+    ports:
+      # Port 5175 is the documented RSoXS UI port. 5174 is reserved for SSH.
+      - "5175:5175"
+    environment:
+      VITE_F2W_AGENT_API_URL: http://127.0.0.1:8090
+    restart: unless-stopped
+    networks:
+      - f2w
+
+volumes:
+  ui_node_modules:
+
+networks:
+  # IPv6-capable bridge so CBORG_FORCE_IPV6=1 has a valid src address inside
+  # the container. Docker Desktop 4.27+ supports IPv6 NAT for outbound reach.
+  f2w:
+    enable_ipv6: true

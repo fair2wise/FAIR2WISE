@@ -3,6 +3,18 @@
 # not kill the stack. Does not start or stop paper extract (scripts/run.py).
 # Prefer `docker compose up` as the documented product path.
 #
+# ── Process isolation note ────────────────────────────────────────────────────
+# The paper extract process (scripts/run.py) must be started separately and
+# will survive UI/agent restarts:
+#
+#   nohup python scripts/run.py ...  &   # background in current shell
+#   # — or —
+#   tmux new-session -d -s extract 'python scripts/run.py ...'
+#
+# `docker compose up` starts agent+UI only; it does NOT start extraction.
+# `docker compose down` (or this script's `stop`) will NOT stop extraction.
+# ─────────────────────────────────────────────────────────────────────────────
+#
 # Usage:
 #   ./scripts/start_rsoxs_stack.sh
 #   ./scripts/start_rsoxs_stack.sh stop
@@ -19,12 +31,22 @@ FRONTEND_PID_FILE="$LOG_DIR/rsoxs_frontend.pid"
 BACKEND_LOG="$LOG_DIR/rsoxs_backend.stdout"
 FRONTEND_LOG="$LOG_DIR/rsoxs_frontend.stdout"
 
-UI_PORT="${F2W_UI_PORT:-5175}"
 AGENT_PORT="${F2W_AGENT_PORT:-8090}"
 
-if [[ "$UI_PORT" == "5174" ]]; then
-  echo "error: host port 5174 is reserved for SSH; use F2W_UI_PORT=5175" >&2
+# UI port: try 5173 first, then 5175; never use 5174 (reserved for SSH).
+if [[ "${F2W_UI_PORT:-}" == "5174" ]]; then
+  echo "[ERROR] Port 5174 is reserved for SSH; use F2W_UI_PORT=5175 (or 5173)" >&2
   exit 1
+fi
+if [[ -n "${F2W_UI_PORT:-}" ]]; then
+  UI_PORT="$F2W_UI_PORT"
+elif ! lsof -ti:5173 >/dev/null 2>&1; then
+  UI_PORT=5173
+elif ! lsof -ti:5175 >/dev/null 2>&1; then
+  UI_PORT=5175
+else
+  UI_PORT=5175
+  echo "[WARN] Both ports 5173 and 5175 appear in use; defaulting to ${UI_PORT}" >&2
 fi
 
 is_extract_pid() {
@@ -135,6 +157,17 @@ export TILED_URI="${TILED_URI:-http://127.0.0.1:8000}"
 
 stop_pidfile "$FRONTEND_PID_FILE" "RSoXS UI"
 stop_pidfile "$BACKEND_PID_FILE" "RSoXS agent"
+
+# ── Port conflict check (runs after stopping old stack) ───────────────────────
+if lsof -ti:"$AGENT_PORT" >/dev/null 2>&1; then
+  echo "[ERROR] Port ${AGENT_PORT} in use. Run: kill \$(lsof -ti:${AGENT_PORT})" >&2
+  exit 1
+fi
+if lsof -ti:"$UI_PORT" >/dev/null 2>&1; then
+  echo "[ERROR] Port ${UI_PORT} in use. Run: kill \$(lsof -ti:${UI_PORT})" >&2
+  exit 1
+fi
+export VITE_PORT="$UI_PORT"
 
 daemonize() {
   local pid_file="$1"

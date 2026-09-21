@@ -5,6 +5,16 @@ name: fair2wise
 # Do not set CBORG_IPV6_BIND here — a stale address fails with
 # "Can't assign requested address". cborg_http probes a live global IPv6.
 #
+# ── Extract process note ──────────────────────────────────────────────────────
+# scripts/run.py (paper extraction) is NOT managed here. Start it separately
+# so it survives agent/UI restarts and terminal/session closure:
+#
+#   nohup python scripts/run.py ...  &       # background in current shell
+#   tmux new-session -d -s extract 'python scripts/run.py ...'
+#
+# `docker compose down` stops agent+UI only; extraction is unaffected.
+# ─────────────────────────────────────────────────────────────────────────────
+#
 # Ports (loopback only):
 #   UI    127.0.0.1:5175  (never 5174 — that port is SSH)
 #   Agent 127.0.0.1:8090  (browser uses VITE_F2W_AGENT_API_URL)

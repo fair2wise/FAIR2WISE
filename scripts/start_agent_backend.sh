@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# ── Process isolation note ────────────────────────────────────────────────────
+# The paper extract process (scripts/run.py) must be started separately so it
+# survives agent restarts and terminal closure:
+#
+#   nohup python scripts/run.py ...  &   # background in current shell
+#   # — or —
+#   tmux new-session -d -s extract 'python scripts/run.py ...'
+#
+# `docker compose up` starts agent+UI only; extraction is not affected.
+# Stopping this script (or `docker compose down`) will NOT stop extraction.
+# ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -57,26 +68,46 @@ EXTRACTION_MODE="${F2W_EXTRACTION_MODE:-targeted}"
 TARGETED_MAX_PAGES="${F2W_TARGETED_MAX_PAGES:-6}"
 SPLASH_HEALTH_URL="${F2W_SPLASH_HEALTH_URL:-http://127.0.0.1:8081/splash_links/health}"
 
-# CBorg allowlists a global IPv6. Probe at process start; never keep a stale bind.
+# ── CBorg IPv6 hardening ──────────────────────────────────────────────────────
+# CBorg allowlists a global IPv6. Always probe at process start; never silently
+# keep a stale bind address from a previous run or .env.
 export CBORG_FORCE_IPV6="${CBORG_FORCE_IPV6:-1}"
 export CBORG_IP_FAMILY="${CBORG_IP_FAMILY:-ipv6}"
+
+# Detect any globally-routable IPv6 on a live interface.
+# macOS: ifconfig; Linux: ip -6 addr show. Excludes loopback (::1) and
+# link-local (fe80::) addresses which cannot reach api.cborg.lbl.gov.
+_global_ipv6=""
+if command -v ifconfig >/dev/null 2>&1; then
+  _global_ipv6="$(ifconfig 2>/dev/null \
+    | awk '/inet6/{gsub(/\/.*/, "", $2); addr=$2;
+           if (addr !~ /^::1$/ && addr !~ /^fe80/) print addr}' \
+    | head -1)"
+elif command -v ip >/dev/null 2>&1; then
+  _global_ipv6="$(ip -6 addr show 2>/dev/null \
+    | awk '/inet6/ && !/::1/ && !/fe80/{gsub(/\/.*/, "", $2); print $2}' \
+    | head -1)"
+fi
+if [[ -z "${_global_ipv6:-}" ]]; then
+  echo "[WARN] No global IPv6 detected — CBorg may fall back to IPv4" >&2
+fi
+
+# If CBORG_IPV6_BIND is set, verify the address is still assigned to a live
+# interface using ifconfig/ip. Never silently keep a stale bind.
 if [[ -n "${CBORG_IPV6_BIND:-}" ]]; then
-  if ! python3 -c 'import os, socket, ipaddress
-addr = os.environ.get("CBORG_IPV6_BIND", "").split("%", 1)[0]
-try:
-    ipaddress.IPv6Address(addr)
-    sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    sock.bind((addr, 0))
-    sock.close()
-except OSError:
-    raise SystemExit(1)
-except ValueError:
-    raise SystemExit(1)
-'; then
-    echo "warning: CBORG_IPV6_BIND is not assigned on this host; probing a current global IPv6" >&2
+  _bind_clean="${CBORG_IPV6_BIND%%%*}"  # strip zone ID (%en0, %eth0, …)
+  _bind_live=0
+  if command -v ifconfig >/dev/null 2>&1; then
+    ifconfig 2>/dev/null | grep -qF "$_bind_clean" && _bind_live=1 || true
+  elif command -v ip >/dev/null 2>&1; then
+    ip -6 addr show 2>/dev/null | grep -qF "$_bind_clean" && _bind_live=1 || true
+  fi
+  if [[ "$_bind_live" -eq 0 ]]; then
+    echo "[WARN] CBORG_IPV6_BIND=${CBORG_IPV6_BIND} is not assigned to any interface; unsetting (fresh probe will run)" >&2
     unset CBORG_IPV6_BIND
   fi
 fi
+# ─────────────────────────────────────────────────────────────────────────────
 
 if [[ "$KG_MODE" != "splash" && "$KG_MODE" != "json" ]]; then
   echo "warning: F2W_KG_MODE=$KG_MODE overrides backend default splash" >&2
@@ -93,6 +124,12 @@ if [[ "$KG_MODE" == "splash" ]] && command -v curl >/dev/null 2>&1; then
     echo "warning: splash-links server not responding at $SPLASH_HEALTH_URL" >&2
     echo "start it in another terminal: cd \"$SPLASH_REPO\" && pixi run serve" >&2
   fi
+fi
+
+# ── Port conflict check ───────────────────────────────────────────────────────
+if lsof -ti:"$PORT" >/dev/null 2>&1; then
+  echo "[ERROR] Port ${PORT} in use. Run: kill \$(lsof -ti:${PORT})" >&2
+  exit 1
 fi
 
 ARGS=(
