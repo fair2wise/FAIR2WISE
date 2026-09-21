@@ -449,3 +449,47 @@ inventory against `/api/graphql`.
 | `rel:related_to` | Weak leftover; prefer a typed predicate |
 | `prov:wasDerivedFrom` | measurement / sample extracted from start+plan → catalog run (`nodeId` set) |
 | `prov:wasGeneratedBy` | dataset → activity / measurement |
+
+## RSoXS v1 / bl1101 v6 Queries
+
+The following named operations were added to `rsoxs_v1_cookbook.graphql` for
+the BL 11.0.1.2 beamline graph (`matkg_bl1101_v6`).  They cover beam-path
+traversal, hardware neighborhood lookup, experiment tree navigation, and
+contact discovery.
+
+> **Name-index note:** the Tiled GraphQL API does not expose a `name` filter
+> on `entities(...)`.  Operations that accept a `$name: String!` variable must
+> page by `entityType` and filter the response client-side where
+> `entity.name == $name`.  The variable documents the intended filtering key.
+
+| Operation | Purpose | Key variables |
+|---|---|---|
+| `PageBeamPathChain` | Page all `rel:beam_path_next` links to reconstruct the ordered photon beam path (EPU → M101 → … → Detector). | `$limit: Int = 50`, `$offset: Int = 0` |
+| `NeighborsOfDevice` | Return all outgoing and incoming links of a named beamline device across every predicate ("how is X connected?"). Page by `$entityType`, filter client-side by name. | `$name: String!`, `$entityType: String = "OphydDevice"`, `$limit`, `$offset` |
+| `MotorToStage` | Page `rel:part_of` links; filter client-side where `subject.entityType == "Motor"` and `object.id` contains `"stage"` to find which stage each motor belongs to. | `$limit: Int = 200`, `$offset: Int = 0` |
+| `PageESAFsWithProposals` | Page ESAF entities and inline each proposal's `rel:hasScan` scan list, enabling scan-count aggregation per proposal without a second round-trip. | `$limit: Int = 20`, `$offset: Int = 0` |
+| `SamplesByProposal` | Given a proposal graph UUID, return all `rel:hasSample` samples and the `prov:used` BlueskyRun IDs that scanned each sample. | `$proposalId: ID!`, `$limit: Int = 50` |
+| `BlueskyRunsByDateRange` | Page BlueskyRun entities with plan, sample, and measurement links included. Filter client-side by `properties.start_time` for the desired date range. Uses field aliases (`plan:`, `usedSample:`, `measurement:`). | `$limit: Int = 100`, `$offset: Int = 0` |
+| `UpstreamPath` | Follow `rel:upstream_of` incomingLinks up to 3 hops from a named BeamlineStage to identify the full upstream feed chain. Client-side: keep the entity whose `name == $name`. | `$name: String!`, `$limit: Int = 50`, `$offset: Int = 0` |
+| `BeamlineContacts` | Page Person entities; return their `rel:hasRole` (filter for `Role-BeamlineScientist`) and `rel:supports` beamline links. Email is in `entity.description`. Uses field aliases (`roles:`, `beamlines:`). | `$limit: Int = 20`, `$offset: Int = 0` |
+
+### Schema notes for bl1101 v6
+
+- **Beam-path predicates in the KG:** `rel:beam_path_next` (17 links),
+  `rel:upstream_of` (19 links), `rel:feeds`, `rel:connected_to`, `rel:part_of`.
+  `beam_path_next` and `upstream_of` share the same directionality
+  (subject → object = earlier → later in the beam path).
+- **Motor → Stage:** 87 `rel:part_of` Motor→stage pairs; 177 Motor→beamline
+  pairs in the same predicate batch.  Filter by `object.id` containing
+  `"stage"` to isolate the stage membership rows.
+- **BlueskyRun ↔ Sample:** `BlueskyRun → prov:used → Sample` (222 links).
+  The inverse direction (`Sample` incomingLinks predicate `prov:used`) returns
+  the runs that scanned a given sample.
+- **Persons:** only 2 Person entities (`Cheng Wang`, `Thomas Ferron`).  Email
+  is stored in `entity.description`, not a dedicated property field.
+  Both persons have `rel:hasRole → Role-BeamlineScientist` and
+  `rel:supports → BL-11-0-1-2`.
+- **Field aliasing:** `BlueskyRunsByDateRange` and `BeamlineContacts` request
+  `outgoingLinks` twice with different `predicate` arguments; GraphQL requires
+  aliases in that case (`plan:`, `usedSample:`, `roles:`, `beamlines:`).  The
+  Tiled GraphQL server honours aliases per the GraphQL spec.

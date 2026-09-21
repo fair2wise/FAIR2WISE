@@ -281,3 +281,264 @@ mutation CreateMeasuredFromLink($measurementId: ID!, $runEntityId: ID!) {
     }
   }
 }
+
+# --- RSoXS v1 / bl1101 v6 Queries ---
+
+# ---
+# PageBeamPathChain
+# Use case: reconstruct the ordered photon beam path through BL 11.0.1.2
+# hardware by paging all rel:beam_path_next links.  Collect subject→object pairs
+# and sort by the object.name / stage order that appears in the blueprint SVG.
+# The KG has 17 such links (EPU → M101 → … → Sample stage → Detector).
+# Client: sort by matching object names to build a sequential chain list.
+# ---
+query PageBeamPathChain($limit: Int = 50, $offset: Int = 0) {
+  links(predicate: "rel:beam_path_next", limit: $limit, offset: $offset) {
+    id
+    predicate
+    subject {
+      id
+      name
+      entityType
+    }
+    object {
+      id
+      name
+      entityType
+    }
+  }
+}
+
+# ---
+# NeighborsOfDevice
+# Use case: answer "how is device X connected?" for any beamline component.
+# The API has no name index.  Page by entityType (default: "OphydDevice"; also
+# try "Motor", "BeamlineStage", "Detector") and filter client-side where
+# entity.name == $name.  The result exposes all outgoing and incoming links
+# across every predicate so the caller can see the full neighborhood.
+# ---
+query NeighborsOfDevice(
+  $name: String!
+  $entityType: String = "OphydDevice"
+  $limit: Int = 100
+  $offset: Int = 0
+) {
+  # Client-side: keep only the entity where entity.name == $name.
+  entities(entityType: $entityType, limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(limit: 50) {
+      predicate
+      object {
+        id
+        name
+        entityType
+        uri
+      }
+    }
+    incomingLinks(limit: 50) {
+      predicate
+      subject {
+        id
+        name
+        entityType
+        uri
+      }
+    }
+  }
+}
+
+# ---
+# MotorToStage
+# Use case: "which stage does motor X belong to?"
+# Page rel:part_of links; filter client-side where subject.entityType == "Motor"
+# AND object.id contains "stage" (i.e. the object is a BeamlineStage node).
+# The KG has 87 such Motor→stage pairs and 177 Motor→beamline pairs combined.
+# ---
+query MotorToStage($limit: Int = 200, $offset: Int = 0) {
+  links(predicate: "rel:part_of", limit: $limit, offset: $offset) {
+    predicate
+    subject {
+      id
+      name
+      entityType
+    }
+    object {
+      id
+      name
+      entityType
+    }
+  }
+}
+
+# ---
+# PageESAFsWithProposals
+# Use case: list all ESAFs, each proposal under them, and how many BlueskyRun
+# scans each proposal owns (via rel:hasScan).  Useful for an experiment-tree
+# overview in the F2W UI.  Scan count = length of hasScan outgoingLinks list.
+# ---
+query PageESAFsWithProposals($limit: Int = 20, $offset: Int = 0) {
+  entities(entityType: "ESAF", limit: $limit, offset: $offset) {
+    ...EntityCore
+    outgoingLinks(predicate: "rel:hasProposal", limit: 50) {
+      predicate
+      object {
+        ...EntityCore
+        outgoingLinks(predicate: "rel:hasScan", limit: 200) {
+          predicate
+          object {
+            id
+            name
+            entityType
+          }
+        }
+      }
+    }
+  }
+}
+
+# ---
+# SamplesByProposal
+# Use case: given a proposal graph UUID ($proposalId), list every sample it owns
+# and which BlueskyRun scans used each sample (via prov:used incomingLinks on
+# the sample node — the run is the subject of prov:used → Sample).
+# material is available in entity.properties (key: "material").
+# ---
+query SamplesByProposal($proposalId: ID!, $limit: Int = 50) {
+  entity(id: $proposalId) {
+    ...EntityCore
+    outgoingLinks(predicate: "rel:hasSample", limit: $limit) {
+      predicate
+      object {
+        ...EntityCore
+        # BlueskyRun entities that prov:used this sample
+        incomingLinks(predicate: "prov:used", limit: 50) {
+          predicate
+          subject {
+            id
+            name
+            entityType
+          }
+        }
+      }
+    }
+  }
+}
+
+# ---
+# BlueskyRunsByDateRange
+# Use case: page BlueskyRun entities and retrieve run ID, plan name, and linked
+# sample.  "started_at" / "start_time" is stored in entity.properties; filter
+# the result client-side for the desired date window.
+# Aliases are required because outgoingLinks is requested twice with different
+# predicate arguments in the same selection set.
+# ---
+query BlueskyRunsByDateRange($limit: Int = 100, $offset: Int = 0) {
+  # Client-side: filter by properties.start_time (ISO-8601) for date range.
+  entities(entityType: "BlueskyRun", limit: $limit, offset: $offset) {
+    ...EntityTiled
+    plan: outgoingLinks(predicate: "rel:implementsPlan", limit: 5) {
+      predicate
+      object {
+        id
+        name
+        entityType
+      }
+    }
+    usedSample: outgoingLinks(predicate: "prov:used", limit: 5) {
+      predicate
+      object {
+        id
+        name
+        entityType
+      }
+    }
+    measurement: incomingLinks(predicate: "prov:wasDerivedFrom", limit: 5) {
+      predicate
+      subject {
+        id
+        name
+        entityType
+      }
+    }
+  }
+}
+
+# ---
+# UpstreamPath
+# Use case: given a stage name ($name), follow rel:upstream_of incomingLinks
+# up to 3 hops to find the full upstream feed chain (what photon optics
+# precede this stage in the beam path).
+# rel:upstream_of direction: subject is upstream of object, so incomingLinks
+# on a node gives what feeds *into* it.
+# Client: page BeamlineStage entities; keep the one where entity.name == $name.
+# Also try entityType "OphydDevice" if the stage is not found.
+# ---
+query UpstreamPath(
+  $name: String!
+  $limit: Int = 50
+  $offset: Int = 0
+) {
+  # Client-side: filter by entity.name == $name after receiving results.
+  entities(entityType: "BeamlineStage", limit: $limit, offset: $offset) {
+    id
+    name
+    entityType
+    upstream1: incomingLinks(predicate: "rel:upstream_of", limit: 20) {
+      predicate
+      subject {
+        id
+        name
+        entityType
+        upstream2: incomingLinks(predicate: "rel:upstream_of", limit: 20) {
+          predicate
+          subject {
+            id
+            name
+            entityType
+            upstream3: incomingLinks(predicate: "rel:upstream_of", limit: 20) {
+              predicate
+              subject {
+                id
+                name
+                entityType
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# ---
+# BeamlineContacts
+# Use case: find all Person entities acting as BeamlineScientist and return
+# name, email (extracted from entity.description — the KG stores email in the
+# description field, not a dedicated property), and linked beamline via
+# rel:supports.
+# rel:hasRole direction: Person → Role-BeamlineScientist.
+# rel:supports direction: Person → BL-11-0-1-2 (the beamline entity).
+# Aliases required: outgoingLinks appears twice with different predicate args.
+# ---
+query BeamlineContacts($limit: Int = 20, $offset: Int = 0) {
+  entities(entityType: "Person", limit: $limit, offset: $offset) {
+    ...EntityCore
+    roles: outgoingLinks(predicate: "rel:hasRole", limit: 10) {
+      predicate
+      object {
+        id
+        name
+        entityType
+      }
+    }
+    beamlines: outgoingLinks(predicate: "rel:supports", limit: 10) {
+      predicate
+      object {
+        id
+        name
+        entityType
+        uri
+      }
+    }
+  }
+}
