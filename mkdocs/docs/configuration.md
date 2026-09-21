@@ -58,7 +58,7 @@ directory by the standard launcher.
 | `CBORG_FORCE_IPV6` | `1` in Compose | Pin the HTTP client to IPv6 |
 | `CBORG_IPV6_BIND` | unset (probe) | Optional source address; ignored if not assigned on the host |
 | `F2W_KG_MODE` | `splash` | Editable Splash graph or JSON snapshot |
-| `F2W_GRAPH` | `storage/kg/matkg_with_code.json` | Initial/fallback graph |
+| `F2W_GRAPH` | `storage/kg/matkg_with_code.json` | Comma-separated JSON graphs. Local `start_rsoxs_stack.sh` defaults to highest `matkg_rsoxs_vN.json` + highest `matkg_bl1101_vN.json`. Compose pins its own pair. |
 | `F2W_SEED_TERMS` | empty | Cumulative terms seed |
 | `F2W_MAX_ROUNDS` | `3` | Evidence-growth rounds |
 | `F2W_MAX_PAPERS` | `1` in UI launcher | Maximum papers per round |
@@ -74,6 +74,9 @@ directory by the standard launcher.
 | Variable | Default/typical | Meaning |
 |---|---:|---|
 | `KG_RAG_GRAPH_SOURCE` | `splash` | `splash` or `json` |
+| `TILED_URI` | `http://127.0.0.1:8000` | Live Tiled catalog base (no `/api/graphql` suffix). ALS/11.0.1.2 uses the beamline Tiled host. |
+| `TILED_API_KEY` | unset | Tiled `Authorization: Apikey …` (or `TILED_API_KEY_SCHEME`). Never commit. Unsigned GraphQL returns empty lists. |
+| `F2W_LIVE_TILED` | unset (on if `TILED_URI` is set) | Chat ESAF/proposal/sample/scan lookup via Tiled GraphQL. JSON sim is fallback. |
 | `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Search implementation (`lexical` or `semantic`; semantic packages ship in the default install) |
 | `KG_RAG_TOPK` | `12` | Final retrieval count |
 | `KG_RAG_EMBED_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model |
@@ -86,6 +89,7 @@ directory by the standard launcher.
 | `KG_RAG_CTX_CHARS` | `16000` in config | Context character budget |
 | `KG_RAG_STRUCT_CTX` | `1` | Include structured node/edge facts |
 | `KG_RAG_GENERIC_PENALTY` | `0.8` | Down-rank generic names |
+| `F2W_SOURCE_RAG` | `0` | Opt-in source RAG default (`1`/`true`/`on`). Alias: `HYBRID_RAG_ENABLED`. UI Settings can override per session. |
 
 The UI's “Search Nodes” action calls the same active `KnowledgeGraph` search
 dispatcher. Results report whether the active backend is `semantic` or

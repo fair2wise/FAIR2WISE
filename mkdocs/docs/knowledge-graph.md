@@ -130,10 +130,10 @@ refreshes the session graph, and returns the normalized node.
 
 After a graph is imported to Tiled’s entity/link graph (`/api/graphql`), use
 the [GraphQL cookbook](graphql-cookbook.md) to inventory entity types, hunt
-`Unknown` stubs, and ask RSoXS neighborhood questions. The same checks can be
-run on `storage/kg/*.json` before promotion. The F2W agent gains a Tiled
-pager (`KG_RAG_GRAPH_SOURCE=tiled`) so retrieval can load that graph the same
-way it pages Splash today.
+`Unknown` stubs, and ask RSoXS neighborhood questions. Chat ESAF / proposal /
+sample / scan lookup uses live Tiled GraphQL when `TILED_URI` / `F2W_LIVE_TILED`
+is configured (`app/modules/tiled_graph.py`), with `matkg_bl1101_v5` as fallback.
+A full `KG_RAG_GRAPH_SOURCE=tiled` pager (replace Splash paging) is still optional.
 
 RSoXS 11.0.1.2 identity, relevance dimensions, extraction confidence,
 SimilarityDocument, and versioning are locked in the Cursor RSoXS pipeline
@@ -142,18 +142,25 @@ boolean stand in for those contracts.
 
 ## Beamline ops KG (bl1101)
 
-The literature graph (`storage/kg/matkg_rsoxs_v1.json`, `matkg:` IDs) is
+The literature graph (`storage/kg/matkg_rsoxs_vN.json`, `matkg:` IDs) is
 separate from the beamline-operations graph (`storage/kg/matkg_bl1101_vN.json`,
 `beamline:` IDs). Do not merge them. Replay:
 
 ```bash
 python3 scripts/ingest_bl1101.py --from-scratch
+python3 scripts/ingest_tiled_sim.py --from-graph storage/kg/matkg_bl1101_v4.json --snapshot 5
+python3 scripts/promote_rsoxs_snapshot.py
 ```
 
-Each successful full run appends the next `vN` snapshot (v1 is never
-overwritten). Schema: `storage/schema/bl1101_schema.yaml`. The agent on port
-8090 continues to load the literature KG unless you point Settings at the ops
-JSON; multi-KG fan-out is not implemented.
+Each successful ingest appends the next `vN` snapshot (existing files are never
+overwritten). ESAF / Proposal / Sample / BlueskyRun entities live on the ops
+graph (Tiled Graph simulation, seed `20260916`), not in the literature file.
+Schema: `storage/schema/bl1101_schema.yaml`. Local `start_rsoxs_stack.sh`
+selects the highest `matkg_rsoxs_vN.json` and `matkg_bl1101_vN.json` when
+`F2W_GRAPH` is unset. Docker Compose stays on its pinned paths so a compose
+up is not surprised. Source RAG stays opt-in (`F2W_SOURCE_RAG` default off).
+Chat can query live Tiled GraphQL when `TILED_URI` / `F2W_LIVE_TILED` is set;
+the JSON sim overlay remains the fallback. SimilarityDocument is still later.
 
 ## Generated graph collections
 

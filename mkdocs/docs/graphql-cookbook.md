@@ -90,6 +90,8 @@ Pick a named operation, then apply the client filter.
 | RSoXS → property links | `MeasuresLinks` | — |
 | Analysis code without a paper | `PageCodeSnippets` | missing `source_paper` / `publications` |
 | Linked 11.0.1.2 runs | `PageBlueskyRuns` + `CatalogNodeId` + `MeasuredFromRun` | empty is OK if catalog has runs; `nodeId` only after an app writes the entity |
+| Simulated ESAFs / proposals / samples | `PageESAFs` / `PageProposals` / `PageSamples` / `PageBlueskyRuns` | JSON overlay `matkg_bl1101_v5` is the **fallback** when live Tiled is off or unreachable |
+| Live Tiled ESAF / proposal / sample / scan (chat) | same Page* queries against `TILED_URI/api/graphql` | Requires `F2W_LIVE_TILED` or a configured `TILED_URI`; set `TILED_API_KEY` or lists are empty |
 | Summarize my last scan | **not GraphQL** — `tiled.client` newest `start.time` in proposal | start/plan properties |
 | Papers similar to this scan | catalog run card, then `PageRSoXSMeasurements` | client overlap on shared slots |
 
@@ -394,14 +396,20 @@ method→property. Do **not** use create/delete for extraction QA. Literature
 `rsoxs_v1` promote skips existing `matkg:` uris. The run indexer is
 idempotent on uid and is a separate write path.
 
-F2W reads the graph through a **Tiled pager** (planned):
-`KG_RAG_GRAPH_SOURCE=tiled` pages `/api/graphql` into MatKG the same way
-`_load_splash_links_graph` pages Splash.
+F2W reads experiment-identity questions (ESAF / proposal / sample / scan)
+through **live Tiled GraphQL** when `F2W_LIVE_TILED` is on or `TILED_URI` is
+set. The agent pages `PageESAFs` / `PageProposals` / `PageSamples` /
+`PageBlueskyRuns` into retrieval context, then still fans out over the JSON
+science + ops KGs for hardware and literature. If Tiled is unreachable or
+unsigned, chat falls back to the JSON sim overlay (`matkg_bl1101_v5`).
 
-At Q/A time an **experiment hook** (planned) queries **Tiled (data)** with
-`tiled.client` for Bluesky `start`/`stop`, plan, and sample whitelist — even
-when GraphQL has no entity for that run. If a ranked graph node already has
-`nodeId`, follow it. Detector arrays stay out of the prompt.
+A full `KG_RAG_GRAPH_SOURCE=tiled` pager (load the entire Tiled graph into
+MatKG the same way `_load_splash_links_graph` pages Splash) remains optional
+follow-up; chat does not wait on it.
+
+Scan/run questions also try **Tiled catalog** (`tiled.client`) when GraphQL
+has no BlueskyRun entities yet. If a ranked graph node already has `nodeId`,
+follow it. Detector arrays stay out of the prompt.
 
 See the RSoXS pipeline plan (Cursor canvas: source of truth) for locked
 data-model and retrieval contracts: canonical Work identity, extraction

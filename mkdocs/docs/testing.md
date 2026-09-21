@@ -33,7 +33,7 @@ Major coverage areas:
 | Area | Representative test files |
 |---|---|
 | Agent API and workflow | `test_f2w_api.py`, `test_workflow_orchestrator.py`, `test_f2w_coordinator.py` |
-| Download/extraction | `test_download_agent.py`, `test_extractor_agent.py`, `test_extract_terms*.py` |
+| Download/extraction | `test_download_agent.py`, `test_extractor_agent.py`, `test_extract_terms*.py`, `test_harvest_rsoxs.py`, `test_paper_finder.py` |
 | KG conversion/retrieval | `test_json2kg*.py`, `test_bl1101_ingest.py`, `test_kg_rag_api*.py`, `test_build_context_filtering.py` |
 | Splash integration | `test_splash_helpers.py`, `test_splash_fallback.py`, `test_kg_update.py` |
 | Settings/sessions | `test_agent_settings.py`, session cases in `test_f2w_api.py` |

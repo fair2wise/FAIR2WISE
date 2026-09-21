@@ -182,3 +182,6 @@ storage/kg/*.json
 storage/kg/*.json.bak
 storage/terminology/*.json
 storage/terminology/*.json.bak
+
+# Hybrid source-RAG indexes (rebuild with scripts/index_source_rag.py)
+storage/source_index/

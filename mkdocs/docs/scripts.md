@@ -43,8 +43,12 @@ extraction behavior.
 | Script | Behavior |
 |---|---|
 | `download_pdfs.py` | Search arXiv or OpenAlex and validate downloaded PDFs |
-| `harvest_rsoxs.py` | Harvest OA RSoXS PDFs into `papers/rsoxs/` (does not write the KG) |
+| `harvest_rsoxs.py` | Harvest **open-access** RSoXS PDFs into `papers/rsoxs/` (does not write the KG; never bulk-fetches publisher PDFs) |
+| `paper_finder.py` | Paper Finder side tool: human review queue for skipped/failed paywalled rows (127.0.0.1 only) |
 | `ingest_bl1101.py` | Replay BL 11.0.1.2 ops KG into `storage/kg/matkg_bl1101_vN.json` |
+| `ingest_tiled_sim.py` | Seeded ESAF/Proposal/Scan/Sample overlay → next `matkg_bl1101_vN.json` (seed `20260916`; no live Tiled) |
+| `promote_rsoxs_snapshot.py` | Copy live extract terms, json2kg the **copy** into `matkg_rsoxs_vN.json` |
+| `index_source_rag.py` | Build literature PDF + bl1101 ops-doc indexes (`storage/source_index/`) |
 | `build_kg.sh` | Extract terms and convert to graph using temp files/backups |
 | `reimport_merged_kg.sh` | Merge two graphs, start Splash if needed, and reimport |
 | `get_pdf_years.py` | Infer PDF year from arXiv filename, metadata, then text |
@@ -63,10 +67,56 @@ python3 scripts/download_pdfs.py \
 `download_pdfs.py` rejects HTML/empty responses even when a URL claims to be a
 PDF.
 
+### Paper Finder (paywalled RSoXS, human-paced)
+
+Lab VPN on. Do not burst publisher downloads. The publisher-facing request
+happens because a **human clicked a link in a real browser tab** — the script
+never GETs the PDF.
+
+```bash
+python3 scripts/paper_finder.py serve
+python3 scripts/paper_finder.py serve --dry-run
+python3 scripts/paper_finder.py reset
+```
+
+Binds `127.0.0.1:5057` only (never 5174 / 5175 / 8090). Queue source is
+`papers/rsoxs/manifest.json` rows with `ingestion.status` in `{skipped, failed}`
+and no PDF on disk. Save publisher PDFs into **`papers/staging/`** (created on
+`serve` if missing; override with `--staging-dir` or `--downloads-dir`). Assign
+moves the file to `papers/rsoxs/{year}/{stem}.pdf`. `missing_rsoxs_papers.txt`
+stays the helpdesk ticket list. Keep OA harvest with
+`python3 scripts/harvest_rsoxs.py --harvest-pending`.
+
 Replay the BL 11.0.1.2 ops graph (appends `storage/kg/matkg_bl1101_vN.json`):
 
 ```bash
 python3 scripts/ingest_bl1101.py --from-scratch
+```
+
+JSON-first Tiled Graph **simulation** (copies `matkg_bl1101_v4.json`, writes `v5`; seed `20260916`):
+
+```bash
+python3 scripts/ingest_tiled_sim.py --from-graph storage/kg/matkg_bl1101_v4.json --snapshot 5
+python3 scripts/ingest_tiled_sim.py --to-tiled
+```
+
+`--to-tiled` writes the fixture identity graph (5 ESAFs, proposals, samples,
+BlueskyRuns) into local Tiled GraphQL (`TILED_URI`, default
+`http://127.0.0.1:8001`). Needs `TILED_API_KEY`. Re-runs skip existing uri/name
+matches and leave unrelated catalog runs in place.
+
+Promote a **copy** of the live RSoXS extract into the next literature snapshot (does not write `extracted_terms_rsoxs_v1.json`):
+
+```bash
+python3 scripts/promote_rsoxs_snapshot.py
+```
+
+Build hybrid source-RAG indexes (gold/sample literature PDFs + ops docs). Full
+PDF reindex is opt-in:
+
+```bash
+python3 scripts/index_source_rag.py
+python3 scripts/index_source_rag.py --literature all
 ```
 
 ## Documentation/repository utility

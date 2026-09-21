@@ -75,6 +75,42 @@ Stepwise retrieval can decompose compound questions and merge seeds from
 multiple sub-questions before the final cap. Code snippet results have a
 separate cap so they cannot dominate the context.
 
+## Hybrid source RAG
+
+Source RAG is **opt-in** and defaults off. Graph-only JSON retrieval works
+without harvest PDFs or `storage/source_index/`. Enable it with Settings →
+**Source RAG**, or set `F2W_SOURCE_RAG=1` (alias `HYBRID_RAG_ENABLED=1`) as the
+server default. The UI can still override the session via Save Preferences or
+the `/chat` `source_rag` field. A missing literature or ops index is a clean
+skip; citations (`[PDF:]` / `[OPS:]`) appear only when RAG actually ran.
+
+When enabled, chat retrieval is
+`PaperRetriever → EvidenceRanker → ContextBuilder` beside the JSON KGs. Two
+indexes share one ranker and stay in separate directories:
+
+| Index | Path | Contents |
+|---|---|---|
+| Literature | `storage/source_index/literature/` | Harvest PDFs keyed by canonical Work (page-aware chunks) |
+| Ops | `storage/source_index/ops_bl1101/` | 11.0.1.2 HTML/md/READMEs (path + heading locator) |
+
+Evidence objects keep `source_kind` (`kg` \| `paper_chunk` \| `tiled_run`) and
+`source_type` (`literature` \| `ops`). Ops chunks stay `paper_chunk` with
+`provenance.corpus=bl1101`. Citations stay distinct: `[PDF: file p.N]` vs
+`[OPS: file §heading]`. A missing index is skipped; KG-only answers still work.
+
+Build or refresh indexes from the repo root (gold/sample literature is the
+default so this is not a multi-hour PDF reindex):
+
+```bash
+python3 scripts/index_source_rag.py
+python3 scripts/index_source_rag.py --literature all
+python3 scripts/index_source_rag.py --ops-only
+```
+
+Tiled `tiled_run` evidence in source RAG is still a stub. Chat ESAF / proposal /
+sample / BlueskyRun lookup uses live Tiled GraphQL (`app/modules/tiled_graph.py`)
+when enabled, with `matkg_bl1101_v5` JSON as fallback.
+
 ## Context construction
 
 The context builder renders only facts attached to selected/rendered nodes and
@@ -82,7 +118,7 @@ respects the soft character budget. Depending on available data it includes:
 
 - node ID, name, type, description, formula, and properties;
 - source-scoped publication metadata;
-- page context snippets or PDF snippets;
+- page-aware literature chunks and ops-doc passages from hybrid source RAG;
 - directed relationships between rendered nodes;
 - evidence strings;
 - code body, language, function, domain, and domain features; and
