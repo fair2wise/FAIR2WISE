@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent, type SetStateAction } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUp, Check, Copy, Share2 } from 'lucide-react';
 import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
 import { ExampleQuery } from './data/mockupData';
-import { GraphMockup, inducedSubgraph } from './GraphMockup';
-import { parseKgCitationNodeIds, splitAnswerHighlightSegments } from './kgCitations';
+import { GraphMockup, inducedSubgraph, type GraphMockupHandle } from './GraphMockup';
+import { CITE_FOCUS_HOPS, looksLikeTiledIdentityRef, resolveViewerNodeId } from './kgCatalog';
+import { parseKgCitationNodeIds, collectAnswerCitations, citationBibliographyLabel, citationLookupPool, splitAnswerCitationSegments, type AnswerCitation, type CitationSourceKind } from './kgCitations';
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import type { ChatMessage } from './chatSessions';
@@ -120,17 +122,178 @@ function DecisionCard({
   );
 }
 
-function AnswerHighlightText({ text }: { text: string }) {
-  const segments = splitAnswerHighlightSegments(text);
+function sourceKindLabel(kind: CitationSourceKind): string {
+  if (kind === 'paper') return 'Paper';
+  if (kind === 'ops') return 'Ops';
+  if (kind === 'rag') return 'RAG';
+  if (kind === 'tiled') return 'Tiled';
+  return 'KG';
+}
+
+function CitationChip({
+  citation,
+  onCitationClick,
+}: {
+  citation: AnswerCitation;
+  onCitationClick?: (nodeId: string) => void;
+}) {
+  const clickable = Boolean(onCitationClick && (citation.nodeId || citation.name));
+  const [tip, setTip] = useState<{ x: number; y: number; below: boolean } | null>(null);
+
+  function showTip(target: HTMLElement) {
+    const rect = target.getBoundingClientRect();
+    setTip({
+      x: Math.min(Math.max(rect.left + rect.width / 2, 152), window.innerWidth - 152),
+      y: rect.bottom + 8,
+      below: true,
+    });
+  }
+
+  return (
+    <span className="relative mx-0.5 inline-block">
+      <button
+        type="button"
+        aria-label={`Citation ${citation.n}: ${citation.name}`}
+        className={`inline-flex h-5 min-w-5 translate-y-[-0.15em] items-center justify-center rounded-full bg-sky-100 px-1.5 align-super text-[10px] font-semibold text-sky-800 hover:bg-sky-200 ${
+          clickable ? 'cursor-pointer' : 'cursor-default'
+        }`}
+        onPointerEnter={event => showTip(event.currentTarget)}
+        onPointerLeave={() => setTip(null)}
+        onFocus={event => showTip(event.currentTarget)}
+        onBlur={() => setTip(null)}
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!onCitationClick) return;
+          onCitationClick(citation.nodeId || citation.name);
+        }}
+        data-citation-chip={String(citation.n)}
+        data-citation-node={citation.nodeId || citation.name}
+      >
+        {citation.n}
+      </button>
+      {tip && createPortal(
+        <span
+          role="tooltip"
+          className={`pointer-events-none fixed z-50 w-72 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-3 text-left text-xs shadow-lg ${
+            tip.below ? '' : '-translate-y-full'
+          }`}
+          style={{ left: tip.x, top: tip.y }}
+        >
+          <span className="block font-semibold text-slate-800">{citation.name}</span>
+          <span className="mt-1 block text-[11px] text-slate-500">
+            {citation.type || 'Entity'}
+            {' · '}
+            {sourceKindLabel(citation.sourceKind)}
+            {citation.graphId ? ` · ${citation.graphId}` : ''}
+          </span>
+          {citation.snippet && (
+            <span className="mt-2 block max-h-28 overflow-y-auto leading-relaxed text-slate-600">
+              {citation.snippet}
+            </span>
+          )}
+        </span>,
+        document.body,
+      )}
+    </span>
+  );
+}
+
+function bibliographyLine(citation: AnswerCitation): string {
+  if (citation.sourceKind === 'tiled' || (citation.graphId || '').toLowerCase() === 'tiled') {
+    return citationBibliographyLabel(citation);
+  }
+  if (citation.title) {
+    const authors = formatAuthors(citation.authors);
+    const venue = [citation.venue, citation.year, citation.page ? `p.${citation.page}` : '']
+      .filter(Boolean)
+      .join(', ');
+    return [citation.title, authors, venue].filter(Boolean).join(' · ');
+  }
+  const ids = [
+    citation.esaf ? `ESAF ${citation.esaf}` : '',
+    citation.proposal ? `proposal ${citation.proposal}` : '',
+    citation.sample ? `sample ${citation.sample}` : '',
+    citation.scan ? `scan ${citation.scan}` : '',
+  ].filter(Boolean);
+  if (ids.length) {
+    return [citation.name, citation.graphId, ...ids].filter(Boolean).join(' · ');
+  }
+  return [citation.name, citation.type, citation.graphId || sourceKindLabel(citation.sourceKind)]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function CitationBibliography({
+  citations,
+  onCitationClick,
+}: {
+  citations: AnswerCitation[];
+  onCitationClick?: (nodeId: string) => void;
+}) {
+  if (citations.length === 0) return null;
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">References</p>
+      <ol className="space-y-1.5">
+        {citations.map(citation => (
+          <li key={`${citation.n}:${citation.raw}`}>
+            <button
+              type="button"
+              className={`flex w-full gap-2 rounded-md px-1 py-0.5 text-left text-xs leading-relaxed text-slate-600 ${
+                onCitationClick && (citation.nodeId || citation.name) ? 'hover:bg-sky-50' : 'cursor-default'
+              }`}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!onCitationClick) return;
+                onCitationClick(citation.nodeId || citation.name);
+              }}
+              data-citation-ref={String(citation.n)}
+              data-citation-node={citation.nodeId || citation.name}
+            >
+              <span className="w-4 shrink-0 font-semibold text-sky-700">{citation.n}.</span>
+              <span>
+                <span className="mr-1 rounded bg-slate-100 px-1 py-px text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  {sourceKindLabel(citation.sourceKind)}
+                </span>
+                {bibliographyLine(citation)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function AnswerHighlightText({
+  text,
+  citations = [],
+  onCitationClick,
+}: {
+  text: string;
+  citations?: AnswerCitation[];
+  onCitationClick?: (nodeId: string) => void;
+}) {
+  const segments = splitAnswerCitationSegments(text, citations);
   return (
     <>
-      {segments.map((segment, i) =>
-        segment.bold ? (
-          <strong key={i} className="font-semibold text-sky-900">{segment.text}</strong>
-        ) : (
-          <span key={i}>{segment.text}</span>
-        )
-      )}
+      {segments.map((segment, i) => {
+        if (segment.type === 'cite') {
+          return (
+            <CitationChip
+              key={`cite-${i}-${segment.citation.n}`}
+              citation={segment.citation}
+              onCitationClick={onCitationClick}
+            />
+          );
+        }
+        if (segment.bold) {
+          return <strong key={i} className="font-semibold text-sky-900">{segment.text}</strong>;
+        }
+        return <span key={i}>{segment.text}</span>;
+      })}
     </>
   );
 }
@@ -180,11 +343,29 @@ function isExtractionSkipped(message: ChatMessage): boolean {
     && /will not run extraction/i.test(message.content);
 }
 
+const CITE_FOCUS_STORAGE_KEY = 'fair2wise.citeFocusNodeId';
 const HIDE_KG_LINK_STATUSES = new Set([
   'awaiting_download_decision',
   'awaiting_extraction_decision',
   'no_new_papers',
 ]);
+
+function readStoredCiteFocus(): string | null {
+  try {
+    return window.sessionStorage.getItem(CITE_FOCUS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredCiteFocus(nodeId: string | null) {
+  try {
+    if (nodeId) window.sessionStorage.setItem(CITE_FOCUS_STORAGE_KEY, nodeId);
+    else window.sessionStorage.removeItem(CITE_FOCUS_STORAGE_KEY);
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
 
 function shouldShowKnowledgeGraph(message: ChatMessage): boolean {
   if ((message.highlightNodeIds?.length ?? 0) === 0) return false;
@@ -257,7 +438,21 @@ function parseMessageSegments(text: string): MessageSegment[] {
   return segments;
 }
 
-function MessageText({ text, cursor = false }: { text: string; cursor?: boolean }) {
+function MessageText({
+  text,
+  cursor = false,
+  nodes = [],
+  publications = [],
+  onCitationClick,
+}: {
+  text: string;
+  cursor?: boolean;
+  nodes?: GraphPayload['nodes'];
+  publications?: PublicationInfo[];
+  onCitationClick?: (nodeId: string) => void;
+}) {
+  const lookup = citationLookupPool(text, nodes);
+  const citations = collectAnswerCitations(text, lookup, publications);
   const segments = parseMessageSegments(text);
   const lastIndex = segments.length - 1;
   return (
@@ -278,12 +473,17 @@ function MessageText({ text, cursor = false }: { text: string; cursor?: boolean 
           const cursorHere = cursor && isLast && j === paras.length - 1;
           return (
             <p key={`${i}-${j}`} className="whitespace-pre-wrap">
-              <AnswerHighlightText text={para} />
+              <AnswerHighlightText
+                text={para}
+                citations={citations}
+                onCitationClick={onCitationClick}
+              />
               {cursorHere && <span className="ml-px animate-pulse text-slate-400">▌</span>}
             </p>
           );
         });
       })}
+      <CitationBibliography citations={citations} onCitationClick={onCitationClick} />
     </div>
   );
 }
@@ -321,6 +521,7 @@ interface Props {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   onGraphUpdate: (graph: GraphPayload) => void;
   onSelect: (q: ExampleQuery) => void;
+  onLoadCatalog?: () => void;
 }
 const MAX_REQUEST_HISTORY_MESSAGES = 8;
 
@@ -372,6 +573,26 @@ export function queryGraphFromResult(result: AgentChatResponse): GraphPayload | 
   if (payload.nodes.length === 0) return null;
   const present = new Set(payload.nodes.map(node => node.id));
   const matched = ids.filter(id => present.has(id));
+  const tiledIds = new Set(
+    payload.nodes
+      .filter(node => (node.graph_id || '').toLowerCase().startsWith('tiled'))
+      .map(node => node.id),
+  );
+  if (tiledIds.size > 0) {
+    const wanted = new Set(matched.length ? matched : ids);
+    for (const id of tiledIds) wanted.add(id);
+    for (const edge of payload.edges) {
+      if (tiledIds.has(edge.source) || tiledIds.has(edge.target)) {
+        wanted.add(edge.source);
+        wanted.add(edge.target);
+      }
+    }
+    return {
+      nodes: payload.nodes.filter(node => wanted.has(node.id)),
+      edges: payload.edges.filter(edge => wanted.has(edge.source) && wanted.has(edge.target)),
+      source_path: payload.source_path,
+    };
+  }
   if (matched.length === 0) return inducedSubgraph(payload, ids);
   // Already the retrieve neighborhood (or a close subset) — keep dual-KG tags.
   if (payload.nodes.length <= Math.max(matched.length, ids.length)) return payload;
@@ -386,7 +607,7 @@ export function raiseViewerLimit(
   return previous < queriedCount ? 'all' : previous;
 }
 
-export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessages, onGraphUpdate, onSelect }: Props) {
+export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessages, onGraphUpdate, onSelect, onLoadCatalog }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [steps, setSteps] = useState<ThinkingStep[]>([]);
@@ -400,6 +621,9 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isKgViewer, setIsKgViewer] = useState(false);
   const [kgViewerNodeLimit, setKgViewerNodeLimit] = useState<number | 'all'>(100);
+  const graphRef = useRef<GraphMockupHandle>(null);
+  const [citeFocusNodeId, setCiteFocusNodeId] = useState<string | null>(() => readStoredCiteFocus());
+  const prevSessionIdRef = useRef(sessionId);
   const endRef = useRef<HTMLDivElement>(null);
   const activeRequestRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
@@ -453,11 +677,22 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   }, [isThinking]);
 
   useEffect(() => {
+    const switched = prevSessionIdRef.current !== sessionId;
+    prevSessionIdRef.current = sessionId;
     stopGeneration();
     setInputValue('');
     setCopiedMessageId(null);
     setPinnedViewId(null);
+    if (switched) {
+      setCiteFocusNodeId(null);
+      writeStoredCiteFocus(null);
+    }
     const lastAssistant = [...messages].reverse().find(message => message.role === 'assistant');
+    if (lastAssistant?.retrievedGraph?.nodes.length) {
+      setQueryGraph(lastAssistant.retrievedGraph);
+    } else if (switched) {
+      setQueryGraph(null);
+    }
     if (lastAssistant) {
       if ((lastAssistant.highlightNodeIds?.length ?? 0) > 0) {
         setPinnedViewId(lastAssistant.id);
@@ -467,6 +702,17 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
       onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
     }
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!citeFocusNodeId) return;
+    const resolved = (queryGraph ? resolveViewerNodeId(queryGraph, citeFocusNodeId) : null)
+      || (streamGraph ? resolveViewerNodeId(streamGraph, citeFocusNodeId) : null)
+      || (looksLikeTiledIdentityRef(citeFocusNodeId) ? null : resolveViewerNodeId(graph, citeFocusNodeId));
+    if (resolved && resolved !== citeFocusNodeId) {
+      setCiteFocusNodeId(resolved);
+      writeStoredCiteFocus(resolved);
+    }
+  }, [citeFocusNodeId, graph, queryGraph, streamGraph]);
 
   useEffect(() => {
     return () => {
@@ -556,6 +802,9 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
       elapsedSeconds: elapsed,
       publications: result.publications ?? [],
       pending: result.pending ?? null,
+      retrievedGraph: nextQueryGraph && nextQueryGraph.nodes.length <= 1500
+        ? nextQueryGraph
+        : undefined,
     };
     setStreamedLen(0);
     if (assistantMessage.content && !assistantMessage.pending) {
@@ -596,6 +845,8 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
     setStreamNodeIds([]);
     setQueryGraph(null);
     setPinnedViewId(null);
+    setCiteFocusNodeId(null);
+    writeStoredCiteFocus(null);
     onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
     const controller = new AbortController();
     const requestId = requestSeqRef.current + 1;
@@ -746,6 +997,8 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
 
     if (pinnedViewId === message.id) {
       setPinnedViewId(null);
+      setCiteFocusNodeId(null);
+      writeStoredCiteFocus(null);
       onSelect({ id: 'idle', question: '', answer: '', nodeIds: [], confidence: 0 });
       return;
     }
@@ -796,22 +1049,53 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
 
     return message.publications ?? [];
   }, [citationMessageId, messages]);
+  const citationLookupSource = useMemo(() => {
+    const merged: typeof graph.nodes = [];
+    const seen = new Set<string>();
+    for (const extra of [streamGraph, queryGraph, (streamGraph || queryGraph) ? null : { nodes: graph.nodes }]) {
+      if (!extra) continue;
+      for (const node of extra.nodes) {
+        if (seen.has(node.id)) continue;
+        seen.add(node.id);
+        merged.push(node);
+      }
+    }
+    return merged;
+  }, [graph.nodes, queryGraph, streamGraph]);
+  const citationLookupNodes = useMemo(() => {
+    const highlightedIds = isThinking && streamNodeIds.length ? streamNodeIds : activeQuery.nodeIds;
+    return citationLookupPool(
+      citationAnswerText,
+      citationLookupSource,
+      highlightedIds,
+    );
+  }, [activeQuery.nodeIds, citationAnswerText, citationLookupSource, isThinking, streamNodeIds]);
   const citedNodeIds = useMemo(() => {
     if (!citationMessageId) return [];
-
-    const highlightedIds = activeQuery.nodeIds;
-    const lookupNodes = highlightedIds.length > 0
-      ? displayGraph.nodes.filter(node => highlightedIds.includes(node.id))
-      : displayGraph.nodes;
-    return parseKgCitationNodeIds(citationAnswerText, lookupNodes, citationPublications);
+    return parseKgCitationNodeIds(citationAnswerText, citationLookupNodes, citationPublications);
   }, [
     citationMessageId,
     citationAnswerText,
     citationPublications,
-    displayGraph.nodes,
-    activeQuery.nodeIds,
+    citationLookupNodes,
   ]);
   const citationAnimationKey = citationMessageId && citedNodeIds.length > 0 ? citationMessageId : '';
+
+  function focusCitedNode(nodeId: string) {
+    const trimmed = nodeId.trim();
+    if (!trimmed) return;
+    const resolved = (queryGraph ? resolveViewerNodeId(queryGraph, trimmed) : null)
+      || (streamGraph ? resolveViewerNodeId(streamGraph, trimmed) : null)
+      || (looksLikeTiledIdentityRef(trimmed) ? trimmed : resolveViewerNodeId(graph, trimmed))
+      || trimmed;
+    setCiteFocusNodeId(resolved);
+    writeStoredCiteFocus(resolved);
+    setIsKgViewer(false);
+
+    window.requestAnimationFrame(() => {
+      graphRef.current?.focusNode(resolved);
+    });
+  }
 
   function handleGraphNodeUpdated(updated: GraphPayload['nodes'][number], refreshedGraph?: GraphPayload) {
     if (refreshedGraph) {
@@ -833,13 +1117,23 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
 
   const graphView = (
     <GraphMockup
-      graph={displayGraph}
+      ref={graphRef}
+      graph={isKgViewer ? graph : { nodes: [], edges: [], source_path: graph.source_path }}
+      retrievedGraph={streamGraph ?? queryGraph}
+      citeFocusNodeId={citeFocusNodeId}
+      citeFocusHops={CITE_FOCUS_HOPS}
       highlightedNodeIds={isThinking && streamNodeIds.length ? streamNodeIds : activeQuery.nodeIds}
       citedNodeIds={citedNodeIds}
       citationAnimationKey={citationAnimationKey}
       isKgViewer={isKgViewer}
       kgViewerNodeLimit={kgViewerNodeLimit}
-      onToggleKgViewer={() => setIsKgViewer(value => !value)}
+      onToggleKgViewer={() => {
+        setIsKgViewer(value => {
+          const next = !value;
+          if (next && graph.nodes.length === 0) onLoadCatalog?.();
+          return next;
+        });
+      }}
       onKgViewerNodeLimitChange={setKgViewerNodeLimit}
       onNodeUpdated={handleGraphNodeUpdated}
     />
@@ -901,7 +1195,12 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                     {message.content && (
                                       <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
                                         <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
-                                          <MessageText text={message.content} />
+                                          <MessageText
+                                            text={message.content}
+                                            nodes={citationLookupSource}
+                                            publications={message.publications ?? []}
+                                            onCitationClick={focusCitedNode}
+                                          />
                                         </div>
                                       </div>
                                     )}
@@ -917,7 +1216,13 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                 <div>
                                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
                                     <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
-                                      <MessageText text={displayText} cursor={showAnswerCursor} />
+                                      <MessageText
+                                        text={displayText}
+                                        cursor={showAnswerCursor}
+                                        nodes={citationLookupSource}
+                                        publications={publications}
+                                        onCitationClick={focusCitedNode}
+                                      />
                                       {!streaming && (
                                         <div className="mt-2 flex justify-start">
                                           <button

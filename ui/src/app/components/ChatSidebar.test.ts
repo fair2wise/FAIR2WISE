@@ -71,4 +71,35 @@ describe('query viewer binding', () => {
       { source: 'a', predicate: 'rel:related_to', target: 'b' },
     ]);
   });
+
+  it('keeps Tiled identity neighbors instead of inducing only hit ids', () => {
+    const result: AgentChatResponse = {
+      status: 'answered',
+      answer: 'ok',
+      sufficient: true,
+      node_ids: ['beamline:ESAF-2026-00043'],
+      confidence: 1,
+      rounds: [],
+      graph: {
+        source_path: 'tiled://graphql',
+        nodes: [
+          { id: 'beamline:ESAF-2026-00043', label: 'ESAF 2026-00043', type: 'ESAF', description: '', graph_id: 'tiled' },
+          { id: 'beamline:Proposal-P202600043-01', label: 'Proposal P202600043-01', type: 'Proposal', description: '', graph_id: 'tiled' },
+          { id: 'matkg:P3HT', label: 'P3HT', type: 'Material', description: '', graph_id: 'rsoxs_v1' },
+        ],
+        edges: [
+          { source: 'beamline:ESAF-2026-00043', predicate: 'rel:hasProposal', target: 'beamline:Proposal-P202600043-01' },
+        ],
+      },
+      workdir: 'runs/session',
+    };
+    const queried = queryGraphFromResult(result);
+    expect(queried?.nodes.map(node => node.id).sort()).toEqual([
+      'beamline:ESAF-2026-00043',
+      'beamline:Proposal-P202600043-01',
+    ]);
+    expect(queried?.edges).toEqual([
+      { source: 'beamline:ESAF-2026-00043', predicate: 'rel:hasProposal', target: 'beamline:Proposal-P202600043-01' },
+    ]);
+  });
 });

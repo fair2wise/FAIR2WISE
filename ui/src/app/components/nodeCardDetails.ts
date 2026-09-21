@@ -240,7 +240,59 @@ const PROPERTY_LABELS: Record<string, string> = {
   technique_type: 'Technique type',
   raw_category: 'Raw category',
   code_domain: 'Code domain',
+  entityType: 'Entity type',
+  entity_type: 'Entity type',
+  esaf: 'ESAF',
+  esaf_number: 'ESAF',
+  esaf_id: 'ESAF',
+  proposal: 'Proposal',
+  proposal_code: 'Proposal',
+  proposal_id: 'Proposal',
+  sample: 'Sample',
+  sample_code: 'Sample',
+  sample_id: 'Sample',
+  sample_name: 'Sample',
+  scan: 'Scan',
+  scan_id: 'Scan',
+  scientist: 'Scientist',
+  co_scientist: 'Co-scientist',
+  plan_name: 'Plan',
+  uid: 'UID',
+  uri: 'URI',
+  graphql_id: 'GraphQL ID',
+  nodeId: 'Tiled node ID',
+  node_id: 'Tiled node ID',
 };
+
+const SKIP_PROPERTY_KEYS = new Set([
+  'haystack',
+  'outgoinglinks',
+  'relations',
+  'properties',
+  'description',
+  'label',
+  'name',
+  'category',
+  'type',
+  'id',
+  'graph_id',
+  'graph_label',
+]);
+
+const TILED_IDENTITY_FIELDS: Array<{ label: string; keys: string[] }> = [
+  { label: 'Entity type', keys: ['entityType', 'entity_type'] },
+  { label: 'ESAF', keys: ['esaf', 'esaf_number', 'esaf_id'] },
+  { label: 'Proposal', keys: ['proposal', 'proposal_code', 'proposal_id'] },
+  { label: 'Sample', keys: ['sample', 'sample_code', 'sample_id', 'sample_name'] },
+  { label: 'Scan', keys: ['scan', 'scan_id'] },
+  { label: 'Scientist', keys: ['scientist'] },
+  { label: 'Co-scientist', keys: ['co_scientist'] },
+  { label: 'Plan', keys: ['plan_name'] },
+  { label: 'UID', keys: ['uid'] },
+  { label: 'URI', keys: ['uri'] },
+  { label: 'GraphQL ID', keys: ['graphql_id'] },
+  { label: 'Tiled node ID', keys: ['nodeId', 'node_id'] },
+];
 
 function humanizeKey(key: string): string {
   return PROPERTY_LABELS[key] || key.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
@@ -295,7 +347,23 @@ export function remainingNodeProperties(node: LiveGraphNode): NodePropertyRow[] 
     rows.push({ label, value: formatted });
   }
 
+  const bag: Record<string, unknown> = { ...(node.extra_fields || {}) };
+  const rawProperties = node.properties as unknown;
+  if (rawProperties && !Array.isArray(rawProperties) && typeof rawProperties === 'object') {
+    Object.assign(bag, rawProperties as Record<string, unknown>);
+  }
+  if (Array.isArray(node.properties)) {
+    for (const entry of node.properties) {
+      if (!entry || typeof entry !== 'object') continue;
+      const record = entry as Record<string, unknown>;
+      const name = asText(record.property || record.name);
+      if (name) bag[name] = record.value ?? record.feature_value;
+    }
+  }
+
+  add('Type', node.type);
   add('ID', node.id);
+  add('Graph', graphDisplayName(node));
   add('Formula', node.formula);
   add('Function', node.function_name);
   add('Language', node.code_language);
@@ -311,15 +379,29 @@ export function remainingNodeProperties(node: LiveGraphNode): NodePropertyRow[] 
   add('Commit', node.repo_commit_sha ? String(node.repo_commit_sha).slice(0, 12) : '');
   add('License', node.repository_license);
 
-  for (const entry of node.properties || []) {
-    const row = formatMatkgProperty(entry);
-    if (!row) continue;
-    if (seen.has(row.label.toLowerCase())) continue;
-    seen.add(row.label.toLowerCase());
-    rows.push(row);
+  for (const field of TILED_IDENTITY_FIELDS) {
+    const value = field.keys.map(key => bag[key]).find(item => formatScalar(item));
+    add(field.label, value);
   }
 
-  for (const [key, value] of Object.entries(node.extra_fields || {})) {
+  if (Array.isArray(node.properties)) {
+    for (const entry of node.properties) {
+      const record = entry as Record<string, unknown> | null;
+      const propName = asText(record?.property || record?.name).toLowerCase();
+      if (TILED_IDENTITY_FIELDS.some(field => field.keys.some(key => key.toLowerCase() === propName))) {
+        continue;
+      }
+      const row = formatMatkgProperty(entry);
+      if (!row) continue;
+      if (seen.has(row.label.toLowerCase())) continue;
+      seen.add(row.label.toLowerCase());
+      rows.push(row);
+    }
+  }
+
+  for (const [key, value] of Object.entries(bag)) {
+    if (SKIP_PROPERTY_KEYS.has(key.toLowerCase())) continue;
+    if (TILED_IDENTITY_FIELDS.some(field => field.keys.includes(key))) continue;
     if (Array.isArray(value)) {
       if (value.every(item => item && typeof item === 'object')) {
         for (const item of value) {

@@ -231,6 +231,12 @@ export interface AgentSettingsApiResponse {
   json_graph_paths?: string[];
   kg_query_max_nodes?: number;
   kg_query_hops?: number;
+  source_rag?: boolean;
+  use_live_tiled?: boolean;
+  tiled_uri?: string | null;
+  tiled_api_key_set?: boolean;
+  tiled_status?: string;
+  tiled_error?: string | null;
   available_json_graphs: string[];
   available_cborg_models: string[];
   default_ollama_model: string;
@@ -247,9 +253,28 @@ export interface AgentSettingsApiUpdate {
   json_graph_paths?: string[];
   kg_query_max_nodes?: number;
   kg_query_hops?: number;
+  source_rag?: boolean;
+  use_live_tiled?: boolean;
+  tiled_uri?: string | null;
 }
 
 import { agentNetworkErrorMessage, settingsApiErrorMessage } from '../agentApiErrors';
+import { loadAgentSettings } from '../agentSettings';
+
+function chatRequestBody(
+  message: string,
+  messages: AgentChatHistoryMessage[] = [],
+  sessionId?: string,
+) {
+  const settings = loadAgentSettings();
+  return {
+    message,
+    messages: nonEmptyHistory(messages),
+    session_id: sessionId,
+    source_rag: settings.sourceRag,
+    use_live_tiled: settings.useLiveTiled,
+  };
+}
 
 export async function fetchAgentSettings(): Promise<AgentSettingsApiResponse> {
   try {
@@ -313,11 +338,7 @@ export async function queryLiveAgentWithHistory(
   const response = await fetch(`${AGENT_API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message,
-      messages: nonEmptyHistory(messages),
-      session_id: sessionId,
-    }),
+    body: JSON.stringify(chatRequestBody(message, messages, sessionId)),
     signal,
   });
 
@@ -418,11 +439,7 @@ export async function queryLiveAgentStream(
     const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        messages: nonEmptyHistory(messages),
-        session_id: sessionId,
-      }),
+      body: JSON.stringify(chatRequestBody(message, messages, sessionId)),
       signal,
     });
 
@@ -588,6 +605,23 @@ export async function searchGraphNodes(
     throw new Error(detail || `Agent API returned ${response.status}`);
   }
 
+  return response.json();
+}
+
+export async function fetchGraphNeighborhood(
+  nodeId: string,
+  hops = 3,
+): Promise<GraphPayload> {
+  const params = new URLSearchParams();
+  if (hops > 0) params.set('hops', String(hops));
+  const query = params.toString();
+  const response = await fetch(
+    `${AGENT_API_BASE}/graph/neighborhood/${encodeURIComponent(nodeId)}${query ? `?${query}` : ''}`,
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || `Agent API returned ${response.status}`);
+  }
   return response.json();
 }
 

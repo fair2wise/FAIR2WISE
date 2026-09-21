@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteAgentSession,
+  fetchGraphNeighborhood,
   queryAgentActionStream,
   queryLiveAgentWithHistory,
   resetAgentSession,
@@ -41,6 +42,8 @@ describe('liveAgent chat requests', () => {
         { role: 'assistant', content: 'P3HT is first. PTB7 is second.' },
       ],
       session_id: 'chat-123',
+      source_rag: false,
+      use_live_tiled: false,
     });
   });
 
@@ -115,6 +118,23 @@ describe('liveAgent chat requests', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain('/session/chat-123');
     expect(init?.method).toBe('DELETE');
+  });
+
+  it('fetches a Tiled identity neighborhood from the agent API', async () => {
+    const responseBody = {
+      source_path: 'tiled://graphql',
+      nodes: [{ id: 'beamline:ESAF-2026-00043', label: 'ESAF 2026-00043', type: 'ESAF', description: '' }],
+      edges: [],
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(responseBody), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchGraphNeighborhood('ESAF-2026-00043', 3);
+
+    expect(result).toEqual(responseBody);
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain('/graph/neighborhood/ESAF-2026-00043');
+    expect(String(url)).toContain('hops=3');
   });
 
   it('searches nodes in the active graph', async () => {

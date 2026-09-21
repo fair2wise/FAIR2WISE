@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseKgCitationNodeIds, splitAnswerHighlightSegments } from './kgCitations';
+import { collectAnswerCitations, citationBibliographyLabel, parseInlineCite, parseKgCitationNodeIds, resolveInlineCiteNodeId, splitAnswerCitationSegments, splitAnswerHighlightSegments } from './kgCitations';
 import type { LiveGraphNode } from './data/liveAgent';
 
 const nodes: LiveGraphNode[] = [
@@ -46,6 +46,99 @@ describe('splitAnswerHighlightSegments', () => {
 });
 
 describe('kgCitations', () => {
+  it('resolves graph_id-prefixed KG citations without concatenating catalogs', () => {
+    const dual: LiveGraphNode[] = [
+      { id: 'matkg:p3ht', label: 'P3HT', type: 'Material', description: '', graph_id: 'rsoxs_v1' },
+      { id: 'beamline:scan-301', label: 'scan 301 scan', type: 'BlueskyPlan', description: '', graph_id: 'bl1101' },
+    ];
+    expect(parseKgCitationNodeIds('Ops [KG:bl1101: scan 301 scan] and P3HT [KG:rsoxs_v1: P3HT].', dual)).toEqual([
+      'beamline:scan-301',
+      'matkg:p3ht',
+    ]);
+    expect(resolveInlineCiteNodeId('[KG:bl1101: scan 301 scan]', dual)).toBe('beamline:scan-301');
+    expect(parseInlineCite('[PDF: paper.pdf p.12]')?.kind).toBe('pdf');
+    expect(parseInlineCite('[OPS: blueprint.html §Motors]')?.kind).toBe('ops');
+  });
+
+  it('numbers distinct citations and keeps source kinds separate', () => {
+    const dual: LiveGraphNode[] = [
+      { id: 'matkg:p3ht', label: 'P3HT', type: 'Material', description: 'Donor polymer.', graph_id: 'rsoxs_v1' },
+      {
+        id: 'beamline:scan-301',
+        label: 'scan 301',
+        type: 'BlueskyPlan',
+        description: 'Azimuth scan.',
+        graph_id: 'bl1101',
+        extra_fields: { esaf: 'P202600045-01', proposal: 'S01', sample: 'S01', scan: '301' },
+      },
+    ];
+    const answer = 'Literature [KG: P3HT] and again [KG:rsoxs_v1: P3HT]. Ops [KG:bl1101: scan 301]. PDF [PDF: paper.pdf p.12]. Doc [OPS: blueprint.html §Motors].';
+    const citations = collectAnswerCitations(answer, dual, [{
+      source_paper: 'paper.pdf',
+      paper_title: 'A paper about P3HT',
+      authors: ['Ada'],
+      journal: 'Nature',
+      publication_year: 2020,
+    }]);
+
+    expect(citations.map(item => [item.n, item.sourceKind, item.name])).toEqual([
+      [1, 'kg', 'P3HT'],
+      [2, 'ops', 'scan 301'],
+      [3, 'rag', 'paper.pdf'],
+      [4, 'ops', 'blueprint.html §Motors'],
+    ]);
+    expect(citations[0].graphId).toBe('rsoxs_v1');
+    expect(citations[1].esaf).toBe('P202600045-01');
+    expect(citations[2].title).toBe('A paper about P3HT');
+    expect(citations[2].page).toBe('12');
+    expect(splitAnswerCitationSegments(answer, citations).filter(item => item.type === 'cite')).toHaveLength(5);
+  });
+
+  it('still numbers a cite when the agent payload has no metadata', () => {
+    const citations = collectAnswerCitations('See [KG: mystery node].', []);
+    expect(citations).toEqual([
+      expect.objectContaining({ n: 1, name: 'mystery node', nodeId: null, sourceKind: 'kg' }),
+    ]);
+  });
+
+  it('does not hang when a citation needle is empty', () => {
+    const citations = collectAnswerCitations('See [KG: mystery node].', []);
+    citations[0].raw = '';
+    citations[0].aliases = [''];
+    const segments = splitAnswerCitationSegments('See [KG: mystery node].', citations);
+    expect(segments.some(segment => segment.type === 'text' && segment.text.includes('[KG: mystery node]'))).toBe(true);
+  });
+
+  it('resolves P3HT from a large node list without scanning every publication', () => {
+    const many: LiveGraphNode[] = Array.from({ length: 500 }, (_, index) => ({
+      id: `matkg:n${index}`,
+      label: `Node ${index}`,
+      type: 'Material',
+      description: '',
+      publications: [{ source_paper: `paper-${index}.pdf`, paper_title: `Title ${index}` }],
+    }));
+    many[250] = { id: 'matkg:p3ht', label: 'p3ht', type: 'Unknown', description: 'Donor polymer.', graph_id: 'rsoxs_v1' };
+    const citations = collectAnswerCitations('Cited [KG: P3HT].', many);
+    expect(citations).toEqual([
+      expect.objectContaining({ n: 1, nodeId: 'matkg:p3ht', sourceKind: 'kg' }),
+    ]);
+  });
+
+  it('prefers a typed P3HT ConjugatedPolymer over an Unknown p3ht node', () => {
+    const nodes: LiveGraphNode[] = [
+      { id: 'matkg:p3ht', label: 'p3ht', type: 'Unknown', description: '', graph_id: 'rsoxs_v1' },
+      {
+        id: 'matkg:P3HT ConjugatedPolymer',
+        label: 'P3HT ConjugatedPolymer',
+        type: 'ConjugatedPolymer',
+        description: '',
+        graph_id: 'rsoxs_v1',
+      },
+    ];
+    const citations = collectAnswerCitations('Cited [KG: P3HT].', nodes);
+    expect(citations[0]?.nodeId).toBe('matkg:P3HT ConjugatedPolymer');
+  });
+
   it('extracts cited node ids in answer order', () => {
     const answer =
       'P3HT is a donor [KG: P3HT]. OPV devices [KG: Organic Photovoltaic Device] reach high PCE [KG: Power Conversion Efficiency].';
@@ -169,5 +262,30 @@ def find_scattering_peaks(q, intensity):
 
     const answer = 'As described in Machine Learning-Assisted Analysis of Small Angle X-ray Scattering, soft matter systems are common in SAXS.';
     expect(parseKgCitationNodeIds(answer, [softMatterNode])).toEqual(['matkg:softmattersystems']);
+  });
+
+  it('labels Tiled ESAF citations as ESAF 2026-00043 instead of Entity stubs', () => {
+    const esaf: LiveGraphNode = {
+      id: 'beamline:ESAF-2026-00043',
+      label: 'ESAF 2026-00043',
+      type: 'ESAF',
+      description: 'PVD glasses; scientist Cheng Wang',
+      graph_id: 'tiled',
+      extra_fields: { esaf_number: '2026-00043', scientist: 'Cheng Wang', entityType: 'ESAF' },
+      properties: [
+        { property: 'esaf_number', value: '2026-00043' },
+        { property: 'scientist', value: 'Cheng Wang' },
+      ],
+    };
+    const citations = collectAnswerCitations(
+      'See [KG:tiled: ESAF-2026-00043] and [KG:tiled: PageESAFs].',
+      [esaf],
+    );
+    expect(citations.map(item => [item.n, item.name, item.type])).toEqual([
+      [1, 'ESAF 2026-00043', 'ESAF'],
+    ]);
+    expect(citations[0].nodeId).toBe('beamline:ESAF-2026-00043');
+    expect(citations[0].esaf).toBe('2026-00043');
+    expect(citationBibliographyLabel(citations[0])).toBe('ESAF 2026-00043');
   });
 });

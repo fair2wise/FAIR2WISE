@@ -194,6 +194,9 @@ export function AppSettingsButton({
   const [error, setError] = useState('');
   const [errorTitle, setErrorTitle] = useState('Settings update failed');
   const [cborgPickerOpen, setCborgPickerOpen] = useState(false);
+  const [tiledStatus, setTiledStatus] = useState<string | undefined>();
+  const [tiledApiKeySet, setTiledApiKeySet] = useState(false);
+  const [tiledError, setTiledError] = useState<string | null>(null);
 
   const hasUnsavedChanges = !settingsEqual(draftSettings, savedSettings);
 
@@ -214,7 +217,20 @@ export function AppSettingsButton({
         setAvailableJsonGraphs(response.available_json_graphs ?? []);
         setAvailableCborgModels(response.available_cborg_models ?? []);
         setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
+        setTiledStatus(response.tiled_status);
+        setTiledApiKeySet(response.tiled_api_key_set === true);
+        setTiledError(response.tiled_error ?? null);
         const synced = settingsFromApiResponse(response);
+        setDraftSettings(prev => ({
+          ...prev,
+          useLiveTiled: synced.useLiveTiled,
+          tiledUri: synced.tiledUri || prev.tiledUri,
+        }));
+        setSavedSettings(prev => ({
+          ...prev,
+          useLiveTiled: synced.useLiveTiled,
+          tiledUri: synced.tiledUri || prev.tiledUri,
+        }));
         if (!response.available_json_graphs?.includes(saved.jsonGraphPath) && synced.jsonGraphPath) {
           setDraftSettings(prev => ({
             ...prev,
@@ -267,6 +283,9 @@ export function AppSettingsButton({
           : synced.jsonGraphPaths,
         kgQueryMaxNodes: draftSettings.kgQueryMaxNodes,
         kgQueryHops: draftSettings.kgQueryHops,
+        sourceRag: draftSettings.sourceRag,
+        useLiveTiled: draftSettings.useLiveTiled,
+        tiledUri: draftSettings.tiledUri,
       };
       setSavedSettings(saved);
       setDraftSettings(saved);
@@ -274,6 +293,9 @@ export function AppSettingsButton({
       setAvailableJsonGraphs(response.available_json_graphs ?? []);
       setAvailableCborgModels(response.available_cborg_models ?? []);
       setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
+      setTiledStatus(response.tiled_status);
+      setTiledApiKeySet(response.tiled_api_key_set === true);
+      setTiledError(response.tiled_error ?? null);
       await onSettingsApplied?.();
       setCborgPickerOpen(false);
       setOpen(false);
@@ -616,6 +638,91 @@ export function AppSettingsButton({
                 </div>
               </div>
             )}
+
+            <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+              <label htmlFor="live-tiled" className="flex cursor-pointer items-start gap-3">
+                <input
+                  id="live-tiled"
+                  type="checkbox"
+                  className="mt-1 size-4 accent-sky-600"
+                  checked={draftSettings.useLiveTiled}
+                  disabled={loading || saving}
+                  onChange={event => setDraftSettings(prev => ({
+                    ...prev,
+                    useLiveTiled: event.target.checked,
+                  }))}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-slate-800">Live Tiled Graph</span>
+                  <span className="block text-xs text-slate-500">
+                    ESAF / proposal / sample / scan questions query the <strong>local</strong> Tiled
+                    {' '}<code>/api/graphql</code> first. JSON sim is the fallback when Tiled is down.
+                    Keep <code>TILED_API_KEY</code> in <code>.env</code> — it is never shown here.
+                    ALS production Tiled is not used.
+                  </span>
+                </span>
+              </label>
+              <div className="space-y-1 pl-7">
+                <Label htmlFor="tiled-uri" className="text-xs font-medium text-slate-500">
+                  Tiled URI
+                </Label>
+                <input
+                  id="tiled-uri"
+                  type="url"
+                  value={draftSettings.tiledUri}
+                  disabled={loading || saving || !draftSettings.useLiveTiled}
+                  onChange={event => setDraftSettings(prev => ({
+                    ...prev,
+                    tiledUri: event.target.value,
+                  }))}
+                  placeholder="http://127.0.0.1:8001"
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <p className="text-xs text-slate-500">
+                  Local catalog host without <code>/api/graphql</code> (this machine uses
+                  {' '}<code>127.0.0.1:8001</code>; nothing is on 8000). Keep the key in
+                  {' '}<code>.env</code> — never paste it here.
+                </p>
+                {draftSettings.useLiveTiled && (
+                  <p className="text-xs text-slate-600">
+                    Status: <code>{tiledStatus || '…'}</code>
+                    {' · '}API key in env: {tiledApiKeySet ? 'yes' : 'no'}
+                    {tiledStatus === 'unsigned' && !tiledApiKeySet
+                      ? ' · No key in .env (unsigned). GraphQL reads can be empty.'
+                      : ''}
+                    {tiledStatus === 'empty' && tiledApiKeySet
+                      ? ' · Key is loaded; this local catalog has no ESAF/Proposal/Sample graph.'
+                      : ''}
+                    {tiledStatus === 'ok' && tiledApiKeySet
+                      ? ' · Key is loaded; GraphQL returned identity entities.'
+                      : ''}
+                    {tiledError && tiledStatus !== 'ok' ? ` · ${tiledError}` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+              <label htmlFor="source-rag" className="flex cursor-pointer items-start gap-3">
+                <input
+                  id="source-rag"
+                  type="checkbox"
+                  className="mt-1 size-4 accent-sky-600"
+                  checked={draftSettings.sourceRag}
+                  disabled={loading || saving}
+                  onChange={event => setDraftSettings(prev => ({
+                    ...prev,
+                    sourceRag: event.target.checked,
+                  }))}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-slate-800">Source RAG</span>
+                  <span className="block text-xs text-slate-500">
+                    Retrieve from papers &amp; ops docs. Off = graph-only. Hosts without PDFs should leave this off.
+                  </span>
+                </span>
+              </label>
+            </div>
 
             {error && (
               <AppErrorMessage title={errorTitle} className="text-xs">

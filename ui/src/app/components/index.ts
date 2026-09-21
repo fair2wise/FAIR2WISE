@@ -1,5 +1,5 @@
 export { GraphMockup } from './GraphMockup';
-export type { GraphMockupProps } from './GraphMockup';
+export type { GraphMockupHandle, GraphMockupProps } from './GraphMockup';
 export { AsciiOrb } from './AsciiOrb';
 
 export { ChatSidebar } from './ChatSidebar';

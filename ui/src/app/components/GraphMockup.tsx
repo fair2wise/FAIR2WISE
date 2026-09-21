@@ -1,12 +1,27 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Crosshair, ExternalLink, Loader2, Maximize2, Pencil, Plus, Search, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { AsciiOrb } from './AsciiOrb';
 import { CodeBlock } from './CodeBlock';
+import { ForceDirectedCanvas, type ForceDirectedCanvasHandle } from './ForceDirectedCanvas';
 import { KGHoverPopup, KGHoverTarget } from './KGInfoPanel';
+import {
+  CITE_FOCUS_HOPS,
+  catalogIdsFromGraph,
+  graphIdFromPath,
+  honorViewerCatalogs,
+  hasTiledIdentityEdges,
+  looksLikeTiledIdentityRef,
+  mergeGraphPayloads,
+  neighborhoodSubgraph,
+  overlayCatalogColor,
+  resolveViewerNodeId,
+  type KgLayoutMode,
+} from './kgCatalog';
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import { loadAgentSettings } from './agentSettings';
 import {
+  fetchGraphNeighborhood,
   fetchGraphNodeDetail,
   fetchLiveGraph,
   GraphPayload,
@@ -54,8 +69,19 @@ interface ViewBox {
   height: number;
 }
 
+export type { KgLayoutMode };
+
+export interface GraphMockupHandle {
+  focusNode: (nodeId: string) => boolean;
+}
+
 export interface GraphMockupProps {
   graph: GraphPayload;
+  /** Retrieve neighborhood for the current answer. Cite hops still use `graph`. */
+  retrievedGraph?: GraphPayload | null;
+  /** Cite-click focus from chat. Drives the 3-hop view even if search state was reset. */
+  citeFocusNodeId?: string | null;
+  citeFocusHops?: number;
   highlightedNodeIds: string[];
   /** Node IDs cited in the answer via [KG: ...], in citation order. */
   citedNodeIds?: string[];
@@ -100,19 +126,19 @@ export function normalizeRelationshipPredicate(value: string): string | null {
 }
 
 export function oneHopNodeIds(graph: GraphPayload, nodeId: string): string[] {
-  const ids = new Set([nodeId]);
-  for (const edge of graph.edges) {
-    if (edge.source === nodeId) ids.add(edge.target);
-    if (edge.target === nodeId) ids.add(edge.source);
-  }
-  return Array.from(ids);
+  const neighborhood = neighborhoodSubgraph(graph, nodeId, 1);
+  return neighborhood.nodes.length > 0
+    ? neighborhood.nodes.map(node => node.id)
+    : [nodeId];
 }
 
 export function inducedSubgraph(graph: GraphPayload, nodeIds: string[]): GraphPayload {
-  const wanted = new Set(nodeIds);
-  const nodes = graph.nodes.filter(
-    node => wanted.has(node.id) && !isUnknownNodeCategory(node.type),
-  );
+  if (nodeIds.length === 0) {
+    return { nodes: [], edges: [], source_path: graph.source_path };
+  }
+  const lowerToId = new Map(graph.nodes.map(node => [node.id.toLowerCase(), node.id]));
+  const wanted = new Set(nodeIds.map(id => lowerToId.get(id.toLowerCase()) ?? id));
+  const nodes = graph.nodes.filter(node => wanted.has(node.id));
   const visibleIds = new Set(nodes.map(node => node.id));
   return {
     nodes,
@@ -258,7 +284,7 @@ function layoutGraph(graph: GraphPayload): LayoutResult {
 
   // Full KGs can contain thousands of nodes. Golden-angle placement is stable and
   // linear; skip the quadratic force pass that is only useful for smaller subsets.
-  if (count > 300) return { nodes, width, height };
+  if (count > 80) return { nodes, width, height };
 
   const indexById = new Map(nodes.map((node, index) => [node.id, index]));
   const links = graph.edges
@@ -640,9 +666,36 @@ function NodeDetailPanel({
     setEditing(false);
     setSaveError(null);
 
+    if (looksLikeTiledIdentityRef(node.id, node)) {
+      return;
+    }
+
     fetchGraphNodeDetail(node.id, uploadedGraphQueryParam(graphSourcePath))
       .then(nextDetail => {
-        if (!cancelled) setDetail(nextDetail);
+        if (cancelled) return;
+        const fetchedUnknown = !nextDetail.type || nextDetail.type.toLowerCase() === 'unknown';
+        const overlayTyped = Boolean(node.type) && node.type.toLowerCase() !== 'unknown';
+        if (fetchedUnknown && overlayTyped) {
+          setDetail({
+            ...nextDetail,
+            ...node,
+            type: node.type,
+            properties: (node.properties && node.properties.length > 0)
+              ? node.properties
+              : nextDetail.properties,
+            extra_fields: { ...(nextDetail.extra_fields || {}), ...(node.extra_fields || {}) },
+          });
+          return;
+        }
+        setDetail({
+          ...node,
+          ...nextDetail,
+          type: nextDetail.type && nextDetail.type.toLowerCase() !== 'unknown' ? nextDetail.type : node.type,
+          properties: (nextDetail.properties && nextDetail.properties.length > 0)
+            ? nextDetail.properties
+            : node.properties,
+          extra_fields: { ...(node.extra_fields || {}), ...(nextDetail.extra_fields || {}) },
+        });
       })
       .catch(() => {
         // Keep inline node data on failure.
@@ -1261,8 +1314,14 @@ function NodeDetailPanel({
               const sourceLinks = collectNodeSourceLinks(display);
               const literature = publications.filter(isLiteraturePublication);
               const extraRows = remainingNodeProperties(display);
+              if (incidentRelationships.length > 0) {
+                extraRows.push({ label: 'Links', value: String(incidentRelationships.length) });
+              }
               return (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+                <div
+                  className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80"
+                  data-node-card={display.id}
+                >
                   {definition && (
                     <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
                       <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Definition</p>
@@ -1291,7 +1350,7 @@ function NodeDetailPanel({
                     </div>
                   )}
                   {extraRows.length > 0 && (
-                    <div className="border-t border-slate-200 px-4 py-3">
+                    <div className={`${definition || sourceLinks.length > 0 || literature.length > 0 ? 'border-t border-slate-200' : ''} px-4 py-3`}>
                       <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                         Properties
                       </p>
@@ -1384,6 +1443,8 @@ function NodeDetailPanel({
 
 function NodeHoverPreview({ node }: { node: LayoutNode }) {
   const color = node.color;
+  const definition = nodeDefinition(node);
+  const extraRows = remainingNodeProperties(node);
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-dashed border-slate-200 bg-white/90 shadow-sm">
       <div className="flex shrink-0 items-start gap-3 border-b border-slate-100 px-4 py-3">
@@ -1398,15 +1459,22 @@ function NodeHoverPreview({ node }: { node: LayoutNode }) {
         <span className="shrink-0 text-[10px] text-slate-400">Click to pin</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        {(nodeDefinition(node) || graphDisplayName(node)) && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
-            <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
-              {nodeDefinition(node) && (
-                <p className="whitespace-pre-wrap font-semibold text-slate-700">
-                  {nodeDefinition(node)}
+        {(definition || extraRows.length > 0) && (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80" data-node-card={node.id}>
+            {definition && (
+              <div className="px-4 py-3.5 text-sm leading-relaxed text-slate-700">
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">Definition</p>
+                <p className="whitespace-pre-wrap font-semibold text-slate-700">{definition}</p>
+              </div>
+            )}
+            {extraRows.length > 0 && (
+              <div className={`${definition ? 'border-t border-slate-200' : ''} px-4 py-3`}>
+                <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Properties
                 </p>
-              )}
-            </div>
+                <PropertyRows rows={extraRows} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1524,8 +1592,51 @@ function choosePopupPosition(
 const CITED_PULSE_MS = 2200;
 const CITED_SCALE = 1.35;
 
-export function GraphMockup({
+function LayoutModeSwitcher({
+  value,
+  onChange,
+}: {
+  value: KgLayoutMode;
+  onChange: (mode: KgLayoutMode) => void;
+}) {
+  const buttonClass = (active: boolean) =>
+    `h-8 whitespace-nowrap rounded px-3 text-xs font-medium transition ${
+      active
+        ? 'bg-sky-50 text-sky-700'
+        : 'text-slate-500 hover:bg-white hover:text-slate-700'
+    }`;
+
+  return (
+    <div
+      role="group"
+      aria-label="KG layout"
+      className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white p-0.5"
+    >
+      <button
+        type="button"
+        aria-pressed={value === 'existing'}
+        className={buttonClass(value === 'existing')}
+        onClick={() => onChange('existing')}
+      >
+        Existing
+      </button>
+      <button
+        type="button"
+        aria-pressed={value === 'force'}
+        className={buttonClass(value === 'force')}
+        onClick={() => onChange('force')}
+      >
+        Force-directed
+      </button>
+    </div>
+  );
+}
+
+export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(function GraphMockup({
   graph,
+  retrievedGraph = null,
+  citeFocusNodeId = null,
+  citeFocusHops = CITE_FOCUS_HOPS,
   highlightedNodeIds,
   citedNodeIds = [],
   citationAnimationKey = '',
@@ -1534,39 +1645,112 @@ export function GraphMockup({
   kgViewerNodeLimit = 100,
   onToggleKgViewer,
   onKgViewerNodeLimitChange,
-}: GraphMockupProps) {
+}, ref) {
   const [hoverPopup, setHoverPopup] = useState<HoverPopupState | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredNode, setHoveredNode] = useState<LayoutNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<LayoutNode | null>(null);
   const [searchedNodeId, setSearchedNodeId] = useState<string | null>(null);
+  const [focusedHops, setFocusedHops] = useState(1);
+  const [tiledFocusGraph, setTiledFocusGraph] = useState<GraphPayload | null>(null);
+  const [tiledFocusLoading, setTiledFocusLoading] = useState(false);
   const [viewBox, setViewBox] = useState<ViewBox>(fullViewBox(W, H));
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [layoutMode, setLayoutMode] = useState<KgLayoutMode>('existing');
+  const [hideWeak, setHideWeak] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const forceCanvasRef = useRef<ForceDirectedCanvasHandle>(null);
+
+  const primaryGraphId = graphIdFromPath(
+    loadAgentSettings().jsonGraphPath || graph.source_path,
+  );
+  const catalogGraph = useMemo(
+    () => honorViewerCatalogs(graph, primaryGraphId),
+    [graph, primaryGraphId],
+  );
 
   const highlightedSignature = highlightedNodeIds.join('|');
+  const activeFocusId = citeFocusNodeId || searchedNodeId;
+  const focusedNodeHint = activeFocusId
+    ? (
+      (tiledFocusGraph && resolveViewerNodeId(tiledFocusGraph, activeFocusId)
+        ? tiledFocusGraph.nodes.find(node => node.id === resolveViewerNodeId(tiledFocusGraph, activeFocusId))
+        : undefined)
+      || (retrievedGraph && resolveViewerNodeId(retrievedGraph, activeFocusId)
+        ? retrievedGraph.nodes.find(node => node.id === resolveViewerNodeId(retrievedGraph, activeFocusId))
+        : undefined)
+      || catalogGraph.nodes.find(node => node.id === resolveViewerNodeId(catalogGraph, activeFocusId))
+      || graph.nodes.find(node => node.id === resolveViewerNodeId(graph, activeFocusId))
+    )
+    : undefined;
+  const tiledFocus = Boolean(activeFocusId && looksLikeTiledIdentityRef(activeFocusId, focusedNodeHint));
+  const activeFocusHops = (citeFocusNodeId || tiledFocus) ? citeFocusHops : focusedHops;
+  const resolvedFocusId = activeFocusId
+    ? (
+      (tiledFocusGraph ? resolveViewerNodeId(tiledFocusGraph, activeFocusId) : null)
+      || (retrievedGraph ? resolveViewerNodeId(retrievedGraph, activeFocusId) : null)
+      || (tiledFocus ? null : resolveViewerNodeId(catalogGraph, activeFocusId))
+      || (tiledFocus ? null : resolveViewerNodeId(graph, activeFocusId))
+      || activeFocusId
+    )
+    : null;
   const highlighted = useMemo(
-    () => new Set(searchedNodeId ? [searchedNodeId] : highlightedNodeIds),
-    [highlightedNodeIds, searchedNodeId],
+    () => new Set(resolvedFocusId ? [resolvedFocusId] : highlightedNodeIds),
+    [highlightedNodeIds, resolvedFocusId],
   );
   const cited = useMemo(() => new Set(citedNodeIds), [citedNodeIds]);
   const displayGraph = useMemo<GraphPayload>(() => {
-    if (searchedNodeId) {
-      const visibleNodeIds = new Set(oneHopNodeIds(graph, searchedNodeId));
+    if (activeFocusId) {
+      const mergedFocus = retrievedGraph && tiledFocusGraph
+        ? mergeGraphPayloads(tiledFocusGraph, retrievedGraph)
+        : (tiledFocusGraph || retrievedGraph);
+      // Tiled ESAF/Proposal/Sample/BlueskyRun links live on the GraphQL
+      // identity graph, not the JSON catalog. Never BFS rsoxs/bl1101 dumps.
+      const source = tiledFocus
+        ? (mergedFocus && mergedFocus.nodes.length > 0
+          ? mergedFocus
+          : { nodes: [], edges: [], source_path: 'tiled://graphql' })
+        : mergedFocus && resolveViewerNodeId(mergedFocus, activeFocusId)
+          ? mergedFocus
+          : resolveViewerNodeId(catalogGraph, activeFocusId)
+            ? catalogGraph
+            : resolveViewerNodeId(graph, activeFocusId)
+              ? graph
+              : mergedFocus && mergedFocus.nodes.length > 0
+                ? mergedFocus
+                : catalogGraph;
+      const seedId = resolvedFocusId || activeFocusId;
+      const neighborhood = neighborhoodSubgraph(source, seedId, activeFocusHops);
+      const nodes = neighborhood.nodes.filter(
+        node => node.id === seedId
+          || node.id.toLowerCase() === seedId.toLowerCase()
+          || !isUnknownNodeCategory(node.type),
+      );
+      const visible = new Set(nodes.map(node => node.id));
+      if (nodes.length === 0) {
+        const stub = source.nodes.find(node => node.id === seedId)
+          || graph.nodes.find(node => node.id === seedId)
+          || {
+            id: seedId,
+            label: seedId,
+            type: 'Unknown',
+            description: '',
+          };
+        return { nodes: [stub], edges: [], source_path: source.source_path };
+      }
       return {
-        nodes: graph.nodes.filter(
-          node => visibleNodeIds.has(node.id) && !isUnknownNodeCategory(node.type),
-        ),
-        edges: graph.edges.filter(
-          edge => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
-        ),
-        source_path: graph.source_path,
+        nodes,
+        edges: neighborhood.edges.filter(edge => visible.has(edge.source) && visible.has(edge.target)),
+        source_path: neighborhood.source_path,
       };
     }
     if (highlightedNodeIds.length > 0) {
-      const queried = inducedSubgraph(graph, highlightedNodeIds);
+      if (retrievedGraph && retrievedGraph.nodes.length > 0 && !isKgViewer) {
+        return retrievedGraph;
+      }
+      const queried = inducedSubgraph(catalogGraph, highlightedNodeIds);
       if (!isKgViewer) return queried;
       if (kgViewerNodeLimit === 'all' || kgViewerNodeLimit >= queried.nodes.length) {
         return queried;
@@ -1574,16 +1758,21 @@ export function GraphMockup({
       return connectedGraphSubset(queried, kgViewerNodeLimit);
     }
     if (isKgViewer) {
-      if (kgViewerNodeLimit === 'all') return graph;
+      if (kgViewerNodeLimit === 'all') return catalogGraph;
       return connectedGraphSubset(
-        graph,
+        catalogGraph,
         kgViewerNodeLimit,
       );
     }
-    return { nodes: [], edges: [], source_path: graph.source_path };
-  }, [graph, highlightedNodeIds, isKgViewer, kgViewerNodeLimit, searchedNodeId]);
-  const layout = useMemo(() => layoutGraph(displayGraph), [displayGraph]);
+    return { nodes: [], edges: [], source_path: catalogGraph.source_path };
+  }, [activeFocusHops, activeFocusId, catalogGraph, focusedHops, graph, highlightedNodeIds, isKgViewer, kgViewerNodeLimit, resolvedFocusId, retrievedGraph, searchedNodeId, tiledFocus, tiledFocusGraph]);
+  const layout = useMemo(
+    () => (layoutMode === 'force' ? { nodes: [] as LayoutNode[], width: W, height: H } : layoutGraph(displayGraph)),
+    [displayGraph, layoutMode],
+  );
   const nodes = layout.nodes;
+  const overlayIds = useMemo(() => catalogIdsFromGraph(displayGraph), [displayGraph]);
+  const overlayActive = overlayIds.length > 1;
   const nodeMap = useMemo(() => new Map(nodes.map(node => [node.id, node])), [nodes]);
   const renderedNodes = useMemo(
     // Keep normal-view citation nodes mounted so panning cannot restart their
@@ -1599,7 +1788,7 @@ export function GraphMockup({
     }),
     [displayGraph.edges, nodeMap, viewBox],
   );
-  const hasVisibleNodes = nodes.length > 0;
+  const hasVisibleNodes = displayGraph.nodes.length > 0;
   // Replays the populate animation whenever the visible node set changes.
   const revealKey = useMemo(() => nodeSetKey(nodes), [nodes]);
 
@@ -1607,16 +1796,50 @@ export function GraphMockup({
     setHoverPopup(null);
     setPopupPos(null);
     setHoveredNode(null);
-    setSelectedNode(null);
-  }, [revealKey]);
+    if (!activeFocusId) setSelectedNode(null);
+  }, [activeFocusId, revealKey]);
 
   useEffect(() => {
     setViewBox(fullViewBox(layout.width, layout.height));
   }, [layout.width, layout.height, displayGraph.source_path]);
 
   useEffect(() => {
+    if (!activeFocusId || !tiledFocus) {
+      setTiledFocusGraph(null);
+      setTiledFocusLoading(false);
+      return;
+    }
+    const overlay = (tiledFocusGraph && resolveViewerNodeId(tiledFocusGraph, activeFocusId)
+      ? tiledFocusGraph
+      : retrievedGraph && resolveViewerNodeId(retrievedGraph, activeFocusId)
+        ? retrievedGraph
+        : null);
+    if (overlay && hasTiledIdentityEdges(overlay)) {
+      setTiledFocusLoading(false);
+      if (!tiledFocusGraph) setTiledFocusGraph(overlay);
+      return;
+    }
+    let cancelled = false;
+    setTiledFocusLoading(true);
+    fetchGraphNeighborhood(activeFocusId, CITE_FOCUS_HOPS)
+      .then(payload => {
+        if (cancelled || !payload.nodes.length) return;
+        setTiledFocusGraph(payload);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setTiledFocusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFocusId, retrievedGraph, tiledFocus, tiledFocusGraph]);
+
+  useEffect(() => {
+    if (citeFocusNodeId) return;
     setSearchedNodeId(null);
-  }, [highlightedSignature, graph.source_path]);
+    setFocusedHops(1);
+  }, [citeFocusNodeId, graph.source_path, highlightedSignature]);
 
   useEffect(() => {
     if (nodes.length === 0) return;
@@ -1628,14 +1851,68 @@ export function GraphMockup({
       prev?.target.kind === 'edge' ? prev : null,
     );
     setHoveredNode(prev => (prev && nodeMap.has(prev.id) ? nodeMap.get(prev.id) ?? null : null));
-    setSelectedNode(prev => prev && nodeMap.has(prev.id) ? nodeMap.get(prev.id) ?? null : null);
-  }, [nodeMap]);
+    if (layoutMode === 'force' && activeFocusId) return;
+    setSelectedNode(prev => (prev && nodeMap.has(prev.id) ? nodeMap.get(prev.id) ?? null : null));
+  }, [activeFocusId, layoutMode, nodeMap]);
 
   useEffect(() => {
-    if (!searchedNodeId) return;
-    const searchedNode = nodeMap.get(searchedNodeId);
-    if (searchedNode) setSelectedNode(searchedNode);
-  }, [nodeMap, searchedNodeId]);
+    if (!activeFocusId) return;
+    const searchedNode = nodeMap.get(activeFocusId)
+      || [...nodeMap.values()].find(node => node.id.toLowerCase() === activeFocusId.toLowerCase());
+    if (searchedNode) {
+      setSelectedNode(searchedNode);
+    } else {
+      const raw = displayGraph.nodes.find(node => node.id === activeFocusId)
+        || displayGraph.nodes.find(node => node.id.toLowerCase() === activeFocusId.toLowerCase())
+        || catalogGraph.nodes.find(node => node.id === activeFocusId)
+        || catalogGraph.nodes.find(node => node.id.toLowerCase() === activeFocusId.toLowerCase());
+      if (raw) {
+        setSelectedNode({
+          ...raw,
+          color: getNodeColor(raw.type),
+          x: 0,
+          y: 0,
+        });
+      }
+    }
+    if (layoutMode === 'existing' && nodes.length > 0) {
+      setViewBox(fitNodesViewBox(nodes, layout.width, layout.height));
+    }
+  }, [activeFocusId, catalogGraph.nodes, displayGraph.nodes, layout.height, layout.width, layoutMode, nodeMap, nodes]);
+
+  function selectSearchNode(nodeId: string) {
+    setFocusedHops(looksLikeTiledIdentityRef(nodeId) ? CITE_FOCUS_HOPS : 1);
+    setSearchedNodeId(nodeId);
+  }
+
+  function focusNode(nodeId: string): boolean {
+    const resolved = (retrievedGraph ? resolveViewerNodeId(retrievedGraph, nodeId) : null)
+      || resolveViewerNodeId(catalogGraph, nodeId)
+      || resolveViewerNodeId(graph, nodeId)
+      || resolveViewerNodeId(displayGraph, nodeId);
+    if (!resolved) return false;
+
+    setFocusedHops(CITE_FOCUS_HOPS);
+    setSearchedNodeId(resolved);
+
+    if (layoutMode === 'force') {
+      window.requestAnimationFrame(() => {
+        forceCanvasRef.current?.focusNode(resolved);
+      });
+    }
+    return true;
+  }
+
+  useImperativeHandle(ref, () => ({ focusNode }), [
+    catalogGraph.nodes,
+    displayGraph.nodes,
+    graph.nodes,
+    layout.height,
+    layout.width,
+    layoutMode,
+    nodeMap,
+    retrievedGraph,
+  ]);
 
   useLayoutEffect(() => {
     if (!hoverPopup || !popupRef.current || !containerRef.current || !svgRef.current) {
@@ -1819,9 +2096,56 @@ export function GraphMockup({
     </label>
   ) : null;
 
+  const layoutModeSwitcher = (
+    <LayoutModeSwitcher
+      value={layoutMode}
+      onChange={mode => {
+        setLayoutMode(mode);
+        setHideWeak(false);
+      }}
+    />
+  );
+
+  const overlayLegend = overlayActive ? (
+    <div className="hidden items-center gap-2 text-[10px] text-slate-500 sm:flex" aria-label="Catalog overlay">
+      {overlayIds.map(id => (
+        <span key={id} className="inline-flex items-center gap-1">
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: overlayCatalogColor(id) }}
+          />
+          {id}
+        </span>
+      ))}
+    </div>
+  ) : null;
+
+  const hideWeakControl = layoutMode === 'force' ? (
+    <button
+      type="button"
+      aria-pressed={hideWeak}
+      aria-label="Toggle weakly connected nodes"
+      title="Hide nodes with fewer than two links"
+      onClick={() => setHideWeak(value => !value)}
+      className={`inline-flex h-9 items-center rounded-md border px-3 text-xs font-medium transition ${
+        hideWeak
+          ? 'border-sky-300 bg-sky-50 text-sky-700'
+          : 'border-slate-200 bg-white text-slate-500 hover:text-slate-700'
+      }`}
+    >
+      Hide weak
+    </button>
+  ) : null;
+
   if (!hasVisibleNodes) {
     return (
-      <div className="relative flex flex-1 min-w-0 flex-col" style={{ background: '#ffffff' }}>
+      <div
+        className="relative flex flex-1 min-w-0 flex-col"
+        style={{ background: '#ffffff' }}
+        data-kg-empty="true"
+        data-cite-focus-id={resolvedFocusId || activeFocusId || ''}
+        data-kg-node-count="0"
+      >
         <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <pattern id="kg-grid-empty" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -1835,21 +2159,37 @@ export function GraphMockup({
           style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.9)' }}
         >
           {kgViewerButton}
+          {layoutModeSwitcher}
           <NodeSearchControl
             activeNodeId={searchedNodeId}
-            onSelect={setSearchedNodeId}
+            onSelect={selectSearchNode}
           />
           {kgViewerLimitControl}
         </div>
-        <div className="relative z-10 flex flex-1 items-center justify-center">
-          <AsciiOrb size={400} />
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3">
+          {tiledFocusLoading ? (
+            <>
+              <Loader2 className="h-8 w-8 animate-spin text-sky-500" aria-label="Loading neighborhood" />
+              <span className="text-xs text-slate-400">Loading Tiled neighbors…</span>
+            </>
+          ) : (
+            <AsciiOrb size={400} />
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative flex-1 min-w-0 flex flex-col" style={{ background: '#ffffff' }}>
+      <div
+        className="relative flex-1 min-w-0 flex flex-col"
+        style={{ background: '#ffffff' }}
+        data-kg-empty="false"
+        data-cite-focus-id={resolvedFocusId || activeFocusId || ''}
+        data-kg-node-count={String(displayGraph.nodes.length)}
+        data-kg-edge-count={String(displayGraph.edges.length)}
+        data-kg-layout={layoutMode}
+      >
       <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="kg-grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -1871,39 +2211,57 @@ export function GraphMockup({
                 style={{ background: '#0ea5e9', boxShadow: '0 0 6px #0ea5e9' }}
               />
               <span className="text-xs" style={{ color: 'rgba(0,0,0,0.45)' }}>
-                <span style={{ color: '#0ea5e9' }}>{nodes.length}</span> nodes
+                <span style={{ color: '#0ea5e9' }}>{displayGraph.nodes.length}</span> nodes
+                {citeFocusNodeId ? ' · 3-hop focus' : ''}
+                {tiledFocusLoading ? ' · loading neighbors' : ''}
               </span>
+              {tiledFocusLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-500" aria-label="Loading neighborhood" />
+              ) : null}
             </div>
           )}
           {kgViewerButton}
+          {layoutModeSwitcher}
+          {overlayLegend}
           <NodeSearchControl
             activeNodeId={searchedNodeId}
-            onSelect={setSearchedNodeId}
+            onSelect={selectSearchNode}
           />
           {kgViewerLimitControl}
-          <button
-            type="button"
-            aria-label="Zoom out"
-            title="Zoom out"
-            onClick={() => zoom(1.2)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
-          >
-            <ZoomOut size={14} />
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom in"
-            title="Zoom in"
-            onClick={() => zoom(0.82)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
-          >
-            <ZoomIn size={14} />
-          </button>
+          {hideWeakControl}
+          {layoutMode === 'existing' && (
+            <>
+              <button
+                type="button"
+                aria-label="Zoom out"
+                title="Zoom out"
+                onClick={() => zoom(1.2)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
+              >
+                <ZoomOut size={14} />
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom in"
+                title="Zoom in"
+                onClick={() => zoom(0.82)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
+              >
+                <ZoomIn size={14} />
+              </button>
+            </>
+          )}
           <button
             type="button"
             aria-label={isKgViewer ? 'Focus viewer nodes' : 'Focus retrieved nodes'}
             title={isKgViewer ? 'Focus viewer nodes' : 'Focus retrieved nodes'}
-            onClick={resetView}
+            onClick={() => {
+              if (layoutMode === 'force') {
+                forceCanvasRef.current?.resetView();
+                return;
+              }
+              resetView();
+            }}
             className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-slate-700"
           >
             {hasVisibleNodes ? <Crosshair size={14} /> : <Maximize2 size={14} />}
@@ -1915,6 +2273,21 @@ export function GraphMockup({
         <ResizablePanelGroup direction="vertical">
           <ResizablePanel defaultSize={45} minSize={30}>
             <div ref={containerRef} className="relative h-full min-h-0 overflow-hidden">
+              {layoutMode === 'force' ? (
+                <ForceDirectedCanvas
+                  ref={forceCanvasRef}
+                  graph={displayGraph}
+                  highlightedNodeIds={highlightedNodeIds}
+                  citedNodeIds={citedNodeIds}
+                  citationAnimationKey={citationAnimationKey}
+                  searchedNodeId={resolvedFocusId || activeFocusId}
+                  hideWeak={hideWeak}
+                  selectedNodeId={selectedNode?.id ?? null}
+                  onSelectNode={node => setSelectedNode(node as LayoutNode | null)}
+                  onHoverNode={node => setHoveredNode(node as LayoutNode | null)}
+                />
+              ) : (
+                <>
               <svg
               ref={svgRef}
               viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
@@ -2065,7 +2438,14 @@ export function GraphMockup({
                         <circle cx={0} cy={0} r={R + 11} fill={`rgba(${r},${g},${b},0.1)`} />
                       )}
 
-                      <circle cx={0} cy={0} r={R} fill={color} stroke="none" />
+                      <circle
+                        cx={0}
+                        cy={0}
+                        r={R}
+                        fill={color}
+                        stroke={overlayActive && node.graph_id ? overlayCatalogColor(node.graph_id) : 'none'}
+                        strokeWidth={overlayActive && node.graph_id ? 2.5 : 0}
+                      />
                     </g>
 
                     {showLabel && labelLines.map((line, lineIndex) => (
@@ -2099,6 +2479,8 @@ export function GraphMockup({
                 }}
               />
             )}
+                </>
+              )}
             </div>
           </ResizablePanel>
 
@@ -2110,11 +2492,12 @@ export function GraphMockup({
                 <NodeDetailPanel
                   key={selectedNode.id}
                   node={selectedNode}
-                  graph={graph}
+                  graph={displayGraph.nodes.length ? displayGraph : graph}
                   graphSourcePath={graph.source_path}
                   onClose={() => {
                     if (searchedNodeId && selectedNode.id === searchedNodeId) {
                       setSearchedNodeId(null);
+                      setFocusedHops(1);
                       return;
                     }
                     setSelectedNode(null);
@@ -2210,4 +2593,4 @@ export function GraphMockup({
       `}</style>
     </div>
   );
-}
+});

@@ -69,6 +69,9 @@ describe('agentSettings', () => {
       jsonGraphPaths: ['storage/kg/ignored.json'],
       kgQueryMaxNodes: 100,
       kgQueryHops: 1,
+      sourceRag: false,
+      useLiveTiled: false,
+      tiledUri: '',
     };
     expect(settingsToApiPayload(settings)).toEqual({
       backend: 'cborg',
@@ -81,6 +84,9 @@ describe('agentSettings', () => {
       json_graph_paths: [],
       kg_query_max_nodes: 100,
       kg_query_hops: 1,
+      source_rag: false,
+      use_live_tiled: false,
+      tiled_uri: null,
     });
   });
 
@@ -96,6 +102,9 @@ describe('agentSettings', () => {
       jsonGraphPaths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
       kgQueryMaxNodes: 250,
       kgQueryHops: 2,
+      sourceRag: true,
+      useLiveTiled: false,
+      tiledUri: '',
     };
     expect(settingsToApiPayload(settings)).toEqual({
       backend: 'ollama',
@@ -108,6 +117,9 @@ describe('agentSettings', () => {
       json_graph_paths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
       kg_query_max_nodes: 250,
       kg_query_hops: 2,
+      source_rag: true,
+      use_live_tiled: false,
+      tiled_uri: null,
     });
   });
 
@@ -124,6 +136,7 @@ describe('agentSettings', () => {
       json_graph_paths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
       kg_query_max_nodes: 250,
       kg_query_hops: 2,
+      source_rag: true,
       available_json_graphs: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
     });
     expect(settings).toEqual({
@@ -137,6 +150,9 @@ describe('agentSettings', () => {
       jsonGraphPaths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
       kgQueryMaxNodes: 250,
       kgQueryHops: 2,
+      sourceRag: true,
+      useLiveTiled: false,
+      tiledUri: '',
     });
   });
 
@@ -148,6 +164,7 @@ describe('agentSettings', () => {
     expect(settings.jsonGraphPaths).toEqual([...DEFAULT_JSON_GRAPH_PATHS]);
     expect(settings.jsonGraphPath).toBe(DEFAULT_JSON_GRAPH_PATHS[0]);
     expect(settings.jsonGraphPaths.join(' ')).not.toContain('matkg_xray_papers_cborg_chat');
+    expect(settings.sourceRag).toBe(false);
   });
 
   it('persists settings in localStorage', () => {
@@ -162,6 +179,9 @@ describe('agentSettings', () => {
       jsonGraphPaths: ['storage/kg/custom.json'],
       kgQueryMaxNodes: 50,
       kgQueryHops: 3,
+      sourceRag: true,
+      useLiveTiled: false,
+      tiledUri: '',
     };
     saveAgentSettings(settings);
     expect(loadAgentSettings()).toEqual(settings);
@@ -180,6 +200,9 @@ describe('agentSettings', () => {
       jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
       kgQueryMaxNodes: DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
       kgQueryHops: DEFAULT_AGENT_SETTINGS.kgQueryHops,
+      sourceRag: false,
+      useLiveTiled: false,
+      tiledUri: '',
     });
   });
 
@@ -195,8 +218,13 @@ describe('agentSettings', () => {
       jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
       kgQueryMaxNodes: 100,
       kgQueryHops: 1,
+      sourceRag: false,
+      useLiveTiled: false,
+      tiledUri: '',
     };
     expect(settingsEqual(base, { ...base })).toBe(true);
+    expect(settingsEqual(base, { ...base, sourceRag: true })).toBe(false);
+    expect(settingsEqual(base, { ...base, useLiveTiled: true })).toBe(false);
     expect(settingsEqual(base, { ...base, backend: 'ollama' })).toBe(false);
     expect(settingsEqual(base, { ...base, model: 'google/gemini-flash' })).toBe(false);
     expect(settingsEqual(base, { ...base, graphSource: 'json' })).toBe(false);

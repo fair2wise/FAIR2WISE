@@ -1,4 +1,4 @@
-import type { PendingAction, PublicationInfo } from './data/liveAgent';
+import type { PendingAction, PublicationInfo, GraphPayload } from './data/liveAgent';
 
 export interface ChatMessage {
   id: string;
@@ -13,6 +13,7 @@ export interface ChatMessage {
   elapsedSeconds?: number;
   publications?: PublicationInfo[];
   pending?: PendingAction | null;
+  retrievedGraph?: GraphPayload;
 }
 
 export interface ChatSession {
@@ -56,6 +57,18 @@ export function createChatSession(now = Date.now()): ChatSession {
   };
 }
 
+function asGraphPayload(value: unknown): GraphPayload | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as Partial<GraphPayload>;
+  if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) return undefined;
+  if (candidate.nodes.length === 0 || candidate.nodes.length > 1500) return undefined;
+  return {
+    nodes: candidate.nodes,
+    edges: candidate.edges,
+    source_path: typeof candidate.source_path === 'string' ? candidate.source_path : '',
+  };
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
@@ -95,6 +108,7 @@ export function normalizeChatMessage(value: unknown): ChatMessage | null {
     pending: candidate.pending && typeof candidate.pending === 'object'
       ? candidate.pending as PendingAction
       : null,
+    retrievedGraph: asGraphPayload(candidate.retrievedGraph),
   };
 }
 

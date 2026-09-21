@@ -14,6 +14,9 @@ export interface AgentSettings {
   jsonGraphPaths: string[];
   kgQueryMaxNodes: number;
   kgQueryHops: number;
+  sourceRag: boolean;
+  useLiveTiled: boolean;
+  tiledUri: string;
 }
 
 export interface AgentSettingsResponse {
@@ -27,6 +30,12 @@ export interface AgentSettingsResponse {
   json_graph_paths?: string[];
   kg_query_max_nodes?: number;
   kg_query_hops?: number;
+  source_rag?: boolean;
+  use_live_tiled?: boolean;
+  tiled_uri?: string | null;
+  tiled_api_key_set?: boolean;
+  tiled_status?: string;
+  tiled_error?: string | null;
   available_json_graphs: string[];
   available_cborg_models: string[];
   default_ollama_model: string;
@@ -79,6 +88,9 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
   kgQueryMaxNodes: 100,
   kgQueryHops: 1,
+  sourceRag: false,
+  useLiveTiled: false,
+  tiledUri: '',
 };
 
 function isXrayDemo(path: string): boolean {
@@ -140,6 +152,9 @@ export function loadAgentSettings(): AgentSettings {
       kgQueryHops: typeof parsed.kgQueryHops === 'number'
         ? clampKgQueryHops(parsed.kgQueryHops)
         : DEFAULT_AGENT_SETTINGS.kgQueryHops,
+      sourceRag: parsed.sourceRag === true,
+      useLiveTiled: parsed.useLiveTiled === true,
+      tiledUri: typeof parsed.tiledUri === 'string' ? parsed.tiledUri.trim() : '',
     };
   } catch {
     return { ...DEFAULT_AGENT_SETTINGS };
@@ -173,6 +188,9 @@ export function settingsToApiPayload(settings: AgentSettings) {
     json_graph_paths: settings.graphSource === 'json' ? settings.jsonGraphPaths : [],
     kg_query_max_nodes: settings.kgQueryMaxNodes,
     kg_query_hops: settings.kgQueryHops,
+    source_rag: settings.sourceRag,
+    use_live_tiled: settings.useLiveTiled,
+    tiled_uri: settings.tiledUri.trim() || null,
   };
 }
 
@@ -205,6 +223,9 @@ export function settingsFromApiResponse(response: AgentSettingsResponse): AgentS
     kgQueryHops: typeof response.kg_query_hops === 'number'
       ? clampKgQueryHops(response.kg_query_hops)
       : DEFAULT_AGENT_SETTINGS.kgQueryHops,
+    sourceRag: response.source_rag === true,
+    useLiveTiled: response.use_live_tiled === true,
+    tiledUri: typeof response.tiled_uri === 'string' ? response.tiled_uri : '',
   };
 }
 
@@ -218,7 +239,10 @@ export function settingsEqual(a: AgentSettings, b: AgentSettings): boolean {
     && a.jsonGraphPath === b.jsonGraphPath
     && a.jsonGraphPaths.join('|') === b.jsonGraphPaths.join('|')
     && a.kgQueryMaxNodes === b.kgQueryMaxNodes
-    && a.kgQueryHops === b.kgQueryHops;
+    && a.kgQueryHops === b.kgQueryHops
+    && a.sourceRag === b.sourceRag
+    && a.useLiveTiled === b.useLiveTiled
+    && a.tiledUri === b.tiledUri;
 }
 
 export function defaultModelForBackend(

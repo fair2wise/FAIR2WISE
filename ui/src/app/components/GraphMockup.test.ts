@@ -184,7 +184,49 @@ describe('node card source and property mapping', () => {
     ]));
     expect(isLiteraturePublication({ source_paper: 'als.lbl.gov/beamlines/11-0-1-2' })).toBe(false);
     expect(remainingNodeProperties(node).map(row => row.label)).toEqual(
-      expect.arrayContaining(['ID', 'PV', 'Ophyd name']),
+      expect.arrayContaining(['ID', 'Type', 'PV', 'Ophyd name']),
     );
+  });
+
+  it('shows Tiled identity fields even without a description', () => {
+    const node: LiveGraphNode = {
+      id: 'tiled:ESAF:2026-00045',
+      label: 'ESAF 2026-00045',
+      type: 'ESAF',
+      description: '',
+      graph_id: 'tiled',
+      graph_label: 'Tiled Graph',
+      properties: [
+        { property: 'esaf_number', value: '2026-00045' },
+        { property: 'scientist', value: 'Ada Lovelace' },
+        { property: 'plan_name', value: 'rsoxs_nexafs' },
+        { property: 'uid', value: 'abc-uid-1' },
+      ],
+      extra_fields: { uri: 'tiled:esaf:2026-00045', graphql_id: 'gql-1' },
+    };
+    const rows = Object.fromEntries(remainingNodeProperties(node).map(row => [row.label, row.value]));
+    expect(rows.Type).toBe('ESAF');
+    expect(rows.ID).toBe('tiled:ESAF:2026-00045');
+    expect(rows.Graph).toBe('Tiled Graph');
+    expect(rows.ESAF).toBe('2026-00045');
+    expect(rows.Scientist).toBe('Ada Lovelace');
+    expect(rows.Plan).toBe('rsoxs_nexafs');
+    expect(rows.UID).toBe('abc-uid-1');
+    expect(rows.URI).toBe('tiled:esaf:2026-00045');
+  });
+
+  it('flattens a Tiled properties dict without throwing', () => {
+    const node = {
+      id: 'tiled:esaf-42',
+      label: 'ESAF 42',
+      type: 'Proposal',
+      description: '',
+      extra_fields: { esaf: '42' },
+      properties: { esaf_number: '42', scientist: 'Grace Hopper', uid: 'run-42' },
+    } as unknown as LiveGraphNode;
+    const rows = Object.fromEntries(remainingNodeProperties(node).map(row => [row.label, row.value]));
+    expect(rows.ESAF).toBe('42');
+    expect(rows.Scientist).toBe('Grace Hopper');
+    expect(rows.UID).toBe('run-42');
   });
 });

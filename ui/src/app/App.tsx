@@ -1,5 +1,5 @@
 import '@blueskyproject/finch/style.css';
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -54,6 +54,7 @@ interface AgentKGViewProps {
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   onGraphUpdate: (graph: GraphPayload) => void;
   onSelect: (query: ExampleQuery) => void;
+  onLoadCatalog?: () => void;
 }
 
 function AgentKGView({
@@ -64,6 +65,7 @@ function AgentKGView({
   setMessages,
   onGraphUpdate,
   onSelect,
+  onLoadCatalog,
 }: AgentKGViewProps) {
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -75,6 +77,7 @@ function AgentKGView({
         setMessages={setMessages}
         onGraphUpdate={onGraphUpdate}
         onSelect={onSelect}
+        onLoadCatalog={onLoadCatalog}
       />
     </div>
   );
@@ -153,11 +156,9 @@ export default function App() {
     async function boot() {
       try {
         const response = await fetchAgentSettings();
-        saveAgentSettings(settingsFromApiResponse(response));
-        const nextGraph = await fetchLiveGraph();
-        if (!cancelled) setGraph(nextGraph);
+        if (!cancelled) saveAgentSettings(settingsFromApiResponse(response));
       } catch (error) {
-        console.warn('Failed to load live KG', error);
+        console.warn('Failed to load agent settings', error);
       }
     }
 
@@ -167,7 +168,7 @@ export default function App() {
     };
   }, []);
 
-  const routes = [
+  const routes = useMemo(() => [
     {
       path: '/',
       label: 'FAIR2WISE',
@@ -180,12 +181,13 @@ export default function App() {
           setMessages={setActiveSessionMessages}
           onGraphUpdate={setGraph}
           onSelect={setActiveQuery}
+          onLoadCatalog={reloadGraph}
         />
       ),
       icon: <Share2 size={28} />,
       isBackgroundTransparent: true,
     },
-  ];
+  ], [activeQuery, activeSession.id, activeSession.messages, graph, reloadGraph, setActiveSessionMessages]);
 
   const headerLogoIcon = (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">

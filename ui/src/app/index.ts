@@ -11,6 +11,7 @@ export {
 } from './components/index';
 
 export type {
+  GraphMockupHandle,
   GraphMockupProps,
   GraphNode,
   GraphEdge,
