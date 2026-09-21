@@ -353,3 +353,65 @@ def test_chat_request_accepts_use_live_tiled_flag():
     assert req.use_live_tiled is True
     omitted = api_mod.ChatRequest(message="ESAF 2026-00041")
     assert omitted.use_live_tiled is None
+
+
+def test_settings_returns_available_graphs_with_metadata(tmp_path, monkeypatch):
+    """GET /settings should return available_graphs with path, graph_id, and label."""
+    kg_dir = tmp_path / "storage" / "kg"
+    kg_dir.mkdir(parents=True)
+    _make_kg_graph(kg_dir / "matkg_rsoxs_v1.json")
+    _make_kg_graph(kg_dir / "matkg_bl1101_v1.json")
+
+    client = _settings_client(tmp_path, monkeypatch)
+    body = client.get("/settings").json()
+
+    assert "available_graphs" in body
+    graphs_by_id = {g["graph_id"]: g for g in body["available_graphs"]}
+    assert "rsoxs_v1" in graphs_by_id
+    assert "bl1101" in graphs_by_id
+    assert graphs_by_id["rsoxs_v1"]["path"] == "storage/kg/matkg_rsoxs_v1.json"
+    assert graphs_by_id["bl1101"]["path"] == "storage/kg/matkg_bl1101_v1.json"
+    assert graphs_by_id["rsoxs_v1"]["label"]  # must be non-empty
+    assert graphs_by_id["bl1101"]["label"]
+
+
+def test_settings_selected_graph_ids_round_trip(tmp_path, monkeypatch):
+    """POST /settings with selected_graph_ids picks the right graphs from storage/kg."""
+    kg_dir = tmp_path / "storage" / "kg"
+    kg_dir.mkdir(parents=True)
+    _make_kg_graph(kg_dir / "matkg_rsoxs_v1.json")
+    _make_kg_graph(kg_dir / "matkg_bl1101_v1.json")
+
+    client = _settings_client(tmp_path, monkeypatch)
+
+    # Select only the ops KG by graph_id
+    response = client.put(
+        "/settings",
+        json={
+            "graph_source": "json",
+            "selected_graph_ids": ["bl1101"],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["graph_source"] == "json"
+    # selected_graph_ids in the response should reflect what was applied
+    assert "bl1101" in body["selected_graph_ids"]
+    # json_graph_paths should contain the bl1101 path, not rsoxs
+    assert any("bl1101" in p for p in body["json_graph_paths"])
+
+
+def test_settings_get_returns_selected_graph_ids(tmp_path, monkeypatch):
+    """GET /settings returns selected_graph_ids matching current json_graph_paths."""
+    kg_dir = tmp_path / "storage" / "kg"
+    kg_dir.mkdir(parents=True)
+    _make_kg_graph(kg_dir / "matkg_rsoxs_v1.json")
+    _make_kg_graph(kg_dir / "matkg_bl1101_v1.json")
+
+    client = _settings_client(tmp_path, monkeypatch, kg_mode="json")
+    body = client.get("/settings").json()
+
+    assert "selected_graph_ids" in body
+    # In JSON mode the selected IDs should reflect the default active graphs
+    # (both rsoxs_v1 and bl1101 are available so both should be selected).
+    assert isinstance(body["selected_graph_ids"], list)

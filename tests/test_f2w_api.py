@@ -805,6 +805,153 @@ def test_json_insufficient_opv_offers_ingest_not_leeway(tmp_path, monkeypatch):
     assert search["missing_topics"] == ["what is the most efficient OPV configuration"]
 
 
+def test_zero_node_json_cta_fires(tmp_path, monkeypatch):
+    """When the KG returns zero matching nodes the CTA (pending.kind=download) must still fire.
+
+    Regression for ingest-cta failure mode 1: zero-node queries were silently
+    dropped instead of offering the paper-ingest call-to-action.
+    """
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [], "associations": []}),
+        encoding="utf-8",
+    )
+
+    class ZeroNodeRetrieval:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 0}
+
+        async def query(self, question, history=None):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "answer": None,
+                "missing_topics": [question],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": True,
+                "graph_source_requested": "json",
+                "graph_source_used": "json",
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Need papers about RSoXS",
+            "objections": [],
+            "selected_action": "download_selected",
+            "reason": "KG has zero nodes; search for relevant paper",
+            "candidate_titles": ["Query-aligned candidate paper"],
+            "candidate_indices": [0],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", ZeroNodeRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", _json_one_candidate_download())
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            workdir=tmp_path / "run",
+            max_rounds=1,
+            kg_mode="json",
+            graph=str(graph_path),
+        )
+    )
+    force_agent_router(service)
+
+    response = asyncio.run(service.ask("what is RSoXS"))
+
+    # CTA must fire even when the KG returned zero nodes.
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["kind"] == "download"
+    assert response.pending["papers"]
+    # Candidate search must use the USER query, not some unrelated KG node.
+    search = AgenticDownload.instances[0].search_calls[0]
+    assert "rsoxs" in search["query"].lower()
+    assert search["missing_topics"] == ["what is RSoXS"]
+
+
+def test_off_topic_query_cta_uses_user_query_not_kg_nodes(tmp_path, monkeypatch):
+    """CTA candidate search must be seeded from the user query, not on-graph RSoXS/cuprate nodes.
+
+    Regression for ingest-cta failure mode 2: off-topic queries were either
+    topic-policed or silently dropped; and when CTA did fire the search used
+    unrelated KG-node terms instead of the user's actual question.
+    """
+    graph_path = tmp_path / "kg.json"
+    graph_path.write_text(
+        json.dumps({"things": [{"id": "n1", "name": "RSoXS"}], "associations": []}),
+        encoding="utf-8",
+    )
+
+    class OffTopicRetrieval:
+        """Returns RSoXS nodes for an OPV query — typical off-topic mismatch."""
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def reload_kg(self, graph_file, graph_source=None):
+            return {"status": "reloaded", "nodes": 1}
+
+        async def query(self, question, history=None):
+            return {
+                "status": "success",
+                "sufficient": False,
+                "answer": None,
+                "missing_topics": ["OPV"],
+                "selected": ["matkg:RSoXS"],
+                "direct_evidence_count": 0,
+                "no_evidence": False,
+                "graph_source_requested": "json",
+                "graph_source_used": "json",
+            }
+
+    AgenticDownload.instances = []
+    AgenticExtractor.instances = []
+    AgenticDebate.instances = []
+    AgenticDebate.decisions = [
+        {
+            "hypothesis": "Need OPV papers",
+            "objections": [],
+            "selected_action": "download_selected",
+            "reason": "KG nodes are unrelated to OPV",
+            "candidate_titles": ["Query-aligned candidate paper"],
+            "candidate_indices": [0],
+        }
+    ]
+    monkeypatch.setattr(api_mod, "RetrievalAgent", OffTopicRetrieval)
+    monkeypatch.setattr(api_mod, "DownloadAgent", _json_one_candidate_download())
+    monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
+    monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
+
+    service = api_mod.AgentPipelineService(
+        CoordinatorConfig(
+            workdir=tmp_path / "run",
+            max_rounds=1,
+            kg_mode="json",
+            graph=str(graph_path),
+        )
+    )
+    force_agent_router(service)
+
+    response = asyncio.run(service.ask("tell me about OPVs"))
+
+    # CTA must fire even when the KG has unrelated (RSoXS) nodes.
+    assert response.status == "awaiting_download_decision"
+    assert response.pending["kind"] == "download"
+    assert response.pending["papers"]
+    # The search must target the USER query ("OPVs"), not "RSoXS" KG nodes.
+    search = AgenticDownload.instances[0].search_calls[0]
+    assert "opv" in search["query"].lower()
+    assert search["missing_topics"] == ["tell me about OPVs"]
+
+
 def test_session_memory_rewrites_followup_without_frontend_history(tmp_path, monkeypatch):
     class RecordingRetrieval:
         queries = []

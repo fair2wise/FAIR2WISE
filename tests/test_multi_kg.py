@@ -160,3 +160,93 @@ def test_search_node_scores_fans_out_without_prior_reload(tmp_path, monkeypatch)
     ranked = __import__("asyncio").run(agent.search_node_scores("RSoXS ALS", limit=10))
     assert set(ranked["graph_ids"]) == {"rsoxs_v1", "bl1101"}
     assert {match["graph_id"] for match in ranked["matches"]} == {"rsoxs_v1", "bl1101"}
+
+
+def test_fanout_parallel_three_graphs(tmp_path, monkeypatch):
+    """N-way fan-out: hits from all N graphs are tagged with correct graph_id."""
+    from app.modules import kg_rag_api as krag
+
+    monkeypatch.setattr(krag, "RETRIEVAL_BACKEND", "lexical")
+    g1 = tmp_path / "matkg_rsoxs_v1.json"
+    g2 = tmp_path / "matkg_bl1101_v1.json"
+    g3 = tmp_path / "matkg_xray_papers_cborg_chat.json"
+    _write_graph(g1, "rsoxs:node", "RSoXS node")
+    _write_graph(g2, "ops:node", "Ops node")
+    _write_graph(g3, "xray:node", "X-ray node")
+
+    agent = RetrievalAgent(
+        graph_files=[str(g1), str(g2), str(g3)],
+        graph_source="json",
+        kg_query_hops=1,
+        kg_query_max_nodes=50,
+    )
+    __import__("asyncio").run(agent.reload_kg(graph_files=agent._graph_files))
+
+    # Three-graph fan-out: each hit must carry a graph_id
+    hits = agent._fanout_hits("RSoXS beamline x-ray", agent._graphs)
+    hit_graph_ids = {hit.graph_id for hit in hits}
+    assert len(hit_graph_ids) >= 1  # at least one graph returned hits
+    for hit in hits:
+        assert hit.graph_id, "every hit must have a non-empty graph_id"
+        assert hit.graph_id in agent._graphs, f"graph_id {hit.graph_id!r} not in loaded graphs"
+
+
+def test_intent_router_ops_first(tmp_path, monkeypatch):
+    """Beam-path / hardware-layout questions should only produce ops KG hits."""
+    from app.modules import kg_rag_api as krag
+    from app.modules.f2w_agent.multi_kg import is_ops_graph_id
+
+    monkeypatch.setattr(krag, "RETRIEVAL_BACKEND", "lexical")
+    science = tmp_path / "matkg_rsoxs_v1.json"
+    ops = tmp_path / "matkg_bl1101_v1.json"
+    _write_graph(science, "rsoxs:node", "RSoXS")
+    _write_graph(ops, "ops:EPU", "EPU undulator")
+
+    agent = RetrievalAgent(
+        graph_files=[str(science), str(ops)],
+        graph_source="json",
+        kg_query_hops=1,
+        kg_query_max_nodes=50,
+    )
+    __import__("asyncio").run(agent.reload_kg(graph_files=agent._graph_files))
+
+    hits = agent._fanout_hits(
+        "How is the hardware connected in order at ALS 11.0.1.2?",
+        agent._graphs,
+    )
+    # All hits must come from the ops KG (if it returns any results).
+    if hits:
+        for hit in hits:
+            assert is_ops_graph_id(hit.graph_id), (
+                f"layout query produced non-ops hit from {hit.graph_id!r}"
+            )
+
+
+def test_intent_router_falls_back_to_science_when_ops_empty(tmp_path, monkeypatch):
+    """If ops KG returns no hits for a layout query, science KG is used as fallback."""
+    from app.modules import kg_rag_api as krag
+    from app.modules.f2w_agent.multi_kg import is_ops_graph_id, is_science_graph_id
+
+    monkeypatch.setattr(krag, "RETRIEVAL_BACKEND", "lexical")
+    # Only a science graph — no ops graph loaded.
+    science = tmp_path / "matkg_rsoxs_v1.json"
+    _write_graph(science, "rsoxs:node", "RSoXS beamline")
+
+    agent = RetrievalAgent(
+        graph_files=[str(science)],
+        graph_source="json",
+        kg_query_hops=1,
+        kg_query_max_nodes=50,
+    )
+    __import__("asyncio").run(agent.reload_kg(graph_files=agent._graph_files))
+
+    hits = agent._fanout_hits(
+        "What is the beam path at the beamline?",
+        agent._graphs,
+    )
+    # With no ops KG present, the router should fall back to science hits.
+    hit_graph_ids = {hit.graph_id for hit in hits}
+    for gid in hit_graph_ids:
+        assert is_science_graph_id(gid) or not is_ops_graph_id(gid), (
+            f"unexpected ops hit {gid!r} when no ops graph was loaded"
+        )

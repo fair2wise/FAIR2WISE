@@ -295,6 +295,10 @@ class AgentSettingsResponse(BaseModel):
     tiled_status: str = "disabled"
     tiled_error: Optional[str] = None
     available_json_graphs: List[str] = Field(default_factory=list)
+    # Richer per-graph metadata (path, graph_id, label) for all KGs in storage/kg.
+    available_graphs: List[Dict[str, str]] = Field(default_factory=list)
+    # IDs of currently selected graphs (subset of available_graphs).
+    selected_graph_ids: List[str] = Field(default_factory=list)
     available_cborg_models: List[str] = Field(default_factory=list)
     default_ollama_model: str = "deepseek-r1:70b"
 
@@ -308,6 +312,10 @@ class AgentSettingsUpdate(BaseModel):
     targeted_max_pages: Optional[int] = Field(default=None, ge=1, le=100)
     json_graph_path: Optional[str] = None
     json_graph_paths: Optional[List[str]] = None
+    # Alternative to json_graph_paths: select graphs by graph_id.
+    # When present and json_graph_paths is absent, each id is resolved to
+    # the best matching path from storage/kg (highest version wins).
+    selected_graph_ids: Optional[List[str]] = None
     kg_query_max_nodes: Optional[int] = Field(default=None, ge=10, le=1000)
     kg_query_hops: Optional[int] = Field(default=None, ge=1, le=MAX_KG_QUERY_HOPS)
     source_rag: Optional[bool] = None
@@ -2482,6 +2490,15 @@ class AgentPipelineService:
             tiled_status=tiled["tiled_status"],
             tiled_error=tiled["tiled_error"],
             available_json_graphs=available,
+            available_graphs=[
+                {
+                    "path": p,
+                    "graph_id": graph_id_for_path(p),
+                    "label": graph_label_for_id(graph_id_for_path(p)),
+                }
+                for p in available
+            ],
+            selected_graph_ids=[graph_id_for_path(p) for p in paths if p],
             available_cborg_models=list_cborg_models(current_model=self.runtime.model),
             default_ollama_model=default_ollama_model_name(),
         )
@@ -2563,6 +2580,27 @@ class AgentPipelineService:
             tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
             if callable(tiled_setter):
                 tiled_setter(self.runtime.use_live_tiled, uri=self.runtime.tiled_uri)
+
+            # selected_graph_ids → resolve to paths from storage/kg when no
+            # explicit json_graph_paths was provided.
+            if update.selected_graph_ids is not None and update.json_graph_paths is None:
+                avail_for_ids = list_storage_kg_json_files()
+                # Build graph_id → sorted candidate paths; take last (highest version).
+                id_to_candidates: Dict[str, List[str]] = {}
+                for _p in avail_for_ids:
+                    _gid = graph_id_for_path(_p)
+                    id_to_candidates.setdefault(_gid, []).append(_p)
+                resolved_by_id = [
+                    sorted(id_to_candidates[gid])[-1]
+                    for gid in update.selected_graph_ids
+                    if gid in id_to_candidates
+                ]
+                if resolved_by_id:
+                    resolved_by_id = unique_graph_paths(resolved_by_id)
+                    if resolved_by_id != self._runtime_json_paths():
+                        self.runtime.json_graph_paths = resolved_by_id
+                        self.runtime.json_graph_path = primary_json_graph_path(resolved_by_id)
+                        graph_changed = True
 
             if update.json_graph_paths is not None:
                 normalized_paths = unique_graph_paths(update.json_graph_paths)
@@ -4662,7 +4700,24 @@ class AgentPipelineService:
             )
             candidates: List[Dict[str, Any]] = []
             debate_summary: Dict[str, Any] = {}
-            search_query = question
+            # For generic "download another paper" requests, resolve to the actual
+            # topic (stored on the active paper) so the candidate search returns
+            # papers relevant to what the user originally asked about, not the raw
+            # "download another …" phrase.
+            if _direct_download_request(question):
+                _active_paper_data = self.workflow.data.get("active_paper") or {}
+                _topic = (
+                    str(_active_paper_data.get("topic") or "").strip()
+                    if isinstance(_active_paper_data, dict)
+                    else ""
+                )
+                if _topic:
+                    _resolved = _direct_download_query(question, _topic)
+                    search_query = _resolved if (_resolved and _resolved == _topic) else question
+                else:
+                    search_query = question
+            else:
+                search_query = question
             for preflight_no in range(1, 3):
                 search_decision = await self._orchestrator_decision(question, emit)
                 if search_decision.get("action") != "search_candidates":

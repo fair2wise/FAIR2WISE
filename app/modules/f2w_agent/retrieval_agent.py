@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -183,6 +184,9 @@ _OPS_LAYOUT_RE = re.compile(
     r"|hardware (?:layout|topology|order)"
     r"|layout of (?:the )?(?:beamline|hardware|endstation|optics)"
     r"|how (?:is|are) (?:the )?(?:devices?|optics|stages?|components?) connected"
+    # Catch "how is the AXIS-SXR-40 connected?" and similar named-device questions.
+    # Matches "how is/are [1–5 tokens including hyphens] connected".
+    r"|how (?:is|are) (?:the )?(?:[\w][\w\-\.:]*(?:\s+[\w][\w\-\.:]*){0,4})\s+connected\b"
     r")",
     re.IGNORECASE,
 )
@@ -704,39 +708,159 @@ class RetrievalAgent(Agent):
             "graph_ids": list(graphs),
         }
 
-    def _fanout_hits(self, question: str, graphs: Dict[str, Any]) -> List[ScoredHit]:
-        layout = _is_ops_layout_question(question)
-        active = graphs
-        if layout:
-            ops_only = {gid: kg for gid, kg in graphs.items() if is_ops_graph_id(gid)}
-            if ops_only:
-                active = ops_only
-        raw_hits: List[ScoredHit] = []
-        hops = max(self._kg_query_hops, LAYOUT_KG_QUERY_HOPS) if layout else self._kg_query_hops
-        max_nodes = self._kg_query_max_nodes
-        for gid, kg in active.items():
-            if gid == TILED_GRAPH_ID:
-                continue
+    def _parallel_retrieve(
+        self,
+        question: str,
+        graphs: Dict[str, Any],
+        hops: int,
+        max_nodes: int,
+        layout: bool,
+    ) -> List[ScoredHit]:
+        """Fan out retrieval across *graphs* in parallel via a thread pool.
+
+        Returns an unmerged list of :class:`ScoredHit` objects tagged with
+        ``graph_id``.  Each graph runs in its own thread so N graphs take
+        ≈1× the latency of the slowest graph instead of N×.
+        """
+        if not graphs:
+            return []
+
+        def _retrieve_one(item: Tuple[str, Any]) -> Tuple[str, Any, List[Any]]:
+            gid, kg = item
             try:
-                infos = _call_retrieve_nodes(question, kg, hops, max_nodes)
-            except Exception as exc:
+                infos: List[Any] = list(_call_retrieve_nodes(question, kg, hops, max_nodes))
+            except Exception as exc:  # pragma: no cover
                 logger.warning("KG retrieval failed for %s / %r: %s", gid, question, exc)
-                continue
+                infos = []
             if layout:
-                infos = list(infos) + _beam_path_nodeinfos(kg)
-            for info in infos:
-                raw_hits.append(
+                infos = infos + _beam_path_nodeinfos(kg)
+            return gid, kg, infos
+
+        raw_hits: List[ScoredHit] = []
+        n_workers = max(1, len(graphs))
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            for gid, kg, infos in pool.map(_retrieve_one, graphs.items()):
+                for info in infos:
+                    raw_hits.append(
+                        ScoredHit(
+                            id=str(getattr(info, "id", info)),
+                            graph_id=gid,
+                            score=float(
+                                getattr(info, "score_prp", getattr(info, "score", 0.0)) or 0.0
+                            ),
+                            evidence_ct=int(getattr(info, "evidence_ct", 0) or 0),
+                            category=str(getattr(info, "category", "") or ""),
+                            name=str(getattr(info, "name", "") or getattr(info, "id", "")),
+                            graph_label=getattr(kg, "graph_label", graph_label_for_id(gid)),
+                            payload=info,
+                        )
+                    )
+        return raw_hits
+
+    @staticmethod
+    def _substring_device_fallback(
+        question: str,
+        graphs: Dict[str, Any],
+        limit: int = 10,
+    ) -> List[ScoredHit]:
+        """Return KG nodes whose *name* appears verbatim (case-insensitive) in *question*.
+
+        Used as a last-resort supplement when embedding/BM25 retrieval misses a
+        named device (e.g. "how is the AXIS-SXR-40 connected?").  Only nodes
+        with a name of ≥4 characters are considered to avoid spurious matches on
+        short abbreviations.
+        """
+        q_lower = question.lower()
+        hits: List[ScoredHit] = []
+        seen: set = set()
+        for gid, kg in graphs.items():
+            nodes = getattr(kg, "nodes", {}) or {}
+            for nid, raw in nodes.items():
+                if not isinstance(raw, dict):
+                    continue
+                name = str(raw.get("name") or "").strip()
+                if len(name) < 4:
+                    continue
+                if name.lower() not in q_lower:
+                    continue
+                if nid in seen:
+                    continue
+                seen.add(nid)
+                hits.append(
                     ScoredHit(
-                        id=str(getattr(info, "id", info)),
+                        id=nid,
                         graph_id=gid,
-                        score=float(getattr(info, "score_prp", getattr(info, "score", 0.0)) or 0.0),
-                        evidence_ct=int(getattr(info, "evidence_ct", 0) or 0),
-                        category=str(getattr(info, "category", "") or ""),
-                        name=str(getattr(info, "name", "") or getattr(info, "id", "")),
+                        score=1.5,  # slightly above normal retrieval floor
+                        evidence_ct=max(1, int(raw.get("evidence_ct") or 1)),
+                        category=str(raw.get("category") or ""),
+                        name=name,
                         graph_label=getattr(kg, "graph_label", graph_label_for_id(gid)),
-                        payload=info,
+                        payload=SimpleNamespace(
+                            id=nid,
+                            name=name,
+                            category=str(raw.get("category") or ""),
+                            description=str(raw.get("description") or ""),
+                            score_prp=1.5,
+                            evidence_ct=max(1, int(raw.get("evidence_ct") or 1)),
+                        ),
                     )
                 )
+                if len(hits) >= limit:
+                    return hits
+        return hits
+
+    def _fanout_hits(self, question: str, graphs: Dict[str, Any]) -> List[ScoredHit]:
+        """Retrieve hits from all active graphs and merge by evidence rank.
+
+        Intent router rules
+        -------------------
+        * Layout / beam-path questions → query ops KG(s) first and only.
+          If the ops KG returns no hits, fall back to non-ops (science) KGs so
+          the user still gets *something* rather than an empty context.
+        * All other questions → fan out across every non-Tiled graph.
+        """
+        layout = _is_ops_layout_question(question)
+        non_tiled = {gid: kg for gid, kg in graphs.items() if gid != TILED_GRAPH_ID}
+        hops = max(self._kg_query_hops, LAYOUT_KG_QUERY_HOPS) if layout else self._kg_query_hops
+        max_nodes = self._kg_query_max_nodes
+
+        if layout:
+            ops_only = {gid: kg for gid, kg in non_tiled.items() if is_ops_graph_id(gid)}
+            active = ops_only if ops_only else non_tiled
+        else:
+            active = non_tiled
+
+        raw_hits = self._parallel_retrieve(question, active, hops, max_nodes, layout)
+
+        # Named-device substring fallback (layout questions): when a device name
+        # appears literally in the question (e.g. "AXIS-SXR-40"), guarantee that
+        # node is always included even if embedding/BM25 retrieval misses it.
+        if layout:
+            ops_graphs = ops_only if ops_only else non_tiled
+            sub_hits = self._substring_device_fallback(question, ops_graphs)
+            if sub_hits:
+                existing_ids = {h.id for h in raw_hits}
+                new_sub = [h for h in sub_hits if h.id not in existing_ids]
+                if new_sub:
+                    logger.info(
+                        "Substring fallback added %d node(s) for layout question %r: %s",
+                        len(new_sub),
+                        question,
+                        [h.id for h in new_sub],
+                    )
+                raw_hits = raw_hits + new_sub
+
+        # Intent router fallback: layout question but ops returned nothing →
+        # include science KGs so the answer is at least partially grounded.
+        if layout and not raw_hits and active is not non_tiled:
+            science_graphs = {
+                gid: kg for gid, kg in non_tiled.items() if not is_ops_graph_id(gid)
+            }
+            if science_graphs:
+                raw_hits = self._parallel_retrieve(
+                    question, science_graphs, hops, max_nodes, layout=False
+                )
+
         return merge_hits(raw_hits, limit=max_nodes)
 
     def _kg_work_ids(self, hits: Sequence[ScoredHit], graphs: Dict[str, Any]) -> List[str]:
