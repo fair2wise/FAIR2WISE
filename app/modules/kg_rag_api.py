@@ -34,19 +34,33 @@ import numpy as np
 from rapidfuzz import fuzz
 import uvicorn
 
-try:
-    import faiss  # type: ignore
-except ImportError:  # Optional semantic-retrieval dependency.
+# Skip heavy semantic-retrieval imports (faiss + sentence-transformers + torch,
+# ~300 MB combined) when the operator has explicitly selected lexical retrieval.
+# This keeps the process footprint small enough to survive macOS jetsam on
+# memory-constrained hosts (e.g. when a VM or browser fleet is also running).
+# The env var is read *before* load_dotenv() here because the CLI entry point
+# (cli.py) already calls load_dotenv() during its own module load, so the value
+# is available by the time this module is imported.
+_SEMANTIC_REQUESTED = os.environ.get("KG_RAG_RETRIEVAL_BACKEND", "").lower() not in ("lexical",)
+
+if _SEMANTIC_REQUESTED:
+    try:
+        import faiss  # type: ignore
+    except ImportError:  # Optional semantic-retrieval dependency.
+        faiss = None  # type: ignore[assignment]
+
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:  # Optional semantic-retrieval dependency.
+        SentenceTransformer = None  # type: ignore[assignment,misc]
+
+    try:
+        import torch
+    except ImportError:  # Optional semantic-retrieval dependency.
+        torch = None  # type: ignore[assignment]
+else:
     faiss = None  # type: ignore[assignment]
-
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:  # Optional semantic-retrieval dependency.
     SentenceTransformer = None  # type: ignore[assignment,misc]
-
-try:
-    import torch
-except ImportError:  # Optional semantic-retrieval dependency.
     torch = None  # type: ignore[assignment]
 
 try:

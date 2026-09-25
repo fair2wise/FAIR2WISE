@@ -384,7 +384,7 @@ def default_json_graph_path(
 class RuntimeSettings:
     backend: str = "cborg"
     model: str = "lbl/cborg-chat"
-    graph_source: str = "splash"
+    graph_source: str = "json"
     workflow_mode: str = "agentic"
     extraction_mode: str = "targeted"
     targeted_max_pages: int = 6
@@ -521,7 +521,8 @@ _CORE_NODE_KEYS = {
 
 
 def _source_paper_list(raw: Dict[str, Any]) -> List[str]:
-    papers = raw.get("source_papers") or []
+    # New-format KGs store DOIs in "papers"; old format uses "source_papers".
+    papers = raw.get("source_papers") or raw.get("papers") or []
     if not isinstance(papers, list):
         papers = [papers]
     values: List[str] = []
@@ -783,7 +784,8 @@ def _node_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
     if publications:
         return publications
 
-    source_papers = raw.get("source_papers") or []
+    # New-format KGs store DOIs in "papers"; old format uses "source_papers".
+    source_papers = raw.get("source_papers") or raw.get("papers") or []
     if not isinstance(source_papers, list):
         source_papers = [source_papers]
     source_papers = [str(source).strip() for source in source_papers if str(source).strip()]
@@ -870,7 +872,7 @@ def _is_code_snippet_raw(raw: Dict[str, Any]) -> bool:
 
 def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[LinkedCodeSnippet]:
     linked_ids: set[str] = set()
-    associations = data.get("associations") or []
+    raw_nodes_all, associations = _kg_raw_parts(data)
     if isinstance(associations, list):
         for raw in associations:
             if not isinstance(raw, dict):
@@ -882,7 +884,7 @@ def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[
             elif target == node_id and source:
                 linked_ids.add(source)
 
-    raw_nodes = data.get("things") or []
+    raw_nodes = raw_nodes_all
     by_id: Dict[str, Dict[str, Any]] = {}
     if isinstance(raw_nodes, list):
         for raw in raw_nodes:
@@ -922,7 +924,13 @@ def _graph_node_from_raw(
 ) -> GraphNode:
     node_id = _string_value(raw.get("id"))
     label = _string_value(raw.get("name") or raw.get("label"), node_id)
-    node_type = _string_value(raw.get("category") or raw.get("type"), "Thing")
+    node_type = _string_value(
+        raw.get("category")
+        or raw.get("type")
+        or raw.get("entity_type")
+        or raw.get("entityType"),
+        "Entity",
+    )
     description = _string_value(
         raw.get("description")
         or raw.get("definition")
@@ -997,7 +1005,7 @@ def graph_node_from_file(
     if data is None:
         return None
 
-    raw_nodes = data.get("things") or []
+    raw_nodes, _ = _kg_raw_parts(data)
     if not isinstance(raw_nodes, list):
         return None
     for raw in raw_nodes:
@@ -1185,13 +1193,20 @@ def _snippet_thing_payload(
     }
 
 
+def _kg_raw_parts(data: Dict[str, Any]) -> tuple[list, list]:
+    """Return (raw_nodes, raw_edges) for both old (things/associations) and
+    new (nodes/edges) MatKG JSON formats."""
+    raw_nodes = data.get("things") or data.get("nodes") or []
+    raw_edges = data.get("associations") or data.get("edges") or []
+    return raw_nodes, raw_edges
+
+
 def graph_payload_from_file(graph_path: Path) -> GraphPayload:
     """Load a MatKG JSON file into the compact UI graph contract."""
     with graph_path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
 
-    raw_nodes = data.get("things") or []
-    raw_edges = data.get("associations") or []
+    raw_nodes, raw_edges = _kg_raw_parts(data)
     nodes: List[GraphNode] = []
     edges: List[GraphEdge] = []
 
@@ -1235,13 +1250,15 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
     if not wanted or not graph_path.exists():
         return empty
 
-    try:
-        data = json.loads(graph_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    # Use the shared JSON cache to avoid re-parsing the same (potentially large)
+    # KG file on every chat message.  _read_graph_json validates mtime+size so
+    # edits are picked up automatically.
+    data = _read_graph_json(graph_path)
+    if data is None:
         return empty
 
     wanted_set = set(wanted)
-    raw_nodes = data.get("things") or []
+    raw_nodes, raw_edges_all = _kg_raw_parts(data)
     by_id: Dict[str, Dict[str, Any]] = {}
     if isinstance(raw_nodes, list):
         for raw in raw_nodes:
@@ -1266,7 +1283,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
 
     present = {node["id"] for node in nodes}
     edges: List[Dict[str, Any]] = []
-    raw_edges = data.get("associations") or []
+    raw_edges = raw_edges_all
     if isinstance(raw_edges, list):
         for raw in raw_edges:
             if not isinstance(raw, dict):
@@ -2253,7 +2270,7 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: List[str]) -> Li
         data = json.loads(graph_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
-    raw_nodes = data.get("things") or []
+    raw_nodes, _ = _kg_raw_parts(data)
     if not isinstance(raw_nodes, list):
         return []
     by_id = {raw.get("id"): raw for raw in raw_nodes if isinstance(raw, dict)}
@@ -2307,7 +2324,7 @@ class AgentPipelineService:
             )
         }
         available_json_graphs = list_storage_kg_json_files()
-        initial_graph_source = "json" if (cfg.graph or getattr(cfg, "graphs", None)) and cfg.kg_mode == "json" else "splash"
+        initial_graph_source = "json" if cfg.kg_mode == "json" else "splash"
         initial_backend = cfg.backend if cfg.backend in {"cborg", "ollama"} else "cborg"
         initial_model = default_runtime_model(initial_backend, cfg.model)
         configured_graphs = collect_graph_paths(getattr(cfg, "graphs", None), cfg.graph)
@@ -2454,6 +2471,13 @@ class AgentPipelineService:
 
     def graph_path(self) -> Path:
         if self.runtime.graph_source == "json":
+            # Check the explicitly-selected primary/viewer path first so that
+            # clicking "View" on graph2 while graph1 is first in json_graph_paths
+            # doesn't silently return graph1 from the list.
+            if self.runtime.json_graph_path:
+                resolved = self._try_resolve_runtime_json_graph_path(self.runtime.json_graph_path)
+                if resolved is not None:
+                    return resolved
             for path in self._runtime_json_paths():
                 resolved = self._try_resolve_runtime_json_graph_path(path)
                 if resolved is not None:
@@ -2612,9 +2636,11 @@ class AgentPipelineService:
 
             if update.json_graph_path is not None:
                 normalized = normalize_graph_path(update.json_graph_path)
-                if normalized != (self.runtime.json_graph_path or ""):
-                    self.runtime.json_graph_path = normalized
-                    graph_changed = True
+                # Always treat an explicit json_graph_path as a viewer-selected
+                # override so clicking VIEW on the same graph a second time still
+                # refreshes the payload (graph_changed must be True unconditionally).
+                self.runtime.json_graph_path = normalized
+                graph_changed = True
                 if update.json_graph_paths is None:
                     self.runtime.json_graph_paths = [normalized] if normalized else []
 

@@ -12,7 +12,6 @@ import asyncio
 import json
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -235,6 +234,40 @@ def _coerce_missing_topics(value: Any) -> List[str]:
     if not isinstance(value, list):
         value = []
     return [str(t).strip() for t in value if str(t).strip()]
+
+
+_TILED_INTENT_RE = re.compile(
+    r"\b(experiment|scan|run|ESAF|proposal|samples?|measurements?|who ran|ran the|"
+    r"Thomas|which runs?|my runs?|last scan|catalog|tiled)\b",
+    re.IGNORECASE,
+)
+_OPS_INTENT_RE = re.compile(
+    r"\b(beamline|BL1101|energy range|detectors?|endstation|beam|contact|"
+    r"beamline scientist|hardware|motor|PV|ophyd|optics)\b",
+    re.IGNORECASE,
+)
+_LITERATURE_INTENT_RE = re.compile(
+    r"\b(tell me about|what is|how does|literature|paper|publication|technique|"
+    r"RSoXS|P-RSoXS|scattering|nanostructure|polymer|synchrotron)\b",
+    re.IGNORECASE,
+)
+
+
+def _classify_query_intent(query: str) -> str:
+    """Classify query into intent bucket using keyword heuristics (no LLM needed).
+
+    Returns one of: 'tiled', 'ops', 'literature', 'general'.
+    """
+    text = str(query or "").strip()
+    if not text:
+        return "general"
+    if _TILED_INTENT_RE.search(text):
+        return "tiled"
+    if _OPS_INTENT_RE.search(text):
+        return "ops"
+    if _LITERATURE_INTENT_RE.search(text):
+        return "literature"
+    return "general"
 
 
 def _is_numeric_claim(question: str) -> bool:
@@ -474,6 +507,7 @@ class RetrievalAgent(Agent):
         self._live_tiled = cfg.enabled
         self._tiled_uri = cfg.uri
         self._last_tiled_meta: Dict[str, Any] = cfg.snapshot()
+        self._last_intent: str = "general"
 
     def _build_kg(self):
         """Build a KnowledgeGraph honoring the configured source (json/splash)."""
@@ -630,6 +664,7 @@ class RetrievalAgent(Agent):
             "kg_query_hops": self._kg_query_hops,
             "kg_query_max_nodes": self._kg_query_max_nodes,
             "live_tiled": dict(self._last_tiled_meta or {}),
+            "kg_intent": self._last_intent,
         }
 
     def _merge_live_tiled(
@@ -716,17 +751,29 @@ class RetrievalAgent(Agent):
         max_nodes: int,
         layout: bool,
     ) -> List[ScoredHit]:
-        """Fan out retrieval across *graphs* in parallel via a thread pool.
+        """Fan out retrieval across *graphs* and return unmerged :class:`ScoredHit` objects.
 
-        Returns an unmerged list of :class:`ScoredHit` objects tagged with
-        ``graph_id``.  Each graph runs in its own thread so N graphs take
-        ≈1× the latency of the slowest graph instead of N×.
+        Implementation note
+        -------------------
+        This method is always called from within ``loop.run_in_executor`` (i.e.
+        it already runs in a background thread from asyncio's default thread
+        pool).  Creating *another* ThreadPoolExecutor here would spawn N extra
+        threads on top of that existing thread — all sharing the same GIL for
+        Python-bound lexical search — while adding ~8 MB of stack overhead per
+        thread and causing concurrent memory allocation spikes that trigger the
+        macOS jetsam OOM-killer on memory-constrained hosts.
+
+        We therefore iterate graphs sequentially.  The latency cost is
+        negligible for ≤3 KGs: each lexical search completes in <50 ms, so two
+        graphs cost ~100 ms instead of ~50 ms.  If semantic (FAISS) retrieval
+        is ever re-enabled and true parallelism is desired, reinstate the pool
+        *only* for that backend, guarded by a per-KG cache hit check.
         """
         if not graphs:
             return []
 
-        def _retrieve_one(item: Tuple[str, Any]) -> Tuple[str, Any, List[Any]]:
-            gid, kg = item
+        raw_hits: List[ScoredHit] = []
+        for gid, kg in graphs.items():
             try:
                 infos: List[Any] = list(_call_retrieve_nodes(question, kg, hops, max_nodes))
             except Exception as exc:  # pragma: no cover
@@ -734,27 +781,21 @@ class RetrievalAgent(Agent):
                 infos = []
             if layout:
                 infos = infos + _beam_path_nodeinfos(kg)
-            return gid, kg, infos
-
-        raw_hits: List[ScoredHit] = []
-        n_workers = max(1, len(graphs))
-        with ThreadPoolExecutor(max_workers=n_workers) as pool:
-            for gid, kg, infos in pool.map(_retrieve_one, graphs.items()):
-                for info in infos:
-                    raw_hits.append(
-                        ScoredHit(
-                            id=str(getattr(info, "id", info)),
-                            graph_id=gid,
-                            score=float(
-                                getattr(info, "score_prp", getattr(info, "score", 0.0)) or 0.0
-                            ),
-                            evidence_ct=int(getattr(info, "evidence_ct", 0) or 0),
-                            category=str(getattr(info, "category", "") or ""),
-                            name=str(getattr(info, "name", "") or getattr(info, "id", "")),
-                            graph_label=getattr(kg, "graph_label", graph_label_for_id(gid)),
-                            payload=info,
-                        )
+            for info in infos:
+                raw_hits.append(
+                    ScoredHit(
+                        id=str(getattr(info, "id", info)),
+                        graph_id=gid,
+                        score=float(
+                            getattr(info, "score_prp", getattr(info, "score", 0.0)) or 0.0
+                        ),
+                        evidence_ct=int(getattr(info, "evidence_ct", 0) or 0),
+                        category=str(getattr(info, "category", "") or ""),
+                        name=str(getattr(info, "name", "") or getattr(info, "id", "")),
+                        graph_label=getattr(kg, "graph_label", graph_label_for_id(gid)),
+                        payload=info,
                     )
+                )
         return raw_hits
 
     @staticmethod
@@ -809,6 +850,54 @@ class RetrievalAgent(Agent):
                     return hits
         return hits
 
+    def _intent_routed_retrieve(
+        self,
+        question: str,
+        graphs: Dict[str, Any],
+        hops: int,
+        max_nodes: int,
+        intent: str,
+    ) -> List[ScoredHit]:
+        """Fan out retrieval with intent-based candidate allocation.
+
+        Primary KG matching the intent gets 60% of candidate slots; remaining
+        KGs share the other 40%.  Falls back to equal split when there is only
+        one KG or intent is 'general'.
+        """
+        if intent == "general" or len(graphs) <= 1:
+            return self._parallel_retrieve(question, graphs, hops, max_nodes, layout=False)
+
+        # Identify primary vs secondary graphs by intent
+        if intent in ("ops", "tiled"):
+            # Tiled data lives in _merge_live_tiled; ops KGs take priority here
+            primary = {gid: kg for gid, kg in graphs.items() if is_ops_graph_id(gid)}
+        else:  # 'literature'
+            primary = {gid: kg for gid, kg in graphs.items() if not is_ops_graph_id(gid)}
+
+        secondary = {gid: kg for gid, kg in graphs.items() if gid not in primary}
+
+        if not primary or not secondary:
+            # Can't split — just do equal allocation
+            return self._parallel_retrieve(question, graphs, hops, max_nodes, layout=False)
+
+        primary_max = max(1, int(max_nodes * 0.6))
+        other_count = max(1, len(secondary))
+        secondary_max = max(1, int(max_nodes * 0.4 / other_count))
+
+        logger.debug(
+            "Intent routing %r → intent=%s primary=%s (max=%d) secondary=%s (max=%d)",
+            question[:80],
+            intent,
+            list(primary),
+            primary_max,
+            list(secondary),
+            secondary_max,
+        )
+
+        raw_hits = self._parallel_retrieve(question, primary, hops, primary_max, layout=False)
+        raw_hits += self._parallel_retrieve(question, secondary, hops, secondary_max, layout=False)
+        return raw_hits
+
     def _fanout_hits(self, question: str, graphs: Dict[str, Any]) -> List[ScoredHit]:
         """Retrieve hits from all active graphs and merge by evidence rank.
 
@@ -817,7 +906,11 @@ class RetrievalAgent(Agent):
         * Layout / beam-path questions → query ops KG(s) first and only.
           If the ops KG returns no hits, fall back to non-ops (science) KGs so
           the user still gets *something* rather than an empty context.
-        * All other questions → fan out across every non-Tiled graph.
+        * All other questions → intent-routed fanout across every non-Tiled graph.
+          - 'ops' intent: ops KGs get 60% of candidate slots.
+          - 'literature' intent: science KGs get 60% of candidate slots.
+          - 'tiled' intent: ops KGs get 60% (Tiled is handled separately).
+          - 'general' intent: equal split across all KGs.
         """
         layout = _is_ops_layout_question(question)
         non_tiled = {gid: kg for gid, kg in graphs.items() if gid != TILED_GRAPH_ID}
@@ -830,7 +923,14 @@ class RetrievalAgent(Agent):
         else:
             active = non_tiled
 
-        raw_hits = self._parallel_retrieve(question, active, hops, max_nodes, layout)
+        if layout:
+            raw_hits = self._parallel_retrieve(question, active, hops, max_nodes, layout)
+        else:
+            intent = _classify_query_intent(question)
+            self._last_intent = intent
+            raw_hits = self._intent_routed_retrieve(
+                question, active, hops, max_nodes, intent
+            )
 
         # Named-device substring fallback (layout questions): when a device name
         # appears literally in the question (e.g. "AXIS-SXR-40"), guarantee that

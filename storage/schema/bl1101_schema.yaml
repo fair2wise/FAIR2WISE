@@ -233,6 +233,32 @@ classes:
     is_a: Role
     description: Beamline scientist / primary scientific contact for 11.0.1.2.
 
+  OpsDoc:
+    is_a: Thing
+    description: >
+      A documentation chunk (RAG chunk) from a public web page or internal document
+      ingested into the bl1101 ops knowledge graph for retrieval. Source kind is
+      typically paper_chunk; corpus is bl1101.
+    slots:
+      - source_kind
+      - corpus
+      - provenance_url
+      - retrieval_date
+      - part_of
+
+  DocumentChunk:
+    is_a: Thing
+    description: >
+      A text chunk split from a source document (blueprint HTML, knowledge markdown,
+      or public web page) for RAG retrieval in the bl1101 ops KG. The provenance
+      field records the original file name or URL.
+    slots:
+      - source_kind
+      - corpus
+      - provenance_url
+      - retrieval_date
+      - part_of
+
 slots:
   hasEndstation:
     description: Beamline hosts this endstation
@@ -382,3 +408,51 @@ slots:
     range: Person
     multivalued: true
     slot_uri: http://www.w3.org/ns/prov#wasAttributedTo
+
+  source_kind:
+    description: >
+      Category of source for a RAG chunk or document node (e.g. paper_chunk,
+      ops_doc, web_page). Used for retrieval filtering.
+    range: string
+    slot_uri: beamline:source_kind
+
+  corpus:
+    description: >
+      Corpus or knowledge graph this document belongs to (e.g. bl1101, matkg).
+      Used for retrieval scoping.
+    range: string
+    slot_uri: beamline:corpus
+
+  provenance_url:
+    description: >
+      Canonical URL or DOI of the original source document or web page from
+      which a node's content was extracted.
+    range: uri
+    slot_uri: beamline:provenance_url
+
+  retrieval_date:
+    description: >
+      ISO-8601 date (YYYY-MM-DD) when the document was fetched or last
+      verified against the source.
+    range: string
+    slot_uri: beamline:retrieval_date
+
+  energy_range:
+    description: >
+      Photon energy range at the beamline (string label, e.g. "165–1,500 eV").
+      Numeric details live in the linked PhotonEnergy node.
+    domain: Beamline
+    range: string
+    slot_uri: beamline:energy_range
+
+  polarization:
+    description: >
+      Human-readable polarization capabilities of the beamline (linear H–V,
+      left/right elliptical/circular). Typed instances live in Polarization nodes.
+    domain: Beamline
+    range: string
+    slot_uri: beamline:polarization
+
+# NOTE: W3C PROV-O vocabulary reference has been moved to
+# storage/schema/prov_vocabulary.yaml to keep this file LinkML-valid.
+# See app/modules/prov.py for Python implementation helpers.

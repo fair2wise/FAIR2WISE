@@ -38,6 +38,10 @@ classes:
       scattering_technique:
         string_serialization: "RSoXS"
 
+# NOTE: W3C PROV-O vocabulary reference (classes, relations, namespace) has been
+# moved to storage/schema/prov_vocabulary.yaml to keep this file LinkML-valid.
+# See app/modules/prov.py for Python implementation helpers.
+
 slots:
   photon_energy_eV:
     description: Incident photon energy in electronvolts
