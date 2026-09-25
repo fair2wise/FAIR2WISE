@@ -361,7 +361,7 @@ export function remainingNodeProperties(node: LiveGraphNode): NodePropertyRow[] 
     }
   }
 
-  add('Type', node.type);
+  add('Type', node.type && node.type.toLowerCase() !== 'unknown' ? node.type : 'Entity');
   add('ID', node.id);
   add('Graph', graphDisplayName(node));
   add('Formula', node.formula);

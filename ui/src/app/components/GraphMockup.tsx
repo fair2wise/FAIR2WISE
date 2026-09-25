@@ -276,6 +276,7 @@ function layoutGraph(graph: GraphPayload): LayoutResult {
     const angle = index * goldenAngle;
     return {
       ...node,
+      label: node.label || node.id,
       color: getNodeColor(node.type),
       x: cx + Math.cos(angle) * radius,
       y: cy + Math.sin(angle) * radius,
@@ -1735,7 +1736,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
           || {
             id: seedId,
             label: seedId,
-            type: 'Unknown',
+            type: 'Entity',
             description: '',
           };
         return { nodes: [stub], edges: [], source_path: source.source_path };
@@ -1972,12 +1973,33 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
     setViewBox(fullViewBox(layout.width, layout.height));
   }
 
-  function handleNodeEnter(node: LayoutNode) {
+  function handleNodeEnter(node: LayoutNode, e: React.MouseEvent<SVGGElement>) {
     setHoveredNode(node);
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const anchor = mouseToContainer(e, containerRect);
+    setHoverPopup({
+      target: {
+        kind: 'node',
+        node: {
+          id: node.id,
+          label: node.label || node.id,
+          type: node.type || 'Entity',
+          description: node.description || '',
+          color: node.color,
+        },
+      },
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      anchorRadius: R,
+    });
   }
 
   function handleNodeLeave() {
     setHoveredNode(null);
+    setHoverPopup(prev => (prev?.target.kind === 'node' ? null : prev));
+    setPopupPos(null);
   }
 
   function handleEdgeHover(
@@ -2288,6 +2310,26 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                 />
               ) : (
                 <>
+              {/* Large-graph performance warning: SVG degrades above ~500 nodes.
+                  Canvas-based Force layout handles 10k+ nodes smoothly. */}
+              {nodes.length > 500 && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-3 pt-2">
+                  <div className="pointer-events-auto inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-1.5 text-[11px] text-amber-800 shadow-sm">
+                    <span>⚡</span>
+                    <span>
+                      <strong>{nodes.length.toLocaleString()} nodes</strong> — SVG layout may lag at this scale.
+                    </span>
+                    <button
+                      type="button"
+                      className="font-semibold underline hover:text-amber-900"
+                      onClick={() => setLayoutMode('force')}
+                    >
+                      Switch to Force layout
+                    </button>
+                    <span className="text-amber-600">(Canvas · handles 10k+ nodes)</span>
+                  </div>
+                </div>
+              )}
               <svg
               ref={svgRef}
               viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
@@ -2413,7 +2455,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                 const color = node.color;
                 const [r, g, b] = hexToRgb(color);
                 const labelLines = splitLabel(node.label);
-                const showLabel = nodes.length <= 150 || isHl || isHovered;
+                const showLabel = true;
 
                 return (
                   <g
@@ -2421,7 +2463,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                     className="kg-node-in"
                     style={{ animationDelay: `${nodes.length <= 100 ? nodeIndex * 35 : 0}ms` }}
                     transform={`translate(${node.x}, ${node.y})`}
-                    onMouseEnter={() => handleNodeEnter(node)}
+                    onMouseEnter={e => handleNodeEnter(node, e)}
                     onMouseLeave={handleNodeLeave}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => {

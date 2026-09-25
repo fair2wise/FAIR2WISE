@@ -39,9 +39,9 @@ export function KGHoverPopup({
               className="shrink-0 font-medium"
               style={{ color: hoverTarget.node.color }}
             >
-              {hoverTarget.node.type || 'Node'}
+              {(hoverTarget.node.type && hoverTarget.node.type.toLowerCase() !== 'unknown') ? hoverTarget.node.type : 'Entity'}
             </span>
-            <span className="min-w-0 font-medium text-slate-800">{hoverTarget.node.label}</span>
+            <span className="min-w-0 font-medium text-slate-800">{hoverTarget.node.label || hoverTarget.node.id}</span>
           </div>
           {hoverTarget.node.description && (
             <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap font-semibold leading-relaxed text-slate-700">

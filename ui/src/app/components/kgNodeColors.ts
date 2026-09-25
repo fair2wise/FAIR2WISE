@@ -69,8 +69,8 @@ const RAINBOW = [
 /** Sky-400 — matches AsciiOrb accent for LLM-invented categories. */
 export const LLM_INVENTED_NODE_COLOR = '#38bdf8';
 
-/** Slate-400 — only for Unknown stub nodes. */
-export const UNKNOWN_NODE_COLOR = '#94a3b8';
+/** Slate-300 — neutral placeholder color for Unknown stub nodes (lighter than typed nodes). */
+export const UNKNOWN_NODE_COLOR = '#cbd5e1';
 
 const SCHEMA_CLASS_COLORS: Record<string, string> = Object.fromEntries(
   SCHEMA_NODE_CLASSES.map((className, index) => [
