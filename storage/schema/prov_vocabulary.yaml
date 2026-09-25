@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# W3C PROV-O canonical terms locked for this project.
+# Namespace:  prov: = http://www.w3.org/ns/prov#
+# Use the compact prov: prefix in all data files; never inline the full URI.
+# Implementation helpers live in app/modules/prov.py.
+#
+# This file is a reference/documentation document only — it is NOT a LinkML
+# schema and should not be loaded via `imports:`.  It was split out from
+# rsoxs_schema.yaml because LinkML's SchemaDefinition rejects unknown
+# top-level keys.
+# ---------------------------------------------------------------------------
+
+prov_vocabulary:
+  namespace:
+    prefix: prov
+    uri: "http://www.w3.org/ns/prov#"
+
+  classes:
+    prov:Entity:
+      uri: "http://www.w3.org/ns/prov#Entity"
+      usage: >
+        A thing that was produced or used. Assign to Work/PDF/snapshot/KG-file
+        nodes when describing their provenance lineage.
+    prov:Activity:
+      uri: "http://www.w3.org/ns/prov#Activity"
+      usage: >
+        Something that happened with optional time bounds.  Use for extraction
+        runs, ingest runs, and json2kg passes.
+    prov:Agent:
+      uri: "http://www.w3.org/ns/prov#Agent"
+      usage: >
+        A person or software responsible for an activity.  Use for Person
+        nodes and model-name agents.
+
+  relations:
+    prov:wasGeneratedBy:
+      uri: "http://www.w3.org/ns/prov#wasGeneratedBy"
+      domain: prov:Entity
+      range: prov:Activity
+      usage: "Entity was produced by an Activity (e.g. KG snapshot wasGeneratedBy ingest run)."
+    prov:used:
+      uri: "http://www.w3.org/ns/prov#used"
+      domain: prov:Activity
+      range: prov:Entity
+      usage: "Activity consumed an Entity (e.g. extraction run used source PDF)."
+    prov:wasDerivedFrom:
+      uri: "http://www.w3.org/ns/prov#wasDerivedFrom"
+      domain: prov:Entity
+      range: prov:Entity
+      usage: "Entity was derived from another Entity (e.g. Chunk wasDerivedFrom blueprint HTML)."
+    prov:wasAttributedTo:
+      uri: "http://www.w3.org/ns/prov#wasAttributedTo"
+      domain: prov:Entity
+      range: prov:Agent
+      usage: "Entity attributed to an Agent (e.g. ESAF wasAttributedTo a Person)."
+    prov:wasAssociatedWith:
+      uri: "http://www.w3.org/ns/prov#wasAssociatedWith"
+      domain: prov:Activity
+      range: prov:Agent
+      usage: "Activity was associated with an Agent (e.g. extraction run wasAssociatedWith model)."
+    prov:atTime:
+      uri: "http://www.w3.org/ns/prov#atTime"
+      usage: "Timestamp on an InstantaneousEvent relation.  Value: ISO-8601 string."
+    prov:startedAtTime:
+      uri: "http://www.w3.org/ns/prov#startedAtTime"
+      usage: "Activity start time.  Value: ISO-8601 string."
+    prov:endedAtTime:
+      uri: "http://www.w3.org/ns/prov#endedAtTime"
+      usage: "Activity end time.  Value: ISO-8601 string."

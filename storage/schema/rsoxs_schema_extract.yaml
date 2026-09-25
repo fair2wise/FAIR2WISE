@@ -1,0 +1,40 @@
+id: https://w3id.org/matkg/rsoxs
+name: rsoxs
+title: RSoXS v1 overlay
+description: >
+  Thin rsoxs_v1 overlay on storage/schema/matkg_schema.yaml.
+  Adds RSoXSMeasurement plus resonant-scattering slots used by term extraction.
+  Do not merge this graph with the x-ray demo KG.
+license: MIT
+version: rsoxs_v1
+
+prefixes:
+  matkg: https://w3id.org/matkg/
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+
+default_prefix: matkg
+default_range: string
+
+imports:
+  - matkg_schema
+
+classes:
+  RSoXSMeasurement:
+    is_a: ExperimentalTechnique
+    description: >
+      A resonant soft X-ray scattering measurement or simulation of one
+      (RSoXS, R-SoXS, P-RSoXS, CyRSoXS). Prefer this class over the parent
+      ExperimentalTechnique for RSoXS, polarized RSoXS, and resonant elastic
+      soft X-ray scattering.
+    slots:
+      - photon_energy_eV
+      - absorption_edge
+      - scattering_technique
+      - polarization
+    slot_usage:
+      technique_type:
+        string_serialization: "rsoxs"
+      scattering_technique:
+        string_serialization: "RSoXS"
+
