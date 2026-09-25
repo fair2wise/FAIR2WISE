@@ -15,11 +15,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Load .env (if present) so TILED_API_KEY, TILED_CATALOG_URI, etc. are available
+# without requiring the caller to pre-export them.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 HOST="${F2W_AGENT_HOST:-127.0.0.1}"
 PORT="${F2W_AGENT_PORT:-8090}"
 BACKEND="${F2W_BACKEND:-cborg}"
 MODEL="${F2W_MODEL:-lbl/cborg-chat}"
-KG_MODE="${F2W_KG_MODE:-splash}"
+KG_MODE="${F2W_KG_MODE:-json}"
 if [[ "$KG_MODE" == "json" ]]; then
   LATEST_OPS="storage/kg/matkg_bl1101_v1.json"
   best=-1
@@ -132,8 +141,52 @@ if lsof -ti:"$PORT" >/dev/null 2>&1; then
   exit 1
 fi
 
+
+# Prefer the project venv Python so all deps (dotenv, PyMuPDF, …) are
+# available even when the shell's PATH doesn't have the venv activated.
+# Falls back to python3 / python if the venv isn't present.
+if [[ -x "$ROOT_DIR/.venv-harvest/bin/python" ]]; then
+  PYTHON="$ROOT_DIR/.venv-harvest/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON="python3"
+else
+  PYTHON="python"
+fi
+
+# ── Local Tiled Graph (non-Docker path) ──────────────────────────────────────
+# Must come after PYTHON is set above.
+TILED_URI_LOCAL="${TILED_URI:-http://127.0.0.1:8765}"
+TILED_HEALTH_URL="${TILED_URI_LOCAL}/api/v1/"
+# Default catalog URI (SQLite, absolute path).  Can be overridden by .env or
+# the environment; Tiled config uses ${TILED_CATALOG_URI} without bash defaults.
+export TILED_CATALOG_URI="${TILED_CATALOG_URI:-sqlite+aiosqlite:///${ROOT_DIR}/storage/tiled_catalog.db}"
+export TILED_API_KEY="${TILED_API_KEY:-devonlykeychangeinproduction00000000000000000000000000000000000000}"
+
+if "$PYTHON" -c 'import tiled' >/dev/null 2>&1; then
+  if ! curl -sf "$TILED_HEALTH_URL" > /dev/null 2>&1; then
+    echo "Starting local Tiled server (F2W instance on :8765)..."
+    mkdir -p "$ROOT_DIR/logs"
+    nohup "$PYTHON" -m tiled serve config "$ROOT_DIR/storage/tiled_config.yml" \
+      --host 127.0.0.1 --port 8765 \
+      > "$ROOT_DIR/logs/tiled_$(date +%Y%m%d_%H%M%S).log" 2>&1 &
+    # Wait up to 15s for Tiled to become healthy
+    for _i in $(seq 1 15); do
+      sleep 1
+      curl -sf "$TILED_HEALTH_URL" > /dev/null 2>&1 && break
+    done
+  fi
+  if curl -sf "$TILED_HEALTH_URL" > /dev/null 2>&1; then
+    echo "Tiled healthy — seeding sim data (idempotent)..."
+    "$PYTHON" scripts/ingest_tiled_sim.py --to-tiled --tiled-uri "$TILED_URI_LOCAL" || true
+    export F2W_LIVE_TILED=1
+    export TILED_URI="$TILED_URI_LOCAL"
+  else
+    echo "warning: Tiled did not start; live Tiled disabled" >&2
+  fi
+fi
+
 ARGS=(
-  python3 -m app.modules.launchers.f2w_agent
+  "$PYTHON" -m app.modules.launchers.f2w_agent
   --backend "$BACKEND"
   --model "$MODEL"
   --kg-mode "$KG_MODE"

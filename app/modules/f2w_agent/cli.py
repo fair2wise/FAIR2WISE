@@ -13,7 +13,13 @@ import asyncio
 import sys
 from pathlib import Path
 
+# load_dotenv() MUST be called before importing coordinator/retrieval_agent so
+# that KG_RAG_RETRIEVAL_BACKEND (and other env vars) are visible to kg_rag_api
+# at module-load time.  In particular, the lexical-mode import guard in
+# kg_rag_api.py skips loading faiss/torch (~300 MB) only when this env var is
+# already set when that module is first imported.
 from dotenv import load_dotenv
+load_dotenv()
 
 from .coordinator import (
     Coordinator,
@@ -24,8 +30,6 @@ from .coordinator import (
     default_workflow_mode,
 )
 from .multi_kg import collect_graph_paths, primary_json_graph_path
-
-load_dotenv()
 
 
 def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
@@ -90,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Alias for --graph; extra corpora for fan-out retrieve",
     )
     p.add_argument("--seed-terms", default=None, help="Seed extracted-terms JSON (cumulative base)")
-    p.add_argument("--kg-mode", default="splash", choices=["json", "splash"], help="KG update/reload mode")
+    p.add_argument("--kg-mode", default="json", choices=["json", "splash"], help="KG update/reload mode")
     p.add_argument("--workdir", default="runs/session", help="Session working directory")
     p.add_argument("--schema", default="storage/schema/matkg_schema.yaml")
     p.add_argument("--chebi", default=None, help="Optional ChEBI .obo path")
