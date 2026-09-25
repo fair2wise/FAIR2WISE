@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { ButtonWithIcon } from '@blueskyproject/finch';
 import { Check, ChevronDown, Info, Save, Settings } from 'lucide-react';
@@ -10,6 +10,8 @@ import {
   KG_QUERY_MAX_NODES_PRESETS,
   defaultModelForBackend,
   loadAgentSettings,
+  loadCachedGraphList,
+  saveCachedGraphList,
   saveAgentSettings,
   settingsEqual,
   settingsFromApiResponse,
@@ -186,10 +188,19 @@ export function AppSettingsButton({
   const [open, setOpen] = useState(false);
   const [savedSettings, setSavedSettings] = useState<AgentSettings>(() => loadAgentSettings());
   const [draftSettings, setDraftSettings] = useState<AgentSettings>(() => loadAgentSettings());
-  const [availableJsonGraphs, setAvailableJsonGraphs] = useState<string[]>([]);
+  // Initialize from the localStorage cache so the list renders immediately on
+  // panel open — even before the API responds and even if the backend is down.
+  const [availableJsonGraphs, setAvailableJsonGraphs] = useState<string[]>(() => loadCachedGraphList());
   const [availableCborgModels, setAvailableCborgModels] = useState<string[]>([]);
   const [defaultOllamaModel, setDefaultOllamaModel] = useState(DEFAULT_OLLAMA_MODEL);
   const [loading, setLoading] = useState(false);
+
+  // Eagerly mark loading=true the moment the panel becomes visible so there is
+  // no single-frame flash of "No JSON graph files found" before the useEffect
+  // fires and kicks off the actual fetch.
+  useLayoutEffect(() => {
+    if (open) setLoading(true);
+  }, [open]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [errorTitle, setErrorTitle] = useState('Settings update failed');
@@ -214,37 +225,52 @@ export function AppSettingsButton({
       try {
         const response = await fetchAgentSettings();
         if (cancelled) return;
-        setAvailableJsonGraphs(response.available_json_graphs ?? []);
+        // Set the graph list immediately — this must not be lost if later
+        // processing of the new multi-kg fields fails.
+        const freshGraphs = response.available_json_graphs ?? [];
+        setAvailableJsonGraphs(freshGraphs);
+        // Persist to localStorage so subsequent opens show the list instantly,
+        // even when the backend is temporarily unreachable.
+        saveCachedGraphList(freshGraphs);
         setAvailableCborgModels(response.available_cborg_models ?? []);
         setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
         setTiledStatus(response.tiled_status);
         setTiledApiKeySet(response.tiled_api_key_set === true);
         setTiledError(response.tiled_error ?? null);
-        const synced = settingsFromApiResponse(response);
-        setDraftSettings(prev => ({
-          ...prev,
-          useLiveTiled: synced.useLiveTiled,
-          tiledUri: synced.tiledUri || prev.tiledUri,
-          availableGraphs: synced.availableGraphs,
-          selectedGraphIds: synced.selectedGraphIds,
-        }));
-        setSavedSettings(prev => ({
-          ...prev,
-          useLiveTiled: synced.useLiveTiled,
-          tiledUri: synced.tiledUri || prev.tiledUri,
-          availableGraphs: synced.availableGraphs,
-          selectedGraphIds: synced.selectedGraphIds,
-        }));
-        if (!response.available_json_graphs?.includes(saved.jsonGraphPath) && synced.jsonGraphPath) {
+        try {
+          const synced = settingsFromApiResponse(response);
+          if (cancelled) return;
           setDraftSettings(prev => ({
             ...prev,
-            jsonGraphPath: saved.jsonGraphPath || synced.jsonGraphPath,
+            useLiveTiled: synced.useLiveTiled,
+            tiledUri: synced.tiledUri || prev.tiledUri,
+            availableGraphs: synced.availableGraphs ?? [],
+            selectedGraphIds: synced.selectedGraphIds ?? [],
           }));
+          setSavedSettings(prev => ({
+            ...prev,
+            useLiveTiled: synced.useLiveTiled,
+            tiledUri: synced.tiledUri || prev.tiledUri,
+            availableGraphs: synced.availableGraphs ?? [],
+            selectedGraphIds: synced.selectedGraphIds ?? [],
+          }));
+          if (!response.available_json_graphs?.includes(saved.jsonGraphPath) && synced.jsonGraphPath) {
+            setDraftSettings(prev => ({
+              ...prev,
+              jsonGraphPath: saved.jsonGraphPath || synced.jsonGraphPath,
+            }));
+          }
+        } catch (syncErr) {
+          // settingsFromApiResponse failed (e.g. malformed multi-kg fields).
+          // Log the error but keep the successfully-loaded availableJsonGraphs.
+          console.error('[Settings] settingsFromApiResponse failed:', syncErr);
         }
       } catch (err) {
         if (!cancelled) {
+          console.error('[Settings] fetchAgentSettings failed:', err);
           setError(err instanceof Error ? err.message : String(err));
-          setAvailableJsonGraphs([]);
+          // NOTE: do NOT reset availableJsonGraphs here — if a previous load
+          // succeeded we should keep showing the list rather than hiding it.
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -296,7 +322,9 @@ export function AppSettingsButton({
       setSavedSettings(saved);
       setDraftSettings(saved);
       saveAgentSettings(saved);
-      setAvailableJsonGraphs(response.available_json_graphs ?? []);
+      const savedGraphs = response.available_json_graphs ?? [];
+      setAvailableJsonGraphs(savedGraphs);
+      saveCachedGraphList(savedGraphs);
       setAvailableCborgModels(response.available_cborg_models ?? []);
       setDefaultOllamaModel(response.default_ollama_model || DEFAULT_OLLAMA_MODEL);
       setTiledStatus(response.tiled_status);
@@ -383,6 +411,46 @@ export function AppSettingsButton({
         : [...prev.jsonGraphPaths, jsonGraphPath];
       return { ...prev, graphSource: 'json', jsonGraphPath, jsonGraphPaths };
     });
+  }
+
+  async function handleViewGraph(path: string) {
+    setSaving(true);
+    setError('');
+    setErrorTitle('Failed to load graph');
+    try {
+      const base = savedSettings;
+      const updated: AgentSettings = {
+        ...base,
+        graphSource: 'json',
+        jsonGraphPath: path,
+        jsonGraphPaths: base.jsonGraphPaths.includes(path)
+          ? base.jsonGraphPaths
+          : [...base.jsonGraphPaths, path],
+      };
+      const response = await updateAgentSettings(settingsToApiPayload(updated));
+      const synced = settingsFromApiResponse(response);
+      const saved: AgentSettings = {
+        ...updated,
+        availableGraphs: synced.availableGraphs,
+        selectedGraphIds: synced.selectedGraphIds,
+      };
+      setSavedSettings(saved);
+      setDraftSettings(prev => ({
+        ...prev,
+        graphSource: 'json',
+        jsonGraphPath: path,
+        jsonGraphPaths: prev.jsonGraphPaths.includes(path)
+          ? prev.jsonGraphPaths
+          : [...prev.jsonGraphPaths, path],
+      }));
+      saveAgentSettings(saved);
+      await onSettingsApplied?.();
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -532,12 +600,12 @@ export function AppSettingsButton({
                 <SettingOption
                   id="splash_links"
                   label="splash_links"
-                  description="Load the live knowledge graph from splash_links (default)."
+                  description="Load the live knowledge graph from splash_links (requires a running splash server on :8081)."
                 />
                 <SettingOption
                   id="json"
                   label="JSON"
-                  description="Load a MatKG JSON file from storage/kg."
+                  description="Load a MatKG JSON file from storage/kg (default)."
                 />
               </RadioGroup>
             </div>
@@ -581,13 +649,13 @@ export function AppSettingsButton({
                           <button
                             type="button"
                             disabled={loading || saving || !checked}
-                            onClick={() => updateDisplayGraph(path)}
+                            onClick={() => void handleViewGraph(path)}
                             className={cn(
                               'shrink-0 rounded px-2 py-1 text-[10px] uppercase tracking-wide',
                               isViewer ? 'bg-sky-100 text-sky-700' : 'text-slate-400 hover:text-slate-600',
                             )}
                           >
-                            {isViewer ? 'Viewer' : 'View'}
+                            View
                           </button>
                         </div>
                       );
@@ -595,7 +663,11 @@ export function AppSettingsButton({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    {loading ? 'Loading available JSON graphs…' : 'No JSON graph files found in storage/kg.'}
+                    {loading
+                      ? 'Loading available JSON graphs…'
+                      : error
+                        ? 'Backend unavailable — cannot list graph files.'
+                        : 'No JSON graph files found in storage/kg.'}
                   </div>
                 )}
                 {draftSettings.jsonGraphPaths.length > 3 && (

@@ -56,6 +56,39 @@ export interface AgentSettingsResponse {
 }
 
 const STORAGE_KEY = 'fair2wise-agent-settings-v1';
+const GRAPH_LIST_CACHE_KEY = 'fair2wise-available-graphs-cache-v1';
+
+/**
+ * Return the last successfully-fetched list of available JSON graph paths.
+ * Used to pre-populate the Settings panel before the API responds (or when
+ * the backend is temporarily unreachable).
+ */
+export function loadCachedGraphList(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(GRAPH_LIST_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Persist a successful available-graph list fetch so subsequent panel opens
+ * can show the list immediately, even before the API responds.
+ */
+export function saveCachedGraphList(paths: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(GRAPH_LIST_CACHE_KEY, JSON.stringify(paths));
+  } catch {
+    // Ignore quota errors — cache is best-effort
+  }
+}
 
 const CBORG_MODEL_ALIASES: Record<string, string> = {
   'google/gemini-flash': 'gemini-flash',
@@ -94,7 +127,7 @@ export function clampKgQueryHops(value: number): number {
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   backend: 'cborg',
   model: DEFAULT_CBORG_MODEL,
-  graphSource: 'splash_links',
+  graphSource: 'json',
   workflowMode: 'agentic',
   extractionMode: 'targeted',
   targetedMaxPages: 6,
@@ -204,7 +237,7 @@ export function settingsToApiPayload(settings: AgentSettings) {
     targeted_max_pages: settings.targetedMaxPages,
     json_graph_path: settings.graphSource === 'json' ? settings.jsonGraphPath : null,
     json_graph_paths: settings.graphSource === 'json' ? settings.jsonGraphPaths : [],
-    selected_graph_ids: settings.graphSource === 'json' && settings.selectedGraphIds.length > 0
+    selected_graph_ids: settings.graphSource === 'json' && (settings.selectedGraphIds ?? []).length > 0
       ? settings.selectedGraphIds
       : undefined,
     kg_query_max_nodes: settings.kgQueryMaxNodes,
@@ -276,8 +309,8 @@ export function settingsEqual(a: AgentSettings, b: AgentSettings): boolean {
     && a.extractionMode === b.extractionMode
     && a.targetedMaxPages === b.targetedMaxPages
     && a.jsonGraphPath === b.jsonGraphPath
-    && a.jsonGraphPaths.join('|') === b.jsonGraphPaths.join('|')
-    && a.selectedGraphIds.join('|') === b.selectedGraphIds.join('|')
+    && (a.jsonGraphPaths ?? []).join('|') === (b.jsonGraphPaths ?? []).join('|')
+    && (a.selectedGraphIds ?? []).join('|') === (b.selectedGraphIds ?? []).join('|')
     && a.kgQueryMaxNodes === b.kgQueryMaxNodes
     && a.kgQueryHops === b.kgQueryHops
     && a.sourceRag === b.sourceRag

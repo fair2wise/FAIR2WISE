@@ -238,6 +238,10 @@ export interface AgentSettingsApiResponse {
   tiled_status?: string;
   tiled_error?: string | null;
   available_json_graphs: string[];
+  /** Richer per-graph metadata (path, graph_id, label). Added by multi-kg changes. */
+  available_graphs?: { path: string; graph_id: string; label: string }[];
+  /** IDs of currently selected graphs. */
+  selected_graph_ids?: string[];
   available_cborg_models: string[];
   default_ollama_model: string;
 }

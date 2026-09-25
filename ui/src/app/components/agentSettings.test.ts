@@ -11,8 +11,10 @@ import {
   graphSourceFromApi,
   graphSourceToApi,
   loadAgentSettings,
+  loadCachedGraphList,
   normalizeCborgModel,
   saveAgentSettings,
+  saveCachedGraphList,
   settingsEqual,
   settingsFromApiResponse,
   settingsToApiPayload,
@@ -67,6 +69,8 @@ describe('agentSettings', () => {
       targetedMaxPages: 6,
       jsonGraphPath: 'storage/kg/ignored.json',
       jsonGraphPaths: ['storage/kg/ignored.json'],
+      availableGraphs: [],
+      selectedGraphIds: [],
       kgQueryMaxNodes: 100,
       kgQueryHops: 1,
       sourceRag: false,
@@ -100,6 +104,8 @@ describe('agentSettings', () => {
       targetedMaxPages: 4,
       jsonGraphPath: 'storage/kg/alpha.json',
       jsonGraphPaths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
+      availableGraphs: [],
+      selectedGraphIds: [],
       kgQueryMaxNodes: 250,
       kgQueryHops: 2,
       sourceRag: true,
@@ -148,6 +154,8 @@ describe('agentSettings', () => {
       targetedMaxPages: 4,
       jsonGraphPath: 'storage/kg/alpha.json',
       jsonGraphPaths: ['storage/kg/alpha.json', 'storage/kg/beta.json'],
+      availableGraphs: [],
+      selectedGraphIds: [],
       kgQueryMaxNodes: 250,
       kgQueryHops: 2,
       sourceRag: true,
@@ -177,6 +185,8 @@ describe('agentSettings', () => {
       targetedMaxPages: 4,
       jsonGraphPath: 'storage/kg/custom.json',
       jsonGraphPaths: ['storage/kg/custom.json'],
+      availableGraphs: [],
+      selectedGraphIds: [],
       kgQueryMaxNodes: 50,
       kgQueryHops: 3,
       sourceRag: true,
@@ -198,6 +208,8 @@ describe('agentSettings', () => {
       targetedMaxPages: DEFAULT_AGENT_SETTINGS.targetedMaxPages,
       jsonGraphPath: DEFAULT_AGENT_SETTINGS.jsonGraphPath,
       jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
+      availableGraphs: [],
+      selectedGraphIds: [],
       kgQueryMaxNodes: DEFAULT_AGENT_SETTINGS.kgQueryMaxNodes,
       kgQueryHops: DEFAULT_AGENT_SETTINGS.kgQueryHops,
       sourceRag: false,
@@ -216,6 +228,8 @@ describe('agentSettings', () => {
       targetedMaxPages: 6,
       jsonGraphPath: DEFAULT_AGENT_SETTINGS.jsonGraphPath,
       jsonGraphPaths: [...DEFAULT_JSON_GRAPH_PATHS],
+      availableGraphs: [],
+      selectedGraphIds: [],
       kgQueryMaxNodes: 100,
       kgQueryHops: 1,
       sourceRag: false,
@@ -255,5 +269,43 @@ describe('agentSettings', () => {
     expect(settings.kgQueryHops).toBe(20);
     saveAgentSettings(settings);
     expect(loadAgentSettings().kgQueryHops).toBe(20);
+  });
+
+  it('loadCachedGraphList returns [] when nothing is cached', () => {
+    expect(loadCachedGraphList()).toEqual([]);
+  });
+
+  it('saveCachedGraphList + loadCachedGraphList round-trips a path list', () => {
+    const paths = [
+      'storage/kg/matkg_rsoxs_v1.json',
+      'storage/kg/matkg_bl1101_v1.json',
+    ];
+    saveCachedGraphList(paths);
+    expect(loadCachedGraphList()).toEqual(paths);
+  });
+
+  it('loadCachedGraphList filters out non-string and blank entries', () => {
+    localStorage.setItem('fair2wise-available-graphs-cache-v1', JSON.stringify([
+      'storage/kg/good.json',
+      42,
+      null,
+      '',
+      'storage/kg/also-good.json',
+    ]));
+    expect(loadCachedGraphList()).toEqual([
+      'storage/kg/good.json',
+      'storage/kg/also-good.json',
+    ]);
+  });
+
+  it('loadCachedGraphList returns [] for malformed cache', () => {
+    localStorage.setItem('fair2wise-available-graphs-cache-v1', 'not-json{{{');
+    expect(loadCachedGraphList()).toEqual([]);
+  });
+
+  it('saveCachedGraphList overwrites a previous cache', () => {
+    saveCachedGraphList(['storage/kg/old.json']);
+    saveCachedGraphList(['storage/kg/new.json']);
+    expect(loadCachedGraphList()).toEqual(['storage/kg/new.json']);
   });
 });
