@@ -37,6 +37,14 @@ services:
       CBORG_IP_FAMILY: ipv6
       F2W_AGENT_HOST: "0.0.0.0"
       F2W_AGENT_PORT: "8090"
+      TILED_URI: "http://tiled:8765"
+      F2W_LIVE_TILED: "1"
+      TILED_API_KEY: "${TILED_API_KEY}"
+    depends_on:
+      tiled:
+        condition: service_healthy
+      tiled_seed:
+        condition: service_completed_successfully
     ports:
       - "8090:8090"
     restart: unless-stopped
@@ -66,8 +74,51 @@ services:
     networks:
       - f2w
 
+  tiled:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./storage/tiled_config.yml:/app/tiled_config.yml:ro
+      - tiled_data:/data
+    environment:
+      TILED_API_KEY: "${TILED_API_KEY}"
+    command: >
+      bash -c "pip install 'tiled[server]>=0.2.18' --quiet --no-cache-dir &&
+               tiled serve config /app/tiled_config.yml --host 0.0.0.0 --port 8765"
+    ports:
+      - "127.0.0.1:8765:8765"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8765/api/v1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks:
+      - f2w
+
+  tiled_seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: agent
+    env_file: .env
+    environment:
+      TILED_URI: "http://tiled:8765"
+    command:
+      - python
+      - scripts/ingest_tiled_sim.py
+      - "--to-tiled"
+      - "--tiled-uri"
+      - "http://tiled:8765"
+    depends_on:
+      tiled:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - f2w
+
 volumes:
   ui_node_modules:
+  tiled_data:
 
 networks:
   # IPv6-capable bridge so CBORG_FORCE_IPV6=1 has a valid src address inside

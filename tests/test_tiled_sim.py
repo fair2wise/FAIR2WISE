@@ -158,10 +158,21 @@ def test_overlay_relations_use_graphql_types_and_prov():
 
 
 def test_promote_appends_v5_without_touching_source(tmp_path: Path):
+    """By default (include_sim_nodes=False) sim nodes are NOT baked into the KG snapshot.
+
+    Since 2026-09-23, ESAF/Proposal/Sample/BlueskyRun nodes are served exclusively by
+    Tiled Graph (:8765).  The JSON KG snapshot (v8+) intentionally omits them.
+    This test verifies the new default behaviour: source file is untouched and the
+    output graph contains NO sim nodes.
+
+    To verify the old overlay logic still works, pass include_sim_nodes=True explicitly.
+    """
     src = tmp_path / "matkg_bl1101_v4.json"
     src.write_text(json.dumps(_tiny_ops_graph()), encoding="utf-8")
     before = src.read_bytes()
     fixture = generate_fixture()
+
+    # --- default: sim nodes NOT included ---
     result = run_tiled_sim_promote(
         source_kg=src,
         fixture=fixture,
@@ -172,11 +183,26 @@ def test_promote_appends_v5_without_touching_source(tmp_path: Path):
     assert result["kg_path"].name == "matkg_bl1101_v5.json"
     assert src.read_bytes() == before
     graph = json.loads(result["kg_path"].read_text(encoding="utf-8"))
-    esafs = [n for n in graph["things"] if n.get("category") == "ESAF"]
-    assert len(esafs) == 5
+    sim_cats = {"ESAF", "Proposal", "Sample", "BlueskyRun"}
+    sim_nodes = [n for n in graph["things"] if n.get("category") in sim_cats]
+    assert sim_nodes == [], "Sim nodes must NOT be baked into KG by default (use Tiled Graph instead)"
     assert any(n["id"] == "beamline:BL-11-0-1-2" for n in graph["things"])
-    assert any(e["predicate"] == "rel:beam_path_next" for e in _tiny_ops_graph()["associations"]) or True
-    assert any(e["predicate"] == "rel:part_of" for e in graph["associations"])
+    assert result["promote"]["include_sim_nodes"] is False
+
+    # --- explicit opt-in: sim nodes included ---
+    result_with = run_tiled_sim_promote(
+        source_kg=src,
+        fixture=fixture,
+        version=6,
+        kg_dir=tmp_path,
+        terms_dir=tmp_path,
+        include_sim_nodes=True,
+    )
+    graph_with = json.loads(result_with["kg_path"].read_text(encoding="utf-8"))
+    esafs = [n for n in graph_with["things"] if n.get("category") == "ESAF"]
+    assert len(esafs) == 5, "include_sim_nodes=True must still bake ESAF nodes for backward compat"
+
+    # overlay logic still works independently
     merged = merge_overlay(_tiny_ops_graph(), fixture_to_overlay(fixture))
     assert fixture_stats(fixture["esafs"])["esafs"] == 5
     assert len([n for n in merged["things"] if n["category"] == "ESAF"]) == 5

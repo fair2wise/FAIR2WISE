@@ -1,0 +1,22 @@
+# Tiled server configuration for F2W dev environment.
+# Serves the built-in entity/link graph at /api/graphql.
+# Port: 8765 (F2W-dedicated — avoids collision with other local Tiled instances).
+trees:
+  - path: /
+    tree: catalog
+    args:
+      # Set TILED_CATALOG_URI in .env (local dev) or docker-compose env (Docker).
+      # Local dev: sqlite+aiosqlite:////absolute/path/to/storage/tiled_catalog.db
+      # Docker:    sqlite+aiosqlite:////data/tiled_catalog.db
+      uri: "${TILED_CATALOG_URI}"
+      init_if_not_exists: true
+
+authentication:
+  single_user_api_key: "${TILED_API_KEY}"
+  allow_anonymous_access: true
+
+allow_origins:
+  - "http://127.0.0.1:8090"
+  - "http://localhost:8090"
+  - "http://127.0.0.1:5175"
+  - "http://localhost:5175"

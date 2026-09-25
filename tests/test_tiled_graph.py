@@ -37,7 +37,7 @@ def test_normalize_and_graphql_url():
     assert graphql_url("http://tiled:8000/api/graphql") == "http://tiled:8000/api/graphql"
     with pytest.raises(ValueError):
         normalize_tiled_uri("not-a-url")
-    assert coerce_local_tiled_uri("https://tiled.als.lbl.gov") == "http://127.0.0.1:8000"
+    assert coerce_local_tiled_uri("https://tiled.als.lbl.gov") == "http://127.0.0.1:8765"
     assert coerce_local_tiled_uri("http://127.0.0.1:8001") == "http://127.0.0.1:8001"
 
 

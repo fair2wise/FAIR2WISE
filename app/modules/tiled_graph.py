@@ -1,9 +1,20 @@
 """Live Tiled Graph lookup for experiment identity (ESAF / Proposal / Sample / BlueskyRun).
 
 Chat retrieval pages ``POST {TILED_URI}/api/graphql`` using the cookbook
-entityTypes, then falls back to the JSON sim KG when Tiled is unreachable or
+entityTypes, then falls back to the JSON KG when Tiled is unreachable or
 unsigned. Catalog ``tiled.client`` is optional for scan/run questions when
 GraphQL has no BlueskyRun entities yet.
+
+.. note:: **2026-09-23 — sim nodes removed from JSON KG fallback**
+
+    ESAF/Proposal/Sample/BlueskyRun nodes were previously baked into the
+    bl1101 JSON KG (``matkg_bl1101_v7.json``) by ``tiled_sim.py --from-graph``
+    as an offline fallback.  As of ``matkg_bl1101_v8.json`` those nodes are
+    **intentionally absent** from the JSON KG.  When Tiled is unreachable or
+    disabled, queries for experiment-identity data (ESAF, Proposal, Sample,
+    BlueskyRun) will return **empty results** — this is correct behaviour.
+    Tiled Graph (``:8765``, configured in ``storage/tiled_config.yml``) is the
+    **sole source** of experiment-identity data.
 
 Never log API keys. Missing auth typically returns empty lists, not HTTP 401.
 """
@@ -25,7 +36,7 @@ LOGGER = logging.getLogger("tiled_graph")
 
 TILED_GRAPH_ID = "tiled"
 TILED_GRAPH_LABEL = "Tiled Graph"
-DEFAULT_TILED_URI = "http://127.0.0.1:8000"
+DEFAULT_TILED_URI = "http://127.0.0.1:8765"
 GRAPHQL_PATH = "/api/graphql"
 _PROBE_TYPENAME = "query { __typename }"
 _PROBE_ENTITIES = "query { entities(limit: 1) { name entityType } }"
@@ -237,14 +248,16 @@ def probe_tiled_status(
                 "No TILED_API_KEY in .env. GraphQL is reachable but identity lists "
                 "are empty — unsigned writes are denied, and this directory catalog "
                 "has no ESAF/Proposal/Sample graph until entities are created. "
-                "JSON sim remains the fallback. Never paste a key into Settings."
+                "Experiment-identity queries will return empty results until Tiled is populated. "
+                "Never paste a key into Settings."
             )
             return snap
         snap["tiled_status"] = "empty"
         snap["tiled_error"] = (
             "API key is loaded. Local Tiled GraphQL has no ESAF/Proposal/Sample/"
             "BlueskyRun entities yet (this catalog is a directory of datasets, not "
-            "an ESAF graph). JSON sim remains the fallback."
+            "an ESAF graph). Experiment-identity queries will return empty results "
+            "until Tiled is populated (sim nodes were removed from the JSON KG in v8)."
         )
         return snap
     except Exception as exc:
@@ -928,7 +941,9 @@ def lookup_experiment_identity(
             error=(
                 "Tiled GraphQL returned no ESAF/Proposal/Sample/BlueskyRun entities. "
                 "Unsigned requests usually yield empty lists. Set TILED_API_KEY "
-                "(Tiled Apikey, or a token from Keycloak/OIDC). JSON sim remains the fallback."
+                "(Tiled Apikey, or a token from Keycloak/OIDC). "
+                "Note: sim nodes were removed from the JSON KG (v8+); experiment-identity "
+                "data is only available from Tiled Graph (:8765)."
             ),
             fallback="json_kg",
             entity_counts=counts,
@@ -958,7 +973,9 @@ def lookup_experiment_identity(
     if not hits:
         return TiledLookupResult(
             status="empty",
-            error="Live Tiled had no matching experiment-identity entities; using JSON KG fallback.",
+            error="Live Tiled had no matching experiment-identity entities. "
+                  "Note: sim nodes were removed from the JSON KG (v8+) — "
+                  "experiment-identity data is only available from Tiled Graph (:8765).",
             fallback="json_kg",
             entity_counts=counts,
             graph=graph,

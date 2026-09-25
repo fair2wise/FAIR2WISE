@@ -56,7 +56,7 @@ PROV_PREDICATES = {
     "wasAttributedTo": "prov:wasAttributedTo",
     "wasAssociatedWith": "prov:wasAssociatedWith",
 }
-TILED_PUSH_DEFAULT_URI = "http://127.0.0.1:8001"
+TILED_PUSH_DEFAULT_URI = "http://127.0.0.1:8765"
 GRAPHQL_IDENTITY_RELS = {
     "hasProposal": "rel:hasProposal",
     "hasScan": "rel:hasScan",
@@ -288,10 +288,10 @@ def resolve_push_uri(uri: Optional[str] = None) -> str:
     host = (parsed.hostname or "").lower()
     if is_als_production_tiled_host(host):
         raise ValueError(
-            "Refusing to write to ALS production Tiled. Populate 127.0.0.1:8001 only."
+            "Refusing to write to ALS production Tiled. Populate 127.0.0.1:8765 only."
         )
     if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise ValueError(f"Refusing non-local Tiled host {host!r}; use 127.0.0.1:8001.")
+        raise ValueError(f"Refusing non-local Tiled host {host!r}; use 127.0.0.1:8765.")
     return normalize_tiled_uri(raw, default=TILED_PUSH_DEFAULT_URI)
 
 
@@ -788,8 +788,24 @@ def run_tiled_sim_promote(
     kg_dir: Optional[Path] = None,
     terms_dir: Optional[Path] = None,
     seed: Optional[Dict[str, Any]] = None,
+    include_sim_nodes: bool = False,
 ) -> Dict[str, Any]:
-    """Copy an ops KG, merge simulated ESAF/Proposal/run entities, write vN."""
+    """Copy an ops KG, optionally merge simulated ESAF/Proposal/run entities, write vN.
+
+    .. note:: **2026-09-23 — sim nodes removed from bl1101 JSON KG**
+
+        The ``--from-graph`` path previously baked ESAF/Proposal/Sample/BlueskyRun
+        nodes into the bl1101 JSON KG as an offline fallback.  This is **no longer
+        desired** — Tiled Graph (``:8765``, configured in
+        ``storage/tiled_config.yml``) is now the **sole source** of
+        experiment-identity data.
+
+        By default this function does **not** merge sim nodes (``include_sim_nodes=False``).
+        If you intentionally need the old offline-bake behaviour (e.g. for a test
+        fixture), pass ``include_sim_nodes=True`` or use the CLI flag
+        ``--include-sim-nodes``.  Do **not** ship a bl1101 snapshot generated with
+        ``--include-sim-nodes`` as the canonical KG.
+    """
     source_kg = source_kg.resolve()
     if not source_kg.exists():
         raise FileNotFoundError(source_kg)
@@ -801,11 +817,22 @@ def run_tiled_sim_promote(
         raise ValueError(f"Refusing to overwrite source snapshot {source_kg}")
     seed = seed or load_seed()
     fixture = fixture or generate_fixture(seed)
-    overlay = fixture_to_overlay(fixture, seed)
     graph = json.loads(source_kg.read_text(encoding="utf-8"))
     before_nodes = len(graph.get("things") or [])
     before_edges = len(graph.get("associations") or [])
-    graph = merge_overlay(graph, overlay)
+    if include_sim_nodes:
+        LOGGER.warning(
+            "--include-sim-nodes is set: baking ESAF/Proposal/Sample/BlueskyRun into the "
+            "JSON KG snapshot. This is intentionally disabled by default since 2026-09-23. "
+            "Do NOT ship this snapshot as the canonical bl1101 KG; use Tiled Graph (:8765) instead."
+        )
+        overlay = fixture_to_overlay(fixture, seed)
+        graph = merge_overlay(graph, overlay)
+    else:
+        LOGGER.info(
+            "Skipping sim-node overlay (include_sim_nodes=False). "
+            "ESAF/Proposal/Sample/BlueskyRun data is served exclusively by Tiled Graph (:8765)."
+        )
     stats = fixture.get("stats") or fixture_stats(fixture.get("esafs") or [])
     meta = graph.setdefault("metadata", {})
     promote = {
@@ -814,10 +841,11 @@ def run_tiled_sim_promote(
         "seed": fixture.get("seed"),
         "seed_path": fixture.get("seed_path") or seed.get("path"),
         "live_tiled": False,
-        "esafs": stats["esafs"],
-        "proposals": stats["proposals"],
-        "scans": stats["scans"],
-        "samples": stats["samples"],
+        "include_sim_nodes": include_sim_nodes,
+        "esafs": stats["esafs"] if include_sim_nodes else 0,
+        "proposals": stats["proposals"] if include_sim_nodes else 0,
+        "scans": stats["scans"] if include_sim_nodes else 0,
+        "samples": stats["samples"] if include_sim_nodes else 0,
         "added_nodes": len(graph.get("things") or []) - before_nodes,
         "added_edges": len(graph.get("associations") or []) - before_edges,
     }
@@ -968,6 +996,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--snapshot", type=int, default=None, help="Write this bl1101 vN (default: next unused)")
     parser.add_argument("--generate-only", action="store_true", help="Write fixture JSON, do not ingest")
     parser.add_argument(
+        "--include-sim-nodes",
+        action="store_true",
+        default=False,
+        help=(
+            "Bake ESAF/Proposal/Sample/BlueskyRun sim nodes into the JSON KG snapshot. "
+            "DISABLED by default since 2026-09-23: Tiled Graph (:8765) is now the sole "
+            "source of experiment-identity data. Only pass this flag for testing."
+        ),
+    )
+    parser.add_argument(
         "--to-tiled",
         action="store_true",
         help="Push fixture ESAF/Proposal/Sample/BlueskyRun entities into local Tiled GraphQL",
@@ -975,7 +1013,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--tiled-uri",
         default=None,
-        help="Local Tiled URI (default: TILED_URI or http://127.0.0.1:8001)",
+        help="Local Tiled URI (default: TILED_URI or http://127.0.0.1:8765)",
     )
     parser.add_argument("--verbose", "-v", action="store_true")
     return parser.parse_args(argv)
@@ -1030,6 +1068,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fixture=fixture,
         version=args.snapshot,
         seed=seed,
+        include_sim_nodes=args.include_sim_nodes,
     )
     print(
         f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
