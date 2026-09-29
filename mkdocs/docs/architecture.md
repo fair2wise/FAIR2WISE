@@ -106,3 +106,64 @@ type casting, boolean coercion, and secret-only environment lookup.
 - KG build scripts use temporary outputs and retain `.bak` copies.
 - Destructive Splash database reset requires a typed confirmation and refuses
   external paths or a running managed service.
+
+## Multi-KG layout
+
+Chat retrieval does **not** concatenate JSON dumps. Each file is a separate
+graph. The agent fans out retrieve per path and merges scored hit lists tagged
+with `graph_id` (`app/modules/f2w_agent/multi_kg.py`).
+
+| Corpus | Typical files | `graph_id` | Namespace | Schema |
+|---|---|---|---|---|
+| RSoXS literature | `storage/kg/matkg_rsoxs_vN.json` | `rsoxs_vN` | `matkg:` | `storage/schema/rsoxs_schema.yaml` |
+| ALS 11.0.1.2 ops | `storage/kg/matkg_bl1101_vN.json` | `bl1101` | `beamline:` | `storage/schema/bl1101_schema.yaml` |
+| X-ray fundamentals (planned) | `storage/kg/matkg_xray_vN.json` | `xray_vN` (when wired) | `xray:` | `storage/schema/xray_schema.yaml` |
+| X-ray demo (opt-in) | `storage/kg/matkg_xray_papers_cborg_chat.json` | `xray_demo` | mixed | not auto-selected |
+| Experiment identity | live Tiled GraphQL | `tiled` | Tiled URIs | not a JSON KG |
+
+Settings JSON mode is a **checkbox catalog**. Defaults are the latest RSoXS
+snapshot plus the latest bl1101 snapshot. The x-ray demo file is never
+auto-unioned. More checked graphs slow queries (fan-out × N).
+
+Intent routing still queries every selected graph; it only changes how
+candidate slots and context budget are allocated (literature vs ops vs Tiled).
+Hardware layout / beam-path questions prefer ops nodes and directed edges
+(`beam_path_next`, `upstream_of`, `feeds`, `connected_to`), never cuprate
+literature elaboration.
+
+LinkML files, extract overlays, and PROV-O reference docs are listed in
+[LinkML schemas](schemas.md) and `storage/schema/README.md`.
+
+## Tiled Graph as experiment identity
+
+From `matkg_bl1101_v8.json` onward, ESAF / Proposal / Sample / BlueskyRun
+nodes are **intentionally absent** from the ops JSON KG. Live Tiled Graph
+(`TILED_URI`, default `http://127.0.0.1:8765`, GraphQL
+`POST {TILED_URI}/api/graphql`) is the **sole source** of experiment-identity
+data.
+
+Unsigned or empty catalogs return empty identity lists (not invented ESAFs).
+Never log `TILED_API_KEY`. Chat settings must not follow ALS production Tiled
+hosts (`als.lbl.gov`); `coerce_local_tiled_uri` keeps lookup on a local
+catalog. Catalog `tiled.client` is only a supplement when GraphQL has no
+BlueskyRun entities yet.
+
+Simulated ESAFs for local demos are ingested with
+`scripts/ingest_tiled_sim.py` into Tiled, not baked back into the JSON KG.
+
+## KG promotion pipeline
+
+1. Harvest OA PDFs into a **corpus-specific** tree (`papers/rsoxs/`, later
+   `papers/xray/`). Do not mix those directories.
+2. Extract terms → `storage/terminology/extracted_terms_<corpus>.json`
+   (`scripts/run.py`). The harvest manifest `extracted_at` field is not yet
+   written back by extract.
+3. `json2kg` → versioned `storage/kg/matkg_<corpus>_vN.json`. Keep `v1`; bump
+   `N` for promotions. Ops ingest (`scripts/ingest_bl1101.py`) follows the
+   same `vN` pattern.
+4. `start_agent_backend.sh` in JSON mode selects the highest `matkg_rsoxs_vN`
+   and `matkg_bl1101_vN` unless `F2W_GRAPHS` / `F2W_GRAPH` overrides.
+5. Optional Splash import is a **copy** of a snapshot, not the identity of
+   the science/ops graphs. Tiled identity stays on the Tiled service.
+
+Do not merge x-ray fundamentals into `matkg_rsoxs_v*` or `matkg_bl1101_v*`.

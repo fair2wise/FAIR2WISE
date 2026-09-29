@@ -16,6 +16,7 @@ nav:
       - End-to-end workflows: tutorials.md
   - Architecture:
       - System architecture: architecture.md
+      - LinkML schemas: schemas.md
       - Core data model: core_model.md
       - Data provenance: provenance.md
       - Agent workflow: agent-workflow.md

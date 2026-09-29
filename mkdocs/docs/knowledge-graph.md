@@ -66,6 +66,11 @@ python3 app/modules/json2kg.py \
 The extraction layer uses it for normalization. The JSON graph remains a
 property graph rather than a fully LinkML-validated serialization.
 
+Corpus overlays (RSoXS, bl1101 ops, X-ray fundamentals), extract-time imports,
+and `prov_vocabulary.yaml` usage are documented in [LinkML schemas](schemas.md)
+and `storage/schema/README.md`. Graphs stay separate; see
+[system architecture](architecture.md#multi-kg-layout).
+
 ## JSON and Splash modes
 
 | Mode | Reads | Edits | Persistence |
