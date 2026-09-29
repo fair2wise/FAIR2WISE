@@ -3,6 +3,11 @@ Conftest for tests/deepeval/.
 
 Sets environment variables required by kg_rag_api before any import,
 and configures pytest-asyncio for async test support.
+
+This directory is named ``deepeval``. pytest prepends ``tests/`` to
+``sys.path``, so a bare ``import deepeval`` would bind *this folder*
+instead of the optional library. ``test_llm_quality.py`` unshadows the
+installed package (and skips cleanly when it is missing).
 """
 import os
 

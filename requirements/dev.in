@@ -2,6 +2,7 @@
 
 # Tests, formatting, linting, documentation, and lock regeneration.
 black>=26.5.1
+deepeval>=4.2.7
 flake8>=7.3.0
 mkdocs>=1.6.1
 mkdocs-material>=9.7.6

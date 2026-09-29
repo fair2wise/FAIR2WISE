@@ -13,7 +13,7 @@ change-impact analysis.
 | `.env.example` | Local environment template |
 | `requirements.txt` | Compatibility entry point that includes the runtime lock and semantic.in |
 | `requirements/runtime.in` / `requirements/runtime.txt` | Runtime dependency source and compiled Python 3.12 lock |
-| `requirements/dev.in` / `requirements/dev.txt` | Development/tooling source and compiled lock |
+| `requirements/dev.in` / `requirements/dev.txt` | Development/tooling source and compiled lock (pytest, MkDocs, DeepEval, pip-tools) |
 | `requirements/globus.in` / `requirements/globus.txt` | Optional Globus Compute dependency source and lock |
 | `requirements/legacy.in` / `requirements/legacy.txt` | Optional archived-module dependency source and lock |
 | `requirements/semantic.in` | FAISS/SentenceTransformer/Torch retrieval inputs included by the default install |

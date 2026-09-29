@@ -57,7 +57,11 @@ deterministic suite offline.
 - context budgets; and
 - sparse graphs.
 
-Run these deliberately with the required model credentials and services:
+The module collects with the rest of `tests/`. `deepeval` is a development
+dependency (`requirements/dev.in`). Deterministic prompt/decompose/budget cases
+always run. LLM-graded cases skip when `CBORG_API_KEY` is unset.
+
+Run the full eval (including the judge) with credentials:
 
 ```bash
 python3 -m pytest tests/deepeval

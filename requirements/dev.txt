@@ -13,6 +13,7 @@ aiohttp==3.14.3
     #   -r requirements/runtime.in
     #   academy-py
     #   aiohttp-sse
+    #   deepeval
 aiohttp-sse==2.2.0
     # via academy-py
 aiologic==0.17.1
@@ -22,7 +23,9 @@ aiologic==0.17.1
 aiosignal==1.4.0
     # via aiohttp
 annotated-doc==0.0.5
-    # via fastapi
+    # via
+    #   fastapi
+    #   typer
 annotated-types==0.8.0
     # via pydantic
 anyio==4.14.2
@@ -42,6 +45,8 @@ attrs==26.1.0
     #   referencing
 babel==2.18.0
     # via mkdocs-material
+backoff==2.2.1
+    # via posthog
 backports-zstd==1.6.0
     # via pystow
 backrefs==8.0
@@ -77,10 +82,11 @@ cfgv==3.5.0
     # via pre-commit
 charset-normalizer==3.4.9
     # via requests
-click==8.4.2
+click==8.3.3
     # via
     #   academy-py
     #   black
+    #   deepeval
     #   flask
     #   json-flattener
     #   linkml-runtime
@@ -106,6 +112,8 @@ curies==0.14.5
     #   prefixmaps
 cycler==0.12.1
     # via matplotlib
+deepeval==4.2.7
+    # via -r requirements/dev.in
 deltalake==1.5.1
     # via mp-api
 deprecated==1.3.1
@@ -118,10 +126,13 @@ distro==1.9.0
     # via
     #   langsmith
     #   openai
+    #   posthog
 editorconfig==0.17.1
     # via jsbeautifier
 emmet-core==0.87.1
     # via mp-api
+execnet==2.1.2
+    # via pytest-xdist
 fastapi==0.141.1
     # via -r requirements/runtime.in
 filelock==3.32.2
@@ -142,6 +153,8 @@ ghp-import==2.1.0
     # via mkdocs
 globus-sdk==4.8.1
     # via academy-py
+grpcio==1.84.0
+    # via deepeval
 h11==0.16.0
     # via
     #   httpcore
@@ -173,6 +186,7 @@ itsdangerous==2.2.0
     # via flask
 jinja2==3.1.6
     # via
+    #   deepeval
     #   flask
     #   mkdocs
     #   mkdocs-material
@@ -239,6 +253,8 @@ markdown==3.10.3
     #   mkdocs
     #   mkdocs-material
     #   pymdown-extensions
+markdown-it-py==4.2.0
+    # via rich
 markupsafe==3.0.3
     # via
     #   flask
@@ -249,6 +265,8 @@ matplotlib==3.11.1
     # via pymatgen-core
 mccabe==0.7.0
     # via flake8
+mdurl==0.1.2
+    # via markdown-it-py
 mergedeep==1.3.4
     # via
     #   mkdocs
@@ -285,6 +303,8 @@ mypy-extensions==1.1.0
     # via black
 narwhals==2.24.0
     # via plotly
+nest-asyncio==1.6.0
+    # via deepeval
 networkx==3.6.1
     # via
     #   obonet
@@ -307,7 +327,17 @@ obonet==1.3.0
 openai==2.53.0
     # via
     #   -r requirements/runtime.in
+    #   deepeval
     #   langchain-openai
+opentelemetry-api==1.45.0
+    # via
+    #   deepeval
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-sdk==1.45.0
+    # via deepeval
+opentelemetry-semantic-conventions==0.66b0
+    # via opentelemetry-sdk
 orjson==3.11.9
     # via
     #   langgraph-sdk
@@ -326,6 +356,7 @@ packaging==26.3
     #   mkdocs
     #   plotly
     #   pytest
+    #   pytest-rerunfailures
     #   wheel
 paginate==0.5.7
     # via mkdocs-material
@@ -350,12 +381,18 @@ plotly==6.9.0
     # via pymatgen-core
 pluggy==1.6.0
     # via pytest
+portalocker==4.4.0
+    # via deepeval
+posthog==7.60.1
+    # via deepeval
 pre-commit==4.6.1
     # via -r requirements/dev.in
 prefixcommons==0.1.12
     # via linkml-runtime
 prefixmaps==0.2.6
     # via linkml-runtime
+prompt-toolkit==3.0.53
+    # via questionary
 propcache==0.5.2
     # via
     #   aiohttp
@@ -378,6 +415,7 @@ pydantic==2.13.4
     # via
     #   academy-py
     #   curies
+    #   deepeval
     #   emmet-core
     #   fastapi
     #   langchain-core
@@ -391,14 +429,18 @@ pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.14.2
     # via
+    #   deepeval
     #   emmet-core
     #   pymatgen-io-validation
+pyfiglet==1.0.4
+    # via deepeval
 pyflakes==3.4.0
     # via flake8
 pygments==2.20.0
     # via
     #   mkdocs-material
     #   pytest
+    #   rich
 pyjwt==2.13.0
     # via globus-sdk
 pymatgen==2026.5.4
@@ -431,9 +473,22 @@ pystow==0.8.21
 pytest==9.1.1
     # via
     #   -r requirements/dev.in
+    #   deepeval
+    #   pytest-asyncio
     #   pytest-logging
+    #   pytest-repeat
+    #   pytest-rerunfailures
+    #   pytest-xdist
+pytest-asyncio==1.4.0
+    # via deepeval
 pytest-logging==2015.11.4
     # via prefixcommons
+pytest-repeat==0.9.4
+    # via deepeval
+pytest-rerunfailures==16.7
+    # via deepeval
+pytest-xdist==3.8.0
+    # via deepeval
 python-dateutil==2.9.0.post0
     # via
     #   botocore
@@ -445,6 +500,7 @@ python-discovery==1.5.1
 python-dotenv==1.2.2
     # via
     #   -r requirements/runtime.in
+    #   deepeval
     #   pydantic-settings
 pytokens==0.4.1
     # via black
@@ -464,6 +520,8 @@ pyyaml==6.0.3
     #   pyyaml-env-tag
 pyyaml-env-tag==1.1
     # via mkdocs
+questionary==2.1.1
+    # via deepeval
 rapidfuzz==3.14.5
     # via -r requirements/runtime.in
 rdflib==7.6.0
@@ -480,12 +538,14 @@ requests==2.34.2
     # via
     #   -r requirements/runtime.in
     #   arxiv
+    #   deepeval
     #   globus-sdk
     #   langsmith
     #   linkml-runtime
     #   mkdocs-material
     #   mkdocs-mermaid2-plugin
     #   mp-api
+    #   posthog
     #   prefixcommons
     #   pyalex
     #   pymatgen-core
@@ -494,6 +554,10 @@ requests==2.34.2
     #   tiktoken
 requests-toolbelt==1.0.0
     # via langsmith
+rich==14.3.4
+    # via
+    #   deepeval
+    #   typer
 rpds-py==2026.6.3
     # via
     #   jsonschema
@@ -504,6 +568,8 @@ s3transfer==0.19.2
     # via boto3
 scipy==1.18.0
     # via pymatgen-core
+shellingham==1.5.4
+    # via typer
 six==1.17.0
     # via python-dateutil
 sniffio==1.3.1
@@ -519,19 +585,26 @@ starlette==1.3.1
     # via fastapi
 sympy==1.14.0
     # via pymatgen-core
-tabulate==0.10.0
-    # via pymatgen-core
+tabulate==0.9.0
+    # via
+    #   deepeval
+    #   pymatgen-core
 tenacity==9.1.4
-    # via langchain-core
+    # via
+    #   deepeval
+    #   langchain-core
 tiktoken==0.13.0
     # via langchain-openai
 tqdm==4.70.0
     # via
+    #   deepeval
     #   openai
     #   pymatgen-core
     #   pystow
 typeguard==4.6.0
     # via inflect
+typer==0.27.2
+    # via deepeval
 typing-extensions==4.16.0
     # via
     #   aiohttp
@@ -543,14 +616,20 @@ typing-extensions==4.16.0
     #   curies
     #   emmet-core
     #   fastapi
+    #   grpcio
     #   langchain-core
     #   langchain-protocol
     #   langsmith
     #   mp-api
     #   openai
+    #   opentelemetry-api
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+    #   posthog
     #   pydantic
     #   pydantic-core
     #   pystow
+    #   pytest-asyncio
     #   referencing
     #   spglib
     #   starlette
@@ -580,6 +659,8 @@ watchdog==6.0.0
     # via
     #   -r requirements/runtime.in
     #   mkdocs
+wcwidth==0.9.1
+    # via prompt-toolkit
 websockets==15.0.1
     # via
     #   langgraph-sdk
@@ -587,7 +668,9 @@ websockets==15.0.1
 werkzeug==3.1.8
     # via flask
 wheel==0.47.0
-    # via pip-tools
+    # via
+    #   deepeval
+    #   pip-tools
 wrapt==2.3.0
     # via
     #   aiologic

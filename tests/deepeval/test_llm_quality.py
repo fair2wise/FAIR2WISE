@@ -12,7 +12,8 @@ LLM-graded tests (tests 1–4, 7) use CBORG as the judge model via
 deepeval's GPTModel with a custom base_url.  They are automatically
 skipped when CBORG_API_KEY is not set in the environment.
 
-Tests 5–6 are deterministic and always run.
+Tests 5, 6, and 10 are deterministic and always run. LLM-graded tests skip
+when deepeval is not installed or CBORG_API_KEY is unset.
 
 Run (no API key — deterministic tests only):
     pytest tests/deepeval/ -v \\
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import textwrap
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
@@ -34,22 +36,71 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-# ---------------------------------------------------------------------------
-# Deepeval imports — skip entire module when deepeval is not installed
-# ---------------------------------------------------------------------------
-deepeval = pytest.importorskip("deepeval", reason="deepeval not installed")
 
-from deepeval import assert_test                                         # noqa: E402
-from deepeval.metrics import (                                           # noqa: E402
-    AnswerRelevancyMetric,
-    ContextualRelevancyMetric,
-    FaithfulnessMetric,
-    HallucinationMetric,
-)
-from deepeval.models.llms.openai_model import GPTModel                  # noqa: E402
-from deepeval.test_case import LLMTestCase                              # noqa: E402
+def _load_installed_deepeval():
+    """Import the optional deepeval library, or ``None`` if it is not installed.
 
-from app.modules import kg_rag_api                                       # noqa: E402
+    pytest prepends ``tests/`` to ``sys.path``, so ``import deepeval`` would
+    otherwise bind this directory (a namespace package with no ``assert_test``)
+    instead of the installed library. That turned collection into an error
+    rather than skipping the judge tests.
+    """
+    here = Path(__file__).resolve().parent
+    blocked = {here.resolve(), here.parent.resolve()}
+    saved_path = list(sys.path)
+    sys.path[:] = [entry for entry in saved_path if Path(entry).resolve() not in blocked]
+    saved_conftest = sys.modules.get("deepeval.conftest")
+    existing = sys.modules.get("deepeval")
+    if existing is not None and getattr(existing, "__file__", None) is None:
+        del sys.modules["deepeval"]
+    loaded = None
+    try:
+        import deepeval as pkg
+        from deepeval import assert_test as assert_test_fn
+        from deepeval.metrics import (
+            AnswerRelevancyMetric,
+            ContextualRelevancyMetric,
+            FaithfulnessMetric,
+            HallucinationMetric,
+        )
+        from deepeval.models.llms.openai_model import GPTModel
+        from deepeval.test_case import LLMTestCase
+
+        if not hasattr(pkg, "assert_test"):
+            raise ImportError("deepeval namespace is not the installed library")
+        loaded = {
+            "package": pkg,
+            "assert_test": assert_test_fn,
+            "AnswerRelevancyMetric": AnswerRelevancyMetric,
+            "ContextualRelevancyMetric": ContextualRelevancyMetric,
+            "FaithfulnessMetric": FaithfulnessMetric,
+            "HallucinationMetric": HallucinationMetric,
+            "GPTModel": GPTModel,
+            "LLMTestCase": LLMTestCase,
+        }
+    except ImportError:
+        loaded = None
+    finally:
+        sys.path[:] = saved_path
+        if saved_conftest is not None:
+            sys.modules["deepeval.conftest"] = saved_conftest
+    return loaded
+
+
+# ---------------------------------------------------------------------------
+# Deepeval imports — judge tests skip when the library is not installed
+# ---------------------------------------------------------------------------
+_DEEPEVAL = _load_installed_deepeval()
+deepeval = None if _DEEPEVAL is None else _DEEPEVAL["package"]
+assert_test = None if _DEEPEVAL is None else _DEEPEVAL["assert_test"]
+AnswerRelevancyMetric = None if _DEEPEVAL is None else _DEEPEVAL["AnswerRelevancyMetric"]
+ContextualRelevancyMetric = None if _DEEPEVAL is None else _DEEPEVAL["ContextualRelevancyMetric"]
+FaithfulnessMetric = None if _DEEPEVAL is None else _DEEPEVAL["FaithfulnessMetric"]
+HallucinationMetric = None if _DEEPEVAL is None else _DEEPEVAL["HallucinationMetric"]
+GPTModel = None if _DEEPEVAL is None else _DEEPEVAL["GPTModel"]
+LLMTestCase = None if _DEEPEVAL is None else _DEEPEVAL["LLMTestCase"]
+
+from app.modules import kg_rag_api
 
 
 # ---------------------------------------------------------------------------
@@ -66,8 +117,12 @@ _JUDGE_MODEL: str = os.environ.get("KG_RAG_DEEPEVAL_JUDGE_MODEL", "lbl/cborg-cha
 
 #: Skip marker applied to every test that calls a real LLM judge
 requires_judge = pytest.mark.skipif(
-    not _CBORG_API_KEY,
-    reason="CBORG_API_KEY not set — LLM-graded deepeval tests skipped",
+    deepeval is None or not _CBORG_API_KEY,
+    reason=(
+        "deepeval not installed"
+        if deepeval is None
+        else "CBORG_API_KEY not set — LLM-graded deepeval tests skipped"
+    ),
 )
 
 

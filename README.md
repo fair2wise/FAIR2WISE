@@ -1270,7 +1270,7 @@ installation commands and Docker keep working and get the retrieval stack.
 | Profile | Install command | Purpose |
 |---|---|---|
 | Runtime | `python3 -m pip install -r requirements.txt` | FAIR2WISE application, Docker runtime, and FAISS/SentenceTransformer/Torch retrieval |
-| Development | `python3 -m pip install -r requirements.txt -r requirements/dev.txt` | Runtime plus tests, linting, formatting, MkDocs, and pip-tools |
+| Development | `python3 -m pip install -r requirements.txt -r requirements/dev.txt` | Runtime plus tests, linting, formatting, MkDocs, pip-tools, and DeepEval |
 | Globus | `python3 -m pip install -r requirements/globus.txt` | Optional Academy/Globus Compute endpoint dependencies |
 | Legacy | `python3 -m pip install -r requirements/legacy.txt` | Optional dependencies for archived modules |
 
