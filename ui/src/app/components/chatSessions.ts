@@ -1,4 +1,11 @@
-import type { PendingAction, PublicationInfo, GraphPayload } from './data/liveAgent';
+import type { ChatProgressEvent, PendingAction, PublicationInfo, GraphPayload } from './data/liveAgent';
+
+export interface TurnAnnotationState {
+  verdict: 'pass' | 'fail';
+  failureTags: string[];
+  note: string;
+  saved: boolean;
+}
 
 export interface ChatMessage {
   id: string;
@@ -14,6 +21,9 @@ export interface ChatMessage {
   publications?: PublicationInfo[];
   pending?: PendingAction | null;
   retrievedGraph?: GraphPayload;
+  turnId?: string;
+  progress?: ChatProgressEvent[];
+  annotation?: TurnAnnotationState | null;
 }
 
 export interface ChatSession {
@@ -61,7 +71,7 @@ function asGraphPayload(value: unknown): GraphPayload | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const candidate = value as Partial<GraphPayload>;
   if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) return undefined;
-  if (candidate.nodes.length === 0 || candidate.nodes.length > 1500) return undefined;
+  if (candidate.nodes.length === 0) return undefined;
   return {
     nodes: candidate.nodes,
     edges: candidate.edges,
@@ -109,6 +119,31 @@ export function normalizeChatMessage(value: unknown): ChatMessage | null {
       ? candidate.pending as PendingAction
       : null,
     retrievedGraph: asGraphPayload(candidate.retrievedGraph),
+    turnId: typeof candidate.turnId === 'string' ? candidate.turnId : undefined,
+    progress: asProgress(candidate.progress),
+    annotation: asAnnotation(candidate.annotation),
+  };
+}
+
+function asProgress(value: unknown): ChatProgressEvent[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  const events = value.filter((item): item is ChatProgressEvent => (
+    Boolean(item) && typeof item === 'object' && typeof (item as ChatProgressEvent).phase === 'string'
+  ));
+  return events.length > 0 ? events : undefined;
+}
+
+function asAnnotation(value: unknown): TurnAnnotationState | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as Partial<TurnAnnotationState>;
+  if (candidate.verdict !== 'pass' && candidate.verdict !== 'fail') return undefined;
+  return {
+    verdict: candidate.verdict,
+    failureTags: Array.isArray(candidate.failureTags)
+      ? candidate.failureTags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
+    note: typeof candidate.note === 'string' ? candidate.note : '',
+    saved: Boolean(candidate.saved),
   };
 }
 

@@ -35,6 +35,7 @@ Run UI checks with:
 ```bash
 cd ui
 npm test
+npm run e2e
 npm run build
 ```
 

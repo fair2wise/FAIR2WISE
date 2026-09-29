@@ -88,6 +88,7 @@ export interface GraphMockupProps {
   /** Changes when a new assistant answer drives citations; restarts pulse animations. */
   citationAnimationKey?: string;
   onNodeUpdated?: (node: LiveGraphNode, graph?: GraphPayload) => void;
+  onNodeClick?: (nodeId: string) => void;
   isKgViewer?: boolean;
   kgViewerNodeLimit?: number | 'all';
   onToggleKgViewer?: () => void;
@@ -1615,14 +1616,16 @@ function LayoutModeSwitcher({
     >
       <button
         type="button"
+        aria-label="Fixed Layout"
         aria-pressed={value === 'existing'}
         className={buttonClass(value === 'existing')}
         onClick={() => onChange('existing')}
       >
-        Existing
+        Fixed Layout
       </button>
       <button
         type="button"
+        aria-label="Force-directed"
         aria-pressed={value === 'force'}
         className={buttonClass(value === 'force')}
         onClick={() => onChange('force')}
@@ -1642,8 +1645,9 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
   citedNodeIds = [],
   citationAnimationKey = '',
   onNodeUpdated,
+  onNodeClick,
   isKgViewer = false,
-  kgViewerNodeLimit = 100,
+  kgViewerNodeLimit = 'all',
   onToggleKgViewer,
   onKgViewerNodeLimitChange,
 }, ref) {
@@ -1748,15 +1752,10 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
       };
     }
     if (highlightedNodeIds.length > 0) {
-      if (retrievedGraph && retrievedGraph.nodes.length > 0 && !isKgViewer) {
+      if (retrievedGraph && retrievedGraph.nodes.length > 0) {
         return retrievedGraph;
       }
-      const queried = inducedSubgraph(catalogGraph, highlightedNodeIds);
-      if (!isKgViewer) return queried;
-      if (kgViewerNodeLimit === 'all' || kgViewerNodeLimit >= queried.nodes.length) {
-        return queried;
-      }
-      return connectedGraphSubset(queried, kgViewerNodeLimit);
+      return inducedSubgraph(catalogGraph, highlightedNodeIds);
     }
     if (isKgViewer) {
       if (kgViewerNodeLimit === 'all') return catalogGraph;
@@ -2167,6 +2166,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
         data-kg-empty="true"
         data-cite-focus-id={resolvedFocusId || activeFocusId || ''}
         data-kg-node-count="0"
+        data-kg-layout={layoutMode}
       >
         <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -2305,7 +2305,11 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                   searchedNodeId={resolvedFocusId || activeFocusId}
                   hideWeak={hideWeak}
                   selectedNodeId={selectedNode?.id ?? null}
-                  onSelectNode={node => setSelectedNode(node as LayoutNode | null)}
+                  onSelectNode={node => {
+                    const selected = node as LayoutNode | null;
+                    setSelectedNode(selected);
+                    if (selected?.id) onNodeClick?.(selected.id);
+                  }}
                   onHoverNode={node => setHoveredNode(node as LayoutNode | null)}
                 />
               ) : (
@@ -2461,6 +2465,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                   <g
                     key={`${revealKey}:node:${node.id}`}
                     className="kg-node-in"
+                    data-kg-node-id={node.id}
                     style={{ animationDelay: `${nodes.length <= 100 ? nodeIndex * 35 : 0}ms` }}
                     transform={`translate(${node.x}, ${node.y})`}
                     onMouseEnter={e => handleNodeEnter(node, e)}
@@ -2468,6 +2473,7 @@ export const GraphMockup = forwardRef<GraphMockupHandle, GraphMockupProps>(funct
                     onPointerDown={e => e.stopPropagation()}
                     onClick={e => {
                       e.stopPropagation();
+                      onNodeClick?.(node.id);
                       setSelectedNode(prev => (prev?.id === node.id ? null : node));
                     }}
                   >

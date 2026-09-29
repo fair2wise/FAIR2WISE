@@ -21,7 +21,7 @@ describe('kgCatalog', () => {
   it('maps snapshot filenames the same way as the backend graph_id', () => {
     expect(graphIdFromPath('storage/kg/matkg_rsoxs_v1.json')).toBe('rsoxs_v1');
     expect(graphIdFromPath('storage/kg/matkg_bl1101_v1.json')).toBe('bl1101');
-    expect(graphIdFromPath('storage/kg/matkg_rsoxs_v3.json')).toBe('rsoxs_v1');
+    expect(graphIdFromPath('storage/kg/matkg_rsoxs_v3.json')).toBe('rsoxs_v3');
     expect(graphIdFromPath('storage/kg/matkg_bl1101_v2.json')).toBe('bl1101');
     expect(graphIdFromPath('storage/kg/matkg_xray_papers_cborg_chat.json')).toBe('xray_demo');
   });

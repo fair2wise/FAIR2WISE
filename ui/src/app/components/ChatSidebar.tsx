@@ -7,10 +7,12 @@ import { CodeBlock } from './CodeBlock';
 import { ExampleQuery } from './data/mockupData';
 import { GraphMockup, inducedSubgraph, type GraphMockupHandle } from './GraphMockup';
 import { CITE_FOCUS_HOPS, looksLikeTiledIdentityRef, resolveViewerNodeId } from './kgCatalog';
-import { parseKgCitationNodeIds, collectAnswerCitations, citationBibliographyLabel, citationLookupPool, splitAnswerCitationSegments, type AnswerCitation, type CitationSourceKind } from './kgCitations';
+import { parseKgCitationNodeIds, collectAnswerCitations, citationBibliographyLabel, citationInlineLabel, citationLookupPool, materialsProjectUrl, splitAnswerCitationSegments, type AnswerCitation, type CitationSourceKind } from './kgCitations';
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
-import type { ChatMessage } from './chatSessions';
+import type { ChatMessage, TurnAnnotationState } from './chatSessions';
+import { TurnAnnotationBar } from './TurnAnnotation';
+import { currentTurnId, recordUiEvent, setActiveTurnId, traceUrl } from './uiTelemetry';
 import {
   AgentChatHistoryMessage,
   AgentChatResponse,
@@ -127,17 +129,23 @@ function sourceKindLabel(kind: CitationSourceKind): string {
   if (kind === 'ops') return 'Ops';
   if (kind === 'rag') return 'RAG';
   if (kind === 'tiled') return 'Tiled';
+  if (kind === 'mp') return 'Materials Project';
   return 'KG';
 }
 
 function CitationChip({
   citation,
   onCitationClick,
+  turnId,
 }: {
   citation: AnswerCitation;
   onCitationClick?: (nodeId: string) => void;
+  turnId?: string;
 }) {
-  const clickable = Boolean(onCitationClick && (citation.nodeId || citation.name));
+  const mpHref = (citation.sourceKind === 'mp' || citation.kind === 'mp')
+    ? materialsProjectUrl(citation)
+    : '';
+  const clickable = Boolean(mpHref || (onCitationClick && (citation.nodeId || citation.name)));
   const [tip, setTip] = useState<{ x: number; y: number; below: boolean } | null>(null);
 
   function showTip(target: HTMLElement) {
@@ -164,6 +172,15 @@ function CitationChip({
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
+          recordUiEvent('citation_click', {
+            cite_type: citation.kind,
+            source_kind: citation.sourceKind,
+            target: citation.nodeId || citation.name || citation.raw,
+          }, turnId || currentTurnId());
+          if (mpHref) {
+            window.open(mpHref, '_blank', 'noopener,noreferrer');
+            return;
+          }
           if (!onCitationClick) return;
           onCitationClick(citation.nodeId || citation.name);
         }}
@@ -227,9 +244,11 @@ function bibliographyLine(citation: AnswerCitation): string {
 function CitationBibliography({
   citations,
   onCitationClick,
+  turnId,
 }: {
   citations: AnswerCitation[];
   onCitationClick?: (nodeId: string) => void;
+  turnId?: string;
 }) {
   if (citations.length === 0) return null;
   return (
@@ -241,11 +260,25 @@ function CitationBibliography({
             <button
               type="button"
               className={`flex w-full gap-2 rounded-md px-1 py-0.5 text-left text-xs leading-relaxed text-slate-600 ${
-                onCitationClick && (citation.nodeId || citation.name) ? 'hover:bg-sky-50' : 'cursor-default'
+                citation.sourceKind === 'mp' || (onCitationClick && (citation.nodeId || citation.name))
+                  ? 'hover:bg-sky-50'
+                  : 'cursor-default'
               }`}
               onClick={event => {
                 event.preventDefault();
                 event.stopPropagation();
+                recordUiEvent('citation_click', {
+                  cite_type: citation.kind,
+                  source_kind: citation.sourceKind,
+                  target: citation.nodeId || citation.name || citation.raw,
+                }, turnId || currentTurnId());
+                const mpHref = (citation.sourceKind === 'mp' || citation.kind === 'mp')
+                  ? materialsProjectUrl(citation)
+                  : '';
+                if (mpHref) {
+                  window.open(mpHref, '_blank', 'noopener,noreferrer');
+                  return;
+                }
                 if (!onCitationClick) return;
                 onCitationClick(citation.nodeId || citation.name);
               }}
@@ -271,24 +304,33 @@ function AnswerHighlightText({
   text,
   citations = [],
   onCitationClick,
+  turnId,
 }: {
   text: string;
   citations?: AnswerCitation[];
   onCitationClick?: (nodeId: string) => void;
+  turnId?: string;
 }) {
   const segments = splitAnswerCitationSegments(text, citations);
+  let preceding = '';
   return (
     <>
       {segments.map((segment, i) => {
         if (segment.type === 'cite') {
+          const label = citationInlineLabel(segment.citation, preceding);
+          preceding += `${label} `;
           return (
-            <CitationChip
-              key={`cite-${i}-${segment.citation.n}`}
-              citation={segment.citation}
-              onCitationClick={onCitationClick}
-            />
+            <span key={`cite-${i}-${segment.citation.n}`}>
+              {label ? <span>{label}</span> : null}
+              <CitationChip
+                citation={segment.citation}
+                onCitationClick={onCitationClick}
+                turnId={turnId}
+              />
+            </span>
           );
         }
+        preceding += segment.text;
         if (segment.bold) {
           return <strong key={i} className="font-semibold text-sky-900">{segment.text}</strong>;
         }
@@ -444,12 +486,14 @@ function MessageText({
   nodes = [],
   publications = [],
   onCitationClick,
+  turnId,
 }: {
   text: string;
   cursor?: boolean;
   nodes?: GraphPayload['nodes'];
   publications?: PublicationInfo[];
   onCitationClick?: (nodeId: string) => void;
+  turnId?: string;
 }) {
   const lookup = citationLookupPool(text, nodes);
   const citations = collectAnswerCitations(text, lookup, publications);
@@ -477,13 +521,14 @@ function MessageText({
                 text={para}
                 citations={citations}
                 onCitationClick={onCitationClick}
+                turnId={turnId}
               />
               {cursorHere && <span className="ml-px animate-pulse text-slate-400">▌</span>}
             </p>
           );
         });
       })}
-      <CitationBibliography citations={citations} onCitationClick={onCitationClick} />
+      <CitationBibliography citations={citations} onCitationClick={onCitationClick} turnId={turnId} />
     </div>
   );
 }
@@ -612,6 +657,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   const [isThinking, setIsThinking] = useState(false);
   const [steps, setSteps] = useState<ThinkingStep[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const progressLogRef = useRef<ChatProgressEvent[]>([]);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [streamedLen, setStreamedLen] = useState(0);
   const [streamGraph, setStreamGraph] = useState<GraphPayload | null>(null);
@@ -620,7 +666,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   const [pinnedViewId, setPinnedViewId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isKgViewer, setIsKgViewer] = useState(false);
-  const [kgViewerNodeLimit, setKgViewerNodeLimit] = useState<number | 'all'>(100);
+  const [kgViewerNodeLimit, setKgViewerNodeLimit] = useState<number | 'all'>('all');
   const graphRef = useRef<GraphMockupHandle>(null);
   const [citeFocusNodeId, setCiteFocusNodeId] = useState<string | null>(() => readStoredCiteFocus());
   const prevSessionIdRef = useRef(sessionId);
@@ -749,6 +795,9 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   function makeProgressHandler(requestId: number, controller: AbortController) {
     return (event: ChatProgressEvent) => {
       if (requestSeqRef.current !== requestId || controller.signal.aborted) return;
+      progressLogRef.current = [...progressLogRef.current, event];
+      if (event.turn_id) setActiveTurnId(event.turn_id);
+      if (event.phase === 'turn_started') return;
       if (event.phase === 'graph_update' && event.graph) {
         const incoming = event.graph;
         setStreamGraph(prev => {
@@ -802,10 +851,11 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
       elapsedSeconds: elapsed,
       publications: result.publications ?? [],
       pending: result.pending ?? null,
-      retrievedGraph: nextQueryGraph && nextQueryGraph.nodes.length <= 1500
-        ? nextQueryGraph
-        : undefined,
+      retrievedGraph: nextQueryGraph || undefined,
+      turnId: result.turn_id || progressLogRef.current.find(event => event.turn_id)?.turn_id,
+      progress: progressLogRef.current.slice(),
     };
+    if (assistantMessage.turnId) setActiveTurnId(assistantMessage.turnId);
     setStreamedLen(0);
     if (assistantMessage.content && !assistantMessage.pending) {
       setStreamingId(assistantMessage.id);
@@ -840,6 +890,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
     setIsThinking(true);
     setElapsedSeconds(0);
     stepsRef.current = [];
+    progressLogRef.current = [];
     setSteps([]);
     setStreamGraph(null);
     setStreamNodeIds([]);
@@ -901,6 +952,10 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
 
   async function runExtractionDecision(decision: 'yes' | 'no', sourceMessageId: string) {
     if (isBusy) return;
+    const source = messages.find(message => message.id === sourceMessageId);
+    recordUiEvent(decision === 'yes' ? 'download_card_accept' : 'download_card_reject', {
+      kind: source?.pending?.kind || 'extraction',
+    }, source?.turnId);
     setMessages(prev => prev.map(message => (
       message.id === sourceMessageId ? { ...message, pending: null } : message
     )));
@@ -913,6 +968,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
     setIsThinking(true);
     setElapsedSeconds(0);
     stepsRef.current = [];
+    progressLogRef.current = [];
     setSteps([]);
     setStreamGraph(null);
     setStreamNodeIds([]);
@@ -932,6 +988,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
         controller.signal,
         undefined,
         sessionId,
+        source?.turnId,
       );
       if (requestSeqRef.current !== requestId || controller.signal.aborted) return;
       applyResult(result, echo.content);
@@ -969,6 +1026,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
   }
 
   function copyAssistantMessage(message: ChatMessage) {
+    recordUiEvent('copy_answer', {}, message.turnId);
     const text = assistantCopyText(message);
     navigator.clipboard.writeText(text).then(() => {
       setCopiedMessageId(message.id);
@@ -978,6 +1036,33 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
     }).catch(() => {
       // Clipboard unavailable — fail silently.
     });
+  }
+
+  async function copyTraceLink(message: ChatMessage) {
+    if (!message.turnId) return;
+    recordUiEvent('copy_trace_link', { turn_id: message.turnId }, message.turnId);
+    try {
+      await navigator.clipboard.writeText(traceUrl(message.turnId));
+      setCopiedMessageId(`trace-${message.id}`);
+      window.setTimeout(() => {
+        setCopiedMessageId(prev => (prev === `trace-${message.id}` ? null : prev));
+      }, 2000);
+    } catch {
+      // Clipboard unavailable.
+    }
+  }
+
+  function regenerateAnswer(message: ChatMessage) {
+    const question = message.question?.trim();
+    if (!question || isBusy) return;
+    recordUiEvent('regenerate', {}, message.turnId);
+    submit(question);
+  }
+
+  function saveAnnotation(messageId: string, annotation: TurnAnnotationState) {
+    setMessages(prev => prev.map(message => (
+      message.id === messageId ? { ...message, annotation } : message
+    )));
   }
 
   function applyAssistantSelection(message: ChatMessage) {
@@ -1136,6 +1221,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
       }}
       onKgViewerNodeLimitChange={setKgViewerNodeLimit}
       onNodeUpdated={handleGraphNodeUpdated}
+      onNodeClick={nodeId => recordUiEvent('graph_node_click', { node_id: nodeId }, currentTurnId())}
     />
   );
 
@@ -1200,6 +1286,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                             nodes={citationLookupSource}
                                             publications={message.publications ?? []}
                                             onCitationClick={focusCitedNode}
+                                            turnId={message.turnId}
                                           />
                                         </div>
                                       </div>
@@ -1222,6 +1309,7 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                         nodes={citationLookupSource}
                                         publications={publications}
                                         onCitationClick={focusCitedNode}
+                                        turnId={message.turnId}
                                       />
                                       {!streaming && (
                                         <div className="mt-2 flex justify-start">
@@ -1237,6 +1325,22 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                             ) : (
                                               <Copy size={15} />
                                             )}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={!message.turnId}
+                                            onClick={() => void copyTraceLink(message)}
+                                            className="rounded-lg px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                                          >
+                                            {copiedMessageId === `trace-${message.id}` ? 'Trace link copied' : 'Copy trace link'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={!message.question || isBusy}
+                                            onClick={() => regenerateAnswer(message)}
+                                            className="rounded-lg px-2 py-1 text-[11px] text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                                          >
+                                            Regenerate
                                           </button>
                                         </div>
                                       )}
@@ -1257,12 +1361,24 @@ export function ChatSidebar({ graph, activeQuery, sessionId, messages, setMessag
                                           intro={null}
                                           collapseLimit={3}
                                           className="mt-0"
+                                          onOpen={publication => recordUiEvent('publication_open', {
+                                            title: publication.paper_title || publication.source_paper || '',
+                                            doi: publication.doi || '',
+                                          }, message.turnId)}
                                         />
                                       </div>
                                     )}
                                   </div>
                                 </div>
                                 ) : null}
+
+                                {!streaming && message.turnId && (
+                                  <TurnAnnotationBar
+                                    turnId={message.turnId}
+                                    annotation={message.annotation}
+                                    onSaved={annotation => saveAnnotation(message.id, annotation)}
+                                  />
+                                )}
 
                                 {!streaming && !isError && showKnowledgeGraph && (
                                   <div className="mt-3 flex items-center gap-1">

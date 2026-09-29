@@ -35,7 +35,14 @@ describe('liveAgent chat requests', () => {
     ], 'chat-123');
 
     const [, init] = fetchMock.mock.calls[0];
-    expect(JSON.parse(String(init?.body))).toEqual({
+    const body = JSON.parse(String(init?.body));
+    expect(body.client_turn_id).toEqual(expect.any(String));
+    expect(body.ui_settings).toEqual(expect.objectContaining({
+      sourceRag: false,
+      useLiveTiled: false,
+    }));
+    const { client_turn_id: _turn, ui_settings: _settings, ...rest } = body;
+    expect(rest).toEqual({
       message: 'What about the second one?',
       messages: [
         { role: 'user', content: 'Compare P3HT and PTB7.' },
@@ -83,7 +90,11 @@ describe('liveAgent chat requests', () => {
     expect(result.pending?.kind).toBe('extraction');
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain('/chat/action/stream');
-    expect(JSON.parse(String(init?.body))).toEqual({
+    const actionBody = JSON.parse(String(init?.body));
+    expect(actionBody.client_turn_id).toEqual(expect.any(String));
+    expect(actionBody.ui_settings).toEqual(expect.any(Object));
+    const { client_turn_id: _actionTurn, ui_settings: _actionSettings, ...actionRest } = actionBody;
+    expect(actionRest).toEqual({
       decision: 'yes',
       kind: 'download',
       candidate_index: 0,

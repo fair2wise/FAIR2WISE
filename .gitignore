@@ -158,6 +158,7 @@ node_modules/
 ui/node_modules/
 ui/dist/
 mkdocs/site/
+mkdocs/.mkdocs.ui.yml
 
 # Local generated/reference notes
 HANDOFF.md
@@ -185,3 +186,9 @@ storage/terminology/*.json.bak
 
 # Hybrid source-RAG indexes (rebuild with scripts/index_source_rag.py)
 storage/source_index/
+
+# Playwright
+ui/test-results/
+ui/playwright-report/
+ui/blob-report/
+ui/playwright/.cache/

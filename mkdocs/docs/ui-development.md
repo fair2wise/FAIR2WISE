@@ -58,6 +58,7 @@ configuration change.
 | `npm ci` | Reproduce the lock-file dependency tree |
 | `npm run dev` | Start Vite development server |
 | `npm test` | Run Vitest once in jsdom |
+| `npm run e2e` | Run Playwright UI specs in `ui/e2e/` against a Vite server |
 | `npm run build` | Create the production bundle in `ui/dist` |
 
 There is currently no dedicated UI lint or `tsc --noEmit` package script.
@@ -190,10 +191,13 @@ Vitest uses jsdom and discovers `src/**/*.test.ts`.
 | `publicationLinks.test.ts` | DOI filename parsing and outbound links |
 | `data/liveAgent.test.ts` | Chat history, streamed actions, sessions, node search, edits |
 
-The current suite primarily tests pure helpers and mocked wire behavior. It is
-not a full end-to-end browser test. For release acceptance, start the complete
-stack and verify a real chat, graph selection, settings save, paper search, and
-session switch manually.
+The current suite primarily tests pure helpers and mocked wire behavior.
+
+Playwright covers browser user flows in `ui/e2e/*.spec.ts`. Specs mock
+`http://127.0.0.1:8090` (`/settings`, `/graph`, SSE `/chat/stream`) and do
+not call CBorg. Run them with `npm run e2e` from `ui/`. Feature list and
+assertions live in the pipeline plan (Playwright UI coverage). Vitest remains
+the suite for pure helpers (`kgCitations`, `chatSessions`, `agentSettings`).
 
 ## Manual smoke checklist
 
@@ -205,7 +209,7 @@ session switch manually.
 6. In Splash mode, edit a disposable node and confirm the refresh.
 7. Create/switch/delete chats and reload the browser.
 8. Search/bookmark a publication and confirm the bookmark survives reload.
-9. Run `npm test` and `npm run build`.
+9. Run `npm test`, `npm run e2e`, and `npm run build`.
 
 ## Debugging
 

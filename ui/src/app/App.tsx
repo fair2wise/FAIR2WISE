@@ -13,6 +13,7 @@ import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
 import { AppPaperSearchButton } from './components/AppPaperSearchButton';
 import { AppSearchChatsButton } from './components/AppSearchChatsButton';
+import { AppDocsButton } from './components/AppDocsButton';
 import { AppSettingsButton } from './components/AppSettingsButton';
 import { ChatSidebar } from './components/ChatSidebar';
 import {
@@ -36,6 +37,7 @@ import {
   fetchLiveGraph,
   GraphPayload,
 } from './components/data/liveAgent';
+import { installUiTelemetry, recordUiEvent } from './components/uiTelemetry';
 
 const queryClient = new QueryClient();
 const EMPTY_QUERY: ExampleQuery = {
@@ -94,6 +96,8 @@ export default function App() {
     saveChatSessionStore(chatStore);
   }, [chatStore]);
 
+  useEffect(() => installUiTelemetry(), []);
+
   const setActiveSessionMessages = useCallback<Dispatch<SetStateAction<ChatMessage[]>>>((update) => {
     const sessionId = activeSession.id;
     setChatStore(store => ({
@@ -122,6 +126,7 @@ export default function App() {
   }
 
   function createNewChat() {
+    recordUiEvent('new_chat');
     const session = createChatSession();
     setActiveQuery(EMPTY_QUERY);
     setChatStore(store => ({
@@ -131,9 +136,14 @@ export default function App() {
   }
 
   function deleteChat(sessionId: string) {
+    recordUiEvent('delete_chat', { session_id: sessionId });
     if (sessionId === chatStore.activeSessionId) setActiveQuery(EMPTY_QUERY);
     void deleteAgentSession(sessionId).catch(error => {
       console.warn('Failed to delete backend chat context', error);
+      recordUiEvent('console_warning', {
+        message: 'Failed to delete backend chat context',
+        detail: error instanceof Error ? error.message : String(error),
+      });
     });
     setChatStore(store => {
       let sessions = store.sessions.filter(session => session.id !== sessionId);
@@ -159,6 +169,10 @@ export default function App() {
         if (!cancelled) saveAgentSettings(settingsFromApiResponse(response));
       } catch (error) {
         console.warn('Failed to load agent settings', error);
+        recordUiEvent('console_warning', {
+          message: 'Failed to load agent settings',
+          detail: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -219,6 +233,7 @@ export default function App() {
                   />
                   <AppPaperSearchButton />
                   <AppBookmarksButton />
+                  <AppDocsButton />
                   <AppSettingsButton onSettingsApplied={reloadGraph} />
                 </div>
               }

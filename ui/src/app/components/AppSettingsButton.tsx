@@ -25,6 +25,7 @@ import {
 import { AppErrorMessage } from './AppErrorMessage';
 import { AsciiOrb } from './AsciiOrb';
 import { fetchAgentSettings, updateAgentSettings } from './data/liveAgent';
+import { recordUiEvent } from './uiTelemetry';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import {
   Dialog,
@@ -54,7 +55,7 @@ function formatCborgModelLabel(model: string): string {
 }
 
 function graphHint(path: string): string {
-  if (path.includes('matkg_rsoxs_v1')) return 'literature / science';
+  if (/matkg_rsoxs_v\d+/.test(path)) return 'literature / science';
   if (path.includes('matkg_bl1101')) return '11.0.1.2 ops';
   if (path.includes('matkg_xray_papers_cborg_chat')) return 'x-ray demo (opt-in)';
   return 'catalog graph';
@@ -291,6 +292,33 @@ export function AppSettingsButton({
     setOpen(nextOpen);
   }
 
+  function recordSettingsDiff(previous: AgentSettings, next: AgentSettings) {
+    const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
+    const changes: Array<{ field: string; old: unknown; new: unknown }> = [];
+    if (!same(previous.jsonGraphPaths, next.jsonGraphPaths) || !same(previous.selectedGraphIds, next.selectedGraphIds)) {
+      changes.push({
+        field: 'graphs_selected',
+        old: { jsonGraphPaths: previous.jsonGraphPaths, selectedGraphIds: previous.selectedGraphIds },
+        new: { jsonGraphPaths: next.jsonGraphPaths, selectedGraphIds: next.selectedGraphIds },
+      });
+    }
+    if (previous.sourceRag !== next.sourceRag) {
+      changes.push({ field: 'source_rag', old: previous.sourceRag, new: next.sourceRag });
+    }
+    if (previous.useLiveTiled !== next.useLiveTiled) {
+      changes.push({ field: 'use_live_tiled', old: previous.useLiveTiled, new: next.useLiveTiled });
+    }
+    if (previous.kgQueryHops !== next.kgQueryHops) {
+      changes.push({ field: 'kg_query_hops', old: previous.kgQueryHops, new: next.kgQueryHops });
+    }
+    if (previous.kgQueryMaxNodes !== next.kgQueryMaxNodes) {
+      changes.push({ field: 'kg_query_max_nodes', old: previous.kgQueryMaxNodes, new: next.kgQueryMaxNodes });
+    }
+    for (const change of changes) {
+      recordUiEvent('settings_change', change);
+    }
+  }
+
   async function handleSave() {
     setSaving(true);
     setError('');
@@ -319,6 +347,7 @@ export function AppSettingsButton({
         useLiveTiled: draftSettings.useLiveTiled,
         tiledUri: draftSettings.tiledUri,
       };
+      recordSettingsDiff(savedSettings, saved);
       setSavedSettings(saved);
       setDraftSettings(saved);
       saveAgentSettings(saved);

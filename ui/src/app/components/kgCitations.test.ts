@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectAnswerCitations, citationBibliographyLabel, parseInlineCite, parseKgCitationNodeIds, resolveInlineCiteNodeId, splitAnswerCitationSegments, splitAnswerHighlightSegments } from './kgCitations';
+import { collectAnswerCitations, citationBibliographyLabel, citationInlineLabel, parseInlineCite, parseKgCitationNodeIds, resolveInlineCiteNodeId, splitAnswerCitationSegments, splitAnswerHighlightSegments } from './kgCitations';
 import type { LiveGraphNode } from './data/liveAgent';
 
 const nodes: LiveGraphNode[] = [
@@ -58,6 +58,7 @@ describe('kgCitations', () => {
     expect(resolveInlineCiteNodeId('[KG:bl1101: scan 301 scan]', dual)).toBe('beamline:scan-301');
     expect(parseInlineCite('[PDF: paper.pdf p.12]')?.kind).toBe('pdf');
     expect(parseInlineCite('[OPS: blueprint.html §Motors]')?.kind).toBe('ops');
+    expect(parseInlineCite('[MP: mp-149 Si]')?.kind).toBe('mp');
   });
 
   it('numbers distinct citations and keeps source kinds separate', () => {
@@ -92,6 +93,20 @@ describe('kgCitations', () => {
     expect(citations[2].title).toBe('A paper about P3HT');
     expect(citations[2].page).toBe('12');
     expect(splitAnswerCitationSegments(answer, citations).filter(item => item.type === 'cite')).toHaveLength(5);
+  });
+
+  it('keeps concept names when a KG tag is used as the noun', () => {
+    const citations = collectAnswerCitations(
+      'RSoXS measures [KG: phase separation], [KG: molecular orientation], and morphology [KG: morphology].',
+      [
+        { id: 'a', label: 'phase separation', type: 'Structure', description: '', graph_id: 'rsoxs_v3' },
+        { id: 'b', label: 'molecular orientation', type: 'Structure', description: '', graph_id: 'rsoxs_v3' },
+        { id: 'c', label: 'morphology', type: 'Structure', description: '', graph_id: 'rsoxs_v3' },
+      ],
+    );
+    expect(citationInlineLabel(citations[0], 'RSoXS measures ')).toBe('phase separation');
+    expect(citationInlineLabel(citations[1], ', ')).toBe('molecular orientation');
+    expect(citationInlineLabel(citations[2], 'and morphology ')).toBe('');
   });
 
   it('still numbers a cite when the agent payload has no metadata', () => {

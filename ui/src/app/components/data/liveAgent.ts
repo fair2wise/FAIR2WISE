@@ -143,6 +143,7 @@ export interface AgentChatResponse {
   graph_source_used?: string | null;
   workdir: string;
   pending?: PendingAction | null;
+  turn_id?: string | null;
   orchestration?: {
     action: string;
     agent: string;
@@ -178,6 +179,7 @@ export interface AgentSessionResetResponse {
 export interface ChatProgressEvent {
   phase: string;
   message: string;
+  turn_id?: string;
   round?: number;
   missing_topics?: string[];
   pdfs?: string[];
@@ -216,9 +218,7 @@ export interface ThinkingStep {
   state: 'active' | 'done';
 }
 
-const AGENT_API_BASE = (import.meta.env.VITE_F2W_AGENT_API_URL || 'http://127.0.0.1:8090').replace(/\/$/, '');
-
-export { AGENT_API_BASE };
+export const AGENT_API_BASE = (import.meta.env.VITE_F2W_AGENT_API_URL || 'http://127.0.0.1:8090').replace(/\/$/, '');
 
 export interface AgentSettingsApiResponse {
   backend: 'cborg' | 'ollama';
@@ -265,16 +265,46 @@ export interface AgentSettingsApiUpdate {
 import { agentNetworkErrorMessage, settingsApiErrorMessage } from '../agentApiErrors';
 import { loadAgentSettings } from '../agentSettings';
 
+export function newClientTurnId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `turn-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function uiSettingsSnapshot() {
+  const settings = loadAgentSettings();
+  return {
+    backend: settings.backend,
+    model: settings.model,
+    graphSource: settings.graphSource,
+    workflowMode: settings.workflowMode,
+    extractionMode: settings.extractionMode,
+    targetedMaxPages: settings.targetedMaxPages,
+    jsonGraphPath: settings.jsonGraphPath,
+    jsonGraphPaths: settings.jsonGraphPaths,
+    selectedGraphIds: settings.selectedGraphIds,
+    kgQueryMaxNodes: settings.kgQueryMaxNodes,
+    kgQueryHops: settings.kgQueryHops,
+    sourceRag: settings.sourceRag,
+    useLiveTiled: settings.useLiveTiled,
+    tiledUri: settings.tiledUri,
+  };
+}
+
 function chatRequestBody(
   message: string,
   messages: AgentChatHistoryMessage[] = [],
   sessionId?: string,
+  clientTurnId?: string,
 ) {
   const settings = loadAgentSettings();
   return {
     message,
     messages: nonEmptyHistory(messages),
     session_id: sessionId,
+    client_turn_id: clientTurnId,
+    ui_settings: uiSettingsSnapshot(),
     source_rag: settings.sourceRag,
     use_live_tiled: settings.useLiveTiled,
   };
@@ -338,11 +368,12 @@ export async function queryLiveAgentWithHistory(
   signal?: AbortSignal,
   messages: AgentChatHistoryMessage[] = [],
   sessionId?: string,
+  clientTurnId?: string,
 ): Promise<AgentChatResponse> {
   const response = await fetch(`${AGENT_API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(chatRequestBody(message, messages, sessionId)),
+    body: JSON.stringify(chatRequestBody(message, messages, sessionId, clientTurnId ?? newClientTurnId())),
     signal,
   });
 
@@ -438,12 +469,13 @@ export async function queryLiveAgentStream(
   sessionId?: string,
 ): Promise<AgentChatResponse> {
   let sawStreamEvent = false;
+  const clientTurnId = newClientTurnId();
 
   try {
     const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(chatRequestBody(message, messages, sessionId)),
+      body: JSON.stringify(chatRequestBody(message, messages, sessionId, clientTurnId)),
       signal,
     });
 
@@ -490,7 +522,7 @@ export async function queryLiveAgentStream(
       throw error;
     }
     if (!sawStreamEvent) {
-      return queryLiveAgentWithHistory(message, signal, messages, sessionId);
+      return queryLiveAgentWithHistory(message, signal, messages, sessionId, clientTurnId);
     }
     throw error;
   }
@@ -503,9 +535,18 @@ export async function queryAgentActionStream(
   signal?: AbortSignal,
   candidateIndex?: number,
   sessionId?: string,
+  parentTurnId?: string,
 ): Promise<AgentChatResponse> {
   let sawStreamEvent = false;
-  const payload: Record<string, unknown> = { decision, kind, session_id: sessionId };
+  const clientTurnId = newClientTurnId();
+  const payload: Record<string, unknown> = {
+    decision,
+    kind,
+    session_id: sessionId,
+    client_turn_id: clientTurnId,
+    ui_settings: uiSettingsSnapshot(),
+  };
+  if (parentTurnId) payload.parent_turn_id = parentTurnId;
   if (candidateIndex !== undefined) {
     payload.candidate_index = candidateIndex;
   }

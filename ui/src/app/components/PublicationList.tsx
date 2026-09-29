@@ -24,11 +24,13 @@ function PublicationAnchor({
   title,
   children,
   className = '',
+  onOpen,
 }: {
   href: string;
   title: string;
   children: ReactNode;
   className?: string;
+  onOpen?: () => void;
 }) {
   return (
     <a
@@ -37,6 +39,7 @@ function PublicationAnchor({
       rel="noopener noreferrer"
       title={title}
       className={className}
+      onClick={() => onOpen?.()}
     >
       {children}
     </a>
@@ -52,6 +55,7 @@ export function PublicationList({
   className = '',
   divided = false,
   renderActions,
+  onOpen,
 }: {
   publications: PublicationInfo[];
   intro?: string | null;
@@ -62,6 +66,7 @@ export function PublicationList({
   className?: string;
   divided?: boolean;
   renderActions?: (publication: PublicationInfo, index: number) => ReactNode;
+  onOpen?: (publication: PublicationInfo) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (!publications.length) return null;
@@ -112,6 +117,7 @@ export function PublicationList({
                       href={links.primaryUrl}
                       title={primaryTitle}
                       className={`inline-flex items-start gap-1 font-bold text-slate-800 ${linkClass}`}
+                      onOpen={() => onOpen?.(publication)}
                     >
                       <span>{title}</span>
                       <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />

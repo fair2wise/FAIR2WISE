@@ -3,7 +3,7 @@ import { parseArxivId, parseCrossrefDoi } from './publicationLinks';
 import { resolveViewerNodeId } from './kgCatalog';
 
 const KG_CITATION_RE = /\[KG:\s*([^\]]+?)\s*\]/gi;
-const TAGGED_CITE_RE = /\[(KG|PDF|OPS):\s*([^\]]+?)\s*\]/gi;
+const TAGGED_CITE_RE = /\[(KG|PDF|OPS|MP):\s*([^\]]+?)\s*\]/gi;
 const MARKDOWN_BOLD_RE = /\*\*([^*]+)\*\*/g;
 const CODE_FENCE_RE = /```[\s\S]*?```/g;
 const PDF_FILENAME_RE = /\b([A-Za-z0-9][A-Za-z0-9._-]*\.pdf)\b/gi;
@@ -229,7 +229,7 @@ function snippetNodes(nodes: LiveGraphNode[]): LiveGraphNode[] {
   return nodes.filter(isSnippetNode);
 }
 
-export type InlineCiteKind = 'kg' | 'pdf' | 'ops';
+export type InlineCiteKind = 'kg' | 'pdf' | 'ops' | 'mp';
 
 export interface InlineCite {
   kind: InlineCiteKind;
@@ -239,7 +239,7 @@ export interface InlineCite {
 }
 
 export function parseInlineCite(text: string): InlineCite | null {
-  const match = text.trim().match(/^\[(KG|PDF|OPS):\s*([^\]]+?)\s*\]$/i);
+  const match = text.trim().match(/^\[(KG|PDF|OPS|MP):\s*([^\]]+?)\s*\]$/i);
   if (!match) return null;
   const kind = match[1].toLowerCase() as InlineCiteKind;
   const body = match[2].trim();
@@ -424,7 +424,7 @@ export function parseKgCitationNodeIds(
   return collectOrderedNodeRefs(answer, nodes, responsePublications);
 }
 
-export type CitationSourceKind = 'paper' | 'ops' | 'rag' | 'tiled' | 'kg';
+export type CitationSourceKind = 'paper' | 'ops' | 'rag' | 'tiled' | 'kg' | 'mp';
 
 export interface AnswerCitation {
   n: number;
@@ -498,6 +498,7 @@ function nodeIdentityFields(node: LiveGraphNode | undefined): Pick<AnswerCitatio
 
 function citationSourceKind(cite: InlineCite | { kind: 'pdf'; body: string; name: string; graphId?: string }, node?: LiveGraphNode): CitationSourceKind {
   const graphId = (cite.graphId || node?.graph_id || '').toLowerCase();
+  if (cite.kind === 'mp') return 'mp';
   if (cite.kind === 'ops' || graphId.startsWith('bl1101')) return 'ops';
   if (graphId === 'tiled' || graphId.startsWith('tiled') || cite.kind === 'kg' && /^tiled:/i.test(cite.body)) return 'tiled';
   if (cite.kind === 'pdf') return /\bp\.\s*\d+/i.test(cite.body) ? 'rag' : 'paper';
@@ -531,7 +532,7 @@ function enrichCitation(
     ? (parsed.graphId || node?.graph_id || '')
     : (node?.graph_id || '');
   const name = node?.label || parsed.name.replace(/\s+p\.\s*\d+\s*$/i, '') || raw;
-  let type = node?.type || (parsed.kind === 'pdf' ? 'Publication' : parsed.kind === 'ops' ? 'Ops' : 'Entity');
+  let type = node?.type || (parsed.kind === 'pdf' ? 'Publication' : parsed.kind === 'ops' ? 'Ops' : parsed.kind === 'mp' ? 'Materials Project' : 'Entity');
   if ((!identity.esaf) && ESAF_LABEL_RE.test(`${name} ${raw}`)) {
     identity.esaf = (`${name} ${raw}`.match(ESAF_LABEL_RE)?.[1] || '').replace('_', '-');
   }
@@ -607,7 +608,16 @@ export function collectAnswerCitations(
   return citations;
 }
 
+export function materialsProjectUrl(citation: Pick<AnswerCitation, 'raw' | 'name' | 'kind'>): string {
+  const haystack = `${citation.raw} ${citation.name}`;
+  const match = haystack.match(/\bmp-\d+\b/i);
+  return match ? `https://next-gen.materialsproject.org/materials/${match[0].toLowerCase()}` : '';
+}
+
 export function citationBibliographyLabel(citation: AnswerCitation): string {
+  if (citation.sourceKind === 'mp' || citation.kind === 'mp') {
+    return citation.name || citation.raw;
+  }
   if (citation.sourceKind === 'tiled' || (citation.graphId || '').toLowerCase() === 'tiled') {
     const esaf = citation.esaf || citation.name.match(ESAF_LABEL_RE)?.[1] || citation.raw.match(ESAF_LABEL_RE)?.[1];
     if (esaf) return `ESAF ${String(esaf).replace('_', '-')}`;
@@ -635,6 +645,25 @@ export function citationBibliographyLabel(citation: AnswerCitation): string {
   return [citation.name, citation.type, citation.graphId || citation.sourceKind]
     .filter(Boolean)
     .join(' · ');
+}
+
+/** Visible label to keep when a [KG:]/[MP:] tag is used as the noun itself. */
+export function citationInlineLabel(citation: AnswerCitation, precedingText = ''): string {
+  const name = (citation.name || '').trim();
+  if (!name) return '';
+  if (!/^\s*\[(KG|PDF|OPS|MP):/i.test(citation.raw)) return '';
+  const prev = precedingText.replace(/\s+/g, ' ').trimEnd().toLowerCase();
+  const needle = name.toLowerCase();
+  if (!needle) return '';
+  if (
+    prev.endsWith(needle)
+    || prev.endsWith(`${needle}.`)
+    || prev.endsWith(`${needle},`)
+    || prev.endsWith(`${needle};`)
+  ) {
+    return '';
+  }
+  return name;
 }
 
 export function splitAnswerCitationSegments(

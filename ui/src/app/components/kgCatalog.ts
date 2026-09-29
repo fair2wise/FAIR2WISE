@@ -22,7 +22,8 @@ export function graphIdFromPath(path: string): string {
   const name = graphFilename(path);
   if (GRAPH_ID_BY_NAME[name]) return GRAPH_ID_BY_NAME[name];
   if (BL1101_SNAPSHOT_RE.test(name)) return 'bl1101';
-  if (RSOXS_SNAPSHOT_RE.test(name)) return 'rsoxs_v1';
+  const rsoxs = name.match(RSOXS_SNAPSHOT_RE);
+  if (rsoxs) return `rsoxs_v${rsoxs[1]}`;
   const stem = name.replace(/\.json$/i, '') || 'graph';
   if (stem.startsWith('matkg_')) return stem.slice('matkg_'.length);
   return stem;
