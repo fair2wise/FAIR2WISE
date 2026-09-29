@@ -32,6 +32,7 @@ class ExtractorAgent(Agent):
         temperature: float = 0.0,
         max_workers: int = 8,
     ) -> None:
+        """Store LLM backend, schema, ChEBI, and worker settings for later extract calls."""
         super().__init__()
         self._backend = backend
         self._model = model or os.environ.get("EXTRACT_TERMS_MODEL", "lbl/cborg-chat")
@@ -44,6 +45,7 @@ class ExtractorAgent(Agent):
         self._cborg_api_key = os.environ.get("CBORG_API_KEY")
 
     def _run(self, pdf_dir: str, terms_json: str, max_workers: Optional[int]) -> Dict[str, Any]:
+        """Synchronous full-directory extract into cumulative *terms_json*."""
         from app.modules.term_extractor import Orchestrator
 
         Path(terms_json).parent.mkdir(parents=True, exist_ok=True)
@@ -70,6 +72,7 @@ class ExtractorAgent(Agent):
         max_pages: int,
         max_workers: Optional[int],
     ) -> Dict[str, Any]:
+        """Synchronous query-targeted extract of selected pages in *pdf_dir*."""
         from app.modules.term_extractor import Orchestrator
 
         Path(terms_json).parent.mkdir(parents=True, exist_ok=True)

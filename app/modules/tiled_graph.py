@@ -117,6 +117,7 @@ query PageTiledEntities($entityType: String, $limit: Int!, $offset: Int!) {
 
 
 def _env(name: str, default: str = "") -> str:
+    """Return a stripped environment variable, or *default* when unset."""
     raw = os.environ.get(name)
     if raw is None:
         return default
@@ -124,6 +125,7 @@ def _env(name: str, default: str = "") -> str:
 
 
 def _truthy(raw: Optional[str]) -> Optional[bool]:
+    """Parse a truthy/falsy env string; empty or unknown values return None."""
     if raw is None:
         return None
     cleaned = str(raw).strip().lower()
@@ -137,6 +139,7 @@ def _truthy(raw: Optional[str]) -> Optional[bool]:
 
 
 def normalize_tiled_uri(value: Optional[str], *, default: str = DEFAULT_TILED_URI) -> str:
+    """Strip a trailing GraphQL path and return a scheme+host Tiled base URI."""
     raw = str(value or "").strip() or default
     parsed = urlparse(raw)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -148,6 +151,7 @@ def normalize_tiled_uri(value: Optional[str], *, default: str = DEFAULT_TILED_UR
 
 
 def is_als_production_tiled_host(host: Optional[str]) -> bool:
+    """True when *host* is als.lbl.gov or a subdomain (never used as chat Tiled)."""
     hostname = (host or "").strip().lower().rstrip(".")
     if not hostname:
         return False
@@ -172,10 +176,12 @@ def coerce_local_tiled_uri(
 
 
 def graphql_url(base_uri: str) -> str:
+    """Join *base_uri* with the Tiled GraphQL path."""
     return f"{normalize_tiled_uri(base_uri)}{GRAPHQL_PATH}"
 
 
 def auth_headers(api_key: Optional[str] = None) -> Dict[str, str]:
+    """JSON headers plus optional Tiled ``Authorization`` from *api_key* or env."""
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     key = (api_key if api_key is not None else _env("TILED_API_KEY")).strip()
     if key:
@@ -185,6 +191,7 @@ def auth_headers(api_key: Optional[str] = None) -> Dict[str, str]:
 
 
 def tiled_api_key_set() -> bool:
+    """True when ``TILED_API_KEY`` is a non-empty environment value."""
     return bool(_env("TILED_API_KEY"))
 
 
@@ -193,6 +200,7 @@ def load_tiled_config(
     uri: Optional[str] = None,
     enabled: Optional[bool] = None,
 ) -> "TiledGraphConfig":
+    """Resolve enabled flag and local URI from arguments and environment."""
     env_enabled = _truthy(_env("F2W_LIVE_TILED") or _env("TILED_GRAPH_ENABLED"))
     if enabled is None:
         if env_enabled is not None:
@@ -273,12 +281,15 @@ def probe_tiled_status(
 
 @dataclass
 class TiledGraphConfig:
+    """Resolved live-Tiled settings: enabled flag, URI, and whether an API key is set."""
+
     enabled: bool
     uri: str
     api_key_set: bool
     uri_error: Optional[str] = None
 
     def snapshot(self) -> Dict[str, Any]:
+        """JSON-serializable status dict for Settings and retrieval metadata."""
         status = "disabled"
         error = self.uri_error
         if self.enabled:
@@ -299,6 +310,8 @@ class TiledGraphConfig:
 
 @dataclass
 class TiledLookupResult:
+    """Hits and overlay graph from a live Tiled identity lookup."""
+
     hits: List[ScoredHit] = field(default_factory=list)
     graph: Optional["TiledLookupGraph"] = None
     status: str = "disabled"
@@ -308,6 +321,7 @@ class TiledLookupResult:
     source: str = "none"
 
     def meta(self) -> Dict[str, Any]:
+        """Compact lookup metadata attached to agent responses."""
         return {
             "enabled": self.status not in {"disabled"},
             "used": bool(self.hits) and self.source != "none",
@@ -332,21 +346,25 @@ class TiledLookupGraph:
     retrieval_backend = "graphql"
 
     def __init__(self, nodes: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+        """Store *nodes* by id; outgoing edges start empty."""
         self.nodes: Dict[str, Dict[str, Any]] = dict(nodes or {})
         self.out_edges: Dict[str, List[Dict[str, Any]]] = {}
 
     def add_node(self, node: Dict[str, Any]) -> None:
+        """Index *node* by its ``id``; ignore records without an id."""
         nid = str(node.get("id") or "")
         if not nid:
             return
         self.nodes[nid] = node
 
     def add_edge(self, subject: str, predicate: str, obj: str) -> None:
+        """Append a directed link from *subject* to *obj*."""
         self.out_edges.setdefault(subject, []).append(
             {"subject": subject, "predicate": predicate, "object": obj, "has_evidence": True}
         )
 
     def semantic_search(self, q: str, topk: int = 12) -> List[Any]:
+        """Rank Tiled nodes by lexical match to *q*; return ``(id, score)`` namespaces."""
         tokens = _query_tokens(q)
         scored: List[Tuple[float, str]] = []
         for nid, node in self.nodes.items():
@@ -364,6 +382,7 @@ class TiledLookupGraph:
         hint_terms: Sequence[str] | None = None,
         include_pdf_snippets: bool = False,
     ) -> str:
+        """Render selected Tiled nodes (and optional triples) into judge context."""
         parts: List[str] = [
             "Live Tiled GraphQL identity nodes (ESAF, Proposal, Sample, BlueskyRun). "
             "Cite the entity name, for example [KG:tiled: ESAF 2026-00043]. "
@@ -412,6 +431,7 @@ class TiledLookupGraph:
 
 
 def is_experiment_identity_question(question: str) -> bool:
+    """True when *question* asks about ESAF, proposal, sample, scan, or catalog ids."""
     text = str(question or "").strip()
     if not text:
         return False
@@ -421,16 +441,19 @@ def is_experiment_identity_question(question: str) -> bool:
 
 
 def _query_tokens(question: str) -> set[str]:
+    """Lowercased alphanumeric tokens of length ≥ 3 from *question*."""
     return {tok for tok in re.findall(r"[a-z0-9]+", str(question or "").lower()) if len(tok) >= 3}
 
 
 def _stem(token: str) -> str:
+    """Naive English plural stem used for entity-type alias matching."""
     if token.endswith("s") and len(token) > 3:
         return token[:-1]
     return token
 
 
 def requested_entity_types(question: str) -> List[str]:
+    """Entity types named in *question*, or all cookbook types if none match."""
     tokens = {_stem(tok) for tok in _query_tokens(question)}
     matched: List[str] = []
     for entity_type, aliases in _TYPE_ALIASES.items():
@@ -446,6 +469,7 @@ def requested_entity_types(question: str) -> List[str]:
 
 
 def _flatten_props(value: Any) -> str:
+    """Recursively flatten a nested property dict/list/scalar to a single string."""
     if value is None:
         return ""
     if isinstance(value, dict):
@@ -456,6 +480,7 @@ def _flatten_props(value: Any) -> str:
 
 
 def _normalize_identity(value: Any) -> str:
+    """Collapse whitespace and punctuation so ESAF/proposal strings compare loosely."""
     return re.sub(r"[\s_\-:]+", " ", str(value or "").strip().lower())
 
 
@@ -523,6 +548,7 @@ def tiled_lookup_candidates(node_id: str) -> List[str]:
 
 
 def resolve_tiled_node_id(kg: Any, node_id: str) -> Optional[str]:
+    """Map a citation or overlay id onto a node key in *kg*, if one exists."""
     nodes = getattr(kg, "nodes", {}) or {}
     if not isinstance(nodes, dict) or not node_id:
         return None
@@ -609,6 +635,7 @@ def tiled_neighborhood_ids(
 
 
 def entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert a Tiled GraphQL entity dict to the canonical KG node dict format."""
     props = dict(entity.get("properties") or {}) if isinstance(entity.get("properties"), dict) else {}
     entity_type = str(entity.get("entityType") or props.get("category") or "Thing")
     graphql_id = str(entity.get("id") or "")
@@ -658,6 +685,7 @@ def entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _match_score(question: str, node: Dict[str, Any], tokens: Iterable[str]) -> float:
+    """Return a float relevance score for *node* against *question* and pre-tokenised *tokens*."""
     hay = str(node.get("haystack") or f"{node.get('name', '')} {node.get('description', '')}").lower()
     name = str(node.get("name") or "").lower()
     q = str(question or "").strip().lower()
@@ -684,11 +712,37 @@ def _match_score(question: str, node: Dict[str, Any], tokens: Iterable[str]) -> 
 
 
 def _safe_error(exc: BaseException) -> str:
+    """Format *exc* for logs/UI with any Tiled API key redacted."""
     text = f"{type(exc).__name__}: {exc}"
     key = _env("TILED_API_KEY")
     if key and key in text:
         text = text.replace(key, "<redacted>")
     return text[:300]
+
+
+class TiledGraphQLError(RuntimeError):
+    """Raised when the Tiled GraphQL endpoint returns an ``errors`` list.
+
+    Carries the raw list of error dicts so callers can inspect them
+    structurally instead of pattern-matching on the string representation.
+    """
+
+    def __init__(self, errors: list) -> None:
+        """Store the GraphQL ``errors`` list and a readable message."""
+        super().__init__(f"Tiled GraphQL error: {errors}")
+        self.errors: list = errors
+
+    def mentions_field(self, field: str) -> bool:
+        """Return True if any error's message or path mentions *field*."""
+        for err in self.errors:
+            if not isinstance(err, dict):
+                continue
+            if field in str(err.get("message") or ""):
+                return True
+            for path_item in err.get("path") or []:
+                if str(path_item) == field:
+                    return True
+        return False
 
 
 def tiled_graphql(
@@ -699,6 +753,7 @@ def tiled_graphql(
     api_key: Optional[str] = None,
     timeout: float = REQUEST_TIMEOUT,
 ) -> dict:
+    """POST *query* to Tiled GraphQL and return ``data``, or raise :class:`TiledGraphQLError`."""
     url = graphql_url(uri or _env("TILED_URI") or DEFAULT_TILED_URI)
     resp = requests.post(
         url,
@@ -709,7 +764,7 @@ def tiled_graphql(
     resp.raise_for_status()
     body = resp.json()
     if body.get("errors"):
-        raise RuntimeError(f"Tiled GraphQL error: {body['errors']}")
+        raise TiledGraphQLError(body["errors"])
     return body.get("data") or {}
 
 
@@ -721,6 +776,7 @@ def _page_entities(
     page_size: int = PAGE_SIZE,
     max_pages: int = MAX_PAGES,
 ) -> List[Dict[str, Any]]:
+    """Page all GraphQL entities of *entity_type*, falling back if ``nodeId`` is unsupported."""
     rows: List[Dict[str, Any]] = []
     query = _PAGE_QUERY
     offset = 0
@@ -732,8 +788,8 @@ def _page_entities(
                 uri=uri,
                 api_key=api_key,
             )
-        except RuntimeError as exc:
-            if query is _PAGE_QUERY and "nodeId" in str(exc):
+        except TiledGraphQLError as exc:
+            if query is _PAGE_QUERY and exc.mentions_field("nodeId"):
                 query = _PAGE_QUERY_NO_NODEID
                 data = tiled_graphql(
                     query,
@@ -754,6 +810,7 @@ def _page_entities(
 
 
 def _count_node(entity_type: str, count: int, source: str) -> Dict[str, Any]:
+    """Synthetic inventory node so “how many ESAFs” questions have a match."""
     return {
         "id": f"tiled:count:{entity_type}",
         "name": f"Tiled {entity_type} inventory",
@@ -768,6 +825,7 @@ def _count_node(entity_type: str, count: int, source: str) -> Dict[str, Any]:
 
 
 def _hits_from_graph(question: str, graph: TiledLookupGraph, *, limit: int = 40) -> List[ScoredHit]:
+    """Score *graph* nodes against *question* and return the top *limit* hits."""
     tokens = _query_tokens(question)
     raw: List[ScoredHit] = []
     for nid, node in graph.nodes.items():
@@ -799,6 +857,7 @@ def _hits_from_graph(question: str, graph: TiledLookupGraph, *, limit: int = 40)
 
 
 def _ingest_entities(graph: TiledLookupGraph, entities: Sequence[Dict[str, Any]]) -> None:
+    """Add GraphQL entities and their outgoing-link targets to *graph*."""
     pending_edges: List[Tuple[str, str, Dict[str, Any]]] = []
     for entity in entities:
         node = entity_to_node(entity)
@@ -823,6 +882,7 @@ def _catalog_runs(
     api_key: Optional[str],
     limit: int = 8,
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """Walk the Tiled catalog tree for BlueskyRun entries when GraphQL returns none."""
     try:
         from tiled.client import from_uri as tiled_from_uri  # type: ignore
     except Exception:
@@ -839,6 +899,7 @@ def _catalog_runs(
     error: Optional[str] = None
 
     def _as_run(node: Any, path: List[str]) -> Optional[Dict[str, Any]]:
+        """Build a BlueskyRun-shaped dict from a catalog node, or None if not a run."""
         try:
             meta = dict(getattr(node, "metadata", None) or {})
         except Exception:
@@ -871,6 +932,7 @@ def _catalog_runs(
         }
 
     def walk(node: Any, path: List[str], depth: int) -> None:
+        """DFS the catalog tree, collecting up to *limit* BlueskyRun entries."""
         if len(runs) >= limit or depth > 3:
             return
         run = _as_run(node, path)

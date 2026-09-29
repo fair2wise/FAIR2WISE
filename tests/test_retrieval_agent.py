@@ -274,6 +274,47 @@ def test_reload_kg_reports_graph_source(monkeypatch):
 
 EVAL_LAYOUT_Q = "how is all of the hardware connected at 11.0.1.2, in order"
 
+# Blueprint-shaped HTML used to build a tiny ops KG for layout retrieval tests.
+# Kept here after test_bl1101_ingest switched to asserting the harvested v7 graph.
+TOPOLOGY_HTML = """
+<html>
+<section id="sheet-a">
+  <figure>
+    <svg viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg">
+      <text x="110" y="192" class="big">Storage ring</text>
+      <text x="290" y="192" class="big">EPU</text>
+      <text x="470" y="192" class="big">M101</text>
+      <text x="650" y="192" class="big">Mono 101</text>
+      <text x="830" y="192" class="big">M103</text>
+      <text x="110" y="512" class="big">Exit slits</text>
+      <text x="290" y="512" class="big">PZT shutter</text>
+    </svg>
+    <figcaption>
+      Element order: mono → M103 → exit slits → PZT shutter → chamber.
+    </figcaption>
+  </figure>
+</section>
+<div class="stages">
+  <div class="stage">
+    <div class="stage-name">Exit slits<span class="stage-id">§A.5</span></div>
+    <div class="stage-what">Downstream of M103.</div>
+  </div>
+  <div class="stage">
+    <div class="stage-name">M103<span class="stage-id">§A.6</span></div>
+    <div class="stage-what">KB pair between the mono and the exit slits.</div>
+  </div>
+  <div class="stage">
+    <div class="stage-name">Sample stage<span class="stage-id">§B.2</span></div>
+    <div class="stage-what">Four-axis manipulator.</div>
+  </div>
+  <div class="stage">
+    <div class="stage-name">Detector<span class="stage-id">§B.3</span></div>
+    <div class="stage-what">AXIS-SXR-40.</div>
+  </div>
+</div>
+</html>
+"""
+
 
 def test_layout_question_is_ops_layout_not_science():
     assert _is_ops_layout_question(EVAL_LAYOUT_Q)
@@ -300,7 +341,6 @@ def test_layout_judge_prompt_and_leeway_are_ops_not_cyrsoxs():
 def test_layout_retrieve_returns_ops_path_nodes(tmp_path, monkeypatch):
     from app.modules import kg_rag_api as krag
     from app.modules.bl1101_ingest import ingest_fixture, records_to_graph
-    from tests.test_bl1101_ingest import TOPOLOGY_HTML
 
     monkeypatch.setattr(krag, "RETRIEVAL_BACKEND", "lexical")
     science = tmp_path / "matkg_rsoxs_v1.json"

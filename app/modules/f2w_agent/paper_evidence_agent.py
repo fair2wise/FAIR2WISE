@@ -18,6 +18,7 @@ MAX_PAGE_CHARS = 7000
 
 
 def _tokens(text: Any) -> set[str]:
+    """Return lowercase alphanumeric tokens, dropping common question stopwords."""
     return {
         token
         for token in re.findall(r"[a-z0-9][a-z0-9+./_-]{2,}", str(text or "").casefold())
@@ -26,6 +27,7 @@ def _tokens(text: Any) -> set[str]:
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
+    """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     match = re.search(r"\{[\s\S]*\}", str(raw or ""))
     if not match:
         return {}
@@ -37,6 +39,7 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
 
 
 def _manifest_entry(manifest_path: Path, filename: str) -> Dict[str, Any]:
+    """Load the extraction-manifest record for ``filename``, raising if missing."""
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -49,6 +52,7 @@ def _manifest_entry(manifest_path: Path, filename: str) -> Dict[str, Any]:
 
 
 def _eligible_pages(entry: Dict[str, Any], page_count: int) -> Tuple[str, List[int]]:
+    """Return extraction mode and 1-based pages the manifest marks as eligible."""
     state = str(entry.get("extraction_state") or "")
     if state == "full":
         # A full extraction processed the whole document unless an explicit page
@@ -77,6 +81,7 @@ def _eligible_pages(entry: Dict[str, Any], page_count: int) -> Tuple[str, List[i
 
 
 def _claims_are_cited(answer: str, filename: str, eligible: set[int]) -> bool:
+    """Return True when every factual claim carries a valid page citation."""
     return not _citation_errors(answer, filename, eligible)
 
 
@@ -291,11 +296,13 @@ class PaperEvidenceAgent(Agent):
     """Answer only from pages that the extraction manifest marks eligible."""
 
     def __init__(self, *, backend: Optional[str] = None, model: Optional[str] = None) -> None:
+        """Store chat backend/model used for page-grounded answering."""
         super().__init__()
         self._backend = backend or os.environ.get("KG_RAG_BACKEND", "cborg")
         self._model = model
 
     def _chat(self, prompt: str) -> str:
+        """Send ``prompt`` to the configured chat backend and return the reply text."""
         from app.modules.term_extractor.clients import make_chat_client
 
         client = make_chat_client(
@@ -304,9 +311,10 @@ class PaperEvidenceAgent(Agent):
             cborg_base=os.environ.get("CBORG_BASE_URL"),
             cborg_api_key=os.environ.get("CBORG_API_KEY"),
         )
-        return str(client.chat(prompt, temperature=0.0, timeout=120) or "")
+        return str(client.chat(prompt, temperature=0.0, timeout=120, trace_label="paper-evidence") or "")
 
     def _query(self, question: str, pdf_path: str, manifest_path: str) -> Dict[str, Any]:
+        """Answer from eligible PDF pages, repairing or rejecting uncited claims."""
         import fitz
 
         path = Path(pdf_path)
@@ -330,7 +338,10 @@ class PaperEvidenceAgent(Agent):
                     for page in eligible
                 }
         except Exception as exc:
+            from app.modules.f2w_agent.trace import note_error
+
             logger.warning("Paper evidence read failed: %s", exc)
+            note_error("PaperEvidenceAgent._query", exc)
             return {
                 "status": "manifest_error", "sufficient": False,
                 "answer": f"I could not safely read the extracted-paper manifest: {exc}",
@@ -438,5 +449,10 @@ class PaperEvidenceAgent(Agent):
 
     @action
     async def query(self, question: str, pdf_path: str, manifest_path: str) -> Dict[str, Any]:
+        """Run ``_query`` in an executor so the Academy action stays non-blocking."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._query, question, pdf_path, manifest_path)
+        from app.modules.f2w_agent.trace import bind_context
+
+        return await loop.run_in_executor(
+            None, bind_context(self._query), question, pdf_path, manifest_path
+        )

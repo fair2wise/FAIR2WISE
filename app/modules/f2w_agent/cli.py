@@ -33,6 +33,7 @@ from .multi_kg import collect_graph_paths, primary_json_graph_path
 
 
 def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
+    """Build a :class:`CoordinatorConfig` from parsed CLI arguments."""
     workflow_mode = "agentic" if args.agentic else args.workflow_mode
     graphs = collect_graph_paths(getattr(args, "graphs", None), getattr(args, "graph", None))
     return CoordinatorConfig(
@@ -62,6 +63,7 @@ def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
 
 
 async def _run_chat(cfg: CoordinatorConfig) -> None:
+    """Interactive stdin loop that sends each question through the coordinator."""
     coord = Coordinator(cfg)
     print("FAIR2WISE orchestrated KG-RAG chat. Type 'exit' to quit.")
     while True:
@@ -75,6 +77,7 @@ async def _run_chat(cfg: CoordinatorConfig) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construct the f2w-agent argument parser and subcommands."""
     p = argparse.ArgumentParser(
         prog="f2w-agent",
         description="FAIR2WISE orchestrated KG-RAG pipeline.",
@@ -143,6 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    """Run status, ask, chat, or the HTTP API; return a process exit code."""
     args = build_parser().parse_args(argv)
     cfg = _cfg(args)
 

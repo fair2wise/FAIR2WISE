@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Optional
 
 from app.modules.tiled_sim import (
     DEFAULT_SEED,
@@ -23,8 +24,27 @@ from app.modules.tiled_sim import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-V4_PATH = ROOT / "storage/kg/matkg_bl1101_v4.json"
 SIDECAR = ROOT / "storage/fixtures/rsoxs_snapshot_promote.json"
+
+
+def _find_latest_bl1101(root: Path) -> Optional[Path]:
+    """Return the highest-numbered matkg_bl1101_v*.json, or None."""
+    import glob as _glob
+    candidates = [
+        Path(p) for p in _glob.glob(str(root / "storage/kg/matkg_bl1101_v*.json"))
+        if "bak" not in Path(p).name
+    ]
+    if not candidates:
+        return None
+    def _ver(p: Path) -> int:
+        try:
+            return int(p.stem.split("_v")[-1])
+        except (ValueError, IndexError):
+            return -1
+    return min(candidates, key=_ver)  # lowest available (most likely v4/v5/etc.)
+
+
+V4_PATH = _find_latest_bl1101(ROOT) or (ROOT / "storage/kg/matkg_bl1101_v4.json")
 
 
 def _tiny_ops_graph() -> dict:

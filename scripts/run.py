@@ -64,6 +64,21 @@ def main() -> None:
     log = logging.getLogger(__name__)
     log.info("Logging to %s", args.log_file)
 
+    # langchain-openai may inject a keepalive transport that drops the IPv6
+    # local_address bind used for CBorg. Keep our httpx client intact.
+    os.environ.setdefault("LANGCHAIN_OPENAI_TCP_KEEPALIVE", "0")
+    # Cursor agent shells inject HTTP(S)_PROXY=127.0.0.1:xxxxx. That proxy dies
+    # after double-fork and cannot reach api.cborg.lbl.gov over IPv6.
+    for key in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    ):
+        os.environ.pop(key, None)
+
     # --- Validate inputs ---
     if not args.pdf_dir.exists():
         log.error("PDF directory not found: %s", args.pdf_dir)

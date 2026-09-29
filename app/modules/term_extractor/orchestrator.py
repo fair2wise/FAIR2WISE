@@ -224,6 +224,7 @@ class Orchestrator:
             api_key=self.cborg_api_key,
             base_url=self.cborg_base,
             temperature=self.temperature,
+            http_socket_options=(),
             **openai_http_kwargs(asynchronous=False),
         )
 

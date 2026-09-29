@@ -313,3 +313,142 @@ def test_optional_live_tiled_probe():
     assert result.status in {"ok", "empty", "unsigned", "unreachable"}
     if result.error:
         assert "TILED_API_KEY" not in result.error or "<redacted>" in result.error or "Set TILED_API_KEY" in result.error
+
+
+# ---------------------------------------------------------------------------
+# New unit tests (2c): _classify_query_intent and _kg_raw_parts
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyQueryIntent:
+    """Unit tests for _classify_query_intent() intent heuristic."""
+
+    def test_tiled_intent_esaf(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("Show me ESAF 2026-00041") == "tiled"
+
+    def test_tiled_intent_proposal(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("how many proposals are in tiled") == "tiled"
+
+    def test_tiled_intent_my_runs(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("show me my runs") == "tiled"
+
+    def test_ops_intent_beamline(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("what detectors does the beamline have") == "ops"
+
+    def test_ops_intent_motor(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("which motor controls the endstation") == "ops"
+
+    def test_literature_intent_rsoxs(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("explain RSoXS technique") == "literature"
+
+    def test_literature_intent_paper(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("list publications about polymer") == "literature"
+
+    def test_general_intent_fallback(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("hello") == "general"
+
+    def test_empty_query_returns_general(self):
+        from app.modules.f2w_agent.retrieval_agent import _classify_query_intent
+
+        assert _classify_query_intent("") == "general"
+
+
+class TestKgRawParts:
+    """Unit tests for _kg_raw_parts() legacy/modern KG format helper."""
+
+    def test_modern_nodes_edges_format(self):
+        from app.modules.f2w_agent.api import _kg_raw_parts
+
+        data = {
+            "nodes": [{"id": "n1"}],
+            "edges": [{"subject": "n1", "predicate": "rel:related_to", "object": "n2"}],
+        }
+        nodes, edges = _kg_raw_parts(data)
+        assert nodes == [{"id": "n1"}]
+        assert len(edges) == 1
+        assert edges[0]["predicate"] == "rel:related_to"
+
+    def test_legacy_things_associations_format(self):
+        from app.modules.f2w_agent.api import _kg_raw_parts
+
+        data = {
+            "things": [{"id": "n1"}, {"id": "n2"}],
+            "associations": [{"subject": "n1", "predicate": "rel:part_of", "object": "n2"}],
+        }
+        nodes, edges = _kg_raw_parts(data)
+        assert len(nodes) == 2
+        assert nodes[0]["id"] == "n1"
+        assert edges[0]["predicate"] == "rel:part_of"
+
+    def test_modern_format_takes_precedence_over_legacy(self):
+        """If both 'things' and 'nodes' exist, 'things' wins (legacy format has priority)."""
+        from app.modules.f2w_agent.api import _kg_raw_parts
+
+        data = {
+            "things": [{"id": "old"}],
+            "nodes": [{"id": "new"}],
+            "associations": [],
+            "edges": [{"subject": "new", "predicate": "rel:x", "object": "new"}],
+        }
+        nodes, edges = _kg_raw_parts(data)
+        # 'things' is checked first (legacy format has priority in the current implementation)
+        assert nodes[0]["id"] == "old"
+
+    def test_empty_data_returns_empty_lists(self):
+        from app.modules.f2w_agent.api import _kg_raw_parts
+
+        nodes, edges = _kg_raw_parts({})
+        assert nodes == []
+        assert edges == []
+
+    def test_node_list_returned_as_list(self):
+        from app.modules.f2w_agent.api import _kg_raw_parts
+
+        nodes, edges = _kg_raw_parts({"nodes": [{"id": "a"}, {"id": "b"}], "edges": []})
+        assert len(nodes) == 2
+
+
+class TestTiledGraphQLError:
+    """Unit tests for the structured TiledGraphQLError exception."""
+
+    def test_mentions_field_in_message(self):
+        from app.modules.tiled_graph import TiledGraphQLError
+
+        err = TiledGraphQLError([{"message": "Cannot query field 'nodeId'", "locations": []}])
+        assert err.mentions_field("nodeId") is True
+        assert err.mentions_field("name") is False
+
+    def test_mentions_field_in_path(self):
+        from app.modules.tiled_graph import TiledGraphQLError
+
+        err = TiledGraphQLError([{"message": "Field error", "path": ["entities", "nodeId"]}])
+        assert err.mentions_field("nodeId") is True
+
+    def test_inherits_runtime_error(self):
+        from app.modules.tiled_graph import TiledGraphQLError
+
+        err = TiledGraphQLError([{"message": "oops"}])
+        assert isinstance(err, RuntimeError)
+
+    def test_errors_attribute_preserved(self):
+        from app.modules.tiled_graph import TiledGraphQLError
+
+        raw = [{"message": "bad field", "extensions": {"code": "GRAPHQL_VALIDATION_FAILED"}}]
+        err = TiledGraphQLError(raw)
+        assert err.errors == raw

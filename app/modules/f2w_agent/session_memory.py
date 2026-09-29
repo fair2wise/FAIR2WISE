@@ -80,10 +80,12 @@ _ENTITY_STOPWORDS = {
 
 
 def _now() -> str:
+    """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def _clip(text: Any, limit: int) -> str:
+    """Collapse whitespace and truncate ``text`` to ``limit`` characters."""
     value = re.sub(r"\s+", " ", str(text or "")).strip()
     if len(value) <= limit:
         return value
@@ -91,6 +93,7 @@ def _clip(text: Any, limit: int) -> str:
 
 
 def _unique(values: Iterable[Any], *, limit: int) -> List[str]:
+    """Deduplicate clipped strings case-insensitively, preserving order up to ``limit``."""
     seen: set[str] = set()
     result: List[str] = []
     for value in values:
@@ -106,6 +109,7 @@ def _unique(values: Iterable[Any], *, limit: int) -> List[str]:
 
 
 def _default_memory() -> Dict[str, Any]:
+    """Return an empty v2 session-memory document."""
     return {
         "version": 2,
         "summary": "",
@@ -120,6 +124,7 @@ def _default_memory() -> Dict[str, Any]:
 
 
 def _extract_entities(*texts: Any) -> List[str]:
+    """Pull likely entity tokens from text, skipping conversational stopwords."""
     candidates: List[str] = []
     for text in texts:
         for token in re.findall(r"\b[A-Za-z][A-Za-z0-9_./+-]{2,}\b", str(text or "")):
@@ -135,6 +140,7 @@ def _extract_entities(*texts: Any) -> List[str]:
 
 
 def _publication_refs(publications: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
+    """Compact title/DOI refs from publication dicts, dropping empty entries."""
     refs: List[Dict[str, str]] = []
     for pub in publications or []:
         if not isinstance(pub, dict):
@@ -154,6 +160,7 @@ def _round_growth_event(
     query: str,
     round_info: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
+    """Build a KG-growth event from one extraction/rebuild round, or None."""
     extraction = round_info.get("extraction")
     kg = round_info.get("kg")
     if not isinstance(extraction, dict) and not isinstance(kg, dict):
@@ -188,6 +195,7 @@ def _round_growth_event(
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
+    """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     if not raw:
         return {}
     match = re.search(r"\{[\s\S]*\}", raw)
@@ -204,10 +212,12 @@ class SessionMemory:
     """Small JSON-backed memory scoped to one ``workdir``."""
 
     def __init__(self, path: Path) -> None:
+        """Load existing JSON memory at ``path``, or start from the empty default."""
         self.path = Path(path)
         self.data = self._load()
 
     def _load(self) -> Dict[str, Any]:
+        """Read and normalize on-disk memory, returning defaults if corrupt."""
         if not self.path.exists():
             return _default_memory()
         try:
@@ -226,14 +236,17 @@ class SessionMemory:
         return data
 
     def save(self) -> None:
+        """Write the in-memory document to ``self.path``."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def clear(self) -> None:
+        """Reset memory to the empty default and persist it."""
         self.data = _default_memory()
         self.save()
 
     def has_context(self) -> bool:
+        """Return True if any summary, questions, entities, growth, or turns exist."""
         return bool(
             self.data.get("summary")
             or self.data.get("open_questions")
@@ -246,6 +259,7 @@ class SessionMemory:
     # Topic segmentation
     # ------------------------------------------------------------------
     def _current_topic(self) -> Optional[Dict[str, Any]]:
+        """Return the topic dict for ``current_topic_id``, or None."""
         current_id = self.data.get("current_topic_id")
         if not current_id:
             return None
@@ -343,6 +357,7 @@ class SessionMemory:
         return _clip("\n".join(lines), max_chars)
 
     def _current_topic_turns(self) -> List[Dict[str, Any]]:
+        """Turns tagged for the current topic, or all turns if none are tagged."""
         current_id = self.data.get("current_topic_id")
         turns = [t for t in (self.data.get("recent_turns") or []) if isinstance(t, dict)]
         if not current_id:
@@ -352,6 +367,7 @@ class SessionMemory:
         return scoped or turns
 
     def memory_section(self) -> str:
+        """Format session memory as a prompt section, or ``(none)`` if empty."""
         block = self.context_block()
         if not block:
             return "SESSION_MEMORY:\n(none)\n"
@@ -363,6 +379,7 @@ class SessionMemory:
         )
 
     def enrich_followup_question(self, question: str) -> str:
+        """Append a short memory block so the model can resolve follow-up references."""
         block = self.context_block(max_chars=1800)
         if not block:
             return question
@@ -387,6 +404,7 @@ class SessionMemory:
         node_ids: Optional[List[str]] = None,
         publications: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
+        """Append a user/assistant turn, update summary/topics, and persist."""
         user_message = _clip(user_message, 1200)
         effective_question = _clip(effective_question or user_message, 1200)
         answer = _clip(answer, 1200)
@@ -461,6 +479,7 @@ class SessionMemory:
     # Constrained compression
     # ------------------------------------------------------------------
     def needs_compression(self) -> bool:
+        """Return True when the append-only summary has grown past the trigger size."""
         return len(self.data.get("summary") or "") >= COMPRESS_TRIGGER_CHARS
 
     def compress(self, chat_fn: Callable[[str], str]) -> bool:

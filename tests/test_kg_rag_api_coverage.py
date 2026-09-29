@@ -407,7 +407,8 @@ class TestSemanticBackend:
         )
 
         with patch("app.modules.kg_rag_api.SentenceTransformer", return_value=fake_embed), \
-             patch("app.modules.kg_rag_api.faiss") as mock_faiss:
+             patch("app.modules.kg_rag_api.faiss") as mock_faiss, \
+             patch("app.modules.kg_rag_api.torch"):
             mock_faiss.index_factory.return_value = MagicMock()
             mock_faiss.get_num_gpus.return_value = 0
             mock_faiss.METRIC_INNER_PRODUCT = 0

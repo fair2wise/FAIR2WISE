@@ -66,12 +66,14 @@ def default_targeted_max_pages() -> int:
 
 @dataclass
 class CoordinatorConfig:
+    """CLI/session knobs for workers, KG mode, extraction, and approvals."""
+
     backend: str = "cborg"
     model: Optional[str] = None
     graph: Optional[str] = None
     graphs: List[str] = field(default_factory=list)
-    kg_query_max_nodes: int = 100
-    kg_query_hops: int = 1
+    kg_query_max_nodes: int = 1000
+    kg_query_hops: int = 20
     seed_terms: Optional[str] = None
     kg_mode: str = "json"  # "json" | "splash"
     workdir: Path = field(default_factory=lambda: Path("runs/session"))
@@ -93,16 +95,19 @@ class CoordinatorConfig:
 
 
 def _empty_terms(path: Path) -> None:
+    """Write an empty terms JSON file at ``path``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"metadata": {}, "terms": [], "code_snippets": []}, indent=2))
 
 
 def _empty_kg(path: Path) -> None:
+    """Write an empty MatKG JSON file at ``path``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"things": [], "associations": []}, indent=2))
 
 
 def _load_processed_pdfs(path: Path) -> set[str]:
+    """Load processed PDF filenames from a JSON list manifest."""
     if not path.exists():
         return set()
     try:
@@ -117,11 +122,13 @@ def _load_processed_pdfs(path: Path) -> set[str]:
 
 
 def _save_processed_pdfs(path: Path, processed: set[str]) -> None:
+    """Persist processed PDF filenames as a sorted JSON list."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(sorted(processed), indent=2))
 
 
 def _sha256_file(path: Path) -> str:
+    """Return the SHA-256 hex digest of ``path``."""
     h = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -130,6 +137,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def _load_extraction_manifest(path: Path) -> Dict[str, Any]:
+    """Load the extraction manifest, or ``{"papers": {}}`` if missing or invalid."""
     if not path.exists():
         return {"papers": {}}
     try:
@@ -146,6 +154,7 @@ def _load_extraction_manifest(path: Path) -> Dict[str, Any]:
 
 
 def _save_extraction_manifest(path: Path, manifest: Dict[str, Any]) -> None:
+    """Write the extraction manifest JSON to ``path``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -154,6 +163,7 @@ class Coordinator:
     """Owns session files; public runs delegate to AgentPipelineService."""
 
     def __init__(self, cfg: CoordinatorConfig) -> None:
+        """Normalize config, create workdirs, and seed session terms/KG files."""
         self.cfg = cfg
         self.cfg.workflow_mode = str(self.cfg.workflow_mode or "agentic").strip().lower()
         if self.cfg.workflow_mode not in {"deterministic", "agentic"}:
@@ -224,6 +234,7 @@ class Coordinator:
                     print("[approval required] Approve extraction in a later ask/chat turn.")
 
     async def _answer(self, question: str, retrieval, download, extractor, debate=None) -> None:
+        """Legacy retrieve-download-extract loop; delegates to agentic when configured."""
         # Retained only as a low-level legacy test/helper. Public CLI/API entry
         # points use ``run`` and therefore the canonical orchestrator service.
         if self.cfg.workflow_mode == "agentic" and debate is not None:
@@ -330,6 +341,7 @@ class Coordinator:
         print(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
 
     async def _answer_agentic(self, question: str, retrieval, download, extractor, debate) -> None:
+        """Debate-gated retrieve, search, download, extract, and KG rebuild loop."""
         print(f"\n=== Question: {question} ===")
         for round_no in range(1, self.cfg.max_rounds + 1):
             try:
@@ -531,6 +543,7 @@ class Coordinator:
         round_no: int,
         source_pdfs: Optional[List[Path]] = None,
     ) -> tuple[Path, List[Path]]:
+        """Copy unprocessed PDFs into a round directory; return that dir and paths."""
         processed = _load_processed_pdfs(self.processed_pdfs_manifest)
         candidates = (
             [Path(pdf) for pdf in source_pdfs]
@@ -555,11 +568,13 @@ class Coordinator:
         return round_dir, pending
 
     def _mark_processed_pdfs(self, pdfs: List[Path]) -> None:
+        """Record PDF names as fully processed in the session manifest."""
         processed = _load_processed_pdfs(self.processed_pdfs_manifest)
         processed.update(pdf.name for pdf in pdfs)
         _save_processed_pdfs(self.processed_pdfs_manifest, processed)
 
     def _record_full_extraction(self, pdfs: List[Path], result: Dict[str, Any]) -> None:
+        """Mark listed PDFs as fully extracted in the extraction manifest."""
         manifest = _load_extraction_manifest(self.extraction_manifest)
         papers = manifest.setdefault("papers", {})
         now = datetime.now(timezone.utc).isoformat()
@@ -593,6 +608,7 @@ class Coordinator:
         pdfs: List[Path],
         result: Dict[str, Any],
     ) -> None:
+        """Append a targeted-extraction record for each PDF in the manifest."""
         manifest = _load_extraction_manifest(self.extraction_manifest)
         papers = manifest.setdefault("papers", {})
         now = datetime.now(timezone.utc).isoformat()

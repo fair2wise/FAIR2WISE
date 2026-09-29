@@ -201,8 +201,8 @@ def test_settings_skips_missing_json_file(tmp_path, monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["json_graph_paths"] == ["storage/kg/missing.json", "storage/kg/exists.json"]
-    assert body["kg_query_hops"] == 1
-    assert body["kg_query_max_nodes"] == 100
+    assert body["kg_query_hops"] == 20
+    assert body["kg_query_max_nodes"] == 1000
 
 
 def test_settings_rejects_json_path_outside_storage(tmp_path, monkeypatch):

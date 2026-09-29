@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, Optional
 from academy.agent import Agent, action
 
 from app.modules.f2w_agent.retrieval_agent import _is_ops_layout_question
+from app.modules.f2w_agent.trace import bind_context, note_error, note_precheck
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ FRESH_TURN_CLASSES = {
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
+    """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     match = re.search(r"\{[\s\S]*\}", str(raw or ""))
     if not match:
         return {}
@@ -74,6 +76,7 @@ def _direct_download_request(message: str) -> bool:
 
 
 def _paper_reference_followup(message: str, state: Dict[str, Any]) -> bool:
+    """Return True if the turn refers to the active extracted paper."""
     paper = state.get("active_paper")
     if not isinstance(paper, dict) or paper.get("status") != "extracted":
         return False
@@ -134,6 +137,7 @@ def _decision(
     candidate_index: Any = None,
     classification: Any = None,
 ) -> Dict[str, Any]:
+    """Build a validated-shape orchestration decision dict."""
     decision = {
         "action": action_name,
         "agent": ACTION_AGENTS[action_name],
@@ -161,6 +165,7 @@ class WorkflowOrchestratorAgent(Agent):
         model: Optional[str] = None,
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> None:
+        """Store chat backend/model and the maximum orchestration step budget."""
         super().__init__()
         self._backend = backend or os.environ.get("KG_RAG_BACKEND", "cborg")
         self._model = model
@@ -172,6 +177,7 @@ class WorkflowOrchestratorAgent(Agent):
         state: Dict[str, Any],
         route_hint: Optional[str],
     ) -> Dict[str, Any]:
+        """Choose the next action from approvals, phase, and cheap turn heuristics."""
         if int(state.get("orchestration_steps") or 0) >= self.max_steps:
             return _decision("stop_insufficient", "Maximum orchestration step count reached.")
 
@@ -215,7 +221,9 @@ class WorkflowOrchestratorAgent(Agent):
                 "Extraction completed; re-check the original query against the updated KG.",
             )
 
-        if route_hint == "report_extraction" or _extracted_terms_followup(user_turn, state):
+        extracted_terms = _extracted_terms_followup(user_turn, state)
+        note_precheck("_extracted_terms_followup", extracted_terms)
+        if route_hint == "report_extraction" or extracted_terms:
             paper = state.get("active_paper") or {}
             return _decision(
                 "report_extraction",
@@ -223,7 +231,9 @@ class WorkflowOrchestratorAgent(Agent):
                 paper_id=paper.get("paper_id"),
             )
 
-        if route_hint == "query_extracted_paper" or _paper_reference_followup(user_turn, state):
+        paper_followup = _paper_reference_followup(user_turn, state)
+        note_precheck("_paper_reference_followup", paper_followup)
+        if route_hint == "query_extracted_paper" or paper_followup:
             paper = state.get("active_paper") or {}
             return _decision(
                 "query_extracted_paper",
@@ -287,6 +297,7 @@ class WorkflowOrchestratorAgent(Agent):
         )
 
     def _llm_classify(self, user_turn: str, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Ask the chat model to classify a fresh turn; returns parsed JSON."""
         from app.modules.term_extractor.clients import make_chat_client
 
         client = make_chat_client(
@@ -332,10 +343,17 @@ class WorkflowOrchestratorAgent(Agent):
             f"STATE: {json.dumps(public_state, ensure_ascii=False)}\n"
             f"USER_TURN: {user_turn}"
         )
-        return _parse_json_object(client.chat(prompt, temperature=0.0, timeout=60))
+        raw = client.chat(
+            prompt,
+            temperature=0.0,
+            timeout=60,
+            trace_label="orchestrator-classify",
+        )
+        return _parse_json_object(raw)
 
     @staticmethod
     def _fresh_turn_decision(classification: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Map a fresh-turn classification to retrieve_kg or direct_response."""
         label = str(classification.get("classification") or "").strip()
         if label not in FRESH_TURN_CLASSES:
             return None
@@ -354,6 +372,7 @@ class WorkflowOrchestratorAgent(Agent):
         *,
         available_agents: Optional[Iterable[str]] = None,
     ) -> Optional[Dict[str, Any]]:
+        """Accept a proposed action only if it matches phase, approvals, and agents."""
         action_name = str(proposed.get("action") or "")
         if action_name not in ACTIONS:
             return None
@@ -471,10 +490,11 @@ class WorkflowOrchestratorAgent(Agent):
         loop = asyncio.get_event_loop()
         try:
             classification = await loop.run_in_executor(
-                None, self._llm_classify, user_turn, state
+                None, bind_context(self._llm_classify), user_turn, state
             )
         except Exception as exc:
             logger.warning("Orchestrator LLM failed (%s); using safe fallback", exc)
+            note_error("WorkflowOrchestratorAgent.decide", exc)
             classification = {}
         if _is_ops_layout_question(user_turn):
             classification = {

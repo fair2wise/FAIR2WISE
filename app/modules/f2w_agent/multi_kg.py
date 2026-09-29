@@ -40,16 +40,19 @@ _SCHEMA_BY_NAME = {
 
 
 def normalize_graph_path(path: str) -> str:
+    """Normalize slashes and strip whitespace from a graph file path."""
     return str(path or "").replace("\\", "/").strip()
 
 
 def split_graph_arg(value: Optional[str]) -> List[str]:
+    """Split a comma-separated ``--graph`` value into unique paths."""
     if not value:
         return []
     return unique_graph_paths(part for part in str(value).split(",") if part.strip())
 
 
 def unique_graph_paths(paths: Iterable[str]) -> List[str]:
+    """Deduplicate graph paths while preserving first-seen order."""
     seen: set[str] = set()
     out: List[str] = []
     for raw in paths:
@@ -64,6 +67,7 @@ def unique_graph_paths(paths: Iterable[str]) -> List[str]:
 def collect_graph_paths(
     *groups: Optional[Sequence[str] | str],
 ) -> List[str]:
+    """Flatten mixed string/sequence graph arguments into unique paths."""
     values: List[str] = []
     for group in groups:
         if group is None:
@@ -77,21 +81,25 @@ def collect_graph_paths(
 
 
 def graph_filename(path: str) -> str:
+    """Return the basename of a graph path."""
     return Path(normalize_graph_path(path)).name
 
 
 def is_xray_demo_graph(path: str) -> bool:
+    """True for the opt-in x-ray demo JSON (never auto-unioned into defaults)."""
     return graph_filename(path) == XRAY_DEMO_NAME
 
 
 def graph_id_for_path(path: str) -> str:
+    """Stable graph_id from filename: rsoxs_vN, bl1101, xray_demo, or stem."""
     name = graph_filename(path)
     if name in _GRAPH_ID_BY_NAME:
         return _GRAPH_ID_BY_NAME[name]
     if _BL1101_SNAPSHOT_RE.match(name):
         return "bl1101"
-    if _RSOXS_SNAPSHOT_RE.match(name):
-        return "rsoxs_v1"
+    rsoxs = _RSOXS_SNAPSHOT_RE.match(name)
+    if rsoxs:
+        return f"rsoxs_v{rsoxs.group(1)}"
     stem = Path(name).stem or "graph"
     if stem.startswith("matkg_"):
         return stem[len("matkg_") :]
@@ -99,15 +107,18 @@ def graph_id_for_path(path: str) -> str:
 
 
 def is_ops_graph_id(graph_id: str) -> bool:
+    """True for ALS 11.0.1.2 ops snapshots (``bl1101`` prefix)."""
     return str(graph_id or "").startswith("bl1101")
 
 
 def is_science_graph_id(graph_id: str) -> bool:
+    """True for RSoXS literature snapshots or the x-ray demo graph."""
     gid = str(graph_id or "")
     return gid.startswith("rsoxs") or gid == "xray_demo"
 
 
 def graph_label_for_id(graph_id: str) -> str:
+    """Human label for Settings/citations: science, ops, x-ray demo, or the raw id."""
     if graph_id in _GRAPH_LABEL_BY_ID:
         return _GRAPH_LABEL_BY_ID[graph_id]
     if graph_id.startswith("bl1101"):
@@ -118,6 +129,7 @@ def graph_label_for_id(graph_id: str) -> str:
 
 
 def schema_path_for_graph(path: str) -> Optional[str]:
+    """LinkML overlay path for a KG file, or None when no overlay is known."""
     name = graph_filename(path)
     if name in _SCHEMA_BY_NAME:
         return _SCHEMA_BY_NAME[name]
@@ -129,6 +141,7 @@ def schema_path_for_graph(path: str) -> Optional[str]:
 
 
 def _latest_snapshot_path(available: Sequence[str], pattern: re.Pattern[str]) -> Optional[str]:
+    """Highest ``vN`` snapshot matching *pattern* among *available* paths."""
     best: Optional[str] = None
     best_n = -1
     for raw in available:
@@ -206,6 +219,7 @@ def default_json_graph_paths(
 
 
 def primary_json_graph_path(paths: Sequence[str]) -> Optional[str]:
+    """First non-empty path in *paths* (viewer/backward-compat primary)."""
     for path in paths:
         normalized = normalize_graph_path(path)
         if normalized:
@@ -216,11 +230,12 @@ def primary_json_graph_path(paths: Sequence[str]) -> Optional[str]:
 MAX_KG_QUERY_HOPS = 20
 KG_QUERY_HOPS_PRESETS: Tuple[int, ...] = tuple(range(1, MAX_KG_QUERY_HOPS + 1))
 KG_QUERY_MAX_NODES_PRESETS: Tuple[int, ...] = (50, 100, 250, 500, 1000)
-DEFAULT_KG_QUERY_HOPS = 1
-DEFAULT_KG_QUERY_MAX_NODES = 100
+DEFAULT_KG_QUERY_HOPS = 20
+DEFAULT_KG_QUERY_MAX_NODES = 1000
 
 
 def clamp_kg_query_hops(value: Any, default: int = DEFAULT_KG_QUERY_HOPS) -> int:
+    """Clamp neighborhood hops to 1..MAX_KG_QUERY_HOPS."""
     try:
         hops = int(value)
     except (TypeError, ValueError):
@@ -229,6 +244,7 @@ def clamp_kg_query_hops(value: Any, default: int = DEFAULT_KG_QUERY_HOPS) -> int
 
 
 def clamp_kg_query_max_nodes(value: Any, default: int = DEFAULT_KG_QUERY_MAX_NODES) -> int:
+    """Clamp retrieve node cap to 10..1000."""
     try:
         count = int(value)
     except (TypeError, ValueError):
@@ -238,6 +254,8 @@ def clamp_kg_query_max_nodes(value: Any, default: int = DEFAULT_KG_QUERY_MAX_NOD
 
 @dataclass
 class ScoredHit:
+    """A retrieval hit tagged with the graph it came from; never smash URIs across KGs."""
+
     id: str
     graph_id: str
     score: float
@@ -248,6 +266,7 @@ class ScoredHit:
     payload: Any = field(default=None, repr=False)
 
     def as_dict(self) -> Dict[str, Any]:
+        """JSON-safe hit for agent response ``selected_hits``."""
         return {
             "id": self.id,
             "graph_id": self.graph_id,

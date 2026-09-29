@@ -19,10 +19,12 @@ STATE_VERSION = 1
 
 
 def _now() -> str:
+    """UTC ISO-8601 timestamp for workflow-state ``updated_at``."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def default_workflow_state() -> Dict[str, Any]:
+    """Empty idle workflow document written on first load or after ``clear``."""
     return {
         "version": STATE_VERSION,
         "current_query": "",
@@ -38,6 +40,9 @@ def default_workflow_state() -> Dict[str, Any]:
         "pending": None,
         "round_no": 0,
         "orchestration_steps": 0,
+        # Tracks questions for which the user explicitly declined a paper download,
+        # so the agent does not re-prompt for the same topic in the same session.
+        "declined_download_topics": [],
         "updated_at": None,
     }
 
@@ -46,10 +51,12 @@ class WorkflowStateStore:
     """JSON-backed workflow state with atomic replacement writes."""
 
     def __init__(self, path: Path) -> None:
+        """Load existing state from *path*, or start from :func:`default_workflow_state`."""
         self.path = Path(path)
         self.data = self._load()
 
     def _load(self) -> Dict[str, Any]:
+        """Read JSON from disk and coerce list/dict fields; ignore corrupt files."""
         state = default_workflow_state()
         if not self.path.exists():
             return state
@@ -64,15 +71,19 @@ class WorkflowStateStore:
             state["candidates"] = []
         if not isinstance(state.get("unavailable_candidate_indices"), list):
             state["unavailable_candidate_indices"] = []
+        if not isinstance(state.get("declined_download_topics"), list):
+            state["declined_download_topics"] = []
         if not isinstance(state.get("pending"), (dict, type(None))):
             state["pending"] = None
         state["version"] = STATE_VERSION
         return state
 
     def snapshot(self) -> Dict[str, Any]:
+        """Deep copy of the in-memory state for API responses."""
         return deepcopy(self.data)
 
     def save(self) -> None:
+        """Atomically replace the state file (temp file + ``os.replace``)."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.data["version"] = STATE_VERSION
         self.data["updated_at"] = _now()
@@ -92,16 +103,19 @@ class WorkflowStateStore:
                 pass
 
     def update(self, **values: Any) -> Dict[str, Any]:
+        """Merge *values* into state, persist, and return a snapshot."""
         self.data.update(values)
         self.save()
         return self.snapshot()
 
     def clear(self) -> None:
+        """Reset to the idle default and persist."""
         self.data = default_workflow_state()
         self.save()
 
     @property
     def pending(self) -> Optional[Dict[str, Any]]:
+        """Copy of the current pending user-action payload, if any."""
         value = self.data.get("pending")
         return deepcopy(value) if isinstance(value, dict) else None
 

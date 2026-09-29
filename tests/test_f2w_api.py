@@ -419,14 +419,16 @@ def test_followup_history_rewrites_before_retrieval(tmp_path, monkeypatch):
         async def reload_kg(self, graph_file, graph_source=None):
             return {"status": "reloaded", "nodes": 1}
 
-        async def query(self, question):
+        async def query(self, question, history=None):
             type(self).queries.append(question)
             return {
                 "status": "success",
                 "sufficient": True,
                 "answer": "grounded rewritten answer",
-                "selected": [],
+                "selected": ["matkg:PTB7"],
+                "selected_hits": [{"id": "matkg:PTB7", "name": "second candidate material"}],
                 "direct_evidence_count": 1,
+                "no_evidence": False,
                 "graph_source_requested": "splash",
                 "graph_source_used": "splash",
             }
@@ -962,14 +964,16 @@ def test_session_memory_rewrites_followup_without_frontend_history(tmp_path, mon
         async def reload_kg(self, graph_file, graph_source=None):
             return {"status": "reloaded", "nodes": 1}
 
-        async def query(self, question):
+        async def query(self, question, history=None):
             type(self).queries.append(question)
             return {
                 "status": "success",
                 "sufficient": True,
                 "answer": "memory-grounded answer",
-                "selected": [],
+                "selected": ["matkg:PTB7"],
+                "selected_hits": [{"id": "matkg:PTB7", "name": "PTB7"}],
                 "direct_evidence_count": 1,
+                "no_evidence": False,
                 "graph_source_requested": "splash",
                 "graph_source_used": "splash",
             }
@@ -1291,7 +1295,7 @@ def test_agent_pipeline_service_emits_progress_events(tmp_path, monkeypatch):
     assert by_phase["retrieval_result"]["sufficient"] is False
     assert by_phase["graph_update"]["node_ids"] == ["n0"]
     assert "nodes" in by_phase["graph_update"]["graph"]
-    assert by_phase["candidate_search_started"]["missing_topics"] == ["topic"]
+    assert by_phase["candidate_search_started"]["missing_topics"] == ["question"]
 
 
 def test_agentic_path_answers_from_kg_without_download(tmp_path, monkeypatch):

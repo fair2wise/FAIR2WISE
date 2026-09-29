@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def _splash_base_url(uri: str) -> str:
+    """Convert a splash:// or http(s) URI into an HTTP base URL."""
     parsed = urlparse(uri)
     if parsed.scheme == "splash":
         host = parsed.netloc or parsed.path
@@ -34,6 +35,7 @@ def _splash_base_url(uri: str) -> str:
 
 
 def _splash_db_path(repo: Path) -> Optional[Path]:
+    """Resolve the splash-links SQLite path relative to ``repo``, or None for memory."""
     raw = str(config_value("paths.splash_links_db", fallback="links.sqlite"))
     if raw in {":memory:", "sqlite:///:memory:"}:
         return None
@@ -59,6 +61,7 @@ def _splash_graphql(
     *,
     timeout: int = 30,
 ) -> Dict[str, Any]:
+    """POST a GraphQL query to splash-links and return ``data``, raising on errors."""
     payload = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
     req = request.Request(
         f"{_splash_base_url(splash_uri)}/splash_links/graphql",
@@ -215,6 +218,7 @@ _ENTITY_FIELDS = "id entityType name uri properties"
 
 
 def splash_uri_default() -> str:
+    """Return the splash URI from env, defaulting to localhost:8081."""
     return (
         os.environ.get("KG_RAG_SPLASH_URI")
         or os.environ.get("SPLASH_LINKS_URI")
@@ -271,6 +275,7 @@ def splash_update_entity(
     properties: Optional[Dict[str, Any]] = None,
     splash_uri: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
+    """Patch splash entity fields; no-op fetch if the update payload is empty."""
     uri = splash_uri or splash_uri_default()
     input_payload: Dict[str, Any] = {}
     if name is not None:
@@ -301,6 +306,7 @@ def splash_create_entity(
     properties: Optional[Dict[str, Any]] = None,
     splash_uri: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Create a splash entity and return it, raising if the mutation is null."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
         splash,
@@ -332,6 +338,7 @@ def splash_create_link(
     properties: Optional[Dict[str, Any]] = None,
     splash_uri: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Create a splash link and return it, raising if the mutation is null."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
         splash,
@@ -363,6 +370,7 @@ def splash_find_links(
     splash_uri: Optional[str] = None,
     limit: int = 100,
 ) -> List[Dict[str, Any]]:
+    """Query splash links filtered by subject, predicate, and/or object."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
         splash,
@@ -384,6 +392,7 @@ def splash_find_links(
 
 
 def splash_delete_link(link_id: str, *, splash_uri: Optional[str] = None) -> bool:
+    """Delete a splash link by id and return whether the mutation succeeded."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
         splash,
@@ -394,11 +403,13 @@ def splash_delete_link(link_id: str, *, splash_uri: Optional[str] = None) -> boo
 
 
 def _splash_node_id(entity: Dict[str, Any]) -> str:
+    """Prefer uri/matkg_id as the MatKG node id, else the splash UUID."""
     props = entity.get("properties") or {}
     return entity.get("uri") or props.get("matkg_id") or entity["id"]
 
 
 def _splash_entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
+    """Map a splash entity into a MatKG-shaped thing dict."""
     props = dict(entity.get("properties") or {})
     node_id = _splash_node_id(entity)
     node = {

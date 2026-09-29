@@ -77,7 +77,7 @@ def test_default_paths_prefer_latest_rsoxs_snapshot():
         "storage/kg/matkg_bl1101_v4.json",
     ]
     assert latest_rsoxs_path(available) == "storage/kg/matkg_rsoxs_v2.json"
-    assert graph_id_for_path("storage/kg/matkg_rsoxs_v2.json") == "rsoxs_v1"
+    assert graph_id_for_path("storage/kg/matkg_rsoxs_v2.json") == "rsoxs_v2"
 
 
 def test_xray_is_opt_in_only_when_configured():

@@ -217,6 +217,7 @@ def create_fastapi_app(
     gap_tracker = MissingNodeTracker(graph_file)
 
     async def _answer_messages(messages: Sequence[Dict[str, str]]) -> str:
+        """Answer the last user message from *messages* using KG-RAG context."""
         q = messages[-1]["content"]
 
         infos = retrieve_nodes(q, kg)
@@ -425,9 +426,13 @@ def extract_query_entities(q: str) -> List[str]:
 
 # @annotate('auto_device')
 def auto_device() -> str:
-    """Return 'cuda' if available and not forced to CPU, otherwise 'cpu'."""
-    _load_kg_deps()
-    if FORCE_CPU:
+    """Return 'cuda' if available and not forced to CPU, otherwise 'cpu'.
+
+    Device selection only needs torch. The full semantic stack from
+    ``requirements/semantic.in`` (faiss, sentence-transformers) is required
+    later, when a semantic index is actually built.
+    """
+    if FORCE_CPU or torch is None:
         return "cpu"
     if torch.cuda.is_available():
         return "cuda"
@@ -437,8 +442,9 @@ def auto_device() -> str:
 # @annotate('cuda_warmup')
 def cuda_warmup(device: str) -> None:
     """Warm up CUDA with a dummy matmul to avoid cold-start latency on first query."""
-    _load_kg_deps()
-    if device.startswith("cuda") and torch.cuda.is_available():
+    if torch is None or not device.startswith("cuda"):
+        return
+    if torch.cuda.is_available():
         try:
             torch.cuda.set_device(0)
             torch.cuda.init()
@@ -634,6 +640,7 @@ query Links($limit: Int, $offset: Int) {
 
 
 def _splash_node_id(entity: Dict[str, Any]) -> str:
+    """Stable node id from Splash URI, matkg_id property, or GraphQL entity id."""
     props = entity.get("properties") or {}
     return entity.get("uri") or props.get("matkg_id") or entity["id"]
 
@@ -803,9 +810,14 @@ class KnowledgeGraph:
                     data = json.load(fh)
         else:
             raise ValueError(f"Unknown KG_RAG_GRAPH_SOURCE: {source}")
-        self.nodes: Dict[str, Dict[str, Any]] = {n["id"]: n for n in data["things"]}
+        # Support both old format (things/associations) and new format (nodes/edges).
+        _raw_nodes = data.get("things") or data.get("nodes") or []
+        _raw_edges = data.get("associations") or data.get("edges") or []
+        self.nodes: Dict[str, Dict[str, Any]] = {
+            n["id"]: n for n in _raw_nodes if isinstance(n, dict) and n.get("id")
+        }
         self.out_edges: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        for e in data["associations"]:
+        for e in _raw_edges:
             self.out_edges[e["subject"]].append(e)
 
         self._canon_to_id: Dict[str, str] = {}
@@ -1577,18 +1589,52 @@ def build_rag_prompt(q: str, ctx: str) -> str:
 
 async def call_llm(cli: ChatClient, messages: Sequence[Dict[str, str]], label: str) -> str:
     """Call the LLM with timeout handling, printing status to stdout."""
+    from app.modules.f2w_agent.trace import record_llm_call
+
     print(
         Fore.YELLOW
         + f"Calling {cli.model} for {label} (timeout={LLM_TIMEOUT}s)..."
         + Style.RESET_ALL,
         flush=True,
     )
+    started = time.perf_counter()
     try:
-        return await asyncio.wait_for(cli.chat(messages), timeout=LLM_TIMEOUT + 5)
+        result = await asyncio.wait_for(cli.chat(messages), timeout=LLM_TIMEOUT + 5)
     except asyncio.TimeoutError as exc:
-        raise RuntimeError(
+        wrapped = RuntimeError(
             f"{label} call exceeded {LLM_TIMEOUT}s. Try --timeout 30, another model, or check CBORG."
-        ) from exc
+        )
+        record_llm_call(
+            label=label,
+            model=getattr(cli, "model", None),
+            messages=messages,
+            response=None,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            timeout=LLM_TIMEOUT,
+            error=wrapped,
+        )
+        raise wrapped from exc
+    except Exception as exc:
+        record_llm_call(
+            label=label,
+            model=getattr(cli, "model", None),
+            messages=messages,
+            response=None,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            timeout=LLM_TIMEOUT,
+            error=exc,
+        )
+        raise
+    record_llm_call(
+        label=label,
+        model=getattr(cli, "model", None),
+        messages=messages,
+        response=result,
+        latency_ms=(time.perf_counter() - started) * 1000,
+        timeout=LLM_TIMEOUT,
+        error=None,
+    )
+    return result
 
 
 async def answer(

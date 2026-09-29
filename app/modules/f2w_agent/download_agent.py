@@ -43,10 +43,12 @@ def _sanitize_openalex_search(text: str) -> str:
 
 
 def _normalize_title(text: str) -> str:
+    """Lowercase alphanumeric tokens of a title for duplicate detection."""
     return " ".join(re.findall(r"[a-z0-9]+", text.lower()))
 
 
 def _env_bool(name: str, default: bool) -> bool:
+    """Parse a boolean environment variable, treating empty/falsey strings as False."""
     raw = os.environ.get(name)
     if raw is None:
         return default
@@ -54,6 +56,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 def _env_float(name: str, default: float) -> float:
+    """Parse a float environment variable, returning ``default`` if unset or invalid."""
     raw = os.environ.get(name)
     if raw is None:
         return default
@@ -120,6 +123,7 @@ PDF_MAGIC = b"%PDF-"
 
 
 def _is_valid_pdf(path: Path) -> bool:
+    """Return True if ``path`` exists, is non-empty, and starts with PDF magic."""
     try:
         if not path.exists() or path.stat().st_size == 0:
             return False
@@ -130,6 +134,7 @@ def _is_valid_pdf(path: Path) -> bool:
 
 
 def _openalex_work_id(candidate: Dict[str, Any]) -> Optional[str]:
+    """Return the OpenAlex short work id, or None if the id is not an OpenAlex URL."""
     wid = str(candidate.get("id") or "").strip()
     if not wid or "openalex.org/" not in wid.lower():
         return None
@@ -142,19 +147,30 @@ def _is_reliable_pdf_url(url: str) -> bool:
 
 
 def _reliable_pdf_urls(work: Dict[str, Any]) -> List[str]:
+    """Return repository-backed PDF URLs, rewritten and ranked by preference."""
     selected, _, _ = _dl.select_openalex_oa_pdfs(work)
-    if selected:
-        return _prefer_pdf_urls(selected)
-    rewritten = []
-    for url in _pdf_urls(work):
-        mapped = _dl.rewrite_oa_pdf_url(url)
-        if mapped:
-            rewritten.append(mapped)
+    candidates: List[str] = []
+    candidates.extend(selected)
+    candidates.extend(_pdf_urls(work))
+    oa_url = (work.get("open_access") or {}).get("oa_url") or work.get("oa_url")
+    if oa_url:
+        candidates.append(str(oa_url))
+    rewritten: List[str] = []
+    seen: set[str] = set()
+    for url in candidates:
+        mapped = _dl.rewrite_oa_pdf_url(str(url).strip())
+        if not mapped or mapped in seen:
+            continue
+        seen.add(mapped)
+        rewritten.append(mapped)
     return _prefer_pdf_urls(rewritten)
 
 
 def _prefer_pdf_urls(urls: List[str]) -> List[str]:
+    """Sort PDF URLs so arXiv and other trusted hosts come first."""
+
     def rank(url: str) -> tuple[int, str]:
+        """Return a sort key preferring arXiv, then other known OA hosts."""
         lowered = url.lower()
         if "arxiv.org/pdf" in lowered or "arxiv.org/abs" in lowered:
             return (0, url)
@@ -204,6 +220,7 @@ def _candidate_summary(work: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _repository_name(urls: List[str]) -> str:
+    """Infer a short repository label from PDF URL hostnames."""
     joined = " ".join(urls).lower()
     if "arxiv.org" in joined:
         return "arXiv"
@@ -238,6 +255,7 @@ def _lexical_score(query: str, text: str) -> float:
 
 
 def _dedupe_key(work: Dict[str, Any]) -> str:
+    """Stable key for a work: DOI, else OpenAlex id, else a JSON snippet."""
     doi = (work.get("doi") or "").strip().lower()
     if doi:
         return doi
@@ -249,6 +267,7 @@ def _search_queries(query: str, missing_topics: List[str]) -> List[str]:
     out: List[str] = []
 
     def add(text: str) -> None:
+        """Append a sanitized query if it is non-empty and not already present."""
         text = _sanitize_openalex_search(text)
         if text and text.lower() not in {q.lower() for q in out}:
             out.append(text)
@@ -262,6 +281,7 @@ def _search_queries(query: str, missing_topics: List[str]) -> List[str]:
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
+    """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     if not raw:
         return {}
     match = re.search(r"\{[\s\S]*\}", raw)
@@ -275,6 +295,7 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
 
 
 def _download_manifest_path(target_dir: Path) -> Path:
+    """Return the sibling ``downloads.jsonl`` path for a PDF target directory."""
     return target_dir.parent / "downloads.jsonl"
 
 
@@ -289,6 +310,7 @@ def _manifest_record(
     status: str,
     reason: str = "",
 ) -> Dict[str, Any]:
+    """Build one JSONL download-attempt record for the session manifest."""
     return {
         "ts": time.time(),
         "query": query,
@@ -306,6 +328,7 @@ def _manifest_record(
 
 
 def _append_download_record(manifest: Path, record: Dict[str, Any]) -> None:
+    """Append one JSON object as a line on the download manifest."""
     manifest.parent.mkdir(parents=True, exist_ok=True)
     with manifest.open("a") as fh:
         fh.write(json.dumps(record, sort_keys=True) + "\n")
@@ -342,6 +365,7 @@ class DownloadAgent(Agent):
         download_delay_seconds: Optional[float] = None,
         validate_downloads: Optional[bool] = None,
     ) -> None:
+        """Configure OA search, polite delays, and optional PDF semantic validation."""
         super().__init__()
         self._backend = backend or os.environ.get("KG_RAG_BACKEND", "cborg")
         self._model = model
@@ -359,6 +383,7 @@ class DownloadAgent(Agent):
 
     # ------------------------------------------------------------------
     def _search_one(self, works, search_text: str, pool: int) -> List[Dict[str, Any]]:
+        """Search OpenAlex for ``search_text``, retrying without the OA filter on failure."""
         try:
             results = (
                 works()
@@ -433,6 +458,7 @@ class DownloadAgent(Agent):
         return merged
 
     def _search_candidates(self, query: str, missing_topics: List[str], pool: int) -> List[Dict[str, Any]]:
+        """Merge arXiv then OpenAlex OA works until ``pool`` unique candidates."""
         from pyalex import Works, config as pyalex_config
 
         if self._mailto:
@@ -490,13 +516,16 @@ class DownloadAgent(Agent):
                 "relevance score in [0,1], e.g. {\"0\": 0.9, \"1\": 0.2}.\n\n"
                 f"QUESTION:\n{query}\n\nPAPERS:\n" + "\n\n".join(listing)
             )
-            raw = cli.chat(prompt, temperature=0.0, timeout=120)
+            raw = cli.chat(prompt, temperature=0.0, timeout=120, trace_label="pdf-validate")
             m = re.search(r"\{[\s\S]*\}", raw)
             scores = json.loads(m.group(0)) if m else {}
             for i, w in enumerate(candidates):
                 w["_score"] = float(scores.get(str(i), 0.0))
         except Exception as e:
+            from app.modules.f2w_agent.trace import note_error
+
             logger.warning("LLM ranking failed (%s); using lexical overlap", e)
+            note_error("DownloadAgent._rank_candidates", e)
             for w in candidates:
                 text = (w.get("title") or "") + " " + _candidate_abstract(w)
                 w["_score"] = _lexical_score(query, text)
@@ -504,6 +533,7 @@ class DownloadAgent(Agent):
         return scored
 
     def _sleep_between_downloads(self) -> None:
+        """Pause between PDF fetches when ``_download_delay_seconds`` is positive."""
         if self._download_delay_seconds > 0:
             time.sleep(self._download_delay_seconds)
 
@@ -586,7 +616,7 @@ class DownloadAgent(Agent):
                 f"OPENALEX_ABSTRACT:\n{abstract}\n\n"
                 f"PDF_PREVIEW:\n{preview}"
             )
-            raw = cli.chat(prompt, temperature=0.0, timeout=120)
+            raw = cli.chat(prompt, temperature=0.0, timeout=120, trace_label="pdf-validate")
             verdict = _parse_json_object(raw)
             is_paper = bool(verdict.get("is_paper"))
             is_relevant = bool(verdict.get("is_relevant"))
@@ -599,10 +629,14 @@ class DownloadAgent(Agent):
             )
             return False
         except Exception as e:
+            from app.modules.f2w_agent.trace import note_error
+
             logger.warning("Semantic PDF validation failed for %s (%s); keeping file", path.name, e)
+            note_error("DownloadAgent._validate_downloaded_pdf", e)
             return True
 
     def _candidate_search(self, query: str, missing_topics: List[str], candidate_pool: int) -> Dict[str, Any]:
+        """Search, keep reliable PDFs, rank, and return compact candidate summaries."""
         candidates = self._search_candidates(query, missing_topics, candidate_pool)
         prepared: List[Dict[str, Any]] = []
         for work in candidates:
@@ -634,6 +668,7 @@ class DownloadAgent(Agent):
         *,
         validate_downloads: Optional[bool] = None,
     ) -> Dict[str, Any]:
+        """Download ranked candidates to ``target_dir`` and append JSONL records."""
         import download_pdfs as dl  # scripts/download_pdfs.py
 
         validate = self._validate_downloads if validate_downloads is None else validate_downloads
@@ -771,6 +806,7 @@ class DownloadAgent(Agent):
 
     def _download(self, query: str, missing_topics: List[str], target_dir: str,
                   max_papers: int, candidate_pool: int) -> Dict[str, Any]:
+        """Search then download the top-ranked papers in one unattended pass."""
         search = self._candidate_search(query, missing_topics, candidate_pool)
         return self._download_candidates(
             query,
@@ -788,10 +824,12 @@ class DownloadAgent(Agent):
         candidate_pool: int = 25,
     ) -> Dict[str, Any]:
         """Search/rank OpenAlex candidates without writing PDFs."""
+        from app.modules.f2w_agent.trace import bind_context
+
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None,
-            lambda: self._candidate_search(query, missing_topics or [], candidate_pool),
+            bind_context(lambda: self._candidate_search(query, missing_topics or [], candidate_pool)),
         )
 
     @action
@@ -814,17 +852,19 @@ class DownloadAgent(Agent):
             prepared.append(
                 self._refresh_candidate_urls(candidate) if refresh_urls else candidate
             )
+        from app.modules.f2w_agent.trace import bind_context
+
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None,
-            lambda: self._download_candidates(
+            bind_context(lambda: self._download_candidates(
                 query,
                 missing_topics or [],
                 target_dir,
                 prepared,
                 max_papers,
                 validate_downloads=validate_downloads,
-            ),
+            )),
         )
 
     @action
@@ -837,10 +877,12 @@ class DownloadAgent(Agent):
         candidate_pool: int = 25,
     ) -> Dict[str, Any]:
         """Search OpenAlex, rank by relevance, download top-N PDFs."""
+        from app.modules.f2w_agent.trace import bind_context
+
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None,
-            lambda: self._download(
+            bind_context(lambda: self._download(
                 query, missing_topics or [], target_dir, max_papers, candidate_pool
-            ),
+            )),
         )

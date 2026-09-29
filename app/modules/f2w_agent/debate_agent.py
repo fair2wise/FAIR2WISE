@@ -24,6 +24,7 @@ MAX_PROMPT_CANDIDATES = 6
 
 
 def _score(candidate: Dict[str, Any]) -> float:
+    """Return the candidate relevance score, or 0.0 if missing or invalid."""
     try:
         return float(candidate.get("score", candidate.get("_score", 0.0)) or 0.0)
     except (TypeError, ValueError):
@@ -31,6 +32,7 @@ def _score(candidate: Dict[str, Any]) -> float:
 
 
 def _candidate_titles(candidates: List[Dict[str, Any]]) -> List[str]:
+    """Return display titles (title, DOI, id, or Untitled) for each candidate."""
     return [
         str(candidate.get("title") or candidate.get("doi") or candidate.get("id") or "Untitled")
         for candidate in candidates
@@ -38,6 +40,7 @@ def _candidate_titles(candidates: List[Dict[str, Any]]) -> List[str]:
 
 
 def _parse_json_object(raw: str) -> Dict[str, Any]:
+    """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     if not raw:
         return {}
     match = re.search(r"\{[\s\S]*\}", raw)
@@ -51,6 +54,7 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
 
 
 def _normalize_objections(value: Any) -> List[str]:
+    """Coerce a string or list of objections into stripped non-empty strings."""
     if isinstance(value, str):
         value = [value]
     if not isinstance(value, list):
@@ -59,6 +63,7 @@ def _normalize_objections(value: Any) -> List[str]:
 
 
 def _selected_indices(value: Any, candidate_count: int) -> List[int]:
+    """Parse unique in-range candidate indices from an int or list."""
     if isinstance(value, int):
         value = [value]
     if not isinstance(value, list):
@@ -85,6 +90,7 @@ def _summary_from_decision(
     candidate_indices: Optional[List[int]] = None,
     refined_query: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Build the compact debate decision dict shown to CLI/UI."""
     candidate_indices = candidate_indices or []
     selected_candidates = [candidates[i] for i in candidate_indices if 0 <= i < len(candidates)]
     return {
@@ -112,6 +118,7 @@ class EvidenceDebateAgent(Agent):
         backend: Optional[str] = None,
         model: Optional[str] = None,
     ) -> None:
+        """Store chat backend/model used for LLM debate decisions."""
         super().__init__()
         self._backend = backend or os.environ.get("KG_RAG_BACKEND", "cborg")
         self._model = model
@@ -122,6 +129,7 @@ class EvidenceDebateAgent(Agent):
         retrieval_probe: Dict[str, Any],
         candidates: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        """Heuristic next action when the LLM is unavailable or returns invalid JSON."""
         if retrieval_probe.get("sufficient"):
             return _summary_from_decision(
                 selected_action="answer_from_kg",
@@ -171,6 +179,7 @@ class EvidenceDebateAgent(Agent):
         candidates: List[Dict[str, Any]],
         round_no: int,
     ) -> Dict[str, Any]:
+        """Ask the chat model for a JSON action, falling back to heuristics."""
         from app.modules.term_extractor.clients import make_chat_client
 
         cli = make_chat_client(
@@ -206,7 +215,7 @@ class EvidenceDebateAgent(Agent):
             f"RETRIEVAL_PROBE: {json.dumps(retrieval_probe, ensure_ascii=False, default=str)[:4000]}\n"
             f"CANDIDATES: {json.dumps(compact_candidates, ensure_ascii=False, default=str)}"
         )
-        raw = cli.chat(prompt, temperature=0.0, timeout=120)
+        raw = cli.chat(prompt, temperature=0.0, timeout=120, trace_label="evidence-debate")
         obj = _parse_json_object(raw)
         action_name = str(obj.get("selected_action") or "").strip()
         if action_name not in ACTIONS:
@@ -244,10 +253,15 @@ class EvidenceDebateAgent(Agent):
         candidates = candidates or []
         loop = asyncio.get_event_loop()
         try:
+            from app.modules.f2w_agent.trace import bind_context, note_error
+
             return await loop.run_in_executor(
                 None,
-                lambda: self._llm_decide(question, retrieval_probe, candidates, round_no),
+                bind_context(lambda: self._llm_decide(question, retrieval_probe, candidates, round_no)),
             )
         except Exception as exc:
+            from app.modules.f2w_agent.trace import note_error
+
             logger.warning("Evidence debate LLM failed (%s); using heuristic decision", exc)
+            note_error("EvidenceDebateAgent.decide", exc)
             return self._fallback_decide(question, retrieval_probe, candidates)

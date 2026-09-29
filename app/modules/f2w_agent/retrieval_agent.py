@@ -26,6 +26,7 @@ from app.modules.tiled_graph import (
     load_tiled_config,
     lookup_experiment_identity,
 )
+from app.modules.f2w_agent.materials_project import lookup_materials_project
 from app.modules.f2w_agent.multi_kg import (
     DEFAULT_KG_QUERY_HOPS,
     DEFAULT_KG_QUERY_MAX_NODES,
@@ -35,97 +36,25 @@ from app.modules.f2w_agent.multi_kg import (
     graph_id_for_path,
     graph_label_for_id,
     is_ops_graph_id,
+    is_science_graph_id,
     merge_hits,
     schema_path_for_graph,
     unique_graph_paths,
 )
+from app.modules.f2w_agent.prompts import (
+    JUDGE_SYSTEM,
+    LAYOUT_LEEWAY_SYSTEM,
+    LEEWAY_SYSTEM,
+)
+from app.modules.f2w_agent.trace import bind_context, note_error, record_retrieval
 
 logger = logging.getLogger(__name__)
 
 
-# RSoXS v1 (and similar technique graphs) are vocabulary/relation seeds: an
-# audit found ~64 ontology terms and ~32 json2kg-ready measurement nodes. Missing
-# photon_energy slots must not be treated as "cannot teach RSoXS".
-JUDGE_SYSTEM = (
-    "You are an evidence adjudicator for a materials-science knowledge graph. "
-    "You are given a user question, optional conversation history, and a "
-    "Retrieved Context block taken from a knowledge graph and source PDFs. "
-    "Decide whether you can answer without inventing measurement numbers.\n"
-    "Graph character: technique KGs such as RSoXS v1 are vocabulary/relation "
-    "seeds (ontology aliases plus json2kg-ready RSoXSMeasurement nodes). Empty "
-    "photon_energy slots or missing numeric properties do NOT mean you cannot "
-    "teach, describe a beamline specialty, name sample classes, outline an "
-    "analysis workflow, or show example code. They mean you must not invent "
-    "those numbers.\n"
-    "Classify the question, then apply the matching bar:\n"
-    "A) Conceptual / overview / teaching / definition / compare / "
-    "'what is X' / 'summarize this graph' / 'give me a summary' / "
-    "beamline specialty / sample classes / analysis workflow / how-to / "
-    "example code:\n"
-    "   SUFFICIENT when retrieved nodes are on-topic (technique names, "
-    "RSoXSMeasurement, related variants such as P-RSoXS, VT-RSoXS, NRSS, "
-    "CyRSoXS, Nika, tools, or publication nodes). Synthesize a teaching answer "
-    "from names, types, descriptions, relations, snippets, and publication "
-    "titles in the context. If the graph lacks a beamline-ops graph, code "
-    "objects, or energy slots, say that first, then still elaborate. "
-    "Paraphrasing and combining those grounded facts is required. "
-    "Cite supporting publications inside the answer with [KG:graph_id: name] "
-    "or [KG: ...] or [PDF: filename p.N] or [OPS: file §heading] that appear in "
-    "the context; include the graph_id so the reader knows whether a node came "
-    "from the science KG or 11.0.1.2 ops. Literature PDFs and beamline ops docs "
-    "are different sources — do not treat an [OPS: ...] cite as a paper. "
-    "Do not refuse and dump papers as a substitute for answering.\n"
-    "Do NOT use class A science elaboration (NRSS, CyRSoXS, cuprate papers, YBCO) "
-    "for hardware-layout / beam-path / 'connected in order' questions; those are class C.\n"
-    "B) Specific numeric or measurement claims (photon energy, eV, q-range, "
-    "temperature, counts, a paper's measured value):\n"
-    "   SUFFICIENT only when the slot, snippet, or property is present in context. "
-    "If the number is absent, sufficient=false. Never invent eV, q, or other "
-    "measurement numbers.\n"
-    "C) Hardware layout / beam path / how devices are connected in order / "
-    "what comes after X at ALS 11.0.1.2:\n"
-    "   Answer from the 11.0.1.2 ops KG (graph_id bl1101) as an ordered list or "
-    "path along directed edges (beam_path_next, upstream_of, feeds, connected_to). "
-    "Cite the Gabe blueprint and GitHub/source_papers that appear in context. "
-    "Do not answer 11.0.1.2 infrastructure with cuprate RSXS papers, YBCO, NRSS, "
-    "or CyRSoXS. If directed topology is thin, say so first, then list ops nodes "
-    "(motors, detectors, AXIS-SXR-40, BeamlineStage) — still ops, never science "
-    "elaboration. SUFFICIENT when any ops hardware / stage / detector nodes are "
-    "on-topic.\n"
-    "Hard rules:\n"
-    "1) Prefer Retrieved Context for measurement facts. For conceptual / how-to / "
-    "specialty / sample-class / workflow / example-code questions, you MAY also "
-    "use conversation history, related technique names in context, and high-level "
-    "domain knowledge. Mark any sentence that is not a KG slot or snippet as "
-    "not a KG measurement fact. Do not refuse these intents merely because "
-    "numeric slots are empty.\n"
-    "2) Never invent authors, years, DOIs, journals, numeric values, or papers "
-    "that do not appear in the context.\n"
-    "3) If the Retrieved Context is empty or clearly off-topic (a different "
-    "material or technique than asked), sufficient=false.\n"
-    "4) Do not treat a missing photon_energy slot as insufficient for conceptual "
-    "questions when on-topic RSoXSMeasurement / technique / publication nodes "
-    "are present.\n"
-    "5) If sufficient, answer the question. Ground KG-backed claims with inline "
-    "[KG:graph_id: ...] or [KG: ...] or [PDF: filename p.N] or [OPS: file §heading] "
-    "citations that appear literally in the context. When Retrieved Context labels "
-    "a graph_id, include that graph_id in the citation. Cite papers as [PDF: ...] "
-    "and beamline docs as [OPS: ...]; never fuse them.\n"
-    "6) When you reproduce a CodeSnippet code block, append this exact disclaimer on its "
-    "own line immediately after the closing fence: " + krag.CODE_SNIPPET_DISCLAIMER + "\n"
-    "Respond with a SINGLE JSON object and nothing else, using this schema:\n"
-    '{"sufficient": true|false, "answer": string|null, '
-    '"missing_topics": [string, ...]}\n'
-    "When sufficient=false for a numeric measurement claim, set answer=null and "
-    "list the missing slots as short search-friendly phrases. When the question "
-    "is conceptual / how-to and on-topic nodes exist, prefer sufficient=true "
-    "with an answer that discloses graph gaps and then elaborates."
-)
-
 
 _CONCEPTUAL_QUESTION_RE = re.compile(
     r"\b(teach|explain|overview|introduc|tell me about|summari[sz]e|"
-    r"give me a summary|what(?:'s|s| is)\b|what does\b|what kind\b|"
+    r"give me a summary|what(?:'s|s| is)\b|what does\b|what are\b|what kinds?\b|"
     r"how does\b|how do\b|how to\b|how would\b|how can\b|"
     r"compare\b|difference between|trained on|"
     r"speciali[sz]e|sample class|samples?\b|analysis (?:code|workflow)|"
@@ -190,37 +119,8 @@ _OPS_LAYOUT_RE = re.compile(
     re.IGNORECASE,
 )
 
-LEEWAY_SYSTEM = (
-    "You answer materials-science questions from a vocabulary/relation knowledge graph "
-    "that often lacks numeric slots and executable code objects. "
-    "First say what the graph lacks for this question (for example: no beamline-ops graph, "
-    "no analysis-code objects, no filled photon_energy slots). "
-    "Then still elaborate using retrieved nodes, publication titles, related techniques "
-    "such as NRSS, CyRSoXS, Nika, and P-RSoXS, conversation so far, and high-level domain "
-    "knowledge. Mark domain-knowledge sentences as not a KG measurement fact. "
-    "Never invent numeric values (eV, q, temperature) or papers/authors/DOIs that are not "
-    "in the retrieved context. "
-    "If the question is a hardware layout / beam-path / connected-in-order question, "
-    "ignore the NRSS/CyRSoXS/science elaboration instruction: answer only from 11.0.1.2 "
-    "ops nodes as an ordered path, never cuprate papers. "
-    "Return ONLY the answer text, not JSON."
-)
-
-LAYOUT_LEEWAY_SYSTEM = (
-    "You answer ALS Beamline 11.0.1.2 hardware-layout questions from the ops knowledge "
-    "graph (graph_id bl1101). Return an ordered list / path along directed edges "
-    "(beam_path_next, upstream_of, feeds, connected_to): source → EPU/optics → M103 → "
-    "exit slits → … → sample → detector. Cite the Gabe blueprint and GitHub sources "
-    "that appear in the retrieved context as [KG:bl1101: …] or [OPS: file §heading]. "
-    "If directed topology is thin or missing, say that first, then list ops hardware "
-    "nodes (motors, detectors, AXIS-SXR-40, BeamlineStage). "
-    "Do not mention CyRSoXS, NRSS, Nika, P-RSoXS, YBCO, cuprate papers, or the science "
-    "KG. Do not invent numeric measurement values. "
-    "Return ONLY the answer text, not JSON."
-)
-
-
 def _coerce_bool(value: Any) -> bool:
+    """Coerce JSON/bool/string flags to bool; unknown strings are false."""
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -229,6 +129,7 @@ def _coerce_bool(value: Any) -> bool:
 
 
 def _coerce_missing_topics(value: Any) -> List[str]:
+    """Normalize judge ``missing_topics`` to a list of non-empty strings."""
     if isinstance(value, str):
         value = [value]
     if not isinstance(value, list):
@@ -293,12 +194,14 @@ def _is_conceptual_question(question: str) -> bool:
 
 
 def leeway_system_for(question: str) -> str:
+    """Pick the layout leeway prompt for beam-path questions, else the default."""
     if _is_ops_layout_question(question):
         return LAYOUT_LEEWAY_SYSTEM
     return LEEWAY_SYSTEM
 
 
 def _format_history_for_judge(history: Optional[List[Dict[str, str]]]) -> str:
+    """Format the last eight chat turns for the sufficiency-judge prompt."""
     if not history:
         return ""
     lines: List[str] = []
@@ -398,6 +301,7 @@ def _has_direct_evidence(kg: Any, node_info: Any) -> bool:
 
 
 def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> List[Any]:
+    """Call ``retrieve_nodes`` with hops/max_nodes, falling back if the signature is older."""
     try:
         return krag.retrieve_nodes(question, kg, hops=hops, max_nodes=max_nodes)
     except TypeError:
@@ -485,6 +389,7 @@ class RetrievalAgent(Agent):
         live_tiled: Optional[bool] = None,
         tiled_uri: Optional[str] = None,
     ) -> None:
+        """Configure graph paths, LLM backend, query caps, hybrid RAG, and live Tiled."""
         super().__init__()
         files = unique_graph_paths(list(graph_files or []))
         if graph_file and graph_file not in files:
@@ -507,6 +412,7 @@ class RetrievalAgent(Agent):
         self._live_tiled = cfg.enabled
         self._tiled_uri = cfg.uri
         self._last_tiled_meta: Dict[str, Any] = cfg.snapshot()
+        self._last_mp_meta: Dict[str, Any] = {}
         self._last_intent: str = "general"
 
     def _build_kg(self):
@@ -521,6 +427,7 @@ class RetrievalAgent(Agent):
         existing: Optional[Dict[str, Any]] = None,
         graph_id: Optional[str] = None,
     ) -> str:
+        """Stamp *kg* with graph_id/label/schema/path, disambiguating collisions in *existing*."""
         gid = graph_id or graph_id_for_path(path)
         taken = existing if existing is not None else self._graphs
         base = gid
@@ -535,6 +442,7 @@ class RetrievalAgent(Agent):
         return gid
 
     def _skip_reason(self, path: str) -> Optional[str]:
+        """Return why *path* cannot be loaded, or None if the file looks usable."""
         candidate = Path(path)
         if not candidate.exists():
             return "missing"
@@ -546,6 +454,7 @@ class RetrievalAgent(Agent):
         return None
 
     def _build_kgs(self) -> Dict[str, Any]:
+        """Load each configured JSON KG, skipping missing/empty/broken files."""
         graphs: Dict[str, Any] = {}
         skipped: List[Dict[str, str]] = []
         for path in self._graph_files:
@@ -570,15 +479,18 @@ class RetrievalAgent(Agent):
         return graphs
 
     def set_query_limits(self, *, hops: Optional[int] = None, max_nodes: Optional[int] = None) -> None:
+        """Clamp and store neighborhood hops / max nodes for the next retrieve."""
         if hops is not None:
             self._kg_query_hops = clamp_kg_query_hops(hops)
         if max_nodes is not None:
             self._kg_query_max_nodes = clamp_kg_query_max_nodes(max_nodes)
 
     def set_source_rag(self, enabled: bool) -> None:
+        """Enable or disable hybrid literature/ops source RAG for later queries."""
         self._source_rag = bool(enabled)
 
     def set_live_tiled(self, enabled: bool, *, uri: Optional[str] = None) -> None:
+        """Toggle live Tiled Graph lookup and optionally replace the Tiled URI."""
         cfg = load_tiled_config(uri=uri if uri is not None else self._tiled_uri, enabled=enabled)
         self._live_tiled = cfg.enabled
         self._tiled_uri = cfg.uri
@@ -629,6 +541,7 @@ class RetrievalAgent(Agent):
         }
 
     def _active_graphs(self) -> Dict[str, Any]:
+        """Return loaded graphs, wrapping a legacy single ``_kg`` if needed."""
         if self._graphs:
             return self._graphs
         if self._kg is not None:
@@ -639,6 +552,7 @@ class RetrievalAgent(Agent):
         return {}
 
     async def _ensure_graphs(self) -> Dict[str, Any]:
+        """Load graphs on first use; raise if none can be opened."""
         graphs = self._active_graphs()
         if graphs:
             return graphs
@@ -647,13 +561,27 @@ class RetrievalAgent(Agent):
             try:
                 self._graphs = await loop.run_in_executor(None, self._build_kgs)
                 self._kg = next(iter(self._graphs.values()), None)
+            except (AttributeError, TypeError):
+                raise
             except Exception:
+                logger.warning(
+                    "Failed to build multi-KG from %s; falling back to single KG",
+                    self._graph_files,
+                    exc_info=True,
+                )
                 self._kg = await loop.run_in_executor(None, self._build_kg)
         elif self._kg is None:
             self._kg = await loop.run_in_executor(None, self._build_kg)
-        return self._active_graphs()
+        result = self._active_graphs()
+        if not result:
+            raise RuntimeError(
+                "No knowledge graphs loaded; cannot answer questions. "
+                "Check graph file paths and logs above."
+            )
+        return result
 
     def _source_meta(self, graphs: Dict[str, Any]) -> Dict[str, Any]:
+        """Metadata block describing graph source, query caps, Tiled, intent, and MP."""
         primary = next(iter(graphs.values()), self._kg)
         return {
             "graph_source_requested": getattr(
@@ -665,6 +593,7 @@ class RetrievalAgent(Agent):
             "kg_query_max_nodes": self._kg_query_max_nodes,
             "live_tiled": dict(self._last_tiled_meta or {}),
             "kg_intent": self._last_intent,
+            "materials_project": dict(getattr(self, "_last_mp_meta", {}) or {}),
         }
 
     def _merge_live_tiled(
@@ -673,6 +602,7 @@ class RetrievalAgent(Agent):
         graphs: Dict[str, Any],
         kg_hits: List[ScoredHit],
     ) -> Tuple[Dict[str, Any], List[ScoredHit]]:
+        """Merge live Tiled identity hits into *graphs*/*kg_hits* when the question needs them."""
         if not self._live_tiled:
             self._last_tiled_meta = load_tiled_config(
                 uri=self._tiled_uri, enabled=False
@@ -776,12 +706,24 @@ class RetrievalAgent(Agent):
         for gid, kg in graphs.items():
             try:
                 infos: List[Any] = list(_call_retrieve_nodes(question, kg, hops, max_nodes))
+            except (AttributeError, TypeError):
+                raise
             except Exception as exc:  # pragma: no cover
-                logger.warning("KG retrieval failed for %s / %r: %s", gid, question, exc)
+                logger.warning(
+                    "KG retrieval failed for %s / %r: %s",
+                    gid,
+                    question,
+                    exc,
+                    exc_info=True,
+                )
                 infos = []
             if layout:
                 infos = infos + _beam_path_nodeinfos(kg)
             for info in infos:
+                _raw_node = getattr(kg, "nodes", {}).get(str(getattr(info, "id", info)), {}) or {}
+                _category = str(getattr(info, "category", "") or "") or str(
+                    _raw_node.get("entity_type") or _raw_node.get("entityType") or ""
+                )
                 raw_hits.append(
                     ScoredHit(
                         id=str(getattr(info, "id", info)),
@@ -790,7 +732,7 @@ class RetrievalAgent(Agent):
                             getattr(info, "score_prp", getattr(info, "score", 0.0)) or 0.0
                         ),
                         evidence_ct=int(getattr(info, "evidence_ct", 0) or 0),
-                        category=str(getattr(info, "category", "") or ""),
+                        category=_category,
                         name=str(getattr(info, "name", "") or getattr(info, "id", "")),
                         graph_label=getattr(kg, "graph_label", graph_label_for_id(gid)),
                         payload=info,
@@ -850,6 +792,79 @@ class RetrievalAgent(Agent):
                     return hits
         return hits
 
+    @staticmethod
+    def _rsoxs_popular_nodes(kg: Any, graph_id: str, max_n: int) -> List[ScoredHit]:
+        """Return the most evidence-rich nodes from a science/RSoXS KG.
+
+        When BM25 returns few rsoxs hits for a literature-intent query (because
+        the question uses general terms like "materials" while the KG stores
+        specific material instances), these popularity-boosted nodes ensure that
+        at least the most-cited materials surface in context.
+
+        Popularity signal: ``len(source_papers)`` or ``len(papers)`` (list of
+        paper references).  Old-format KGs (v1/v2) use ``source_papers``; new-
+        format KGs (v3+) use ``papers``.  Only nodes with ≥ 2 papers are
+        included.
+        Score = 0.3 + len(papers)/100 — kept below normal retrieval hits but
+        above zero so they don't displace high-quality BM25 results after merge.
+        """
+        nodes = getattr(kg, "nodes", None) or {}
+        # Guard: kg.nodes should always be a dict from KnowledgeGraph, but
+        # handle the list case defensively in case a caller passes a raw KG dict.
+        if isinstance(nodes, list):
+            nodes = {n.get("id", str(i)): n for i, n in enumerate(nodes) if isinstance(n, dict)}
+
+        logger.info(
+            "RSoXS popular nodes: scanning %d nodes in graph %s (max_n=%d)",
+            len(nodes),
+            graph_id,
+            max_n,
+        )
+        candidates: List[Tuple[int, str, Dict[str, Any]]] = []
+        for nid, raw in nodes.items():
+            if not isinstance(raw, dict):
+                continue
+            # Old-format KGs (v1/v2) store paper refs in "source_papers";
+            # new-format KGs (v3+) store DOI strings in "papers".
+            papers = raw.get("source_papers") or raw.get("papers")
+            if not isinstance(papers, list):
+                continue
+            count = len(papers)
+            if count < 2:
+                continue
+            candidates.append((count, str(nid), raw))
+
+        candidates.sort(key=lambda x: x[0], reverse=True)
+
+        graph_label = getattr(kg, "graph_label", graph_label_for_id(graph_id))
+        hits: List[ScoredHit] = []
+        for count, nid, raw in candidates[:max_n]:
+            score = 0.3 + count / 100.0
+            entity_type = str(
+                raw.get("entity_type") or raw.get("entityType") or ""
+            )
+            name = str(raw.get("label") or raw.get("name") or nid)
+            hits.append(
+                ScoredHit(
+                    id=nid,
+                    graph_id=graph_id,
+                    score=score,
+                    evidence_ct=count,
+                    category=entity_type,
+                    name=name,
+                    graph_label=graph_label,
+                    payload=SimpleNamespace(
+                        id=nid,
+                        name=name,
+                        category=entity_type,
+                        description=str(raw.get("description") or ""),
+                        score_prp=score,
+                        evidence_ct=count,
+                    ),
+                )
+            )
+        return hits
+
     def _intent_routed_retrieve(
         self,
         question: str,
@@ -896,6 +911,31 @@ class RetrievalAgent(Agent):
 
         raw_hits = self._parallel_retrieve(question, primary, hops, primary_max, layout=False)
         raw_hits += self._parallel_retrieve(question, secondary, hops, secondary_max, layout=False)
+
+        # Literature-intent popularity supplement for RSoXS science KGs.
+        # BM25 scores poorly for general-category questions (e.g. "what kinds of
+        # materials") against a KG of specific material instances — supplement
+        # with the most paper-cited nodes so they don't get crowded out by ops nodes.
+        if intent == "literature":
+            rsoxs_hit_count = sum(1 for h in raw_hits if is_science_graph_id(h.graph_id))
+            threshold = max_nodes * 0.3
+            if rsoxs_hit_count < threshold:
+                existing_ids = {h.id for h in raw_hits}
+                for gid, kg in primary.items():
+                    if not is_science_graph_id(gid):
+                        continue
+                    n_supplement = max(1, int(threshold) - rsoxs_hit_count + 1)
+                    supplement = self._rsoxs_popular_nodes(kg, gid, max_n=n_supplement)
+                    new_hits = [h for h in supplement if h.id not in existing_ids]
+                    if new_hits:
+                        logger.info(
+                            "RSoXS popularity supplement: adding %d popular node(s) for %r",
+                            len(new_hits),
+                            question[:80],
+                        )
+                        raw_hits = raw_hits + new_hits
+                        existing_ids.update(h.id for h in new_hits)
+
         return raw_hits
 
     def _fanout_hits(self, question: str, graphs: Dict[str, Any]) -> List[ScoredHit]:
@@ -916,10 +956,12 @@ class RetrievalAgent(Agent):
         non_tiled = {gid: kg for gid, kg in graphs.items() if gid != TILED_GRAPH_ID}
         hops = max(self._kg_query_hops, LAYOUT_KG_QUERY_HOPS) if layout else self._kg_query_hops
         max_nodes = self._kg_query_max_nodes
+        self._trace_layout_ops_only_applied = False
 
         if layout:
             ops_only = {gid: kg for gid, kg in non_tiled.items() if is_ops_graph_id(gid)}
             active = ops_only if ops_only else non_tiled
+            self._trace_layout_ops_only_applied = bool(ops_only)
         else:
             active = non_tiled
 
@@ -964,6 +1006,7 @@ class RetrievalAgent(Agent):
         return merge_hits(raw_hits, limit=max_nodes)
 
     def _kg_work_ids(self, hits: Sequence[ScoredHit], graphs: Dict[str, Any]) -> List[str]:
+        """Collect source-paper filenames and DOIs from hit nodes for hybrid RAG."""
         ids: List[str] = []
         seen: set[str] = set()
         for hit in hits:
@@ -985,11 +1028,35 @@ class RetrievalAgent(Agent):
         return ids
 
     def _build_kg_context(self, question: str, hits: Sequence[ScoredHit], graphs: Dict[str, Any]) -> str:
+        """Build per-graph context blocks, giving the intent-primary graph the budget first."""
         by_graph: Dict[str, List[Any]] = {}
         for hit in hits:
             if hit.payload is None:
                 continue
             by_graph.setdefault(hit.graph_id, []).append(hit.payload)
+
+        # Reorder graph sections so the intent-primary graph gets the majority of the
+        # context budget.  Hits are sorted by score (descending) so the ops KG's
+        # high-scoring named-component nodes often insert themselves first — even when
+        # the query is about RSoXS science.  Reordering fixes that.
+        if len(by_graph) > 1:
+            intent = getattr(self, "_last_intent", "general")
+            if intent == "literature":
+                # Science/RSoXS graphs first so their context fills the budget.
+                ordered_ids = [
+                    *[gid for gid in by_graph if is_science_graph_id(gid)],
+                    *[gid for gid in by_graph if not is_science_graph_id(gid)],
+                ]
+                by_graph = {gid: by_graph[gid] for gid in ordered_ids if gid in by_graph}
+            elif intent in ("ops", "tiled"):
+                # Ops graphs first.
+                ordered_ids = [
+                    *[gid for gid in by_graph if is_ops_graph_id(gid)],
+                    *[gid for gid in by_graph if not is_ops_graph_id(gid)],
+                ]
+                by_graph = {gid: by_graph[gid] for gid in ordered_ids if gid in by_graph}
+            # "general" intent: keep original score-based insertion order.
+
         parts: List[str] = []
         remaining = krag.CTX_SOFT_LIMIT
         for gid, infos in by_graph.items():
@@ -999,9 +1066,36 @@ class RetrievalAgent(Agent):
             if kg is None:
                 continue
             label = getattr(kg, "graph_label", graph_label_for_id(gid))
+            cite_tokens: List[str] = []
+            nodes_index = getattr(kg, "nodes", None) or {}
+            if isinstance(nodes_index, list):
+                nodes_index = {
+                    str(n.get("id")): n
+                    for n in nodes_index
+                    if isinstance(n, dict) and n.get("id")
+                }
+            for info in infos:
+                nid = str(getattr(info, "id", "") or "")
+                raw: Dict[str, Any] = {}
+                if isinstance(nodes_index, dict) and nid:
+                    raw = nodes_index.get(nid) or {}
+                name = str(
+                    getattr(info, "name", "")
+                    or raw.get("name")
+                    or raw.get("label")
+                    or nid
+                ).strip()
+                if name:
+                    cite_tokens.append(f"[KG: {gid}: {name}]")
+            allowed = ""
+            if cite_tokens:
+                allowed = "Allowed citations (copy these tokens exactly):\n" + "\n".join(
+                    f"- {token}" for token in cite_tokens
+                ) + "\n"
             header = (
-                f"### Knowledge graph `{gid}` ({label})\n"
-                f"Cite nodes from this graph as [KG:{gid}: <name>].\n"
+                f"### Knowledge graph `{gid}` ({label}). "
+                f"Cite nodes from this graph as [KG: {gid}: <name>].\n"
+                f"{allowed}"
             )
             try:
                 ctx = kg.build_context(
@@ -1030,6 +1124,7 @@ class RetrievalAgent(Agent):
         graphs: Dict[str, Any],
         source_context: str = "",
     ) -> str:
+        """Concatenate KG context with optional PDF/ops/MP source context."""
         kg_ctx = self._build_kg_context(question, hits, graphs)
         parts = [part for part in (kg_ctx, source_context) if str(part or "").strip()]
         return "\n\n".join(parts)
@@ -1040,6 +1135,7 @@ class RetrievalAgent(Agent):
         hits: Sequence[ScoredHit],
         graphs: Dict[str, Any],
     ) -> Dict[str, Any]:
+        """Invoke the HybridSourceRAG pipeline and return a source-context pack dict."""
         empty = {
             "intent": "factual",
             "evidence": [],
@@ -1065,6 +1161,7 @@ class RetrievalAgent(Agent):
             )
         except Exception as exc:
             logger.warning("Hybrid source RAG skipped for %r: %s", question, exc)
+            note_error("RetrievalAgent._hybrid_pack", exc)
             return empty
 
     @action
@@ -1077,15 +1174,24 @@ class RetrievalAgent(Agent):
         """Retrieve context for ``question`` and judge whether it suffices to answer."""
         loop = asyncio.get_event_loop()
         graphs = await self._ensure_graphs()
+        self._trace_layout_ops_only_applied = False
+        self._trace_merged_context = None
+        self._trace_raw_judge = None
+        self._trace_parsed_verdict = None
+        self._trace_leeway_used = False
+        self._trace_leeway_prompt = None
 
         meta = self._source_meta(graphs)
         primary = next(iter(graphs.values()), self._kg)
         hits: List[ScoredHit] = []
         if graphs:
             try:
-                hits = await loop.run_in_executor(None, self._fanout_hits, question, graphs)
+                hits = await loop.run_in_executor(
+                    None, bind_context(self._fanout_hits), question, graphs
+                )
             except Exception as exc:
                 logger.warning("KG retrieval failed for %r: %s", question, exc)
+                note_error("RetrievalAgent.query._fanout_hits", exc)
                 hits = []
         graphs, hits = self._merge_live_tiled(question, graphs, hits)
         meta = self._source_meta(graphs)
@@ -1094,7 +1200,7 @@ class RetrievalAgent(Agent):
         enabled = self._source_rag if source_rag is None else bool(source_rag)
         if enabled:
             hybrid = await loop.run_in_executor(
-                None, lambda: self._hybrid_pack(question, hits, graphs)
+                None, bind_context(lambda: self._hybrid_pack(question, hits, graphs))
             )
         else:
             hybrid = {
@@ -1107,6 +1213,18 @@ class RetrievalAgent(Agent):
             }
         source_context = str(hybrid.get("source_context") or "")
         chunk_count = int(hybrid.get("chunk_count") or 0)
+        mp_pack = await loop.run_in_executor(None, lambda: lookup_materials_project(question))
+        self._last_mp_meta = {
+            "triggered": bool(mp_pack.get("triggered")),
+            "queries": list(mp_pack.get("queries") or []),
+            "record_count": len(mp_pack.get("records") or []),
+            "skipped": mp_pack.get("skipped"),
+        }
+        mp_context = str(mp_pack.get("context") or "")
+        if mp_context.strip():
+            source_context = "\n\n".join(
+                part for part in (source_context, mp_context) if str(part).strip()
+            )
 
         selected = [hit.id for hit in hits]
         selected_hits = [hit.as_dict() for hit in hits]
@@ -1117,10 +1235,11 @@ class RetrievalAgent(Agent):
         )
         conceptual = _is_conceptual_question(question)
         numeric = _is_numeric_claim(question)
+        has_mp = bool(mp_context.strip())
         no_evidence = (
-            len(selected) == 0 and chunk_count == 0
+            len(selected) == 0 and chunk_count == 0 and not has_mp
         ) or (
-            direct_evidence_count == 0 and chunk_count == 0 and not conceptual
+            direct_evidence_count == 0 and chunk_count == 0 and not conceptual and not has_mp
         )
         hybrid_meta = {
             "hybrid_rag": {
@@ -1128,9 +1247,20 @@ class RetrievalAgent(Agent):
                 "chunk_count": chunk_count,
                 "literature_available": bool(hybrid.get("literature_available")),
                 "ops_available": bool(hybrid.get("ops_available")),
-            }
+            },
+            "materials_project": dict(self._last_mp_meta),
         }
         if no_evidence:
+            self._publish_retrieval_trace(
+                question,
+                hits=hits,
+                meta=meta,
+                hybrid_meta=hybrid_meta,
+                sufficient=False,
+                no_evidence=True,
+                direct_evidence_count=0,
+                missing_topics=[question],
+            )
             return {
                 "status": "success",
                 "question": question,
@@ -1148,15 +1278,28 @@ class RetrievalAgent(Agent):
         try:
             ctx = await loop.run_in_executor(
                 None,
-                lambda: self._build_merged_context(
+                bind_context(lambda: self._build_merged_context(
                     question, hits, graphs, source_context=source_context
-                ),
+                )),
             )
+            self._trace_merged_context = ctx
         except Exception as exc:
             logger.warning("KG context build failed for %r: %s", question, exc)
+            note_error("RetrievalAgent.query._build_merged_context", exc)
             if source_context.strip():
                 ctx = source_context
+                self._trace_merged_context = ctx
             else:
+                self._publish_retrieval_trace(
+                    question,
+                    hits=hits,
+                    meta=meta,
+                    hybrid_meta=hybrid_meta,
+                    sufficient=False,
+                    no_evidence=False,
+                    direct_evidence_count=direct_evidence_count,
+                    missing_topics=[question],
+                )
                 return {
                     "status": "context_error",
                     "question": question,
@@ -1183,6 +1326,17 @@ class RetrievalAgent(Agent):
             )
         except Exception as exc:
             logger.warning("Retrieval judge failed for %r: %s", question, exc)
+            note_error("RetrievalAgent.query.judge", exc)
+            self._publish_retrieval_trace(
+                question,
+                hits=hits,
+                meta=meta,
+                hybrid_meta=hybrid_meta,
+                sufficient=False,
+                no_evidence=False,
+                direct_evidence_count=direct_evidence_count,
+                missing_topics=[question],
+            )
             return {
                 "status": "judge_error",
                 "question": question,
@@ -1197,7 +1351,9 @@ class RetrievalAgent(Agent):
                 **meta,
                 **hybrid_meta,
             }
+        self._trace_raw_judge = raw
         verdict = _parse_judge(raw)
+        self._trace_parsed_verdict = verdict
 
         sufficient = bool(verdict.get("sufficient"))
         missing = verdict.get("missing_topics") or []
@@ -1212,7 +1368,18 @@ class RetrievalAgent(Agent):
             if leeway:
                 sufficient = True
                 answer = leeway
+                self._trace_leeway_used = True
 
+        self._publish_retrieval_trace(
+            question,
+            hits=hits,
+            meta=meta,
+            hybrid_meta=hybrid_meta,
+            sufficient=sufficient,
+            no_evidence=False,
+            direct_evidence_count=direct_evidence_count,
+            missing_topics=list(missing),
+        )
         return {
             "status": "success",
             "question": question,
@@ -1231,6 +1398,54 @@ class RetrievalAgent(Agent):
             "graph_source_used": getattr(primary, "graph_source_used", self._graph_source),
         }
 
+    def _publish_retrieval_trace(
+        self,
+        question: str,
+        *,
+        hits: Sequence[ScoredHit],
+        meta: Dict[str, Any],
+        hybrid_meta: Dict[str, Any],
+        sufficient: bool,
+        no_evidence: bool,
+        direct_evidence_count: int,
+        missing_topics: List[str],
+    ) -> None:
+        """Copy retrieval internals onto the active turn trace. Never raises."""
+        try:
+            selected_hits = []
+            for hit in hits:
+                raw = hit.as_dict()
+                selected_hits.append({
+                    "id": raw.get("id"),
+                    "graph_id": raw.get("graph_id"),
+                    "graph_label": raw.get("graph_label"),
+                    "score": raw.get("score"),
+                    "category": raw.get("category"),
+                })
+            record_retrieval({
+                "selected_hits": selected_hits,
+                "sufficient": sufficient,
+                "no_evidence": no_evidence,
+                "direct_evidence_count": direct_evidence_count,
+                "missing_topics": list(missing_topics),
+                "live_tiled": dict(meta.get("live_tiled") or {}),
+                "hybrid_rag": dict((hybrid_meta.get("hybrid_rag") or {})),
+                "route_flags": {
+                    "_is_ops_layout_question": _is_ops_layout_question(question),
+                    "_is_numeric_claim": _is_numeric_claim(question),
+                    "_is_conceptual_question": _is_conceptual_question(question),
+                    "is_experiment_identity_question": is_experiment_identity_question(question),
+                },
+                "layout_ops_only_filter": bool(getattr(self, "_trace_layout_ops_only_applied", False)),
+                "merged_context": getattr(self, "_trace_merged_context", None),
+                "raw_judge_output": getattr(self, "_trace_raw_judge", None),
+                "parsed_verdict": getattr(self, "_trace_parsed_verdict", None),
+                "leeway_used": bool(getattr(self, "_trace_leeway_used", False)),
+                "leeway_system_prompt": getattr(self, "_trace_leeway_prompt", None),
+            })
+        except Exception as exc:
+            logger.warning("Retrieval trace publish failed: %s", exc)
+
     async def _synthesize_leeway_answer(
         self,
         cli: Any,
@@ -1239,6 +1454,7 @@ class RetrievalAgent(Agent):
         history: Optional[List[Dict[str, str]]],
         missing: List[str],
     ) -> Optional[str]:
+        """Second-pass LLM answer that discloses graph gaps then still teaches from context."""
         history_block = _format_history_for_judge(history)
         missing_text = ", ".join(missing) if missing else (
             "numeric slots / code objects / beamline-ops graph"
@@ -1250,6 +1466,9 @@ class RetrievalAgent(Agent):
             f"Retrieved Context:\n{ctx.strip() or '(empty)'}\n\n"
             "Write the answer now."
         )
+        self._trace_leeway_prompt = (
+            "LAYOUT_LEEWAY_SYSTEM" if _is_ops_layout_question(question) else "LEEWAY_SYSTEM"
+        )
         try:
             raw = await krag.call_llm(
                 cli,
@@ -1258,6 +1477,9 @@ class RetrievalAgent(Agent):
             )
         except Exception as exc:
             logger.warning("Leeway synthesis failed for %r: %s", question, exc)
+            note_error("RetrievalAgent._synthesize_leeway_answer", exc)
             return None
         text = str(raw or "").strip()
+        if text:
+            self._trace_leeway_used = True
         return text or None

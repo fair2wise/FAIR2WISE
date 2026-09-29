@@ -34,6 +34,7 @@ __all__ = [
 
 
 def __getattr__(name: str):  # lazy exports to keep import light
+    """Load Academy agent classes on first attribute access."""
     if name == "RetrievalAgent":
         from .retrieval_agent import RetrievalAgent
 
