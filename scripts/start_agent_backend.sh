@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# ── Process isolation note ────────────────────────────────────────────────────
-# The paper extract process (scripts/run.py) must be started separately so it
-# survives agent restarts and terminal closure:
+# ── FAIR2WISE local agent API launcher ────────────────────────────────────────
+# Starts python -m app.modules.launchers.f2w_agent api (default :8090).
+# Loads $ROOT/.env when present. Secrets stay in .env (gitignored).
+#
+# Process isolation: paper extract (scripts/run.py) must be started separately
+# so it survives agent restarts and terminal closure:
 #
 #   nohup python scripts/run.py ...  &   # background in current shell
 #   # — or —
@@ -9,6 +12,57 @@
 #
 # `docker compose up` starts agent+UI only; extraction is not affected.
 # Stopping this script (or `docker compose down`) will NOT stop extraction.
+#
+# Accepted environment variables (defaults in parentheses):
+#
+#   Agent / LLM
+#     F2W_AGENT_HOST          bind address (127.0.0.1)
+#     F2W_AGENT_PORT          API port (8090)
+#     F2W_BACKEND             cborg | cborg-openai | ollama (cborg)
+#     F2W_MODEL               chat model (lbl/cborg-chat)
+#     CBORG_API_KEY           required for CBorg; never log
+#     CBORG_BASE_URL          CBorg-compatible base URL
+#     CBORG_FORCE_IPV6        probe/bind IPv6 (1)
+#     CBORG_IP_FAMILY         ipv6 (ipv6)
+#     CBORG_IPV6_BIND         optional GUA; unset if the address is stale
+#
+#   Knowledge graphs (JSON mode is the local default)
+#     F2W_KG_MODE             json | splash (json)
+#     F2W_GRAPH               single graph path (legacy)
+#     F2W_GRAPHS              comma-separated JSON paths (overrides latest vN)
+#     F2W_SCHEMA              LinkML path (storage/schema/matkg_schema.yaml)
+#     F2W_SEED_TERMS          optional cumulative extracted-terms JSON
+#     F2W_WORKDIR             session dir (runs/ui_session_splash)
+#     See storage/schema/README.md and mkdocs/docs/architecture.md
+#
+#   Splash (only when F2W_KG_MODE=splash)
+#     SPLASH_LINKS_REPO       path to splash_links checkout
+#     F2W_SPLASH_HEALTH_URL   health URL (http://127.0.0.1:8081/splash_links/health)
+#
+#   Orchestration / extract (API process; not the background paper harvest)
+#     F2W_DOWNLOAD_DELAY      seconds between PDF attempts (0)
+#     F2W_MAX_ROUNDS          (3)
+#     F2W_MAX_PAPERS          (1)
+#     F2W_CANDIDATE_POOL      (25)
+#     F2W_WORKERS             extract workers (8)
+#     F2W_WORKFLOW_MODE       agentic | deterministic (agentic)
+#     F2W_EXTRACTION_MODE     targeted | full (targeted)
+#     F2W_TARGETED_MAX_PAGES  (6)
+#
+#   Live Tiled Graph (experiment identity; not JSON ESAF nodes)
+#     TILED_URI               GraphQL/catalog base (http://127.0.0.1:8765)
+#     TILED_API_KEY           Tiled Apikey; this script defaults to a dev placeholder
+#                             if unset — put a real key in .env for anything non-local
+#     TILED_API_KEY_SCHEME    Authorization scheme (Apikey)
+#     TILED_CATALOG_URI       SQLAlchemy catalog DSN (sqlite under storage/)
+#     F2W_LIVE_TILED          1 after local Tiled is healthy
+#     TILED_GRAPH_ENABLED     alias for enabling live Tiled
+#
+#   Optional chat extras (read by the API, not this script)
+#     MP_API_KEY              Materials Project; never log
+#     F2W_SOURCE_RAG          hybrid PDF/ops RAG
+#     F2W_TRACE_ENABLED       write per-turn traces (1)
+#     F2W_TRACE_DIR           trace root (runs/traces)
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -177,13 +231,16 @@ if "$PYTHON" -c 'import tiled' >/dev/null 2>&1; then
   fi
   if curl -sf "$TILED_HEALTH_URL" > /dev/null 2>&1; then
     echo "Tiled healthy — seeding sim data (idempotent)..."
-    "$PYTHON" scripts/ingest_tiled_sim.py --to-tiled --tiled-uri "$TILED_URI_LOCAL" || true
+    "$PYTHON" scripts/ingest_tiled_sim.py --to-tiled --tiled-uri "$TILED_URI_LOCAL" || echo "warning: tiled seed failed (non-fatal)" >&2
     export F2W_LIVE_TILED=1
     export TILED_URI="$TILED_URI_LOCAL"
   else
     echo "warning: Tiled did not start; live Tiled disabled" >&2
   fi
 fi
+
+export F2W_TRACE_ENABLED="${F2W_TRACE_ENABLED:-1}"
+export F2W_TRACE_DIR="${F2W_TRACE_DIR:-runs/traces}"
 
 ARGS=(
   "$PYTHON" -m app.modules.launchers.f2w_agent

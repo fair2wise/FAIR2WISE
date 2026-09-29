@@ -40,6 +40,8 @@ services:
       TILED_URI: "http://tiled:8765"
       F2W_LIVE_TILED: "1"
       TILED_API_KEY: "${TILED_API_KEY}"
+      F2W_TRACE_ENABLED: "1"
+      F2W_TRACE_DIR: /app/runs/traces
     depends_on:
       tiled:
         condition: service_healthy

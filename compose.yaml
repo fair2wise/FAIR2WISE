@@ -46,6 +46,8 @@ services:
       F2W_GRAPH: storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json
       F2W_SCHEMA: storage/schema/rsoxs_schema.yaml
       F2W_WORKDIR: /app/runs/ui_session_rsoxs
+      F2W_TRACE_ENABLED: "0"
+      F2W_TRACE_DIR: /app/runs/traces
       KG_RAG_BACKEND: cborg
       KG_RAG_CBORG_MODEL: lbl/cborg-chat
       KG_RAG_GRAPH_SOURCE: json
