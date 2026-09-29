@@ -1,0 +1,97 @@
+# Example principle nodes for extract / tests — not harvested papers.
+# A good node is a named principle or quantity with a one-sentence definition.
+# Bad nodes: a 2020 P3HT paper, an ESAF id, a Pilatus serial number.
+
+coverage:
+  - production
+  - atomic_spectroscopy
+  - channels
+  - optics
+  - q_space
+  - dose
+  - detection_statistics
+  - cosmic
+
+instances:
+  XRayPhenomenon:
+    - name: photoelectric absorption
+      coverage: channels
+    - name: Compton scattering
+      coverage: channels
+    - name: Thomson scattering
+      coverage: channels
+    - name: pair production
+      coverage: channels
+  XRaySource:
+    - name: bremsstrahlung
+      coverage: production
+    - name: undulator radiation
+      coverage: production
+    - name: SASE
+      coverage: production
+  XRayBeamProperty:
+    - name: photon energy
+      coverage: production
+    - name: brilliance
+      coverage: production
+  XRayOpticalConstant:
+    - name: X-ray refractive index
+      coverage: optics
+    - name: critical angle
+      coverage: optics
+  AbsorptionEdge:
+    - name: K-edge
+      coverage: atomic_spectroscopy
+  SecondaryProcess:
+    - name: fluorescence yield
+      coverage: channels
+    - name: Auger decay
+      coverage: channels
+  MaterialXRayInteraction:
+    - name: mass attenuation coefficient
+      coverage: channels
+    - name: radiation damage
+      coverage: channels
+  XRaySafetyConcept:
+    - name: ALARA
+      coverage: dose
+    - name: half-value layer
+      coverage: dose
+  CosmicXRayProcess:
+    - name: inverse Compton
+      coverage: cosmic
+    - name: cosmic X-ray background
+      coverage: cosmic
+  ReciprocalSpaceConcept:
+    - name: Bragg's law
+      coverage: q_space
+    - name: Debye–Waller factor
+      coverage: q_space
+  WaveOpticsConcept:
+    - name: X-ray standing wave
+      coverage: optics
+    - name: spatial coherence
+      coverage: optics
+  AtomicTransition:
+    - name: dipole selection rule
+      coverage: atomic_spectroscopy
+    - name: photoelectric equation
+      coverage: atomic_spectroscopy
+  InteractionCrossSection:
+    - name: Klein–Nishina cross section
+      coverage: channels
+    - name: anomalous scattering factor
+      coverage: channels
+  DetectionPrinciple:
+    - name: detective quantum efficiency
+      coverage: detection_statistics
+    - name: Poisson photon statistics
+      coverage: detection_statistics
+  XRayTechniqueFamily:
+    - name: RSoXS
+      coverage: q_space
+    - name: EXAFS
+      coverage: atomic_spectroscopy
+  ScatteringGeometry:
+    - name: grazing-incidence geometry
+      coverage: q_space

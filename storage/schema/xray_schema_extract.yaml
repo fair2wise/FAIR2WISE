@@ -1,0 +1,21 @@
+id: https://w3id.org/matkg/xray/extract
+name: xray_extract
+title: General X-ray fundamentals extract overlay
+description: >
+  Thin extract-time overlay. Imports storage/schema/xray_schema.yaml so the
+  term extractor sees the same classes and slots as the viewer schema.
+  Extract-safe: no extra top-level keys (do not add prov_vocabulary).
+license: MIT
+version: xray_v1
+
+prefixes:
+  matkg: https://w3id.org/matkg/
+  xray: https://w3id.org/matkg/xray/
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+
+default_prefix: xray
+default_range: string
+
+imports:
+  - xray_schema

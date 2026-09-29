@@ -1,0 +1,531 @@
+id: https://w3id.org/matkg/xray
+name: xray
+title: General X-ray fundamentals overlay
+description: >
+  Principles overlay on storage/schema/matkg_schema.yaml. Captures photon
+  kinematics, production, atomic spectroscopy, propagation, interaction
+  channels, reciprocal-space limits, detection physics, dose/safety, and
+  the same laws in astrophysical plasmas. Techniques are downstream of
+  those principles. Do not merge this graph with matkg_rsoxs_v* or
+  matkg_bl1101_v*. Do not reintroduce sample/device classes or beamline
+  hardware inventory.
+license: MIT
+version: xray_v1
+
+prefixes:
+  matkg: https://w3id.org/matkg/
+  xray: https://w3id.org/matkg/xray/
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+
+default_prefix: xray
+default_range: string
+
+imports:
+  - matkg_schema
+
+# NOTE: W3C PROV-O vocabulary reference lives in
+# storage/schema/prov_vocabulary.yaml. Do not add a prov_vocabulary: key.
+
+classes:
+  XRayPhenomenon:
+    is_a: Phenomenon
+    description: >
+      A named X-ray interaction or radiation-physics principle (photoelectric
+      absorption, Compton, Rayleigh/Thomson, pair production, fluorescence,
+      Auger, refraction, resonance). One node per principle, not per paper.
+    slots:
+      - typical_energy_range_eV
+      - energy_band
+      - interaction_channel
+      - atomic_number_dependence
+      - polarization_factor
+      - magnetic_channel
+      - described_by
+      - same_physics_as
+    slot_usage:
+      category:
+        string_serialization: "XRayPhenomenon"
+
+  XRaySource:
+    is_a: Process
+    description: >
+      A production mechanism (tube, bending magnet, undulator, wiggler, FEL,
+      plasma; cosmic synchrotron, accretion, inverse Compton). Principle-level,
+      not a facility inventory.
+    slots:
+      - typical_energy_range_eV
+      - energy_band
+      - brilliance
+      - photon_statistic
+      - cosmic_mechanism
+      - produces
+    slot_usage:
+      category:
+        string_serialization: "XRaySource"
+
+  XRayBeamProperty:
+    is_a: Property
+    description: >
+      A definitional beam or photon quantity (energy, wavelength, wavevector,
+      brilliance, coherence, polarization, bandwidth, fluence, flux).
+    slots:
+      - typical_energy_range_eV
+      - energy_band
+      - wavelength_nm
+      - wavelength_angstrom
+      - wavevector
+      - brilliance
+      - fluence
+      - flux
+      - coherence_type
+      - coherence_length
+      - polarization_state
+      - photon_statistic
+    slot_usage:
+      category:
+        string_serialization: "XRayBeamProperty"
+
+  XRayOpticalConstant:
+    is_a: Property
+    description: >
+      A propagation or optical constant at X-ray energies (δ, β, critical
+      angle, HVL, attenuation or energy-absorption coefficients).
+    slots:
+      - dispersion_delta
+      - absorption_beta
+      - critical_angle
+      - refractive_index_form
+      - attenuation_length
+      - mass_attenuation_coefficient
+      - hvl
+    slot_usage:
+      category:
+        string_serialization: "XRayOpticalConstant"
+
+  AbsorptionEdge:
+    is_a: Parameter
+    description: >
+      A named absorption edge or shell (K, L2, L3, M) as a principle, not a
+      paper’s measured eV on a specific sample.
+    slots:
+      - edge_name
+      - element_symbol
+      - shell
+      - typical_energy_range_eV
+      - governs
+    slot_usage:
+      category:
+        string_serialization: "AbsorptionEdge"
+
+  SecondaryProcess:
+    is_a: Phenomenon
+    description: >
+      A secondary or competing process after the primary interaction
+      (fluorescence yield, Auger, Coster–Kronig, photoelectrons, cascades,
+      thermal spikes).
+    slots:
+      - fluorescence_yield
+      - auger_branching
+      - interaction_channel
+    slot_usage:
+      category:
+        string_serialization: "SecondaryProcess"
+
+  MaterialXRayInteraction:
+    is_a: Phenomenon
+    description: >
+      How X-rays couple to matter as a function of Z, energy, and optical
+      depth (mean free path, damage mechanisms, attenuation). Generic
+      material-interaction concepts only — no polymer or device classes.
+    slots:
+      - atomic_number_dependence
+      - attenuation_length
+      - mean_free_path
+      - optical_depth
+      - damage_mechanism
+      - interaction_channel
+      - involves
+    slot_usage:
+      category:
+        string_serialization: "MaterialXRayInteraction"
+
+  XRaySafetyConcept:
+    is_a: Phenomenon
+    description: >
+      A dose, shielding, or radiation-protection principle (kerma, LET/RBE,
+      ALARA, HVL, buildup, skyshine). Concepts, not a beamline interlock list.
+    slots:
+      - dose_quantity
+      - let
+      - quality_factor
+      - hvl
+      - shielding_material
+      - safety_control
+      - follows_from
+    slot_usage:
+      category:
+        string_serialization: "XRaySafetyConcept"
+
+  CosmicXRayProcess:
+    is_a: Phenomenon
+    description: >
+      An astrophysical mechanism that is the same radiation physics as the
+      lab (accretion, inverse Compton / Comptonization, synchrotron cooling,
+      cosmic X-ray background). Not a source catalog.
+    slots:
+      - cosmic_mechanism
+      - typical_energy_range_eV
+      - optical_depth
+      - same_physics_as
+    slot_usage:
+      category:
+        string_serialization: "CosmicXRayProcess"
+
+  ScatteringGeometry:
+    is_a: ExperimentalTechnique
+    description: >
+      A scattering or diffraction geometry as a q-space choice (transmission,
+      grazing incidence, reflection; small- vs wide-angle as q-range).
+    slots:
+      - geometry
+      - q_definition
+      - technique_family
+    slot_usage:
+      category:
+        string_serialization: "ScatteringGeometry"
+
+  XRayTechniqueFamily:
+    is_a: ExperimentalTechnique
+    description: >
+      A named technique family (XRD, SAXS, XAS, XANES, EXAFS, RIXS, RSoXS)
+      linked *to* principles. One RSoXS instance may exist here; it does not
+      own RSoXSMeasurement nodes from the literature KG.
+    slots:
+      - technique_family
+      - typical_energy_range_eV
+      - geometry
+      - uses
+    slot_usage:
+      category:
+        string_serialization: "XRayTechniqueFamily"
+
+  InteractionCrossSection:
+    is_a: Property
+    description: >
+      A channel cross-section or scattering amplitude (Klein–Nishina, Thomson,
+      atomic form factor, anomalous corrections f′ and f″).
+    slots:
+      - cross_section_form
+      - anomalous_correction
+      - polarization_factor
+      - atomic_number_dependence
+      - interaction_channel
+    slot_usage:
+      category:
+        string_serialization: "InteractionCrossSection"
+
+  ReciprocalSpaceConcept:
+    is_a: Parameter
+    description: >
+      A reciprocal-space or diffraction principle (q, Bragg, Laue, Ewald,
+      form/structure factor, dynamical vs kinematical, Debye–Waller).
+    slots:
+      - q_definition
+      - diffraction_limit
+      - geometry
+      - governs
+    slot_usage:
+      category:
+        string_serialization: "ReciprocalSpaceConcept"
+
+  WaveOpticsConcept:
+    is_a: Parameter
+    description: >
+      A wave-optics or coherence principle (Fresnel/Fraunhofer, coherence
+      lengths, phase contrast, Talbot, X-ray standing waves).
+    slots:
+      - coherence_type
+      - coherence_length
+      - refractive_index_form
+      - critical_angle
+      - governs
+    slot_usage:
+      category:
+        string_serialization: "WaveOpticsConcept"
+
+  AtomicTransition:
+    is_a: Parameter
+    description: >
+      An atomic-structure or spectroscopy principle (selection rules,
+      linewidth, chemical shift, shake-up, XPS kinematics). The atom, not
+      the sample.
+    slots:
+      - selection_rule
+      - linewidth
+      - chemical_shift_principle
+      - edge_name
+      - shell
+      - element_symbol
+      - governs
+    slot_usage:
+      category:
+        string_serialization: "AtomicTransition"
+
+  DetectionPrinciple:
+    is_a: Phenomenon
+    description: >
+      Detection and counting physics (photoelectric conversion, Poisson
+      statistics, QE/DQE, escape peaks, pile-up). Not a detector asset list.
+    slots:
+      - photon_statistic
+      - interaction_channel
+      - uses
+    slot_usage:
+      category:
+        string_serialization: "DetectionPrinciple"
+
+enums:
+  EnergyBand:
+    description: Soft / tender / hard as energy decades, not facility brands.
+    permissible_values:
+      soft:
+        description: Typically below about 2 keV
+      tender:
+        description: Typically about 2–8 keV
+      hard:
+        description: Typically above about 8 keV
+
+slots:
+  typical_energy_range_eV:
+    description: Typical energy or energy decade where the principle applies (eV), not one experiment’s setpoint
+    range: string
+
+  energy_band:
+    description: Soft, tender, or hard band as an energy decade
+    range: EnergyBand
+
+  wavelength_nm:
+    description: Photon wavelength in nanometres (definitional)
+    range: float
+
+  wavelength_angstrom:
+    description: Photon wavelength in ångströms (definitional)
+    range: float
+
+  wavevector:
+    description: Photon or scattering wavevector (k or q) as a definition
+    range: string
+
+  dispersion_delta:
+    description: Real decrement δ in n = 1 − δ − iβ
+    range: string
+
+  absorption_beta:
+    description: Imaginary part β of the X-ray refractive index
+    range: string
+
+  critical_angle:
+    description: Critical angle for total external reflection
+    range: string
+
+  refractive_index_form:
+    description: Form of the refractive index (e.g. n = 1 − δ − iβ)
+    range: string
+
+  brilliance:
+    description: Spectral brightness / brilliance and its units
+    range: string
+
+  fluence:
+    description: Fluence (photons or energy per area)
+    range: string
+
+  flux:
+    description: Flux (photons or energy per time, optionally per area)
+    range: string
+
+  coherence_type:
+    description: Spatial, temporal, or other coherence type
+    range: string
+
+  coherence_length:
+    description: Coherence length or time (definitional)
+    range: string
+
+  polarization_state:
+    description: Linear, circular, elliptical, or unpolarized; Stokes / Jones when relevant
+    range: string
+
+  edge_name:
+    description: Named absorption edge (e.g. C K-edge, Fe K)
+    range: string
+
+  element_symbol:
+    description: Element symbol when the principle is element-specific
+    range: string
+
+  shell:
+    description: Electron shell or subshell (K, L2, L3, M)
+    range: string
+
+  fluorescence_yield:
+    description: Fluorescence yield ω and its competition with Auger decay
+    range: string
+
+  auger_branching:
+    description: Auger or Coster–Kronig branching as a competing channel
+    range: string
+
+  interaction_channel:
+    description: Photoelectric, Compton, Rayleigh, pair, or photonuclear channel
+    range: string
+
+  atomic_number_dependence:
+    description: Approximate Z scaling (e.g. Z^4–Z^5 for photoelectric)
+    range: string
+
+  cross_section_form:
+    description: Named cross-section (Klein–Nishina, Thomson, …)
+    range: string
+
+  anomalous_correction:
+    description: Anomalous scattering factors f′ and f″
+    range: string
+
+  attenuation_length:
+    description: Linear attenuation length or 1/μ
+    range: string
+
+  mass_attenuation_coefficient:
+    description: Mass attenuation coefficient μ/ρ
+    range: string
+
+  optical_depth:
+    description: Optical depth or transmission regime (including Compton-thick/thin)
+    range: string
+
+  mean_free_path:
+    description: Photon or photoelectron mean free path
+    range: string
+
+  damage_mechanism:
+    description: Radiation-damage channel (radiolysis, knock-on, heating, charging)
+    range: string
+
+  dose_quantity:
+    description: Dose quantity being defined (fluence, kerma, absorbed, equivalent, effective)
+    range: string
+
+  let:
+    description: Linear energy transfer (definitional)
+    range: string
+
+  quality_factor:
+    description: Radiation quality factor or RBE as used in protection quantities
+    range: string
+
+  hvl:
+    description: Half-value or tenth-value layer
+    range: string
+
+  shielding_material:
+    description: Shielding regime or material class (PE- vs Compton-dominated; not a parts list)
+    range: string
+
+  safety_control:
+    description: A protection principle (ALARA, time/distance/shielding) — not a beamline interlock asset
+    range: string
+
+  cosmic_mechanism:
+    description: Astrophysical production or transport mechanism (accretion, IC, synchrotron cooling, CXB)
+    range: string
+
+  geometry:
+    description: Scattering or diffraction geometry (transmission, GI, Bragg vs Laue)
+    range: string
+
+  q_definition:
+    description: Definition of momentum transfer q or the Ewald construction
+    range: string
+
+  diffraction_limit:
+    description: Kinematical vs dynamical diffraction limit
+    range: string
+
+  selection_rule:
+    description: Dipole or multipole selection rule for an atomic transition
+    range: string
+
+  linewidth:
+    description: Natural linewidth or core-hole lifetime
+    range: string
+
+  chemical_shift_principle:
+    description: Chemical shift of an edge as a change in local potential — not a sample result
+    range: string
+
+  polarization_factor:
+    description: Polarization factor in Thomson / Klein–Nishina scattering
+    range: string
+
+  magnetic_channel:
+    description: Magnetic or dichroic channel (spin, orbital, XMCD/XMLD) as polarization × spin–orbit
+    range: string
+
+  photon_statistic:
+    description: Photon arrival statistic (Poisson, bunching, chaotic vs FEL)
+    range: string
+
+  technique_family:
+    description: How a named technique uses the principle (secondary to the physics)
+    range: string
+
+  produces:
+    description: Source or process produces a beam property or radiation phenomenon
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:produces
+
+  described_by:
+    description: Phenomenon is described by a cross-section or optical constant
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:described_by
+
+  involves:
+    description: Material interaction involves a primary or secondary phenomenon
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:involves
+
+  governs:
+    description: A parameter or concept governs a phenomenon, edge, or technique
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:governs
+
+  uses:
+    description: Technique or detection principle uses an interaction channel or phenomenon
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:uses
+
+  follows_from:
+    description: Safety or dose concept follows from energy deposition / material interaction
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:follows_from
+
+  same_physics_as:
+    description: Cosmic and lab nodes that are the same radiation-physics principle
+    domain: Thing
+    range: Thing
+    multivalued: true
+    slot_uri: xray:same_physics_as
