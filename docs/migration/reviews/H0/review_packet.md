@@ -29,7 +29,10 @@ scope verified?* H0 blocks T01 and all branch-specific implementation.
 | `8cefac3` | plan v8.0 and short-form specs |
 | `2825a39` | companion bundle v8, verbatim |
 | `379010e` | T00 baseline lock and test results |
-| this packet's commit | T00 audit, inventories, LLM/QA baseline, this packet |
+| `2569a4f` | T00 audit, inventories, LLM/QA baseline, this packet |
+| `f0c6ce3` | E1: untrack `papers/` |
+| `28820b0` | E2: mark PyMuPDF sites for Docling replacement |
+| `bfbec85` | E3: exclude Tiled catalog DB from the image |
 
 No commit touches `main` or `rsoxs`. Nothing was pushed. No source PDF, key,
 catalog or runtime database was added by any migration commit (the PDFs and
@@ -127,22 +130,38 @@ are recorded, not fixed:
     Exceptions become `error` with `stream_error` on HTTP 200. Disconnect
     cancels with no terminal event. No backend test covers the SSE routes.
 
-## 5. Escalations requiring an owner decision
+## 5. Escalations
 
-From `license_dependency_audit.md`:
+Details are in `license_dependency_audit.md`.
 
-- **E1: 90 publisher PDFs tracked in public repos.** `papers/` (83 Wiley).
-  Conflicts with D19/D28/D31. Options: keep for now / remove from the tip in a
-  normal commit / purge history (a rewrite: needs explicit approval and
-  upstream coordination).
-- **E2: PyMuPDF is AGPL-3.0.** It is a direct runtime dependency in 10 modules
-  and is network-served in the ALS images. Options: accept AGPL obligations /
-  Artifex commercial license / alternative parser. Can be settled at H1 with
-  the T04 lock.
-- **E3: Corpus data baked into the agent image.** `COPY . .` with
-  `.dockerignore` not excluding `storage/kg`, `storage/terminology` or
-  `storage/tiled_catalog.db`. Conflicts with D28/D31. Proposed fix belongs to
-  T24A at H1.
+Decided by the owner on 2026-10-09 and applied on `forge_merge`:
+
+- **E1: 90 publisher PDFs tracked in public repos.** Decision: gitignore them
+  here; leave `main` alone. `f0c6ce3` untracks `papers/` (the `.gitignore` rule
+  already existed). The files stay on disk. History and `main` still contain
+  them.
+- **E2: PyMuPDF is AGPL-3.0.** Decision: keep it for now; it will be deprecated
+  in this repo in favor of Docling. `28820b0` marks all 13 import sites and the
+  requirement with `DEPRECATED(pymupdf)`. The Docling switch must resolve the
+  Docling/Tiled dependency conflict at T04 and keep the geometry that evidence
+  locators use (T05/T09).
+- **E3: Corpus data baked into the agent image.** Decision: `storage/` may be
+  in the image; the Tiled catalog DB may not, except in a local image.
+  `bfbec85` excludes `**/tiled_catalog*.db` via `.dockerignore`. The future
+  `:local` target (T24B) may bundle a local catalog. This is an owner exception
+  to the plan's "exclude storage/kg from build layers" (section 4.14).
+
+After E1-E3 the isolated pytest run on a fresh HEAD export is unchanged (733
+passed, same 3 failures and 15 errors).
+
+Still open:
+
+- **E4: Local paper-text index copied into locally built images.**
+  `storage/source_index/literature/chunks.jsonl` (gitignored) contains paper
+  text chunks with page locators. Under E3, an image built from a working
+  checkout bakes it in (CI builds from clean checkouts would not). This
+  conflicts with D19/D28. Proposed: add `storage/source_index/` to
+  `.dockerignore` and mount it at runtime.
 
 Other findings for H1 scoping (no decision needed now):
 
@@ -189,9 +208,8 @@ Approve H0 with this exact scope:
    deviations in section 3 as known, unfixed baseline failures.
 2. Accept the LLM/QA baseline (`f2w_llm_qa_baseline.json`) and parity inventory
    as the H0 reference, including the default dispositions in section 6.
-3. For E1, E2 and E3, either decide now or record each as an open item that
-   must be resolved by H1. E1 can be deferred without blocking contract work,
-   because no migration commit adds or moves papers.
+3. E1-E3 are decided and applied (section 5). Decide E4, or record it as an
+   open item to resolve by T24A at H1.
 4. Unblock T01 and the H1 contract tasks (T18A, T19A, T20A, T21A, T22A, T23A,
    T24A, T25A, T26A), which remain documentation and contract work until H1.
 

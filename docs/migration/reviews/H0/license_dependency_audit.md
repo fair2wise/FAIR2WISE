@@ -4,6 +4,19 @@ Audited 2026-10-09 against the frozen baseline `222b1e7`. Static audit of file
 notices, package metadata and tracked assets. Not legal advice. Items marked
 **escalate** need an owner decision before the work they affect.
 
+## Owner decisions (2026-10-09)
+
+| Item | Decision | Applied in |
+|---|---|---|
+| E1 | Gitignore `papers/` on `forge_merge`; leave `main` as it is. | `f0c6ce3` untracks the 90 PDFs (already listed in `.gitignore`). No history rewrite. |
+| E2 | Keep PyMuPDF for now. Mark every use. It will be deprecated in this repo in favor of Docling (Alex's request). | `28820b0` adds `DEPRECATED(pymupdf)` markers at 13 import sites and in `requirements/runtime.in`. |
+| E3 | `storage/` may be in the image. The Tiled catalog DB may not, except in a local image. | `bfbec85` excludes `**/tiled_catalog*.db` and sidecars via `.dockerignore`. |
+
+After these commits the isolated pytest run on a fresh export of HEAD is
+unchanged: 733 passed, with the same 3 failures and 15 errors.
+
+New finding from the E3 check: see E4 below.
+
 ## Escalations
 
 ### E1: Publisher PDFs tracked in a public repository (escalate)
@@ -54,6 +67,41 @@ notices, package metadata and tracked assets. Not legal advice. Items marked
   tracked by Git. These files were not checked for source-text excerpts. That
   check belongs to T21A/T26A (disclosure review before commit-ready status).
 - `splash_links/links.sqlite` is tracked in Git and excluded from the image.
+
+### E2 site list (as marked in `28820b0`)
+
+`app/modules/extract_terms.py`, `app/modules/kg_rag_api.py`,
+`app/modules/f2w_agent/download_agent.py` (nested), `app/modules/f2w_agent/paper_evidence_agent.py` (nested),
+`app/modules/hybrid_rag/chunker.py` (nested), `app/modules/term_extractor/orchestrator.py`,
+`app/modules/term_extractor/provenance.py`, `app/modules/legacy/extract_terms.py`,
+`app/modules/legacy/extract_terms_linkml.py`, `app/modules/legacy/kg_rag_ollama.py`,
+`scripts/app/modules/kg_rag_api.py`, `scripts/get_pdf_years.py`, `scripts/harvest_rsoxs.py` (nested),
+and `requirements/runtime.in`. Find them with `git grep -n 'DEPRECATED(pymupdf)'`.
+
+Docling note for T04/L-12: the plan (section 3) records that Docling's
+pydantic-settings requirement conflicts with Tiled in the donor environment.
+The Docling switch must resolve that in the full-profile lock (Tiled 0.2.19,
+FastAPI, figures) and must keep page/figure/table geometry used by evidence
+locators (plan T05, T09).
+
+### E4: Local paper-text index is copied into locally built images (escalate)
+
+Found while verifying E3 with a throwaway build of the context:
+
+- `storage/source_index/literature/chunks.jsonl` (gitignored, local only)
+  holds source-RAG chunks of paper text: 1200-character `text` fields with
+  `work_id`, `page` and `locator`. `storage/source_index/ops_bl1101/` holds ops
+  document chunks.
+- Because `storage/` stays in the image (E3), any image built from a working
+  checkout that has this index bakes paper text into a layer. CI builds from a
+  clean checkout would not include it, because the directory is gitignored.
+- This conflicts with D19 (no reconstructable source-text export) and D28
+  (parsed artifacts are mounted, not image content).
+- `storage/ontologies/chebi.obo` (242 MB, gitignored) is also copied. It is
+  ChEBI under CC BY 4.0: allowed, but needs attribution if shipped.
+- Proposed fix (not applied, pending owner decision): add
+  `storage/source_index/` to `.dockerignore`, keeping the rest of `storage/`,
+  and mount the index at runtime.
 
 ## Repository and vendored notices
 
