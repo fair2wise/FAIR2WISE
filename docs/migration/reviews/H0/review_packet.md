@@ -2,7 +2,7 @@
 
 Gate: H0
 Approver: project owner
-Status: **awaiting owner decision**
+Status: **approved 2026-10-09** (see decision.json)
 
 H0 asks: *are the exact confirmed rsoxs source, LLM/QA baseline, tests and
 scope verified?* H0 blocks T01 and all branch-specific implementation.
@@ -215,9 +215,9 @@ model evaluation or change to `main`/`rsoxs`.
 
 ## Owner decision
 
-Decision:
-Limits:
-Date:
+Decision: approved (owner reply: "continue")
+Limits: section 8 scope only; see `decision.json` `not_authorized`
+Date: 2026-10-09
 
 Record the decision in `docs/migration/reviews/H0/decision.json`. Changes
 outside the approved scope require a new review.

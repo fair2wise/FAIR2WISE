@@ -1,0 +1,23 @@
+{
+  "gate": "H0",
+  "status": "approved",
+  "approver": "project owner",
+  "decided_on": "2026-10-09",
+  "basis": "Owner replied \"continue\" to the request to approve section 8 of review_packet.md; recorded as approval of exactly that scope.",
+  "owner_response_verbatim": "continue",
+  "approved_scope": [
+    "222b1e7b130567dbf4a3242697ac2b465794a38d is the verified frozen baseline; 2430320 is a recorded pre-migration change, not baseline.",
+    "The 18 pre-existing test deviations in review_packet.md section 3 (15 bl1101 data errors, 2 ambient-CBORG_API_KEY failures, 1 pixi-precondition failure) are accepted as known, unfixed baseline failures.",
+    "f2w_llm_qa_baseline.json and f2w_baseline_inventory.json, including its default dispositions, are the H0 reference.",
+    "Escalations E1-E4 are decided and applied as recorded in license_dependency_audit.md.",
+    "T01 and the H1 contract tasks (T18A, T19A, T20A, T21A, T22A, T23A, T24A, T25A, T26A) are unblocked."
+  ],
+  "not_authorized": [
+    "Any push, pull request, or remote write (F2W or FORGE)",
+    "Changes to main or rsoxs",
+    "Image builds for publication, Tiled access, or live/paid model evaluation",
+    "Runtime implementation beyond contract/test-seam work before H1"
+  ],
+  "evidence_commits": ["379010e", "2569a4f", "f0c6ce3", "28820b0", "bfbec85", "ca14b75", "23d3d05"],
+  "invalidated_by": "Any item in task_graph.json H0.approval_invalidated_by, including a change of the baseline commit or source-lock identity."
+}
