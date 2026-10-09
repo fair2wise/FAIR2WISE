@@ -1,0 +1,19 @@
+flowchart TB
+ GH["GitHub Actions / reviewed commit"] --> L[":local + UI / API / workers + Tiled"]
+ GH --> D[":als-dev + app / no Tiled server"]
+ GH --> P[":als-prod + app / no Tiled server"]
+ A["Ansible / FQDN /fair2wise / mounts / secrets / digest"] --> D
+ A --> P
+ LU["Local: no sign-in / full application capabilities / loopback default"] --> L
+ AU["ALS: Tiled sign-in / ordinary chat / admin privileged"] --> D
+ AU --> P
+ L --> LT["Local Tiled Graph 0.2.19 / internal service writer"]
+ D --> DT["tiled-staging.als.lbl.gov / Graph 0.2.19"]
+ P --> PT["tiled.als.lbl.gov / Graph 0.2.19"]
+ KG["Frozen versioned KG JSON committed to Git"] --> V["Staging validation binds exact hash"]
+ V --> E["Approved commit/path/hash export to production mount"]
+ E --> I["Production-specific ALS admin approval and receipt"]
+ I --> PT
+ X["Owner + Alex coordinate FORGE merge"] --> F["FORGE consumes F2W agents and released literature"]
+ F --> P
+ NOTE["No papers or corpus snapshots in images; no re-extraction for promotion; no local access fallback on ALS"]

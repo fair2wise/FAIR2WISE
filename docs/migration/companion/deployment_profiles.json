@@ -1,0 +1,100 @@
+{
+  "version": "8.0",
+  "kind": "deployment_requirements_not_live_config",
+  "base_path": "/fair2wise",
+  "image_repository": {
+    "value": "ghcr.io/fair2wise/fair2wise",
+    "status": "proposed_reuse_of_existing_ghcr"
+  },
+  "publication_writer": "F2W_Tiled_admin_account",
+  "user_tiled_write_policy": "profile_specific_local_full_als_admin",
+  "tiled_version": "0.2.19",
+  "kg_creation": "versioned_json",
+  "paper_delivery": "deployment_mount_not_image",
+  "profiles": [
+    {
+      "tag": "local",
+      "docker_target": "local",
+      "tiled_mode": "managed",
+      "bundles_tiled_server": true,
+      "tiled_url": null,
+      "proposed_internal_tiled_url": "http://127.0.0.1:8765",
+      "graph_target": "application_local_tiled",
+      "fqdn": "local_operator_config",
+      "identity_authority": "local_operator_context",
+      "authorization_mode": "local_trusted",
+      "user_sign_in_required": false,
+      "user_role_checks_required": false,
+      "user_capabilities": "all_application_capabilities",
+      "audit_actor": "local-operator",
+      "authenticated_user_subject": null,
+      "default_host_bind": "127.0.0.1",
+      "wider_exposure_requires_explicit_operator_configuration": true,
+      "backend_tiled_service_authentication": "configured_local_writer_credential"
+    },
+    {
+      "tag": "als-dev",
+      "docker_target": "als-dev",
+      "tiled_mode": "external",
+      "bundles_tiled_server": false,
+      "tiled_url": "https://tiled-staging.als.lbl.gov/",
+      "graph_target": "ALS_staging",
+      "fqdn": "ansible_inventory",
+      "identity_authority": "profile_tiled_instance",
+      "owner_confirmed_graph_0_2_19": true,
+      "authorization_mode": "tiled_authenticated",
+      "user_sign_in_required": true,
+      "ordinary_user_capabilities": "chat_and_bounded_read_support",
+      "admin_user_capabilities": "all_scoped_application_capabilities",
+      "trusted_local_override_allowed": false
+    },
+    {
+      "tag": "als-prod",
+      "docker_target": "als-prod",
+      "tiled_mode": "external",
+      "bundles_tiled_server": false,
+      "tiled_url": "https://tiled.als.lbl.gov/",
+      "graph_target": "ALS_production",
+      "fqdn": "ansible_inventory",
+      "identity_authority": "profile_tiled_instance",
+      "owner_confirmed_graph_0_2_19": true,
+      "authorization_mode": "tiled_authenticated",
+      "user_sign_in_required": true,
+      "ordinary_user_capabilities": "chat_and_bounded_read_support",
+      "admin_user_capabilities": "all_scoped_application_capabilities",
+      "trusted_local_override_allowed": false
+    }
+  ],
+  "proposed_public_api_prefix": "/fair2wise/api",
+  "proposed_model_api_prefix": "/fair2wise/model-api",
+  "edge_preserves_prefix": {
+    "value": true,
+    "status": "proposed_H1_contract"
+  },
+  "runtime_credentials_baked": false,
+  "replication": "none",
+  "production_promotion": "owner_policy_O06_pending",
+  "backup_details": "O07_required_before_H7",
+  "local_inference_and_platforms": "O08_pending",
+  "application_tests_executed": false,
+  "authentication": {
+    "selection": "trusted_server_startup_profile",
+    "request_selectable": false,
+    "local": "local_trusted_no_user_sign_in",
+    "als-dev": "tiled_authenticated",
+    "als-prod": "tiled_authenticated",
+    "technical_writer": "separate_F2W_admin_account",
+    "als_auth_failure_fallback_to_local": false
+  },
+  "kg_promotion": {
+    "source": "committed_F2W_versioned_JSON",
+    "selection": [
+      "git_commit",
+      "relative_path",
+      "sha256"
+    ],
+    "requires_staging_pass": true,
+    "reextract_in_production": false,
+    "bundled_in_images": false
+  }
+}

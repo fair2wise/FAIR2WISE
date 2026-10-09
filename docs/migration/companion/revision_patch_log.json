@@ -1,0 +1,191 @@
+{
+  "version": "6.0",
+  "edits": [
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Only O03 (job-settings policy) remains for owner confirmatio"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Read this document first, then `DECISIONS.md`,"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Tiled Graph ownership is logical even when hosted with FORGE"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "### 4.6 Tiled deployment and owner-write support"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "### 4.7 Model selection and admission controls"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "pyproject.toml                          # package metadata a"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "## 5. Preserve the verified F2W baseline before importing do"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Keep a frozen copy/build from this archive for every integra"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "The browser's `liveAgent.ts` defaults to `http://127.0.0.1:8"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "**Critical Splash/Tiled compatibility decision:**"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Preserve persisted settings/session/favorites keys and migra"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "| **H1 - Architecture contracts** |"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "| **H4 - Integrated candidate corpus** |"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "| **H6 - Consumer and application parity** |"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "| **H7 - Cutover and retirement** |"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "## 8. What can run in parallel, and what cannot"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "| Evaluation | `evals/binary/`, curated fixtures, contract/r"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "## 13. API, deployment and cutover detail"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "## 14. Deliverables the coding agent must produce"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "**Definition of done:**"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "**Engineering choices to present at H1:**"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "**Before H7:** agree a compatibility window and deletion lis"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "managed/central Tiled and source-disclosure design |"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Tiled Graph adapter, jobs/curation, canonicalization proposa"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "Performance profiling, canary preparation, dependency/instal"
+    ],
+    [
+      "MIGRATION_PLAN.md",
+      1,
+      "## 17. Remaining clarification for the owner"
+    ],
+    [
+      "TILED_DEPLOYMENT_SPEC.md",
+      1,
+      "Managed and external are alternatives for a configured conne"
+    ],
+    [
+      "TILED_DEPLOYMENT_SPEC.md",
+      1,
+      "Namespaces identify scope; actual server permission configur"
+    ],
+    [
+      "TILED_DEPLOYMENT_SPEC.md",
+      1,
+      "The application creates disposable instances, waits for actu"
+    ],
+    [
+      "TILED_DEPLOYMENT_SPEC.md",
+      1,
+      "- Owner A can write A's literature scope and cannot write/de"
+    ],
+    [
+      "FRONTEND_COMPATIBILITY.md",
+      1,
+      "It must work against the migrated F2W backend without mandat"
+    ],
+    [
+      "FRONTEND_COMPATIBILITY.md",
+      1,
+      "Keep base"
+    ],
+    [
+      "JSON_KG_PUBLICATION_SPEC.md",
+      1,
+      "KG creation must finish with Tiled unavailable."
+    ],
+    [
+      "JSON_KG_PUBLICATION_SPEC.md",
+      1,
+      "Preserve edit UX, IDs, citations, relationship changes and s"
+    ],
+    [
+      "JSON_KG_PUBLICATION_SPEC.md",
+      1,
+      "It may acknowledge an edit after durable journaling and its "
+    ],
+    [
+      "BINARY_EVALUATION_SPEC.md",
+      1,
+      "The inventory now contains 56 proposed cases."
+    ],
+    [
+      "DECISIONS.md",
+      1,
+      "Open: O03 requires owner confirmation after the FORGE job-se"
+    ]
+  ],
+  "historical_revision_note": "Inherited v6 patch log; revision_patch_log_v7.json and CHANGES_V7.md describe the current revision."
+}

@@ -1,0 +1,180 @@
+{
+  "version": "8.0",
+  "purpose": "D34 local-access proposals; no executed application results",
+  "cases": [
+    {
+      "case_id": "LOCAL-01",
+      "suite": "local_access",
+      "title": "Local application opens fully without sign-in",
+      "required_proposal": true,
+      "expected_rule": "With no Tiled user account/session/token, /fair2wise opens without login redirect; all application controls are available. Repeat with expired and non-admin user credentials without restricting local capabilities.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-02",
+      "suite": "local_access",
+      "title": "All local administrative workflows are callable without login",
+      "required_proposal": true,
+      "expected_rule": "Without user sign-in, run literature discovery/intake/extraction/figure processing, Knowledge Operations, curation, explicit approval, versioned JSON creation, local Tiled publication and graph editing using isolated fixtures. All preserve their scientific/data contracts.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-03",
+      "suite": "local_access",
+      "title": "Local audit records operator rather than invented authentication",
+      "required_proposal": true,
+      "expected_rule": "Use deployment_profile=local and authorization_mode=local_trusted. requested_by=local-operator; approved_by becomes local-operator only after explicit approval. No authenticated user subject or role-check timestamp is fabricated; executed_as is the separate configured writer.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-04",
+      "suite": "local_access",
+      "title": "Local API SDK Tools and workers use the same access policy",
+      "required_proposal": true,
+      "expected_rule": "No user login is required for local direct Python/CLI, FastAPI, agent Tools or scoped background resume; work stays within the recorded local target/effects and respects cancellation and explicit approvals.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-05",
+      "suite": "local_access",
+      "title": "Local user identity lookup is not an access prerequisite",
+      "required_proposal": true,
+      "expected_rule": "Disable or mock user-identity/admin lookup as unavailable while preserving the local Tiled graph service. Local application capabilities and publication still work through service credentials, with zero user-role gate calls.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-06",
+      "suite": "local_access",
+      "title": "Backend service failure is not a user login challenge",
+      "required_proposal": true,
+      "expected_rule": "Missing/invalid local Tiled service credentials produce a truthful graph-operation failure, not a request for user sign-in. Unrelated local QA/JSON capabilities stay available; credentials are not returned to the browser.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-07",
+      "suite": "local_access",
+      "title": "Trusted access cannot be selected through an ALS request",
+      "required_proposal": true,
+      "expected_rule": "On als-dev and als-prod, client/header/model/payload claims of local_trusted, a local hostname or a saved local grant do not authorize privileged calls. Identity outages fail closed; ALS rejects local_trusted startup overrides.",
+      "deployment_profiles": [
+        "local",
+        "als-dev",
+        "als-prod"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-08",
+      "suite": "local_access",
+      "title": "Local exposure defaults to loopback",
+      "required_proposal": true,
+      "expected_rule": "The local launcher host bind defaults to 127.0.0.1 or equivalent loopback. Wider exposure requires explicit operator configuration and communicates that every reachable user has full application access.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-09",
+      "suite": "local_access",
+      "title": "Local full access does not disable scientific or source rules",
+      "required_proposal": true,
+      "expected_rule": "No-login local operation still enforces schema/evidence validation, immutable JSON versions, target-specific import checks, rate limits, explicit approval and private full-paper/crop handling. The agent cannot fabricate owner H-gate approval.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-10",
+      "suite": "local_access",
+      "title": "Local approvals do not authorize central publication",
+      "required_proposal": true,
+      "expected_rule": "A local job/ApprovalRecord/receipt cannot authorize staging or production import. Receiving ALS deployment checks its own profile, verified admin and target scope before invoking its configured writer.",
+      "deployment_profiles": [
+        "local",
+        "als-dev",
+        "als-prod"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    }
+  ]
+}

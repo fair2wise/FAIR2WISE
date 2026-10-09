@@ -1,0 +1,308 @@
+[
+  {
+    "path": "/health",
+    "method": "GET",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.health",
+    "line": 6625,
+    "end_line": 6642,
+    "decorator": "app.get('/health')"
+  },
+  {
+    "path": "/settings",
+    "method": "GET",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.get_settings",
+    "line": 6645,
+    "end_line": 6647,
+    "decorator": "app.get('/settings', response_model=AgentSettingsResponse)"
+  },
+  {
+    "path": "/settings",
+    "method": "PUT",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.update_settings",
+    "line": 6650,
+    "end_line": 6655,
+    "decorator": "app.put('/settings', response_model=AgentSettingsResponse)"
+  },
+  {
+    "path": "/session/reset",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.reset_session",
+    "line": 6658,
+    "end_line": 6660,
+    "decorator": "app.post('/session/reset', response_model=SessionResetResponse)"
+  },
+  {
+    "path": "/session/{session_id}",
+    "method": "DELETE",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.delete_session",
+    "line": 6663,
+    "end_line": 6668,
+    "decorator": "app.delete('/session/{session_id}')"
+  },
+  {
+    "path": "/graph",
+    "method": "GET",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.graph",
+    "line": 6671,
+    "end_line": 6673,
+    "decorator": "app.get('/graph', response_model=GraphPayload)"
+  },
+  {
+    "path": "/graph/nodes/search",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.search_graph_nodes",
+    "line": 6676,
+    "end_line": 6683,
+    "decorator": "app.post('/graph/nodes/search', response_model=GraphNodeSearchResponse)"
+  },
+  {
+    "path": "/graph/neighborhood/{node_id:path}",
+    "method": "GET",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.graph_neighborhood",
+    "line": 6686,
+    "end_line": 6694,
+    "decorator": "app.get('/graph/neighborhood/{node_id:path}', response_model=GraphPayload)"
+  },
+  {
+    "path": "/graph/node/{node_id}",
+    "method": "GET",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.graph_node",
+    "line": 6716,
+    "end_line": 6748,
+    "decorator": "app.get('/graph/node/{node_id}', response_model=GraphNode)"
+  },
+  {
+    "path": "/graph/node/{node_id}",
+    "method": "PATCH",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.patch_graph_node",
+    "line": 6751,
+    "end_line": 6760,
+    "decorator": "app.patch('/graph/node/{node_id}', response_model=GraphNode)"
+  },
+  {
+    "path": "/graph/upload",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.upload_graph",
+    "line": 6763,
+    "end_line": 6768,
+    "decorator": "app.post('/graph/upload', response_model=GraphUploadResponse)"
+  },
+  {
+    "path": "/chat",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.chat",
+    "line": 6771,
+    "end_line": 6787,
+    "decorator": "app.post('/chat', response_model=ChatResponse)"
+  },
+  {
+    "path": "/chat/action",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.chat_action",
+    "line": 6790,
+    "end_line": 6803,
+    "decorator": "app.post('/chat/action', response_model=ChatResponse)"
+  },
+  {
+    "path": "/publications/search",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.publication_search",
+    "line": 6806,
+    "end_line": 6815,
+    "decorator": "app.post('/publications/search', response_model=PublicationSearchResponse)"
+  },
+  {
+    "path": "/chat/stream",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.chat_stream",
+    "line": 6818,
+    "end_line": 6908,
+    "decorator": "app.post('/chat/stream')"
+  },
+  {
+    "path": "/chat/action/stream",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.chat_action_stream",
+    "line": 6911,
+    "end_line": 6999,
+    "decorator": "app.post('/chat/action/stream')"
+  },
+  {
+    "path": "/traces/{turn_id}",
+    "method": "GET",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.get_trace",
+    "line": 7002,
+    "end_line": 7007,
+    "decorator": "app.get('/traces/{turn_id}')"
+  },
+  {
+    "path": "/telemetry/ui",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.telemetry_ui",
+    "line": 7010,
+    "end_line": 7016,
+    "decorator": "app.post('/telemetry/ui')"
+  },
+  {
+    "path": "/annotations",
+    "method": "POST",
+    "file": "app/modules/f2w_agent/api.py",
+    "symbol": "create_app.create_annotation",
+    "line": 7019,
+    "end_line": 7029,
+    "decorator": "app.post('/annotations')"
+  },
+  {
+    "path": "/api/chat",
+    "method": "POST",
+    "file": "app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.api_chat",
+    "line": 246,
+    "end_line": 259,
+    "decorator": "app.post('/api/chat')"
+  },
+  {
+    "path": "/v1/chat/completions",
+    "method": "POST",
+    "file": "app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.openai_chat_completions",
+    "line": 262,
+    "end_line": 282,
+    "decorator": "app.post('/v1/chat/completions')"
+  },
+  {
+    "path": "/api/tags",
+    "method": "GET",
+    "file": "app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.list_models",
+    "line": 285,
+    "end_line": 291,
+    "decorator": "app.get('/api/tags')"
+  },
+  {
+    "path": "/api/version",
+    "method": "GET",
+    "file": "app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.ollama_version",
+    "line": 294,
+    "end_line": 296,
+    "decorator": "app.get('/api/version')"
+  },
+  {
+    "path": "/v1/models",
+    "method": "GET",
+    "file": "app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.openai_models",
+    "line": 299,
+    "end_line": 311,
+    "decorator": "app.get('/v1/models')"
+  },
+  {
+    "path": "/api/ps",
+    "method": "GET",
+    "file": "app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.list_processes",
+    "line": 314,
+    "end_line": 316,
+    "decorator": "app.get('/api/ps')"
+  },
+  {
+    "path": "/api/chat",
+    "method": "POST",
+    "file": "scripts/app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.api_chat",
+    "line": 221,
+    "end_line": 234,
+    "decorator": "app.post('/api/chat')"
+  },
+  {
+    "path": "/v1/chat/completions",
+    "method": "POST",
+    "file": "scripts/app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.openai_chat_completions",
+    "line": 237,
+    "end_line": 257,
+    "decorator": "app.post('/v1/chat/completions')"
+  },
+  {
+    "path": "/api/tags",
+    "method": "GET",
+    "file": "scripts/app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.list_models",
+    "line": 260,
+    "end_line": 266,
+    "decorator": "app.get('/api/tags')"
+  },
+  {
+    "path": "/api/version",
+    "method": "GET",
+    "file": "scripts/app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.ollama_version",
+    "line": 269,
+    "end_line": 271,
+    "decorator": "app.get('/api/version')"
+  },
+  {
+    "path": "/v1/models",
+    "method": "GET",
+    "file": "scripts/app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.openai_models",
+    "line": 274,
+    "end_line": 286,
+    "decorator": "app.get('/v1/models')"
+  },
+  {
+    "path": "/api/ps",
+    "method": "GET",
+    "file": "scripts/app/modules/kg_rag_api.py",
+    "symbol": "create_fastapi_app.list_processes",
+    "line": 289,
+    "end_line": 291,
+    "decorator": "app.get('/api/ps')"
+  },
+  {
+    "path": "/",
+    "method": "GET",
+    "file": "scripts/paper_finder.py",
+    "symbol": "create_app.index",
+    "line": 601,
+    "end_line": 616,
+    "decorator": "app.get('/')"
+  },
+  {
+    "path": "/detected",
+    "method": "GET",
+    "file": "scripts/paper_finder.py",
+    "symbol": "create_app.detected",
+    "line": 619,
+    "end_line": 624,
+    "decorator": "app.get('/detected')"
+  },
+  {
+    "path": "/action",
+    "method": "POST",
+    "file": "scripts/paper_finder.py",
+    "symbol": "create_app.action",
+    "line": 627,
+    "end_line": 693,
+    "decorator": "app.post('/action')"
+  }
+]

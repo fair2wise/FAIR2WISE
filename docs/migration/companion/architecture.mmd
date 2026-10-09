@@ -1,0 +1,27 @@
+flowchart TB
+  UI["F2W UI /fair2wise + FORGE client"] --> MODE["Trusted server deployment profile"]
+  MODE --> LOCAL[":local - all application access / no user login"]
+  MODE --> ALS["ALS - Tiled sign-in / verified principal + role"]
+  LOCAL --> API["Shared API / SDK / application policy"]
+  ALS --> API
+  API --> READ["Chat + scoped read-only supporting Tools"]
+  API --> WRITE["Local operator or ALS admin: ingestion / edits / approvals"]
+  READ --> RT["LangGraph Skills / Tools or direct services"]
+  WRITE --> RT
+  RT --> DOMAIN["Literature / extraction / canonicalization / operations / paper figures"]
+  SCHEMA["Preserved schemas: loading / validation / versions"] -.-> DOMAIN
+  LLM["Existing F2W model paths + rate limits"] -.-> DOMAIN
+  SOURCE["Private mounted source papers / text / crops"] --> DOMAIN
+  DOMAIN --> JSON["Versioned JSON KG + manifest / preserved json2kg"]
+  JSON --> GIT["Reviewed Git commit + path + hash"]
+  GIT --> TEST["Staging binary PASS on identical bytes"]
+  TEST --> SELECT["Production selection + verified ALS-admin approval"]
+  SELECT --> IMPORT["Saved JSON to Tiled importer / no inference"]
+  JSON --> LIMPORT["Explicit local approval + local import"]
+  LIMPORT --> LT["Local Tiled 0.2.19"]
+  IMPORT --> AT["ALS Tiled 0.2.19"]
+  LT --> READ
+  AT --> READ
+  WRITE --> EDIT["Scoped edit journal to next JSON version"]
+  EDIT --> JSON
+  READ --> OUT["Derived answers / relevant exact quotes / citations"]

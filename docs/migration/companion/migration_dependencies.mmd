@@ -1,0 +1,216 @@
+flowchart TB
+  T00["T00: Verify uploaded source in real Git; prepare forge_merge; execute baseline"]
+  T01["T01: Shared architecture contracts"]
+  H0 --> T01
+  T02["T02: Scoped LangGraph runtime and policy hooks"]
+  H1 --> T02
+  T03["T03: Existing F2W read path as a Tool and Skill"]
+  T02 --> T03
+  T25B --> T03
+  T04["T04: Importable app/modules package, SDK and agent factory"]
+  H2 --> T04
+  T05["T05: Literature providers, parser and staging"]
+  H2 --> T05
+  T21B --> T05
+  T06A["T06A: Lossless scientific contract mapping under preserved F2W schema"]
+  H2 --> T06A
+  T06B["T06B: Extraction strategies and validated evidence"]
+  H3 --> T06B
+  T05 --> T06B
+  T07A["T07A: Canonicalization proposal and campaign services"]
+  H2 --> T07A
+  T07B["T07B: Canonicalization apply adapters"]
+  H3 --> T07B
+  T07A --> T07B
+  T08A --> T07B
+  T08A["T08A: Required Tiled Graph read adapter and retrieval parity"]
+  H2 --> T08A
+  T20B --> T08A
+  T08B["T08B: Import versioned F2W JSON into Tiled 0.2.19; ownership, receipts and provenance"]
+  H3 --> T08B
+  T08A --> T08B
+  T23B --> T08B
+  T09["T09: Required paper figures, panels, tables, axes and scale evidence"]
+  H2 --> T09
+  T05 --> T09
+  T10["T10: Durable jobs and curation"]
+  H2 --> T10
+  T05 --> T10
+  T08A --> T10
+  T11A["T11A: Required binary case specification, approved references and baseline fixtures"]
+  H1 --> T11A
+  T11B["T11B: Required binary extraction/chat and integrated evaluation runner"]
+  H3 --> T11B
+  T11A --> T11B
+  T12["T12: Integrated staging-only pilot"]
+  T04 --> T12
+  T05 --> T12
+  T06B --> T12
+  T07B --> T12
+  T08B --> T12
+  T10 --> T12
+  T11B --> T12
+  T09 --> T12
+  T19D --> T12
+  T20B --> T12
+  T21B --> T12
+  T22B --> T12
+  T23B --> T12
+  T13["T13: Publication and rollback rehearsal"]
+  H4 --> T13
+  T14["T14: Required FastAPI plus F2W CLI/UI compatibility"]
+  T04 --> T14
+  T10 --> T14
+  T08B --> T14
+  T18A --> T14
+  T21B --> T14
+  T25B --> T14
+  T15["T15: FORGE imports F2W agents and consumes equivalent FastAPI behavior"]
+  T04 --> T15
+  T05 --> T15
+  T14 --> T15
+  T16A["T16A: Canary and soak"]
+  H6 --> T16A
+  T16B["T16B: Production cutover and approved retirement"]
+  H7 --> T16B
+  T17["T17: All paper infrastructure, routes, operators and asset coverage closure"]
+  H1 --> T17
+  T18A["T18A: Freeze current F2W frontend API, SSE and persistence contracts"]
+  H0 --> T18A
+  T18B["T18B: Frozen frontend against first migrated runtime/API read slice"]
+  T03 --> T18B
+  T18A --> T18B
+  T21B --> T18B
+  T25B --> T18B
+  T18C["T18C: Full frozen-frontend parity on actual Tiled; recovery and old-client closure"]
+  T14 --> T18C
+  T08B --> T18C
+  T10 --> T18C
+  T18B --> T18C
+  T19A["T19A: Knowledge Operations inventory and population semantics"]
+  H0 --> T19A
+  T19B["T19B: Unchanged deterministic paper-summary Tool and UI demonstration"]
+  H1 --> T19B
+  T03 --> T19B
+  T19A --> T19B
+  T19C["T19C: Graph and corpus computational operations"]
+  H3 --> T19C
+  T08A --> T19C
+  T10 --> T19C
+  T19D["T19D: Binary correctness and scale tests for Knowledge Operations"]
+  T19C --> T19D
+  T19B --> T19D
+  T11B --> T19D
+  T09 --> T19D
+  T19E["T19E: Operation CLI, agent, SDK, API and frontend closure"]
+  T14 --> T19E
+  T15 --> T19E
+  T18C --> T19E
+  T19D --> T19E
+  T20A["T20A: Managed and central Tiled deployment contracts"]
+  H0 --> T20A
+  T20B["T20B: Application-managed Tiled lifecycle and disposable fixture"]
+  H2 --> T20B
+  T20A --> T20B
+  T21A["T21A: Private source/public disclosure contract and route classification"]
+  H0 --> T21A
+  T21B["T21B: Source access controls and user-safe projection"]
+  H1 --> T21B
+  T21A --> T21B
+  T22A["T22A: Existing schema assets and architectural contract inventory"]
+  H0 --> T22A
+  T22B["T22B: Schema registry, validation reuse and revision binding"]
+  H2 --> T22B
+  T22A --> T22B
+  T23A["T23A: Versioned JSON KG creation/import/edit contract"]
+  H0 --> T23A
+  T23B["T23B: Preserve json2kg and implement immutable JSON snapshot service"]
+  H2 --> T23B
+  T23A --> T23B
+  T22B --> T23B
+  T24A["T24A: Three-image deployment, prefix, admin and mounted-storage contracts"]
+  H0 --> T24A
+  T24B["T24B: Build shared runtime and three supervised image finals"]
+  H2 --> T24B
+  T04 --> T24B
+  T20B --> T24B
+  T24A --> T24B
+  T24C["T24C: Prefix-correct gateway and existing UI/API deployment"]
+  H2 --> T24C
+  T24A --> T24C
+  T18A --> T24C
+  T24D["T24D: GitHub Actions build/test/publication and protected tag promotion"]
+  T24B --> T24D
+  T24C --> T24D
+  T24E["T24E: Three-profile container, Ansible and restore integration"]
+  T24B --> T24E
+  T24C --> T24E
+  T24D --> T24E
+  T14 --> T24E
+  T18C --> T24E
+  T25A["T25A: Freeze trusted-local and Tiled-authenticated ALS access contracts"]
+  H0 --> T25A
+  T25B["T25B: Implement profile-specific access context and shared effect guards"]
+  H1 --> T25B
+  T25A --> T25B
+  T25C["T25C: Verify no-login local workflows and real ALS Tiled role enforcement"]
+  T25B --> T25C
+  T20B --> T25C
+  T08A --> T25C
+  T26A["T26A: Freeze Git JSON release and promotion contract"]
+  H0 --> T26A
+  T23A --> T26A
+  T26B["T26B: Implement committed artifact validation and export"]
+  H3 --> T26B
+  T23B --> T26B
+  T26A --> T26B
+  T26C["T26C: Rehearse exact Git snapshot promotion and rollback"]
+  H4 --> T26C
+  T13 --> T26C
+  T26B --> T26C
+  H0{"STOP H0: owner review"}
+  T00 --> H0
+  H1{"STOP H1: owner review"}
+  T01 --> H1
+  T18A --> H1
+  T19A --> H1
+  T20A --> H1
+  T21A --> H1
+  T22A --> H1
+  T23A --> H1
+  T24A --> H1
+  T25A --> H1
+  T26A --> H1
+  H2{"STOP H2: owner review"}
+  T03 --> H2
+  T18B --> H2
+  T19B --> H2
+  T21B --> H2
+  T25B --> H2
+  H3{"STOP H3: owner review"}
+  T06A --> H3
+  T11A --> H3
+  T07A --> H3
+  T22B --> H3
+  H4{"STOP H4: owner review"}
+  T12 --> H4
+  T24B --> H4
+  T24C --> H4
+  T25C --> H4
+  T26B --> H4
+  H5{"STOP H5: owner review"}
+  T13 --> H5
+  T26C --> H5
+  H6{"STOP H6: owner review"}
+  T14 --> H6
+  T15 --> H6
+  H5 --> H6
+  T17 --> H6
+  T18C --> H6
+  T19E --> H6
+  T24D --> H6
+  T24E --> H6
+  T25C --> H6
+  T26C --> H6
+  H7{"STOP H7: owner review"}
+  T16A --> H7

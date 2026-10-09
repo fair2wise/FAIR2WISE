@@ -1,0 +1,32 @@
+{
+  "requested_version": "0.2.19",
+  "authority": "owner_selected_and_central_deployment_confirmed",
+  "verified_latest": false,
+  "final_release_artifact_fetched": false,
+  "checked_on": "2026-10-07",
+  "attempts": [
+    {
+      "url": "https://pypi.org/project/tiled/0.2.19/",
+      "result": "web cache miss"
+    },
+    {
+      "url": "https://github.com/bluesky/tiled/releases/tag/v0.2.19",
+      "result": "web cache miss"
+    },
+    {
+      "url": "https://pypi.org/pypi/tiled/0.2.19/json",
+      "result": "web cache miss"
+    }
+  ],
+  "retrieved_public_metadata": [
+    "https://pypi.org/project/tiled/",
+    "https://pypi.org/project/tiled/0.2.19rc2/"
+  ],
+  "interpretation": "Retrieved index showed 0.2.18 and 0.2.19rc2; stale/cache limitations do not establish final-release absence.",
+  "required_action": "Record exact artifact and deployment secret references; run authorized login/role/capability checks. Earlier failed public fetches are historical, not evidence against owner-confirmed central deployments.",
+  "runtime_tests_executed": false,
+  "owner_confirmed_on": "2026-10-08",
+  "owner_confirmed_central_graph_0_2_19": true,
+  "owner_confirmed_admin_writer_coordination": true,
+  "independent_central_runtime_verified": false
+}

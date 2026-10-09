@@ -1,0 +1,193 @@
+{
+  "version": "8.0",
+  "basis": "Owner-approved full-access local mode without Tiled user sign-in; ALS roles unchanged",
+  "files": [
+    {
+      "path": "AGENT_START_HERE.md",
+      "change": "modified",
+      "previous_sha256": "546cff4a432b1b829f92ed21dee412a12eb76bd0c167028cc1c7c54f7a20c0dc",
+      "sha256": "e047ae3872dc9ba66e3cd9aa0860c46f4f48561215fd05bb47b502ed75218edd"
+    },
+    {
+      "path": "ANSIBLE_HANDOFF.md",
+      "change": "modified",
+      "previous_sha256": "504845587d1b328c2df5b55e768af4f3d1065098e13a196afff7466f6bc867fd",
+      "sha256": "eea95ee6022f48eb2a465e6ba191f7cb8f8d63653d81236fe6556e6863d9fcc5"
+    },
+    {
+      "path": "AUTHORIZATION_SPEC.md",
+      "change": "modified",
+      "previous_sha256": "db6687a79308ae4e583935c0362460b38562164fdd4d736def49ed52f174cfb2",
+      "sha256": "227084f8a434d6adbb786117d02699112a7adbcbf0f14b612aec3094be7ad97e"
+    },
+    {
+      "path": "BINARY_EVALUATION_SPEC.md",
+      "change": "modified",
+      "previous_sha256": "e71b2318614212a97767ab1af3e7f45aca3886882377ddc0f64b607187b30dc9",
+      "sha256": "8a84898d01aec1698bd76f79a8a6d73b47819e3992f663ee27b3619127f96145"
+    },
+    {
+      "path": "CHANGES_V8.md",
+      "change": "added",
+      "previous_sha256": null,
+      "sha256": "9a2c5b6886c8f5cb86d0d55d7137d5210422dc3dd2edd277a6311209bbe18711"
+    },
+    {
+      "path": "CI_CD_CONTRACT.md",
+      "change": "modified",
+      "previous_sha256": "2841d8dfccb0b97db89a552e9c8d64331c215865cb80b9f1e27be8ee7a4d68db",
+      "sha256": "561ab177a841719cda38bfe3ba8121b7c91c728ad8b455b47cfbdd49ee4fb9e4"
+    },
+    {
+      "path": "CONTENT_ACCESS_POLICY.md",
+      "change": "modified",
+      "previous_sha256": "de48bf68ad140a1d500373d3cbeeadc82e703b86ea084c1236edc017f0df1190",
+      "sha256": "b30de269eec8d0338cdb5f0f241d012e87a861fefff28656aca06f84371b0373"
+    },
+    {
+      "path": "DECISIONS.md",
+      "change": "modified",
+      "previous_sha256": "ecf8f59fd80542d4d8e72dacce8ec0081762afd4638158eabbd1a5e2a07b33d5",
+      "sha256": "2f346d9dbf282520658d58505a723a2b78b2ed1818113c7baf47cecce0f3691a"
+    },
+    {
+      "path": "DEPLOYMENT_STRATEGY.md",
+      "change": "modified",
+      "previous_sha256": "6057dbd6ee4efaf7798e04c4effe7974d827cff28a88c70c54308577c6e37bdf",
+      "sha256": "b7fb4450dab24869a49933677af9f38855e6902cbe85fedd010e0e97963786d2"
+    },
+    {
+      "path": "FORGE_INTEGRATION_HANDOFF.md",
+      "change": "modified",
+      "previous_sha256": "6cb99324190afc7833c7e22d1fcb9f36da57f43407f2002442d1791af53608f3",
+      "sha256": "6d68f768ee19a11a015f97c033d0601fdb65bb5795aa5fc74c7ad2aefc5f152c"
+    },
+    {
+      "path": "FRONTEND_COMPATIBILITY.md",
+      "change": "modified",
+      "previous_sha256": "e18b24dd334730b578cec1601b5cc2df1b3f6a4a98de62fb51c0cc4231d55981",
+      "sha256": "a3f480fec005c64bf6c8eb3296d9b7feb78b82e3e320f53f45049c6531e88107"
+    },
+    {
+      "path": "GIT_KG_PROMOTION_SPEC.md",
+      "change": "modified",
+      "previous_sha256": "e028d9b593017d9653907cac94cde168297d29ed835434fbc716ce2b1d6e0e5b",
+      "sha256": "5e294f05140e3f27865312221d74d9a7235f87c9075e05076c8d692355799e75"
+    },
+    {
+      "path": "JSON_KG_PUBLICATION_SPEC.md",
+      "change": "modified",
+      "previous_sha256": "badec3ad06cb5245523ce48b392342c027f7e6e88cde55382720be6988c0c12e",
+      "sha256": "07f12800bd5d13938fe32aa76ae8f26c583defc4255f3c0d663b822d276b98e8"
+    },
+    {
+      "path": "MIGRATION_PLAN.docx",
+      "change": "modified",
+      "previous_sha256": "55d5e20dfabb55ab79824d78a1155e84d01403df806d03689d83941f1c723bac",
+      "sha256": "e33f4d10f416b3c53777aabdb181384e00aeda1c6f8d85e65f9cf466b43fb0fa"
+    },
+    {
+      "path": "MIGRATION_PLAN.md",
+      "change": "modified",
+      "previous_sha256": "123c2da7e3e0553b08c64c94540211d2401a0aa1f41c9162fef284bb8f1571f6",
+      "sha256": "49d08d3f7145e3ced1c36919ad2c2e488fc5a01fb7210ef8c6a67c651dbc1622"
+    },
+    {
+      "path": "OWNER_CLARIFICATIONS_V8.md",
+      "change": "added",
+      "previous_sha256": null,
+      "sha256": "6dbd18b3c32d17e01c7a00272b96c5d335dd047dd706a872262e7d79663b6364"
+    },
+    {
+      "path": "README.md",
+      "change": "modified",
+      "previous_sha256": "9524e7864d7f7f26092d4d52be6eb952a137110819d5b7337a7be6b6b56b369a",
+      "sha256": "a49f25814667dc418d82bb4b411d496e708a22227914bc30b866f054c73b7fe7"
+    },
+    {
+      "path": "TILED_DEPLOYMENT_SPEC.md",
+      "change": "modified",
+      "previous_sha256": "df373c9c960976ea9e22a258b1467e31ab3badf65c71d67401502a07c7d62351",
+      "sha256": "869667fef9f8207ef2e4ddcd59bb8af9d5abda3fe7f2a9b32ed6db662df64b6c"
+    },
+    {
+      "path": "VALIDATION_REPORT.json",
+      "change": "modified",
+      "previous_sha256": "419726f4fc874f3777b48a7c676d8693090089bdd6de0f82b281f8bca5f4edea",
+      "sha256": "60e819c9be98db05cf6648ce300a8a398933c3e8faf43ae2e1d8d93bdbc01315"
+    },
+    {
+      "path": "VALIDATION_REPORT_V7.json",
+      "change": "added",
+      "previous_sha256": null,
+      "sha256": "419726f4fc874f3777b48a7c676d8693090089bdd6de0f82b281f8bca5f4edea"
+    },
+    {
+      "path": "architecture.mmd",
+      "change": "modified",
+      "previous_sha256": "271a56442a208101fe2bf9dcda17a468247290aebd786692194e1e80d5ffeeff",
+      "sha256": "9763c9974313603ef1feef487113533ea824d94b218b35b323e5a8426e2364fb"
+    },
+    {
+      "path": "authorization_and_promotion_cases.json",
+      "change": "modified",
+      "previous_sha256": "ff8974e4f886483b0d82dd0961f098608ce6e2025a0fc109f5aa3b79769bf2d2",
+      "sha256": "a88b887d03b10c816e53f02a724182f1a672c80eae31d0815f79d8cdae7ddb2a"
+    },
+    {
+      "path": "binary_case_inventory.json",
+      "change": "modified",
+      "previous_sha256": "7ff953560a37f49f826a1c986462afd5a37d0797fa6875a08e6aec479d9a6115",
+      "sha256": "039a70fb484f6e1147840d1d96e90a5ae85b90ad4b34ecba7a9884d7023d6174"
+    },
+    {
+      "path": "deployment.mmd",
+      "change": "modified",
+      "previous_sha256": "0b76fdca3d3031720b301df59662d4bc44dff516763a3124a301d788b1f02e6c",
+      "sha256": "0ee515457c938d8ccbd847bc44c73fdb10b8275327404ab82a068ab00df26bd8"
+    },
+    {
+      "path": "deployment_case_inventory.json",
+      "change": "modified",
+      "previous_sha256": "f480c5e9332937d768ced977a8ab5fb68d3e1bb9ed003e13334bc8b5758b1453",
+      "sha256": "868cab299d2ccdf8f75a8ffcfa700f53204e3b8e24d2af59180b3da2c9e2cbc9"
+    },
+    {
+      "path": "deployment_profiles.json",
+      "change": "modified",
+      "previous_sha256": "10b4c99d8ddd4d2c8b8e23794909bca04fa86abac6c1188079f399ee707100f3",
+      "sha256": "47f4d2f8d80e7c6d3b08932787c7188c575efa6c90d7e5b8d0b1b7d5c775c876"
+    },
+    {
+      "path": "local_access_case_inventory.json",
+      "change": "added",
+      "previous_sha256": null,
+      "sha256": "54b3c743e61b6da26276ee247f82e9574f5a91cd1f36469ea95400f76f80a904"
+    },
+    {
+      "path": "migration_dependencies.mmd",
+      "change": "modified",
+      "previous_sha256": "2ed0e5093e083c727056d1abc97b31c75f8b02ad981ada86c5be267050af1bcf",
+      "sha256": "f3c93a3c929fc483403c7c30cbfb1d451d9d99a96a8187eff345dc22a73ca597"
+    },
+    {
+      "path": "scripts/verify_handoff.py",
+      "change": "modified",
+      "previous_sha256": "9537ead68237d412c8c402ca5bfd0dcc86c9fa73596637a6bc606e76e40681b0",
+      "sha256": "887172991e613ee3a396c207e78db921916b1b9e715f2faedb11829d82e69561"
+    },
+    {
+      "path": "source_lock.json",
+      "change": "modified",
+      "previous_sha256": "c2537a44de5fb0b5f28fc671f2f04cb03093ceeeba9876988f46fe7327f89326",
+      "sha256": "c559bdcad128ef0b42204b71ddd098817455c4018d3d76f29c2592aa32f937ff"
+    },
+    {
+      "path": "task_graph.json",
+      "change": "modified",
+      "previous_sha256": "194a178390d441cb7c8158b14a843a0511a7fbe1bdd2a8173d6b85e0b9e21b30",
+      "sha256": "8236b779396676b0c226621d114c93883144b915c1fcb6be8cb91834a929c4a7"
+    }
+  ],
+  "source_code_migration_executed": false
+}

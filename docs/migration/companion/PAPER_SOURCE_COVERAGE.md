@@ -1,0 +1,112 @@
+# Paper source scope coverage
+
+All files in the listed core paper directories are enumerated. This is not a claim that every paper-related caller elsewhere in FORGE is already discovered. T17 must resolve all asset/support review items, trace import/call closure, audit paper operators/gateway consumers, and obtain owner approval for any lost capability.
+
+- `als_knowledge_agent/src/als_knowledge_agent/graph/__init__.py` - **rebuild_bootstrap**: Public exports/initialization handled by packaging, no donor import-time registration.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/bibliography_backfill.py` - **mapped**: L-07
+- `als_knowledge_agent/src/als_knowledge_agent/graph/cborg_approval.py` - **mapped**: U-05
+- `als_knowledge_agent/src/als_knowledge_agent/graph/cborg_control.py` - **mapped**: U-08
+- `als_knowledge_agent/src/als_knowledge_agent/graph/cborg_ledger.py` - **mapped**: U-06
+- `als_knowledge_agent/src/als_knowledge_agent/graph/cborg_resolution.py` - **mapped**: U-07
+- `als_knowledge_agent/src/als_knowledge_agent/graph/chemical_identity.py` - **mapped**: C-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/child_process.py` - **mapped**: J-09
+- `als_knowledge_agent/src/als_knowledge_agent/graph/chunk_reextraction.py` - **mapped**: U-09
+- `als_knowledge_agent/src/als_knowledge_agent/graph/citation_links.py` - **mapped**: L-17
+- `als_knowledge_agent/src/als_knowledge_agent/graph/classification_units.py` - **mapped**: V-01
+- `als_knowledge_agent/src/als_knowledge_agent/graph/codex_sol_resolution.py` - **mapped**: U-11
+- `als_knowledge_agent/src/als_knowledge_agent/graph/corpus_index.py` - **mapped**: J-07
+- `als_knowledge_agent/src/als_knowledge_agent/graph/corpus_manifest.py` - **mapped**: J-06
+- `als_knowledge_agent/src/als_knowledge_agent/graph/corpus_refresh.py` - **mapped**: J-10
+- `als_knowledge_agent/src/als_knowledge_agent/graph/dual_fit_job.py` - **FORGE_owned_mixed_or_experimental**: Literature outputs consumed by FORGE; computation/experimental behavior does not move.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/dual_fit_trigger.py` - **FORGE_owned_mixed_or_experimental**: Literature outputs consumed by FORGE; computation/experimental behavior does not move.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/enrichment_agent.py` - **mapped**: J-11
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_classification.py` - **mapped**: V-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_extraction.py` - **mapped**: V-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_ocr.py` - **mapped**: V-05
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_orientation.py` - **mapped**: V-08
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_qrange.py` - **mapped**: V-07
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_scale.py` - **mapped**: V-06
+- `als_knowledge_agent/src/als_knowledge_agent/graph/figure_text_layer.py` - **mapped**: V-04
+- `als_knowledge_agent/src/als_knowledge_agent/graph/folder_ingest.py` - **mapped**: J-05
+- `als_knowledge_agent/src/als_knowledge_agent/graph/group_adjudication.py` - **mapped**: C-06
+- `als_knowledge_agent/src/als_knowledge_agent/graph/import_staged.py` - **mapped**: J-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/ingest_folders_routes.py` - **mapped**: I-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/ingest_journal.py` - **mapped**: J-04
+- `als_knowledge_agent/src/als_knowledge_agent/graph/ingest_telemetry.py` - **mapped**: J-08
+- `als_knowledge_agent/src/als_knowledge_agent/graph/ingested_papers.py` - **mapped**: L-06
+- `als_knowledge_agent/src/als_knowledge_agent/graph/kg_store.py` - **mapped**: K-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/kg_writer.py` - **mapped**: K-01
+- `als_knowledge_agent/src/als_knowledge_agent/graph/licensing.py` - **mapped**: L-18
+- `als_knowledge_agent/src/als_knowledge_agent/graph/llm_defaults.py` - **mapped**: R-11
+- `als_knowledge_agent/src/als_knowledge_agent/graph/local_llm_resolution.py` - **mapped**: U-04
+- `als_knowledge_agent/src/als_knowledge_agent/graph/merge_safety.py` - **mapped**: C-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/openalex_supplement.json` - **asset_or_support_review**: Inventory and classify during T17; schema/vocabulary/config data require attribution, ownership and version review before migration.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/orchestrator.py` - **mapped**: R-10
+- `als_knowledge_agent/src/als_knowledge_agent/graph/paper_context.py` - **mapped**: L-16
+- `als_knowledge_agent/src/als_knowledge_agent/graph/paper_intake.py` - **mapped**: L-05
+- `als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py` - **mapped**: L-10
+- `als_knowledge_agent/src/als_knowledge_agent/graph/paper_resolver.py` - **mapped**: L-04
+- `als_knowledge_agent/src/als_knowledge_agent/graph/paper_simulation.py` - **mapped**: E-09
+- `als_knowledge_agent/src/als_knowledge_agent/graph/paper_staging.py` - **mapped**: J-01
+- `als_knowledge_agent/src/als_knowledge_agent/graph/parsed_document.py` - **mapped**: L-11
+- `als_knowledge_agent/src/als_knowledge_agent/graph/parser_pool.py` - **mapped**: L-12
+- `als_knowledge_agent/src/als_knowledge_agent/graph/parser_worker.py` - **mapped**: L-13
+- `als_knowledge_agent/src/als_knowledge_agent/graph/pdf_extraction.py` - **mapped**: E-01
+- `als_knowledge_agent/src/als_knowledge_agent/graph/quote_location.py` - **mapped**: E-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/reduction_prov.py` - **FORGE_owned_mixed_or_experimental**: Literature outputs consumed by FORGE; computation/experimental behavior does not move.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/reference_parsing.py` - **mapped**: L-14
+- `als_knowledge_agent/src/als_knowledge_agent/graph/resolution_routing.py` - **mapped**: U-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/scientific_artifacts.py` - **mapped**: U-01
+- `als_knowledge_agent/src/als_knowledge_agent/graph/scientific_records.py` - **mapped**: E-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/section_projection.py` - **mapped**: L-15
+- `als_knowledge_agent/src/als_knowledge_agent/graph/service_health.py` - **mapped**: J-12
+- `als_knowledge_agent/src/als_knowledge_agent/graph/staged_import_routes.py` - **mapped**: I-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/staged_import_status.py` - **mapped**: J-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign.py` - **mapped**: C-11
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign_routes.py` - **mapped**: I-04
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign_types.py` - **mapped**: C-07
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_embeddings.py` - **mapped**: C-04
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_evidence.py` - **mapped**: C-08
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_grouping.py` - **mapped**: C-05
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_provenance.py` - **mapped**: U-10
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_quarantine.py` - **mapped**: C-09
+- `als_knowledge_agent/src/als_knowledge_agent/graph/term_resolver.py` - **mapped**: C-10
+- `als_knowledge_agent/src/als_knowledge_agent/graph/thread_sqlite.py` - **mapped**: U-02
+- `als_knowledge_agent/src/als_knowledge_agent/graph/tiled_client.py` - **replace_dependency**: Use F2W Tiled Graph adapter; no forge.data import or global dotenv/catalog client.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/tiled_store.py` - **mapped**: K-03
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocab_cleanup.py` - **mapped**: C-12
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocab_migration.py` - **mapped**: C-13
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocab_quality_snapshot.py` - **mapped**: C-16
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary.py` - **mapped**: C-01
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary.yaml` - **asset_or_support_review**: Inventory and classify during T17; schema/vocabulary/config data require attribution, ownership and version review before migration.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_audit.py` - **mapped**: C-15
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_growth.py` - **mapped**: C-14
+- `als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_review.yaml` - **asset_or_support_review**: Inventory and classify during T17; schema/vocabulary/config data require attribution, ownership and version review before migration.
+- `als_knowledge_agent/src/als_knowledge_agent/graph/web_search.py` - **mapped**: L-20
+- `src/forge/agents/literature/__init__.py` - **rebuild_bootstrap**: Public exports/initialization handled by packaging, no donor import-time registration.
+- `src/forge/agents/literature/comparison.py` - **FORGE_owned_mixed_or_experimental**: Literature outputs consumed by FORGE; computation/experimental behavior does not move.
+- `src/forge/agents/literature/extraction.py` - **mapped**: E-08
+- `src/forge/agents/literature/grounding.py` - **mapped**: E-04
+- `src/forge/agents/literature/hypothesis.py` - **FORGE_owned_mixed_or_experimental**: Literature outputs consumed by FORGE; computation/experimental behavior does not move.
+- `src/forge/agents/literature/openalex.py` - **mapped**: L-02
+- `src/forge/agents/literature/papers.py` - **mapped**: L-09
+- `src/forge/agents/literature/publication.py` - **mapped**: E-07
+- `src/forge/agents/literature/resolver_batch.py` - **mapped**: L-03
+- `src/forge/agents/literature/structured_output.py` - **mapped**: E-06
+- `src/forge/agents/literature/tools.py` - **mapped**: L-01
+- `src/forge/agents/literature/units.py` - **mapped**: E-05
+- `als_knowledge_agent/src/als_knowledge_agent/gold/__init__.py` - **rebuild_bootstrap**: Public exports/initialization handled by packaging, no donor import-time registration.
+- `als_knowledge_agent/src/als_knowledge_agent/gold/annotate.py` - **mapped**: Q-01
+- `als_knowledge_agent/src/als_knowledge_agent/gold/bundle.py` - **mapped**: Q-02
+- `als_knowledge_agent/src/als_knowledge_agent/gold/harness.py` - **mapped**: Q-03
+- `als_knowledge_agent/src/als_knowledge_agent/gold/metrics.py` - **mapped**: Q-04
+- `als_knowledge_agent/src/als_knowledge_agent/gold/parsers.py` - **mapped**: Q-05
+- `als_knowledge_agent/src/als_knowledge_agent/gold/preannotate.py` - **mapped**: Q-06
+- `als_knowledge_agent/src/als_knowledge_agent/gold/schema.py` - **mapped**: Q-07
+- `als_knowledge_agent/src/als_knowledge_agent/gold/selection.py` - **mapped**: Q-08
+- `als_knowledge_agent/src/als_knowledge_agent/gold/stages.py` - **mapped**: Q-09
+
+
+## v4 implementation-policy overlay
+
+Source paths, hashes and symbols above remain snapshot evidence. Current decisions D12-D20 govern their use: both managed/central Tiled with app-owned disposable tests; binary acceptance; preserved frontend model selection with shared all-provider limits; agent-private source documents/figures and user-safe projections; explicit schema assets/validation without automatic semantic reclassification; reusable Knowledge Operations. A source function that serves PDF/text/crops is not thereby approved as a public endpoint. See MIGRATION_PLAN.md and CONTENT_ACCESS_POLICY.md.

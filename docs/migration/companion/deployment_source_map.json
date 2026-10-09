@@ -1,0 +1,151 @@
+{
+  "version": "6.0",
+  "source": "owner uploaded FAIR2WISE-rsoxs.zip",
+  "archive_recorded_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "verification": "static source inspection only",
+  "files": [
+    {
+      "path": "Dockerfile",
+      "sha256": "10fb5218224c2bf338106b55f4035af4f22386ddd32636fb11a02b977692346f",
+      "line_count": 76,
+      "spans": [
+        {
+          "start_line": 3,
+          "end_line": 18,
+          "excerpt": "FROM node:20-bookworm-slim AS frontend-build\n\nWORKDIR /build/ui\nCOPY ui/package.json ui/package-lock.json ./\nRUN --mount=type=cache,target=/root/.npm npm ci\nCOPY ui/ ./\n# Browser-visible API URL only. Do not pass LLM credentials as build args.\nARG VITE_F2W_AGENT_API_URL=http://127.0.0.1:8090\nENV VITE_F2W_AGENT_API_URL=${VITE_F2W_AGENT_API_URL}\nRUN npm run build\n\n\nFROM nginx:1.27-alpine AS frontend\n\nCOPY docker/nginx.conf /etc/nginx/conf.d/default.conf\nCOPY --from=frontend-build /build/ui/dist /usr/share/nginx/html"
+        },
+        {
+          "start_line": 31,
+          "end_line": 43,
+          "excerpt": "FROM python:3.12-slim AS agent\n\n# Runtime secrets are injected by Compose env_file from the host dotenv file.\n# Do not pass LLM credentials as build args or bake dotenv files into layers.\n\nENV PYTHONDONTWRITEBYTECODE=1 \\\n    PYTHONUNBUFFERED=1 \\\n    PIP_NO_CACHE_DIR=1 \\\n    PYSTOW_HOME=/app/.cache/pystow \\\n    SPLASH_LINKS_REPO=/app/splash_links \\\n    F2W_AGENT_HOST=0.0.0.0 \\\n    F2W_AGENT_PORT=8090 \\\n    KG_RAG_FORCE_CPU=1"
+        },
+        {
+          "start_line": 53,
+          "end_line": 72,
+          "excerpt": "COPY requirements.txt ./\nCOPY requirements/runtime.txt ./requirements/runtime.txt\nCOPY requirements/semantic.in ./requirements/semantic.in\nRUN --mount=type=cache,target=/root/.cache/pip \\\n    python -m pip install --upgrade pip && \\\n    python -m pip install -r requirements.txt\n\nCOPY splash_links ./splash_links\nRUN --mount=type=cache,target=/root/.cache/rattler \\\n    pixi install --manifest-path splash_links/pixi.toml --locked\n\nCOPY . .\n\nRUN mkdir -p /app/.cache/pystow /app/runs && \\\n    chmod +x scripts/start_agent_backend.sh\n\nHEALTHCHECK --interval=10s --timeout=5s --start-period=45s --retries=12 \\\n    CMD curl -fsS http://127.0.0.1:8090/health >/dev/null || exit 1\n\nCMD [\"./scripts/start_agent_backend.sh\"]"
+        }
+      ]
+    },
+    {
+      "path": ".dockerignore",
+      "sha256": "a8cbc0ab22a06cbfe5ee1cd4e5956d7feeb30161fd0a298e774a53ef2bd8d047",
+      "line_count": 25,
+      "spans": [
+        {
+          "start_line": 1,
+          "end_line": 25,
+          "excerpt": ".git\n.github\n.agents\n.codex\n.env\n.env.*\n!.env.example\n.cache\n.docker-data\n.pytest_cache\n.run\n.venv*\n**/__pycache__\n**/*.pyc\n**/.DS_Store\n**/.pixi\n**/node_modules\nmkdocs/site\nui/dist\nruns\nlogs\ntests/results\ntests/deepeval/results\npapers\nsplash_links/links.sqlite"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/build-app.yml",
+      "sha256": "8805c95dc7581db5aae279009d35956367a8a115ee11ddbcd8cae36e0c4f99e9",
+      "line_count": 46,
+      "spans": [
+        {
+          "start_line": 1,
+          "end_line": 8,
+          "excerpt": "name: project template\n\non:\n  push:\n    branches: [ main ]\n  pull_request:\n    branches: [ main ]\n"
+        },
+        {
+          "start_line": 37,
+          "end_line": 46,
+          "excerpt": "    - name: Test with pytest\n      run: pytest\n    - name: Build MkDocs site strictly\n      run: mkdocs build --strict -f mkdocs/mkdocs.yml\n    - name: Build MkDocs site\n      if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n      run: mkdocs gh-deploy --force -f mkdocs/mkdocs.yml\n    - name: Update Readme Tree\n      if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n      run: python scripts/update_readme_tree.py"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/publish-image.yml",
+      "sha256": "2dec062bed234e77b537d2be5bc22bdedaf0269fb26b089e2f63f5bcf813df5a",
+      "line_count": 46,
+      "spans": [
+        {
+          "start_line": 3,
+          "end_line": 18,
+          "excerpt": "on:\n  push:\n    branches: [ 'main' ]\n    tags: [ 'v*' ]\n\nenv:\n  REGISTRY: ghcr.io\n  IMAGE_NAME: ${{ github.repository }}\n\njobs:\n  build-and-push-image:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: read\n      packages: write\n"
+        },
+        {
+          "start_line": 25,
+          "end_line": 46,
+          "excerpt": "    - name: Log in to the Container registry\n      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567\n      with:\n        registry: ${{ env.REGISTRY }}\n        username: ${{ github.actor }}\n        password: ${{ secrets.GITHUB_TOKEN }}\n\n    - name: Extract metadata (tags, labels) for Docker\n      id: meta\n      uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804\n      with:\n        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\n\n    - name: Build and push Docker image\n      uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4\n      with:\n        context: .\n        file: Dockerfile\n        target: agent\n        push: true\n        tags: ${{ steps.meta.outputs.tags }}\n        labels: ${{ steps.meta.outputs.labels }}"
+        }
+      ]
+    },
+    {
+      "path": "docker/nginx.conf",
+      "sha256": "534a4505ca83a5dc2e3b58810a747d8667c38eee0ac6d05f4a8fdfdb34343405",
+      "line_count": 29,
+      "spans": [
+        {
+          "start_line": 1,
+          "end_line": 29,
+          "excerpt": "server {\n    listen 80;\n    server_name _;\n\n    root /usr/share/nginx/html;\n    index index.html;\n\n    location = /healthz {\n        access_log off;\n        default_type text/plain;\n        return 200 \"ok\\n\";\n    }\n\n    location /api/ {\n        proxy_pass http://agent:8090/;\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_buffering off;\n        proxy_cache off;\n        proxy_read_timeout 900s;\n        proxy_send_timeout 900s;\n    }\n\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n}"
+        }
+      ]
+    },
+    {
+      "path": "ui/vite.config.ts",
+      "sha256": "23fabf69b548683aa19811e97e09c3ced978ba4713b3866ee47ae817559e67af",
+      "line_count": 38,
+      "spans": [
+        {
+          "start_line": 20,
+          "end_line": 38,
+          "excerpt": "export default defineConfig({\n  plugins: [\n    figmaAssetResolver(),\n    serveMkdocs(__dirname),\n    // The React and Tailwind plugins are both required for Make, even if\n    // Tailwind is not being actively used \u2013 do not remove them\n    react(),\n    tailwindcss(),\n  ],\n  resolve: {\n    alias: {\n      // Alias @ to the src directory\n      '@': path.resolve(__dirname, './src'),\n    },\n  },\n\n  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.\n  assetsInclude: ['**/*.svg', '**/*.csv'],\n})"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/data/liveAgent.ts",
+      "sha256": "5d63aceb4efa3642977bfa3f50e2ffb7ef2f211aadcd54dee253bda744ba0cdf",
+      "line_count": 730,
+      "spans": [
+        {
+          "start_line": 219,
+          "end_line": 221,
+          "excerpt": "}\n\nexport const AGENT_API_BASE = (import.meta.env.VITE_F2W_AGENT_API_URL || 'http://127.0.0.1:8090').replace(/\\/$/, '');"
+        },
+        {
+          "start_line": 473,
+          "end_line": 484,
+          "excerpt": "\n  try {\n    const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify(chatRequestBody(message, messages, sessionId, clientTurnId)),\n      signal,\n    });\n\n    if (!response.ok) {\n      const detail = await response.text();\n      throw new Error(detail || `Agent API returned ${response.status}`);"
+        }
+      ]
+    },
+    {
+      "path": "compose.yaml",
+      "sha256": "669470680dbb0fe95c2e99fd437056f267be63143449c6edeafedcd6b824aff7",
+      "line_count": 106,
+      "spans": [
+        {
+          "start_line": 8,
+          "end_line": 25,
+          "excerpt": "# \u2500\u2500 Extract process note \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# scripts/run.py (paper extraction) is NOT managed here. Start it separately\n# so it survives agent/UI restarts and terminal/session closure:\n#\n#   nohup python scripts/run.py ...  &       # background in current shell\n#   tmux new-session -d -s extract 'python scripts/run.py ...'\n#\n# `docker compose down` stops agent+UI only; extraction is unaffected.\n# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n#\n# Ports (loopback only):\n#   UI    127.0.0.1:5175  (never 5174 \u2014 that port is SSH)\n#   Agent 127.0.0.1:8090  (browser uses VITE_F2W_AGENT_API_URL)\n#\n# Darwin / Docker Desktop: IPv6 egress to api.cborg.lbl.gov is unreliable\n# because the Mac host GUA is not the Linux VM's source address. On macOS\n# use ./scripts/start_rsoxs_stack.sh for CBorg, or Linux Docker with IPv6.\n# Optional Linux host-network overlay: compose.hostnet.yaml"
+        },
+        {
+          "start_line": 27,
+          "end_line": 73,
+          "excerpt": "services:\n  agent:\n    build:\n      context: .\n      dockerfile: Dockerfile\n      target: agent\n    env_file:\n      - path: .env\n        required: false\n    environment:\n      CBORG_BASE_URL: https://api.cborg.lbl.gov\n      CBORG_IP_FAMILY: ipv6\n      CBORG_FORCE_IPV6: \"1\"\n      CBORG_IPV6_BIND: \"\"\n      F2W_AGENT_HOST: 0.0.0.0\n      F2W_AGENT_PORT: \"8090\"\n      F2W_BACKEND: cborg\n      F2W_MODEL: lbl/cborg-chat\n      F2W_KG_MODE: json\n      F2W_GRAPH: storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json\n      F2W_SCHEMA: storage/schema/rsoxs_schema.yaml\n      F2W_WORKDIR: /app/runs/ui_session_rsoxs\n      F2W_TRACE_ENABLED: \"0\"\n      F2W_TRACE_DIR: /app/runs/traces\n      KG_RAG_BACKEND: cborg\n      KG_RAG_CBORG_MODEL: lbl/cborg-chat\n      KG_RAG_GRAPH_SOURCE: json\n      KG_RAG_GRAPH: storage/kg/matkg_rsoxs_v1.json\n      KG_RAG_RETRIEVAL_BACKEND: lexical\n      PYSTOW_HOME: /app/.cache/pystow\n    ports:\n      - \"127.0.0.1:8090:8090\"\n    volumes:\n      - ./storage/kg/matkg_rsoxs_v1.json:/app/storage/kg/matkg_rsoxs_v1.json:ro\n      - ./storage/kg/matkg_bl1101_v1.json:/app/storage/kg/matkg_bl1101_v1.json:ro\n      - ./storage/kg/matkg_bl1101_v2.json:/app/storage/kg/matkg_bl1101_v2.json:ro\n      - ./storage/schema/rsoxs_schema.yaml:/app/storage/schema/rsoxs_schema.yaml:ro\n      - ./storage/schema/bl1101_schema.yaml:/app/storage/schema/bl1101_schema.yaml:ro\n      - agent-runs:/app/runs\n      - agent-cache:/app/.cache\n    healthcheck:\n      test: [\"CMD\", \"curl\", \"-fsS\", \"http://127.0.0.1:8090/health\"]\n      interval: 5s\n      timeout: 5s\n      start_period: 45s\n      retries: 24\n    restart: unless-stopped"
+        },
+        {
+          "start_line": 75,
+          "end_line": 98,
+          "excerpt": "  frontend:\n    build:\n      context: .\n      dockerfile: Dockerfile\n      target: frontend\n      args:\n        # Browser origin, not an in-container hostname. Map host 8090.\n        VITE_F2W_AGENT_API_URL: http://127.0.0.1:8090\n    ports:\n      - \"127.0.0.1:${F2W_UI_PORT:-5175}:80\"\n    depends_on:\n      agent:\n        condition: service_healthy\n    healthcheck:\n      test: [\"CMD\", \"wget\", \"-qO-\", \"http://127.0.0.1/healthz\"]\n      interval: 5s\n      timeout: 3s\n      start_period: 10s\n      retries: 12\n    restart: unless-stopped\n\nvolumes:\n  agent-runs:\n  agent-cache:"
+        }
+      ]
+    },
+    {
+      "path": "docker-compose.yml",
+      "sha256": "da4f379a521a1ae971e6ec73301737fc55e96a12c98de5d65e7c34c0a784ce49",
+      "line_count": 129,
+      "spans": [
+        {
+          "start_line": 79,
+          "end_line": 118,
+          "excerpt": "  tiled:\n    image: python:3.11-slim\n    working_dir: /app\n    volumes:\n      - ./storage/tiled_config.yml:/app/tiled_config.yml:ro\n      - tiled_data:/data\n    environment:\n      TILED_API_KEY: \"${TILED_API_KEY}\"\n    command: >\n      bash -c \"pip install 'tiled[server]>=0.2.18' --quiet --no-cache-dir &&\n               tiled serve config /app/tiled_config.yml --host 0.0.0.0 --port 8765\"\n    ports:\n      - \"127.0.0.1:8765:8765\"\n    healthcheck:\n      test: [\"CMD-SHELL\", \"curl -sf http://localhost:8765/api/v1/\"]\n      interval: 5s\n      timeout: 3s\n      retries: 15\n    networks:\n      - f2w\n\n  tiled_seed:\n    build:\n      context: .\n      dockerfile: Dockerfile\n      target: agent\n    env_file: .env\n    environment:\n      TILED_URI: \"http://tiled:8765\"\n    command:\n      - python\n      - scripts/ingest_tiled_sim.py\n      - \"--to-tiled\"\n      - \"--tiled-uri\"\n      - \"http://tiled:8765\"\n    depends_on:\n      tiled:\n        condition: service_healthy\n    restart: \"no\"\n    networks:"
+        }
+      ]
+    }
+  ]
+}

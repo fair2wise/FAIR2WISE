@@ -1,0 +1,143 @@
+{
+  "archive": "FAIR2WISE-rsoxs.zip",
+  "items": [
+    {
+      "path": "app/modules/cborg_limiter.py",
+      "sha256": "edb1d1b7e0e46ad64852cf03f231e1d63fbccdaeb9987b668e293ec0ce2668dc",
+      "line_count": 79,
+      "verification": "archive_bytes_only",
+      "symbols": [
+        {
+          "name": "_read_cap",
+          "line": 24,
+          "end_line": 30
+        },
+        {
+          "name": "sync_slot",
+          "line": 42,
+          "end_line": 55
+        },
+        {
+          "name": "get_async_semaphore",
+          "line": 58,
+          "end_line": 68
+        },
+        {
+          "name": "async_slot",
+          "line": 72,
+          "end_line": 79
+        }
+      ]
+    },
+    {
+      "path": "app/modules/cborg_http.py",
+      "sha256": "cad3ffabae422ac306cbf99be8fffe23d64aa1afbc2a12a4e7d06b57b6c786e9",
+      "line_count": 123,
+      "verification": "archive_bytes_only",
+      "symbols": [
+        {
+          "name": "_truthy",
+          "line": 16,
+          "end_line": 17
+        },
+        {
+          "name": "_is_global_ipv6",
+          "line": 20,
+          "end_line": 25
+        },
+        {
+          "name": "_probe_global_ipv6",
+          "line": 28,
+          "end_line": 48
+        },
+        {
+          "name": "_ifconfig_global_ipv6",
+          "line": 51,
+          "end_line": 64
+        },
+        {
+          "name": "_ipv6_bind_assignable",
+          "line": 67,
+          "end_line": 85
+        },
+        {
+          "name": "_local_address",
+          "line": 88,
+          "end_line": 111
+        },
+        {
+          "name": "openai_http_kwargs",
+          "line": 114,
+          "end_line": 123
+        }
+      ]
+    },
+    {
+      "path": "storage/schema/README.md",
+      "sha256": "5f2a6b765a9fd0b56655bb556fa05aa404b965634031acd73e7138bfd921e788",
+      "line_count": 64,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/bl1101_motor_stage_map.yaml",
+      "sha256": "74a131e5a11a9c22d3e78ce2aaf1ce3b0dbb747475427f90f2b909fc98beb687",
+      "line_count": 96,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/bl1101_schema.yaml",
+      "sha256": "5b41ba99a8c5344eea9422ff0e51cf8a74c67fd86d48c4d0245ce40d7c6461f3",
+      "line_count": 458,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/matkg_schema.yaml",
+      "sha256": "0214a61a200b1f7c98cdb641a97c5cfc2a29a1517147342c04eb470f2a4abf68",
+      "line_count": 1060,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/prov_vocabulary.yaml",
+      "sha256": "0120f16f4fab7bf7fce763cc13536f2bf23f1946bd0ba37635a41574c278dc61",
+      "line_count": 69,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/rsoxs_schema.yaml",
+      "sha256": "8269251b1bdaaf92750b58db04013910f596f35519b6cebbcbb036241d51b175",
+      "line_count": 65,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/rsoxs_schema_extract.yaml",
+      "sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca",
+      "line_count": 40,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/tiled_sim_seed.yaml",
+      "sha256": "64f5edb17dea7a1f23284ee2cc6ed60060e725cd7ece1a48506db36094754f07",
+      "line_count": 151,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/xray_schema.yaml",
+      "sha256": "2d0742fb0f8d757f2860c755c6b11dbf001d226caad3057313f6adcbc15b9d08",
+      "line_count": 531,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/xray_schema_extract.yaml",
+      "sha256": "a80fd18354f7f957a39ab6fe2f2b2cf737de6ede639c576ac5ce13ce18b07d5b",
+      "line_count": 21,
+      "verification": "archive_bytes_only"
+    },
+    {
+      "path": "storage/schema/xray_seed_instances.yaml",
+      "sha256": "64c86053fcabf0069a6522481e85e4524bb92c4893a2a36b50ac263d28574bbc",
+      "line_count": 97,
+      "verification": "archive_bytes_only"
+    }
+  ],
+  "runtime_tests_executed": false
+}

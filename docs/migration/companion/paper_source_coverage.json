@@ -1,0 +1,631 @@
+{
+  "version": "4.0",
+  "enumerated_roots": [
+    "als_knowledge_agent/src/als_knowledge_agent/graph/",
+    "src/forge/agents/literature/",
+    "als_knowledge_agent/src/als_knowledge_agent/gold/"
+  ],
+  "exhaustive_within_enumerated_roots": true,
+  "whole_repository_paper_discovery_complete": false,
+  "items": [
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/__init__.py",
+      "disposition": "rebuild_bootstrap",
+      "reason_or_port_id": "Public exports/initialization handled by packaging, no donor import-time registration.",
+      "sha256": "52b0116c3664918d56cb068df19b252447e5f57b152796ee6f6448ce5f7e7da5"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/bibliography_backfill.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-07",
+      "sha256": "9eb2d04ad4ca867d0425a3341bde6c046c4911506995eb213580986bfe9f96af"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/cborg_approval.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-05",
+      "sha256": "92fbec663949e7c1492ca57e04071527a402422a8c00741b5d65ee2eed273f34"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/cborg_control.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-08",
+      "sha256": "ba2aea9d737068973825e78290ac54b33595e6a549666e921f5c40d1f7eee363"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/cborg_ledger.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-06",
+      "sha256": "3065cd3e8c8d110d40eeec5d227c3a5a39bb045f57212f31ecb433566c178f59"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/cborg_resolution.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-07",
+      "sha256": "72a8af75c4e90fe3d4cbe514969ea0d92921d51ef67780fe14f71ca0b9b89756"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/chemical_identity.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-03",
+      "sha256": "2bae91ed54b8b6750aba57d307d6b84a4ad0de644ccdca43186d154b6997ba8f"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/child_process.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-09",
+      "sha256": "aaee302cf76918ce5a68f50cb22f3bf7a75cb02b040de31fff9a21e0451ef706"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/chunk_reextraction.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-09",
+      "sha256": "5957a5fdb8df8b33bf436fe03a553c97843a051aa1e6c6cba10fd61276d70139"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/citation_links.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-17",
+      "sha256": "1caa5164a9f9a815b8de7e82a737350ead02d8384b0645452c89a157e637a8f5"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/classification_units.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-01",
+      "sha256": "884dc6e57e4e7c41eda5240de903c1c53d5b2e27edd58a06219592b2850461ba"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/codex_sol_resolution.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-11",
+      "sha256": "fa39f4f0628095417aecce7401c56d604246f99a9b71e1eb39170ba37cda3ae6"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/corpus_index.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-07",
+      "sha256": "0afd027cadac4563fec848a2f488b3f72ddafbee4bc6a7ac92f56aee378d1da6"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/corpus_manifest.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-06",
+      "sha256": "3148d40d599c23629cf48e26f3c90e015910483a20ab9c797ac4279f4fe64ca4"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/corpus_refresh.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-10",
+      "sha256": "046bb544a58ceb3965123ffc1cbb60670d31897eec5a9bc9a0c312b8c95ead36"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/dual_fit_job.py",
+      "disposition": "FORGE_owned_mixed_or_experimental",
+      "reason_or_port_id": "Literature outputs consumed by FORGE; computation/experimental behavior does not move.",
+      "sha256": "0a03a1081705d78b3f53773fef1349b485d62d62251bad132afb5a66b11d9610"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/dual_fit_trigger.py",
+      "disposition": "FORGE_owned_mixed_or_experimental",
+      "reason_or_port_id": "Literature outputs consumed by FORGE; computation/experimental behavior does not move.",
+      "sha256": "87d9e7cf6c09e51585475ea5e734c235f33f0fca1e2227445cbe9252d3d696b8"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/enrichment_agent.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-11",
+      "sha256": "ef0fd37a301046ebc033b0520960a1970289ce57b8abf8e9795ea88c86bdfa8f"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_classification.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-02",
+      "sha256": "2d113cc80c3c3a14a0381fb8aab45d0e20178464adf0e605d5f516097ccbf447"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_extraction.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-03",
+      "sha256": "3a60243c3d28fc400dc498a002e7de87be1bfb900635aece7cab269c318fdbac"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_ocr.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-05",
+      "sha256": "5fc112ecfdc4fb4dc26ed09d15f483a4521e3a6a8144849d9c0187f30dc43064"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_orientation.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-08",
+      "sha256": "db9745fd0383df545806962ae930af3d1a395ab45b1a585cf448b42c24bfa804"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_qrange.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-07",
+      "sha256": "b72be91a3c5a891bbfbcd8774bb62327fdf8a2258af2ccf3e2874e64c24968ce"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_scale.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-06",
+      "sha256": "f3b36b6120d466dcacd96d09e1c654d45e6d0be5fb5946b12c0571a195055fb3"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/figure_text_layer.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "V-04",
+      "sha256": "6317e71c1b1f83bf83b48bab647809751cfcb68269819672ae665bba34c1a773"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/folder_ingest.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-05",
+      "sha256": "7c97f43863d457c2fa2c3ef4efd46aae08bcd0bc2a940606d966dac908a51d2a"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/group_adjudication.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-06",
+      "sha256": "4b144c83d3081e163e5ddc71fc71285cc79bc5c86bbb3858706663d70666deb0"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/import_staged.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-02",
+      "sha256": "cdb605d2b18d8ba9a67109805ac6ed885f0ed880f4635eb7de8a6bdf0d018c82"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/ingest_folders_routes.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "I-02",
+      "sha256": "7a54df28909ca83d47869dd6e16af8fbeeb36f80218010083e671bcddf5abade"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/ingest_journal.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-04",
+      "sha256": "52368e5058354047fb602bdfb4f9a3096aea4555dd4d6cdcf02487757efc4442"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/ingest_telemetry.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-08",
+      "sha256": "7df55299b5852f747932ad3e74f33f86a20cdc704c76e212345e3a628d98b5d2"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/ingested_papers.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-06",
+      "sha256": "33ccd7f27d3d9e4ed331a77990b99f049c9154067a0e025b0eb39f1535ce32e0"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/kg_store.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "K-02",
+      "sha256": "90740c5930f829c03b11103a0e0fc0c264b5ec3a7dd310c645c5bf2a3d16045e"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/kg_writer.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "K-01",
+      "sha256": "7136fbef9084771461ad1ff80819352ea0f9375472aa2a026f0e4f5057135e18"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/licensing.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-18",
+      "sha256": "fcb1cc0f9e63555cb539000f2ff642edeef6150c6e92c49fd129c4a1ab9310b6"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/llm_defaults.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "R-11",
+      "sha256": "e702bcc986e3296a90801fcaabc9ca3f4a7cb2086c300c7699ee444e5eedc4cb"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/local_llm_resolution.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-04",
+      "sha256": "0b47160565ee9a24ad8336974d9786f6d7e2c922b92faa9ec7c154da182e8c14"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/merge_safety.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-02",
+      "sha256": "0d5d52b8e5459c7b8c886397cf8717a2c0e081af371f29f8a22636c57138a0dc"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/openalex_supplement.json",
+      "disposition": "asset_or_support_review",
+      "reason_or_port_id": "Inventory and classify during T17; schema/vocabulary/config data require attribution, ownership and version review before migration.",
+      "sha256": "4dfef0756150fc585569e4734228b6b14c8965fc4dc1f659142360c60f933dc8"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/orchestrator.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "R-10",
+      "sha256": "c527b9fae2adcc4c203ff3d319e0b461c7ae1be46394d6dcc419a725960e2eff"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/paper_context.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-16",
+      "sha256": "1fd19639c9704a700f49ce21a28035172799e7389be074cf48c9ea89157f8fdd"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/paper_intake.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-05",
+      "sha256": "57812b1aff411c938ea092a5a3b1f91ee83e2ec0590739a7d0ae35ed0d52bce5"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-10",
+      "sha256": "63719198999015c41cd2e9ad98a48b83a5daa4a4c3cd5744d4114210a1a27c5a"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/paper_resolver.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-04",
+      "sha256": "b696ea5f2dcf7ae2186ab17e66ff00c4c3138893d6f40b12d88ab90615a50f11"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/paper_simulation.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-09",
+      "sha256": "641c8257fe26329e8bfd25dbe3bc43a256c990093b17274deded84167e8e0b01"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/paper_staging.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-01",
+      "sha256": "779af623fb9cf824e874a3c6b5d5b7b51e327d63c9217e84841d4bf31c164a27"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/parsed_document.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-11",
+      "sha256": "dd8942b71d135cf07ab5b0ba35dd31290a6ca95f1ea4b7af7d534954518f5965"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/parser_pool.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-12",
+      "sha256": "a2f2b093bdab14bc5b84403ec913f6c0e60642cd8807c982866a70dbdd10e02c"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/parser_worker.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-13",
+      "sha256": "6396e4700a1f9cf3de6794b8f602e9618f6842edc09083a39b5c02e8a77bd2ac"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/pdf_extraction.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-01",
+      "sha256": "b83bc6c5bc84b25fc0be2d07ccabcc063f59a330c537305e63935474f7455a2b"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/quote_location.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-03",
+      "sha256": "743e301187142af3affe3e3f5d9525a2684099c0f2b55f3fcbba7ac58012bebb"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/reduction_prov.py",
+      "disposition": "FORGE_owned_mixed_or_experimental",
+      "reason_or_port_id": "Literature outputs consumed by FORGE; computation/experimental behavior does not move.",
+      "sha256": "2c9c4a4c3ed8419aaead99c2a1d94b55225d7974c80220ee9e20a346651c3ff0"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/reference_parsing.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-14",
+      "sha256": "ae86cc8311d212c4f962e7e30e0dfd0ffb6fb99481ddd495d574ec13c5f55446"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/resolution_routing.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-03",
+      "sha256": "f250d7174f65fcbf35fb490bf4b1a1c9819d38a9624d6391ae72ee19a6c9e1f5"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/scientific_artifacts.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-01",
+      "sha256": "74e2b32f983203512cd1b67d4a8a4d030079d708c12eb5487059a3d16865a827"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/scientific_records.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-02",
+      "sha256": "59f457926b3767f93b3ffe63bd63f9f0b20a79d94e15a34aa2952239cec7e3ac"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/section_projection.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-15",
+      "sha256": "4b61cb04899a7fdd347a5d66e076ac40ce9ff64372db8322ddaae37639ea4797"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/service_health.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-12",
+      "sha256": "28e911bfc56c7d085c26b8707c69a539b999881a7c9d2b862b49246df3e3f9c3"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/staged_import_routes.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "I-03",
+      "sha256": "1f8e0ba056fa8db5114ecafc08d2d24dbac3a8e881c3ec42aced5dfb32260d9c"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/staged_import_status.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "J-03",
+      "sha256": "9e5cb553586445d1f637adbcb957aba2ee7d9575fa77371403683894d2415e3f"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-11",
+      "sha256": "1033ec389e6d814f57b4eb8679765c8c38cfaafaef1f837b3c5dc6ab92c01789"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign_routes.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "I-04",
+      "sha256": "cc9911009e1d3d5939d50fffdb206c5b31e99a03d8e5467500a7ddd6b068c18b"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign_types.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-07",
+      "sha256": "49175f9c8a715708bed50cf76943a3f2bd10e4db7c91256a404f9dc532983491"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_embeddings.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-04",
+      "sha256": "c8da8df1f476e27e88385bca4cd541dd0d35d7f71b66e909d3a3e7aa03bf4253"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_evidence.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-08",
+      "sha256": "9a3026cab08644ded540c0c6b96822f75cf2c67ce2f6b0a528b3dfba31556c55"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_grouping.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-05",
+      "sha256": "0f7a6e133683ca82775fdc9f8ed7c03aab53fd37c3090e2190fad39628636d58"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_provenance.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-10",
+      "sha256": "ddcd0a3e4b3ca93c6b19adacb274f7c6770d59252c58c4dddaff9cb216b2334e"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_quarantine.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-09",
+      "sha256": "61c3435c7e951016a75d38d8ad43591b4f2d7750e334cdb78e9e5361f60ad3ec"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/term_resolver.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-10",
+      "sha256": "a81d20285c1e805f9a939c7f3cef40954b508d882021a7c1e0980a51b5b8efd6"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/thread_sqlite.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "U-02",
+      "sha256": "026bb3c709db0893921bd755ae14d8d8da0964702a69244172874e49b88c5c6f"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/tiled_client.py",
+      "disposition": "replace_dependency",
+      "reason_or_port_id": "Use F2W Tiled Graph adapter; no forge.data import or global dotenv/catalog client.",
+      "sha256": "666e6348874687f87718dcc5cb03952ebcc1aa2f9395714af1015fc6db417dcd"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/tiled_store.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "K-03",
+      "sha256": "2fc869d8796416e0344793eb35008e80bbf3f3ae013f348fe8fa7477360e9f57"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocab_cleanup.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-12",
+      "sha256": "5454d8cdb0fc37c4a36ac8f06731630cd4721fe72aca3c430c9043ddd8928b8e"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocab_migration.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-13",
+      "sha256": "eadc7e5ce0bbbd73135f20ea8b594f07ca41a215cd46b4284ed6ab4d4371f7da"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocab_quality_snapshot.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-16",
+      "sha256": "1ffbf3d2c8e3e8ee91d7b76a7d012bf39fbaaecad1dd73491663cfb0eb6e0012"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-01",
+      "sha256": "9350c9f2180621f465751ad7dc6f5d5d813b0fad4eaff0eb617c0873a0dc7835"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary.yaml",
+      "disposition": "asset_or_support_review",
+      "reason_or_port_id": "Inventory and classify during T17; schema/vocabulary/config data require attribution, ownership and version review before migration.",
+      "sha256": "5c3bed1122aeb2df76565fad76275b1f4f4e0d2491397e172d50329daaebe0be"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_audit.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-15",
+      "sha256": "4452b49b2193e582fdbed46a962bfaddf935266204f115c143d5d6dd7ce874fa"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_growth.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "C-14",
+      "sha256": "a188086025b60c3ac393e4b76fa4287188387940f978381d30e2db23614dc313"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_review.yaml",
+      "disposition": "asset_or_support_review",
+      "reason_or_port_id": "Inventory and classify during T17; schema/vocabulary/config data require attribution, ownership and version review before migration.",
+      "sha256": "c512357866f8c438b10713b3f4764e8dd2ec2aa8dbc75262dda27a81baf32f88"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/web_search.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-20",
+      "sha256": "b333b397cfcadf53c61f760aacb80a82251a37fce9198960230b2d3c6aae25a6"
+    },
+    {
+      "path": "src/forge/agents/literature/__init__.py",
+      "disposition": "rebuild_bootstrap",
+      "reason_or_port_id": "Public exports/initialization handled by packaging, no donor import-time registration.",
+      "sha256": "dd7cacf1963951eca3621d6593ad93c45bf65c8f21ec48c875826d46fdfe5902"
+    },
+    {
+      "path": "src/forge/agents/literature/comparison.py",
+      "disposition": "FORGE_owned_mixed_or_experimental",
+      "reason_or_port_id": "Literature outputs consumed by FORGE; computation/experimental behavior does not move.",
+      "sha256": "d2a5a06ce8d8e355f777ac124a41b4707155a54e6f0673a4ec9833e0caaa82af"
+    },
+    {
+      "path": "src/forge/agents/literature/extraction.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-08",
+      "sha256": "28d4c9342323baf1a5d59ae32f25121da584dd7da95cc458d0b862a7c9ac9b4b"
+    },
+    {
+      "path": "src/forge/agents/literature/grounding.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-04",
+      "sha256": "df64943645e4ef16135b9bc84ce46f83348d519c88d89823abbd0a4e2f516026"
+    },
+    {
+      "path": "src/forge/agents/literature/hypothesis.py",
+      "disposition": "FORGE_owned_mixed_or_experimental",
+      "reason_or_port_id": "Literature outputs consumed by FORGE; computation/experimental behavior does not move.",
+      "sha256": "3977623966282aff586b61705a543f2548629721d0479378143a11c5509796aa"
+    },
+    {
+      "path": "src/forge/agents/literature/openalex.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-02",
+      "sha256": "e8850b695691d2223402764cb82e2853cda0dc330d997b20a280e083ee83ace6"
+    },
+    {
+      "path": "src/forge/agents/literature/papers.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-09",
+      "sha256": "4ab9d40778e9aa3505e1e9c3bcb7aeaafc5d53979530ec5ff68a498f44d52208"
+    },
+    {
+      "path": "src/forge/agents/literature/publication.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-07",
+      "sha256": "eeb22eb0ce1429d327730295d56306a7c313e1cd2f9abae65ca0874ce5d46b14"
+    },
+    {
+      "path": "src/forge/agents/literature/resolver_batch.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-03",
+      "sha256": "08f720a8d098d0eaa70263d6b48b4af50c38607d2cff83a2c9fc96af5ae83f52"
+    },
+    {
+      "path": "src/forge/agents/literature/structured_output.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-06",
+      "sha256": "66bd785c66e7128519f11b9748dddd9cd00ab98debf4215938fcafd188b447b7"
+    },
+    {
+      "path": "src/forge/agents/literature/tools.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "L-01",
+      "sha256": "2212bfe462de260d784d58f5587f3b4b36e8be4f88cde0d543280bc2ea537c7e"
+    },
+    {
+      "path": "src/forge/agents/literature/units.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "E-05",
+      "sha256": "5ccdfc2727772285977b2dabe7bfc5dd46ac63bf3729d0c7d7bc2a53888c8f07"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/__init__.py",
+      "disposition": "rebuild_bootstrap",
+      "reason_or_port_id": "Public exports/initialization handled by packaging, no donor import-time registration.",
+      "sha256": "c125c67367fc60337d3b26b965b4136fa478446f45d7d29404780a92b0974c64"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/annotate.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-01",
+      "sha256": "95dbb81e9f75a16adcc949a21cec66e8573990e6fc3119ed31c82f1fb2de83aa"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/bundle.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-02",
+      "sha256": "b8f4601f7f8869b4bf474f4ea10a2c71c4094139fd8f2d54a3ccb98cadeeebc2"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/harness.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-03",
+      "sha256": "cc74442a7902e149e9a329fbe48438eb6f0db0a009d24450b218bd201808be5a"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/metrics.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-04",
+      "sha256": "158c78b167016a7612f5a7378e2bb6bbd1fd8025273eeef9374b064f182dbf2c"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/parsers.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-05",
+      "sha256": "e2d3d5e01ba0b699d79e6048b056f1ff08fdcc771dd348acc5f423cc845377ea"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/preannotate.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-06",
+      "sha256": "e87edefcc40c98e6e1274647903bc7a11bf4300a569f3236f2877fa428cefa0a"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/schema.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-07",
+      "sha256": "4b86a8ad63654a1033ad7686dcf514297b1c08621bd50c4d76fb0774bff3d4ad"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/selection.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-08",
+      "sha256": "ba2b80f90ae6c19d256d1dd464f76f81a722f696a7c2e75d390d779b5d9b87ff"
+    },
+    {
+      "path": "als_knowledge_agent/src/als_knowledge_agent/gold/stages.py",
+      "disposition": "mapped",
+      "reason_or_port_id": "Q-09",
+      "sha256": "f9a98dd4eb566f5cf3f6439aa025093d32879627327ca87bf96bdc2828a911ac"
+    }
+  ],
+  "v4_policy_reference": "DECISIONS.md D12-D20; source facts unchanged; implementation/exposure must follow current requirements"
+}

@@ -1,0 +1,1627 @@
+{
+  "source": {
+    "filename": "FAIR2WISE-rsoxs.zip",
+    "sha256": "d3e9d821e7878211f08399c3f69e7d9cf0f55f8a7f17397e737fa3a4292077a6",
+    "archive_comment": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "entries": 723
+  },
+  "entries": [
+    {
+      "id": "B01",
+      "title": "Actual API and unchanged browser contract",
+      "source_file": "app/modules/f2w_agent/api.py",
+      "source_sha256": "50fb15d5b3a1fe2cece7bfd7ad4cb71dc42dab9f42a900343439eb98debe8c6a",
+      "verified_symbols": [
+        {
+          "name": "create_app",
+          "line": 6611,
+          "end_line": 7031
+        },
+        {
+          "name": "run_api",
+          "line": 7034,
+          "end_line": 7038
+        },
+        {
+          "name": "AgentPipelineService",
+          "line": 2479,
+          "end_line": 6600
+        },
+        {
+          "name": "ChatRequest",
+          "line": 124,
+          "end_line": 145
+        },
+        {
+          "name": "ChatResponse",
+          "line": 210,
+          "end_line": 225
+        },
+        {
+          "name": "ChatActionRequest",
+          "line": 228,
+          "end_line": 254
+        },
+        {
+          "name": "AgentSettingsResponse",
+          "line": 383,
+          "end_line": 407
+        },
+        {
+          "name": "AgentSettingsUpdate",
+          "line": 410,
+          "end_line": 428
+        }
+      ],
+      "donor_port_ids": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04"
+      ],
+      "proposed_destination": "app/api/main.py + app/api/compat/ + app/modules/application.py",
+      "instructions": "Keep the existing create_app(cfg, cors_origins=...) and launcher callable as facades. Preserve all 19 HTTP method/path contracts. Extract service seams from the 7,038-line module; do not replace its workflow behavior with the FORGE server.",
+      "existing_tests": [
+        "tests/test_f2w_api.py",
+        "tests/test_agent_settings.py"
+      ]
+    },
+    {
+      "id": "B02",
+      "title": "Pending actions, sessions and UI graph updates",
+      "source_file": "app/modules/f2w_agent/api.py",
+      "source_sha256": "50fb15d5b3a1fe2cece7bfd7ad4cb71dc42dab9f42a900343439eb98debe8c6a",
+      "verified_symbols": [
+        {
+          "name": "AgentPipelineService.ask",
+          "line": 3595,
+          "end_line": 3641
+        },
+        {
+          "name": "AgentPipelineService.ask_with_progress",
+          "line": 3739,
+          "end_line": 3787
+        },
+        {
+          "name": "AgentPipelineService.act",
+          "line": 5919,
+          "end_line": 5957
+        },
+        {
+          "name": "AgentPipelineService.act_with_progress",
+          "line": 5972,
+          "end_line": 6012
+        },
+        {
+          "name": "AgentPipelineService._activate_session",
+          "line": 2555,
+          "end_line": 2576
+        },
+        {
+          "name": "AgentPipelineService._pending_payload",
+          "line": 6581,
+          "end_line": 6600
+        },
+        {
+          "name": "AgentPipelineService._query_graph_event",
+          "line": 2908,
+          "end_line": 2914
+        },
+        {
+          "name": "AgentPipelineService._response",
+          "line": 6472,
+          "end_line": 6508
+        },
+        {
+          "name": "AgentPipelineService._extract_rebuild_reload",
+          "line": 5517,
+          "end_line": 5711
+        }
+      ],
+      "donor_port_ids": [
+        "R-04",
+        "J-04",
+        "U-01"
+      ],
+      "proposed_destination": "app/modules/application.py + agent_runtime/ + jobs/",
+      "instructions": "Keep session_id/client_turn_id/parent_turn_id, pending selection indexes, active-paper follow-ups, graph_update progress and response statuses. Preserve candidate/session graph visibility while separately gating publication. Never assume a LangGraph event is already an F2W UI event.",
+      "existing_tests": [
+        "tests/test_f2w_api.py",
+        "ui/e2e/pending-ingest.spec.ts",
+        "ui/e2e/sessions.spec.ts"
+      ]
+    },
+    {
+      "id": "B03",
+      "title": "Graph detail, editing and code-snippet contracts",
+      "source_file": "app/modules/f2w_agent/api.py",
+      "source_sha256": "50fb15d5b3a1fe2cece7bfd7ad4cb71dc42dab9f42a900343439eb98debe8c6a",
+      "verified_symbols": [
+        {
+          "name": "GraphNode",
+          "line": 167,
+          "end_line": 193
+        },
+        {
+          "name": "GraphPayload",
+          "line": 203,
+          "end_line": 207
+        },
+        {
+          "name": "LinkedCodeSnippetUpdate",
+          "line": 317,
+          "end_line": 326
+        },
+        {
+          "name": "GraphRelationshipUpdate",
+          "line": 329,
+          "end_line": 334
+        },
+        {
+          "name": "AgentPipelineService.update_graph_node",
+          "line": 2978,
+          "end_line": 3046
+        },
+        {
+          "name": "AgentPipelineService._apply_relationship_updates",
+          "line": 3069,
+          "end_line": 3129
+        },
+        {
+          "name": "AgentPipelineService._apply_linked_snippet_updates",
+          "line": 3131,
+          "end_line": 3332
+        },
+        {
+          "name": "resolve_graph_node",
+          "line": 782,
+          "end_line": 814
+        }
+      ],
+      "donor_port_ids": [
+        "K-03",
+        "K-04",
+        "K-06"
+      ],
+      "proposed_destination": "app/api/compat/graph.py + app/modules/graph/",
+      "instructions": "Translate existing UI graph detail/edit results over Tiled, including _action=upsert|unlink, relationship add/remove and publication provenance. Preserve external IDs and references; do not merely disable edits when retiring Splash. Unsupported mutation semantics block the release or require a separate owner-approved exception.",
+      "existing_tests": [
+        "tests/test_f2w_api.py",
+        "ui/src/app/components/GraphMockup.test.ts",
+        "ui/e2e/kg-viewer.spec.ts"
+      ]
+    },
+    {
+      "id": "B04",
+      "title": "Coordinator and CLI compatibility",
+      "source_file": "app/modules/f2w_agent/coordinator.py",
+      "source_sha256": "e72cb0cf10fc1c0d78873aabe171d9d75ef744ca0f61b209c625420175726f8e",
+      "verified_symbols": [
+        {
+          "name": "CoordinatorConfig",
+          "line": 68,
+          "end_line": 94
+        },
+        {
+          "name": "Coordinator",
+          "line": 162,
+          "end_line": 654
+        }
+      ],
+      "donor_port_ids": [
+        "R-04",
+        "R-05"
+      ],
+      "proposed_destination": "app/modules/f2w_agent/ facades + application.py",
+      "instructions": "Keep configuration fields, workdir/artifact paths and supported command behavior. Preserve current Academy-facing integration until caller parity is demonstrated; the scoped LangGraph supervisor replaces orchestration gradually.",
+      "existing_tests": [
+        "tests/test_f2w_coordinator.py"
+      ]
+    },
+    {
+      "id": "B05",
+      "title": "Workflow intent routing",
+      "source_file": "app/modules/f2w_agent/orchestrator_agent.py",
+      "source_sha256": "fee9776b43e47a45fd6efc0bb6179dc68ec299c835e5bf6e670291e5639ef53c",
+      "verified_symbols": [
+        {
+          "name": "WorkflowOrchestratorAgent",
+          "line": 153,
+          "end_line": 516
+        },
+        {
+          "name": "WorkflowOrchestratorAgent.validate",
+          "line": 368,
+          "end_line": 465
+        },
+        {
+          "name": "WorkflowOrchestratorAgent.decide",
+          "line": 468,
+          "end_line": 516
+        }
+      ],
+      "donor_port_ids": [
+        "R-02",
+        "R-04"
+      ],
+      "proposed_destination": "app/modules/agent_runtime/ routing adapters",
+      "instructions": "Retain deterministic validation, pending-action handling, active-paper state and safe fallback while moving execution into LangGraph. No new default prompt or provider stack.",
+      "existing_tests": [
+        "tests/test_workflow_orchestrator.py"
+      ]
+    },
+    {
+      "id": "B06",
+      "title": "Evidence ranking debate agent",
+      "source_file": "app/modules/f2w_agent/debate_agent.py",
+      "source_sha256": "a383de6dfb48266b13d3ed1c38161355d6d78a410b33d1aa262f939ce6677a0f",
+      "verified_symbols": [
+        {
+          "name": "EvidenceDebateAgent",
+          "line": 112,
+          "end_line": 267
+        }
+      ],
+      "donor_port_ids": [
+        "R-04"
+      ],
+      "proposed_destination": "app/modules/curation/ or retained f2w_agent adapter",
+      "instructions": "Retain candidate-ranking specialist behavior. It is not replaced by a generic retrieval tool without equivalent behavior and output tests.",
+      "existing_tests": [
+        "tests/test_f2w_api.py"
+      ]
+    },
+    {
+      "id": "B07",
+      "title": "Active-paper bounded answers",
+      "source_file": "app/modules/f2w_agent/paper_evidence_agent.py",
+      "source_sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba",
+      "verified_symbols": [
+        {
+          "name": "PaperEvidenceAgent",
+          "line": 295,
+          "end_line": 458
+        },
+        {
+          "name": "_eligible_pages",
+          "line": 54,
+          "end_line": 80
+        },
+        {
+          "name": "_citation_errors",
+          "line": 88,
+          "end_line": 119
+        },
+        {
+          "name": "summarize_extracted_terms",
+          "line": 122,
+          "end_line": 292
+        }
+      ],
+      "donor_port_ids": [
+        "L-09",
+        "L-10",
+        "E-03",
+        "E-04"
+      ],
+      "proposed_destination": "app/modules/evidence/ + retrieval/",
+      "instructions": "Preserve manifest-bounded pages and citation checking for the active extracted paper. New FORGE section/figure readers extend the evidence service, not permission to answer from unrelated corpus pages.",
+      "existing_tests": [
+        "tests/test_paper_evidence_agent.py"
+      ]
+    },
+    {
+      "id": "B08",
+      "title": "Real retrieval, sufficiency and leeway",
+      "source_file": "app/modules/f2w_agent/retrieval_agent.py",
+      "source_sha256": "c9a24dc2e0c0991e27d69b71b3fe509bf891df4cd9a08e997103f85225425195",
+      "verified_symbols": [
+        {
+          "name": "RetrievalAgent.query",
+          "line": 1168,
+          "end_line": 1399
+        },
+        {
+          "name": "RetrievalAgent._parallel_retrieve",
+          "line": 676,
+          "end_line": 741
+        },
+        {
+          "name": "RetrievalAgent._fanout_hits",
+          "line": 941,
+          "end_line": 1006
+        },
+        {
+          "name": "RetrievalAgent._build_merged_context",
+          "line": 1120,
+          "end_line": 1130
+        },
+        {
+          "name": "RetrievalAgent._hybrid_pack",
+          "line": 1132,
+          "end_line": 1165
+        },
+        {
+          "name": "RetrievalAgent._synthesize_leeway_answer",
+          "line": 1449,
+          "end_line": 1485
+        },
+        {
+          "name": "build_judge_prompt",
+          "line": 219,
+          "end_line": 249
+        },
+        {
+          "name": "leeway_system_for",
+          "line": 196,
+          "end_line": 200
+        }
+      ],
+      "donor_port_ids": [
+        "K-09",
+        "K-10",
+        "K-12"
+      ],
+      "proposed_destination": "app/modules/retrieval/ baseline adapter first",
+      "instructions": "Preserve lexical/semantic KG retrieval, separate graph identities, parallel paths, source_rag, existing contextual leeway and numeric-claim evidence rules. Ops/MP/live-Tiled branches already exist; retain them behind compatibility scope without adding FORGE experimental tools.",
+      "existing_tests": [
+        "tests/test_retrieval_agent.py",
+        "tests/test_build_context_filtering.py",
+        "tests/test_rag_system_prompt.py",
+        "tests/test_multi_kg.py"
+      ]
+    },
+    {
+      "id": "B09",
+      "title": "KnowledgeGraph implementation and independent chat API",
+      "source_file": "app/modules/kg_rag_api.py",
+      "source_sha256": "eee8f57331895a0c5b8f65eeab99bad0147a77e621655a427a3aa3e9727106c8",
+      "verified_symbols": [
+        {
+          "name": "KnowledgeGraph",
+          "line": 778,
+          "end_line": 1266
+        },
+        {
+          "name": "retrieve_nodes",
+          "line": 1279,
+          "end_line": 1334
+        },
+        {
+          "name": "NodeInfo.score_prp",
+          "line": 734,
+          "end_line": 751
+        },
+        {
+          "name": "answer",
+          "line": 1640,
+          "end_line": 1690
+        },
+        {
+          "name": "create_fastapi_app",
+          "line": 196,
+          "end_line": 318
+        },
+        {
+          "name": "run_fastapi",
+          "line": 321,
+          "end_line": 330
+        },
+        {
+          "name": "MissingNodeTracker",
+          "line": 346,
+          "end_line": 373
+        }
+      ],
+      "donor_port_ids": [
+        "K-03",
+        "K-09",
+        "K-10"
+      ],
+      "proposed_destination": "app/modules/kg_rag_api.py facade + retrieval/graph services",
+      "instructions": "Preserve both actual lexical and semantic implementations, BFS/context/evidence behaviors, knowledge-gap recording and six OpenAI/Ollama-compatible routes. Do not confuse this server with the 19-route UI agent server.",
+      "existing_tests": [
+        "tests/test_kg_rag_api.py",
+        "tests/test_kg_rag_api_extended.py",
+        "tests/test_kg_rag_api_coverage.py",
+        "tests/test_fastapi_endpoints.py"
+      ]
+    },
+    {
+      "id": "B10",
+      "title": "Async F2W inference path",
+      "source_file": "app/modules/kg_rag_api.py",
+      "source_sha256": "eee8f57331895a0c5b8f65eeab99bad0147a77e621655a427a3aa3e9727106c8",
+      "verified_symbols": [
+        {
+          "name": "ChatClient",
+          "line": 1396,
+          "end_line": 1403
+        },
+        {
+          "name": "OllamaClient",
+          "line": 1406,
+          "end_line": 1429
+        },
+        {
+          "name": "CBorgClient",
+          "line": 1432,
+          "end_line": 1472
+        },
+        {
+          "name": "make_chat_client",
+          "line": 1475,
+          "end_line": 1482
+        },
+        {
+          "name": "call_llm",
+          "line": 1590,
+          "end_line": 1637
+        }
+      ],
+      "donor_port_ids": [
+        "R-04",
+        "R-10",
+        "R-11"
+      ],
+      "proposed_destination": "existing classes + app/modules/llm_adapters.py",
+      "instructions": "Retain async messages-based contract and existing CBORG/Ollama configuration, timeout and tracing paths. Do not replace it with the different prompt-string synchronous client.",
+      "existing_tests": [
+        "tests/test_chat_clients.py",
+        "tests/test_kg_rag_api.py"
+      ]
+    },
+    {
+      "id": "B11",
+      "title": "Synchronous F2W inference path",
+      "source_file": "app/modules/term_extractor/clients.py",
+      "source_sha256": "41643a6c619521b35e38e3bb5743355a59c202cee7b16dac65905f258fc07034",
+      "verified_symbols": [
+        {
+          "name": "ChatClient",
+          "line": 46,
+          "end_line": 55
+        },
+        {
+          "name": "OllamaChatClient",
+          "line": 58,
+          "end_line": 86
+        },
+        {
+          "name": "CBorgChatClient",
+          "line": 89,
+          "end_line": 124
+        },
+        {
+          "name": "make_chat_client",
+          "line": 127,
+          "end_line": 141
+        },
+        {
+          "name": "_traced_chat",
+          "line": 16,
+          "end_line": 43
+        }
+      ],
+      "donor_port_ids": [
+        "E-01",
+        "U-03",
+        "U-04",
+        "U-11"
+      ],
+      "proposed_destination": "existing classes + app/modules/llm_adapters.py",
+      "instructions": "Keep chat(prompt, temperature, timeout, trace_label) and existing tracing/concurrency behavior. Adapt every FORGE paper inference site to a suitable existing F2W path; new multimodal/tool-call capabilities require a minimal additive reviewed extension.",
+      "existing_tests": [
+        "tests/test_chat_clients.py",
+        "tests/test_cborg_http.py",
+        "tests/test_cborg_limiter.py"
+      ]
+    },
+    {
+      "id": "B12",
+      "title": "Existing LangGraph extraction loop",
+      "source_file": "app/modules/term_extractor/agent.py",
+      "source_sha256": "fef2fe3e36d31e00326fe7aa4b711113fa8d21e46d6c73fe31798a29c34656f9",
+      "verified_symbols": [
+        {
+          "name": "build_graph",
+          "line": 9,
+          "end_line": 32
+        }
+      ],
+      "donor_port_ids": [
+        "R-01",
+        "R-02",
+        "R-04"
+      ],
+      "proposed_destination": "app/modules/agent_runtime/ + retained term_extractor/agent.py",
+      "instructions": "LangGraph is already used: MessagesState, ToolNode, tool-call continuation and graph.compile. Adopt the shared registry/supervisor architecture, not a redundant first graph framework. Wrap current extraction before changing its behavior.",
+      "existing_tests": [
+        "tests/test_extractor_agent.py"
+      ]
+    },
+    {
+      "id": "B13",
+      "title": "Extractor orchestration and tool-capable model construction",
+      "source_file": "app/modules/term_extractor/orchestrator.py",
+      "source_sha256": "e3759da7831b3246c98906b556829e02bfbae25e368a30e1f5c078d66cd127ca",
+      "verified_symbols": [
+        {
+          "name": "Orchestrator",
+          "line": 152,
+          "end_line": 652
+        },
+        {
+          "name": "Orchestrator._build_llm",
+          "line": 212,
+          "end_line": 229
+        },
+        {
+          "name": "Orchestrator._build_tools",
+          "line": 199,
+          "end_line": 210
+        },
+        {
+          "name": "Orchestrator.process_page",
+          "line": 235,
+          "end_line": 266
+        },
+        {
+          "name": "run_extraction",
+          "line": 655,
+          "end_line": 685
+        }
+      ],
+      "donor_port_ids": [
+        "E-01",
+        "L-12",
+        "L-13"
+      ],
+      "proposed_destination": "app/modules/extraction/strategies/legacy_f2w.py + retained term_extractor/",
+      "instructions": "_build_llm already constructs ChatOpenAI for CBORG or Ollama /v1 and binds tools. Reuse that configuration seam without instantiating the full extractor to obtain a model. Preserve page fallback, concurrency, selected-page behavior, snippet extraction and provenance.",
+      "existing_tests": [
+        "tests/test_extractor_agent.py",
+        "tests/test_source_repos.py"
+      ]
+    },
+    {
+      "id": "B14",
+      "title": "Current extraction tools and full-list merge risk",
+      "source_file": "app/modules/term_extractor/tools.py",
+      "source_sha256": "c8008b94d0e9f50b38b8ac84dfc0ee69835890a1efe21976f5c5e6799d38c762",
+      "verified_symbols": [
+        {
+          "name": "ToolState",
+          "line": 19,
+          "end_line": 44
+        },
+        {
+          "name": "build_tools",
+          "line": 47,
+          "end_line": 303
+        },
+        {
+          "name": "build_tools.check_existing_term",
+          "line": 49,
+          "end_line": 65
+        },
+        {
+          "name": "build_tools.fuzzy_merge_term",
+          "line": 68,
+          "end_line": 158
+        },
+        {
+          "name": "build_tools.register_term",
+          "line": 230,
+          "end_line": 301
+        }
+      ],
+      "donor_port_ids": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06"
+      ],
+      "proposed_destination": "app/modules/canonicalization/ behind existing tool wrappers",
+      "instructions": "The inspected fuzzy_merge_term builds an LLM prompt from ALL store display names; do not claim ANN shortlisting is already implemented on this path. Preserve behavior at H2; add bounded candidate search/merge safety as a measured H3-approved improvement. Keep page/source context and evidence registration.",
+      "existing_tests": [
+        "tests/test_extractor_agent.py"
+      ]
+    },
+    {
+      "id": "B15",
+      "title": "Persistent extracted term records",
+      "source_file": "app/modules/term_extractor/store.py",
+      "source_sha256": "823aee831067e5ac11e52653c319ea653e7feab2238eeffc1369c7ddb7eab1a5",
+      "verified_symbols": [
+        {
+          "name": "TermStore",
+          "line": 14,
+          "end_line": 346
+        },
+        {
+          "name": "TermStore.upsert",
+          "line": 131,
+          "end_line": 208
+        },
+        {
+          "name": "TermStore.add_code_snippets",
+          "line": 227,
+          "end_line": 270
+        },
+        {
+          "name": "TermStore.stamp_source_metadata",
+          "line": 272,
+          "end_line": 294
+        },
+        {
+          "name": "TermStore.save",
+          "line": 78,
+          "end_line": 92
+        }
+      ],
+      "donor_port_ids": [
+        "J-01",
+        "E-02"
+      ],
+      "proposed_destination": "retained term_extractor/store.py + extraction record adapter",
+      "instructions": "Preserve locking, merge semantics, progress fields, publications, code snippets and source metadata. Do not exchange TermStore for a FORGE record model by dropping unmapped fields.",
+      "existing_tests": [
+        "tests/test_extractor_agent.py"
+      ]
+    },
+    {
+      "id": "B16",
+      "title": "Extraction schema validation",
+      "source_file": "app/modules/term_extractor/schema.py",
+      "source_sha256": "ee434fc59fce67d5ba81f333f1b786302426443afb18982d61473a725680ba59",
+      "verified_symbols": [
+        {
+          "name": "SchemaHelper",
+          "line": 107,
+          "end_line": 345
+        }
+      ],
+      "donor_port_ids": [
+        "E-02",
+        "K-01"
+      ],
+      "proposed_destination": "app/modules/extraction/validation + retained schema helper",
+      "instructions": "Retain actual category/slot correction and relation checks. The supplied RSoXS overlay still models RSoXSMeasurement as an ExperimentalTechnique subclass. Changing that is a scientific migration, not a packaging fix.",
+      "existing_tests": [
+        "tests/test_xray_schema.py",
+        "tests/test_extractor_agent.py"
+      ]
+    },
+    {
+      "id": "B17",
+      "title": "Extraction record DTOs",
+      "source_file": "app/modules/term_extractor/models.py",
+      "source_sha256": "627e22405d5e783368e8a406ab6163380fe2175ffa4d8b36fd2b74d00a9f457a",
+      "verified_symbols": [
+        {
+          "name": "TermRecord",
+          "line": 96,
+          "end_line": 173
+        },
+        {
+          "name": "RelationRecord",
+          "line": 17,
+          "end_line": 39
+        },
+        {
+          "name": "ContextSnippet",
+          "line": 43,
+          "end_line": 59
+        },
+        {
+          "name": "PropertyRecord",
+          "line": 63,
+          "end_line": 92
+        }
+      ],
+      "donor_port_ids": [
+        "E-02",
+        "E-05"
+      ],
+      "proposed_destination": "app/modules/contracts/ mapping + existing models",
+      "instructions": "Map donor records to these actual fields, preserving publications, code/repository provenance and per-field uncertainty. Proposed WorkVersion/Mention models are separate H3 changes, not claimed current classes.",
+      "existing_tests": [
+        "tests/test_extractor_agent.py"
+      ]
+    },
+    {
+      "id": "B18",
+      "title": "Existing source RAG and document indexes",
+      "source_file": "app/modules/hybrid_rag/pipeline.py",
+      "source_sha256": "200b8278726f79fca0e8a27acb8423d68102c405bdb705e0877bec92b0e1257e",
+      "verified_symbols": [
+        {
+          "name": "HybridSourceRAG",
+          "line": 211,
+          "end_line": 289
+        },
+        {
+          "name": "HybridSourceRAG.pack",
+          "line": 253,
+          "end_line": 289
+        },
+        {
+          "name": "build_literature_index",
+          "line": 63,
+          "end_line": 138
+        },
+        {
+          "name": "build_ops_index",
+          "line": 141,
+          "end_line": 208
+        },
+        {
+          "name": "hybrid_rag_enabled",
+          "line": 55,
+          "end_line": 60
+        }
+      ],
+      "donor_port_ids": [
+        "L-11",
+        "L-12",
+        "E-04",
+        "K-10"
+      ],
+      "proposed_destination": "retain hybrid_rag/ first; later retrieval/ service facades",
+      "instructions": "Source-document RAG already exists and is toggled via source_rag/F2W_SOURCE_RAG. Preserve both literature and existing ops separation. New FORGE parsing must populate or adapt these indexes instead of building an unrelated parallel corpus.",
+      "existing_tests": [
+        "tests/test_hybrid_rag.py"
+      ]
+    },
+    {
+      "id": "B19",
+      "title": "Actual BM25 index",
+      "source_file": "app/modules/hybrid_rag/index_store.py",
+      "source_sha256": "9acec447fcd2465c1f63782a39422b834e1a55c20e7404459b29a10e71a47864",
+      "verified_symbols": [
+        {
+          "name": "BM25Index",
+          "line": 26,
+          "end_line": 62
+        },
+        {
+          "name": "SourceIndex",
+          "line": 65,
+          "end_line": 139
+        },
+        {
+          "name": "write_index",
+          "line": 142,
+          "end_line": 172
+        },
+        {
+          "name": "merge_chunks",
+          "line": 175,
+          "end_line": 184
+        }
+      ],
+      "donor_port_ids": [
+        "L-11",
+        "K-10"
+      ],
+      "proposed_destination": "retained hybrid_rag/index_store.py or retrieval/index_store.py",
+      "instructions": "Do not describe independent lexical document retrieval as wholly future. Keep existing chunk IDs/index metadata and rebuild compatibility. Any new vector mode is additive and separately evaluated.",
+      "existing_tests": [
+        "tests/test_hybrid_rag.py"
+      ]
+    },
+    {
+      "id": "B20",
+      "title": "Actual evidence-context builder",
+      "source_file": "app/modules/hybrid_rag/context.py",
+      "source_sha256": "9bdf3e18c2f4e7dfa5344ab7de68ff9487030d9b1a96ed447c8eab9e4a52ec80",
+      "verified_symbols": [
+        {
+          "name": "ContextBuilder",
+          "line": 37,
+          "end_line": 145
+        },
+        {
+          "name": "ContextBuilder.build",
+          "line": 40,
+          "end_line": 104
+        },
+        {
+          "name": "_pdf_cite",
+          "line": 12,
+          "end_line": 16
+        },
+        {
+          "name": "_ops_cite",
+          "line": 19,
+          "end_line": 26
+        },
+        {
+          "name": "_kg_cite",
+          "line": 29,
+          "end_line": 34
+        }
+      ],
+      "donor_port_ids": [
+        "E-03",
+        "E-04",
+        "K-10"
+      ],
+      "proposed_destination": "retained hybrid_rag/context.py -> retrieval/evidence_context.py facade",
+      "instructions": "This is a verified context builder, not retrieval/models.py. Keep source-kind partitions, budgets and literal citation grammar. New figure locators extend it without changing existing citation chip rendering.",
+      "existing_tests": [
+        "tests/test_hybrid_rag.py",
+        "tests/test_build_context_filtering.py"
+      ]
+    },
+    {
+      "id": "B21",
+      "title": "Hybrid evidence model and ranker",
+      "source_file": "app/modules/hybrid_rag/evidence.py",
+      "source_sha256": "6cfd9aeed9350ebb8a76d288e9fba69963f2249198274f59f4f6860137906435",
+      "verified_symbols": [
+        {
+          "name": "Evidence",
+          "line": 23,
+          "end_line": 64
+        },
+        {
+          "name": "kg_evidence_from_hit",
+          "line": 93,
+          "end_line": 115
+        },
+        {
+          "name": "evidence_from_chunk",
+          "line": 118,
+          "end_line": 156
+        },
+        {
+          "name": "infer_intent",
+          "line": 67,
+          "end_line": 90
+        }
+      ],
+      "donor_port_ids": [
+        "E-02",
+        "E-04"
+      ],
+      "proposed_destination": "app/modules/evidence/ adapters + retained hybrid_rag evidence",
+      "instructions": "Keep current provenance/source_kind/source_type/graph_id tags. Reconcile richer FORGE evidence objects without relabeling operational or Materials Project evidence as a paper statement.",
+      "existing_tests": [
+        "tests/test_hybrid_rag.py"
+      ]
+    },
+    {
+      "id": "B22",
+      "title": "Download and acquisition behavior",
+      "source_file": "app/modules/f2w_agent/download_agent.py",
+      "source_sha256": "a169b0c5d1858e570cf8cf939ee4ffb65a728f5fb8c762867e0998ed77a2011c",
+      "verified_symbols": [
+        {
+          "name": "DownloadAgent",
+          "line": 356,
+          "end_line": 888
+        },
+        {
+          "name": "DownloadAgent.search_candidates",
+          "line": 820,
+          "end_line": 833
+        },
+        {
+          "name": "DownloadAgent.download_selected",
+          "line": 836,
+          "end_line": 868
+        },
+        {
+          "name": "DownloadAgent._validate_downloaded_pdf",
+          "line": 588,
+          "end_line": 636
+        },
+        {
+          "name": "_append_download_record",
+          "line": 330,
+          "end_line": 334
+        }
+      ],
+      "donor_port_ids": [
+        "L-01",
+        "L-02",
+        "L-03",
+        "L-04",
+        "L-05",
+        "L-19",
+        "L-20"
+      ],
+      "proposed_destination": "app/modules/literature/ services under existing DownloadAgent facade",
+      "instructions": "Preserve OpenAlex/arXiv candidates, deduplication, ranking, PDF validation, preview and download manifest behavior. Port FORGE resolver/provider batching beneath that contract; do not bypass the separate candidate-choice/download/extraction UI flow.",
+      "existing_tests": [
+        "tests/test_download_agent.py",
+        "tests/test_download_pdfs.py",
+        "ui/e2e/pending-ingest.spec.ts"
+      ]
+    },
+    {
+      "id": "B23",
+      "title": "Harvest Work/version identity and operator paths",
+      "source_file": "scripts/harvest_rsoxs.py",
+      "source_sha256": "e5f58771aab7e2c7b2832a171876c0f05a3131317012f01c4868be5d22191a0f",
+      "verified_symbols": [
+        {
+          "name": "collapse_near_duplicates",
+          "line": 835,
+          "end_line": 874
+        },
+        {
+          "name": "works_same_identity",
+          "line": 1821,
+          "end_line": 1851
+        },
+        {
+          "name": "harvest",
+          "line": 1225,
+          "end_line": 1388
+        },
+        {
+          "name": "import_pubtemp",
+          "line": 1945,
+          "end_line": 2038
+        },
+        {
+          "name": "harvest_pending_pdfs",
+          "line": 2228,
+          "end_line": 2330
+        }
+      ],
+      "donor_port_ids": [
+        "L-04",
+        "L-06",
+        "J-06",
+        "J-07",
+        "O-12"
+      ],
+      "proposed_destination": "literature/work_identity.py + manifest/operator facades",
+      "instructions": "The branch has implemented bibliographic near-duplicate/version workflows. Reuse these, with explicit H3 identity improvements; do not restart from only earlier design notes. Retain publication-list import and pending-PDF recovery.",
+      "existing_tests": [
+        "tests/test_harvest_rsoxs.py"
+      ]
+    },
+    {
+      "id": "B24",
+      "title": "Graph construction and field retention",
+      "source_file": "app/modules/json2kg.py",
+      "source_sha256": "81dba522cff892cda7d5bf1e98a67b10cb7ccb990972d0b995c76b65e755527f",
+      "verified_symbols": [
+        {
+          "name": "make_id",
+          "line": 85,
+          "end_line": 100
+        },
+        {
+          "name": "copy_passthrough_slots",
+          "line": 61,
+          "end_line": 73
+        },
+        {
+          "name": "normalize_publications",
+          "line": 134,
+          "end_line": 181
+        },
+        {
+          "name": "make_code_snippet_node",
+          "line": 204,
+          "end_line": 260
+        },
+        {
+          "name": "build_graph",
+          "line": 263,
+          "end_line": 454
+        },
+        {
+          "name": "convert_terms_to_graph",
+          "line": 457,
+          "end_line": 482
+        },
+        {
+          "name": "main",
+          "line": 505,
+          "end_line": 533
+        }
+      ],
+      "donor_port_ids": [
+        "K-01",
+        "J-01",
+        "J-02"
+      ],
+      "proposed_destination": "retain json2kg CLI facade + graph/snapshot services",
+      "instructions": "Freeze identifiers and field/edge retention. Preserve MatKG things/associations and snippet/license/source fields through Tiled projection. New revision/identity rules require explicit migration receipts; do not recreate IDs from new labels.",
+      "existing_tests": [
+        "tests/test_json2kg.py",
+        "tests/test_json2kg_extended.py"
+      ]
+    },
+    {
+      "id": "B25",
+      "title": "Existing Tiled lookup path",
+      "source_file": "app/modules/tiled_graph.py",
+      "source_sha256": "99542ba7c42edd349707ea8d57c46f5f4a6692411c0bb39b206501fa28e1e903",
+      "verified_symbols": [
+        {
+          "name": "TiledGraphConfig",
+          "line": 283,
+          "end_line": 308
+        },
+        {
+          "name": "TiledLookupGraph",
+          "line": 338,
+          "end_line": 430
+        },
+        {
+          "name": "tiled_graphql",
+          "line": 748,
+          "end_line": 768
+        },
+        {
+          "name": "entity_to_node",
+          "line": 637,
+          "end_line": 684
+        },
+        {
+          "name": "lookup_experiment_identity",
+          "line": 962,
+          "end_line": 1053
+        },
+        {
+          "name": "probe_tiled_status",
+          "line": 225,
+          "end_line": 279
+        },
+        {
+          "name": "coerce_local_tiled_uri",
+          "line": 161,
+          "end_line": 175
+        }
+      ],
+      "donor_port_ids": [
+        "K-03",
+        "K-04",
+        "K-05",
+        "K-06"
+      ],
+      "proposed_destination": "graph/backends/tiled.py + retained compatibility lookup",
+      "instructions": "Tiled is present as lookup/enrichment, not yet a full replacement for every Splash edit/rebuild path. Preserve live_tiled/status/identity/neighborhood behavior and local-host policy while adding the required literature adapter. No new FORGE experimental functionality.",
+      "existing_tests": [
+        "tests/test_tiled_graph.py",
+        "tests/test_f2w_api.py"
+      ]
+    },
+    {
+      "id": "B26",
+      "title": "Existing snapshot promotion and simulation fixtures",
+      "source_file": "app/modules/tiled_sim.py",
+      "source_sha256": "47838f7a8d6dea4f6a075d9b69a164268dbbbdc268d55bfa419809f6aca74874",
+      "verified_symbols": [
+        {
+          "name": "push_fixture_to_tiled",
+          "line": 506,
+          "end_line": 610
+        },
+        {
+          "name": "promote_rsoxs_snapshot",
+          "line": 941,
+          "end_line": 1005
+        },
+        {
+          "name": "iter_identity_entities",
+          "line": 330,
+          "end_line": 405
+        },
+        {
+          "name": "iter_identity_links",
+          "line": 408,
+          "end_line": 431
+        }
+      ],
+      "donor_port_ids": [
+        "K-03",
+        "K-06",
+        "J-02"
+      ],
+      "proposed_destination": "existing fixture/operator path + literature publication adapters",
+      "instructions": "Keep existing F2W fixture and snapshot-promotion behavior accounted for; do not move FORGE simulators into F2W or treat synthetic runs as paper gold data. Adapt approved publication code after ownership/recovery review.",
+      "existing_tests": [
+        "tests/test_tiled_sim.py"
+      ]
+    },
+    {
+      "id": "B27",
+      "title": "Scoped multi-graph identities",
+      "source_file": "app/modules/f2w_agent/multi_kg.py",
+      "source_sha256": "bb112ab8044489de1d533371179db644bc800b1eae5f1b44f353f8c4a8ff46a2",
+      "verified_symbols": [
+        {
+          "name": "graph_id_for_path",
+          "line": 93,
+          "end_line": 106
+        },
+        {
+          "name": "default_json_graph_paths",
+          "line": 169,
+          "end_line": 218
+        },
+        {
+          "name": "ScoredHit",
+          "line": 256,
+          "end_line": 277
+        },
+        {
+          "name": "merge_hits",
+          "line": 280,
+          "end_line": 310
+        },
+        {
+          "name": "primary_json_graph_path",
+          "line": 221,
+          "end_line": 227
+        }
+      ],
+      "donor_port_ids": [
+        "K-09",
+        "K-10"
+      ],
+      "proposed_destination": "retrieval/fanout.py adapters + retained multi_kg.py",
+      "instructions": "Keep (graph_id,node id) identity, selected graph lists, primary viewer path, available_graphs/selected_graph_ids and same-label collision behavior. Do not union literature, ops or Tiled into one anonymous graph.",
+      "existing_tests": [
+        "tests/test_multi_kg.py",
+        "ui/src/app/components/kgCatalog.test.ts"
+      ]
+    },
+    {
+      "id": "B28",
+      "title": "Session persistence and compression",
+      "source_file": "app/modules/f2w_agent/session_memory.py",
+      "source_sha256": "fa5986b4ff33bef6fa01f5a29a7661977c99aaf2fcf1560767a046bcd9259b0c",
+      "verified_symbols": [
+        {
+          "name": "SessionMemory",
+          "line": 211,
+          "end_line": 529
+        },
+        {
+          "name": "SessionMemory.record_turn",
+          "line": 395,
+          "end_line": 476
+        },
+        {
+          "name": "SessionMemory.enrich_followup_question",
+          "line": 381,
+          "end_line": 390
+        },
+        {
+          "name": "SessionMemory.compress",
+          "line": 485,
+          "end_line": 529
+        }
+      ],
+      "donor_port_ids": [
+        "R-07",
+        "J-04"
+      ],
+      "proposed_destination": "agent_runtime/session bridge + existing session_memory path",
+      "instructions": "Retain current on-disk session state, topic/history rewriting and compression boundaries. Reuse source paths or migrate with receipts. Checkpoints do not replace browser localStorage or workflow_state.json automatically.",
+      "existing_tests": [
+        "tests/test_f2w_api.py",
+        "ui/e2e/sessions.spec.ts"
+      ]
+    },
+    {
+      "id": "B29",
+      "title": "Persistent approval workflow",
+      "source_file": "app/modules/f2w_agent/workflow_state.py",
+      "source_sha256": "72ac7aa789954469b08b423f4b713f092e7f867f6385015fdb4746b8fb0efb5a",
+      "verified_symbols": [
+        {
+          "name": "WorkflowStateStore",
+          "line": 50,
+          "end_line": 120
+        },
+        {
+          "name": "default_workflow_state",
+          "line": 26,
+          "end_line": 47
+        }
+      ],
+      "donor_port_ids": [
+        "R-07",
+        "J-04",
+        "U-01"
+      ],
+      "proposed_destination": "agent_runtime/checkpointer.py + workflow compatibility adapter",
+      "instructions": "Preserve current pending downloads/extractions across restarts and named-session isolation. Add explicit mapping from old workflow phases to LangGraph state. Do not replay approved effects when resuming an interrupt.",
+      "existing_tests": [
+        "tests/test_workflow_orchestrator.py",
+        "tests/test_f2w_api.py"
+      ]
+    },
+    {
+      "id": "B30",
+      "title": "Existing execution trace and annotations",
+      "source_file": "app/modules/f2w_agent/trace.py",
+      "source_sha256": "b3dca3ce0e977f3ba2680af40d98ed08189fd2326f9c759ab1112defa88d05c8",
+      "verified_symbols": [
+        {
+          "name": "TurnTrace",
+          "line": 353,
+          "end_line": 554
+        },
+        {
+          "name": "record_llm_call",
+          "line": 736,
+          "end_line": 761
+        },
+        {
+          "name": "record_retrieval",
+          "line": 728,
+          "end_line": 729
+        },
+        {
+          "name": "parse_citations",
+          "line": 563,
+          "end_line": 569
+        },
+        {
+          "name": "append_ui_events",
+          "line": 789,
+          "end_line": 799
+        },
+        {
+          "name": "append_annotation",
+          "line": 802,
+          "end_line": 810
+        },
+        {
+          "name": "load_detail",
+          "line": 813,
+          "end_line": 823
+        },
+        {
+          "name": "redact",
+          "line": 217,
+          "end_line": 220
+        }
+      ],
+      "donor_port_ids": [
+        "K-13",
+        "K-14",
+        "R-08"
+      ],
+      "proposed_destination": "provenance/ facade + retained trace routes",
+      "instructions": "F2W already has detailed traces and user annotations. Combine with GraphRecorder event sinks; preserve turn IDs, redaction, unclipped detail and UI feedback endpoints. Do not replace annotations with a donor-only tracing system.",
+      "existing_tests": [
+        "tests/test_trace.py"
+      ]
+    },
+    {
+      "id": "B31",
+      "title": "Scientific provenance helpers",
+      "source_file": "app/modules/prov.py",
+      "source_sha256": "78537cf59a048d92ad57474202cc61aa9e6c5c6ec15ea0f07e41a1a10d9f1d3d",
+      "verified_symbols": [
+        {
+          "name": "work_entity",
+          "line": 157,
+          "end_line": 190
+        },
+        {
+          "name": "extraction_activity",
+          "line": 115,
+          "end_line": 154
+        },
+        {
+          "name": "kg_snapshot_entity",
+          "line": 193,
+          "end_line": 222
+        },
+        {
+          "name": "extraction_provenance_edges",
+          "line": 225,
+          "end_line": 273
+        }
+      ],
+      "donor_port_ids": [
+        "K-13",
+        "E-02"
+      ],
+      "proposed_destination": "provenance/models and recorder adapters",
+      "instructions": "Preserve existing PROV vocabulary and structured extraction/snapshot links, distinct from FORGE operational execution provenance.",
+      "existing_tests": [
+        "tests/test_prov.py"
+      ]
+    },
+    {
+      "id": "B32",
+      "title": "Configuration precedence",
+      "source_file": "app/modules/project_config.py",
+      "source_sha256": "b286c868095cb333b87ff1956b32dea48909c25781c31d73fd65c411e079037d",
+      "verified_symbols": [
+        {
+          "name": "get_config",
+          "line": 33,
+          "end_line": 40
+        },
+        {
+          "name": "config_value",
+          "line": 77,
+          "end_line": 90
+        },
+        {
+          "name": "secret_env",
+          "line": 93,
+          "end_line": 100
+        }
+      ],
+      "donor_port_ids": [
+        "R-05"
+      ],
+      "proposed_destination": "existing project_config + application instance config adapter",
+      "instructions": "Preserve environment/config.yml precedence and secret sourcing. Library import must not load arbitrary host .env or change globals; CLI remains the explicit config-loading boundary.",
+      "existing_tests": [
+        "tests/test_project_config.py"
+      ]
+    },
+    {
+      "id": "B33",
+      "title": "Existing Materials Project evidence",
+      "source_file": "app/modules/f2w_agent/materials_project.py",
+      "source_sha256": "19ae7d2332e5f1e8387a691197541a84af74813c2f5e24937f30c75c616dbe21",
+      "verified_symbols": [
+        {
+          "name": "mp_context_for_question",
+          "line": 255,
+          "end_line": 257
+        },
+        {
+          "name": "format_mp_context",
+          "line": 156,
+          "end_line": 191
+        },
+        {
+          "name": "cite_token",
+          "line": 194,
+          "end_line": 201
+        }
+      ],
+      "donor_port_ids": [],
+      "proposed_destination": "retained optional compatibility evidence adapter",
+      "instructions": "Already participates in F2W QA. Do not remove it merely because donor migration is literature-only. Keep [MP:] source labeling; do not broaden it into experimental analysis.",
+      "existing_tests": [
+        "tests/test_materials_project.py",
+        "ui/e2e/citations.spec.ts"
+      ]
+    },
+    {
+      "id": "B34",
+      "title": "Current corpus repair",
+      "source_file": "scripts/repair_corpus.py",
+      "source_sha256": "52796a6d36825463c757cb43ca9c00c9ff60d3af183925c740482b72d56a13f1",
+      "verified_symbols": [
+        {
+          "name": "repair",
+          "line": 379,
+          "end_line": 478
+        },
+        {
+          "name": "step_quarantine_hard_stubs",
+          "line": 142,
+          "end_line": 165
+        },
+        {
+          "name": "step_fix_known_bad_relations",
+          "line": 197,
+          "end_line": 245
+        },
+        {
+          "name": "step_merge_near_duplicates",
+          "line": 248,
+          "end_line": 363
+        }
+      ],
+      "donor_port_ids": [
+        "C-12",
+        "C-13",
+        "U-09"
+      ],
+      "proposed_destination": "canonicalization/repair services + operator CLI facade",
+      "instructions": "Preserve current repair utilities as read/propose adapters; characterize them before substituting FORGE campaigns. No bulk apply without source/scope/semantic review.",
+      "existing_tests": []
+    },
+    {
+      "id": "B35",
+      "title": "Current corpus quality checks",
+      "source_file": "scripts/corpus_qa.py",
+      "source_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f",
+      "verified_symbols": [
+        {
+          "name": "audit",
+          "line": 814,
+          "end_line": 912
+        },
+        {
+          "name": "audit_duplicate_works",
+          "line": 173,
+          "end_line": 278
+        },
+        {
+          "name": "audit_stubs",
+          "line": 281,
+          "end_line": 343
+        },
+        {
+          "name": "audit_technique_measurement",
+          "line": 346,
+          "end_line": 410
+        },
+        {
+          "name": "audit_numeric_values",
+          "line": 413,
+          "end_line": 515
+        },
+        {
+          "name": "audit_relations",
+          "line": 637,
+          "end_line": 735
+        }
+      ],
+      "donor_port_ids": [
+        "Q-10",
+        "C-16"
+      ],
+      "proposed_destination": "evals/ corpus QA + retained operator CLI",
+      "instructions": "Retain quality checks and exact failure categories. These checks do not establish the intended Work/measurement schema is already active.",
+      "existing_tests": []
+    },
+    {
+      "id": "B36",
+      "title": "Existing operator invocation",
+      "source_file": "scripts/run.py",
+      "source_sha256": "4ee5af54e9ac48267ea4ed8aad1dc62d923cd7d57cde25dff2e9c09b6ccd276c",
+      "verified_symbols": [
+        {
+          "name": "parse_args",
+          "line": 22,
+          "end_line": 48
+        },
+        {
+          "name": "main",
+          "line": 51,
+          "end_line": 149
+        }
+      ],
+      "donor_port_ids": [
+        "J-05",
+        "O-06"
+      ],
+      "proposed_destination": "scripts/run.py facade -> retained extractor/new job service",
+      "instructions": "Preserve command options and path resolution. New library packaging cannot require all operators to switch imports simultaneously.",
+      "existing_tests": [
+        "tests/test_extractor_agent.py"
+      ]
+    }
+  ],
+  "supporting_files": [
+    {
+      "path": "app/modules/f2w_agent/prompts.py",
+      "sha256": "819bd811203555a87571e934251d01165bc73ab6661cc48c808634f03b3373a0",
+      "line_count": 135
+    },
+    {
+      "path": "app/modules/cborg_http.py",
+      "sha256": "cad3ffabae422ac306cbf99be8fffe23d64aa1afbc2a12a4e7d06b57b6c786e9",
+      "line_count": 123
+    },
+    {
+      "path": "app/modules/cborg_limiter.py",
+      "sha256": "edb1d1b7e0e46ad64852cf03f231e1d63fbccdaeb9987b668e293ec0ce2668dc",
+      "line_count": 79
+    },
+    {
+      "path": "storage/schema/rsoxs_schema.yaml",
+      "sha256": "8269251b1bdaaf92750b58db04013910f596f35519b6cebbcbb036241d51b175",
+      "line_count": 65
+    },
+    {
+      "path": "storage/schema/rsoxs_schema_extract.yaml",
+      "sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca",
+      "line_count": 40
+    },
+    {
+      "path": "storage/schema/matkg_schema.yaml",
+      "sha256": "0214a61a200b1f7c98cdb641a97c5cfc2a29a1517147342c04eb470f2a4abf68",
+      "line_count": 1060
+    },
+    {
+      "path": "storage/schema/xray_schema.yaml",
+      "sha256": "2d0742fb0f8d757f2860c755c6b11dbf001d226caad3057313f6adcbc15b9d08",
+      "line_count": 531
+    },
+    {
+      "path": "storage/schema/bl1101_schema.yaml",
+      "sha256": "5b41ba99a8c5344eea9422ff0e51cf8a74c67fd86d48c4d0245ce40d7c6461f3",
+      "line_count": 458
+    },
+    {
+      "path": "config.yml",
+      "sha256": "d6748f2eccc17618d12119e2e8fe533ffbc21f479c8f97e316f1aa453b955ae1",
+      "line_count": 276
+    },
+    {
+      "path": "requirements/runtime.in",
+      "sha256": "d169d3dbf34e2c7600006655ab567c36f184df51d8cfe230b3803adbe8f5aecb",
+      "line_count": 27
+    },
+    {
+      "path": "requirements/runtime.txt",
+      "sha256": "24882d7744b8fc59afffaaf0d3462590295812e4ad8bd08e871220d8481e07b3",
+      "line_count": 479
+    },
+    {
+      "path": "requirements/dev.txt",
+      "sha256": "3aefc77c3ca76ace425ff6c1da9a18d66f346f327656caacc9c54e6992cc5ded",
+      "line_count": 689
+    },
+    {
+      "path": "requirements/semantic.in",
+      "sha256": "7f7990b74eeade3789763637cdd035d416ba36620c524082a6326a41339dd6e8",
+      "line_count": 6
+    },
+    {
+      "path": "ui/package.json",
+      "sha256": "3c5400b8d5e410a3cab8da77cd5afccef035205cad795de20e52d6d12d40678b",
+      "line_count": 106
+    },
+    {
+      "path": "ui/package-lock.json",
+      "sha256": "40a46ede187c2e9364b532035eecfea4e96c740caad29b5c183979acab6294f0",
+      "line_count": 10108
+    },
+    {
+      "path": "ui/playwright.config.ts",
+      "sha256": "85e86c70ae8ba2e828ad2ba222c62d81c98d26668b171d1ce0686c594e11ca5f",
+      "line_count": 38
+    },
+    {
+      "path": "ui/vitest.config.ts",
+      "sha256": "9fc47837fb4ed73045ecb28ac0d2876da08d3f501209543794059b97f6498244",
+      "line_count": 14
+    },
+    {
+      "path": ".github/workflows/build-app.yml",
+      "sha256": "8805c95dc7581db5aae279009d35956367a8a115ee11ddbcd8cae36e0c4f99e9",
+      "line_count": 46
+    },
+    {
+      "path": "scripts/start_agent_backend.sh",
+      "sha256": "e19c0c1aaf195897303ab10fea608516030dcd8ab46515a5f829045d8156b1b3",
+      "line_count": 297
+    },
+    {
+      "path": "scripts/start_agent_frontend.sh",
+      "sha256": "90ebb61391d7b59aab16eef06e82475458a27b5f4046cf4f20bbfbdb9b2d5a95",
+      "line_count": 40
+    },
+    {
+      "path": "scripts/start_rsoxs_stack.sh",
+      "sha256": "274c0296f49d260144c88dc416efb44f482c5a2090076180f5e6d6e287da366f",
+      "line_count": 220
+    },
+    {
+      "path": "docker/nginx.conf",
+      "sha256": "534a4505ca83a5dc2e3b58810a747d8667c38eee0ac6d05f4a8fdfdb34343405",
+      "line_count": 29
+    }
+  ],
+  "runtime_tests_run": false,
+  "v4_policy_reference": "DECISIONS.md D12-D20; source facts unchanged; implementation/exposure must follow current requirements"
+}

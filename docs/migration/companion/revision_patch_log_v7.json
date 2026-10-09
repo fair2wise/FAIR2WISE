@@ -1,0 +1,336 @@
+{
+  "version": "7.0",
+  "edits": [
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Draft v6.0",
+      "new": "Draft v7.0"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 2,
+      "old": "OWNER_CLARIFICATIONS_V6.md",
+      "new": "OWNER_CLARIFICATIONS_V7.md"
+    },
+    {
+      "file": "DEPLOYMENT_STRATEGY.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "CI_CD_CONTRACT.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "ANSIBLE_HANDOFF.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "DECISIONS.md",
+      "count": 2,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "DECISIONS.md",
+      "count": 2,
+      "old": "OWNER_CLARIFICATIONS_V6.md",
+      "new": "OWNER_CLARIFICATIONS_V7.md"
+    },
+    {
+      "file": "BRANCH_WORKFLOW.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "TILED_DEPLOYMENT_SPEC.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "JSON_KG_PUBLICATION_SPEC.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "FRONTEND_COMPATIBILITY.md",
+      "count": 3,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "FRONTEND_COMPATIBILITY.md",
+      "count": 2,
+      "old": "OWNER_CLARIFICATIONS_V6.md",
+      "new": "OWNER_CLARIFICATIONS_V7.md"
+    },
+    {
+      "file": "BINARY_EVALUATION_SPEC.md",
+      "count": 2,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "BINARY_EVALUATION_SPEC.md",
+      "count": 2,
+      "old": "OWNER_CLARIFICATIONS_V6.md",
+      "new": "OWNER_CLARIFICATIONS_V7.md"
+    },
+    {
+      "file": "CONTENT_ACCESS_POLICY.md",
+      "count": 2,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "AGENT_START_HERE.md",
+      "count": 1,
+      "old": "migration v6",
+      "new": "migration v7"
+    },
+    {
+      "file": "AGENT_START_HERE.md",
+      "count": 1,
+      "old": "OWNER_CLARIFICATIONS_V6.md",
+      "new": "OWNER_CLARIFICATIONS_V7.md"
+    },
+    {
+      "file": "README.md",
+      "count": 1,
+      "old": "Draft v6",
+      "new": "Draft v7"
+    },
+    {
+      "file": "README.md",
+      "count": 1,
+      "old": "OWNER_CLARIFICATIONS_V6.md",
+      "new": "OWNER_CLARIFICATIONS_V7.md"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Trusted importer/application guard holds runtime-only admin credentials; preserve logical scope and actor audit. User-facing Tiled writes remain O05, not implicitly enabled.",
+      "new": "The technical writer remains the configured F2W admin account. The caller must be authenticated through the environment's Tiled and verified as an admin before ingest, approval, publication or graph editing; non-admin users are chat-only."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "| D29 | Publication target follows the image environment | local publishes to local Tiled; ALS variants publish to their respective central servers. FORGE production uses production F2W/Tiled; no implicit replication. |",
+      "new": "| D29 | Publication target follows the image environment | local publishes to local Tiled; ALS variants publish to their respective central servers. FORGE production uses production F2W/Tiled; no implicit replication. |\n| D30 | Users sign into Tiled; only Tiled admins may perform privileged work | Verify identity/admin status server-side against the configured environment. Non-admin users have chat and its read-only supporting interactions, not ingestion, approval, publication or graph editing. No separate maintainer allowlist or assumed OAuth2-proxy. |\n| D31 | Versioned JSON KGs are committed to the F2W repository | Commit frozen, disclosure-reviewed JSON and manifests. Promote the exact Git-identified, hash-verified artifact that passed staging validation; production import does not rerun extraction. Papers/private processing state stay mounted and out of Git/images. |\n| D32 | Project owner coordinates FORGE merge with Alex | Prepare and test the consumer adapter; owner and Alex choose the FORGE target branch and merge. F2W forge_merge/H0-H7 approval does not authorize a FORGE push or merge. |\n| D33 | Central staging and production run Tiled Graph 0.2.19 | Owner confirms central version/Graph availability and coordination for admin writing. Preserve that premise; record artifact/credential references and run authorized deployment checks without claiming prior runtime verification. |"
+    },
+    {
+      "file": "DECISIONS.md",
+      "count": 1,
+      "old": "Trusted importer/application guard holds runtime-only admin credentials; preserve logical scope and actor audit. User-facing Tiled writes remain O05, not implicitly enabled.",
+      "new": "The technical writer remains the configured F2W admin account. The caller must be authenticated through the environment's Tiled and verified as an admin before ingest, approval, publication or graph editing; non-admin users are chat-only."
+    },
+    {
+      "file": "DECISIONS.md",
+      "count": 1,
+      "old": "| D29 | Publication target follows the image environment | local publishes to local Tiled; ALS variants publish to their respective central servers. FORGE production uses production F2W/Tiled; no implicit replication. |",
+      "new": "| D29 | Publication target follows the image environment | local publishes to local Tiled; ALS variants publish to their respective central servers. FORGE production uses production F2W/Tiled; no implicit replication. |\n| D30 | Users sign into Tiled; only Tiled admins may perform privileged work | Verify identity/admin status server-side against the configured environment. Non-admin users have chat and its read-only supporting interactions, not ingestion, approval, publication or graph editing. No separate maintainer allowlist or assumed OAuth2-proxy. |\n| D31 | Versioned JSON KGs are committed to the F2W repository | Commit frozen, disclosure-reviewed JSON and manifests. Promote the exact Git-identified, hash-verified artifact that passed staging validation; production import does not rerun extraction. Papers/private processing state stay mounted and out of Git/images. |\n| D32 | Project owner coordinates FORGE merge with Alex | Prepare and test the consumer adapter; owner and Alex choose the FORGE target branch and merge. F2W forge_merge/H0-H7 approval does not authorize a FORGE push or merge. |\n| D33 | Central staging and production run Tiled Graph 0.2.19 | Owner confirms central version/Graph availability and coordination for admin writing. Preserve that premise; record artifact/credential references and run authorized deployment checks without claiming prior runtime verification. |"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Three deployment images; /fair2wise routing; mounted sources; admin publication",
+      "new": "Tiled-authenticated roles; Git-versioned KG promotion; coordinated FORGE integration"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "O03 (job settings) remains open, together with O05-O08 deployment choices. Admin writing does not settle whether ordinary user-facing actions may publish.",
+      "new": "D30 resolves O05: only authenticated Tiled admins may ingest, approve, publish or edit; non-admin users are chat-only. D31 commits versioned JSON to Git for exact-artifact promotion. O03 and the still-unsupplied O06/O07/O08 details remain review inputs."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Read this document first, then `DEPLOYMENT_STRATEGY.md`",
+      "new": "Read this document first, then `AUTHORIZATION_SPEC.md`, `GIT_KG_PROMOTION_SPEC.md`, `FORGE_INTEGRATION_HANDOFF.md`, `DEPLOYMENT_STRATEGY.md`"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "F2W / FORGE queries (UI writes: O05)",
+      "new": "F2W / FORGE queries; admin-authorized graph edits"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "validated, immutable build artifact",
+      "new": "frozen, tested, committed to Git"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "old": "F2W writes through a runtime-only admin credential. Record requested_by, approved_by and executed_as separately; application-scoped authorization is mandatory even if Tiled would permit the admin operation. User-facing writeback is unresolved O05: do not enable new implicit writes, remove existing edit behavior, or report deferred edits as published. H1 resolves the compatibility policy and H6 tests it. DEPLOYMENT_STRATEGY.md and TILED_DEPLOYMENT_SPEC.md specify deployment/identity boundaries; JSON_KG_PUBLICATION_SPEC.md retains JSON-first creation.",
+      "new": "F2W writes through a runtime-only admin credential after authorizing the initiating caller. Users sign into the configured environment's Tiled; F2W verifies principal and current admin status server-side. Non-admin users may chat and use its read-only supporting interactions; they cannot submit ingestion/extraction jobs, approve, publish, edit the graph or change deployment configuration. Admin users retain the existing scoped edit/ingest/review workflows, subject to explicit effect approval and durable audit. Record requested_by, approved_by and executed_as separately. AUTHORIZATION_SPEC.md closes O05; no independent allowlist or OAuth2-proxy is assumed. Required Tiled sign-in is not the same as using the user's credential as the technical graph writer."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "old": "The latest admin-account decision does not determine what a browser Save means. O05 must select an explicit session/JSON-candidate edit path, scoped admin-published edit path, or approved read-only deviation. A candidate-only edit needs truthful UI readback and reconciliation; do not silently publish it or return a success response for a lost edit. Keep full feature parity as the baseline obligation until the owner decides otherwise.",
+      "new": "D30 resolves the deployed editing policy. Preserve existing Save, relationship and code-snippet editing behavior for authenticated Tiled admins through the configured writer. For authenticated non-admin users, enforce the chat-only capability boundary at the API, Tools, SDK and jobs, not just the browser. Existing session history, preferences and allowed citation/evidence interaction remain available as part of chat; they confer no corpus or graph write privilege. Add the minimal login/capability UI or outer authentication wrapper needed for Tiled sign-in while retaining legacy endpoint suffixes, DTOs and event payloads. This owner-directed access restriction qualifies prior blanket UI parity; it is not permission to remove the admin edit workflow or fake success."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "**Critical Splash/Tiled compatibility decision (qualified by O05 user-write policy):**",
+      "new": "**Critical Splash/Tiled compatibility decision (admin-only under D30):**"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "T24A three-image/base-path/mount/admin contract and open deployment decisions;",
+      "new": "T25A Tiled identity/admin contract; T26A Git snapshot contract; T24A three-image/base-path/mount/admin contract and remaining deployment inputs;"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "unchanged frontend model/QA policy and combined admission tests |",
+      "new": "unchanged frontend model/QA policy, combined admission tests and T25B authenticated reader/admin boundary |"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "app-provisioned 0.2.19 import; exact-quote/privacy checks;",
+      "new": "app-provisioned 0.2.19 import; T25C real identity/role checks; T26B committed-artifact validation; exact-quote/privacy checks;"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Exact JSON hash and target-scoped import plan, authorization, field/readback proof, crash/replay, edit reconciliation and rollback",
+      "new": "Exact Git commit/path/JSON hash, staging PASS report and target-scoped import plan; T26C promote identical bytes, authorization, field/readback, crash/replay, edit reconciliation and rollback"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "T24D/E tested/published image variants and Ansible handoff; O05 resolved;",
+      "new": "T24D/E tested/published image variants and Ansible handoff; Tiled admin-only writes and Git promotion demonstrated;"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "**Sole approving authority: the project owner (the requesting F2W maintainer).** The owner approves H0-H7, scientific examples/rubrics and publication plans. Other engineers or domain experts may supply advisory evidence; Dylan/Alex are not mandatory gatekeepers. Agents and automated reviewers never self-approve. The decisions in section 0 settle scope, not test results or production change authorization.",
+      "new": "**F2W migration gate approver: the project owner (the requesting F2W maintainer).** The owner approves H0-H7 and the scientific/binary acceptance rubric. Deployed application approvals are made by authenticated Tiled admins within approved scope and recorded as runtime ApprovalRecords; these are not migration-gate approvals. The owner works with Alex on FORGE branch selection, review and merge. Passing an F2W gate does not authorize a FORGE merge or unscheduled production mutation. Agents never self-approve."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "**Owner:** FORGE integration lead. **Depends:**",
+      "new": "**Owner:** project owner coordinating with Alex; implementation agent prepares adapters. **Depends:**"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Prove two required consumption paths:",
+      "new": "FORGE remains a separately governed repository. The donor is als-computing/forge_rsoxs_analysis; its supplied archive is source evidence, not an authorized target branch. Prepare a patch/PR-ready series and local consumer tests; record the target checkout/ref/commit with the owner and Alex before remote writes. Do not assume the F2W branch name forge_merge also exists in FORGE, choose its merge branch, push, or merge autonomously. H6 distinguishes adapter-ready/tested from Alex/owner-coordinated merge complete. See FORGE_INTEGRATION_HANDOFF.md.\n\nProve two required consumption paths:"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "## 5. Preserve the verified F2W baseline before importing donor behavior",
+      "new": "### 4.13 Tiled sign-in and admin-only capabilities\n\nTiled is the identity and admin-role authority for each environment. F2W validates credentials and resolves the actual user principal/admin status against the configured local, staging or production instance, not an endpoint supplied in an LLM argument. Authentication and the technical admin writer are separate: never use the service writer's identity to decide whether an end user is an admin. Map verified non-admin users to chat-only access and verified admins to ingestion, curation, approval, scoped graph editing and publication. Ordinary chat can use bounded read-only Tools and maintain its own session/preferences; it cannot automatically trigger enrichment or corpus writes when evidence is weak.\n\nNo separate named maintainer allowlist or assumed OAuth2-proxy is introduced. The exact native Tiled login/session integration is verified at H1; do not invent an auth endpoint or infer admin from an email, HTTP header or client boolean. Test login/logout, expiry/revocation, cross-environment token rejection and admin downgrade. Local mode must support a narrow authenticated login path without exposing a general admin GraphQL proxy. Existing frontend endpoints/DTOs/SSE remain compatible for authorized use; minimal login/capability presentation is an explicit owner-directed addition.\n\nApprovalRecord stores verified approving principal, target Tiled instance, role-check timestamp, scope, snapshot/plan hash and decision. Recheck authority before privileged effects; persistent approved job grants must be bounded and cannot survive account revocation as unchecked global authority. A headless worker executes an authenticated administrator's authorized job; background service possession of the admin key is not a substitute for authorization. The same policy applies through direct Python, FastAPI, Tools, workers and FORGE delegation.\n\n### 4.14 Git is the versioned JSON promotion channel\n\nFrozen versioned JSON KGs and their manifests are committed to the F2W repository on the reviewed integration path. Proposed layout is storage/kg/<corpus>/<snapshot-id>/graph.json and manifest.json; preserve existing selectable paths via compatibility references where needed. Commit-ready artifacts contain derived graph facts, permitted relevant excerpts and stable private evidence references, not PDFs, source-paper dumps, figure crops, credentials, local paths or operational databases. If a current JSON contains source material that must stay private, stop and separate private payloads through explicit references before committing; do not silently drop facts or claim a public repo is an access-control boundary.\n\nPromotion selects an immutable Git commit, repository-relative path and SHA-256. Staging validates those exact bytes and records the required binary report against that hash. Production receives the same committed JSON and manifest onto its mounted storage and verifies hashes and compatible schema/importer before a production-specific approved import. No extraction, parsing, model calls, identity re-resolution or schema reinterpretation occurs to transfer a tested KG. Missing private evidence dependencies are copied/mounted through their separately authorized channel and verified; they are not rebuilt invisibly and never added to Git merely to make promotion pass.\n\nCode image digest, data commit/snapshot hash and target import receipt are distinct identifiers. Committing a graph does not bake it into an image or authorize publication. Docker build contexts/layers must continue excluding storage/kg corpus artifacts even when tracked by Git. The deployment/release process exports only the reviewed data files from the selected commit into runtime mounts. Staging receipts cannot authorize production. Record the commit after it exists in an external release/promotion record; do not make a manifest claim its own containing commit hash. An admin edit is journaled, reconciled into a new JSON version, tested and committed before cross-environment promotion.\n\n### 4.15 Confirmed central infrastructure and separate repository governance\n\nThe owner confirms tiled-staging.als.lbl.gov and tiled.als.lbl.gov run Tiled Graph 0.2.19 and acknowledges coordination around admin publication. Treat the old failed public release lookups as historical drafting limitations, not evidence against this confirmation. The implementing/deploying team still records the actual build/image digest, target identity and issued environment-specific secret references and executes authorized connection/role/edit checks. No operator contact, account name or secret is invented by this plan.\n\nF2W work remains on forge_merge with owner-controlled H0-H7. FORGE integration is prepared in a separate reviewed working copy and merged in coordination with Alex. Central deployment checks, registry publication, application rollout, Git data commits, Tiled import approval and FORGE merge remain distinct operations.\n\n## 5. Preserve the verified F2W baseline before importing donor behavior"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "Every environment creates immutable versioned JSON KGs on mounted storage first. The reviewed, resumable importer publishes the saved artifact to that profile's Tiled target using an environment-specific F2W admin account.",
+      "new": "F2W creates immutable versioned JSON on mounted working storage and commits release snapshots/manifests to Git. Production promotion uses the identical committed snapshot validated on staging, not a fresh extract. The reviewed importer publishes the hash-verified saved artifact to the profile's Tiled target using the environment-specific F2W admin account."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "old": "O05 is unresolved: the owner expects user-facing actions may not write to Tiled, but has not selected a replacement for the existing edit workflow. Preserve that capability in the migration; do not silently disable Save, fake success, or automatically elevate it to admin publication. At H1 present candidate/session JSON edits with operator import, explicitly authorized admin-backed edits, or an approved read-only compatibility exception. H6 must test the chosen policy and acknowledged-edit reconciliation. There is no per-end-user Tiled impersonation in the selected admin-write design.",
+      "new": "D30 resolves O05: a verified Tiled admin can use existing privileged UI workflows, including scoped graph edits, through the configured admin writer; non-admin users remain chat-only. Deny unauthenticated/ordinary-user ingest, approval, publication and edits before queuing work or accessing the writer. Preserve admin edit readback, audit and next-JSON reconciliation. Login/capability presentation is an authorized narrow change; the scientific QA and existing wire contracts stay intact for permitted operations."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "approved O05 edit/link/snippet readback",
+      "new": "Tiled-admin-only edit/link/snippet readback"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "explicit resolution of O05 user edits",
+      "new": "Tiled-authenticated role tests and exact Git-artifact promotion"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "O05 user-edit policy, O06 protected promotion triggers",
+      "new": "Tiled login/admin-role and Git-artifact implementation, O06 protected image-promotion triggers"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "resolved O05 edit policy",
+      "new": "verified Tiled-admin-only edit policy"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "User writeback O05 and release trigger O06 are not implicit approvals.",
+      "new": "D30 fixes user writeback as admin-only; O06 release triggers remain unapproved."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "**Already decided:** D01-D29",
+      "new": "**Already decided:** D01-D33"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "old": "**O05 - User edits and Tiled writeback:** should current edits remain in session/versioned JSON candidates for later operator import, be executed by the admin writer after scoped authorization, or be disabled in a specifically approved read-only deployment? 'Likely not' is not a final policy and cannot silently override backward compatibility.",
+      "new": "**O05 - Resolved by D30:** users sign into the configured Tiled; verified admins may perform privileged application work and graph writes; other users are chat-only. The application service account remains the technical writer. No separate maintainer allowlist or OAuth2-proxy prerequisite is selected."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "old": "Settled: three GitHub-built image tags local/als-dev/als-prod; local includes Tiled; ALS variants use their respective staging/production Tiled without a bundled server; /fair2wise in every image; Ansible resolves ALS FQDN; publication uses an F2W admin account; papers are mounted, not image contents. Existing schema meanings, exact cited quotations, Tiled 0.2.19, JSON-first builds, forge_merge and F2W frontend/LLM/QA preservation remain fixed.",
+      "new": "Settled: D01-D33, including Tiled sign-in, admin-only ingestion/approval/publication/editing, non-admin chat access, Git-committed versioned JSON as the promotion artifact, owner/Alex coordination for FORGE merge and owner-confirmed central Tiled Graph 0.2.19. Existing image profiles, /fair2wise, mounted private papers, schema semantics, exact quotations, F2W LLM/QA behavior and forge_merge remain fixed."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "OWNER_CLARIFICATIONS_V7.md records proposals versus requirements.",
+      "new": "OWNER_CLARIFICATIONS_V7.md records proposals versus requirements. No new answers are required on O05 or central 0.2.19 availability."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "ALS URLs/admin policy come from the owner; no private-server connectivity/version/configuration claim is made.",
+      "new": "ALS URLs/admin policy and central 0.2.19/Graph availability are owner-confirmed; no independent connectivity, role or runtime test is claimed."
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "## 8. What can run in parallel, and what cannot",
+      "new": "### T25A-T25C - Tiled authentication and role-enforced application access\n\nT25A runs after H0 alongside T01/T18A/T24A and blocks H1. Freeze the actual native Tiled sign-in/admin-resolution contract, environment binding, internal versus end-user identity, the reader/admin capability matrix and ApprovalRecord origin. Design the narrow local sign-in path and the minimal login/capability UI integration. No guessed OAuth2-proxy, allowlist, endpoint or auth header.\n\nT25B runs after H1 in parallel with runtime T02 and blocks H2. Implement verified-principal construction, fail-closed capability checks, session boundaries and audit identity across Python/API/Tools/jobs. Use fake identity fixtures for the first UI/runtime slice; test forged admin flags, direct SDK calls, revoked grants and reader attempts to start ingestion before any effect.\n\nT25C joins after application-owned disposable Tiled T20B. Verify real login/role/expiry/admin and regular-user flows in managed mode and connect-only mode; run every protected mutation through the shared guard with an admin writer present. It blocks H4 and the full H6 role-specific UI/FORGE demonstration. Central smoke tests remain explicitly authorized; fixture credentials never come from central production secrets.\n\n### T26A-T26C - Git-versioned KG release and promotion\n\nT26A runs after H0 with T23A and blocks H1: freeze the tracked JSON/manifest layout, disclosure check, data-release descriptor, artifact hashes and image exclusion. Define how schema/evidence dependencies are verified without committing source papers or secrets. Preserve existing graph payload and schema meanings.\n\nT26B runs after H3 and JSON builder T23B, in parallel with T08B importer and domain ports. Add commit-ready artifact validation, immutable lookup/export and hash checks, a release record tied to executed binary results and evidence-availability checks. Tests use an isolated temporary Git fixture; the migration's reviewed JSON commits still integrate into forge_merge. It blocks H4's candidate-artifact acceptance.\n\nT26C runs after H4/T13. Rehearse selecting the tested Git artifact and mounting identical bytes for a second production-profile disposable target, rejecting tampering/wrong hashes, producing a distinct target approval/receipt and doing zero inference. Demonstrate rollback by selecting an earlier committed snapshot; verify edit reconciliation creates a new committed version before cross-environment promotion. H5 reviews the exact data-release/import packet and H6 repeats package/container parity. No live production write is authorized by this rehearsal.\n\n## 8. What can run in parallel, and what cannot"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "      content_access.py  disclosure.py   # private source vs public result policy",
+      "new": "      content_access.py  disclosure.py   # private source vs public result policy\n      tiled_identity.py  authorization.py # verified Tiled user/admin; shared guard"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "      imports/tiled_json.py  imports/receipts.py",
+      "new": "      imports/tiled_json.py  imports/receipts.py\n      releases.py                       # Git-pinned snapshot/export verification"
+    },
+    {
+      "file": "MIGRATION_PLAN.md",
+      "count": 1,
+      "old": "  schema/  vocabulary/  corpus/  terminology/  kg/  knowledge_gaps/",
+      "new": "  schema/  vocabulary/  corpus/  terminology/  kg/  knowledge_gaps/\n  kg/<corpus>/<snapshot-id>/             # reviewed graph.json + manifest.json in Git"
+    }
+  ]
+}

@@ -1,0 +1,2235 @@
+{
+  "version": "8.0",
+  "kind": "draft_agent_handoff_not_live_tasks",
+  "source_lock": "source_lock.json",
+  "rules": [
+    "Owner decisions D01-D34 are fixed requirements, not recorded H-gate approvals.",
+    "All H0-H7 approval decisions belong to the project owner; no agent self-approval.",
+    "Physical implementation stays app/modules; require safe importable namespace plus FastAPI.",
+    "T09 paper figures and required Tiled Graph implementation must complete before T12/H4.",
+    "All inference/QA behavior must preserve the actual F2W rsoxs classes and constraints.",
+    "No new Splash backend or experimental sim/analysis capabilities enter F2W.",
+    "T17 covers all donor paper infrastructure/routes/operators and closes before H6.",
+    "No paid/model-provider escalation or production mutation without explicit scoped authorization.",
+    "Prototype FORGE/API integration against mocks after H1; real SDK/agent/API parity requires listed dependencies.",
+    "F2W migration commits integrate on forge_merge; no direct changes to main/rsoxs, no fabricated ZIP history.",
+    "T18A freezes UI contracts before H1, T18B tests the frozen UI with the runtime before H2, T18C full real-backend parity blocks H6.",
+    "Existing F2W ops/MP/live lookup and source/multi-KG retrieval remain baseline compatibility obligations; donor sim/analysis stays excluded.",
+    "Legacy splash/splash_links wire values require a reviewed Tiled compatibility projection, not a running Splash service or dropped editing.",
+    "T19A-T19E integrates reusable Knowledge Operations; no arbitrary script/Python execution.",
+    "Both managed and external Tiled Graph modes are mandatory; T20B supplies disposable application-owned test provisioning.",
+    "Tiled required owner permissions are owner-confirmed; exact pinned build/configuration and integration checks remain evidence requirements.",
+    "T11 implements required binary extraction/chat acceptance, not only gold metrics or aggregate thresholds.",
+    "Frontend-selected F2W model settings and configured/provider limits apply to all callers; no hidden donor/paid fallback or invented dollar cap.",
+    "T21 enforces agent-private full paper/figure access; public UI/API/trace/graph/report outputs use safe projections.",
+    "KG creation produces immutable versioned JSON artifacts using preserved F2W logic, independently of Tiled.",
+    "The required Tiled 0.2.19 importer consumes approved JSON without parser, inference or provider calls.",
+    "Preserve current schema meanings including RSoXSMeasurement inheritance; no semantic split in this migration.",
+    "Permit relevant exact cited quotations; forbid complete paper/source-crop serving and raw-source reconstruction.",
+    "Tiled target is exactly 0.2.19; resolve artifact hashes and capabilities, never silently substitute a prerelease/latest.",
+    "O03 awaits owner confirmation after the source audit; generation settings capture is distinct from live rate/auth controls.",
+    "Snapshot re-import must not erase acknowledged UI edits; reconcile durable edits into the next JSON version.",
+    "GitHub Actions must build/test/publish local, als-dev and als-prod image variants; approved promotion is separate from Ansible rollout.",
+    "Every image serves /fair2wise; the API gateway strips its reviewed prefix once and frontend build configuration agrees.",
+    "Local includes managed Tiled; ALS finals have no managed server and target staging/prod respectively without fallback or replication.",
+    "Papers, private derived content and state are mounted at runtime, never image layers or CI caches.",
+    "F2W imports JSON using an admin account; application authorization and distinct request/approval/execution audit remain mandatory.",
+    "O05 is resolved by D30/D34: local full access without sign-in; ALS admin-only writes; preserve real edit behavior and audit.",
+    "Ansible resolves ALS FQDN, secret/mount/proxy settings and digest rollout; actual backup details must be settled before H7.",
+    "D34 local_trusted grants all application capabilities without sign-in. D30 uses Tiled identity/admin authority on ALS, with ordinary users chat-only. Technical writer is separate.",
+    "Committed JSON/data commit is independent of code image digest and Tiled target receipt.",
+    "FORGE remote branch and merge are coordinated by project owner with Alex; no target branch inferred."
+  ],
+  "tasks": [
+    {
+      "id": "T00",
+      "title": "Verify uploaded source in real Git; prepare forge_merge; execute baseline",
+      "depends_on": [],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/migration/sources/",
+        "docs/migration/f2w_baseline_inventory.json"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "pinned F2W source",
+        "FORGE source lock",
+        "baseline tests and parity inventory",
+        "license/dependency audit",
+        "f2w_llm_qa_baseline.json; user-confirmed remote/ref resolved to exact commit",
+        "archive-versus-Git source check and source-lock update",
+        "BRANCH_WORKFLOW.md evidence; created/resumed forge_merge in real checkout",
+        "B01-B36 baseline validated by executed isolated tests"
+      ],
+      "acceptance": [
+        "exact F2W ref and commit verified",
+        "no live source/corpus mutations",
+        "target is fair2wise/FAIR2WISE refs/heads/rsoxs; no main substitution",
+        "source archive gap resolved; do not request another archive solely for static mapping",
+        "no synthetic git init/history or overwriting existing forge_merge",
+        "owner explicitly approves baseline test deviations"
+      ],
+      "mode": "read_only_audit",
+      "status": "not_started",
+      "stop_before": "H0",
+      "integration_branch": "forge_merge",
+      "drafting_evidence": "Archive/static mapping available; Git/runtime checks not executed by drafting agent."
+    },
+    {
+      "id": "T01",
+      "title": "Shared architecture contracts",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "app/modules/contracts/",
+        "docs/adr/",
+        "public API spec"
+      ],
+      "port_ids": [
+        "R-01",
+        "R-02",
+        "R-03",
+        "R-04",
+        "R-05",
+        "R-06",
+        "R-07",
+        "R-08",
+        "R-09",
+        "R-10",
+        "K-01",
+        "K-02",
+        "K-03",
+        "K-04",
+        "K-05",
+        "K-06",
+        "K-07",
+        "K-08",
+        "K-09",
+        "K-10",
+        "K-11",
+        "K-12",
+        "K-13",
+        "K-14",
+        "K-15",
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04",
+        "I-05",
+        "I-06",
+        "I-07"
+      ],
+      "deliverables": [
+        "ToolSpec and result/error/evidence/job contracts",
+        "dependency ownership ADR",
+        "fake adapters",
+        "app/modules import mapping; required Tiled/figures/SDK/FastAPI contracts; preserved F2W inference bridge"
+      ],
+      "acceptance": [
+        "one owner per shared file",
+        "no runtime/provider side effects on import",
+        "T18A complete; old editable-graph wire mapping and Tiled mutation projection reviewed",
+        "packaging preserves app/modules and state/class identity with old imports",
+        "CI covers forge_merge without deployment",
+        "D20/D21/D22: preserve schema logic, versioned JSON build boundary, exact Tiled 0.2.19 pin"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T02",
+      "title": "Scoped LangGraph runtime and policy hooks",
+      "depends_on": [
+        "H1"
+      ],
+      "owner_role": "runtime_lead",
+      "exclusive_path_ownership": [
+        "app/modules/agent_runtime/",
+        "app/modules/tools/bootstrap.py"
+      ],
+      "port_ids": [
+        "R-01",
+        "R-02",
+        "R-03",
+        "R-04",
+        "R-05",
+        "R-06",
+        "R-07",
+        "R-08",
+        "R-09",
+        "R-10",
+        "R-11"
+      ],
+      "deliverables": [
+        "runtime factories",
+        "authorization executor",
+        "checkpointer/event hooks"
+      ],
+      "acceptance": [
+        "no experimental registrations",
+        "repeat/resume/cancel/scope tests pass",
+        "existing F2W LLM classes used; no donor defaults/transports",
+        "simultaneous sync/async/worker calls respect one effective provider/account quota",
+        "all providers honor configured rate limits/backoff",
+        "no donor defaults or automatic paid-model escalation"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T03",
+      "title": "Existing F2W read path as a Tool and Skill",
+      "depends_on": [
+        "T02",
+        "T25B"
+      ],
+      "owner_role": "f2w_maintainer",
+      "exclusive_path_ownership": [
+        "legacy runtime bridge",
+        "read-only retrieval adapter"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "before/after fixtures",
+        "legacy/new runtime toggle",
+        "read-only demo"
+      ],
+      "acceptance": [
+        "existing semantics retained",
+        "no unauthorized effects",
+        "baseline QA prompts/evidence/citations/fallback/approval preserved",
+        "uses actual B08/B09/B18-B21 behavior without replacing source RAG or QA policy",
+        "pairs with T18B before H2"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H2",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T04",
+      "title": "Importable app/modules package, SDK and agent factory",
+      "depends_on": [
+        "H2"
+      ],
+      "owner_role": "packaging_lead",
+      "exclusive_path_ownership": [
+        "app/public.py",
+        "app/__init__.py",
+        "packaging configuration"
+      ],
+      "port_ids": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04",
+        "I-05",
+        "I-06",
+        "I-07"
+      ],
+      "deliverables": [
+        "wheel and extras",
+        "client lifecycle",
+        "compatibility import shims"
+      ],
+      "acceptance": [
+        "clean install and pip check",
+        "no FORGE or experimental imports",
+        "no generic app-package collision in FORGE",
+        "full profile resolves Tiled + figures + FastAPI",
+        "no source move to src-layout"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T05",
+      "title": "Literature providers, parser and staging",
+      "depends_on": [
+        "H2",
+        "T21B"
+      ],
+      "owner_role": "literature_lead",
+      "exclusive_path_ownership": [
+        "app/modules/literature/",
+        "app/modules/artifacts/"
+      ],
+      "port_ids": [
+        "L-01",
+        "L-02",
+        "L-03",
+        "L-04",
+        "L-05",
+        "L-06",
+        "L-07",
+        "L-08",
+        "L-09",
+        "L-10",
+        "L-11",
+        "L-12",
+        "L-13",
+        "L-14",
+        "L-15",
+        "L-16",
+        "L-17",
+        "L-18",
+        "L-19",
+        "J-01",
+        "J-02",
+        "J-03",
+        "J-04",
+        "J-05",
+        "J-06",
+        "J-07",
+        "J-08",
+        "J-09",
+        "J-10",
+        "J-11",
+        "J-12",
+        "L-20",
+        "O-01",
+        "O-02",
+        "O-06",
+        "O-10",
+        "O-12",
+        "O-13",
+        "O-14"
+      ],
+      "deliverables": [
+        "unified durable paper services",
+        "parser adapters",
+        "staged artifacts and source identities"
+      ],
+      "acceptance": [
+        "legacy cache/reference retention",
+        "security/partial/quota fixtures pass"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T06A",
+      "title": "Lossless scientific contract mapping under preserved F2W schema",
+      "depends_on": [
+        "H2"
+      ],
+      "owner_role": "extraction_lead",
+      "exclusive_path_ownership": [
+        "lossless mappings using current schema; separate follow-on notes only",
+        "evidence contract fixtures"
+      ],
+      "port_ids": [
+        "E-01",
+        "E-02",
+        "E-03",
+        "E-04",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-08",
+        "E-09"
+      ],
+      "deliverables": [
+        "donor-to-F2W field map",
+        "RSoXS examples",
+        "unmapped-field register"
+      ],
+      "acceptance": [
+        "no unapproved schema activation",
+        "source-support/epistemic distinctions documented"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H3",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T06B",
+      "title": "Extraction strategies and validated evidence",
+      "depends_on": [
+        "H3",
+        "T05"
+      ],
+      "owner_role": "extraction_lead",
+      "exclusive_path_ownership": [
+        "app/modules/extraction/",
+        "app/modules/evidence/",
+        "app/modules/science/"
+      ],
+      "port_ids": [
+        "E-01",
+        "E-02",
+        "E-03",
+        "E-04",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-08",
+        "E-09"
+      ],
+      "deliverables": [
+        "legacy and FORGE strategies",
+        "evidence locator/quantity validation",
+        "reported evidence persistence"
+      ],
+      "acceptance": [
+        "approved contracts enforced",
+        "baseline side outputs retained",
+        "no simulation code"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T07A",
+      "title": "Canonicalization proposal and campaign services",
+      "depends_on": [
+        "H2"
+      ],
+      "owner_role": "canonicalization_lead",
+      "exclusive_path_ownership": [
+        "app/modules/canonicalization/ read-only/proposal paths"
+      ],
+      "port_ids": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "C-08",
+        "C-09",
+        "C-10",
+        "C-11",
+        "C-12",
+        "C-13",
+        "C-14",
+        "C-15",
+        "C-16",
+        "O-04",
+        "O-05",
+        "O-11"
+      ],
+      "deliverables": [
+        "vocabulary/candidate services",
+        "campaign reports and review plans"
+      ],
+      "acceptance": [
+        "negative controls",
+        "no actual merge/vocab promotion before H3",
+        "actual F2W fuzzy_merge_term full-name-list baseline measured; ANN is an evaluated upgrade, not assumed existing behavior"
+      ],
+      "mode": "proposal_only",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T07B",
+      "title": "Canonicalization apply adapters",
+      "depends_on": [
+        "H3",
+        "T07A",
+        "T08A"
+      ],
+      "owner_role": "canonicalization_lead",
+      "exclusive_path_ownership": [
+        "app/modules/canonicalization/ apply paths"
+      ],
+      "port_ids": [
+        "C-01",
+        "C-02",
+        "C-03",
+        "C-04",
+        "C-05",
+        "C-06",
+        "C-07",
+        "C-08",
+        "C-09",
+        "C-10",
+        "C-11",
+        "C-12",
+        "C-13",
+        "C-14",
+        "C-15",
+        "C-16",
+        "O-04",
+        "O-05",
+        "O-11"
+      ],
+      "deliverables": [
+        "scoped merge plans",
+        "stale-revision and approval checks"
+      ],
+      "acceptance": [
+        "all application paths call safety gate",
+        "fixture-only application"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T08A",
+      "title": "Required Tiled Graph read adapter and retrieval parity",
+      "depends_on": [
+        "H2",
+        "T20B"
+      ],
+      "owner_role": "graph_lead",
+      "exclusive_path_ownership": [
+        "app/modules/graph/ read ports",
+        "app/modules/retrieval/"
+      ],
+      "port_ids": [
+        "K-01",
+        "K-02",
+        "K-03",
+        "K-04",
+        "K-05",
+        "K-06",
+        "K-07",
+        "K-08",
+        "K-09",
+        "K-10",
+        "K-11",
+        "K-12",
+        "K-13",
+        "K-14",
+        "K-15"
+      ],
+      "deliverables": [
+        "JSON/Splash adapters",
+        "literature graph projections",
+        "retrieval parity tests"
+      ],
+      "acceptance": [
+        "no silent incomplete graph reads",
+        "stable evidence and graph identities",
+        "actual disposable Tiled integration",
+        "no new Splash adapter",
+        "literature-owned scope retained"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T08B",
+      "title": "Import versioned F2W JSON into Tiled 0.2.19; ownership, receipts and provenance",
+      "depends_on": [
+        "H3",
+        "T08A",
+        "T23B"
+      ],
+      "owner_role": "graph_lead",
+      "exclusive_path_ownership": [
+        "app/modules/graph/ mutation planning",
+        "app/modules/provenance/"
+      ],
+      "port_ids": [
+        "K-01",
+        "K-02",
+        "K-03",
+        "K-04",
+        "K-05",
+        "K-06",
+        "K-07",
+        "K-08",
+        "K-09",
+        "K-10",
+        "K-11",
+        "K-12",
+        "K-13",
+        "K-14",
+        "K-15"
+      ],
+      "deliverables": [
+        "capability-aware ChangePlan application",
+        "durable audit",
+        "snapshot/index revision pairing"
+      ],
+      "acceptance": [
+        "disposable backend only until H5",
+        "no graph-wide resets",
+        "FORGE-owned sentinel entities untouched",
+        "no fake mutable-property/transaction claims",
+        "real configured owner read/write isolation and effective edit projection demonstrated",
+        "publicly readable graph payloads cannot expose private paper/crop evidence",
+        "Consumes immutable JSON plus manifest; no extraction/inference/parser calls",
+        "Replay receipts are target/scope/snapshot-specific; source JSON is never mutated",
+        "Re-import detects/reconciles acknowledged UI edits and leaves FORGE records untouched",
+        "D27 backend admin writes enforce scope; D30/D34 permit all local users and verified ALS admins to edit; no per-user Tiled writer impersonation",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T09",
+      "title": "Required paper figures, panels, tables, axes and scale evidence",
+      "depends_on": [
+        "H2",
+        "T05"
+      ],
+      "owner_role": "paper_vision_lead",
+      "exclusive_path_ownership": [
+        "app/modules/vision/"
+      ],
+      "port_ids": [
+        "V-01",
+        "V-02",
+        "V-03",
+        "V-04",
+        "V-05",
+        "V-06",
+        "V-07",
+        "V-08",
+        "V-09",
+        "V-10",
+        "V-11",
+        "V-12",
+        "V-13",
+        "V-14"
+      ],
+      "deliverables": [
+        "text-layer and panel pipeline",
+        "optional OCR",
+        "scale/q-axis evidence"
+      ],
+      "acceptance": [
+        "paper-only import closure",
+        "geometry/units/evidence fixtures",
+        "license-aware asset exports",
+        "required for H4/H6",
+        "full figure path using approved F2W model capabilities",
+        "no silent text-only fallback"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T10",
+      "title": "Durable jobs and curation",
+      "depends_on": [
+        "H2",
+        "T05",
+        "T08A"
+      ],
+      "owner_role": "operations_lead",
+      "exclusive_path_ownership": [
+        "app/modules/jobs/",
+        "app/modules/curation/",
+        "event sink implementation"
+      ],
+      "port_ids": [
+        "J-01",
+        "J-02",
+        "J-03",
+        "J-04",
+        "J-05",
+        "J-06",
+        "J-07",
+        "J-08",
+        "J-09",
+        "J-10",
+        "J-11",
+        "J-12",
+        "U-01",
+        "U-02",
+        "U-03",
+        "U-04",
+        "U-05",
+        "U-06",
+        "U-07",
+        "U-08",
+        "U-09",
+        "U-10",
+        "U-11"
+      ],
+      "deliverables": [
+        "journal leases and recovery",
+        "uncertainty routing",
+        "approval and cost ledger",
+        "publish planning",
+        "FORGE settings audit comparison and owner-approved O03 decision before behavior change"
+      ],
+      "acceptance": [
+        "no semantic publication before H3/H5",
+        "failure injection and stale-approval tests",
+        "proposed job settings snapshot follows O03; no silent live-job model switch",
+        "model usage respects frontend selection, configured limits and shared admission"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T11A",
+      "title": "Required binary case specification, approved references and baseline fixtures",
+      "depends_on": [
+        "H1"
+      ],
+      "owner_role": "independent_evaluation_lead",
+      "exclusive_path_ownership": [
+        "evals/binary/cases/",
+        "owner-approved reference fixtures"
+      ],
+      "port_ids": [
+        "Q-01",
+        "Q-02",
+        "Q-03",
+        "Q-04",
+        "Q-05",
+        "Q-06",
+        "Q-07",
+        "Q-08",
+        "Q-09",
+        "Q-10",
+        "Q-11",
+        "Q-12",
+        "Q-13",
+        "Q-14",
+        "Q-15",
+        "Q-16",
+        "Q-17",
+        "Q-18",
+        "Q-19",
+        "Q-20",
+        "Q-21",
+        "Q-22",
+        "Q-23",
+        "Q-24",
+        "O-03"
+      ],
+      "deliverables": [
+        "gold selection proposal",
+        "review rubric",
+        "baseline isolation/contract tests",
+        "required case manifest; PASS/FAIL assertions; separate execution status",
+        "source/schema-specific expected outcomes for extraction and chat"
+      ],
+      "acceptance": [
+        "human references separated from drafts",
+        "split Work versions together",
+        "gold labels/metrics support binary tests rather than replace them",
+        "preserved-schema binary expectations and permitted exact-quote safe reports"
+      ],
+      "mode": "evaluation",
+      "status": "not_started",
+      "stop_before": "H3",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T11B",
+      "title": "Required binary extraction/chat and integrated evaluation runner",
+      "depends_on": [
+        "H3",
+        "T11A"
+      ],
+      "owner_role": "independent_evaluation_lead",
+      "exclusive_path_ownership": [
+        "evals/",
+        "tests/contracts/",
+        "tests/parity/"
+      ],
+      "port_ids": [
+        "Q-01",
+        "Q-02",
+        "Q-03",
+        "Q-04",
+        "Q-05",
+        "Q-06",
+        "Q-07",
+        "Q-08",
+        "Q-09",
+        "Q-10",
+        "Q-11",
+        "Q-12",
+        "Q-13",
+        "Q-14",
+        "Q-15",
+        "Q-16",
+        "Q-17",
+        "Q-18",
+        "Q-19",
+        "Q-20",
+        "Q-21",
+        "Q-22",
+        "Q-23",
+        "Q-24"
+      ],
+      "deliverables": [
+        "reproducible baseline/candidate reports",
+        "unscored/failed-case reporting"
+      ],
+      "acceptance": [
+        "no live state by default",
+        "named negative controls",
+        "no scientific gold self-approval",
+        "all required cases completed PASS; execution errors/skips are NOT_PASS",
+        "no retry-until-green",
+        "frontend-selected model and common limiter honored",
+        "private source and raw prompts absent from public reports"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T12",
+      "title": "Integrated staging-only pilot",
+      "depends_on": [
+        "T04",
+        "T05",
+        "T06B",
+        "T07B",
+        "T08B",
+        "T10",
+        "T11B",
+        "T09",
+        "T19D",
+        "T20B",
+        "T21B",
+        "T22B",
+        "T23B"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "isolated pilot output directory"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "review packet and evidence examples",
+        "capability parity report"
+      ],
+      "acceptance": [
+        "all candidate outputs accounted for",
+        "H3 scientific rules passed",
+        "text AND figure pilot",
+        "required Tiled adapter tested",
+        "LLM and QA preservation parity",
+        "T11 binary suite gate PASS, not only diagnostic metrics",
+        "managed test Tiled provisioned by application",
+        "T19D complete-population operations tested",
+        "Demonstrate versioned JSON -> separate Tiled import with field/ID/evidence retention and edit reconciliation"
+      ],
+      "mode": "stage_only",
+      "status": "not_started",
+      "stop_before": "H4",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T13",
+      "title": "Publication and rollback rehearsal",
+      "depends_on": [
+        "H4"
+      ],
+      "owner_role": "graph_and_operations_leads",
+      "exclusive_path_ownership": [
+        "disposable target namespace",
+        "docs/migration/reviews/H5/"
+      ],
+      "port_ids": [
+        "K-01",
+        "K-02",
+        "K-03",
+        "K-04",
+        "K-05",
+        "K-06",
+        "K-07",
+        "K-08",
+        "K-09",
+        "K-10",
+        "K-11",
+        "K-12",
+        "K-13",
+        "K-14",
+        "K-15",
+        "J-01",
+        "J-02",
+        "J-03",
+        "J-04",
+        "J-05",
+        "J-06",
+        "J-07",
+        "J-08",
+        "J-09",
+        "J-10",
+        "J-11",
+        "J-12",
+        "O-08",
+        "O-09"
+      ],
+      "deliverables": [
+        "reviewed ChangePlan",
+        "crash recovery evidence",
+        "rollback rehearsal"
+      ],
+      "acceptance": [
+        "no actual target changes before explicit approval",
+        "complete input scan and durable receipt",
+        "Demonstrate versioned JSON -> separate Tiled import with field/ID/evidence retention and edit reconciliation",
+        "D27 backend admin writes enforce scope; D30/D34 permit all local users and verified ALS admins to edit; no per-user Tiled writer impersonation",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion"
+      ],
+      "mode": "disposable_rehearsal",
+      "status": "not_started",
+      "stop_before": "H5",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T14",
+      "title": "Required FastAPI plus F2W CLI/UI compatibility",
+      "depends_on": [
+        "T04",
+        "T10",
+        "T08B",
+        "T18A",
+        "T21B",
+        "T25B"
+      ],
+      "owner_role": "api_compatibility_lead",
+      "exclusive_path_ownership": [
+        "app/api/",
+        "legacy API/CLI wrappers"
+      ],
+      "port_ids": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04",
+        "I-05",
+        "I-06",
+        "I-07",
+        "O-07"
+      ],
+      "deliverables": [
+        "compatible endpoints/events",
+        "review/job UI mapping",
+        "SDK permission tests"
+      ],
+      "acceptance": [
+        "no HTTP algorithms",
+        "same policy in SDK and worker",
+        "real publication remains H5-gated",
+        "shared client/agent service contract for HTTP and direct use",
+        "preserve all 19 legacy UI route contracts and six separate model API endpoints",
+        "preserve legacy entrypoint/create_app signature and frozen frontend behavior"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T15",
+      "title": "FORGE imports F2W agents and consumes equivalent FastAPI behavior",
+      "depends_on": [
+        "T04",
+        "T05",
+        "T14"
+      ],
+      "owner_role": "project_owner_coordinating_with_Alex",
+      "exclusive_path_ownership": [
+        "FORGE A/literature/tools.py",
+        "FORGE selected paper handlers/adapters"
+      ],
+      "port_ids": [
+        "L-01",
+        "L-02",
+        "L-03",
+        "L-04",
+        "L-05",
+        "L-06",
+        "L-07",
+        "L-08",
+        "L-09",
+        "L-10",
+        "L-11",
+        "L-12",
+        "L-13",
+        "L-14",
+        "L-15",
+        "L-16",
+        "L-17",
+        "L-18",
+        "L-19",
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04",
+        "I-05",
+        "I-06",
+        "I-07"
+      ],
+      "deliverables": [
+        "six lit tool compatibility adapters",
+        "paper evidence public bundle",
+        "FORGE regression tests",
+        "FORGE target branch/base approved with owner/Alex before remote write",
+        "separate patch-ready/tested/submitted/merged status and consumer report"
+      ],
+      "acceptance": [
+        "no circular import",
+        "simulation/analysis ownership unchanged",
+        "no duplicate parser/provider logic",
+        "real delegated F2W agent task from installed import",
+        "same literature results/errors/evidence via FastAPI",
+        "no duplicate provider/parsing ownership",
+        "FORGE privileged agent consumption remains separate from user-facing response/trace forwarding",
+        "no public source-serving route inherited from donor",
+        "No assumed FORGE forge_merge branch or autonomous remote merge; FORGE follows receiving profile, no local-to-ALS or ALS non-admin escalation"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "F2W forge_merge plus a separately approved FORGE consumer branch"
+    },
+    {
+      "id": "T16A",
+      "title": "Canary and soak",
+      "depends_on": [
+        "H6"
+      ],
+      "owner_role": "release_lead",
+      "exclusive_path_ownership": [
+        "release flags",
+        "canary scope",
+        "runbooks"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "canary metrics",
+        "inventory closure",
+        "rollback evidence"
+      ],
+      "acceptance": [
+        "no duplicate writers",
+        "separate strategy/runtime toggles",
+        "scope limited by H5 authorization"
+      ],
+      "mode": "authorized_canary",
+      "status": "not_started",
+      "stop_before": "H7",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T16B",
+      "title": "Production cutover and approved retirement",
+      "depends_on": [
+        "H7"
+      ],
+      "owner_role": "release_lead",
+      "exclusive_path_ownership": [
+        "approved legacy removals",
+        "release configuration"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "release notes",
+        "deprecation/retirement closure",
+        "final owner sign-off"
+      ],
+      "acceptance": [
+        "only approved scope removed",
+        "retained artifacts and audit",
+        "rollback documented",
+        "compatibility facades not removed merely because cutover approved; explicit owner retirement scope",
+        "accepted F2W commits are on forge_merge"
+      ],
+      "mode": "release",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T17",
+      "title": "All paper infrastructure, routes, operators and asset coverage closure",
+      "depends_on": [
+        "H1"
+      ],
+      "owner_role": "independent_migration_auditor",
+      "exclusive_path_ownership": [
+        "docs/migration/paper_scope_inventory.json",
+        "paper route/caller ledger",
+        "scope closure report"
+      ],
+      "port_ids": [
+        "L-20",
+        "U-11",
+        "O-01",
+        "O-02",
+        "O-03",
+        "O-04",
+        "O-05",
+        "O-06",
+        "O-07",
+        "O-08",
+        "O-09",
+        "O-10",
+        "O-11",
+        "O-12",
+        "O-13",
+        "O-14"
+      ],
+      "deliverables": [
+        "complete source-to-capability ledger",
+        "resolved paper route/operator/asset dispositions",
+        "no unexplained paper deferral"
+      ],
+      "acceptance": [
+        "every paper capability mapped to retained or equivalent implementation and tests",
+        "owner-approved exceptions only",
+        "all required capabilities demonstrated before H6"
+      ],
+      "mode": "parallel_audit",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T18A",
+      "title": "Freeze current F2W frontend API, SSE and persistence contracts",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "ui_api_compatibility_lead",
+      "exclusive_path_ownership": [
+        "tests/contracts/legacy_ui/",
+        "docs/migration/ui_contracts/"
+      ],
+      "port_ids": [
+        "I-01",
+        "I-02",
+        "I-03",
+        "I-04"
+      ],
+      "baseline_ids": [
+        "B01",
+        "B02",
+        "B03",
+        "B27",
+        "B28",
+        "B29",
+        "B30"
+      ],
+      "deliverables": [
+        "frozen current UI source/build hash",
+        "executed baseline OpenAPI/payload/SSE fixtures",
+        "persisted settings/session/favorite fixtures",
+        "legacy splash-to-Tiled mapping ADR",
+        "forge_merge CI plan"
+      ],
+      "acceptance": [
+        "all current routes and fields inventoried from actual running fixture app",
+        "frozen client unchanged; no mandatory client upgrade",
+        "legacy graph-edit authority and mutation semantics documented",
+        "baseline failures separated from regression",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion"
+      ],
+      "mode": "contract_baseline",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T18B",
+      "title": "Frozen frontend against first migrated runtime/API read slice",
+      "depends_on": [
+        "T03",
+        "T18A",
+        "T21B",
+        "T25B"
+      ],
+      "owner_role": "ui_api_compatibility_lead",
+      "exclusive_path_ownership": [
+        "ui/e2e/live-backend/read/",
+        "tests/contracts/legacy_ui/runtime/"
+      ],
+      "port_ids": [],
+      "baseline_ids": [
+        "B01",
+        "B02",
+        "B08",
+        "B18",
+        "B27",
+        "B30"
+      ],
+      "deliverables": [
+        "actual FastAPI plus fake-inference browser demo",
+        "fragmented stream/fallback/cancel cases",
+        "baseline-candidate schema/event/citation diff"
+      ],
+      "acceptance": [
+        "old UI QA/settings/citations work without mocking HTTP handlers",
+        "turn_started/graph_update/complete/error semantics retained",
+        "no unexpected graph publication or provider changes",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion",
+        "Exercise local UI without any user login and ALS reader/admin sessions separately; no login gate may leak into local mode."
+      ],
+      "mode": "read_only_vertical_slice",
+      "status": "not_started",
+      "stop_before": "H2",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T18C",
+      "title": "Full frozen-frontend parity on actual Tiled; recovery and old-client closure",
+      "depends_on": [
+        "T14",
+        "T08B",
+        "T10",
+        "T18B"
+      ],
+      "owner_role": "ui_api_compatibility_lead",
+      "exclusive_path_ownership": [
+        "ui/e2e/live-backend/full/",
+        "tests/contracts/legacy_ui/closure/",
+        "docs/migration/ui_reports/"
+      ],
+      "port_ids": [
+        "I-01",
+        "K-03",
+        "K-04",
+        "K-05"
+      ],
+      "baseline_ids": [
+        "B01",
+        "B02",
+        "B03",
+        "B25",
+        "B27",
+        "B28",
+        "B29",
+        "B30"
+      ],
+      "deliverables": [
+        "UI01-UI28 executed compatibility matrix",
+        "frozen browser + migrated API + disposable Tiled + fake inference traces",
+        "pending/edit/snippet/session/publication/recovery evidence",
+        "six model endpoint contract results"
+      ],
+      "acceptance": [
+        "no removed old UI features, no updated client used to conceal breakage",
+        "Tiled implements safe editable-mode parity without Splash service",
+        "no unauthorized writes, duplicate action effects or broken old citations",
+        "all deviations surfaced to owner",
+        "both Tiled modes exercised through same adapter",
+        "approved relevant exact-quote legacy projection",
+        "SSE and graph exports do not serve source bodies/crops",
+        "Demonstrate versioned JSON -> separate Tiled import with field/ID/evidence retention and edit reconciliation",
+        "D27 backend admin writes enforce scope; D30/D34 permit all local users and verified ALS admins to edit; no per-user Tiled writer impersonation",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion",
+        "Exercise local UI without any user login and ALS reader/admin sessions separately; no login gate may leak into local mode."
+      ],
+      "mode": "isolated_integration",
+      "status": "not_started",
+      "stop_before": "H6",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T19A",
+      "title": "Knowledge Operations inventory and population semantics",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/migration/operations_inventory.json"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Knowledge Operations inventory and population semantics",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "existing script behavior/effects identified",
+        "no blind registration",
+        "source-to-service-to-Tool map"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T19B",
+      "title": "Unchanged deterministic paper-summary Tool and UI demonstration",
+      "depends_on": [
+        "H1",
+        "T03",
+        "T19A"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "app/modules/operations/papers.py",
+        "summary compatibility adapter"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Unchanged deterministic paper-summary Tool and UI demonstration",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "same page/citation eligibility",
+        "existing LLM/QA constraints unchanged",
+        "bounded result under old UI"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H2",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T19C",
+      "title": "Graph and corpus computational operations",
+      "depends_on": [
+        "H3",
+        "T08A",
+        "T10"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "app/modules/operations/graph.py",
+        "app/modules/operations/corpus.py",
+        "app/modules/operations/reports.py"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Graph and corpus computational operations",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "defined counting unit",
+        "complete/partial distinction",
+        "audits do not apply repairs",
+        "shared rate controls and private artifacts"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T19D",
+      "title": "Binary correctness and scale tests for Knowledge Operations",
+      "depends_on": [
+        "T19C",
+        "T19B",
+        "T11B",
+        "T09"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "tests/operations/",
+        "evals/binary/cases/operations/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Binary correctness and scale tests for Knowledge Operations",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "full population exceeds prompt budget",
+        "counts not based on top-k samples",
+        "figure-aware evidence and safe report projection",
+        "no runtime code generation"
+      ],
+      "mode": "evaluation",
+      "status": "not_started",
+      "stop_before": "H4",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T19E",
+      "title": "Operation CLI, agent, SDK, API and frontend closure",
+      "depends_on": [
+        "T14",
+        "T15",
+        "T18C",
+        "T19D"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "operation integration evidence"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Operation CLI, agent, SDK, API and frontend closure",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "all in-scope script capabilities have dispositions",
+        "one implementation with CLI wrappers",
+        "no private paper artifact leaked to user"
+      ],
+      "mode": "evaluation",
+      "status": "not_started",
+      "stop_before": "H6",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T20A",
+      "title": "Managed and central Tiled deployment contracts",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/adr/tiled-deployment.md"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Managed and central Tiled deployment contracts",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "both modes included",
+        "exact 0.2.19 artifact hash/contract recorded at H1",
+        "app owns disposable test lifecycle",
+        "no Splash service",
+        "D20/D21/D22: preserve schema logic, versioned JSON build boundary, exact Tiled 0.2.19 pin"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T20B",
+      "title": "Application-managed Tiled lifecycle and disposable fixture",
+      "depends_on": [
+        "H2",
+        "T20A"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "app/modules/deployment/",
+        "scripts/tiled_server.py",
+        "tests/fixtures/tiled_server.py"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Application-managed Tiled lifecycle and disposable fixture",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "owned isolated ports/storage/identities",
+        "normal stop retains managed data",
+        "external mode never controls central server",
+        "permission test identities separated from setup admin"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T21A",
+      "title": "Private source/public disclosure contract and route classification",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/adr/content-disclosure.md",
+        "source disclosure field map"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Private source/public disclosure contract and route classification",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "relevant exact quotations preserved in legacy snippets",
+        "internal-agent authority cannot come from input flag",
+        "public source routes/fields classified",
+        "O02 resolved: positive exact-quote tests and negative full-paper/crop leakage tests"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T21B",
+      "title": "Source access controls and user-safe projection",
+      "depends_on": [
+        "H1",
+        "T21A"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "app/modules/security/content_access.py",
+        "app/modules/security/disclosure.py"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Source access controls and user-safe projection",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "PDF/fulltext/crop private",
+        "API/SSE/traces/graph/report bypass cases covered",
+        "trusted internal F2W/FORGE source reads work",
+        "protect H2 demo and all later ports"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": null,
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T22A",
+      "title": "Existing schema assets and architectural contract inventory",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/migration/schema_inventory.json",
+        "docs/adr/schema-ownership.md"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Existing schema assets and architectural contract inventory",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "actual overlays/imports/ref YAML distinguished",
+        "existing validators retained",
+        "no semantic change inferred",
+        "D20/D21/D22: preserve schema logic, versioned JSON build boundary, exact Tiled 0.2.19 pin"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T22B",
+      "title": "Schema registry, validation reuse and revision binding",
+      "depends_on": [
+        "H2",
+        "T22A"
+      ],
+      "owner_role": "assigned_workstream_lead",
+      "exclusive_path_ownership": [
+        "app/modules/schema/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Schema registry, validation reuse and revision binding",
+        "versioned evidence and binary test results where applicable"
+      ],
+      "acceptance": [
+        "schema fingerprints bound to jobs/graphs/indexes/reports",
+        "current schema behavior preserved by owner decision",
+        "H3 reviews semantic decision and binary cases",
+        "Current RSoXSMeasurement inheritance and baseline validation behavior remain unchanged"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H3",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T23A",
+      "title": "Versioned JSON KG creation/import/edit contract",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "graph_integration_lead",
+      "exclusive_path_ownership": [
+        "docs/migration/json_kg_contract.md"
+      ],
+      "port_ids": [
+        "J-01",
+        "J-02",
+        "K-01"
+      ],
+      "f2w_anchor_ids": [
+        "B24"
+      ],
+      "deliverables": [
+        "json2kg compatibility fixtures",
+        "snapshot manifest/import receipt/edit-reconciliation contracts"
+      ],
+      "acceptance": [
+        "JSON is the primary build artifact, not only Tiled export",
+        "No new ontology or broken JSON/CLI/UI contract"
+      ],
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T23B",
+      "title": "Preserve json2kg and implement immutable JSON snapshot service",
+      "depends_on": [
+        "H2",
+        "T23A",
+        "T22B"
+      ],
+      "owner_role": "graph_integration_lead",
+      "exclusive_path_ownership": [
+        "app/modules/graph/snapshot.py",
+        "app/modules/graph/snapshot_manifest.py"
+      ],
+      "port_ids": [
+        "J-01",
+        "J-02"
+      ],
+      "f2w_anchor_ids": [
+        "B24"
+      ],
+      "deliverables": [
+        "versioned JSON builder with sidecar manifests",
+        "no-Tiled creation tests",
+        "unchanged CLI facade"
+      ],
+      "acceptance": [
+        "Offline construction without Tiled succeeds",
+        "IDs, scientific/evidence/code fields preserved",
+        "Frozen source snapshots never overwritten",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion"
+      ],
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T24A",
+      "title": "Three-image deployment, prefix, admin and mounted-storage contracts",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "deployment_lead",
+      "exclusive_path_ownership": [
+        "docker profile contract",
+        "Ansible input contract",
+        "DEPLOYMENT_STRATEGY.md"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Required variant/URL/base path matrix",
+        "O06-O08 choices explicitly recorded",
+        "Source Docker/workflow/browser seams mapped"
+      ],
+      "acceptance": [
+        "Required variant/URL/base path matrix",
+        "O06-O08 choices explicitly recorded",
+        "Source Docker/workflow/browser seams mapped",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion"
+      ],
+      "mode": "design",
+      "status": "not_started",
+      "stop_before": "H1",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T24B",
+      "title": "Build shared runtime and three supervised image finals",
+      "depends_on": [
+        "H2",
+        "T04",
+        "T20B",
+        "T24A"
+      ],
+      "owner_role": "deployment_lead",
+      "exclusive_path_ownership": [
+        "Dockerfile",
+        "docker/profiles/",
+        "docker/entrypoint/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Local includes UI/API/worker/Tiled; ALS has no managed server",
+        "Private corpus excluded from build layers; runtime mounts persist",
+        "Supervised startup/termination and no implicit imports"
+      ],
+      "acceptance": [
+        "Local includes UI/API/worker/Tiled; ALS has no managed server",
+        "Private corpus excluded from build layers; runtime mounts persist",
+        "Supervised startup/termination and no implicit imports"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H4",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T24C",
+      "title": "Prefix-correct gateway and existing UI/API deployment",
+      "depends_on": [
+        "H2",
+        "T24A",
+        "T18A"
+      ],
+      "owner_role": "ui_api_deployment_lead",
+      "exclusive_path_ownership": [
+        "docker/nginx.conf",
+        "ui/vite.config.ts",
+        "deployment configuration"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "/fair2wise/ assets and same-origin /fair2wise/api",
+        "One prefix stripping boundary; docs/redirects/SSE/deep links work",
+        "Existing API suffix/DTO/stream compatibility preserved"
+      ],
+      "acceptance": [
+        "/fair2wise/ assets and same-origin /fair2wise/api",
+        "One prefix stripping boundary; docs/redirects/SSE/deep links work",
+        "Existing API suffix/DTO/stream compatibility preserved"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H4",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T24D",
+      "title": "GitHub Actions build/test/publication and protected tag promotion",
+      "depends_on": [
+        "T24B",
+        "T24C"
+      ],
+      "owner_role": "release_lead",
+      "exclusive_path_ownership": [
+        ".github/workflows/publish-image.yml",
+        ".github/workflows/build-app.yml"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "All three tested variant digests and release manifest",
+        "No untrusted PR publishing/runtime secrets",
+        "Owner-approved O06 tag rules; host deployment separate"
+      ],
+      "acceptance": [
+        "All three tested variant digests and release manifest",
+        "No untrusted PR publishing/runtime secrets",
+        "Owner-approved O06 tag rules; host deployment separate"
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H6",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T24E",
+      "title": "Three-profile container, Ansible and restore integration",
+      "depends_on": [
+        "T24B",
+        "T24C",
+        "T24D",
+        "T14",
+        "T18C"
+      ],
+      "owner_role": "deployment_integration_lead",
+      "exclusive_path_ownership": [
+        "deploy/",
+        "tests/deployment/",
+        "Ansible integration branch"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Real container/UI/prefix/SSE/import tests; central target defaults and disposable override",
+        "Scoped writer guard and D30/D34 profile policy tested; local full-access and ALS admin/reader cases",
+        "Mounted-state restore and digest rollout/rollback evidence; H7 confirms actual production config"
+      ],
+      "acceptance": [
+        "Real container/UI/prefix/SSE/import tests; central target defaults and disposable override",
+        "Scoped writer guard and D30/D34 profile policy tested; local full-access and ALS admin/reader cases",
+        "Mounted-state restore and digest rollout/rollback evidence; H7 confirms actual production config",
+        "D34 local full access without user sign-in; D30 verified ALS Tiled-admin privileges for protected actions; D31 committed JSON promotion",
+        "Exercise local UI without any user login and ALS reader/admin sessions separately; no login gate may leak into local mode."
+      ],
+      "mode": "implementation",
+      "status": "not_started",
+      "stop_before": "H6",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T25A",
+      "title": "Freeze trusted-local and Tiled-authenticated ALS access contracts",
+      "depends_on": [
+        "H0"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/migration/authentication/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Server-side deployment/access-mode mapping; no user identity prerequisite locally",
+        "ALS native sign-in/admin API mapping",
+        "Local-operator and verified ALS ApprovalRecord schemas; loopback-default local exposure"
+      ],
+      "acceptance": [
+        "D34 permits every local application function without sign-in; D30 restricts ALS privileged actions to verified admins",
+        "Reject request-selected trusted mode and ALS local_trusted startup configuration",
+        "No synthetic local Tiled subject, role timestamp or automated human approval"
+      ],
+      "mode": "contract_or_implementation",
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T25B",
+      "title": "Implement profile-specific access context and shared effect guards",
+      "depends_on": [
+        "H1",
+        "T25A"
+      ],
+      "owner_role": "identity_and_release_lead",
+      "exclusive_path_ownership": [
+        "app/modules/security/tiled_identity.py",
+        "app/modules/security/authorization.py",
+        "app/api/auth.py"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Local-operator context across UI/API/SDK/Tools/jobs",
+        "Verified ALS principals, login/session flow and fail-closed effect checks",
+        "Local full administrative capability presentation without Tiled login"
+      ],
+      "acceptance": [
+        "Local QA/summary/settings and administrative controls work with no user sign-in",
+        "Local capability resolution makes no user identity/admin API calls",
+        "ALS forged roles, revoked grants and reader mutations fail before effects; no local fallback"
+      ],
+      "mode": "contract_or_implementation",
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T25C",
+      "title": "Verify no-login local workflows and real ALS Tiled role enforcement",
+      "depends_on": [
+        "T25B",
+        "T20B",
+        "T08A"
+      ],
+      "owner_role": "identity_and_release_lead",
+      "exclusive_path_ownership": [
+        "tests/integration/tiled_auth/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Real local full workflow without user sign-in: ingest/extract/figures/curate/approve/JSON/import/edit",
+        "Truthful local-operator audit and profile-bound job resumption",
+        "ALS role/revocation tests using real disposable Tiled in connect-only mode"
+      ],
+      "acceptance": [
+        "No user identity fixture or token is required for local administrative actions",
+        "ALS config/request injection, local grants and auth outages cannot enable local_trusted",
+        "Service writer authentication remains separate; no production secrets in fixtures",
+        "Scientific validation, JSON immutability, target scope and source privacy remain enforced"
+      ],
+      "mode": "contract_or_implementation",
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T26A",
+      "title": "Freeze Git JSON release and promotion contract",
+      "depends_on": [
+        "H0",
+        "T23A"
+      ],
+      "owner_role": "integration_lead",
+      "exclusive_path_ownership": [
+        "docs/migration/data_releases/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Immutable commit/path/hash and staging report contract; disclosure/image exclusion"
+      ],
+      "acceptance": [
+        "No raw sources in Git or images; no required production re-extraction"
+      ],
+      "mode": "contract_or_implementation",
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T26B",
+      "title": "Implement committed artifact validation and export",
+      "depends_on": [
+        "H3",
+        "T23B",
+        "T26A"
+      ],
+      "owner_role": "identity_and_release_lead",
+      "exclusive_path_ownership": [
+        "app/modules/graph/releases.py",
+        "scripts/prepare_kg_release.py"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Commit-ready checks; isolated Git fixtures; data release descriptors"
+      ],
+      "acceptance": [
+        "Committed bytes equal tested bytes; private dependencies checked; no automatic Git push"
+      ],
+      "mode": "contract_or_implementation",
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    },
+    {
+      "id": "T26C",
+      "title": "Rehearse exact Git snapshot promotion and rollback",
+      "depends_on": [
+        "H4",
+        "T13",
+        "T26B"
+      ],
+      "owner_role": "identity_and_release_lead",
+      "exclusive_path_ownership": [
+        "tests/integration/kg_promotion/"
+      ],
+      "port_ids": [],
+      "deliverables": [
+        "Second-target mounted artifact/import rehearsal and distinct receipt"
+      ],
+      "acceptance": [
+        "Identical snapshot bytes, zero inference, separate target approval; no live central writes"
+      ],
+      "mode": "contract_or_implementation",
+      "status": "not_started",
+      "integration_branch": "forge_merge"
+    }
+  ],
+  "human_gates": [
+    {
+      "id": "H0",
+      "depends_on": [
+        "T00"
+      ],
+      "decision_required": "Are the exact confirmed rsoxs source, LLM/QA baseline, tests and scope verified?",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H0/decision.json",
+      "blocks": [
+        "T01",
+        "all branch-specific implementation"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H1",
+      "depends_on": [
+        "T01",
+        "T18A",
+        "T19A",
+        "T20A",
+        "T21A",
+        "T22A",
+        "T23A",
+        "T24A",
+        "T25A",
+        "T26A"
+      ],
+      "decision_required": "Approve D34 trusted-local context and D30 ALS native sign-in/admin implementation; Git promotion and shared contracts; remaining O03/O06-O08 engineering choices. Local full-access policy is already fixed.",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H1/decision.json",
+      "blocks": [
+        "T02",
+        "contract-consuming implementations"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H2",
+      "depends_on": [
+        "T03",
+        "T18B",
+        "T19B",
+        "T21B",
+        "T25B"
+      ],
+      "decision_required": "Approve unchanged QA/summary and private-source boundary; demonstrate no-login local access and fail-closed ALS reader/admin guards.",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H2/decision.json",
+      "blocks": [
+        "deep module migration"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H3",
+      "depends_on": [
+        "T06A",
+        "T11A",
+        "T07A",
+        "T22B"
+      ],
+      "decision_required": "Approve lossless mappings under existing schema semantics and required binary cases; no measurement/technique redesign",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H3/decision.json",
+      "blocks": [
+        "T06B",
+        "T07B",
+        "T08B",
+        "scientific data apply"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H4",
+      "depends_on": [
+        "T12",
+        "T24B",
+        "T24C",
+        "T25C",
+        "T26B"
+      ],
+      "decision_required": "Approve required binary pilot with versioned JSON, figures and operations; include full local administrative workflow without sign-in and real ALS-mode role checks against disposable Tiled.",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H4/decision.json",
+      "blocks": [
+        "T13",
+        "broad publication or paid processing"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H5",
+      "depends_on": [
+        "T13",
+        "T26C"
+      ],
+      "decision_required": "Authorize exact JSON-hash/target-scope import plan and recovery/edit-reconciliation proof; exact Git data selection and zero-inference promotion rehearsal",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H5/decision.json",
+      "blocks": [
+        "real target publication",
+        "destructive repair"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H6",
+      "depends_on": [
+        "T14",
+        "T15",
+        "H5",
+        "T17",
+        "T18C",
+        "T19E",
+        "T24D",
+        "T24E",
+        "T25C",
+        "T26C"
+      ],
+      "decision_required": "Approve full local no-login functionality, ALS role-specific UI/API/SDK/FORGE behavior, all paper coverage, tested deployment variants and exact committed-artifact promotion.",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H6/decision.json",
+      "blocks": [
+        "T16A"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    },
+    {
+      "id": "H7",
+      "depends_on": [
+        "T16A"
+      ],
+      "decision_required": "Are canary results, rollback and specific retirements approved?; authorize production digest/config rollout with mount backup/restore evidence and resolved infrastructure inputs",
+      "reviewer": "project_owner",
+      "status": "not_approved",
+      "approval_record": "docs/migration/reviews/H7/decision.json",
+      "blocks": [
+        "T16B"
+      ],
+      "agent_may_self_approve": false,
+      "approval_invalidated_by": [
+        "relevant source commit change",
+        "schema or vocabulary meaning change",
+        "affected corpus/snapshot change",
+        "expanded cost or privilege scope",
+        "changed destructive operation plan",
+        "breaking existing UI wire/persistence/behavior contract",
+        "unreviewed change to forge_merge baseline or source-lock identity",
+        "changed source-disclosure policy",
+        "changed required binary case manifest",
+        "changed pinned schema or Tiled capability contract",
+        "changed JSON snapshot/import projection contract",
+        "unreviewed image profile or Tiled target change",
+        "changed public base path/proxy contract",
+        "changed admin writer or user-write policy",
+        "changed private mount/backup/secret delivery",
+        "changed deployment authorization profile/mode"
+      ],
+      "approver": "project_owner"
+    }
+  ],
+  "integration_branch": "forge_merge",
+  "open_owner_questions": [
+    "O03",
+    "O06",
+    "O07",
+    "O08"
+  ]
+}

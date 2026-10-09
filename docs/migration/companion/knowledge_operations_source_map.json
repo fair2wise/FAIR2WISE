@@ -1,0 +1,169 @@
+{
+  "archive": "FAIR2WISE-rsoxs.zip",
+  "sha256": "d3e9d821e7878211f08399c3f69e7d9cf0f55f8a7f17397e737fa3a4292077a6",
+  "archive_recorded_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "inspection": "static AST only; no source imports or runtime tests",
+  "selected_symbols": [
+    {
+      "file": "app/modules/f2w_agent/paper_evidence_agent.py",
+      "symbol": "summarize_extracted_terms",
+      "start_line": 122,
+      "end_line": 292,
+      "file_sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba"
+    },
+    {
+      "file": "app/modules/f2w_agent/paper_evidence_agent.py",
+      "symbol": "PaperEvidenceAgent",
+      "start_line": 295,
+      "end_line": 458,
+      "file_sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba"
+    },
+    {
+      "file": "app/modules/f2w_agent/paper_evidence_agent.py",
+      "symbol": "_eligible_pages",
+      "start_line": 54,
+      "end_line": 80,
+      "file_sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba"
+    },
+    {
+      "file": "app/modules/f2w_agent/paper_evidence_agent.py",
+      "symbol": "_citation_errors",
+      "start_line": 88,
+      "end_line": 119,
+      "file_sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba"
+    },
+    {
+      "file": "scripts/analyze_kgs.py",
+      "symbol": "load_kg",
+      "start_line": 9,
+      "end_line": 17,
+      "file_sha256": "155c1cea7fdc1a9074a147c9b58bf04ab12f30c82e9a767c2c874769df2cac91"
+    },
+    {
+      "file": "scripts/analyze_kgs.py",
+      "symbol": "calculate_structural_metrics",
+      "start_line": 19,
+      "end_line": 48,
+      "file_sha256": "155c1cea7fdc1a9074a147c9b58bf04ab12f30c82e9a767c2c874769df2cac91"
+    },
+    {
+      "file": "scripts/analyze_kgs.py",
+      "symbol": "calculate_growth_metrics",
+      "start_line": 50,
+      "end_line": 75,
+      "file_sha256": "155c1cea7fdc1a9074a147c9b58bf04ab12f30c82e9a767c2c874769df2cac91"
+    },
+    {
+      "file": "scripts/analyze_kgs.py",
+      "symbol": "evaluate_kgs_independent",
+      "start_line": 78,
+      "end_line": 234,
+      "file_sha256": "155c1cea7fdc1a9074a147c9b58bf04ab12f30c82e9a767c2c874769df2cac91"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit",
+      "start_line": 814,
+      "end_line": 912,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_summary_stats",
+      "start_line": 738,
+      "end_line": 799,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_duplicate_works",
+      "start_line": 173,
+      "end_line": 278,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_stubs",
+      "start_line": 281,
+      "end_line": 343,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_technique_measurement",
+      "start_line": 346,
+      "end_line": 410,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_numeric_values",
+      "start_line": 413,
+      "end_line": 515,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_zero_measurement_papers",
+      "start_line": 518,
+      "end_line": 565,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_aliases",
+      "start_line": 568,
+      "end_line": 634,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/corpus_qa.py",
+      "symbol": "audit_relations",
+      "start_line": 637,
+      "end_line": 735,
+      "file_sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f"
+    },
+    {
+      "file": "scripts/list_missing_rsoxs_papers.py",
+      "symbol": "collect_missing_citations",
+      "start_line": 99,
+      "end_line": 204,
+      "file_sha256": "0184d217870359fa6cd966894c1e7968194bebd027471cfe9590a8e81eb2e1fb"
+    },
+    {
+      "file": "scripts/list_missing_rsoxs_papers.py",
+      "symbol": "verify_written_against_rtf",
+      "start_line": 219,
+      "end_line": 277,
+      "file_sha256": "0184d217870359fa6cd966894c1e7968194bebd027471cfe9590a8e81eb2e1fb"
+    },
+    {
+      "file": "scripts/get_pdf_years.py",
+      "symbol": "guess_year",
+      "start_line": 102,
+      "end_line": 113,
+      "file_sha256": "f94d0de73b788d94836a0c8a76f7b4f5073ed7cbf1ffa4ff8eb4f10a2f58b046"
+    },
+    {
+      "file": "scripts/get_pdf_years.py",
+      "symbol": "scan_folder",
+      "start_line": 116,
+      "end_line": 130,
+      "file_sha256": "f94d0de73b788d94836a0c8a76f7b4f5073ed7cbf1ffa4ff8eb4f10a2f58b046"
+    },
+    {
+      "file": "scripts/repair_corpus.py",
+      "symbol": "repair",
+      "start_line": 379,
+      "end_line": 478,
+      "file_sha256": "52796a6d36825463c757cb43ca9c00c9ff60d3af183925c740482b72d56a13f1"
+    },
+    {
+      "file": "scripts/repair_corpus.py",
+      "symbol": "step_merge_near_duplicates",
+      "start_line": 248,
+      "end_line": 363,
+      "file_sha256": "52796a6d36825463c757cb43ca9c00c9ff60d3af183925c740482b72d56a13f1"
+    }
+  ]
+}

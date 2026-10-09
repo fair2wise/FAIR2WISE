@@ -1,0 +1,1684 @@
+{
+  "version": "4.0",
+  "extraction": "Static AST and literal frontend inspection, not generated OpenAPI or runtime route registration",
+  "api_source": "app/modules/f2w_agent/api.py",
+  "models": [
+    {
+      "name": "ChatMessageInput",
+      "kind": "class",
+      "line": 116,
+      "end_line": 121,
+      "doc": "One chat history turn with a user or assistant role.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "role",
+          "annotation": "str",
+          "default": "Field(..., pattern='^(user|assistant)$')",
+          "line": 118
+        },
+        {
+          "name": "content",
+          "annotation": "str",
+          "default": "''",
+          "line": 121
+        }
+      ]
+    },
+    {
+      "name": "ChatRequest",
+      "kind": "class",
+      "line": 124,
+      "end_line": 145,
+      "doc": "Inbound chat request including message, history, session, and graph options.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "message",
+          "annotation": "str",
+          "default": "Field(..., min_length=1)",
+          "line": 126
+        },
+        {
+          "name": "messages",
+          "annotation": "List[ChatMessageInput]",
+          "default": "Field(default_factory=list)",
+          "line": 127
+        },
+        {
+          "name": "session_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 128
+        },
+        {
+          "name": "client_turn_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 134
+        },
+        {
+          "name": "ui_settings",
+          "annotation": "Optional[Dict[str, Any]]",
+          "default": "None",
+          "line": 140
+        },
+        {
+          "name": "graph_source",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(splash|json)$')",
+          "line": 141
+        },
+        {
+          "name": "json_graph_path",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 142
+        },
+        {
+          "name": "json_graph_paths",
+          "annotation": "Optional[List[str]]",
+          "default": "None",
+          "line": 143
+        },
+        {
+          "name": "source_rag",
+          "annotation": "Optional[bool]",
+          "default": "None",
+          "line": 144
+        },
+        {
+          "name": "use_live_tiled",
+          "annotation": "Optional[bool]",
+          "default": "None",
+          "line": 145
+        }
+      ]
+    },
+    {
+      "name": "LinkedCodeSnippet",
+      "kind": "class",
+      "line": 148,
+      "end_line": 164,
+      "doc": "A code snippet linked to a knowledge-graph node.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "annotation": "str",
+          "default": null,
+          "line": 150
+        },
+        {
+          "name": "label",
+          "annotation": "str",
+          "default": "''",
+          "line": 151
+        },
+        {
+          "name": "function_name",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 152
+        },
+        {
+          "name": "code_language",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 153
+        },
+        {
+          "name": "code_snippet",
+          "annotation": "str",
+          "default": null,
+          "line": 154
+        },
+        {
+          "name": "publications",
+          "annotation": "List[Dict[str, Any]]",
+          "default": "Field(default_factory=list)",
+          "line": 155
+        },
+        {
+          "name": "source_type",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 156
+        },
+        {
+          "name": "repo_url",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 157
+        },
+        {
+          "name": "repo_owner",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 158
+        },
+        {
+          "name": "repo_name",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 159
+        },
+        {
+          "name": "repo_commit_sha",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 160
+        },
+        {
+          "name": "source_file_path",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 161
+        },
+        {
+          "name": "source_file_url",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 162
+        },
+        {
+          "name": "source_start_line",
+          "annotation": "Optional[int]",
+          "default": "None",
+          "line": 163
+        },
+        {
+          "name": "source_end_line",
+          "annotation": "Optional[int]",
+          "default": "None",
+          "line": 164
+        }
+      ]
+    },
+    {
+      "name": "GraphNode",
+      "kind": "class",
+      "line": 167,
+      "end_line": 193,
+      "doc": "A knowledge-graph node returned to the client.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "annotation": "str",
+          "default": null,
+          "line": 169
+        },
+        {
+          "name": "label",
+          "annotation": "str",
+          "default": null,
+          "line": 170
+        },
+        {
+          "name": "type",
+          "annotation": "str",
+          "default": null,
+          "line": 171
+        },
+        {
+          "name": "description",
+          "annotation": "str",
+          "default": "''",
+          "line": 172
+        },
+        {
+          "name": "publications",
+          "annotation": "List[Dict[str, Any]]",
+          "default": "Field(default_factory=list)",
+          "line": 173
+        },
+        {
+          "name": "code_snippet",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 174
+        },
+        {
+          "name": "code_language",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 175
+        },
+        {
+          "name": "function_name",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 176
+        },
+        {
+          "name": "linked_code_snippets",
+          "annotation": "List[LinkedCodeSnippet]",
+          "default": "Field(default_factory=list)",
+          "line": 177
+        },
+        {
+          "name": "graph_id",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 178
+        },
+        {
+          "name": "graph_label",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 179
+        },
+        {
+          "name": "formula",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 180
+        },
+        {
+          "name": "source_papers",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 181
+        },
+        {
+          "name": "properties",
+          "annotation": "List[Dict[str, Any]]",
+          "default": "Field(default_factory=list)",
+          "line": 182
+        },
+        {
+          "name": "extra_fields",
+          "annotation": "Dict[str, Any]",
+          "default": "Field(default_factory=dict)",
+          "line": 183
+        },
+        {
+          "name": "source_type",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 184
+        },
+        {
+          "name": "repo_url",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 185
+        },
+        {
+          "name": "repo_owner",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 186
+        },
+        {
+          "name": "repo_name",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 187
+        },
+        {
+          "name": "repo_commit_sha",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 188
+        },
+        {
+          "name": "source_file_path",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 189
+        },
+        {
+          "name": "source_file_url",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 190
+        },
+        {
+          "name": "source_start_line",
+          "annotation": "Optional[int]",
+          "default": "None",
+          "line": 191
+        },
+        {
+          "name": "source_end_line",
+          "annotation": "Optional[int]",
+          "default": "None",
+          "line": 192
+        },
+        {
+          "name": "repository_license",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 193
+        }
+      ]
+    },
+    {
+      "name": "GraphEdge",
+      "kind": "class",
+      "line": 196,
+      "end_line": 200,
+      "doc": "A directed edge between two graph nodes.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "source",
+          "annotation": "str",
+          "default": null,
+          "line": 198
+        },
+        {
+          "name": "target",
+          "annotation": "str",
+          "default": null,
+          "line": 199
+        },
+        {
+          "name": "predicate",
+          "annotation": "str",
+          "default": "'rel:related_to'",
+          "line": 200
+        }
+      ]
+    },
+    {
+      "name": "GraphPayload",
+      "kind": "class",
+      "line": 203,
+      "end_line": 207,
+      "doc": "Nodes, edges, and source path for a graph view.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "nodes",
+          "annotation": "List[GraphNode]",
+          "default": null,
+          "line": 205
+        },
+        {
+          "name": "edges",
+          "annotation": "List[GraphEdge]",
+          "default": null,
+          "line": 206
+        },
+        {
+          "name": "source_path",
+          "annotation": "str",
+          "default": null,
+          "line": 207
+        }
+      ]
+    },
+    {
+      "name": "ChatResponse",
+      "kind": "class",
+      "line": 210,
+      "end_line": 225,
+      "doc": "Agent pipeline reply including answer, graph, and pending state.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "status",
+          "annotation": "str",
+          "default": null,
+          "line": 212
+        },
+        {
+          "name": "answer",
+          "annotation": "str",
+          "default": null,
+          "line": 213
+        },
+        {
+          "name": "sufficient",
+          "annotation": "bool",
+          "default": null,
+          "line": 214
+        },
+        {
+          "name": "node_ids",
+          "annotation": "List[str]",
+          "default": null,
+          "line": 215
+        },
+        {
+          "name": "publications",
+          "annotation": "List[Dict[str, Any]]",
+          "default": "Field(default_factory=list)",
+          "line": 216
+        },
+        {
+          "name": "confidence",
+          "annotation": "float",
+          "default": null,
+          "line": 217
+        },
+        {
+          "name": "rounds",
+          "annotation": "List[Dict[str, Any]]",
+          "default": null,
+          "line": 218
+        },
+        {
+          "name": "graph",
+          "annotation": "GraphPayload",
+          "default": null,
+          "line": 219
+        },
+        {
+          "name": "graph_source_requested",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 220
+        },
+        {
+          "name": "graph_source_used",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 221
+        },
+        {
+          "name": "workdir",
+          "annotation": "str",
+          "default": null,
+          "line": 222
+        },
+        {
+          "name": "pending",
+          "annotation": "Optional[Dict[str, Any]]",
+          "default": "None",
+          "line": 223
+        },
+        {
+          "name": "orchestration",
+          "annotation": "Optional[Dict[str, Any]]",
+          "default": "None",
+          "line": 224
+        },
+        {
+          "name": "turn_id",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 225
+        }
+      ]
+    },
+    {
+      "name": "ChatActionRequest",
+      "kind": "class",
+      "line": 228,
+      "end_line": 254,
+      "doc": "Yes/no decision for a pending download or extraction.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "decision",
+          "annotation": "str",
+          "default": "Field(..., pattern='^(yes|no)$')",
+          "line": 230
+        },
+        {
+          "name": "kind",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(download|extraction)$')",
+          "line": 231
+        },
+        {
+          "name": "candidate_index",
+          "annotation": "Optional[int]",
+          "default": "Field(default=None, ge=0)",
+          "line": 232
+        },
+        {
+          "name": "messages",
+          "annotation": "List[ChatMessageInput]",
+          "default": "Field(default_factory=list)",
+          "line": 233
+        },
+        {
+          "name": "session_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 234
+        },
+        {
+          "name": "client_turn_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 240
+        },
+        {
+          "name": "parent_turn_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 246
+        },
+        {
+          "name": "ui_settings",
+          "annotation": "Optional[Dict[str, Any]]",
+          "default": "None",
+          "line": 252
+        },
+        {
+          "name": "graph_source",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(splash|json)$')",
+          "line": 253
+        },
+        {
+          "name": "json_graph_path",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 254
+        }
+      ]
+    },
+    {
+      "name": "UiTelemetryEvent",
+      "kind": "class",
+      "line": 257,
+      "end_line": 267,
+      "doc": "One browser interaction, never including draft keystrokes.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "type",
+          "annotation": "str",
+          "default": "Field(..., min_length=1, max_length=80)",
+          "line": 259
+        },
+        {
+          "name": "turn_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 260
+        },
+        {
+          "name": "ts",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 266
+        },
+        {
+          "name": "data",
+          "annotation": "Dict[str, Any]",
+          "default": "Field(default_factory=dict)",
+          "line": 267
+        }
+      ]
+    },
+    {
+      "name": "UiTelemetryBatch",
+      "kind": "class",
+      "line": 270,
+      "end_line": 272,
+      "doc": "Batch of UI events flushed by the browser.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "events",
+          "annotation": "List[UiTelemetryEvent]",
+          "default": "Field(default_factory=list)",
+          "line": 272
+        }
+      ]
+    },
+    {
+      "name": "AnnotationRequest",
+      "kind": "class",
+      "line": 275,
+      "end_line": 282,
+      "doc": "Human pass/fail label for one traced turn.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "turn_id",
+          "annotation": "str",
+          "default": "Field(..., min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 277
+        },
+        {
+          "name": "verdict",
+          "annotation": "str",
+          "default": "Field(..., pattern='^(pass|fail)$')",
+          "line": 278
+        },
+        {
+          "name": "failure_tags",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 279
+        },
+        {
+          "name": "note",
+          "annotation": "str",
+          "default": "''",
+          "line": 280
+        },
+        {
+          "name": "annotator",
+          "annotation": "str",
+          "default": "''",
+          "line": 281
+        },
+        {
+          "name": "ts",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 282
+        }
+      ]
+    },
+    {
+      "name": "GraphUploadRequest",
+      "kind": "class",
+      "line": 285,
+      "end_line": 288,
+      "doc": "Uploaded MatKG JSON graph and suggested filename.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "filename",
+          "annotation": "str",
+          "default": "'uploaded_graph.json'",
+          "line": 287
+        },
+        {
+          "name": "graph",
+          "annotation": "Dict[str, Any]",
+          "default": null,
+          "line": 288
+        }
+      ]
+    },
+    {
+      "name": "GraphUploadResponse",
+      "kind": "class",
+      "line": 291,
+      "end_line": 295,
+      "doc": "Saved uploaded graph payload and filesystem path.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "graph",
+          "annotation": "GraphPayload",
+          "default": null,
+          "line": 293
+        },
+        {
+          "name": "graph_path",
+          "annotation": "str",
+          "default": null,
+          "line": 294
+        },
+        {
+          "name": "filename",
+          "annotation": "str",
+          "default": null,
+          "line": 295
+        }
+      ]
+    },
+    {
+      "name": "GraphNodeSearchRequest",
+      "kind": "class",
+      "line": 298,
+      "end_line": 301,
+      "doc": "Text query and result limit for graph node search.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "query",
+          "annotation": "str",
+          "default": "Field(..., min_length=1, max_length=500)",
+          "line": 300
+        },
+        {
+          "name": "limit",
+          "annotation": "int",
+          "default": "Field(default=10, ge=1, le=25)",
+          "line": 301
+        }
+      ]
+    },
+    {
+      "name": "GraphNodeSearchResult",
+      "kind": "class",
+      "line": 304,
+      "end_line": 307,
+      "doc": "One ranked graph-node search hit.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "node",
+          "annotation": "GraphNode",
+          "default": null,
+          "line": 306
+        },
+        {
+          "name": "score",
+          "annotation": "float",
+          "default": null,
+          "line": 307
+        }
+      ]
+    },
+    {
+      "name": "GraphNodeSearchResponse",
+      "kind": "class",
+      "line": 310,
+      "end_line": 314,
+      "doc": "Node-search results with the retrieval backend used.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "query",
+          "annotation": "str",
+          "default": null,
+          "line": 312
+        },
+        {
+          "name": "retrieval_backend",
+          "annotation": "str",
+          "default": null,
+          "line": 313
+        },
+        {
+          "name": "results",
+          "annotation": "List[GraphNodeSearchResult]",
+          "default": "Field(default_factory=list)",
+          "line": 314
+        }
+      ]
+    },
+    {
+      "name": "LinkedCodeSnippetUpdate",
+      "kind": "class",
+      "line": 317,
+      "end_line": 326,
+      "doc": "Upsert or unlink a linked code snippet on a node.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 321
+        },
+        {
+          "name": "label",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 322
+        },
+        {
+          "name": "function_name",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 323
+        },
+        {
+          "name": "code_language",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 324
+        },
+        {
+          "name": "code_snippet",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 325
+        },
+        {
+          "name": "action",
+          "annotation": "str",
+          "default": "Field(default='upsert', alias='_action', pattern='^(upsert|unlink)$')",
+          "line": 326
+        }
+      ]
+    },
+    {
+      "name": "GraphRelationshipUpdate",
+      "kind": "class",
+      "line": 329,
+      "end_line": 334,
+      "doc": "Add or remove a relationship incident to a node.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "action",
+          "annotation": "str",
+          "default": "Field(..., pattern='^(add|remove)$')",
+          "line": 331
+        },
+        {
+          "name": "source",
+          "annotation": "str",
+          "default": "Field(..., min_length=1)",
+          "line": 332
+        },
+        {
+          "name": "predicate",
+          "annotation": "str",
+          "default": "Field(..., min_length=1)",
+          "line": 333
+        },
+        {
+          "name": "target",
+          "annotation": "str",
+          "default": "Field(..., min_length=1)",
+          "line": 334
+        }
+      ]
+    },
+    {
+      "name": "GraphNodeUpdateRequest",
+      "kind": "class",
+      "line": 337,
+      "end_line": 345,
+      "doc": "Partial patch for a splash-mode graph node.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "label",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 339
+        },
+        {
+          "name": "type",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 340
+        },
+        {
+          "name": "description",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 341
+        },
+        {
+          "name": "code_snippet",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 342
+        },
+        {
+          "name": "publications",
+          "annotation": "Optional[List[Dict[str, Any]]]",
+          "default": "None",
+          "line": 343
+        },
+        {
+          "name": "linked_code_snippets",
+          "annotation": "Optional[List[LinkedCodeSnippetUpdate]]",
+          "default": "None",
+          "line": 344
+        },
+        {
+          "name": "relationship_updates",
+          "annotation": "Optional[List[GraphRelationshipUpdate]]",
+          "default": "None",
+          "line": 345
+        }
+      ]
+    },
+    {
+      "name": "PublicationSearchRequest",
+      "kind": "class",
+      "line": 348,
+      "end_line": 352,
+      "doc": "Publication search query with optional OpenAlex lookup.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "query",
+          "annotation": "str",
+          "default": "Field(..., min_length=1)",
+          "line": 350
+        },
+        {
+          "name": "max_results",
+          "annotation": "int",
+          "default": "Field(default=20, ge=1, le=50)",
+          "line": 351
+        },
+        {
+          "name": "include_external",
+          "annotation": "bool",
+          "default": "False",
+          "line": 352
+        }
+      ]
+    },
+    {
+      "name": "PublicationSearchResponse",
+      "kind": "class",
+      "line": 355,
+      "end_line": 361,
+      "doc": "Ranked publications matching a search query.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "status",
+          "annotation": "str",
+          "default": null,
+          "line": 357
+        },
+        {
+          "name": "query",
+          "annotation": "str",
+          "default": null,
+          "line": 358
+        },
+        {
+          "name": "publications",
+          "annotation": "List[Dict[str, Any]]",
+          "default": "Field(default_factory=list)",
+          "line": 359
+        },
+        {
+          "name": "matched_node_ids",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 360
+        },
+        {
+          "name": "source",
+          "annotation": "str",
+          "default": null,
+          "line": 361
+        }
+      ]
+    },
+    {
+      "name": "SessionResetResponse",
+      "kind": "class",
+      "line": 364,
+      "end_line": 370,
+      "doc": "Result of clearing a chat session's memory and workflow.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "status",
+          "annotation": "str",
+          "default": null,
+          "line": 366
+        },
+        {
+          "name": "session_memory",
+          "annotation": "str",
+          "default": null,
+          "line": 367
+        },
+        {
+          "name": "session_memory_has_context",
+          "annotation": "bool",
+          "default": null,
+          "line": 368
+        },
+        {
+          "name": "workflow_state",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 369
+        },
+        {
+          "name": "workflow_phase",
+          "annotation": "str",
+          "default": "'idle'",
+          "line": 370
+        }
+      ]
+    },
+    {
+      "name": "SessionResetRequest",
+      "kind": "class",
+      "line": 373,
+      "end_line": 380,
+      "doc": "Optional session id for a session reset.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "session_id",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=64, pattern='^[A-Za-z0-9][A-Za-z0-9_-]*$')",
+          "line": 375
+        }
+      ]
+    },
+    {
+      "name": "AgentSettingsResponse",
+      "kind": "class",
+      "line": 383,
+      "end_line": 407,
+      "doc": "Current agent backend, model, graph, and workflow settings.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "backend",
+          "annotation": "str",
+          "default": null,
+          "line": 385
+        },
+        {
+          "name": "model",
+          "annotation": "str",
+          "default": null,
+          "line": 386
+        },
+        {
+          "name": "graph_source",
+          "annotation": "str",
+          "default": null,
+          "line": 387
+        },
+        {
+          "name": "workflow_mode",
+          "annotation": "str",
+          "default": "'agentic'",
+          "line": 388
+        },
+        {
+          "name": "extraction_mode",
+          "annotation": "str",
+          "default": "'targeted'",
+          "line": 389
+        },
+        {
+          "name": "targeted_max_pages",
+          "annotation": "int",
+          "default": "6",
+          "line": 390
+        },
+        {
+          "name": "json_graph_path",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 391
+        },
+        {
+          "name": "json_graph_paths",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 392
+        },
+        {
+          "name": "kg_query_max_nodes",
+          "annotation": "int",
+          "default": "DEFAULT_KG_QUERY_MAX_NODES",
+          "line": 393
+        },
+        {
+          "name": "kg_query_hops",
+          "annotation": "int",
+          "default": "DEFAULT_KG_QUERY_HOPS",
+          "line": 394
+        },
+        {
+          "name": "source_rag",
+          "annotation": "bool",
+          "default": "False",
+          "line": 395
+        },
+        {
+          "name": "use_live_tiled",
+          "annotation": "bool",
+          "default": "False",
+          "line": 396
+        },
+        {
+          "name": "tiled_uri",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 397
+        },
+        {
+          "name": "tiled_api_key_set",
+          "annotation": "bool",
+          "default": "False",
+          "line": 398
+        },
+        {
+          "name": "tiled_status",
+          "annotation": "str",
+          "default": "'disabled'",
+          "line": 399
+        },
+        {
+          "name": "tiled_error",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 400
+        },
+        {
+          "name": "available_json_graphs",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 401
+        },
+        {
+          "name": "available_graphs",
+          "annotation": "List[Dict[str, str]]",
+          "default": "Field(default_factory=list)",
+          "line": 403
+        },
+        {
+          "name": "selected_graph_ids",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 405
+        },
+        {
+          "name": "available_cborg_models",
+          "annotation": "List[str]",
+          "default": "Field(default_factory=list)",
+          "line": 406
+        },
+        {
+          "name": "default_ollama_model",
+          "annotation": "str",
+          "default": "'deepseek-r1:70b'",
+          "line": 407
+        }
+      ]
+    },
+    {
+      "name": "AgentSettingsUpdate",
+      "kind": "class",
+      "line": 410,
+      "end_line": 428,
+      "doc": "Partial update for runtime agent settings.",
+      "decorators": [],
+      "bases": [
+        "BaseModel"
+      ],
+      "fields": [
+        {
+          "name": "backend",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(cborg|ollama)$')",
+          "line": 412
+        },
+        {
+          "name": "model",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, min_length=1, max_length=200)",
+          "line": 413
+        },
+        {
+          "name": "graph_source",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(splash|json)$')",
+          "line": 414
+        },
+        {
+          "name": "workflow_mode",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(deterministic|agentic)$')",
+          "line": 415
+        },
+        {
+          "name": "extraction_mode",
+          "annotation": "Optional[str]",
+          "default": "Field(default=None, pattern='^(full|targeted)$')",
+          "line": 416
+        },
+        {
+          "name": "targeted_max_pages",
+          "annotation": "Optional[int]",
+          "default": "Field(default=None, ge=1, le=100)",
+          "line": 417
+        },
+        {
+          "name": "json_graph_path",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 418
+        },
+        {
+          "name": "json_graph_paths",
+          "annotation": "Optional[List[str]]",
+          "default": "None",
+          "line": 419
+        },
+        {
+          "name": "selected_graph_ids",
+          "annotation": "Optional[List[str]]",
+          "default": "None",
+          "line": 423
+        },
+        {
+          "name": "kg_query_max_nodes",
+          "annotation": "Optional[int]",
+          "default": "Field(default=None, ge=10, le=1000)",
+          "line": 424
+        },
+        {
+          "name": "kg_query_hops",
+          "annotation": "Optional[int]",
+          "default": "Field(default=None, ge=1, le=MAX_KG_QUERY_HOPS)",
+          "line": 425
+        },
+        {
+          "name": "source_rag",
+          "annotation": "Optional[bool]",
+          "default": "None",
+          "line": 426
+        },
+        {
+          "name": "use_live_tiled",
+          "annotation": "Optional[bool]",
+          "default": "None",
+          "line": 427
+        },
+        {
+          "name": "tiled_uri",
+          "annotation": "Optional[str]",
+          "default": "None",
+          "line": 428
+        }
+      ]
+    }
+  ],
+  "browser_files": [
+    {
+      "path": "ui/src/app/components/ChatSidebar.tsx",
+      "sha256": "b1ca378744c838dcd7b4c660c6834c85025e69be67c2ab701477c2090dd1848e",
+      "references": [
+        {
+          "line": 388,
+          "text": "const CITE_FOCUS_STORAGE_KEY = 'fair2wise.citeFocusNodeId';"
+        },
+        {
+          "line": 397,
+          "text": "return window.sessionStorage.getItem(CITE_FOCUS_STORAGE_KEY);"
+        },
+        {
+          "line": 405,
+          "text": "if (nodeId) window.sessionStorage.setItem(CITE_FOCUS_STORAGE_KEY, nodeId);"
+        },
+        {
+          "line": 406,
+          "text": "else window.sessionStorage.removeItem(CITE_FOCUS_STORAGE_KEY);"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/agentSettings.ts",
+      "sha256": "9f0cc14e9e3a88b84743b9eaf382fc5eaeba7b7d6cf91f7f653ec184a917c397",
+      "references": [
+        {
+          "line": 58,
+          "text": "const STORAGE_KEY = 'fair2wise-agent-settings-v1';"
+        },
+        {
+          "line": 59,
+          "text": "const GRAPH_LIST_CACHE_KEY = 'fair2wise-available-graphs-cache-v1';"
+        },
+        {
+          "line": 69,
+          "text": "const raw = window.localStorage.getItem(GRAPH_LIST_CACHE_KEY);"
+        },
+        {
+          "line": 87,
+          "text": "window.localStorage.setItem(GRAPH_LIST_CACHE_KEY, JSON.stringify(paths));"
+        },
+        {
+          "line": 175,
+          "text": "const raw = window.localStorage.getItem(STORAGE_KEY);"
+        },
+        {
+          "line": 217,
+          "text": "window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/chatSessions.test.ts",
+      "sha256": "efc5cfb1b715fc3fdf7497b46abe476b0606ef446e82145c403ffa3ba6e0b9f0",
+      "references": [
+        {
+          "line": 3,
+          "text": "CHAT_SESSIONS_STORAGE_KEY,"
+        },
+        {
+          "line": 4,
+          "text": "LEGACY_CHAT_STORAGE_KEY,"
+        },
+        {
+          "line": 32,
+          "text": "localStorage.setItem(LEGACY_CHAT_STORAGE_KEY, JSON.stringify(["
+        },
+        {
+          "line": 43,
+          "text": "expect(localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY)).not.toBeNull();"
+        },
+        {
+          "line": 44,
+          "text": "expect(localStorage.getItem(LEGACY_CHAT_STORAGE_KEY)).toBeNull();"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/chatSessions.ts",
+      "sha256": "2bce4613aadbcba18256c0b903f96f845ef0aaa7943b3a22e38b9ba5aabac053",
+      "references": [
+        {
+          "line": 42,
+          "text": "export const CHAT_SESSIONS_STORAGE_KEY = 'fair2wise.chat.sessions.v2';"
+        },
+        {
+          "line": 43,
+          "text": "export const LEGACY_CHAT_STORAGE_KEY = 'fair2wise.chat.messages.v1';"
+        },
+        {
+          "line": 196,
+          "text": "const raw = window.localStorage.getItem(CHAT_SESSIONS_STORAGE_KEY);"
+        },
+        {
+          "line": 209,
+          "text": "const legacy = window.localStorage.getItem(LEGACY_CHAT_STORAGE_KEY);"
+        },
+        {
+          "line": 232,
+          "text": "CHAT_SESSIONS_STORAGE_KEY,"
+        },
+        {
+          "line": 235,
+          "text": "window.localStorage.removeItem(LEGACY_CHAT_STORAGE_KEY);"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/data/liveAgent.ts",
+      "sha256": "5d63aceb4efa3642977bfa3f50e2ffb7ef2f211aadcd54dee253bda744ba0cdf",
+      "references": [
+        {
+          "line": 221,
+          "text": "export const AGENT_API_BASE = (import.meta.env.VITE_F2W_AGENT_API_URL || 'http://127.0.0.1:8090').replace(/\\/$/, '');"
+        },
+        {
+          "line": 315,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/settings`);"
+        },
+        {
+          "line": 328,
+          "text": "throw new Error(agentNetworkErrorMessage(AGENT_API_BASE, error));"
+        },
+        {
+          "line": 336,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/settings`, {"
+        },
+        {
+          "line": 354,
+          "text": "throw new Error(agentNetworkErrorMessage(AGENT_API_BASE, error));"
+        },
+        {
+          "line": 373,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/chat`, {"
+        },
+        {
+          "line": 393,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/publications/search`, {"
+        },
+        {
+          "line": 419,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/session/reset`, {"
+        },
+        {
+          "line": 438,
+          "text": "const response = await fetch("
+        },
+        {
+          "line": 439,
+          "text": "`${AGENT_API_BASE}/session/${encodeURIComponent(sessionId)}`,"
+        },
+        {
+          "line": 475,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/chat/stream`, {"
+        },
+        {
+          "line": 555,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/chat/action`, {"
+        },
+        {
+          "line": 569,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/chat/action/stream`, {"
+        },
+        {
+          "line": 626,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/graph`);"
+        },
+        {
+          "line": 641,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/graph/nodes/search`, {"
+        },
+        {
+          "line": 663,
+          "text": "const response = await fetch("
+        },
+        {
+          "line": 664,
+          "text": "`${AGENT_API_BASE}/graph/neighborhood/${encodeURIComponent(nodeId)}${query ? `?${query}` : ''}`,"
+        },
+        {
+          "line": 682,
+          "text": "const response = await fetch("
+        },
+        {
+          "line": 683,
+          "text": "`${AGENT_API_BASE}/graph/node/${encodeURIComponent(nodeId)}${query ? `?${query}` : ''}`,"
+        },
+        {
+          "line": 715,
+          "text": "const response = await fetch("
+        },
+        {
+          "line": 716,
+          "text": "`${AGENT_API_BASE}/graph/node/${encodeURIComponent(nodeId)}`,"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/publicationFavorites.ts",
+      "sha256": "d2a6970cc78ae96390d7f7ca36220f2d97e8884d930bb3171cb50af7b0103ef4",
+      "references": [
+        {
+          "line": 4,
+          "text": "const STORAGE_KEY = 'fair2wise-publication-favorites-v1';"
+        },
+        {
+          "line": 25,
+          "text": "const raw = window.localStorage.getItem(STORAGE_KEY);"
+        },
+        {
+          "line": 44,
+          "text": "window.localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));"
+        },
+        {
+          "line": 97,
+          "text": "if (event.key === STORAGE_KEY) sync();"
+        }
+      ]
+    },
+    {
+      "path": "ui/src/app/components/uiTelemetry.ts",
+      "sha256": "0df779ce2374ce5d0a124175a10a739a80a92ecfcbfd303d97b596bb03734ad2",
+      "references": [
+        {
+          "line": 1,
+          "text": "import { AGENT_API_BASE } from './data/liveAgent';"
+        },
+        {
+          "line": 53,
+          "text": "await fetch(`${AGENT_API_BASE}/telemetry/ui`, {"
+        },
+        {
+          "line": 80,
+          "text": "const response = await fetch(`${AGENT_API_BASE}/annotations`, {"
+        },
+        {
+          "line": 99,
+          "text": "const path = `${AGENT_API_BASE}/traces/${encodeURIComponent(turnId)}`;"
+        }
+      ]
+    }
+  ],
+  "vitest_test_files": [
+    "ui/src/app/components/ChatSidebar.test.ts",
+    "ui/src/app/components/GraphMockup.test.ts",
+    "ui/src/app/components/agentApiErrors.test.ts",
+    "ui/src/app/components/agentSettings.test.ts",
+    "ui/src/app/components/chatSessions.test.ts",
+    "ui/src/app/components/data/liveAgent.test.ts",
+    "ui/src/app/components/kgCatalog.test.ts",
+    "ui/src/app/components/kgCitations.test.ts",
+    "ui/src/app/components/kgNodeColors.test.ts",
+    "ui/src/app/components/publicationLinks.test.ts"
+  ],
+  "playwright_spec_files": [
+    "ui/e2e/chat-ask.spec.ts",
+    "ui/e2e/citations.spec.ts",
+    "ui/e2e/errors-responsive.spec.ts",
+    "ui/e2e/kg-viewer.spec.ts",
+    "ui/e2e/papers-bookmarks-docs.spec.ts",
+    "ui/e2e/pending-ingest.spec.ts",
+    "ui/e2e/sessions.spec.ts",
+    "ui/e2e/settings.spec.ts",
+    "ui/e2e/shell.spec.ts"
+  ],
+  "literal_response_statuses": [
+    "agent_unavailable",
+    "answered",
+    "awaiting_download_decision",
+    "awaiting_extraction_decision",
+    "candidate_search_error",
+    "debate_error",
+    "direct_response",
+    "download_error",
+    "download_query_needed",
+    "extraction_error",
+    "insufficient_evidence",
+    "insufficient_json_graph",
+    "kg_rebuild_error",
+    "max_rounds",
+    "no_download_candidates",
+    "no_new_papers",
+    "no_pending_action",
+    "no_unprocessed_pdfs",
+    "orchestration_stopped",
+    "retrieval_error",
+    "splash_error",
+    "stop_insufficient",
+    "stopped_by_user"
+  ],
+  "literal_progress_phases": [
+    "action_selected",
+    "awaiting_download_decision",
+    "awaiting_extraction_decision",
+    "candidate_search_result",
+    "candidate_search_started",
+    "debate_result",
+    "debate_started",
+    "download_result",
+    "download_started",
+    "extraction_result",
+    "extraction_started",
+    "graph_update",
+    "kg_rebuild_result",
+    "kg_rebuild_started",
+    "orchestrator_decision",
+    "reload_result",
+    "reload_started",
+    "retrieval_result",
+    "retrieval_started",
+    "splash_reimport_result",
+    "splash_reimport_started"
+  ],
+  "sse_events": [
+    "progress",
+    "complete",
+    "error"
+  ],
+  "runtime_tests_run": false,
+  "additional_progress_phases": [
+    "turn_started"
+  ],
+  "status_inventory_note": "Literal constants only; conditional/dynamic statuses require runtime characterization, not a closed enum.",
+  "v4_policy_reference": "DECISIONS.md D12-D20; source facts unchanged; implementation/exposure must follow current requirements"
+}

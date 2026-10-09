@@ -1,0 +1,483 @@
+{
+  "version": "8.0",
+  "cases": [
+    {
+      "case_id": "AUTH-01",
+      "suite": "authorization",
+      "title": "ALS: Unauthenticated requests cannot chat or invoke jobs",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Only login shell and non-sensitive health allowed; no model call or data effect before verified login.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-02",
+      "suite": "authorization",
+      "title": "ALS: Native Tiled non-admin chat succeeds",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Allowed chat/session/model preference and authorized read evidence work without graph writes.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-03",
+      "suite": "authorization",
+      "title": "ALS: Non-admin ingestion and batch work are denied",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Reject before job creation, downloads, extraction, model budget reservation or candidate mutation.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-04",
+      "suite": "authorization",
+      "title": "ALS: Non-admin graph edit and approval are denied",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Legacy routes, direct SDK, Tools and workers cannot bypass admin check.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-05",
+      "suite": "authorization",
+      "title": "ALS: Admin scoped edit and import succeed with audit",
+      "required_proposal": true,
+      "expected_rule": "ALS only: requested_by/approved_by are verified user subjects; executed_as is separate writer; IDs/readback preserved.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-06",
+      "suite": "authorization",
+      "title": "ALS: Forged roles and writer identity do not elevate user",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Ignore caller-declared is_admin, spoofed headers or writer account role in user resolution.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-07",
+      "suite": "authorization",
+      "title": "ALS: Expiry, logout, role downgrade and revocation block new effects",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Revalidate privileged authorization; fail closed without losing prior audit history.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-08",
+      "suite": "authorization",
+      "title": "ALS: Identity and publication grants are environment-bound",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Staging subject/token/receipt does not authorize production; no implicit alternate-server validation.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-09",
+      "suite": "authorization",
+      "title": "ALS: prefixed native Tiled sign-in works",
+      "required_proposal": true,
+      "expected_rule": "ALS only: usable /fair2wise sign-in/return path with no broad unauthenticated Tiled admin proxy or credential leakage. Local no-login behavior is covered by LOCAL cases.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-10",
+      "suite": "authorization",
+      "title": "ALS: FORGE delegation preserves caller capability",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Non-admin request inside admin-capable host cannot trigger ingestion/publication or expose full papers.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "AUTH-11",
+      "suite": "authorization",
+      "title": "ALS: Ordinary chat recording is not a Tiled write bypass",
+      "required_proposal": true,
+      "expected_rule": "ALS only: Session/audit bookkeeping is not silently published using the service admin key.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "deployment_profiles": [
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    {
+      "case_id": "REL-01",
+      "suite": "git_promotion",
+      "title": "Committed JSON equals validated graph bytes",
+      "required_proposal": true,
+      "expected_rule": "Commit/path/sha256 and staging PASS result identify identical snapshot/manifest; mutation forces new validation.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-02",
+      "suite": "git_promotion",
+      "title": "Production promotion invokes zero extraction or inference",
+      "required_proposal": true,
+      "expected_rule": "Transfer/export/import approved Git JSON without parser/model/acquisition/canonicalization calls.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-03",
+      "suite": "git_promotion",
+      "title": "Production import has independent authorization and receipt",
+      "required_proposal": true,
+      "expected_rule": "Staging receipt/approval cannot substitute for target-scoped production admin plan.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-04",
+      "suite": "git_promotion",
+      "title": "Git commit candidates exclude private source and secrets",
+      "required_proposal": true,
+      "expected_rule": "Check tracked graph/manifests without exposing full papers, crops, raw source bodies or credentials.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-05",
+      "suite": "git_promotion",
+      "title": "Tracked graph snapshots remain outside image layers",
+      "required_proposal": true,
+      "expected_rule": "All three variants exclude Git-tracked corpus data from build context/final and intermediate layers.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-06",
+      "suite": "git_promotion",
+      "title": "Private evidence dependencies are checked without hidden rebuild",
+      "required_proposal": true,
+      "expected_rule": "Missing private asset yields explicit blocked/degraded capability rather than model calls or source commit.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-07",
+      "suite": "git_promotion",
+      "title": "Admin edits produce a new committed promotion version",
+      "required_proposal": true,
+      "expected_rule": "Reconcile journal into new JSON, preserve previous version; older import cannot erase acknowledged edits.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-08",
+      "suite": "git_promotion",
+      "title": "Data rollback and code rollback are independent",
+      "required_proposal": true,
+      "expected_rule": "Select an earlier immutable data commit/hash with target approval, no history rewrite or automatic image coupling.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "REL-09",
+      "suite": "git_promotion",
+      "title": "FORGE merge status is independently recorded",
+      "required_proposal": true,
+      "expected_rule": "A tested patch is not reported merged; owner/Alex select target and authorize remote integration.",
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented"
+    },
+    {
+      "case_id": "LOCAL-01",
+      "suite": "local_access",
+      "title": "Local application opens fully without sign-in",
+      "required_proposal": true,
+      "expected_rule": "With no Tiled user account/session/token, /fair2wise opens without login redirect; all application controls are available. Repeat with expired and non-admin user credentials without restricting local capabilities.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-02",
+      "suite": "local_access",
+      "title": "All local administrative workflows are callable without login",
+      "required_proposal": true,
+      "expected_rule": "Without user sign-in, run literature discovery/intake/extraction/figure processing, Knowledge Operations, curation, explicit approval, versioned JSON creation, local Tiled publication and graph editing using isolated fixtures. All preserve their scientific/data contracts.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-03",
+      "suite": "local_access",
+      "title": "Local audit records operator rather than invented authentication",
+      "required_proposal": true,
+      "expected_rule": "Use deployment_profile=local and authorization_mode=local_trusted. requested_by=local-operator; approved_by becomes local-operator only after explicit approval. No authenticated user subject or role-check timestamp is fabricated; executed_as is the separate configured writer.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-04",
+      "suite": "local_access",
+      "title": "Local API SDK Tools and workers use the same access policy",
+      "required_proposal": true,
+      "expected_rule": "No user login is required for local direct Python/CLI, FastAPI, agent Tools or scoped background resume; work stays within the recorded local target/effects and respects cancellation and explicit approvals.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-05",
+      "suite": "local_access",
+      "title": "Local user identity lookup is not an access prerequisite",
+      "required_proposal": true,
+      "expected_rule": "Disable or mock user-identity/admin lookup as unavailable while preserving the local Tiled graph service. Local application capabilities and publication still work through service credentials, with zero user-role gate calls.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-06",
+      "suite": "local_access",
+      "title": "Backend service failure is not a user login challenge",
+      "required_proposal": true,
+      "expected_rule": "Missing/invalid local Tiled service credentials produce a truthful graph-operation failure, not a request for user sign-in. Unrelated local QA/JSON capabilities stay available; credentials are not returned to the browser.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-07",
+      "suite": "local_access",
+      "title": "Trusted access cannot be selected through an ALS request",
+      "required_proposal": true,
+      "expected_rule": "On als-dev and als-prod, client/header/model/payload claims of local_trusted, a local hostname or a saved local grant do not authorize privileged calls. Identity outages fail closed; ALS rejects local_trusted startup overrides.",
+      "deployment_profiles": [
+        "local",
+        "als-dev",
+        "als-prod"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-08",
+      "suite": "local_access",
+      "title": "Local exposure defaults to loopback",
+      "required_proposal": true,
+      "expected_rule": "The local launcher host bind defaults to 127.0.0.1 or equivalent loopback. Wider exposure requires explicit operator configuration and communicates that every reachable user has full application access.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-09",
+      "suite": "local_access",
+      "title": "Local full access does not disable scientific or source rules",
+      "required_proposal": true,
+      "expected_rule": "No-login local operation still enforces schema/evidence validation, immutable JSON versions, target-specific import checks, rate limits, explicit approval and private full-paper/crop handling. The agent cannot fabricate owner H-gate approval.",
+      "deployment_profiles": [
+        "local"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    },
+    {
+      "case_id": "LOCAL-10",
+      "suite": "local_access",
+      "title": "Local approvals do not authorize central publication",
+      "required_proposal": true,
+      "expected_rule": "A local job/ApprovalRecord/receipt cannot authorize staging or production import. Receiving ALS deployment checks its own profile, verified admin and target scope before invoking its configured writer.",
+      "deployment_profiles": [
+        "local",
+        "als-dev",
+        "als-prod"
+      ],
+      "expected_rule_status": "draft_requires_owner_case_approval",
+      "source_fixture": null,
+      "owner_approval_ref": null,
+      "execution_status": "not_run",
+      "verdict": null,
+      "status": "proposed_case_not_implemented",
+      "introduced_by": "D34"
+    }
+  ]
+}

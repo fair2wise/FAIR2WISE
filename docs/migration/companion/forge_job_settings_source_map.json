@@ -1,0 +1,149 @@
+{
+  "archive": "forge_rsoxs_analysis-main(2).zip",
+  "archive_sha256": "97e4b2bf151f9ecf141f206cb939206bd879656ac29a9362cc5a38900c8c365d",
+  "archive_recorded_commit": "f1cd2ded95f26d8e43569dc94613b1dfde6b2045",
+  "inspection": "static call-path inspection",
+  "runtime_tests_executed": false,
+  "items": [
+    {
+      "id": "FGS-01",
+      "repository": "FORGE",
+      "path": "frontend/src/components/KG/FolderIngestPanel.tsx",
+      "sha256": "40b25dafd49842bccc6e9e95d778ff2e0f7daeb3d096b0f33a0f328ad5346009",
+      "start_line": 73,
+      "end_line": 125,
+      "finding": "UI resolves the KG model and includes it in the start request.",
+      "excerpt": "export function FolderIngestPanel() {\n  const [folder, setFolder] = useState('data/paper_cache');\n  const [apply, setApply] = useState(false);\n  const [limit, setLimit] = useState(0);\n  const [force, setForce] = useState(false);\n  const [concurrency, setConcurrency] = useState(16);\n  const [thinkingBudget, setThinkingBudget] = useState(256);\n  const [output, setOutput] = useState<'json' | 'tiled'>('json');\n  const [corpusManifest, setCorpusManifest] = useState(false);\n  const [priority, setPriority] = useState<'source' | 'scattering'>('scattering');\n  const [status, setStatus] = useState<FolderIngestStatus | null>(null);\n  const [error, setError] = useState('');\n  const [stopping, setStopping] = useState(false);\n  const [browsing, setBrowsing] = useState(false);\n  const selectedModel = useResolvedModel('kg');\n\n  const isRunning = status?.running === true;\n\n  const refresh = useCallback(async () => {\n    try {\n      setStatus(await getFolderIngestStatus());\n    } catch {\n      // A poll failure is not worth a banner: the next tick usually succeeds,\n      // and the start button surfaces anything that actually blocks a run.\n    }\n  }, []);\n\n  useEffect(() => {\n    void refresh();\n  }, [refresh]);\n\n  useEffect(() => {\n    const id = setInterval(() => void refresh(), isRunning ? POLL_MS : IDLE_POLL_MS);\n    return () => clearInterval(id);\n  }, [isRunning, refresh]);\n\n  const handleStart = async () => {\n    setError('');\n    try {\n      await startFolderIngest({\n        folder: folder.trim(),\n        apply,\n        limit: limit || undefined,\n        force,\n        extract_entities: true,\n        model: selectedModel || undefined,\n        concurrency,\n        thinking_budget: thinkingBudget,\n        output,\n        corpus_manifest: corpusManifest,\n        priority,\n      });\n      await refresh();"
+    },
+    {
+      "id": "FGS-02",
+      "repository": "FORGE",
+      "path": "frontend/src/lib/knowledgeAgentApi.ts",
+      "sha256": "7cc3110150de1d0b07153f77761fa89657845237a9a51b5cdfc938a4e898e5eb",
+      "start_line": 1718,
+      "end_line": 1753,
+      "finding": "Client serializes start parameters; it does not update a running job when the selector changes.",
+      "excerpt": "export async function startFolderIngest(\n  params: FolderIngestParams,\n): Promise<Record<string, unknown>> {\n  const url = new URL(`${AGENT_URL}/api/graph/ingest_folder`);\n  url.searchParams.set('folder', params.folder);\n  if (params.apply != null) url.searchParams.set('apply', String(params.apply));\n  if (params.limit) url.searchParams.set('limit', String(params.limit));\n  if (params.force != null) url.searchParams.set('force', String(params.force));\n  if (params.extract_entities != null) {\n    url.searchParams.set('extract_entities', String(params.extract_entities));\n  }\n  if (params.model) url.searchParams.set('model', params.model);\n  if (params.concurrency != null) url.searchParams.set('concurrency', String(params.concurrency));\n  if (params.thinking_budget != null) url.searchParams.set('thinking_budget', String(params.thinking_budget));\n  if (params.output) url.searchParams.set('output', params.output);\n  if (params.corpus_manifest != null) url.searchParams.set('corpus_manifest', String(params.corpus_manifest));\n  if (params.priority) url.searchParams.set('priority', params.priority);\n  if (params.selection) url.searchParams.set('selection', params.selection);\n  const res = await fetch(url.toString(), { method: 'POST', headers: adminHeaders() });\n  if (!res.ok) {\n    // THE BODY CARRIES THE REASON, and it is the useful half. A containment\n    // refusal answers 400 with the allowed directories listed; showing only\n    // \"HTTP 400\" would leave someone guessing at a path the server could have\n    // told them.\n    let detail = '';\n    try {\n      detail = ((await res.json()) as { detail?: string }).detail ?? '';\n    } catch {\n      // non-JSON body; the status alone will have to do\n    }\n    throw new Error(detail || `HTTP ${res.status}`);\n  }\n  return res.json() as Promise<Record<string, unknown>>;\n}\n\n/** Poll the folder-ingest job. */"
+    },
+    {
+      "id": "FGS-03",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 3416,
+      "end_line": 3472,
+      "finding": "Start records requested model and relevant job settings, then passes them to the worker.",
+      "excerpt": "    config = {\"folder\": str(resolved), \"apply\": apply, \"glob\": glob, \"limit\": limit,\n              \"force\": force, \"offline\": offline, \"extract_entities\": extract_entities,\n              \"simulate\": simulate, \"corpus_manifest\": corpus_manifest, \"priority\": priority,\n              \"model\": model, \"concurrency\": concurrency, \"output\": output,\n              \"thinking_budget\": thinking_budget,\n              \"_pipeline\": _ingest_pipeline_revision()}\n    owner = uuid.uuid4().hex\n    job_id = _ingest_journal().acquire(config, owner)\n    if job_id is None:\n        return {\"started\": False, \"reason\": \"already_running\"}\n\n    if output == \"json\":\n        _ingest_journal().adopt_tiled_checkpoints(job_id, config)\n\n    _folder_ingest_job.update(\n        running=True,\n        folder=str(resolved),\n        applied=apply,\n        progress=0,\n        total=0,\n        current=\"\",\n        active_files=[],\n        concurrency=concurrency,\n        thinking_budget=thinking_budget,\n        output=output,\n        priority=priority if corpus_manifest else \"source\",\n        counts={},\n        verdicts=[],\n        error=None,\n        stop_requested=False,\n        started_at=time.time(),\n        elapsed_s=0.0,\n        papers_per_min=None,\n        eta_s=None,\n        last_progress_at=time.time(),\n        rate_sample_started_at=None,\n        rate_sample_start_progress=None,\n        model=model or \"\",\n    )\n    asyncio.create_task(\n        _run_folder_ingest_background(\n            str(resolved),\n            apply=apply,\n            glob=glob,\n            limit=limit,\n            force=force,\n            offline=offline,\n            extract_entities=extract_entities,\n            simulate=simulate,\n            corpus_manifest=corpus_manifest,\n            priority=priority,\n            model=model,\n            job_id=job_id, owner=owner, concurrency=concurrency, output=output,\n            thinking_budget=thinking_budget,\n        )\n    )\n    return {\"started\": True, **_folder_ingest_job}"
+    },
+    {
+      "id": "FGS-04",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/ingest_journal.py",
+      "sha256": "52368e5058354047fb602bdfb4f9a3096aea4555dd4d6cdcf02487757efc4442",
+      "start_line": 98,
+      "end_line": 126,
+      "finding": "Journal keys the sorted serialized configuration and stores it.",
+      "excerpt": "    def acquire(self, config: dict[str, Any], owner: str, lease_seconds: float = 120) -> str | None:\n        payload = json.dumps(config, sort_keys=True)\n        key = hashlib.sha256(payload.encode()).hexdigest()\n        now = time.time()\n        with self.connect() as con:\n            con.execute(\"BEGIN IMMEDIATE\")\n            # The endpoint promises one folder job, across all API workers.\n            busy = con.execute(\n                \"SELECT id FROM jobs WHERE state='running' AND lease_until>?\", (now,)\n            ).fetchone()\n            if busy:\n                return None\n            previous = con.execute(\"SELECT state FROM jobs WHERE id=?\", (key,)).fetchone()\n            # Force starts a fresh completed job. Stopped and failed jobs keep\n            # successful paper checkpoints so an operator can resume a long\n            # corpus run without re-extracting the papers already staged.\n            if config.get(\"force\") and previous and previous[\"state\"] not in {\n                \"running\", \"stopped\", \"failed\"\n            }:\n                con.execute(\"DELETE FROM stages WHERE job_id=?\", (key,))\n            con.execute(\n                \"\"\"INSERT INTO jobs VALUES (?, ?, 'running', ?, ?, 0, ?)\n                ON CONFLICT(id) DO UPDATE SET state='running', owner=excluded.owner,\n                lease_until=excluded.lease_until, stop_requested=0, updated=excluded.updated\"\"\",\n                (key, payload, owner, now + lease_seconds, now),\n            )\n        return key\n\n    def heartbeat(self, key: str, owner: str) -> bool:"
+    },
+    {
+      "id": "FGS-05",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 3167,
+      "end_line": 3243,
+      "finding": "Worker closure forwards its model argument for each paper.",
+      "excerpt": "async def _run_folder_ingest_background(\n    folder: str,\n    *,\n    apply: bool,\n    glob: str,\n    limit: int,\n    force: bool,\n    offline: bool,\n    extract_entities: bool,\n    simulate: bool = False,\n    corpus_manifest: bool = False,\n    priority: Literal[\"source\", \"scattering\"] = \"source\",\n    model: str | None = None,\n    job_id: str = \"\",\n    owner: str = \"\",\n    concurrency: int = 1,\n    thinking_budget: int | None = None,\n    output: str = \"tiled\",\n) -> None:\n    \"\"\"Drive `ingest_folder`, publishing each verdict as it lands.\"\"\"\n    from als_knowledge_agent.graph.folder_ingest import ingest_folder, list_pdfs\n\n    manifest_queue = None\n    try:\n        if corpus_manifest:\n            from als_knowledge_agent.graph.corpus_manifest import load_corpus_queue\n\n            repository = Path(__file__).resolve().parents[3]\n            manifest_queue = load_corpus_queue(\n                folder,\n                repository / \"docs\" / \"validation\" / \"als_corpus_scan.json\",\n                repository / \"docs\" / \"validation\" / \"als_corpus_metadata.json\",\n                priority=priority,\n            )\n            if manifest_queue.missing:\n                examples = \", \".join(manifest_queue.missing[:3])\n                raise ValueError(\n                    f\"corpus manifest has {len(manifest_queue.missing)} missing files; \"\n                    f\"examples: {examples}\"\n                )\n    except Exception as exc:  # noqa: BLE001 - close the job on any preflight failure\n        logger.warning(\"Folder ingest preflight failed: %s\", exc)\n        _folder_ingest_job.update(running=False, error=str(exc), active_files=[])\n        if job_id:\n            journal = _ingest_journal()\n            journal.save(job_id, \"job\", \"telemetry\", dict(_folder_ingest_job))\n            journal.finish(job_id, owner, \"failed\")\n        return\n\n    async def _ingest_one_async(doi: str) -> dict[str, Any]:\n        # The handler directly, as `upload_paper` does: a plain coroutine on\n        # this app with no request-scoped dependencies.\n        publication = await add_publication(\n            AddPublicationRequest(\n                identifier=doi,\n                output=output,\n                parse_pdf=True,\n                extract_entities=extract_entities,\n                simulate=simulate,\n                allow_without_openalex=offline,\n                model=model,\n                extraction_thinking_budget=thinking_budget,\n            )\n        )\n        return publication if isinstance(publication, dict) else {}\n\n    journal = _ingest_journal() if job_id else None\n    loop = asyncio.get_running_loop()\n\n    def _ingest_one(doi: str) -> dict[str, Any]:\n        # `ingest_folder` is synchronous (its vetting is blocking file I/O), so\n        # it is driven in a worker thread and hands each ingest BACK to this\n        # loop. Running `add_publication` on the worker thread instead would\n        # need a second event loop and a second httpx client per paper.\n        return asyncio.run_coroutine_threadsafe(\n            _ingest_one_async(doi), loop\n        ).result()"
+    },
+    {
+      "id": "FGS-06",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 3048,
+      "end_line": 3060,
+      "finding": "Pipeline fingerprint includes default model, parser and an environment-supplied model revision.",
+      "excerpt": "def _ingest_pipeline_revision() -> dict[str, Any]:\n    from als_knowledge_agent.graph.enrichment_agent import _current_parser\n    from als_knowledge_agent.graph.kg_writer import EXTRACTION_VERSION\n    from als_knowledge_agent.graph.llm_defaults import default_ollama_model\n\n    return {\n        \"extraction_version\": EXTRACTION_VERSION, \"parser_adapter\": 4,\n        \"structured_output\": 1,\n        \"parser\": _current_parser(), \"parser_worker\": os.getenv(\"ALS_PARSER_PYTHON\", \"\"),\n        \"formulas\": os.getenv(\"ALS_PARSER_FORMULAS\", \"1\"),\n        \"default_model\": default_ollama_model(),\n        \"model_revision\": os.getenv(\"ALS_EXTRACTION_MODEL_REVISION\", \"\"),\n    }"
+    },
+    {
+      "id": "FGS-07",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 3063,
+      "end_line": 3099,
+      "finding": "Recovery reuses stored request config, removes _pipeline and restarts through the start functions.",
+      "excerpt": "@app.on_event(\"startup\")\nasync def _resume_interrupted_folder_ingest():\n    \"\"\"Recover after a lease expires; multiple API workers arbitrate in SQLite.\n\n    The journal reads run in a worker thread: a SQLite call made on the event\n    loop froze the whole service (every route, /health included) whenever the\n    open queued behind other threads' SQLite work.\n    \"\"\"\n    async def recover():\n        while True:\n            previous = None\n            try:\n                previous = await asyncio.to_thread(lambda: _ingest_journal().recoverable())\n                if previous and previous[\"state\"] == \"running\" and previous[\"lease_until\"] < time.time():\n                    if not previous[\"stop_requested\"]:\n                        config = dict(previous[\"config\"])\n                        config.pop(\"_pipeline\", None)\n                        if config.pop(\"kind\", \"folder\") == \"pdf_parse\":\n                            restarted = await start_pdf_parse(**config)\n                        else:\n                            restarted = await start_folder_ingest(**config)\n                        current = await asyncio.to_thread(lambda: _ingest_journal().latest())\n                        if restarted.get(\"started\") and current and current[\"id\"] != previous[\"id\"]:\n                            await asyncio.to_thread(\n                                lambda: _ingest_journal().finish(previous[\"id\"], previous[\"owner\"], \"superseded\")\n                            )\n            except HTTPException:\n                # A removed or no-longer-allowed folder cannot resume. Do not\n                # let it terminate recovery for other interrupted jobs.\n                if previous:\n                    await asyncio.to_thread(\n                        lambda: _ingest_journal().finish(previous[\"id\"], previous[\"owner\"], \"failed\")\n                    )\n                logger.warning(\"Interrupted ingest request is no longer valid\", exc_info=True)\n            except Exception:\n                logger.warning(\"Ingest recovery failed; retrying in 30 seconds\", exc_info=True)\n            await asyncio.sleep(30)"
+    },
+    {
+      "id": "FGS-08",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 3770,
+      "end_line": 3793,
+      "finding": "Bulk PDF parse journals and passes the model argument to its background task.",
+      "excerpt": "    model: str | None = Query(default=None, description=\"Ollama model for LLM entity extraction\"),\n) -> dict[str, Any]:\n    \"\"\"Start bulk PDF download + section/figure extraction for top-K papers.\"\"\"\n    if _pdf_parse_job[\"running\"]:\n        return {\"started\": False, \"reason\": \"already_running\", **_pdf_parse_job}\n    config = {\"kind\": \"pdf_parse\", \"top_k\": top_k, \"query_filter\": query_filter,\n              \"oa_only\": oa_only, \"extract_entities\": extract_entities, \"model\": model,\n              \"_pipeline\": _ingest_pipeline_revision()}\n    owner = uuid.uuid4().hex\n    job_id = _ingest_journal().acquire(config, owner)\n    if job_id is None:\n        return {\"started\": False, \"reason\": \"already_running\"}\n    _pdf_parse_job[\"running\"] = True\n    _pdf_parse_job[\"error\"] = None\n    _pdf_parse_job[\"stage\"] = \"\"\n    _pdf_parse_job[\"message\"] = \"\"\n    _pdf_parse_job[\"progress\"] = 0\n    _pdf_parse_job[\"total\"] = 0\n    _pdf_parse_job[\"sections_created\"] = 0\n    _pdf_parse_job[\"figures_created\"] = 0\n    _pdf_parse_job[\"parse_failures\"] = 0\n    asyncio.create_task(_run_pdf_parse_background(\n        top_k, query_filter, oa_only, extract_entities, model, job_id=job_id, owner=owner))\n    return {\"started\": True, **_pdf_parse_job}"
+    },
+    {
+      "id": "FGS-09",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 2905,
+      "end_line": 2937,
+      "finding": "PDF background worker passes its model into run_pdf_parse.",
+      "excerpt": "async def _run_pdf_parse_background(\n    top_k: int,\n    query_filter: str | None,\n    oa_only: bool = True,\n    extract_entities: bool = True,\n    model: str | None = None,\n    job_id: str = \"\", owner: str = \"\",\n) -> None:\n    from als_knowledge_agent.graph.enrichment_agent import run_pdf_parse\n\n    _pdf_parse_job[\"running\"] = True\n    _pdf_parse_job[\"error\"] = None\n    _pdf_parse_job[\"sections_created\"] = 0\n    _pdf_parse_job[\"figures_created\"] = 0\n    _pdf_parse_job[\"parse_failures\"] = 0\n    journal = _ingest_journal() if job_id else None\n    async def renew():\n        from als_knowledge_agent.graph.enrichment_agent import request_pdf_parse_stop\n        while journal:\n            if not journal.heartbeat(job_id, owner) or journal.stopped(job_id):\n                request_pdf_parse_stop()\n                return\n            await asyncio.sleep(30)\n    heartbeat = asyncio.create_task(renew())\n    try:\n        async for event in run_pdf_parse(\n            top_k=top_k,\n            query_filter=query_filter,\n            oa_only=oa_only,\n            extract_entities=extract_entities,\n            model=model,\n            **({\"journal\": journal, \"job_id\": job_id} if journal else {}),\n        ):"
+    },
+    {
+      "id": "FGS-10",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/pdf_extraction.py",
+      "sha256": "b83bc6c5bc84b25fc0be2d07ccabcc063f59a330c537305e63935474f7455a2b",
+      "start_line": 348,
+      "end_line": 365,
+      "finding": "Omitted model is resolved with default_ollama_model at the inference path.",
+      "excerpt": "    Args:\n        section_text: One bounded text chunk; sent in full.\n        candidate_hits: Hits produced by :func:`extract_keywords`.\n        model: Model name, optionally ``vllm:``-prefixed to route to vLLM\n            instead of Ollama.  Defaults to the shared resolution in\n            :func:`~als_knowledge_agent.graph.llm_defaults.default_ollama_model`\n            (``OLLAMA_MODEL``, else the project default). This module used to\n            carry its own ``\"llama3.2\"`` fallback, which meant a deployment that\n            never set the variable ran THIS extractor on a different model from\n            every other stage, with nothing reporting the difference.\n\n    Returns:\n        A :class:`RefinedExtraction` populated from the LLM response, or an\n        empty one on any exception.\n    \"\"\"\n    model_name = model or default_ollama_model()\n    use_vllm = model_name.startswith(\"vllm:\")\n    if use_vllm:"
+    },
+    {
+      "id": "FGS-11",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/pdf_extraction.py",
+      "sha256": "b83bc6c5bc84b25fc0be2d07ccabcc063f59a330c537305e63935474f7455a2b",
+      "start_line": 410,
+      "end_line": 426,
+      "finding": "Provider transport settings can be read from the server environment.",
+      "excerpt": "    try:\n        if use_vllm:\n            import os as _os\n\n            base = _os.environ.get(\"VLLM_BASE_URL\", \"http://127.0.0.1:8000/v1\")\n            from forge.agents.literature.structured_output import vllm_extraction_options\n            llm = ChatOpenAI(\n                model=model_name,\n                base_url=base,\n                api_key=_os.environ.get(\"VLLM_API_KEY\") or \"not-needed\",\n                **vllm_extraction_options(\n                    model_name, _ENTITY_SCHEMA, thinking_budget=thinking_budget,\n                ),\n            )\n        else:\n            # num_predict matches the vLLM cap above, for the same reason.\n            llm = ChatOllama(model=model_name, temperature=0, num_predict=1024)"
+    },
+    {
+      "id": "FGS-12",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/graph/llm_defaults.py",
+      "sha256": "e702bcc986e3296a90801fcaabc9ca3f4a7cb2086c300c7699ee444e5eedc4cb",
+      "start_line": 38,
+      "end_line": 53,
+      "finding": "Default model helper consults the current process environment.",
+      "excerpt": "DEFAULT_OLLAMA_MODEL = \"nemotron3:33b\"\n\n\ndef default_ollama_model() -> str:\n    \"\"\"The Ollama model to use when a caller did not name one.\n\n    Returns:\n        ``OLLAMA_MODEL`` from the environment when it is set to a non-blank\n        value, otherwise :data:`DEFAULT_OLLAMA_MODEL`.\n\n    Note:\n        Resolved on every call. A module-level constant would freeze whatever\n        the environment held at import time, which is the specific bug this\n        module replaces.\n    \"\"\"\n    return os.environ.get(\"OLLAMA_MODEL\", \"\").strip() or DEFAULT_OLLAMA_MODEL"
+    },
+    {
+      "id": "FGS-13",
+      "repository": "FORGE",
+      "path": "als_knowledge_agent/src/als_knowledge_agent/server.py",
+      "sha256": "9dedc0c0df05e0e7d56f67b1e64dc60e15a63a05ca66d4b0f0186640f80a3236",
+      "start_line": 3594,
+      "end_line": 3632,
+      "finding": "Separate paid resolver controls can pause/drain a worker; not all operational controls are immutable.",
+      "excerpt": "class CBorgControlRequest(BaseModel):\n    \"\"\"Paid resolver switch and cumulative spending ceiling.\"\"\"\n\n    enabled: bool\n    budget_cap_usd: float = Field(ge=1, le=10_000, allow_inf_nan=False)\n\n\n@app.post(\"/api/graph/uncertainty/cborg/control\", dependencies=[Depends(require_admin_key)])\nasync def set_cborg_control(body: CBorgControlRequest) -> dict[str, Any]:\n    \"\"\"Pause or start paid resolution without disturbing local review.\"\"\"\n    from als_knowledge_agent.graph.cborg_control import (\n        apply_control_environment,\n        read_control,\n        write_control,\n    )\n    from als_knowledge_agent.graph.cborg_resolution import resolution_worker\n\n    current = read_control()\n    task = getattr(app.state, \"scientific_resolution_task\", None)\n    active = task is not None and not task.done()\n    if current[\"enabled\"] and body.budget_cap_usd != current[\"budget_cap_usd\"]:\n        raise HTTPException(409, detail=\"Pause CBorg before changing the budget\")\n    if body.enabled and not current[\"enabled\"]:\n        if active:\n            raise HTTPException(409, detail=\"Previous CBorg requests are still draining\")\n        if os.getenv(\"ALS_SECOND_PASS_PROVIDER\", \"cborg\").strip().lower() != \"cborg\":\n            raise HTTPException(409, detail=\"CBorg is not the configured second-pass provider\")\n        if not os.getenv(\"CBORG_API_KEY\"):\n            raise HTTPException(409, detail=\"CBorg API key is not configured\")\n    write_control(body.enabled, body.budget_cap_usd)\n    apply_control_environment(body.model_dump())\n    if body.enabled and not active:\n        app.state.cborg_resolution_stop = asyncio.Event()\n        app.state.scientific_resolution_task = asyncio.create_task(\n            resolution_worker(app.state.cborg_resolution_stop)\n        )\n    elif not body.enabled and active:\n        app.state.cborg_resolution_stop.set()\n    return await scientific_uncertainty_summary()"
+    },
+    {
+      "id": "FGS-14",
+      "repository": "FORGE",
+      "path": "docs/json-paper-staging.md",
+      "sha256": "f4ea38369695a053a2eac515b3988e80178130cc72ece45417edbfd31e4a4cb4",
+      "start_line": 1,
+      "end_line": 50,
+      "finding": "Donor has JSON staging and later model-free publication, but this is not the same schema as the F2W KG JSON.",
+      "excerpt": "# Parse and extract first, publish to Tiled later\n\nSet `ALS_INGEST_OUTPUT=json` for bulk folder ingestion, or pass `output=json`\nto `POST /api/graph/ingest_folder`. Keep `simulate=false`. The single-paper\nendpoint accepts the same `output` value in its request body. The default\nremains `tiled` for installations that have not selected staging.\n\nJSON mode does not open the graph store. It resolves metadata, parses the PDF,\nextracts entities, and writes an atomic `paper.json` under\n`$ALS_PAPER_CACHE_DIR/staged_papers/<package-id>/`. Override the root with\n`ALS_PAPER_STAGING_DIR`. Each package includes:\n\n- Bibliographic metadata, parser/model configuration, source checksum and timings.\n- Full parsed text, sections, figure/table geometry and captions.\n- Per-section entities, source mentions, identities and chunk coverage.\n- An `assets/` directory containing independently copied PDF, figure, table and\n  figure-text-span files, with checksums and relative references in the JSON.\n\nThe existing successful-chunk and parser caches remain reusable. Failed model\nchunks produce an explicitly incomplete package and a failed journal verdict;\nthey are not counted as staged. Evidence validation and confidence thresholds\nare unchanged. Vocabulary observations and uncertainty cases still enter the\nlocal SQLite stores; global vocabulary promotion is deferred from this path.\n\nWhen recovering an interrupted Tiled job as JSON with the same source, model\nand pipeline configuration, completed Tiled checkpoints are carried forward.\nStreamlit reports those as `ingested` and newly saved packages as `staged`.\nPreviously completed Tiled papers are not reprocessed just to create packages.\nJSON completion is never treated as Tiled completion.\n\nSet `ALS_INGEST_PRIORITY=scattering` to process RSoXS mentions first, then\nnamed scattering techniques (including GISAXS, GIWAXS and SAXS), then generic\nscattering matches, and finally the remaining corpus. This uses the reviewed\ncorpus scan and metadata, preserves every source and DOI, and keeps completion\ncheckpoints valid. Restart the API to apply a new order to a running job.\nThe default `source` preserves the original manifest order.\n\n## Import when ready\n\nFrom the repository root, with the intended graph settings in `.env`, validate:\n\n```bash\n.venv/bin/python -m als_knowledge_agent.graph.import_staged --dry-run\n```\n\nThen explicitly publish (optionally use `--limit 10` for a first batch):\n\n```bash\n.venv/bin/python -m als_knowledge_agent.graph.import_staged --apply\n```"
+    }
+  ]
+}

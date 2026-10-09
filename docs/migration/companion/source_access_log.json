@@ -1,0 +1,57 @@
+{
+  "prepared_on": "2026-10-07",
+  "target": "https://github.com/fair2wise/FAIR2WISE",
+  "branch": "rsoxs",
+  "ref": "refs/heads/rsoxs",
+  "branch_commit_resolved": false,
+  "container_attempts": [
+    {
+      "name": "branch",
+      "url": "https://api.github.com/repos/fair2wise/FAIR2WISE/branches/rsoxs",
+      "error": "HTTPSConnectionPool(host='api.github.com', port=443): Max retries exceeded with url: /repos/fair2wise/FAIR2WISE/branches/rsoxs (Caused by NameResolutionError(\"HTTPSConnection(host='api.github.com', port=443): Failed to resolve 'api.github.com' ([Errno -3] Temporary failure in name resolution)\"))"
+    },
+    {
+      "name": "raw_readme",
+      "url": "https://raw.githubusercontent.com/fair2wise/FAIR2WISE/rsoxs/README.md",
+      "error": "HTTPSConnectionPool(host='raw.githubusercontent.com', port=443): Max retries exceeded with url: /fair2wise/FAIR2WISE/rsoxs/README.md (Caused by NameResolutionError(\"HTTPSConnection(host='raw.githubusercontent.com', port=443): Failed to resolve 'raw.githubusercontent.com' ([Errno -3] Temporary failure in name resolution)\"))"
+    },
+    {
+      "name": "archive",
+      "url": "https://codeload.github.com/fair2wise/FAIR2WISE/zip/refs/heads/rsoxs",
+      "error": "HTTPSConnectionPool(host='codeload.github.com', port=443): Max retries exceeded with url: /fair2wise/FAIR2WISE/zip/refs/heads/rsoxs (Caused by NameResolutionError(\"HTTPSConnection(host='codeload.github.com', port=443): Failed to resolve 'codeload.github.com' ([Errno -3] Temporary failure in name resolution)\"))"
+    }
+  ],
+  "web_attempts": [
+    {
+      "url": "https://github.com/fair2wise/FAIR2WISE/tree/rsoxs",
+      "outcome": "cache miss"
+    },
+    {
+      "url": "https://github.com/fair2wise/FAIR2WISE/blob/rsoxs/README.md",
+      "outcome": "cache miss"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/fair2wise/FAIR2WISE/refs/heads/rsoxs/README.md",
+      "outcome": "cache miss"
+    },
+    {
+      "url": "https://api.github.com/repos/fair2wise/FAIR2WISE/git/ref/heads/rsoxs",
+      "outcome": "not accessible"
+    },
+    {
+      "url": "https://codeload.github.com/fair2wise/FAIR2WISE/zip/refs/heads/rsoxs",
+      "outcome": "not accessible; downloader also refused inaccessible URL"
+    },
+    {
+      "url": "https://github.com/fair2wise/FAIR2WISE",
+      "outcome": "root README available; explicitly not treated as rsoxs"
+    }
+  ],
+  "v3_resolution": {
+    "method": "user_uploaded_archive",
+    "file": "FAIR2WISE-rsoxs.zip",
+    "sha256": "d3e9d821e7878211f08399c3f69e7d9cf0f55f8a7f17397e737fa3a4292077a6",
+    "archive_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "status": "static_source_gap_resolved; real Git/runtime verification pending"
+  }
+}
