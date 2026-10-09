@@ -1,0 +1,1986 @@
+{
+ "record": "T00 F2W baseline parity inventory",
+ "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+ "generated_on": "2026-10-09",
+ "disposition_note": "Default dispositions proposed by the integration agent for owner review at H0. No disposition authorizes removal; legacy modules need explicit deletion approval (plan T16).",
+ "anchors": [
+  {
+   "id": "B01",
+   "title": "Actual API and unchanged browser contract",
+   "source_file": "app/modules/f2w_agent/api.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/api/main.py + app/api/compat/ + app/modules/application.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 74
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_f2w_api.py",
+    "tests/test_agent_settings.py"
+   ]
+  },
+  {
+   "id": "B02",
+   "title": "Pending actions, sessions and UI graph updates",
+   "source_file": "app/modules/f2w_agent/api.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/application.py + agent_runtime/ + jobs/",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 53
+   },
+   "ui_tests_passed": [
+    "ui/e2e/pending-ingest.spec.ts",
+    "ui/e2e/sessions.spec.ts"
+   ],
+   "existing_tests": [
+    "tests/test_f2w_api.py",
+    "ui/e2e/pending-ingest.spec.ts",
+    "ui/e2e/sessions.spec.ts"
+   ]
+  },
+  {
+   "id": "B03",
+   "title": "Graph detail, editing and code-snippet contracts",
+   "source_file": "app/modules/f2w_agent/api.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/api/compat/graph.py + app/modules/graph/",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 53
+   },
+   "ui_tests_passed": [
+    "ui/src/app/components/GraphMockup.test.ts",
+    "ui/e2e/kg-viewer.spec.ts"
+   ],
+   "existing_tests": [
+    "tests/test_f2w_api.py",
+    "ui/src/app/components/GraphMockup.test.ts",
+    "ui/e2e/kg-viewer.spec.ts"
+   ]
+  },
+  {
+   "id": "B04",
+   "title": "Coordinator and CLI compatibility",
+   "source_file": "app/modules/f2w_agent/coordinator.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/f2w_agent/ facades + application.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 5
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_f2w_coordinator.py"
+   ]
+  },
+  {
+   "id": "B05",
+   "title": "Workflow intent routing",
+   "source_file": "app/modules/f2w_agent/orchestrator_agent.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/agent_runtime/ routing adapters",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 13
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_workflow_orchestrator.py"
+   ]
+  },
+  {
+   "id": "B06",
+   "title": "Evidence ranking debate agent",
+   "source_file": "app/modules/f2w_agent/debate_agent.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/curation/ or retained f2w_agent adapter",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 53
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_f2w_api.py"
+   ]
+  },
+  {
+   "id": "B07",
+   "title": "Active-paper bounded answers",
+   "source_file": "app/modules/f2w_agent/paper_evidence_agent.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/evidence/ + retrieval/",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 7
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_paper_evidence_agent.py"
+   ]
+  },
+  {
+   "id": "B08",
+   "title": "Real retrieval, sufficiency and leeway",
+   "source_file": "app/modules/f2w_agent/retrieval_agent.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/retrieval/ baseline adapter first",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 66
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_retrieval_agent.py",
+    "tests/test_build_context_filtering.py",
+    "tests/test_rag_system_prompt.py",
+    "tests/test_multi_kg.py"
+   ]
+  },
+  {
+   "id": "B09",
+   "title": "KnowledgeGraph implementation and independent chat API",
+   "source_file": "app/modules/kg_rag_api.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/kg_rag_api.py facade + retrieval/graph services",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 85
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_kg_rag_api.py",
+    "tests/test_kg_rag_api_extended.py",
+    "tests/test_kg_rag_api_coverage.py",
+    "tests/test_fastapi_endpoints.py"
+   ]
+  },
+  {
+   "id": "B10",
+   "title": "Async F2W inference path",
+   "source_file": "app/modules/kg_rag_api.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "existing classes + app/modules/llm_adapters.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 33
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_chat_clients.py",
+    "tests/test_kg_rag_api.py"
+   ]
+  },
+  {
+   "id": "B11",
+   "title": "Synchronous F2W inference path",
+   "source_file": "app/modules/term_extractor/clients.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "existing classes + app/modules/llm_adapters.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 19
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_chat_clients.py",
+    "tests/test_cborg_http.py",
+    "tests/test_cborg_limiter.py"
+   ]
+  },
+  {
+   "id": "B12",
+   "title": "Existing LangGraph extraction loop",
+   "source_file": "app/modules/term_extractor/agent.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/agent_runtime/ + retained term_extractor/agent.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 12
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_extractor_agent.py"
+   ]
+  },
+  {
+   "id": "B13",
+   "title": "Extractor orchestration and tool-capable model construction",
+   "source_file": "app/modules/term_extractor/orchestrator.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/extraction/strategies/legacy_f2w.py + retained term_extractor/",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 15
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_extractor_agent.py",
+    "tests/test_source_repos.py"
+   ]
+  },
+  {
+   "id": "B14",
+   "title": "Current extraction tools and full-list merge risk",
+   "source_file": "app/modules/term_extractor/tools.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/canonicalization/ behind existing tool wrappers",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 12
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_extractor_agent.py"
+   ]
+  },
+  {
+   "id": "B15",
+   "title": "Persistent extracted term records",
+   "source_file": "app/modules/term_extractor/store.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retained term_extractor/store.py + extraction record adapter",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 12
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_extractor_agent.py"
+   ]
+  },
+  {
+   "id": "B16",
+   "title": "Extraction schema validation",
+   "source_file": "app/modules/term_extractor/schema.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/extraction/validation + retained schema helper",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 22
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_xray_schema.py",
+    "tests/test_extractor_agent.py"
+   ]
+  },
+  {
+   "id": "B17",
+   "title": "Extraction record DTOs",
+   "source_file": "app/modules/term_extractor/models.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/contracts/ mapping + existing models",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 12
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_extractor_agent.py"
+   ]
+  },
+  {
+   "id": "B18",
+   "title": "Existing source RAG and document indexes",
+   "source_file": "app/modules/hybrid_rag/pipeline.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retain hybrid_rag/ first; later retrieval/ service facades",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 16
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_hybrid_rag.py"
+   ]
+  },
+  {
+   "id": "B19",
+   "title": "Actual BM25 index",
+   "source_file": "app/modules/hybrid_rag/index_store.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retained hybrid_rag/index_store.py or retrieval/index_store.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 16
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_hybrid_rag.py"
+   ]
+  },
+  {
+   "id": "B20",
+   "title": "Actual evidence-context builder",
+   "source_file": "app/modules/hybrid_rag/context.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retained hybrid_rag/context.py -> retrieval/evidence_context.py facade",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 25
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_hybrid_rag.py",
+    "tests/test_build_context_filtering.py"
+   ]
+  },
+  {
+   "id": "B21",
+   "title": "Hybrid evidence model and ranker",
+   "source_file": "app/modules/hybrid_rag/evidence.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/evidence/ adapters + retained hybrid_rag evidence",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 16
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_hybrid_rag.py"
+   ]
+  },
+  {
+   "id": "B22",
+   "title": "Download and acquisition behavior",
+   "source_file": "app/modules/f2w_agent/download_agent.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "app/modules/literature/ services under existing DownloadAgent facade",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 27
+   },
+   "ui_tests_passed": [
+    "ui/e2e/pending-ingest.spec.ts"
+   ],
+   "existing_tests": [
+    "tests/test_download_agent.py",
+    "tests/test_download_pdfs.py",
+    "ui/e2e/pending-ingest.spec.ts"
+   ]
+  },
+  {
+   "id": "B23",
+   "title": "Harvest Work/version identity and operator paths",
+   "source_file": "scripts/harvest_rsoxs.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "literature/work_identity.py + manifest/operator facades",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 24
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_harvest_rsoxs.py"
+   ]
+  },
+  {
+   "id": "B24",
+   "title": "Graph construction and field retention",
+   "source_file": "app/modules/json2kg.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retain json2kg CLI facade + graph/snapshot services",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 21
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_json2kg.py",
+    "tests/test_json2kg_extended.py"
+   ]
+  },
+  {
+   "id": "B25",
+   "title": "Existing Tiled lookup path",
+   "source_file": "app/modules/tiled_graph.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "graph/backends/tiled.py + retained compatibility lookup",
+   "executed_test_status": "executed_passed_with_skips",
+   "pytest_totals": {
+    "passed": 82,
+    "skipped": 1
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_tiled_graph.py",
+    "tests/test_f2w_api.py"
+   ]
+  },
+  {
+   "id": "B26",
+   "title": "Existing snapshot promotion and simulation fixtures",
+   "source_file": "app/modules/tiled_sim.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "existing fixture/operator path + literature publication adapters",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 13
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_tiled_sim.py"
+   ]
+  },
+  {
+   "id": "B27",
+   "title": "Scoped multi-graph identities",
+   "source_file": "app/modules/f2w_agent/multi_kg.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retrieval/fanout.py adapters + retained multi_kg.py",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 11
+   },
+   "ui_tests_passed": [
+    "ui/src/app/components/kgCatalog.test.ts"
+   ],
+   "existing_tests": [
+    "tests/test_multi_kg.py",
+    "ui/src/app/components/kgCatalog.test.ts"
+   ]
+  },
+  {
+   "id": "B28",
+   "title": "Session persistence and compression",
+   "source_file": "app/modules/f2w_agent/session_memory.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "agent_runtime/session bridge + existing session_memory path",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 53
+   },
+   "ui_tests_passed": [
+    "ui/e2e/sessions.spec.ts"
+   ],
+   "existing_tests": [
+    "tests/test_f2w_api.py",
+    "ui/e2e/sessions.spec.ts"
+   ]
+  },
+  {
+   "id": "B29",
+   "title": "Persistent approval workflow",
+   "source_file": "app/modules/f2w_agent/workflow_state.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "agent_runtime/checkpointer.py + workflow compatibility adapter",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 66
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_workflow_orchestrator.py",
+    "tests/test_f2w_api.py"
+   ]
+  },
+  {
+   "id": "B30",
+   "title": "Existing execution trace and annotations",
+   "source_file": "app/modules/f2w_agent/trace.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "provenance/ facade + retained trace routes",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 6
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_trace.py"
+   ]
+  },
+  {
+   "id": "B31",
+   "title": "Scientific provenance helpers",
+   "source_file": "app/modules/prov.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "provenance/models and recorder adapters",
+   "executed_test_status": "executed_passed_with_skips",
+   "pytest_totals": {
+    "passed": 35,
+    "skipped": 10
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_prov.py"
+   ]
+  },
+  {
+   "id": "B32",
+   "title": "Configuration precedence",
+   "source_file": "app/modules/project_config.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "existing project_config + application instance config adapter",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 12
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_project_config.py"
+   ]
+  },
+  {
+   "id": "B33",
+   "title": "Existing Materials Project evidence",
+   "source_file": "app/modules/f2w_agent/materials_project.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "retained optional compatibility evidence adapter",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 5
+   },
+   "ui_tests_passed": [
+    "ui/e2e/citations.spec.ts"
+   ],
+   "existing_tests": [
+    "tests/test_materials_project.py",
+    "ui/e2e/citations.spec.ts"
+   ]
+  },
+  {
+   "id": "B34",
+   "title": "Current corpus repair",
+   "source_file": "scripts/repair_corpus.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "canonicalization/repair services + operator CLI facade",
+   "executed_test_status": "no_existing_tests",
+   "pytest_totals": {},
+   "ui_tests_passed": [],
+   "existing_tests": []
+  },
+  {
+   "id": "B35",
+   "title": "Current corpus quality checks",
+   "source_file": "scripts/corpus_qa.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "evals/ corpus QA + retained operator CLI",
+   "executed_test_status": "no_existing_tests",
+   "pytest_totals": {},
+   "ui_tests_passed": [],
+   "existing_tests": []
+  },
+  {
+   "id": "B36",
+   "title": "Existing operator invocation",
+   "source_file": "scripts/run.py",
+   "disposition": "retain_baseline_seam",
+   "proposed_destination": "scripts/run.py facade -> retained extractor/new job service",
+   "executed_test_status": "executed_all_passed",
+   "pytest_totals": {
+    "passed": 12
+   },
+   "ui_tests_passed": [],
+   "existing_tests": [
+    "tests/test_extractor_agent.py"
+   ]
+  }
+ ],
+ "http_entrypoints": [
+  {
+   "method": "GET",
+   "path": "/health",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.health"
+  },
+  {
+   "method": "GET",
+   "path": "/settings",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.get_settings"
+  },
+  {
+   "method": "PUT",
+   "path": "/settings",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.update_settings"
+  },
+  {
+   "method": "POST",
+   "path": "/session/reset",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.reset_session"
+  },
+  {
+   "method": "DELETE",
+   "path": "/session/{session_id}",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.delete_session"
+  },
+  {
+   "method": "GET",
+   "path": "/graph",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.graph"
+  },
+  {
+   "method": "POST",
+   "path": "/graph/nodes/search",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.search_graph_nodes"
+  },
+  {
+   "method": "GET",
+   "path": "/graph/neighborhood/{node_id:path}",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.graph_neighborhood"
+  },
+  {
+   "method": "GET",
+   "path": "/graph/node/{node_id}",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.graph_node"
+  },
+  {
+   "method": "PATCH",
+   "path": "/graph/node/{node_id}",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.patch_graph_node"
+  },
+  {
+   "method": "POST",
+   "path": "/graph/upload",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.upload_graph"
+  },
+  {
+   "method": "POST",
+   "path": "/chat",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.chat"
+  },
+  {
+   "method": "POST",
+   "path": "/chat/action",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.chat_action"
+  },
+  {
+   "method": "POST",
+   "path": "/publications/search",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.publication_search"
+  },
+  {
+   "method": "POST",
+   "path": "/chat/stream",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.chat_stream"
+  },
+  {
+   "method": "POST",
+   "path": "/chat/action/stream",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.chat_action_stream"
+  },
+  {
+   "method": "GET",
+   "path": "/traces/{turn_id}",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.get_trace"
+  },
+  {
+   "method": "POST",
+   "path": "/telemetry/ui",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.telemetry_ui"
+  },
+  {
+   "method": "POST",
+   "path": "/annotations",
+   "file": "app/modules/f2w_agent/api.py",
+   "symbol": "create_app.create_annotation"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat",
+   "file": "app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.api_chat"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "file": "app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.openai_chat_completions"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tags",
+   "file": "app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.list_models"
+  },
+  {
+   "method": "GET",
+   "path": "/api/version",
+   "file": "app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.ollama_version"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/models",
+   "file": "app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.openai_models"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ps",
+   "file": "app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.list_processes"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat",
+   "file": "scripts/app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.api_chat"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "file": "scripts/app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.openai_chat_completions"
+  },
+  {
+   "method": "GET",
+   "path": "/api/tags",
+   "file": "scripts/app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.list_models"
+  },
+  {
+   "method": "GET",
+   "path": "/api/version",
+   "file": "scripts/app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.ollama_version"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/models",
+   "file": "scripts/app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.openai_models"
+  },
+  {
+   "method": "GET",
+   "path": "/api/ps",
+   "file": "scripts/app/modules/kg_rag_api.py",
+   "symbol": "create_fastapi_app.list_processes"
+  },
+  {
+   "method": "GET",
+   "path": "/",
+   "file": "scripts/paper_finder.py",
+   "symbol": "create_app.index"
+  },
+  {
+   "method": "GET",
+   "path": "/detected",
+   "file": "scripts/paper_finder.py",
+   "symbol": "create_app.detected"
+  },
+  {
+   "method": "POST",
+   "path": "/action",
+   "file": "scripts/paper_finder.py",
+   "symbol": "create_app.action"
+  }
+ ],
+ "files": [
+  {
+   "path": "app/modules/__init__.py",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "lines": 0,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": null,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/agents/__init__.py",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "lines": 0,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": null,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/agents/chebi.py",
+   "sha256": "a6e14ba68604a3c571ff7919e17791a2bc55d73f7700e7ae0ebbf154606daa9d",
+   "lines": 214,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/agents/chem_checker.py",
+   "sha256": "557756cf4d9516703fcecb7f0dccd73fb8ff66976e13dd7953b65d5149856a3c",
+   "lines": 96,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/agents/properties.py",
+   "sha256": "cd372f437f5113e00608da327f4bc859a8fe0205d5a136706a07128837ce84bc",
+   "lines": 663,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/bl1101_ingest.py",
+   "sha256": "a100e09e570d7cc53bc57e790bf34355e21b161eecf20319cac5215f3d808aaa",
+   "lines": 2398,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/cborg_http.py",
+   "sha256": "cad3ffabae422ac306cbf99be8fffe23d64aa1afbc2a12a4e7d06b57b6c786e9",
+   "lines": 123,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/cborg_limiter.py",
+   "sha256": "edb1d1b7e0e46ad64852cf03f231e1d63fbccdaeb9987b668e293ec0ce2668dc",
+   "lines": 79,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/extract_terms.py",
+   "sha256": "3ab128b710b4a7068ce27ca38ece93119507fc2aba630edd0d9d0a8b9db61b5a",
+   "lines": 2100,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "app/modules/f2w_agent/__init__.py",
+   "sha256": "a6da48fbbcfdb9e336017bb5e91f96df24ff2e7d9aa5aae965407bb170948ced",
+   "lines": 62,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": null,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "app/modules/f2w_agent/api.py",
+   "sha256": "50fb15d5b3a1fe2cece7bfd7ad4cb71dc42dab9f42a900343439eb98debe8c6a",
+   "lines": 7038,
+   "anchors": [
+    "B01",
+    "B02",
+    "B03"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/cli.py",
+   "sha256": "0654f4b5d7e25f33647e7dac729a251bffa934ca971a45301efa61075fbe1caf",
+   "lines": 189,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/coordinator.py",
+   "sha256": "e72cb0cf10fc1c0d78873aabe171d9d75ef744ca0f61b209c625420175726f8e",
+   "lines": 654,
+   "anchors": [
+    "B04"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/debate_agent.py",
+   "sha256": "a383de6dfb48266b13d3ed1c38161355d6d78a410b33d1aa262f939ce6677a0f",
+   "lines": 267,
+   "anchors": [
+    "B06"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": false,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/download_agent.py",
+   "sha256": "a169b0c5d1858e570cf8cf939ee4ffb65a728f5fb8c762867e0998ed77a2011c",
+   "lines": 888,
+   "anchors": [
+    "B22"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/extractor_agent.py",
+   "sha256": "6e0743b615d2d097208d987199e985257e20309db80d0436a2af12a6281f04a1",
+   "lines": 130,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/kg_update.py",
+   "sha256": "99d57ba0bc82e2904c5987c4b534d6339e3bf9c68ceb44f4db63a64975c010e4",
+   "lines": 512,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/materials_project.py",
+   "sha256": "19ae7d2332e5f1e8387a691197541a84af74813c2f5e24937f30c75c616dbe21",
+   "lines": 257,
+   "anchors": [
+    "B33"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/multi_kg.py",
+   "sha256": "bb112ab8044489de1d533371179db644bc800b1eae5f1b44f353f8c4a8ff46a2",
+   "lines": 310,
+   "anchors": [
+    "B27"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/orchestrator_agent.py",
+   "sha256": "fee9776b43e47a45fd6efc0bb6179dc68ec299c835e5bf6e670291e5639ef53c",
+   "lines": 516,
+   "anchors": [
+    "B05"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/paper_evidence_agent.py",
+   "sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba",
+   "lines": 458,
+   "anchors": [
+    "B07"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/prompts.py",
+   "sha256": "819bd811203555a87571e934251d01165bc73ab6661cc48c808634f03b3373a0",
+   "lines": 135,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/retrieval_agent.py",
+   "sha256": "c9a24dc2e0c0991e27d69b71b3fe509bf891df4cd9a08e997103f85225425195",
+   "lines": 1485,
+   "anchors": [
+    "B08"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/session_memory.py",
+   "sha256": "fa5986b4ff33bef6fa01f5a29a7661977c99aaf2fcf1560767a046bcd9259b0c",
+   "lines": 529,
+   "anchors": [
+    "B28"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/trace.py",
+   "sha256": "b3dca3ce0e977f3ba2680af40d98ed08189fd2326f9c759ab1112defa88d05c8",
+   "lines": 823,
+   "anchors": [
+    "B30"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/f2w_agent/workflow_state.py",
+   "sha256": "72ac7aa789954469b08b423f4b713f092e7f867f6385015fdb4746b8fb0efb5a",
+   "lines": 121,
+   "anchors": [
+    "B29"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/__init__.py",
+   "sha256": "2e520efa3f6e896b83ec8bc7f3b26f87a8de1390966b57afafea4ec8a1a0c59b",
+   "lines": 18,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": null,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/chunker.py",
+   "sha256": "eed185974468b39305bbca0f6e4aca070bc02992338d8d898a3d058eefa7382d",
+   "lines": 233,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/context.py",
+   "sha256": "9bdf3e18c2f4e7dfa5344ab7de68ff9487030d9b1a96ed447c8eab9e4a52ec80",
+   "lines": 145,
+   "anchors": [
+    "B20"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/evidence.py",
+   "sha256": "6cfd9aeed9350ebb8a76d288e9fba69963f2249198274f59f4f6860137906435",
+   "lines": 160,
+   "anchors": [
+    "B21"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/index_store.py",
+   "sha256": "9acec447fcd2465c1f63782a39422b834e1a55c20e7404459b29a10e71a47864",
+   "lines": 184,
+   "anchors": [
+    "B19"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/pipeline.py",
+   "sha256": "200b8278726f79fca0e8a27acb8423d68102c405bdb705e0877bec92b0e1257e",
+   "lines": 289,
+   "anchors": [
+    "B18"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/ranker.py",
+   "sha256": "be3fc9b4241842543e5a90638638049f3aecf9e641e599f2b01a1b2d894eef34",
+   "lines": 68,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/retriever.py",
+   "sha256": "fed3c6f5136ca83fda9447e7b96003e8cbe9c73dacca695f232f49095a798dde",
+   "lines": 88,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/hybrid_rag/sources.py",
+   "sha256": "a09602129b58ca54b77f9f199969902ce564fc8803f7d484e24ad3e0ad5416c8",
+   "lines": 243,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/json2kg.py",
+   "sha256": "81dba522cff892cda7d5bf1e98a67b10cb7ccb990972d0b995c76b65e755527f",
+   "lines": 630,
+   "anchors": [
+    "B24"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/kg_rag_api.py",
+   "sha256": "eee8f57331895a0c5b8f65eeab99bad0147a77e621655a427a3aa3e9727106c8",
+   "lines": 1799,
+   "anchors": [
+    "B09",
+    "B10"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/launchers/__init__.py",
+   "sha256": "a208cef1fe85c60fd748befb0f06c45e8b6bca10d6d5587f24e1b8e21f1f46be",
+   "lines": 1,
+   "anchors": [],
+   "disposition": "retain_entrypoint",
+   "referenced_by_tests": null,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/launchers/academy_auth.py",
+   "sha256": "b1cfcb8d792ce3e05e6a4eb27d9cec5898d9054ae2868f616a8c488b479a3fe0",
+   "lines": 21,
+   "anchors": [],
+   "disposition": "retain_entrypoint",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/launchers/academy_extractor.py",
+   "sha256": "3d46818df5616f30ce674450624181895d5c4cae40ca9d2536cd09f6b952562d",
+   "lines": 145,
+   "anchors": [],
+   "disposition": "retain_entrypoint",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/launchers/f2w_agent.py",
+   "sha256": "edafdda535aeb439c01e70cbadb42cca72236ce34d2c70c138c528254017357f",
+   "lines": 14,
+   "anchors": [],
+   "disposition": "retain_entrypoint",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/launchers/user_agent.py",
+   "sha256": "22c370fc8ea16461a7b34e20521772818b1fb7836f1afd74a6a45108f426a95b",
+   "lines": 94,
+   "anchors": [],
+   "disposition": "retain_entrypoint",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/build_onto.py",
+   "sha256": "b73f283e0e65e3d644c938cdfe567cc6024c6715ab6e446a67017ad1031e2b1b",
+   "lines": 1111,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/extract_terms.py",
+   "sha256": "07798677656b51d4e16dc02c32eb0115d5342584be9097ccf9e8baaa4a02e40d",
+   "lines": 441,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/extract_terms_linkml.py",
+   "sha256": "0896b28f1f9fb4d32c83df3cc82142666349f35ac32f0d92d69244a5ac4c5fbc",
+   "lines": 984,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/extract_terms_linkml_jun3.py",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "lines": 0,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": false,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/extracted_terms_json2kg_with_context.py",
+   "sha256": "48c0c7a0a492d2806ad4c5d49702d43e6cd61aba548f7961f6baf1a128ae8a7f",
+   "lines": 111,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/json2kg.py",
+   "sha256": "8dfc6013ca2c8b1a1e36b996b5e7547354ccabb082221a72935c565298f2ee97",
+   "lines": 219,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/kg_rag_ollama.py",
+   "sha256": "726f14bd63b9ffb5b6556989617e977779f82372b38a3aba80275bff45d0d37b",
+   "lines": 227,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/legacy/kg_rag_ollama_nersc.py",
+   "sha256": "6acf366844f9642df0291ed1d96dbeb14b4706f5033152c930e6abf4dd55ec8b",
+   "lines": 204,
+   "anchors": [],
+   "disposition": "legacy_retained_deletion_needs_owner_approval",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/project_config.py",
+   "sha256": "b286c868095cb333b87ff1956b32dea48909c25781c31d73fd65c411e079037d",
+   "lines": 100,
+   "anchors": [
+    "B32"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/prov.py",
+   "sha256": "78537cf59a048d92ad57474202cc61aa9e6c5c6ec15ea0f07e41a1a10d9f1d3d",
+   "lines": 273,
+   "anchors": [
+    "B31"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/__init__.py",
+   "sha256": "407e932e95e316417b8aa4a6fc56e4cec5de2bb5690de2332fec76882d0a643c",
+   "lines": 24,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": null,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/academy_agent.py",
+   "sha256": "f5739fddfd35a719b87af147959bd3b64233c8c6fa2728b7bb0989cdec4daa25",
+   "lines": 114,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": false,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/agent.py",
+   "sha256": "fef2fe3e36d31e00326fe7aa4b711113fa8d21e46d6c73fe31798a29c34656f9",
+   "lines": 32,
+   "anchors": [
+    "B12"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/clients.py",
+   "sha256": "41643a6c619521b35e38e3bb5743355a59c202cee7b16dac65905f258fc07034",
+   "lines": 141,
+   "anchors": [
+    "B11"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/dashboard.py",
+   "sha256": "8a033833607ee72d833516c03b20cb0f4878270262c93a55cfd5cc793c7594fd",
+   "lines": 1323,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": false,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/message.py",
+   "sha256": "87e71ad169cae6f59c3a3ee87b52cbda3f0a04bed43efc265e95253b89865831",
+   "lines": 58,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/models.py",
+   "sha256": "627e22405d5e783368e8a406ab6163380fe2175ffa4d8b36fd2b74d00a9f457a",
+   "lines": 173,
+   "anchors": [
+    "B17"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/monitored_agent.py",
+   "sha256": "8fa3a8ba818f01166dc5f7e089c746c8de8a832d475d6febd387968ea3d5fd40",
+   "lines": 218,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": false,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/orchestrator.py",
+   "sha256": "e3759da7831b3246c98906b556829e02bfbae25e368a30e1f5c078d66cd127ca",
+   "lines": 685,
+   "anchors": [
+    "B13"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/prompts.py",
+   "sha256": "9a0f80a8f7a0150e59e2c3c8f1af986f6ac3df8dfe0ba256903ec9ba1741bb68",
+   "lines": 127,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/provenance.py",
+   "sha256": "d02e7b9603cad1edc3c43b0785a03908ff71e27033395f9e866d050942018a8a",
+   "lines": 447,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/schema.py",
+   "sha256": "ee434fc59fce67d5ba81f333f1b786302426443afb18982d61473a725680ba59",
+   "lines": 345,
+   "anchors": [
+    "B16"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/services.py",
+   "sha256": "17b4ca4112808fc374d35298e28678b6d4aec4c7d7d620cd0b78cf2c377d349d",
+   "lines": 83,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/source_repos.py",
+   "sha256": "319c5fcc843ff14a4486e6d9c7d0b5dc187a09d701e4699e4b7d13db89a83eea",
+   "lines": 409,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/store.py",
+   "sha256": "823aee831067e5ac11e52653c319ea653e7feab2238eeffc1369c7ddb7eab1a5",
+   "lines": 346,
+   "anchors": [
+    "B15"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/tools.py",
+   "sha256": "c8008b94d0e9f50b38b8ac84dfc0ee69835890a1efe21976f5c5e6799d38c762",
+   "lines": 303,
+   "anchors": [
+    "B14"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/term_extractor/user_agent.py",
+   "sha256": "3f86d3d0c29a4c8f91872ca7877e9c469c264739e5e4907abeb2d6c2b6d4bdfe",
+   "lines": 81,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": false,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/tiled_graph.py",
+   "sha256": "99542ba7c42edd349707ea8d57c46f5f4a6692411c0bb39b206501fa28e1e903",
+   "lines": 1053,
+   "anchors": [
+    "B25"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": false,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/modules/tiled_sim.py",
+   "sha256": "47838f7a8d6dea4f6a075d9b69a164268dbbbdc268d55bfa419809f6aca74874",
+   "lines": 1099,
+   "anchors": [
+    "B26"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "app/run_pipeline_cborg.py",
+   "sha256": "06686d3ba9dc1708c8756e3fc747b9a872553981bfad8629bdc07ab2e368a1f0",
+   "lines": 181,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/analyze_kgs.py",
+   "sha256": "155c1cea7fdc1a9074a147c9b58bf04ab12f30c82e9a767c2c874769df2cac91",
+   "lines": 273,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/app/modules/kg_rag_api.py",
+   "sha256": "12910adedc50b31f9399c968e6179c73d1df4b09d1443521d9b30d5078abc562",
+   "lines": 1621,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/build_v7_kg.py",
+   "sha256": "fa8ded278305db719982298a28b956bf461e647339eec634f88dbb4acf65e777",
+   "lines": 563,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/corpus_qa.py",
+   "sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f",
+   "lines": 916,
+   "anchors": [
+    "B35"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/download_pdfs.py",
+   "sha256": "f8699f3f866085b42a7f050b83bbb6699c110f875235f4bd7aaf6439d6499ed2",
+   "lines": 933,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/get_pdf_years.py",
+   "sha256": "f94d0de73b788d94836a0c8a76f7b4f5073ed7cbf1ffa4ff8eb4f10a2f58b046",
+   "lines": 133,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/harvest_rsoxs.py",
+   "sha256": "e5f58771aab7e2c7b2832a171876c0f05a3131317012f01c4868be5d22191a0f",
+   "lines": 2435,
+   "anchors": [
+    "B23"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/harvest_xray.py",
+   "sha256": "e3f392dfe297147f69366863ce76b6291bde06539ff4d30c54100d5f157b494e",
+   "lines": 666,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/index_source_rag.py",
+   "sha256": "8d45b2a51d89485b97baf7b06fbd62af3209e91dcb8cd85b0377148741c51c2a",
+   "lines": 93,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/ingest_bl1101.py",
+   "sha256": "8a2f4631baf32a868c976d0ad68f4124037583b5143d366716b91a356428ef47",
+   "lines": 21,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/ingest_bl1101_v7.py",
+   "sha256": "2f5ee126cb763bff58e79f9c4c71fbff04c110bb203cee5a6e33d882c013de94",
+   "lines": 564,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/ingest_rsoxs_v3.py",
+   "sha256": "3680a1d15bc35992f95d36b47cac089cb41c9b39b582e2c903a5cb36a81486ed",
+   "lines": 510,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/ingest_tiled_sim.py",
+   "sha256": "a2028e60039ecd158adaa1e5168e9cdd0c2622476e70d243bb1b69463c0883c8",
+   "lines": 25,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/list_missing_rsoxs_papers.py",
+   "sha256": "0184d217870359fa6cd966894c1e7968194bebd027471cfe9590a8e81eb2e1fb",
+   "lines": 355,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/match_als_zips.py",
+   "sha256": "2d5373b4fcc47c29d03f02a8d5ebe268ac1a91a5a07f140e7eb116ec81276fe6",
+   "lines": 503,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/paper_finder.py",
+   "sha256": "fe2bebcad05d21107f6c28f32901a509274fad5441de2605a23c31febe0cc9ce",
+   "lines": 845,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/promote_rsoxs_snapshot.py",
+   "sha256": "40bbd6061dfba1bcf6090216686e0432ac80b73e77d1e7de8d4ff7009fe476f8",
+   "lines": 81,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/repair_corpus.py",
+   "sha256": "52796a6d36825463c757cb43ca9c00c9ff60d3af183925c740482b72d56a13f1",
+   "lines": 482,
+   "anchors": [
+    "B34"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "scripts/run.py",
+   "sha256": "4ee5af54e9ac48267ea4ed8aad1dc62d923cd7d57cde25dff2e9c09b6ccd276c",
+   "lines": 153,
+   "anchors": [
+    "B36"
+   ],
+   "disposition": "retain_baseline_seam",
+   "referenced_by_tests": true,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": true,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/test_chat_apis.py",
+   "sha256": "a9d99b58b17cf98e6a1840549d965d0a0ebfe74ca8942b9c18e4b8acc7a66b11",
+   "lines": 85,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": true
+  },
+  {
+   "path": "scripts/update_readme_tree.py",
+   "sha256": "f8dfa9c8dab8c5f20ad75cbb910f418d3486319c71783e346a50484c8c622626",
+   "lines": 251,
+   "anchors": [],
+   "disposition": "retain_cli_facade_T19A_review",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": true,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  },
+  {
+   "path": "storage/terminology/parse_terms.py",
+   "sha256": "a607fddfe793525a9b5713abb6bb15b4ad0bbfd0a1b3f7753d53d94fd089aa42",
+   "lines": 42,
+   "anchors": [],
+   "disposition": "retain_unmapped_needs_H1_crosswalk",
+   "referenced_by_tests": false,
+   "has_main_guard": true,
+   "uses_argparse": false,
+   "load_dotenv_at_import": false,
+   "sys_path_mutation": false
+  }
+ ]
+}
