@@ -1,0 +1,71 @@
+{
+  "record": "H0 checkout source lock (supplements companion/source_lock.json; does not replace it)",
+  "recorded_on": "2026-10-09",
+  "gate_status": "H0_not_approved",
+  "f2w": {
+    "repository": "https://github.com/fair2wise/FAIR2WISE",
+    "base_ref": "refs/heads/rsoxs",
+    "remote_rsoxs_tip_at_fetch": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "remote_fetched_on": "2026-10-09",
+    "archive_recorded_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "git_object_type": "commit",
+    "remote_tip_equals_archive_commit": true,
+    "source_equivalence": {
+      "method": "companion/scripts/verify_handoff.py against `git archive 222b1e7`",
+      "static_checks_passed": true,
+      "errors": 0,
+      "nonvendored_python_files": 144,
+      "baseline_crosswalk_entries": 36,
+      "ui_agent_routes": 19,
+      "model_api_routes": 6,
+      "note": "Static hash/AST/route equivalence only. Not a runtime or behavior claim."
+    },
+    "frozen_baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "baseline_decision": {
+      "decided_by": "project owner",
+      "decided_on": "2026-10-09",
+      "decision": "Keep 222b1e7 as the frozen H0 baseline. Record 2430320 as a known pre-migration change. Count its merge-index work as an early T07 upgrade, measured against the 222b1e7 behavior at H3.",
+      "source_lock_update_required": false
+    }
+  },
+  "forge_merge": {
+    "branch": "forge_merge",
+    "created_from": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "worktree": "primary checkout (single worktree)",
+    "remote_branch_exists": {"fair2wise": false, "origin": false},
+    "pushed": false,
+    "commits": [
+      {
+        "sha": "243032056a72e03b2dbd4aa24fe75c6a45bc80cc",
+        "kind": "pre_migration_change",
+        "summary": "Pre-existing local work committed before migration; see pre_migration_changes.md"
+      },
+      {
+        "sha": "8cefac3705ec73aea84e6e53a4a90531700a36e1",
+        "kind": "migration_docs",
+        "summary": "Migration plan v8.0 and short-form specs under docs/migration/"
+      }
+    ]
+  },
+  "forge": {
+    "local_tree": "AGENT/forge_rsoxs_analysis-main (gitignored, not committed)",
+    "archive_recorded_commit": "f1cd2ded95f26d8e43569dc94613b1dfde6b2045",
+    "git_metadata_present": false,
+    "commit_verified": false,
+    "static_checks_passed": true,
+    "donor_file_records": 153,
+    "donor_symbol_records": 817,
+    "donor_test_candidates": 128,
+    "license": "BSD-3-Clause",
+    "note": "Local tree matches the port manifest hashes, but has no .git, so the commit identity is unverified."
+  },
+  "companion_bundle": {
+    "path": "docs/migration/companion/",
+    "version": "v8",
+    "sha256sums_ok": 64,
+    "sha256sums_missing": ["MIGRATION_PLAN.md", "MIGRATION_PLAN.docx"],
+    "plan_text_used": "docs/migration/plan.md",
+    "plan_text_sha256": "abbfd6c72704d1d4734bddb0d6d985d65763111be368e765fdd9d20ef621b926",
+    "plan_text_matches_listed_MIGRATION_PLAN_md": false
+  }
+}
