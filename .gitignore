@@ -192,3 +192,6 @@ ui/test-results/
 ui/playwright-report/
 ui/blob-report/
 ui/playwright/.cache/
+
+# FORGE donor source and local migration scratch (plan/specs live in docs/migration/)
+AGENT/
