@@ -315,6 +315,8 @@ class PaperEvidenceAgent(Agent):
 
     def _query(self, question: str, pdf_path: str, manifest_path: str) -> Dict[str, Any]:
         """Answer from eligible PDF pages, repairing or rejecting uncited claims."""
+        # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+        # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
         import fitz
 
         path = Path(pdf_path)

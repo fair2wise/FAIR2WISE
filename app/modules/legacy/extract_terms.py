@@ -7,6 +7,8 @@ import requests
 import datetime
 import difflib
 from typing import Dict, Any, Optional
+# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz  # PyMuPDF
 
 # Set up logging

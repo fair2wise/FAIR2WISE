@@ -18,6 +18,8 @@ openai>=2.40.0
 psutil>=5.9,<8
 pyalex>=0.21
 pymatgen>=2026.5.4
+# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 PyMuPDF>=1.27.2
 python-dotenv>=1.2.2
 PyYAML>=6.0.3

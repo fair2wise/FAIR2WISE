@@ -532,6 +532,8 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
     logging.getLogger("pypdf").setLevel(logging.ERROR)
     logging.getLogger("fontTools").setLevel(logging.ERROR)
     try:
+        # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+        # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
         import fitz
 
         doc = fitz.open(path)

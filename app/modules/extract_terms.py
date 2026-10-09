@@ -15,6 +15,8 @@ import sys
 import threading
 from typing import Dict, Any, Optional, List, Union, Tuple
 
+# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz  # this is exactly the same as PyMuPDF
 from linkml_runtime.utils.schemaview import SchemaView
 import openai

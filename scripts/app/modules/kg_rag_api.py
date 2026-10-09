@@ -28,6 +28,8 @@ from colorama import Fore, Style, init as colorama_init
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz  # PyMuPDF
 import numpy as np
 # from nvtx import annotate

@@ -337,6 +337,8 @@ def _append_download_record(manifest: Path, record: Dict[str, Any]) -> None:
 def _extract_pdf_preview(path: Path, max_pages: int = 2, max_chars: int = 4000) -> str:
     """Extract a small text preview for semantic validation."""
     try:
+        # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+        # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
         import fitz
 
         doc = fitz.open(str(path))

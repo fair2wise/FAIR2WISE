@@ -7,6 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence
 
+# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI

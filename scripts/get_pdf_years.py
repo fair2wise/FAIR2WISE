@@ -1,5 +1,7 @@
 import os
 import re
+# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
+# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz  # pip install pymupdf
 from collections import Counter
 from datetime import datetime
