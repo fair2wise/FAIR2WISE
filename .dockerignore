@@ -23,3 +23,8 @@ tests/results
 tests/deepeval/results
 papers
 splash_links/links.sqlite
+# Tiled catalog databases (and SQLite sidecars) are runtime state, not image
+# content. Docker Tiled keeps its catalog in the tiled_data volume. Only a
+# future :local image target may bundle a local catalog (H0 escalation E3).
+**/tiled_catalog*.db
+**/tiled_catalog*.db-*
