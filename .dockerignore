@@ -28,3 +28,6 @@ splash_links/links.sqlite
 # future :local image target may bundle a local catalog (H0 escalation E3).
 **/tiled_catalog*.db
 **/tiled_catalog*.db-*
+# Source-RAG indexes hold paper-text chunks; mount them at runtime and point
+# HYBRID_RAG_LITERATURE_INDEX / HYBRID_RAG_OPS_INDEX at them (H0 escalation E4).
+storage/source_index

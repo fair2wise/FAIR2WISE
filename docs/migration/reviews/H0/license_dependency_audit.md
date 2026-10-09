@@ -11,11 +11,12 @@ notices, package metadata and tracked assets. Not legal advice. Items marked
 | E1 | Gitignore `papers/` on `forge_merge`; leave `main` as it is. | `f0c6ce3` untracks the 90 PDFs (already listed in `.gitignore`). No history rewrite. |
 | E2 | Keep PyMuPDF for now. Mark every use. It will be deprecated in this repo in favor of Docling (Alex's request). | `28820b0` adds `DEPRECATED(pymupdf)` markers at 13 import sites and in `requirements/runtime.in`. |
 | E3 | `storage/` may be in the image. The Tiled catalog DB may not, except in a local image. | `bfbec85` excludes `**/tiled_catalog*.db` and sidecars via `.dockerignore`. |
+| E4 | Exclude the source-RAG index from the image; mount it at runtime. | This commit adds `storage/source_index` to `.dockerignore`. Throwaway build confirms it is no longer copied. |
 
 After these commits the isolated pytest run on a fresh export of HEAD is
 unchanged: 733 passed, with the same 3 failures and 15 errors.
 
-New finding from the E3 check: see E4 below.
+E4 was found while verifying E3 and decided the same day.
 
 ## Escalations
 
@@ -84,7 +85,7 @@ The Docling switch must resolve that in the full-profile lock (Tiled 0.2.19,
 FastAPI, figures) and must keep page/figure/table geometry used by evidence
 locators (plan T05, T09).
 
-### E4: Local paper-text index is copied into locally built images (escalate)
+### E4: Local paper-text index is copied into locally built images (decided)
 
 Found while verifying E3 with a throwaway build of the context:
 
@@ -99,9 +100,11 @@ Found while verifying E3 with a throwaway build of the context:
   (parsed artifacts are mounted, not image content).
 - `storage/ontologies/chebi.obo` (242 MB, gitignored) is also copied. It is
   ChEBI under CC BY 4.0: allowed, but needs attribution if shipped.
-- Proposed fix (not applied, pending owner decision): add
-  `storage/source_index/` to `.dockerignore`, keeping the rest of `storage/`,
-  and mount the index at runtime.
+- Decision: add `storage/source_index/` to `.dockerignore`, keeping the rest
+  of `storage/`. Only `hybrid_rag/pipeline.py` reads it; source RAG is off by
+  default and a missing index is handled (`test_ask_locked_survives_missing_source_index`).
+  With source RAG on in a container, mount the index and set
+  `HYBRID_RAG_LITERATURE_INDEX` / `HYBRID_RAG_OPS_INDEX`.
 
 ## Repository and vendored notices
 

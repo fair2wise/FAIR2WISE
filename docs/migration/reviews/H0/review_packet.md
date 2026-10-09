@@ -154,14 +154,12 @@ Decided by the owner on 2026-10-09 and applied on `forge_merge`:
 After E1-E3 the isolated pytest run on a fresh HEAD export is unchanged (733
 passed, same 3 failures and 15 errors).
 
-Still open:
-
 - **E4: Local paper-text index copied into locally built images.**
   `storage/source_index/literature/chunks.jsonl` (gitignored) contains paper
   text chunks with page locators. Under E3, an image built from a working
   checkout bakes it in (CI builds from clean checkouts would not). This
-  conflicts with D19/D28. Proposed: add `storage/source_index/` to
-  `.dockerignore` and mount it at runtime.
+  conflicts with D19/D28. Decision: exclude it via `.dockerignore` and mount
+  it at runtime; applied in the commit after `bfbec85`.
 
 Other findings for H1 scoping (no decision needed now):
 
@@ -208,8 +206,7 @@ Approve H0 with this exact scope:
    deviations in section 3 as known, unfixed baseline failures.
 2. Accept the LLM/QA baseline (`f2w_llm_qa_baseline.json`) and parity inventory
    as the H0 reference, including the default dispositions in section 6.
-3. E1-E3 are decided and applied (section 5). Decide E4, or record it as an
-   open item to resolve by T24A at H1.
+3. E1-E4 are decided and applied (section 5).
 4. Unblock T01 and the H1 contract tasks (T18A, T19A, T20A, T21A, T22A, T23A,
    T24A, T25A, T26A), which remain documentation and contract work until H1.
 
