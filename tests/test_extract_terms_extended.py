@@ -59,6 +59,22 @@ class _DummyFormulaChecker:
         return {"status": "ok", "canonical": formula}
 
 
+class _StubMergeIndex:
+    """Return registered display names as merge candidates without MiniLM/FAISS."""
+
+    def __init__(self, owner):
+        self.owner = owner
+
+    def ensure(self, names):
+        return None
+
+    def add(self, name):
+        return None
+
+    def query(self, term, k=12):
+        return list(self.owner._bk_terms.keys())[:k]
+
+
 def _make_extractor(tmp_path, client=None, response="{}"):
     """Return a fully wired LLMTermExtractor with real __init__ skipped."""
     e = LLMTermExtractor.__new__(LLMTermExtractor)
@@ -82,6 +98,8 @@ def _make_extractor(tmp_path, client=None, response="{}"):
     e.chebi_lookup = None
     e.metadata = {"version": "test"}
     e._save_lock = threading.Lock()
+    e.merge_top_k = 12
+    e._merge_index = _StubMergeIndex(e)
     import os
     os.makedirs(str(tmp_path), exist_ok=True)
     return e

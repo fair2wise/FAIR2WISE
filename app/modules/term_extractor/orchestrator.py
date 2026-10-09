@@ -18,6 +18,7 @@ from app.modules.cborg_limiter import sync_slot
 from . import provenance, source_repos
 from .agent import build_graph
 from .clients import make_chat_client
+from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
 from .models import ContextSnippet, RelationRecord, TermRecord
 from .prompts import build_page_prompt
 from .schema import SchemaHelper
@@ -164,6 +165,8 @@ class Orchestrator:
         cborg_api_key: Optional[str] = None,
         ollama_url: str = "http://localhost:11434",
         chebi_obo_path: Optional[str] = "storage/ontologies/chebi.obo",
+        merge_top_k: int = DEFAULT_MERGE_TOP_K,
+        merge_embed_model: str = "",
     ):
         self.model = model
         self.backend = backend
@@ -181,6 +184,16 @@ class Orchestrator:
         self.schema_helper = SchemaHelper(schema_path=schema_path)
         self.store = TermStore(output_file)
         self.services = build_services(chebi_obo_path=chebi_obo_path)
+        self.merge_index = TermMergeIndex(
+            model_name=merge_embed_model or DEFAULT_EMBED_MODEL,
+            top_k=merge_top_k,
+        )
+        logger.info("Building term merge index from %d existing names", len(self.store))
+        try:
+            self.merge_index.ensure(self.store.all_display_names())
+        except Exception:
+            logger.exception("Failed to build term merge index")
+            raise
 
         # Synchronous client used by the PDF-derived code-snippet context pass.
         self._snippet_client = make_chat_client(
@@ -206,6 +219,7 @@ class Orchestrator:
             schema=self.schema_helper,
             services=self.services,
             llm_invoke=_llm_invoke,
+            merge_index=self.merge_index,
         )
         return build_tools(self._tool_state)
 
@@ -224,6 +238,7 @@ class Orchestrator:
             api_key=self.cborg_api_key,
             base_url=self.cborg_base,
             temperature=self.temperature,
+            streaming=True,
             http_socket_options=(),
             **openai_http_kwargs(asynchronous=False),
         )
@@ -666,6 +681,8 @@ def run_extraction(
     context_length: int = 50,
     max_workers: int = 8,
     chebi_obo_path: Optional[str] = None,
+    merge_top_k: int = DEFAULT_MERGE_TOP_K,
+    merge_embed_model: str = "",
 ) -> dict:
     """Drop-in replacement for extract_terms.run_extraction."""
     logger.info("run_extraction: dir=%s output=%s model=%s backend=%s", pdf_dir, output_json, model, backend)
@@ -681,5 +698,7 @@ def run_extraction(
         cborg_api_key=cborg_api_key,
         ollama_url=ollama_url,
         chebi_obo_path=chebi_obo_path,
+        merge_top_k=merge_top_k,
+        merge_embed_model=merge_embed_model,
     )
     return o.process_directory(str(pdf_dir))

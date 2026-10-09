@@ -91,6 +91,9 @@ def _bare_extractor(tmp_path, client=None, response="{}"):
         "processed_pages_with_terms": 0,
     }
     e._save_lock = threading.Lock()
+    e.merge_top_k = 12
+    e._merge_index = MagicMock()
+    e._merge_index.query.return_value = []
     return e
 
 
@@ -213,26 +216,33 @@ class TestOllamaChatClient:
 
 class TestCBorgChatClient:
     def test_chat_returns_last_choice_content(self):
-        fake_choice = MagicMock()
-        fake_choice.message.content = "cborg answer"
-        fake_resp = MagicMock()
-        fake_resp.choices = [fake_choice]
+        first = MagicMock()
+        first.delta.content = "cborg "
+        first.message = None
+        last = MagicMock()
+        last.delta.content = "answer"
+        last.message = None
+        chunk = MagicMock()
+        chunk.choices = [first, last]
 
         with patch("app.modules.extract_terms.openai.OpenAI") as mock_openai:
-            mock_openai.return_value.chat.completions.create.return_value = fake_resp
+            mock_openai.return_value.chat.completions.create.return_value = [chunk]
             client = CBorgChatClient(model="lbl/cborg-chat", api_key="key")
             result = client.chat("hello", temperature=0.0, timeout=60)
+            kwargs = mock_openai.return_value.chat.completions.create.call_args.kwargs
 
-        assert result == "cborg answer"
+        assert kwargs["stream"] is True
+        assert result == "answer"
 
     def test_chat_returns_empty_string_when_content_is_none(self):
-        fake_choice = MagicMock()
-        fake_choice.message.content = None
-        fake_resp = MagicMock()
-        fake_resp.choices = [fake_choice]
+        choice = MagicMock()
+        choice.delta.content = None
+        choice.message = None
+        chunk = MagicMock()
+        chunk.choices = [choice]
 
         with patch("app.modules.extract_terms.openai.OpenAI") as mock_openai:
-            mock_openai.return_value.chat.completions.create.return_value = fake_resp
+            mock_openai.return_value.chat.completions.create.return_value = [chunk]
             client = CBorgChatClient(model="lbl/cborg-chat", api_key="key")
             result = client.chat("hello")
 

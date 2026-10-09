@@ -231,6 +231,26 @@ def test_detail_schema_is_complete_and_unclipped(tmp_path: Path, monkeypatch: py
     assert summary["top_graph_ids"] == ["g1"]
     assert detail["parent_turn_id"] == "turn-parent"
     assert detail["orchestration"]["prechecks"]["_paper_reference_followup"] is True
+    assert detail["request"]["batch_id"] is None
+    assert summary["batch_id"] is None
+    assert summary["category"] is None
+
+
+def test_summary_records_batch_id_and_category(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(monkeypatch, tmp_path)
+    open_turn(
+        client_turn_id="turn-batch-1",
+        session_id="session-batch",
+        request={
+            "message": "What does resonant scattering tell me?",
+            "batch_id": "pilot",
+            "ui_settings": {"category": "science", "case_id": "S01"},
+        },
+    )
+    finish_turn()
+    _detail, summary = _detail_and_summary(tmp_path, "turn-batch-1")
+    assert summary["batch_id"] == "pilot"
+    assert summary["category"] == "science"
 
 
 def test_disabled_tracing_writes_no_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

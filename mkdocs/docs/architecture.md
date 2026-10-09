@@ -153,8 +153,8 @@ Simulated ESAFs for local demos are ingested with
 
 ## KG promotion pipeline
 
-1. Harvest OA PDFs into a **corpus-specific** tree (`papers/rsoxs/`, later
-   `papers/xray/`). Do not mix those directories.
+1. Harvest OA PDFs into a **corpus-specific** tree (`papers/rsoxs/`,
+   `papers/xray/`, `papers/tomo/`). Do not mix those directories.
 2. Extract terms → `storage/terminology/extracted_terms_<corpus>.json`
    (`scripts/run.py`). The harvest manifest `extracted_at` field is not yet
    written back by extract.

@@ -1,0 +1,1499 @@
+# Eval batch. prefilled: true marks rows filled from a ground-truth file; review before scoring.
+# must_include is required text. allowed_entities is the fixture inventory for UID and P2026 tokens.
+# scan_count: N matches that integer in the answer. when_tiled_off replaces entity checks while live Tiled is off.
+# Optional history_from: <case id> posts that case first in this session.
+x-beamline-stages: &beamline_stages
+  - "Beam stop"
+  - "Detector"
+  - "Diag 106"
+  - "EPU"
+  - "EPU5"
+  - "Exit slits"
+  - "Gold mesh"
+  - "Higher Order Suppressor"
+  - "M101"
+  - "M103"
+  - "M121"
+  - "Middle slits (JJ)"
+  - "Mono 101"
+  - "PZT shutter"
+  - "Photodiode"
+  - "Ring lamp and video camera"
+  - "Sample stage"
+  - "Scatter slits (JJ)"
+  - "Shutters"
+  - "Storage ring"
+  - "Upstream slits (JJ)"
+x-stage-attribution: &stage_attribution
+  - '(?i)(part of|on|belongs to|mounted on)\s+(the\s+)?(Ring\ lamp\ and\ video\ camera|Higher\ Order\ Suppressor|Upstream\ slits\ \(JJ\)|Scatter\ slits\ \(JJ\)|Middle\ slits\ \(JJ\)|Sample\ stage|Storage\ ring|PZT\ shutter|Exit\ slits|Photodiode|Beam\ stop|Gold\ mesh|Detector|Diag\ 106|Mono\ 101|Shutters|EPU5|M101|M103|M121|EPU)'
+x-tiled-identity-ban: &tiled_identity_ban
+  - 'P2026\d{5}(-\d{2})?(-S\d{2})?'
+  - '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+  - '(?i)Cheng\ Wang|Thomas\ Ferron'
+settings:
+  graph_source: json
+  json_graph_paths:
+    - storage/kg/matkg_rsoxs_v1.json
+    - storage/kg/matkg_bl1101_v2.json
+  source_rag: false
+  use_live_tiled: false
+  ui_settings:
+    graphSource: json
+    sourceRag: false
+    useLiveTiled: false
+cases:
+  - id: S01
+    question: "What solution-processing methods are effective to create high-quality OPVs?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S02
+    question: "How can I examine the nanostructure of an OPV using synchrotron radiation?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S03
+    question: "What metrics are useful to determine the performance of an OPV?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S04
+    question: "What can ultra-fast spectroscopy tell me about an OPV?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S05
+    question: "How do I measure short circuit current in an OPV?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S06
+    question: "What properties of an OPV determine how high a short circuit current will be?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S07
+    question: "I am not getting very efficient OPVs compared to literature values. What can I check for in my laboratory to try and troubleshoot what may be happening?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S08
+    question: "What is the highest efficiency OPV that has ever been tested? What processing steps were used to achieve this result?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S09
+    question: "Explain the concept of radiative versus non-radiative loss channels as they relate to OPVs."
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S10
+    question: "What are the best methods to measure radiative versus non-radiative recombination in OPVs?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S11
+    question: "Can you give me an example device stack for OPVs? What layer thicknesses should I use for each element?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S12
+    question: "Can you give me an example inverted device stack for OPVs? What layer thicknesses should I use for each element?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S13
+    question: "What are the differences between Y5, Y6, Y7, Y8, and Y18 molecules?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S14
+    question: "How important are co-crystals between Donor and Acceptor in OPVs?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S15
+    question: "What are the advantages of ITIC derived acceptor molecules compared to Y6?"
+    category: science
+    tuple_ids:
+      - "C23"
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S16
+    question: "What are methods that I can use to improve the light-stability of my OPV devices?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S17
+    question: "What are the advantages of a ternary OPV blend? Can you give me examples of high performing materials and specific blend ratios that I should use?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S18
+    question: "I am making a bilayer OPV using CuPC and ZnPc. What is the morphology of those two molecules and how can I prepare devices using vapor deposition? What should I consider during device fabrication?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S19
+    question: "Where should I buy OPV donor and acceptor materials?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: false
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S20
+    question: "What does resonant scattering tell me about an OPV active layer?"
+    category: science
+    tuple_ids:
+      - "C20"
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S21
+    question: "Can you explain to me the steps of conducting RSOXS at the Advanced Light Source? Who should I contact to learn more about this technique?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S22
+    question: "How do I interpret polarization-induced anisotropic resonant scattering? In what ways could I misinterpret the data?"
+    category: science
+    tuple_ids:
+      - "C21"
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S23
+    question: "What does an integrated scattering intensity tell me in RSOXS and when is it appropriate to use such an analysis?"
+    category: science
+    tuple_ids:
+      - "C25"
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S24
+    question: "What properties of an OPV can I measure using the Advanced Light Source?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S25
+    question: "What are the benefits of using fullerene acceptors instead of non-fullerene acceptors in OPVs?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S26
+    question: "Why is P3HT a much better donor polymer to use than PM6?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S27
+    question: "Why do acceptor molecules similar to (2,2′-((2Z,2′Z)-((12,13-bis(2-ethylhexyl)-3,9-diundecyl-12,13-dihydro-[1,2,5]thiadiazolo[3,4-e]thieno[2,\"3′’:4’,5′]thieno[2′,3′:4,5]pyrrolo[3,2-g]thieno[2′,3′:4,5]thieno[3,2-b]indole-2,10-diyl)bis(methanylylidene))bis(5,6-difluoro-3-oxo-2,3-dihydro-1H-indene-2,1-diylidene))dimalononitrile) perform so much better than fullerenes."
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: S28
+    question: "Why do acceptor molecules similar to Y6 perform so much better than fullerenes?"
+    category: science
+    tuple_ids: []
+    expected_graph_ids:
+      - "rsoxs_v1"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    notes: ""
+    prefilled: true
+  - id: O01
+    question: "Which stage is in_chamber_jj_vert_aperture part of?"
+    category: ops
+    tuple_ids:
+      - "C15"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "Scatter slits (JJ)"
+    allowed_entities: []
+    notes: "Motor in_chamber_jj_vert_aperture maps to Scatter slits (JJ) in storage/schema/bl1101_motor_stage_map.yaml."
+    prefilled: true
+  - id: O02
+    question: "Which stage is upstream_jj_horz_aperture part of?"
+    category: ops
+    tuple_ids:
+      - "C15"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "Upstream slits (JJ)"
+    allowed_entities: []
+    notes: "Motor upstream_jj_horz_aperture maps to Upstream slits (JJ) in storage/schema/bl1101_motor_stage_map.yaml."
+    prefilled: true
+  - id: O03
+    question: "Which stage is exit_slit_top part of?"
+    category: ops
+    tuple_ids:
+      - "C15"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "Exit slits"
+    allowed_entities: []
+    notes: "Motor exit_slit_top maps to Exit slits in storage/schema/bl1101_motor_stage_map.yaml."
+    prefilled: true
+  - id: O04
+    question: "Which stage is sample_azimuthal_rotation part of?"
+    category: ops
+    tuple_ids:
+      - "C15"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "Sample stage"
+    allowed_entities: []
+    notes: "Motor sample_azimuthal_rotation maps to Sample stage in storage/schema/bl1101_motor_stage_map.yaml."
+    prefilled: true
+  - id: O05
+    question: "Which stage is mono_energy part of?"
+    category: ops
+    tuple_ids:
+      - "C15"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "Mono 101"
+    allowed_entities: []
+    notes: "Motor mono_energy maps to Mono 101 in storage/schema/bl1101_motor_stage_map.yaml."
+    prefilled: true
+  - id: O06
+    question: "Which stage is ccd_shutter_control part of?"
+    category: ops
+    tuple_ids:
+      - "C15"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "Detector"
+    allowed_entities: []
+    notes: "Motor ccd_shutter_control maps to Detector in storage/schema/bl1101_motor_stage_map.yaml."
+    prefilled: true
+  - id: O07
+    question: "Where is sample_z_galil_c?"
+    category: ops
+    tuple_ids:
+      - "C16"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "sample_z"
+      - "Sample stage"
+    allowed_entities: []
+    notes: "sample_z_galil_c aliases sample_z, which is part_of Sample stage in matkg_bl1101_v2."
+    prefilled: true
+  - id: O08
+    question: "Where is beam_stop_x_galil_f?"
+    category: ops
+    tuple_ids:
+      - "C16"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "beam_stop_x"
+      - "Beam stop"
+    allowed_entities: []
+    notes: "beam_stop_x_galil_f aliases beam_stop_x, which is part_of Beam stop in matkg_bl1101_v2."
+    prefilled: true
+  - id: O09
+    question: "Where is ccd_theta_galil_e?"
+    category: ops
+    tuple_ids:
+      - "C16"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include:
+      - "ccd_theta"
+      - "Detector"
+    allowed_entities: []
+    notes: "ccd_theta_galil_e aliases ccd_theta, which is part_of Detector in matkg_bl1101_v2."
+    prefilled: true
+  - id: O10
+    question: "What stage is piezo_horiz on?"
+    category: ops
+    tuple_ids:
+      - "C17"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_match: *stage_attribution
+    notes: "piezo_horiz is leave_on_beamline in the motor map. must_not_match is the stage-attribution regex over &beamline_stages in matkg_bl1101_v2 (the concatenated duplicate stage node is omitted)."
+    prefilled: true
+  - id: O11
+    question: "What stage is fake_motor on?"
+    category: ops
+    tuple_ids:
+      - "C17"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_match: *stage_attribution
+    notes: "fake_motor is leave_on_beamline in the motor map. must_not_match is the stage-attribution regex over &beamline_stages in matkg_bl1101_v2 (the concatenated duplicate stage node is omitted)."
+    prefilled: true
+  - id: O12
+    question: "What stage is ao_0 on?"
+    category: ops
+    tuple_ids:
+      - "C17"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_match: *stage_attribution
+    notes: "ao_0 is leave_on_beamline in the motor map. must_not_match is the stage-attribution regex over &beamline_stages in matkg_bl1101_v2 (the concatenated duplicate stage node is omitted)."
+    prefilled: true
+  - id: O13
+    question: "Walk me through how the hardware is connected in order on 11.0.1.2"
+    category: ops
+    tuple_ids:
+      - "C12"
+      - "C13"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_mention:
+      - "CyRSoXS"
+      - "NRSS"
+      - "YBCO"
+      - "cuprate"
+    notes: "Layout question. Ops graph only."
+    prefilled: true
+  - id: O14
+    question: "Walk me through the beam path on 11.0.1.2"
+    category: ops
+    tuple_ids:
+      - "C14"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_mention:
+      - "CyRSoXS"
+      - "NRSS"
+      - "YBCO"
+      - "cuprate"
+    notes: "Layout question. Ops graph only."
+    prefilled: true
+  - id: O15
+    question: "What comes after M103 on 11.0.1.2?"
+    category: ops
+    tuple_ids:
+      - "C02"
+    expected_graph_ids:
+      - "bl1101"
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_mention:
+      - "CyRSoXS"
+      - "NRSS"
+      - "YBCO"
+      - "cuprate"
+    notes: "Layout question. Ops graph only."
+    prefilled: true
+  - id: T01
+    question: "Tell me about ESAF 2026-00041"
+    category: tiled
+    tuple_ids:
+      - "C29"
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "Cheng Wang"
+      - "P202600041-01"
+      - "P202600041-02"
+      - "P202600041-03"
+      - "P202600041-04"
+      - "P202600041-05"
+      - "P202600041-06"
+      - "P202600041-07"
+      - "P202600041-08"
+      - "P202600041-09"
+      - "P202600041-10"
+      - "scan_count: 98"
+    allowed_entities:
+      - "P202600041-01-S01 (P3HT:PCBM blend)"
+      - "P202600041-01-S02 (P3HT)"
+      - "P202600041-02-S01 (P3HT:PCBM blend)"
+      - "P202600041-02-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-02-S03 (regioregular P3HT)"
+      - "P202600041-02-S04 (regioregular P3HT)"
+      - "P202600041-02-S05 (P3HT)"
+      - "P202600041-02-S06 (P3HT:PCBM blend)"
+      - "P202600041-02-S07 (P3HT)"
+      - "P202600041-02-S08 (regioregular P3HT)"
+      - "P202600041-02-S09 (organic photovoltaic (OPV) devices)"
+      - "P202600041-02-S10 (P3HT:PCBM blend)"
+      - "P202600041-02-S11 (regioregular P3HT)"
+      - "P202600041-03-S01 (regioregular P3HT)"
+      - "P202600041-03-S02 (P3HT)"
+      - "P202600041-03-S03 (regioregular P3HT)"
+      - "P202600041-03-S04 (P3HT)"
+      - "P202600041-03-S05 (P3HT)"
+      - "P202600041-03-S06 (regioregular P3HT)"
+      - "P202600041-03-S07 (P3HT)"
+      - "P202600041-03-S08 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S09 (P3HT)"
+      - "P202600041-03-S10 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S11 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S12 (P3HT:PCBM blend)"
+      - "P202600041-03-S13 (regioregular P3HT)"
+      - "P202600041-03-S14 (regioregular P3HT)"
+      - "P202600041-03-S15 (P3HT:PCBM blend)"
+      - "P202600041-03-S16 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S17 (P3HT:PCBM blend)"
+      - "P202600041-03-S18 (P3HT)"
+      - "P202600041-03-S19 (P3HT)"
+      - "P202600041-03-S20 (P3HT)"
+      - "P202600041-04-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S02 (regioregular P3HT)"
+      - "P202600041-04-S03 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S04 (P3HT)"
+      - "P202600041-04-S05 (regioregular P3HT)"
+      - "P202600041-04-S06 (P3HT)"
+      - "P202600041-04-S07 (regioregular P3HT)"
+      - "P202600041-04-S08 (regioregular P3HT)"
+      - "P202600041-04-S09 (P3HT)"
+      - "P202600041-04-S10 (regioregular P3HT)"
+      - "P202600041-04-S11 (P3HT)"
+      - "P202600041-04-S12 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S13 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S14 (regioregular P3HT)"
+      - "P202600041-05-S01 (P3HT)"
+      - "P202600041-05-S02 (regioregular P3HT)"
+      - "P202600041-05-S03 (P3HT:PCBM blend)"
+      - "P202600041-05-S04 (regioregular P3HT)"
+      - "P202600041-05-S05 (P3HT:PCBM blend)"
+      - "P202600041-05-S06 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S07 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S08 (regioregular P3HT)"
+      - "P202600041-05-S09 (regioregular P3HT)"
+      - "P202600041-05-S10 (P3HT:PCBM blend)"
+      - "P202600041-05-S11 (P3HT:PCBM blend)"
+      - "P202600041-05-S12 (regioregular P3HT)"
+      - "P202600041-05-S13 (P3HT)"
+      - "P202600041-05-S14 (regioregular P3HT)"
+      - "P202600041-05-S15 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S16 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S17 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S01 (regioregular P3HT)"
+      - "P202600041-06-S02 (P3HT:PCBM blend)"
+      - "P202600041-06-S03 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S04 (regioregular P3HT)"
+      - "P202600041-06-S05 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S06 (P3HT:PCBM blend)"
+      - "P202600041-06-S07 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S08 (P3HT:PCBM blend)"
+      - "P202600041-06-S09 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S10 (P3HT)"
+      - "P202600041-06-S11 (P3HT:PCBM blend)"
+      - "P202600041-06-S12 (regioregular P3HT)"
+      - "P202600041-06-S13 (regioregular P3HT)"
+      - "P202600041-06-S14 (P3HT:PCBM blend)"
+      - "P202600041-06-S15 (regioregular P3HT)"
+      - "P202600041-06-S16 (P3HT:PCBM blend)"
+      - "P202600041-06-S17 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S18 (P3HT)"
+      - "P202600041-07-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-07-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-07-S03 (regioregular P3HT)"
+      - "P202600041-07-S04 (regioregular P3HT)"
+      - "P202600041-07-S05 (P3HT:PCBM blend)"
+      - "P202600041-07-S06 (P3HT:PCBM blend)"
+      - "P202600041-07-S07 (P3HT)"
+      - "P202600041-07-S08 (regioregular P3HT)"
+      - "P202600041-07-S09 (P3HT)"
+      - "P202600041-07-S10 (P3HT)"
+      - "P202600041-07-S11 (P3HT)"
+      - "P202600041-07-S12 (regioregular P3HT)"
+      - "P202600041-08-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-08-S02 (regioregular P3HT)"
+      - "P202600041-08-S03 (organic photovoltaic (OPV) devices)"
+      - "P202600041-08-S04 (P3HT:PCBM blend)"
+      - "P202600041-08-S05 (P3HT:PCBM blend)"
+      - "P202600041-08-S06 (P3HT:PCBM blend)"
+      - "P202600041-08-S07 (P3HT:PCBM blend)"
+      - "P202600041-08-S08 (P3HT)"
+      - "P202600041-08-S09 (P3HT:PCBM blend)"
+      - "P202600041-09-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S02 (P3HT)"
+      - "P202600041-09-S03 (regioregular P3HT)"
+      - "P202600041-09-S04 (P3HT)"
+      - "P202600041-09-S05 (P3HT)"
+      - "P202600041-09-S06 (regioregular P3HT)"
+      - "P202600041-09-S07 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S08 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S09 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S10 (regioregular P3HT)"
+      - "P202600041-09-S11 (regioregular P3HT)"
+      - "P202600041-09-S12 (P3HT)"
+      - "P202600041-09-S13 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S14 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S15 (P3HT)"
+      - "P202600041-09-S16 (P3HT:PCBM blend)"
+      - "P202600041-09-S17 (P3HT:PCBM blend)"
+      - "P202600041-09-S18 (regioregular P3HT)"
+      - "P202600041-10-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-10-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-10-S03 (regioregular P3HT)"
+      - "P202600041-10-S04 (regioregular P3HT)"
+      - "9cd237f8-8fc5-4d6f-bc31-8d2c803ccbc4"
+      - "d32208c3-2ea7-4199-ca20-14ccce292113"
+      - "9b9de663-e733-b909-6839-4383426f97bc"
+      - "38dc0112-c486-05d2-5738-18151350a3bd"
+      - "32819e92-6fec-c1f3-7299-7cc6f2977cae"
+      - "be036a62-43d1-4e73-fcc8-7721df7582ac"
+      - "658f7942-abe2-2c09-d9a4-8252a789bc0b"
+      - "70d1ee29-89fd-2dc2-5a3b-2c9fc0ee7ae4"
+      - "c82083a9-568e-e9b7-0842-7878ef8b6364"
+      - "004b79c9-ebd4-5987-444f-3131e809004a"
+      - "a4f25bf7-e960-d753-2027-552c5c8db7cb"
+      - "0a745682-b1b4-86a7-a7d8-106961c12d55"
+      - "19f7fd9d-0122-ca73-e4f7-c06114c2f2ce"
+      - "9b7bb82a-ae31-9cdf-d2d3-e7579e5c8e37"
+      - "0767d018-73e5-8d1a-404e-9fbc745ef447"
+      - "8f928ddc-df6d-fdef-2245-9b58cd2abb66"
+      - "2b6f3beb-30ba-a915-fb0e-bedfecbb312d"
+      - "3fe0d307-6dc6-a127-6b2a-b1ba09d06c16"
+      - "b0d69e17-ce77-55f0-3e34-beafa814eb4f"
+      - "570c6a04-3d2e-d983-5b56-498968049541"
+      - "7f350c06-2e69-f5fd-7eee-d327d173c897"
+      - "4ba8e379-29dc-365b-e38a-4fc03731de99"
+      - "1b77274f-808c-e202-55f7-fec1dccdc561"
+      - "bd98633c-97c2-51bf-cb66-35b7a439c6db"
+      - "ef3a7c1b-9832-1625-fe40-d67e63290a79"
+      - "66eeeb69-5193-aabc-f117-87cbee0ff56b"
+      - "1ec4d31a-444b-cf57-639b-e475d17dced0"
+      - "a7f4bc89-4bc6-c91c-bb47-b4601463e246"
+      - "7536da50-0767-30db-4fe3-7f9a9144ead9"
+      - "a1ca2703-7db5-f02e-ce10-64211bb9d211"
+      - "a94d1bfa-1bbf-7a88-8e8f-e8b20e075808"
+      - "03ad3f5f-d0ae-5eb2-b596-31b98acef9b0"
+      - "f30ff51f-3e3e-bdfb-f132-d135d4ca5d26"
+      - "eaee7d80-a758-9086-592b-f785d90c6107"
+      - "5e4b05c2-ba6d-75a6-154c-f1bf8a9396be"
+      - "bcd14a3a-a3c0-9497-fa54-08d35343f085"
+      - "8a409097-144f-3666-07bc-62d9f1ed399b"
+      - "48cdef9e-b43b-cc92-5280-6d029463e186"
+      - "d5490498-f8eb-3141-c6db-6b708834087c"
+      - "c03995cc-cda7-4b32-fedc-e89187cacc28"
+      - "2243542e-24a2-094b-a5f7-44330e1fd9a9"
+      - "f949c981-5a0c-1a76-286a-420b1fb8c7dc"
+      - "e1f48347-c43c-b956-9375-6e90d1e11417"
+      - "e9c0fe27-ab7c-6bd4-9aa3-9cd0460cfead"
+      - "9998d1f1-d587-cf5b-76d3-d7d3d05a5222"
+      - "669f38a2-cd8a-2d76-938b-a068fbba3218"
+      - "40df901e-7db1-d7dd-d610-0f9c2cbabaf4"
+      - "e20208c2-0b6c-2eea-857b-905758f35561"
+      - "bf863c01-4338-2e6a-bc36-f5800a8fe69a"
+      - "d60ce85a-d5c9-0d5e-d702-63114082a7a6"
+      - "8c5a54c0-149b-97ef-cfbc-b26d156b9b79"
+      - "eb570ef3-6d02-9d56-3382-25f38ce9cb5d"
+      - "167e2a1d-3f3b-9fef-c18c-425cfb0a648a"
+      - "edfd0dae-946e-fb18-261c-b6f37d066dac"
+      - "c1bf9afa-ba24-7ad4-0060-5a137625cab0"
+      - "733c495d-2768-82bc-0528-267d24be3b09"
+      - "dd2b3231-e149-0e69-e1bc-4e3250ed0f7d"
+      - "d8cec9cc-fcb6-3526-c2f8-e37c8fc23008"
+      - "b5f35462-c18f-f5d5-0088-5bc98599b095"
+      - "4fde3fbe-e4be-59b9-1b03-3280af9b0127"
+      - "347d3d32-b7b1-b318-000f-d0758265baf7"
+      - "2b8ff0ab-2190-ac32-50e7-833441b9cb47"
+      - "183e85a1-558d-bd14-474b-6624f4351e1f"
+      - "17dd40d4-45bf-f0ad-030f-83fe882cb21a"
+      - "d98a3135-4666-a681-733b-2dbab05c9f04"
+      - "cb9e67d7-4814-bc36-d69c-1fc78e5680e6"
+      - "e3de0194-f309-2c30-0d79-fbc3549e5ea5"
+      - "0d3c2e30-8dd3-724d-04c7-c70ebb35ec79"
+      - "8b2f7277-866b-3d05-e621-fd035486efe9"
+      - "b34227b5-2ad9-74ed-00ae-0bb87cf6a269"
+      - "de2e7190-8d92-45b2-224f-8bd1f0af6285"
+      - "bb2a8dc9-2e0a-a81f-ee1a-7f8033dcbbe4"
+      - "5910979c-8374-9277-b64c-c9658841e6a7"
+      - "ee0d9016-dac2-b866-d82a-6954879b2a77"
+      - "b106e1a8-74db-388a-ea68-916e02a882e8"
+      - "74f8c803-4995-2016-d646-6e588f3b9d86"
+      - "cd66c765-29ec-f702-d088-598898040224"
+      - "9200daa9-f880-80f7-3a61-8c519a3e644b"
+      - "5b18b8b4-d35b-a840-645c-8fda157dabb8"
+      - "e3702ecc-f093-fe10-fa53-dc28f6871301"
+      - "542e1b54-a25d-32df-7c45-0201db730ce6"
+      - "2fe92b05-ef9a-3f98-fc07-720e39e13cfa"
+      - "123c185b-108a-f7a7-ccbd-06e10e1aa26b"
+      - "360a72c1-0613-a756-fe82-ce7f8dd175e7"
+      - "dc9426de-f319-ea48-a4ad-e8879343b452"
+      - "b46b49f6-59c7-f67d-4213-eb3e81220e3b"
+      - "1683850a-da75-f4c0-7080-1fc9917f2ee4"
+      - "669df7ca-bce5-fe3f-a3ec-88853176acf4"
+      - "900fa6ba-bfb9-62ae-606a-f5c9df7cdbae"
+      - "be880a82-2d4c-1f52-832c-07b8b5dadf89"
+      - "880dc4e2-80ac-f266-061b-1e2ee6abaafc"
+      - "aa99524a-e282-3b99-cbb0-41f43e491013"
+      - "7d405bf5-479c-5b30-d6d7-3fffcd7890e0"
+      - "a0d48c46-497d-b7e0-d402-3a1ae093ad91"
+      - "7d81c079-2b1d-fb1e-7ef4-b9e2a87cc7f0"
+      - "9143f7f1-f0c8-da00-bfd5-ce4b9122e45f"
+      - "614e4e74-edac-5557-be43-1c96e69fb960"
+      - "b17018a4-8bcb-bbe9-1267-20969a1be609"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "must_include is scientist, proposal codes, and scan_count. allowed_entities is samples and scan UIDs for this ESAF."
+    prefilled: true
+  - id: T02
+    question: "What samples are in P202600041-01?"
+    category: tiled
+    tuple_ids:
+      - "C30"
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "P202600041-01-S01 (P3HT:PCBM blend)"
+      - "P202600041-01-S02 (P3HT)"
+    allowed_entities:
+      - "P202600041-01-S01 (P3HT:PCBM blend)"
+      - "P202600041-01-S02 (P3HT)"
+      - "9cd237f8-8fc5-4d6f-bc31-8d2c803ccbc4"
+      - "d32208c3-2ea7-4199-ca20-14ccce292113"
+      - "9b9de663-e733-b909-6839-4383426f97bc"
+      - "38dc0112-c486-05d2-5738-18151350a3bd"
+      - "32819e92-6fec-c1f3-7299-7cc6f2977cae"
+      - "be036a62-43d1-4e73-fcc8-7721df7582ac"
+      - "658f7942-abe2-2c09-d9a4-8252a789bc0b"
+      - "70d1ee29-89fd-2dc2-5a3b-2c9fc0ee7ae4"
+      - "c82083a9-568e-e9b7-0842-7878ef8b6364"
+      - "004b79c9-ebd4-5987-444f-3131e809004a"
+      - "a4f25bf7-e960-d753-2027-552c5c8db7cb"
+      - "0a745682-b1b4-86a7-a7d8-106961c12d55"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "Samples on P202600041-01."
+    prefilled: true
+  - id: T03
+    question: "Summarize the scans for ESAF 2026-00041"
+    category: tiled
+    tuple_ids:
+      - "C31"
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "Cheng Wang"
+      - "P202600041-01"
+      - "P202600041-02"
+      - "P202600041-03"
+      - "P202600041-04"
+      - "P202600041-05"
+      - "P202600041-06"
+      - "P202600041-07"
+      - "P202600041-08"
+      - "P202600041-09"
+      - "P202600041-10"
+      - "scan_count: 98"
+    allowed_entities:
+      - "P202600041-01-S01 (P3HT:PCBM blend)"
+      - "P202600041-01-S02 (P3HT)"
+      - "P202600041-02-S01 (P3HT:PCBM blend)"
+      - "P202600041-02-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-02-S03 (regioregular P3HT)"
+      - "P202600041-02-S04 (regioregular P3HT)"
+      - "P202600041-02-S05 (P3HT)"
+      - "P202600041-02-S06 (P3HT:PCBM blend)"
+      - "P202600041-02-S07 (P3HT)"
+      - "P202600041-02-S08 (regioregular P3HT)"
+      - "P202600041-02-S09 (organic photovoltaic (OPV) devices)"
+      - "P202600041-02-S10 (P3HT:PCBM blend)"
+      - "P202600041-02-S11 (regioregular P3HT)"
+      - "P202600041-03-S01 (regioregular P3HT)"
+      - "P202600041-03-S02 (P3HT)"
+      - "P202600041-03-S03 (regioregular P3HT)"
+      - "P202600041-03-S04 (P3HT)"
+      - "P202600041-03-S05 (P3HT)"
+      - "P202600041-03-S06 (regioregular P3HT)"
+      - "P202600041-03-S07 (P3HT)"
+      - "P202600041-03-S08 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S09 (P3HT)"
+      - "P202600041-03-S10 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S11 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S12 (P3HT:PCBM blend)"
+      - "P202600041-03-S13 (regioregular P3HT)"
+      - "P202600041-03-S14 (regioregular P3HT)"
+      - "P202600041-03-S15 (P3HT:PCBM blend)"
+      - "P202600041-03-S16 (organic photovoltaic (OPV) devices)"
+      - "P202600041-03-S17 (P3HT:PCBM blend)"
+      - "P202600041-03-S18 (P3HT)"
+      - "P202600041-03-S19 (P3HT)"
+      - "P202600041-03-S20 (P3HT)"
+      - "P202600041-04-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S02 (regioregular P3HT)"
+      - "P202600041-04-S03 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S04 (P3HT)"
+      - "P202600041-04-S05 (regioregular P3HT)"
+      - "P202600041-04-S06 (P3HT)"
+      - "P202600041-04-S07 (regioregular P3HT)"
+      - "P202600041-04-S08 (regioregular P3HT)"
+      - "P202600041-04-S09 (P3HT)"
+      - "P202600041-04-S10 (regioregular P3HT)"
+      - "P202600041-04-S11 (P3HT)"
+      - "P202600041-04-S12 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S13 (organic photovoltaic (OPV) devices)"
+      - "P202600041-04-S14 (regioregular P3HT)"
+      - "P202600041-05-S01 (P3HT)"
+      - "P202600041-05-S02 (regioregular P3HT)"
+      - "P202600041-05-S03 (P3HT:PCBM blend)"
+      - "P202600041-05-S04 (regioregular P3HT)"
+      - "P202600041-05-S05 (P3HT:PCBM blend)"
+      - "P202600041-05-S06 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S07 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S08 (regioregular P3HT)"
+      - "P202600041-05-S09 (regioregular P3HT)"
+      - "P202600041-05-S10 (P3HT:PCBM blend)"
+      - "P202600041-05-S11 (P3HT:PCBM blend)"
+      - "P202600041-05-S12 (regioregular P3HT)"
+      - "P202600041-05-S13 (P3HT)"
+      - "P202600041-05-S14 (regioregular P3HT)"
+      - "P202600041-05-S15 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S16 (organic photovoltaic (OPV) devices)"
+      - "P202600041-05-S17 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S01 (regioregular P3HT)"
+      - "P202600041-06-S02 (P3HT:PCBM blend)"
+      - "P202600041-06-S03 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S04 (regioregular P3HT)"
+      - "P202600041-06-S05 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S06 (P3HT:PCBM blend)"
+      - "P202600041-06-S07 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S08 (P3HT:PCBM blend)"
+      - "P202600041-06-S09 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S10 (P3HT)"
+      - "P202600041-06-S11 (P3HT:PCBM blend)"
+      - "P202600041-06-S12 (regioregular P3HT)"
+      - "P202600041-06-S13 (regioregular P3HT)"
+      - "P202600041-06-S14 (P3HT:PCBM blend)"
+      - "P202600041-06-S15 (regioregular P3HT)"
+      - "P202600041-06-S16 (P3HT:PCBM blend)"
+      - "P202600041-06-S17 (organic photovoltaic (OPV) devices)"
+      - "P202600041-06-S18 (P3HT)"
+      - "P202600041-07-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-07-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-07-S03 (regioregular P3HT)"
+      - "P202600041-07-S04 (regioregular P3HT)"
+      - "P202600041-07-S05 (P3HT:PCBM blend)"
+      - "P202600041-07-S06 (P3HT:PCBM blend)"
+      - "P202600041-07-S07 (P3HT)"
+      - "P202600041-07-S08 (regioregular P3HT)"
+      - "P202600041-07-S09 (P3HT)"
+      - "P202600041-07-S10 (P3HT)"
+      - "P202600041-07-S11 (P3HT)"
+      - "P202600041-07-S12 (regioregular P3HT)"
+      - "P202600041-08-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-08-S02 (regioregular P3HT)"
+      - "P202600041-08-S03 (organic photovoltaic (OPV) devices)"
+      - "P202600041-08-S04 (P3HT:PCBM blend)"
+      - "P202600041-08-S05 (P3HT:PCBM blend)"
+      - "P202600041-08-S06 (P3HT:PCBM blend)"
+      - "P202600041-08-S07 (P3HT:PCBM blend)"
+      - "P202600041-08-S08 (P3HT)"
+      - "P202600041-08-S09 (P3HT:PCBM blend)"
+      - "P202600041-09-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S02 (P3HT)"
+      - "P202600041-09-S03 (regioregular P3HT)"
+      - "P202600041-09-S04 (P3HT)"
+      - "P202600041-09-S05 (P3HT)"
+      - "P202600041-09-S06 (regioregular P3HT)"
+      - "P202600041-09-S07 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S08 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S09 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S10 (regioregular P3HT)"
+      - "P202600041-09-S11 (regioregular P3HT)"
+      - "P202600041-09-S12 (P3HT)"
+      - "P202600041-09-S13 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S14 (organic photovoltaic (OPV) devices)"
+      - "P202600041-09-S15 (P3HT)"
+      - "P202600041-09-S16 (P3HT:PCBM blend)"
+      - "P202600041-09-S17 (P3HT:PCBM blend)"
+      - "P202600041-09-S18 (regioregular P3HT)"
+      - "P202600041-10-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-10-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-10-S03 (regioregular P3HT)"
+      - "P202600041-10-S04 (regioregular P3HT)"
+      - "9cd237f8-8fc5-4d6f-bc31-8d2c803ccbc4"
+      - "d32208c3-2ea7-4199-ca20-14ccce292113"
+      - "9b9de663-e733-b909-6839-4383426f97bc"
+      - "38dc0112-c486-05d2-5738-18151350a3bd"
+      - "32819e92-6fec-c1f3-7299-7cc6f2977cae"
+      - "be036a62-43d1-4e73-fcc8-7721df7582ac"
+      - "658f7942-abe2-2c09-d9a4-8252a789bc0b"
+      - "70d1ee29-89fd-2dc2-5a3b-2c9fc0ee7ae4"
+      - "c82083a9-568e-e9b7-0842-7878ef8b6364"
+      - "004b79c9-ebd4-5987-444f-3131e809004a"
+      - "a4f25bf7-e960-d753-2027-552c5c8db7cb"
+      - "0a745682-b1b4-86a7-a7d8-106961c12d55"
+      - "19f7fd9d-0122-ca73-e4f7-c06114c2f2ce"
+      - "9b7bb82a-ae31-9cdf-d2d3-e7579e5c8e37"
+      - "0767d018-73e5-8d1a-404e-9fbc745ef447"
+      - "8f928ddc-df6d-fdef-2245-9b58cd2abb66"
+      - "2b6f3beb-30ba-a915-fb0e-bedfecbb312d"
+      - "3fe0d307-6dc6-a127-6b2a-b1ba09d06c16"
+      - "b0d69e17-ce77-55f0-3e34-beafa814eb4f"
+      - "570c6a04-3d2e-d983-5b56-498968049541"
+      - "7f350c06-2e69-f5fd-7eee-d327d173c897"
+      - "4ba8e379-29dc-365b-e38a-4fc03731de99"
+      - "1b77274f-808c-e202-55f7-fec1dccdc561"
+      - "bd98633c-97c2-51bf-cb66-35b7a439c6db"
+      - "ef3a7c1b-9832-1625-fe40-d67e63290a79"
+      - "66eeeb69-5193-aabc-f117-87cbee0ff56b"
+      - "1ec4d31a-444b-cf57-639b-e475d17dced0"
+      - "a7f4bc89-4bc6-c91c-bb47-b4601463e246"
+      - "7536da50-0767-30db-4fe3-7f9a9144ead9"
+      - "a1ca2703-7db5-f02e-ce10-64211bb9d211"
+      - "a94d1bfa-1bbf-7a88-8e8f-e8b20e075808"
+      - "03ad3f5f-d0ae-5eb2-b596-31b98acef9b0"
+      - "f30ff51f-3e3e-bdfb-f132-d135d4ca5d26"
+      - "eaee7d80-a758-9086-592b-f785d90c6107"
+      - "5e4b05c2-ba6d-75a6-154c-f1bf8a9396be"
+      - "bcd14a3a-a3c0-9497-fa54-08d35343f085"
+      - "8a409097-144f-3666-07bc-62d9f1ed399b"
+      - "48cdef9e-b43b-cc92-5280-6d029463e186"
+      - "d5490498-f8eb-3141-c6db-6b708834087c"
+      - "c03995cc-cda7-4b32-fedc-e89187cacc28"
+      - "2243542e-24a2-094b-a5f7-44330e1fd9a9"
+      - "f949c981-5a0c-1a76-286a-420b1fb8c7dc"
+      - "e1f48347-c43c-b956-9375-6e90d1e11417"
+      - "e9c0fe27-ab7c-6bd4-9aa3-9cd0460cfead"
+      - "9998d1f1-d587-cf5b-76d3-d7d3d05a5222"
+      - "669f38a2-cd8a-2d76-938b-a068fbba3218"
+      - "40df901e-7db1-d7dd-d610-0f9c2cbabaf4"
+      - "e20208c2-0b6c-2eea-857b-905758f35561"
+      - "bf863c01-4338-2e6a-bc36-f5800a8fe69a"
+      - "d60ce85a-d5c9-0d5e-d702-63114082a7a6"
+      - "8c5a54c0-149b-97ef-cfbc-b26d156b9b79"
+      - "eb570ef3-6d02-9d56-3382-25f38ce9cb5d"
+      - "167e2a1d-3f3b-9fef-c18c-425cfb0a648a"
+      - "edfd0dae-946e-fb18-261c-b6f37d066dac"
+      - "c1bf9afa-ba24-7ad4-0060-5a137625cab0"
+      - "733c495d-2768-82bc-0528-267d24be3b09"
+      - "dd2b3231-e149-0e69-e1bc-4e3250ed0f7d"
+      - "d8cec9cc-fcb6-3526-c2f8-e37c8fc23008"
+      - "b5f35462-c18f-f5d5-0088-5bc98599b095"
+      - "4fde3fbe-e4be-59b9-1b03-3280af9b0127"
+      - "347d3d32-b7b1-b318-000f-d0758265baf7"
+      - "2b8ff0ab-2190-ac32-50e7-833441b9cb47"
+      - "183e85a1-558d-bd14-474b-6624f4351e1f"
+      - "17dd40d4-45bf-f0ad-030f-83fe882cb21a"
+      - "d98a3135-4666-a681-733b-2dbab05c9f04"
+      - "cb9e67d7-4814-bc36-d69c-1fc78e5680e6"
+      - "e3de0194-f309-2c30-0d79-fbc3549e5ea5"
+      - "0d3c2e30-8dd3-724d-04c7-c70ebb35ec79"
+      - "8b2f7277-866b-3d05-e621-fd035486efe9"
+      - "b34227b5-2ad9-74ed-00ae-0bb87cf6a269"
+      - "de2e7190-8d92-45b2-224f-8bd1f0af6285"
+      - "bb2a8dc9-2e0a-a81f-ee1a-7f8033dcbbe4"
+      - "5910979c-8374-9277-b64c-c9658841e6a7"
+      - "ee0d9016-dac2-b866-d82a-6954879b2a77"
+      - "b106e1a8-74db-388a-ea68-916e02a882e8"
+      - "74f8c803-4995-2016-d646-6e588f3b9d86"
+      - "cd66c765-29ec-f702-d088-598898040224"
+      - "9200daa9-f880-80f7-3a61-8c519a3e644b"
+      - "5b18b8b4-d35b-a840-645c-8fda157dabb8"
+      - "e3702ecc-f093-fe10-fa53-dc28f6871301"
+      - "542e1b54-a25d-32df-7c45-0201db730ce6"
+      - "2fe92b05-ef9a-3f98-fc07-720e39e13cfa"
+      - "123c185b-108a-f7a7-ccbd-06e10e1aa26b"
+      - "360a72c1-0613-a756-fe82-ce7f8dd175e7"
+      - "dc9426de-f319-ea48-a4ad-e8879343b452"
+      - "b46b49f6-59c7-f67d-4213-eb3e81220e3b"
+      - "1683850a-da75-f4c0-7080-1fc9917f2ee4"
+      - "669df7ca-bce5-fe3f-a3ec-88853176acf4"
+      - "900fa6ba-bfb9-62ae-606a-f5c9df7cdbae"
+      - "be880a82-2d4c-1f52-832c-07b8b5dadf89"
+      - "880dc4e2-80ac-f266-061b-1e2ee6abaafc"
+      - "aa99524a-e282-3b99-cbb0-41f43e491013"
+      - "7d405bf5-479c-5b30-d6d7-3fffcd7890e0"
+      - "a0d48c46-497d-b7e0-d402-3a1ae093ad91"
+      - "7d81c079-2b1d-fb1e-7ef4-b9e2a87cc7f0"
+      - "9143f7f1-f0c8-da00-bfd5-ce4b9122e45f"
+      - "614e4e74-edac-5557-be43-1c96e69fb960"
+      - "b17018a4-8bcb-bbe9-1267-20969a1be609"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "must_include is scientist, proposal codes, and scan_count. allowed_entities is samples and scan UIDs for this ESAF."
+    prefilled: true
+  - id: T04
+    question: "Tell me about ESAF 2026-00042"
+    category: tiled
+    tuple_ids: []
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "Thomas Ferron"
+      - "P202600042-01"
+      - "P202600042-02"
+      - "scan_count: 29"
+    allowed_entities:
+      - "P202600042-01-S01 (polymer blends)"
+      - "P202600042-01-S02 (conjugated polymers)"
+      - "P202600042-01-S03 (polymer blends)"
+      - "P202600042-01-S04 (conjugated polymers)"
+      - "P202600042-01-S05 (polymer blends)"
+      - "P202600042-01-S06 (polymer blends)"
+      - "P202600042-01-S07 (polymer blends)"
+      - "P202600042-01-S08 (conjugated polymers)"
+      - "P202600042-02-S01 (polymer blends)"
+      - "P202600042-02-S02 (conjugated polymers)"
+      - "P202600042-02-S03 (polymer blends)"
+      - "P202600042-02-S04 (conjugated polymers)"
+      - "P202600042-02-S05 (conjugated polymers)"
+      - "P202600042-02-S06 (polymer blends)"
+      - "P202600042-02-S07 (polymer blends)"
+      - "P202600042-02-S08 (conjugated polymers)"
+      - "f1278745-77c0-a7ce-46b5-5fb87c18103e"
+      - "e7220719-f11a-caef-3346-9ff380e9c985"
+      - "0fd0748e-110f-387f-a498-11aa73ccb73b"
+      - "b31171e5-bb3e-e6fe-9728-a3a5ec40c8c3"
+      - "c84a1519-6b31-f576-3b57-985d5d2d5063"
+      - "51ae431b-9049-9803-d153-c42cf83ae617"
+      - "7968e44b-9b60-3d0a-4660-bfe9e22da8fe"
+      - "6d6060ad-e400-9039-1520-40a4dff7bf7a"
+      - "c817f3e3-e006-2c81-6878-a204a20349d8"
+      - "94d07501-d288-9fcf-442b-ec2e5dfbdd45"
+      - "4f6a8043-0105-8628-c7ff-414af2847f2f"
+      - "e28e65d4-3088-eb75-ae6d-bc641da23494"
+      - "c034c7d8-51c4-fa31-a39a-8bfabb839d2e"
+      - "91e56a64-fb72-4e25-0b19-5c8ee22871ed"
+      - "f8fe7cd0-e929-0763-99c7-5864a0658d44"
+      - "9a07f2f9-f9ba-c073-fccd-4c5a7bccab0e"
+      - "fcad15f6-acbf-8831-b2fb-2e3d497a5972"
+      - "39d738af-b7e5-a9a3-f7ab-7bf8df7abfc3"
+      - "11f7cadd-ce3c-f0b3-f0e3-3337e9ac45da"
+      - "aac41b9e-ab3f-bd40-da12-7e27baf2c1b0"
+      - "b9889739-93d8-a467-e73e-133773668add"
+      - "230f0344-77d5-f9e6-046f-a6784b6bb7b5"
+      - "8ba99c7d-7627-261a-b40a-36a29b77cbef"
+      - "7c5f7191-5fc7-a541-c8d0-755957aa1b6f"
+      - "b1e791d3-d3e3-5982-453d-3c2551245ffb"
+      - "19e675bc-5634-4c42-2004-393e96829277"
+      - "f324bf6d-014a-bc79-9b1a-3e7e70e7feed"
+      - "acc1fbd4-1d1f-80d1-69e2-9b5fcfada700"
+      - "c0262574-f49c-9dbb-f75c-d393dd7b8af8"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "must_include is scientist, proposal codes, and scan_count. allowed_entities is samples and scan UIDs for this ESAF."
+    prefilled: true
+  - id: T05
+    question: "What proposals are under ESAF 2026-00043?"
+    category: tiled
+    tuple_ids: []
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "P202600043-01"
+    allowed_entities:
+      - "P202600043-01-S01 (PVD glasses)"
+      - "P202600043-01-S02 (PVD glasses)"
+      - "P202600043-01-S03 (TPD-DO37 contrast)"
+      - "P202600043-01-S04 (PVD-grown film)"
+      - "P202600043-01-S05 (TPD-DO37 contrast)"
+      - "P202600043-01-S06 (TPD-DO37 contrast)"
+      - "P202600043-01-S07 (PVD glasses)"
+      - "P202600043-01-S08 (PVD-grown film)"
+      - "P202600043-01-S09 (PVD glasses)"
+      - "P202600043-01-S10 (TPD-DO37 contrast)"
+      - "41bc0d89-475d-2d7e-e5ff-8456d2c88248"
+      - "b75b3ec3-d97f-89d6-6950-fc22787164ba"
+      - "fb0cf9b9-ef82-53e9-f845-2a541905f397"
+      - "4d932cae-258d-ba3c-7e22-6ecd6361e8c6"
+      - "36a30736-7639-0b85-07d8-dd7eb9a684f0"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "Proposal codes on ESAF 2026-00043."
+    prefilled: true
+  - id: T06
+    question: "What samples are in P202600044-01?"
+    category: tiled
+    tuple_ids: []
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "P202600044-01-S01 (P3HT)"
+      - "P202600044-01-S02 (P3HT)"
+      - "P202600044-01-S03 (P3HT)"
+      - "P202600044-01-S04 (crystalline P3HT)"
+      - "P202600044-01-S05 (P3HT)"
+      - "P202600044-01-S06 (crystalline P3HT)"
+      - "P202600044-01-S07 (P3HT)"
+      - "P202600044-01-S08 (P3HT)"
+      - "P202600044-01-S09 (crystalline P3HT)"
+      - "P202600044-01-S10 (crystalline P3HT)"
+    allowed_entities:
+      - "P202600044-01-S01 (P3HT)"
+      - "P202600044-01-S02 (P3HT)"
+      - "P202600044-01-S03 (P3HT)"
+      - "P202600044-01-S04 (crystalline P3HT)"
+      - "P202600044-01-S05 (P3HT)"
+      - "P202600044-01-S06 (crystalline P3HT)"
+      - "P202600044-01-S07 (P3HT)"
+      - "P202600044-01-S08 (P3HT)"
+      - "P202600044-01-S09 (crystalline P3HT)"
+      - "P202600044-01-S10 (crystalline P3HT)"
+      - "61c404ee-9023-a8e7-081a-fcf59aff860a"
+      - "241b87df-a8c4-d4eb-bd45-52613f09538f"
+      - "7a8527e9-08fd-905d-ce58-eeeb3aa569df"
+      - "c58b5848-eb8d-ff05-446f-3a10c0e55260"
+      - "b8d777de-e2f2-e383-4746-79c62c5fde0f"
+      - "03cfafe3-d0d0-6eec-5576-0bdd0ac15a11"
+      - "bd81c3c9-8ef3-2ad6-6c18-77b4f4dd2f05"
+      - "64cd3f9e-ba77-3b08-ff9a-3803110d3211"
+      - "5052933d-f17e-4ff0-ed90-ece494e4555c"
+      - "f851c36c-2076-2cc3-8aeb-11b6cff5a25a"
+      - "d3af6d43-63f0-6a24-55e5-c12aad7b56db"
+      - "257bbbc1-33f7-a2c6-240e-1bc5dd1a4ca4"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "Samples on P202600044-01."
+    prefilled: true
+  - id: T07
+    question: "Tell me about ESAF 2026-00045"
+    category: tiled
+    tuple_ids: []
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "Cheng Wang"
+      - "P202600045-01"
+      - "P202600045-02"
+      - "P202600045-03"
+      - "P202600045-04"
+      - "P202600045-05"
+      - "P202600045-06"
+      - "scan_count: 63"
+    allowed_entities:
+      - "P202600045-01-S01 (conjugated polymers)"
+      - "P202600045-01-S02 (conjugated polymers)"
+      - "P202600045-01-S03 (conjugated polymers)"
+      - "P202600045-01-S04 (OPV blends)"
+      - "P202600045-01-S05 (OPV blends)"
+      - "P202600045-01-S06 (conjugated polymers)"
+      - "P202600045-01-S07 (OPV blends)"
+      - "P202600045-01-S08 (OPV blends)"
+      - "P202600045-01-S09 (conjugated polymers)"
+      - "P202600045-01-S10 (conjugated polymers)"
+      - "P202600045-02-S01 (conjugated polymers)"
+      - "P202600045-02-S02 (OPV blends)"
+      - "P202600045-02-S03 (conjugated polymers)"
+      - "P202600045-02-S04 (conjugated polymers)"
+      - "P202600045-02-S05 (OPV blends)"
+      - "P202600045-02-S06 (OPV blends)"
+      - "P202600045-02-S07 (conjugated polymers)"
+      - "P202600045-02-S08 (OPV blends)"
+      - "P202600045-02-S09 (OPV blends)"
+      - "P202600045-02-S10 (conjugated polymers)"
+      - "P202600045-02-S11 (conjugated polymers)"
+      - "P202600045-02-S12 (OPV blends)"
+      - "P202600045-02-S13 (OPV blends)"
+      - "P202600045-02-S14 (conjugated polymers)"
+      - "P202600045-02-S15 (conjugated polymers)"
+      - "P202600045-02-S16 (conjugated polymers)"
+      - "P202600045-03-S01 (conjugated polymers)"
+      - "P202600045-03-S02 (conjugated polymers)"
+      - "P202600045-03-S03 (OPV blends)"
+      - "P202600045-03-S04 (conjugated polymers)"
+      - "P202600045-03-S05 (OPV blends)"
+      - "P202600045-03-S06 (conjugated polymers)"
+      - "P202600045-03-S07 (OPV blends)"
+      - "P202600045-03-S08 (OPV blends)"
+      - "P202600045-03-S09 (conjugated polymers)"
+      - "P202600045-03-S10 (conjugated polymers)"
+      - "P202600045-03-S11 (conjugated polymers)"
+      - "P202600045-03-S12 (OPV blends)"
+      - "P202600045-03-S13 (OPV blends)"
+      - "P202600045-03-S14 (OPV blends)"
+      - "P202600045-03-S15 (conjugated polymers)"
+      - "P202600045-03-S16 (OPV blends)"
+      - "P202600045-04-S01 (conjugated polymers)"
+      - "P202600045-04-S02 (conjugated polymers)"
+      - "P202600045-04-S03 (conjugated polymers)"
+      - "P202600045-04-S04 (OPV blends)"
+      - "P202600045-04-S05 (OPV blends)"
+      - "P202600045-04-S06 (conjugated polymers)"
+      - "P202600045-04-S07 (conjugated polymers)"
+      - "P202600045-04-S08 (conjugated polymers)"
+      - "P202600045-04-S09 (OPV blends)"
+      - "P202600045-04-S10 (conjugated polymers)"
+      - "P202600045-04-S11 (conjugated polymers)"
+      - "P202600045-04-S12 (conjugated polymers)"
+      - "P202600045-04-S13 (OPV blends)"
+      - "P202600045-04-S14 (OPV blends)"
+      - "P202600045-04-S15 (OPV blends)"
+      - "P202600045-04-S16 (OPV blends)"
+      - "P202600045-04-S17 (OPV blends)"
+      - "P202600045-05-S01 (conjugated polymers)"
+      - "P202600045-06-S01 (conjugated polymers)"
+      - "P202600045-06-S02 (conjugated polymers)"
+      - "P202600045-06-S03 (OPV blends)"
+      - "P202600045-06-S04 (conjugated polymers)"
+      - "1f2bf24f-7c83-4a1d-0fd7-4d6b7021a8c7"
+      - "0533782c-7ce4-42a3-b6e1-66d41d6470ca"
+      - "7ea8cd7a-96ce-8c91-ae31-f47855ba1d07"
+      - "2207d808-e0f5-9da5-2304-d9ea6baa9b1e"
+      - "85a758dc-d732-1dfd-470d-5427df4280b2"
+      - "367b8a65-a99b-27af-e65e-e8cc70261f07"
+      - "c16ad9e9-a041-7f60-dfd0-5a93f004d3df"
+      - "b62ce67d-3875-e9dc-09f7-23dcffa85faa"
+      - "6628ed1a-5e28-3a14-40da-7028434705d2"
+      - "d8ac0720-22ab-9fbd-9912-d892fb265cb8"
+      - "bd289979-d1fb-3f1d-763f-44595b155ddd"
+      - "19cabdaf-5a86-0e88-0f59-e4615ac0296c"
+      - "961d0072-116b-0316-13fc-7ece482c9f40"
+      - "1c9aa31a-ef3c-e21b-da84-ffb75710dfa9"
+      - "82d6a1d5-cfe1-156b-b546-9582041fed56"
+      - "aa111873-7549-2c88-ef5e-2f0544d47e32"
+      - "a0edb6e1-e589-220e-a29b-e1875d8dbfd4"
+      - "f1b1931e-8408-64e4-3052-6d6ef6506c36"
+      - "793501ba-5bc7-c9b1-7751-861e18b38e6a"
+      - "d9e68a60-8883-b9f9-23c9-f4a1c31c77f4"
+      - "b520503f-4623-a69b-3632-bd989b5e3919"
+      - "9de7cbbc-6135-6899-b7fc-03e1a4f0f535"
+      - "fc105c57-1958-ce6b-ebf1-f3c1a57bff02"
+      - "b33185d2-af7a-6d49-7cd5-5b9e02cc2004"
+      - "e6f6fa24-84b0-0464-9904-709e85abdf6e"
+      - "2467991d-b784-5106-c3ca-1b0e2f2f3a31"
+      - "f8278a2b-3d44-3b0b-a2d9-d201971ba6b5"
+      - "e765e3ac-fdc6-a03e-b1ae-9d6010c0dcd4"
+      - "c39454f4-1e81-e587-3afb-91ce2e733b76"
+      - "ef749a20-3e66-e6d6-37e5-303ce41d690a"
+      - "de15404c-8fbf-da00-1260-aa0ecf2c33d1"
+      - "fed1b54c-e72c-fe9f-804f-c8910e44e8db"
+      - "8b171ada-ebab-7518-a86f-ca5fb391dee8"
+      - "6131e5a1-8ea4-d639-c5f9-7b5343e38869"
+      - "82afa8fd-c7f7-922e-afb0-8b3a74180984"
+      - "150da5cf-fc91-e5ef-39cf-40c5026f6c8a"
+      - "17b126dc-92df-0533-d831-56db5f6146b8"
+      - "2177b4e7-acaa-3607-a274-76a01af83b67"
+      - "57e6c283-af6b-2833-80a6-c6762d427276"
+      - "f470c5fb-ed1d-d7ef-eb5f-f58a5ab63330"
+      - "17274482-6223-ce72-702c-9bafd6fb94fa"
+      - "e3d9d5ed-76ee-a054-0baf-4e368bbf849c"
+      - "2a9437f0-be98-7a0e-af83-473f45299f56"
+      - "89a92fb3-4465-75e4-aa58-964a937cc224"
+      - "b7ed50ee-fbff-9478-2004-c4617a76d9fe"
+      - "13afc629-f8ac-bef9-e87b-b80776ba0009"
+      - "4f15dba6-be22-538e-3435-63af8ab4ee88"
+      - "fad8f738-07ef-5aac-309b-2c928a6ef927"
+      - "2f2b3c58-267b-c4af-9681-e671527445be"
+      - "2c730e49-d9bc-0d67-f1b0-aa6bb50eef52"
+      - "2d01124b-61f3-110a-5e9d-015f13a6daea"
+      - "c6baa997-e8b1-95ee-c51e-0dee6339157b"
+      - "23dbd623-1a66-cd06-8177-1011535531fd"
+      - "aa27aae5-4f1d-46f7-728c-9f628642e3e4"
+      - "9a098cac-d831-e968-0307-9f620e1b0b44"
+      - "e5c97cd8-bd9a-95fe-8c9f-21bae18e8096"
+      - "01803e13-d4ce-2d43-9f28-a8ab0c472748"
+      - "bf403ce0-0608-d744-fc5e-9c15890b303a"
+      - "c8690cf1-ac94-e1f2-0891-4b12325b24f8"
+      - "e9be25e5-c503-c7e6-4937-3c50bbc44b99"
+      - "051a955d-4fcc-ec85-5b3d-50233db90767"
+      - "fb2c8da4-278b-6eda-c344-dba7b88f573c"
+      - "c3df3d19-aa91-f524-aebb-f43b95ba5492"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "must_include is scientist, proposal codes, and scan_count. allowed_entities is samples and scan UIDs for this ESAF."
+    prefilled: true
+  - id: T08
+    question: "Show me the most recent scan"
+    category: tiled
+    tuple_ids: []
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "5910979c-8374-9277-b64c-c9658841e6a7"
+      - "P202600041-07"
+      - "2026-00041"
+    allowed_entities:
+      - "P202600041-07-S01 (organic photovoltaic (OPV) devices)"
+      - "P202600041-07-S02 (organic photovoltaic (OPV) devices)"
+      - "P202600041-07-S03 (regioregular P3HT)"
+      - "P202600041-07-S04 (regioregular P3HT)"
+      - "P202600041-07-S05 (P3HT:PCBM blend)"
+      - "P202600041-07-S06 (P3HT:PCBM blend)"
+      - "P202600041-07-S07 (P3HT)"
+      - "P202600041-07-S08 (regioregular P3HT)"
+      - "P202600041-07-S09 (P3HT)"
+      - "P202600041-07-S10 (P3HT)"
+      - "P202600041-07-S11 (P3HT)"
+      - "P202600041-07-S12 (regioregular P3HT)"
+      - "4fde3fbe-e4be-59b9-1b03-3280af9b0127"
+      - "347d3d32-b7b1-b318-000f-d0758265baf7"
+      - "2b8ff0ab-2190-ac32-50e7-833441b9cb47"
+      - "183e85a1-558d-bd14-474b-6624f4351e1f"
+      - "17dd40d4-45bf-f0ad-030f-83fe882cb21a"
+      - "d98a3135-4666-a681-733b-2dbab05c9f04"
+      - "cb9e67d7-4814-bc36-d69c-1fc78e5680e6"
+      - "e3de0194-f309-2c30-0d79-fbc3549e5ea5"
+      - "0d3c2e30-8dd3-724d-04c7-c70ebb35ec79"
+      - "8b2f7277-866b-3d05-e621-fd035486efe9"
+      - "b34227b5-2ad9-74ed-00ae-0bb87cf6a269"
+      - "de2e7190-8d92-45b2-224f-8bd1f0af6285"
+      - "bb2a8dc9-2e0a-a81f-ee1a-7f8033dcbbe4"
+      - "5910979c-8374-9277-b64c-c9658841e6a7"
+      - "ee0d9016-dac2-b866-d82a-6954879b2a77"
+      - "b106e1a8-74db-388a-ea68-916e02a882e8"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "Latest start_time in the fixture is 2026-05-23T07:11:00Z (scan 213 labview_energy_scan)."
+    prefilled: true
+  - id: T09
+    question: "What is in P202600042-01?"
+    category: tiled
+    tuple_ids: []
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "P202600042-01-S01 (polymer blends)"
+      - "P202600042-01-S02 (conjugated polymers)"
+      - "P202600042-01-S03 (polymer blends)"
+      - "P202600042-01-S04 (conjugated polymers)"
+      - "P202600042-01-S05 (polymer blends)"
+      - "P202600042-01-S06 (polymer blends)"
+      - "P202600042-01-S07 (polymer blends)"
+      - "P202600042-01-S08 (conjugated polymers)"
+      - "scan_count: 9"
+    allowed_entities:
+      - "P202600042-01-S01 (polymer blends)"
+      - "P202600042-01-S02 (conjugated polymers)"
+      - "P202600042-01-S03 (polymer blends)"
+      - "P202600042-01-S04 (conjugated polymers)"
+      - "P202600042-01-S05 (polymer blends)"
+      - "P202600042-01-S06 (polymer blends)"
+      - "P202600042-01-S07 (polymer blends)"
+      - "P202600042-01-S08 (conjugated polymers)"
+      - "f1278745-77c0-a7ce-46b5-5fb87c18103e"
+      - "e7220719-f11a-caef-3346-9ff380e9c985"
+      - "0fd0748e-110f-387f-a498-11aa73ccb73b"
+      - "b31171e5-bb3e-e6fe-9728-a3a5ec40c8c3"
+      - "c84a1519-6b31-f576-3b57-985d5d2d5063"
+      - "51ae431b-9049-9803-d153-c42cf83ae617"
+      - "7968e44b-9b60-3d0a-4660-bfe9e22da8fe"
+      - "6d6060ad-e400-9039-1520-40a4dff7bf7a"
+      - "c817f3e3-e006-2c81-6878-a204a20349d8"
+    when_tiled_off:
+      must_include: []
+      must_not_match: *tiled_identity_ban
+    notes: "must_include is the eight samples and scan_count: 9. Scan UIDs are allowed, not required."
+    prefilled: true
+  - id: T10
+    question: "Tell me about ESAF 2026-99999"
+    category: tiled
+    tuple_ids:
+      - "C33"
+    expected_graph_ids: []
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    must_not_match: *tiled_identity_ban
+    notes: "ESAF absent from the fixture. must_not_match bans proposal/sample codes, scan UUIDs, and fixture scientist names."
+    prefilled: true
+  - id: R01
+    question: "How do I run CyRSoXS?"
+    category: regex_probe
+    tuple_ids:
+      - "C11"
+    expected_graph_ids: []
+    assert_graph: true
+    must_include:
+      - "CyRSoXS"
+    allowed_entities: []
+    expect_live_tiled_status: skipped
+    notes: "expect_live_tiled_status applies only when live Tiled is on."
+    prefilled: false
+  - id: R02
+    question: "What sample classes suit RSoXS?"
+    category: regex_probe
+    tuple_ids:
+      - "C11"
+    expected_graph_ids: []
+    assert_graph: true
+    must_include: []
+    allowed_entities: []
+    expect_live_tiled_status: skipped
+    notes: "expect_live_tiled_status applies only when live Tiled is on."
+    prefilled: false

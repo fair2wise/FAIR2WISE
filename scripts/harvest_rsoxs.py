@@ -889,6 +889,52 @@ def _arxiv_id_from_work(work: Dict[str, Any]) -> Optional[str]:
     )
 
 
+# arXiv API floor is 1 req / 3s. A 3s client retry plus the next query immediately
+# after HTTP 429/503 is what boxed harvest_tomo. Space pages, and back off the
+# same query on throttle instead of skipping it.
+ARXIV_DELAY_SECONDS = 15.0
+ARXIV_CLIENT_NUM_RETRIES = 1
+ARXIV_THROTTLE_BACKOFF_SECONDS = 60.0
+ARXIV_THROTTLE_BACKOFF_CAP_SECONDS = 180.0
+ARXIV_THROTTLE_MAX_RETRIES = 5
+
+
+def _arxiv_is_throttle(exc: BaseException) -> bool:
+    """True when export.arxiv.org rate-limited or overloaded the request."""
+    text = str(exc)
+    return "HTTP 429" in text or "HTTP 503" in text
+
+
+def _arxiv_throttle_wait(attempt: int) -> float:
+    """Exponential wait after a 429/503, capped so a harvest cannot stall for hours."""
+    return min(
+        ARXIV_THROTTLE_BACKOFF_SECONDS * (2 ** max(attempt, 0)),
+        ARXIV_THROTTLE_BACKOFF_CAP_SECONDS,
+    )
+
+
+def _work_from_arxiv_result(result: Any) -> Optional[Dict[str, Any]]:
+    """Map an arxiv.Result into the harvest work dict, or None if the PDF URL is bad."""
+    short_id = str(result.get_short_id()).strip()
+    pdf_url = str(result.pdf_url or f"https://arxiv.org/pdf/{short_id}").strip()
+    if not short_id or not _is_reliable_pdf_url(pdf_url):
+        return None
+    published = getattr(result, "published", None)
+    doi = str(getattr(result, "doi", "") or "").strip()
+    if doi and not doi.lower().startswith("http"):
+        doi = f"https://doi.org/{doi}"
+    return {
+        "id": f"https://arxiv.org/abs/{short_id}",
+        "doi": doi or f"https://doi.org/10.48550/arXiv.{short_id}",
+        "title": " ".join(str(result.title or "").split()),
+        "abstract": " ".join(str(result.summary or "").split()),
+        "publication_year": getattr(published, "year", None),
+        "publication_date": published.date().isoformat() if published else None,
+        "pdf_urls": [pdf_url],
+        "source": "arxiv",
+    }
+
+
 def search_arxiv(
     queries: Iterable[str],
     per_query: int,
@@ -898,7 +944,11 @@ def search_arxiv(
     import arxiv
 
     classify = classifier or classify_rsoxs
-    client = arxiv.Client(page_size=min(per_query, 50), delay_seconds=3, num_retries=2)
+    client = arxiv.Client(
+        page_size=min(per_query, 50),
+        delay_seconds=ARXIV_DELAY_SECONDS,
+        num_retries=ARXIV_CLIENT_NUM_RETRIES,
+    )
     merged: List[Dict[str, Any]] = []
     seen: set[str] = set()
     for query in queries:
@@ -909,37 +959,35 @@ def search_arxiv(
             sort_by=arxiv.SortCriterion.SubmittedDate,
             sort_order=arxiv.SortOrder.Descending,
         )
-        try:
-            results = client.results(search)
-            for result in results:
-                short_id = str(result.get_short_id()).strip()
-                pdf_url = str(result.pdf_url or f"https://arxiv.org/pdf/{short_id}").strip()
-                if not short_id or not _is_reliable_pdf_url(pdf_url):
+        attempt = 0
+        while True:
+            try:
+                for result in client.results(search):
+                    work = _work_from_arxiv_result(result)
+                    if work is None:
+                        continue
+                    if classify(work["title"], work["abstract"]) == "C":
+                        continue
+                    key = _dedupe_key(work)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    merged.append(work)
+                break
+            except Exception as exc:
+                if _arxiv_is_throttle(exc) and attempt < ARXIV_THROTTLE_MAX_RETRIES:
+                    wait = _arxiv_throttle_wait(attempt)
+                    LOGGER.warning(
+                        "arXiv throttled for %r; backing off %.0fs (%s)",
+                        query,
+                        wait,
+                        exc,
+                    )
+                    time.sleep(wait)
+                    attempt += 1
                     continue
-                published = getattr(result, "published", None)
-                doi = str(getattr(result, "doi", "") or "").strip()
-                if doi and not doi.lower().startswith("http"):
-                    doi = f"https://doi.org/{doi}"
-                work = {
-                    "id": f"https://arxiv.org/abs/{short_id}",
-                    "doi": doi or f"https://doi.org/10.48550/arXiv.{short_id}",
-                    "title": " ".join(str(result.title or "").split()),
-                    "abstract": " ".join(str(result.summary or "").split()),
-                    "publication_year": getattr(published, "year", None),
-                    "publication_date": published.date().isoformat() if published else None,
-                    "pdf_urls": [pdf_url],
-                    "source": "arxiv",
-                }
-                if classify(work["title"], work["abstract"]) == "C":
-                    continue
-                key = _dedupe_key(work)
-                if key in seen:
-                    continue
-                seen.add(key)
-                merged.append(work)
-        except Exception as exc:
-            LOGGER.warning("arXiv search failed for %r (%s)", query, exc)
-            continue
+                LOGGER.warning("arXiv search failed for %r (%s)", query, exc)
+                break
     return merged
 
 
@@ -1442,7 +1490,11 @@ def _arxiv_pdf_urls_for_title(title: str) -> List[str]:
         import arxiv
 
         query = f'ti:"{title.split(":")[0].strip()}"'
-        client = arxiv.Client(page_size=5, delay_seconds=3, num_retries=1)
+        client = arxiv.Client(
+            page_size=5,
+            delay_seconds=ARXIV_DELAY_SECONDS,
+            num_retries=ARXIV_CLIENT_NUM_RETRIES,
+        )
         search = arxiv.Search(query=query, max_results=5, sort_by=arxiv.SortCriterion.Relevance)
         urls: List[str] = []
         for result in client.results(search):

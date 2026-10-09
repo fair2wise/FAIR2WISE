@@ -24,7 +24,9 @@ Implementation: `app/modules/f2w_agent/multi_kg.py` (`graph_id_for_path`,
 | `prov_vocabulary.yaml` | W3C PROV-O *reference* (not LinkML) | See below |
 
 Do not point the RSoXS extractor at `xray_schema.yaml`, and do not harvest
-X-ray fundamentals PDFs into `papers/rsoxs/`.
+X-ray fundamentals PDFs into `papers/rsoxs/`. Synchrotron tomography PDFs go
+in `papers/tomo/` (`scripts/harvest_tomo.py`), not `papers/xray/` or
+`papers/rsoxs/`.
 
 ## Extract vs viewer schemas
 

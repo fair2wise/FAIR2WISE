@@ -92,45 +92,59 @@ class TestOllamaClient:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _stream_chunk(*contents: str | None):
+    choices = []
+    for content in contents:
+        choice = MagicMock()
+        choice.delta.content = content
+        choice.message = None
+        choices.append(choice)
+    chunk = MagicMock()
+    chunk.choices = choices
+    return chunk
+
+
+def _async_stream(chunks):
+    async def create(**kwargs):
+        assert kwargs["stream"] is True
+
+        async def _chunks():
+            for chunk in chunks:
+                yield chunk
+
+        return _chunks()
+
+    return create
+
+
 class TestCBorgClient:
     def _run(self, coro):
         return asyncio.run(coro)
 
     def test_chat_returns_content(self):
-        mock_choice = MagicMock()
-        mock_choice.message.content = "response"
-        mock_resp = MagicMock()
-        mock_resp.choices = [mock_choice]
-
         client = kg_rag_api.CBorgClient(model="test", api_key="fake-key")
-        client.client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        client.client.chat.completions.create = _async_stream([
+            _stream_chunk("res"),
+            _stream_chunk("ponse"),
+        ])
 
         result = self._run(client.chat([{"role": "user", "content": "hi"}]))
         assert result == "response"
 
     def test_chat_returns_last_choice(self):
-        choices = []
-        for text in ["first", "second", "last"]:
-            c = MagicMock()
-            c.message.content = text
-            choices.append(c)
-        mock_resp = MagicMock()
-        mock_resp.choices = choices
-
         client = kg_rag_api.CBorgClient(model="test", api_key="fake-key")
-        client.client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        client.client.chat.completions.create = _async_stream([
+            _stream_chunk("first", "last"),
+        ])
 
         result = self._run(client.chat([{"role": "user", "content": "hi"}]))
         assert result == "last"
 
     def test_chat_returns_empty_on_none_content(self):
-        mock_choice = MagicMock()
-        mock_choice.message.content = None
-        mock_resp = MagicMock()
-        mock_resp.choices = [mock_choice]
-
         client = kg_rag_api.CBorgClient(model="test", api_key="fake-key")
-        client.client.chat.completions.create = AsyncMock(return_value=mock_resp)
+        client.client.chat.completions.create = _async_stream([
+            _stream_chunk(None),
+        ])
 
         result = self._run(client.chat([{"role": "user", "content": "hi"}]))
         assert result == ""

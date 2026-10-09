@@ -21,7 +21,8 @@ out per JSON file and merges hit lists tagged with `graph_id`.
 | `prov_vocabulary.yaml` | W3C PROV-O *reference* (not LinkML) | See below |
 
 Do not point the RSoXS extractor at `xray_schema.yaml`, and do not harvest
-X-ray fundamentals PDFs into `papers/rsoxs/`.
+X-ray fundamentals PDFs into `papers/rsoxs/`. Synchrotron tomography PDFs go
+in `papers/tomo/` (`scripts/harvest_tomo.py`).
 
 ## Extract vs viewer schemas
 

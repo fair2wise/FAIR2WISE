@@ -111,6 +111,42 @@ def _local_address() -> str | None:
     return "::"
 
 
+def _stream_piece(value: Any) -> str:
+    return value if isinstance(value, str) and value else ""
+
+
+def stream_chunk_text(chunk: Any) -> str:
+    """Text from one streamed chat chunk. Uses the last choice, then its delta."""
+    choices = getattr(chunk, "choices", None) or []
+    if not choices:
+        return ""
+    choice = choices[-1]
+    delta = getattr(choice, "delta", None)
+    if delta is not None:
+        piece = _stream_piece(getattr(delta, "content", None))
+        if piece:
+            return piece
+    message = getattr(choice, "message", None)
+    if message is None:
+        return ""
+    return _stream_piece(getattr(message, "content", None))
+
+
+def collect_stream_text(chunks: Any) -> str:
+    """Join a synchronous ``stream=True`` completion into one string."""
+    return "".join(stream_chunk_text(chunk) for chunk in chunks)
+
+
+async def collect_stream_text_async(chunks: Any) -> str:
+    """Join an async ``stream=True`` completion into one string."""
+    parts: list[str] = []
+    async for chunk in chunks:
+        piece = stream_chunk_text(chunk)
+        if piece:
+            parts.append(piece)
+    return "".join(parts)
+
+
 def openai_http_kwargs(*, asynchronous: bool) -> dict[str, Any]:
     """Return OpenAI client kwargs that pin CBORG to IPv4 or IPv6."""
     local_address = _local_address()

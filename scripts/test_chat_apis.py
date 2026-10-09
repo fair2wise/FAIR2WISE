@@ -68,8 +68,11 @@ class CBorgChatClient(ChatClient):
             temperature=temperature,
             # tools / response_format / max_tokens can be added here if needed
             timeout=timeout or self.timeout,  # requires openai>=1.40
+            stream=True,
         )
-        return resp.choices[-1].message.content or ""
+        from app.modules.cborg_http import collect_stream_text
+
+        return collect_stream_text(resp)
 
 
 if __name__ == "__main__":

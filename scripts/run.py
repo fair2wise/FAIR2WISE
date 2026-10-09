@@ -34,6 +34,10 @@ def parse_args() -> argparse.Namespace:
                    help="LLM backend")
     p.add_argument("--workers", type=int, default=4,
                    help="Parallel page-processing workers")
+    p.add_argument("--merge-top-k", type=int, default=int(os.environ.get("F2W_MERGE_TOP_K", "12")),
+                   help="Nearest existing terms sent to the LLM for merge verification")
+    p.add_argument("--merge-embed-model", default=os.environ.get("F2W_MERGE_EMBED_MODEL", "paraphrase-MiniLM-L6-v2"),
+                   help="SentenceTransformer model for merge candidate retrieval")
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--schema", default="storage/schema/matkg_schema.yaml",
                    help="Path to LinkML schema file")
@@ -59,6 +63,9 @@ def main() -> None:
     ))
     logging.root.setLevel(getattr(logging, args.log_level))
     logging.root.addHandler(handler)
+    console = logging.StreamHandler()
+    console.setFormatter(handler.formatter)
+    logging.root.addHandler(console)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     log = logging.getLogger(__name__)
@@ -110,6 +117,8 @@ def main() -> None:
     log.info("PDFs     : %d files in %s", len(pdfs), args.pdf_dir)
     log.info("Output   : %s", args.output)
     log.info("Workers  : %d", args.workers)
+    log.info("Merge k  : %d", args.merge_top_k)
+    log.info("Merge emb: %s", args.merge_embed_model)
     log.info("Schema   : %s", args.schema)
     log.info("ChEBI    : %s", chebi_path or "disabled")
 
@@ -135,6 +144,8 @@ def main() -> None:
         temperature=args.temperature,
         max_workers=args.workers,
         chebi_obo_path=chebi_path,
+        merge_top_k=args.merge_top_k,
+        merge_embed_model=args.merge_embed_model,
     )
 
     if result["status"] == "success":

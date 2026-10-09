@@ -190,8 +190,8 @@ if [[ "$KG_MODE" == "splash" ]] && command -v curl >/dev/null 2>&1; then
 fi
 
 # ── Port conflict check ───────────────────────────────────────────────────────
-if lsof -ti:"$PORT" >/dev/null 2>&1; then
-  echo "[ERROR] Port ${PORT} in use. Run: kill \$(lsof -ti:${PORT})" >&2
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "[ERROR] Port ${PORT} in use. Run: kill \$(lsof -tiTCP:${PORT} -sTCP:LISTEN)" >&2
   exit 1
 fi
 

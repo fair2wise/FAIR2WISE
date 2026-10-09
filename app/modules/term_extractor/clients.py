@@ -7,7 +7,7 @@ import openai
 import requests
 
 from app.modules.cborg_limiter import sync_slot
-from app.modules.cborg_http import openai_http_kwargs
+from app.modules.cborg_http import collect_stream_text, openai_http_kwargs
 from app.modules.f2w_agent.trace import record_llm_call
 
 logger = logging.getLogger(__name__)
@@ -116,8 +116,9 @@ class CBorgChatClient(ChatClient):
                     messages=[{"role": "user", "content": prompt}],
                     temperature=temperature,
                     timeout=timeout,
+                    stream=True,
                 )
-            result = resp.choices[-1].message.content or ""
+            result = collect_stream_text(resp)
             logger.debug("CBorgClient.chat: response_len=%d", len(result))
             return result
 

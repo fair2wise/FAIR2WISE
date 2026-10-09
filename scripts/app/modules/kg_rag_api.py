@@ -1310,13 +1310,17 @@ class CBorgClient:
 
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
         """Send messages to CBORG and return the assistant response."""
+        from app.modules.cborg_http import collect_stream_text_async
+
         try:
             resp = await self.client.chat.completions.create(
                 model=self.model,
                 messages=list(messages),
                 temperature=LLM_TEMPERATURE,
                 timeout=LLM_TIMEOUT,
+                stream=True,
             )
+            return await collect_stream_text_async(resp)
         except openai.APIConnectionError as exc:
             raise RuntimeError(
                 f"CBORG connection failed for {self.model}. Check CBORG_BASE_URL/network. {exc}"
@@ -1327,7 +1331,6 @@ class CBorgClient:
             ) from exc
         except openai.AuthenticationError as exc:
             raise RuntimeError("CBORG authentication failed. Check CBORG_API_KEY.") from exc
-        return resp.choices[-1].message.content or ""
 
 
 def make_chat_client(backend: str = LLM_BACKEND, model: Optional[str] = None) -> ChatClient:

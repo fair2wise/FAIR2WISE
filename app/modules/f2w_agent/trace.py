@@ -78,6 +78,7 @@ REQUEST_KEYS = (
     "source_rag",
     "use_live_tiled",
     "ui_settings",
+    "batch_id",
 )
 ORCHESTRATION_KEYS = (
     "raw_classifier_output",
@@ -319,6 +320,7 @@ def _empty_record(turn_id: str, session_id: Optional[str], parent_turn_id: Optio
             "source_rag": None,
             "use_live_tiled": None,
             "ui_settings": {},
+            "batch_id": None,
         },
         "orchestration": {
             "raw_classifier_output": None,
@@ -586,9 +588,12 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> Dict[str, Any
             graph_ids.append(graph_id)
         if len(graph_ids) == 3:
             break
+    ui_settings = request.get("ui_settings") if isinstance(request.get("ui_settings"), Mapping) else {}
     return {
         "turn_id": payload.get("turn_id"),
         "session_id": payload.get("session_id"),
+        "batch_id": request.get("batch_id"),
+        "category": ui_settings.get("category"),
         "ts": payload.get("started_at"),
         "question": question[:300],
         "classification": orchestration.get("classification"),

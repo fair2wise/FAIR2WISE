@@ -138,6 +138,12 @@ class ChatRequest(BaseModel):
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
     ui_settings: Optional[Dict[str, Any]] = None
+    batch_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+    )
     graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
     json_graph_path: Optional[str] = None
     json_graph_paths: Optional[List[str]] = None
@@ -3533,6 +3539,7 @@ class AgentPipelineService:
         source_rag: Optional[bool],
         use_live_tiled: Optional[bool],
         ui_settings: Optional[Dict[str, Any]],
+        batch_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Request fields stored on the turn, with server defaults filled in."""
         paths = [path for path in (json_graph_paths or []) if str(path or "").strip()]
@@ -3550,6 +3557,7 @@ class AgentPipelineService:
                 self.runtime.use_live_tiled if use_live_tiled is None else bool(use_live_tiled)
             ),
             "ui_settings": ui_settings or {},
+            "batch_id": batch_id,
         }
 
     def _open_chat_trace(
@@ -3566,6 +3574,7 @@ class AgentPipelineService:
         client_turn_id: Optional[str],
         parent_turn_id: Optional[str],
         ui_settings: Optional[Dict[str, Any]],
+        batch_id: Optional[str] = None,
     ) -> None:
         """Bind a turn collector. Reuses one already opened for this request."""
         open_turn(
@@ -3581,6 +3590,7 @@ class AgentPipelineService:
                 source_rag,
                 use_live_tiled,
                 ui_settings,
+                batch_id,
             ),
             env=self._trace_env(),
         )
@@ -3606,6 +3616,7 @@ class AgentPipelineService:
         auto_approve: bool = False,
         client_turn_id: Optional[str] = None,
         ui_settings: Optional[Dict[str, Any]] = None,
+        batch_id: Optional[str] = None,
         ) -> ChatResponse:
         """Run a chat turn without streaming progress events."""
         self._open_chat_trace(
@@ -3620,6 +3631,7 @@ class AgentPipelineService:
             client_turn_id=client_turn_id,
             parent_turn_id=None,
             ui_settings=ui_settings,
+            batch_id=batch_id,
         )
         try:
             response = await self._ask_body(
@@ -3751,6 +3763,7 @@ class AgentPipelineService:
         auto_approve: bool = False,
         client_turn_id: Optional[str] = None,
         ui_settings: Optional[Dict[str, Any]] = None,
+        batch_id: Optional[str] = None,
         ) -> ChatResponse:
         """Run a chat turn, emitting progress events along the way."""
         self._open_chat_trace(
@@ -3765,6 +3778,7 @@ class AgentPipelineService:
             client_turn_id=client_turn_id,
             parent_turn_id=None,
             ui_settings=ui_settings,
+            batch_id=batch_id,
         )
         try:
             response = await self._ask_with_progress_body(
@@ -6782,6 +6796,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                 use_live_tiled=req.use_live_tiled,
                 client_turn_id=req.client_turn_id,
                 ui_settings=req.ui_settings,
+                batch_id=req.batch_id,
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -6831,6 +6846,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                     req.source_rag,
                     req.use_live_tiled,
                     req.ui_settings,
+                    req.batch_id,
                 ),
                 env=service._trace_env(),
             )

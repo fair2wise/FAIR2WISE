@@ -44,6 +44,8 @@ extraction behavior.
 |---|---|
 | `download_pdfs.py` | Search arXiv or OpenAlex and validate downloaded PDFs |
 | `harvest_rsoxs.py` | Harvest **open-access** RSoXS PDFs into `papers/rsoxs/` (does not write the KG; never bulk-fetches publisher PDFs) |
+| `harvest_xray.py` | Harvest OA X-ray *fundamentals* PDFs into `papers/xray/` (not RSoXS, not clinical CT) |
+| `harvest_tomo.py` | Harvest OA **synchrotron X-ray tomography** PDFs into `papers/tomo/` (TXM, nano-CT, holotomography; not clinical CT, not `papers/xray/`) |
 | `paper_finder.py` | Paper Finder side tool: human review queue for skipped/failed paywalled rows (127.0.0.1 only) |
 | `ingest_bl1101.py` | Replay BL 11.0.1.2 ops KG into `storage/kg/matkg_bl1101_vN.json` |
 | `ingest_tiled_sim.py` | Seeded ESAF/Proposal/Scan/Sample overlay → next `matkg_bl1101_vN.json` (seed `20260916`; no live Tiled) |

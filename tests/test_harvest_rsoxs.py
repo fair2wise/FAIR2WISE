@@ -17,8 +17,11 @@ from harvest_rsoxs import (
     parse_pubtemp_plain,
     parse_pubtemp_rtf,
     score_rsoxs,
+    search_arxiv,
     works_same_identity,
     year_from_work,
+    _arxiv_is_throttle,
+    _arxiv_throttle_wait,
     _missing_pdf_dois,
     _openalex_oa_urls_for_doi,
     _resolve_oa_pdfs,
@@ -683,3 +686,59 @@ def test_resolve_oa_falls_back_to_osti_when_empty(monkeypatch):
     urls, sources = _resolve_oa_pdfs(paper, mailto="dev@localhost")
     assert urls == ["https://www.osti.gov/servlets/purl/1656507"]
     assert sources == ["osti"]
+
+
+def test_arxiv_throttle_detects_429_and_503():
+    assert _arxiv_is_throttle(
+        RuntimeError("Page request resulted in HTTP 429 (https://export.arxiv.org/api/query)")
+    )
+    assert _arxiv_is_throttle(
+        RuntimeError("Page request resulted in HTTP 503 (https://export.arxiv.org/api/query)")
+    )
+    assert not _arxiv_is_throttle(RuntimeError("timeout"))
+    assert _arxiv_throttle_wait(0) == 60.0
+    assert _arxiv_throttle_wait(1) == 120.0
+    assert _arxiv_throttle_wait(4) == 180.0
+
+
+def test_search_arxiv_retries_same_query_after_429(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    sleeps: list[float] = []
+    monkeypatch.setattr("harvest_rsoxs.time.sleep", lambda secs: sleeps.append(secs))
+
+    class _FakeResult:
+        pdf_url = "https://arxiv.org/pdf/2401.00001"
+        title = "Resonant soft X-ray scattering of a conjugated polymer"
+        summary = "RSoXS of P3HT:PCBM at a synchrotron beamline."
+        published = datetime(2024, 1, 15, tzinfo=timezone.utc)
+        doi = ""
+
+        def get_short_id(self):
+            return "2401.00001"
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.calls = 0
+
+        def results(self, search):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError(
+                    "Page request resulted in HTTP 429 "
+                    "(https://export.arxiv.org/api/query)"
+                )
+            return [_FakeResult()]
+
+    fake_arxiv = SimpleNamespace(
+        Client=_FakeClient,
+        Search=lambda **kwargs: SimpleNamespace(**kwargs),
+        SortCriterion=SimpleNamespace(SubmittedDate="SubmittedDate"),
+        SortOrder=SimpleNamespace(Descending="Descending"),
+    )
+    monkeypatch.setitem(__import__("sys").modules, "arxiv", fake_arxiv)
+    hits = search_arxiv(['all:"RSoXS"'], per_query=5, classifier=lambda *a: "A")
+    assert sleeps == [60.0]
+    assert len(hits) == 1
+    assert hits[0]["id"] == "https://arxiv.org/abs/2401.00001"

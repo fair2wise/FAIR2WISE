@@ -27,6 +27,13 @@ from modules.agents.chebi import ChebiOboLookup
 from modules.agents.chem_checker import ChemicalFormulaValidator
 from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
 from modules.cborg_http import openai_http_kwargs
+from modules.term_extractor.merge_index import (
+    DEFAULT_EMBED_MODEL,
+    DEFAULT_MERGE_TOP_K,
+    TermMergeIndex,
+    build_merge_prompt,
+    clean_term,
+)
 # extract tables and images in an agentic way
 # GEMMA 3 27b
 # Llama 3.2 Vision
@@ -89,8 +96,11 @@ class CBorgChatClient(ChatClient):
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             timeout=timeout,
+            stream=True,
         )
-        return resp.choices[-1].message.content or ""
+        from app.modules.cborg_http import collect_stream_text
+
+        return collect_stream_text(resp)
 
 
 def make_chat_client(
@@ -548,6 +558,9 @@ class LLMTermExtractor:
         max_workers: int = 50,
         chat_client: ChatClient | None = None,
         chebi_obo_path: str | None = None,
+        merge_top_k: int = DEFAULT_MERGE_TOP_K,
+        merge_embed_model: str = "",
+        merge_index: TermMergeIndex | None = None,
     ):
         """
         Args:
@@ -627,6 +640,12 @@ class LLMTermExtractor:
                 )
             except Exception as e:
                 logger.warning(f"Could not load previous terms: {e}")
+
+        self.merge_top_k = max(1, int(merge_top_k))
+        self._merge_index = merge_index or TermMergeIndex(
+            model_name=merge_embed_model or DEFAULT_EMBED_MODEL,
+            top_k=self.merge_top_k,
+        )
 
     @retry_on_exception((Exception,), retries=2, delay_seconds=2.0)
     def call_llm(self, prompt: str, timeout: int = 240) -> str:
@@ -743,91 +762,33 @@ class LLMTermExtractor:
         return term.strip().lower()
 
     def fuzzy_merge(self, term: str) -> Optional[str]:
-        """
-        Ask the LLM which existing term (if any) matches semantically.
-        Return that existing key, or None.
+        """Retrieve top-k similar existing terms, then ask the LLM to verify a merge.
+
+        Returns the existing canonical key, or None to register a new term.
         """
         if not self._bk_terms:
             return None
 
-        existing_display = list(self._bk_terms.keys())
-        bullets = "\n".join(f"- {disp}" for disp in existing_display)
+        cleaned = clean_term(term)
+        if not cleaned:
+            return None
 
-        prompt = f"""
-We have just extracted a new term:    "{term}"
-Below is the list of all already‐registered terms (one per line; the first time we saw each term):
-{bullets}
+        self._merge_index.ensure(list(self._bk_terms.keys()))
+        candidates = [
+            name for name in self._merge_index.query(cleaned, k=self.merge_top_k)
+            if name in self._bk_terms
+        ]
+        if not candidates:
+            return None
 
-You must decide whether "{term}" refers to exactly the same concept as one of these,
-or if it is a distinct new concept. Follow these rules:
-
-  1. **Ignore only trivial punctuation (spaces, hyphens, slashes, brackets, parentheses, capitalization)**
-     when comparing.  For example, "GIWAXS" and "GI-WAXS" are the *same* technique and should be merged
-     (choose the variant already in the list).  Likewise, "XRD" and "X-RD" (if it appeared) are identical.
-     Anything beyond punctuation differences (letters, numbers, or added qualifiers) is not trivial.
-
-  2. **Do NOT merge distinct instrument or method acronyms**.  Even if two acronyms share letters, if they are
-     known to be different techniques or materials, keep them separate.
-     Examples you must treat as always distinct:
-       - "SEM" (scanning electron microscopy) vs. "TEM" (transmission electron microscopy)
-       - "AFM" (atomic force microscopy)
-       - "XPS" vs. "UPS"
-       - "MoTe2" vs. "WTe2" (different compounds)
-       - "Al2O3[0001]" (specific surface) vs. "Al2O3" (generic material)
-     In other words, if two strings differ by more than punctuation—by letters, numbers
-     or explicit qualifiers—they should not be merged.
-
-  3. **Do NOT merge general vs. specific variants**.
-     If one term is a broader concept (e.g. "band structure") and another is a specialized version
-     (e.g. "Dirac-like band structure"), treat them as distinct.
-     Similarly, if a term includes an added qualifier or context
-     (e.g. surface orientation "[0001]" vs. generic material), do not merge into a more general term.
-
-  4. **If the newly extracted term is an exact punctuation-agnostic match** to one of the existing
-     terms—i.e., removing or changing only punctuation/brackets/spaces/case makes them identical—then respond
-     with exactly that already-registered term (preserve its original casing/spelling).
-     Otherwise, respond `"None"`.
-
-  5. **DO merge terms if one is the acronym for the other term**, vice versa,
-      or one term includes the acronym and the other doesn't
-      For example, "angle-resolved photoelectric spectroscopy" and "ARPES" should merge to become:
-      "angle-resolved photoemission spectroscopy (ARPES)".
-      Another example: "resonant soft xray scattering" or "R-SoXS" should merge to become:
-      "Resonant soft xray scattering (RSoXS)"
-
-  6. **Your response must be exactly one line**: either the exact existing term (matching punctuation
-     and case as it appears above) or the single word `None`. Don't output anything else—no quotes,
-     no extra commentary.
-
-Here are additional examples to illustrate:
-
-  • If the new term is `"GI-WAXS"` and the list already contains `"GIWAXS"`, respond exactly `"GIWAXS"`.
-  • If the new term is `"RSoXS"` and the list already contains `"R-SoXS"`,
-    respond exactly `"RSoXS" as the correct term`.
-  • If the new term is `"SEM"` and the list contains `"SEM"`, respond `"SEM"`, but if the list contains
-    only `"TEM"`, respond `"None"` (distinct acronyms).
-  • If the new term is `"MoTe2"` and the list has `"WTe2"`, respond `"None"` (different compound).
-  • If the new term is `"Band-structure"` and the list has `"Dirac-like band structure"`, respond `"None"`
-    (general vs. specific).
-  • If the new term is `"Al2O3[0001]"` and the list has `"Al2O3"`, respond `"None"` (surface-specific vs. generic).
-  • If the new term is `"photoemission"` and the list has `"angle-resolved photoemission spectroscopy (ARPES)"`,
-    respond `"None"` (general process vs. specific technique).
-  • If the new term is `"X-RD"` and the list has `"XRD"`, respond `"XRD"`
-    (consistent acronym once punctuation is removed).
-  • "organic solar cells" and "OSCs" should merge to become "Organic solar cells (OSCs)"
-
-Now, having read the rules, please answer: which of the above existing terms is exactly the same concept
-as "{term}"?  If none match, respond with `None`.
-"""
+        prompt = build_merge_prompt(cleaned, candidates)
         try:
-            # llm_response = self.call_ollama(prompt).strip()
             llm_response = self.call_llm(prompt).strip()
-
         except Exception as e:
             logger.warning(f"LLM merge check failed for '{term}': {e}")
             return None
 
-        if llm_response in self._bk_terms:
+        if llm_response in self._bk_terms and llm_response in set(candidates):
             logger.debug(f"LLM‐merge '{term}' → '{llm_response}'")
             return self._bk_terms[llm_response]
 
@@ -839,6 +800,7 @@ as "{term}"?  If none match, respond with `None`.
         """
         key = self.normalize_term(display_text)
         self._bk_terms[display_text] = key
+        self._merge_index.add(display_text)
         logger.debug(f"Registered new term '{display_text}' → '{key}'")
         return key
 
@@ -1932,6 +1894,8 @@ def run_extraction(
     temperature: float = 0.0,
     context_length: int = 50,
     max_workers: int = 4,
+    merge_top_k: int = DEFAULT_MERGE_TOP_K,
+    merge_embed_model: str = "",
 ) -> dict:
     """
     Run term extraction on a folder of PDFs and write the results JSON.
@@ -1985,6 +1949,8 @@ def run_extraction(
         max_workers=max_workers,
         chat_client=chat,
         chebi_obo_path=str(chebi_obo_path) if chebi_obo_path else None,
+        merge_top_k=merge_top_k,
+        merge_embed_model=merge_embed_model,
     )
 
     result = extractor.process_directory()
@@ -2067,6 +2033,17 @@ def parse_args() -> argparse.Namespace:
         default=4,
         help="Page-level worker count.",
     )
+    parser.add_argument(
+        "--merge-top-k",
+        type=int,
+        default=DEFAULT_MERGE_TOP_K,
+        help="Nearest existing terms to send to the LLM during fuzzy merge.",
+    )
+    parser.add_argument(
+        "--merge-embed-model",
+        default=os.environ.get("F2W_MERGE_EMBED_MODEL", DEFAULT_EMBED_MODEL),
+        help="SentenceTransformer model for merge candidate retrieval.",
+    )
     return parser.parse_args()
 
 
@@ -2085,6 +2062,8 @@ if __name__ == "__main__":
         temperature=args.temperature,
         context_length=args.context_length,
         max_workers=args.max_workers,
+        merge_top_k=args.merge_top_k,
+        merge_embed_model=args.merge_embed_model,
     )
     if result.get("status") == "error":
         print(f"✗ Error: {result.get('message')}")
