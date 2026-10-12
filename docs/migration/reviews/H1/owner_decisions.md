@@ -90,3 +90,27 @@ exists (PyPI, GitHub releases and conda-forge stop at 0.2.18; only
   central server's version and capabilities and fail clearly on mismatch.
 - Tiled's `pydantic-settings` constraint still conflicts with the F2W lock;
   the managed server runs in its own environment (`optional-dependencies.md`).
+
+## O-A5, O-A6, O-A7: T25B follow-ups (2026-10-12)
+
+Owner answers to the T25B open questions:
+
+- **O-A5 (JSON graph reading).** "All users on local, and all authenticated
+  users on staging/prod should have json graph reading ability." Applied:
+  `GET /graph/node/{id}` with `json_graph_path` now needs only
+  `chat.read_support` (`authorization.graph_node_read_capabilities`, route
+  R09). Per-turn graph choice in chat requests was already open. Changing the
+  server-wide default selection (`PUT /settings json_graph_paths`) stays
+  admin-only pending the owner (see open items).
+- **O-A6 (`extraction_mode`).** Admin-gated. Already implemented: it is not a
+  personal settings field, so changing it needs `settings.global`.
+- **O-A7 (MkDocs).** "MKDocs should be rendered and hosted on ALS deployment
+  target versions (and local)." Requirement for T24B/T24C: build the MkDocs
+  site into every image (`:local`, `:als-dev`, `:als-prod`) and serve it
+  under the `/fair2wise` prefix (the T24A source audit found the nginx image
+  has no `/docs` route today). This is separate from FastAPI's generated
+  `/docs`, `/redoc` and `/openapi.json` pages (open item below).
+
+Still open from T25B: `workflow_mode` gating, Tiled service principals as
+callers, FastAPI's generated API docs on ALS, `PUT /settings json_graph_paths`
+for non-admins, O-A1 (annotations), O-A2 (role-check max age).

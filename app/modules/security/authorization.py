@@ -570,7 +570,7 @@ ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("R07", _A, "POST", "/graph/nodes/search", "chat.read_support"),
     _p("R08", _A, "GET", "/graph/neighborhood/{node_id:path}", "chat.read_support"),
     _p("R09", _A, "GET", "/graph/node/{node_id}", "chat.read_support",
-       note="json_graph_path query needs settings.global (graph_node_read_capabilities)"),
+       note="json_graph_path query allowed for every reader (owner decision O-A5)"),
     _p("R10", _A, "PATCH", "/graph/node/{node_id}", "graph.edit"),
     _p("R11", _A, "POST", "/graph/upload", "graph.upload"),
     _p("R12", _A, "POST", "/chat", "chat.ask", note="no ingestion pending card unless chat_offers_ingestion"),
@@ -649,9 +649,13 @@ def chat_action_capabilities(decision: str, kind: Optional[str]) -> FrozenSet[st
 
 
 def graph_node_read_capabilities(json_graph_path: Optional[str]) -> FrozenSet[str]:
-    """Return capabilities for GET /graph/node/{id} (R09): file selection is admin only."""
-    if json_graph_path:
-        return frozenset({"chat.read_support", "settings.global"})
+    """Return capabilities for GET /graph/node/{id} (R09).
+
+    Reading a JSON graph is open to every local user and every signed-in ALS user,
+    with or without ``json_graph_path`` (owner decision O-A5, 2026-10-12). Changing
+    the server-wide default graph selection (PUT /settings ``json_graph_paths``)
+    stays admin-only.
+    """
     return frozenset({"chat.read_support"})
 
 

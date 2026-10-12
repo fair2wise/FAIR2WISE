@@ -167,7 +167,7 @@ Key: **A** allowed; **R** reduced/projected form; **D** denied (401 if not signe
 | R06 | GET /graph | `chat.read_support` | A | D | A | A | Projected GraphPayload. |
 | R07 | POST /graph/nodes/search | `chat.read_support` | A | D | A | A | |
 | R08 | GET /graph/neighborhood/{id} | `chat.read_support` | A | D | A | A | |
-| R09 | GET /graph/node/{id} | `chat.read_support` | A | D | A | A | `json_graph_path` query: admin only on ALS (selects files). |
+| R09 | GET /graph/node/{id} | `chat.read_support` | A | D | A | A | `json_graph_path` query allowed for every reader: all local users and all signed-in ALS users (owner decision O-A5, 2026-10-12). |
 | R10 | PATCH /graph/node/{id} | `graph.edit` | A | D | D | A | Re-check admin at write time (AUTH-04, TIL-05). |
 | R11 | POST /graph/upload | `graph.upload` | A | D | D | A | |
 | R12 | POST /chat | `chat.ask` | A | D | A | A | No ingestion pending card for non-admins. |

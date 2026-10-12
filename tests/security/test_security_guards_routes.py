@@ -161,7 +161,8 @@ def test_conditional_route_rules():
     assert chat_action_capabilities("yes", None) == {"ingest.acquire", "ingest.extract"}
     with pytest.raises(ContractError):
         chat_action_capabilities("maybe", None)
-    assert graph_node_read_capabilities("storage/kg/x.json") == {"chat.read_support", "settings.global"}
+    assert graph_node_read_capabilities("storage/kg/x.json") == {"chat.read_support"}  # O-A5
+    assert graph_node_read_capabilities(None) == {"chat.read_support"}
 
 
 def test_user_chat_action_yes_denied_before_job_creation():
