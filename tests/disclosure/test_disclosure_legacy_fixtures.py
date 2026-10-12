@@ -289,7 +289,7 @@ def check_ui_contract(fid: str, case, projected):
     if resp["status_code"] >= 400:
         if isinstance(original, dict):
             assert list(projected) == list(original), fid
-            assert type(projected["detail"]) is type(original["detail"]), fid
+            assert H.shape(projected) == H.shape(original), fid  # {"detail": str|list} or {"error": str}
         else:
             assert isinstance(projected, str), fid
         return
