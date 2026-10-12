@@ -583,7 +583,8 @@ ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
        note="trace.read_any for another principal's turn; always projected"),
     _p("R18", _A, "POST", "/telemetry/ui", "telemetry.write", note="actor from ctx, not payload"),
     _p("R19", _A, "POST", "/annotations", "annotation.write",
-       note="annotator replaced by verified subject; own turns only for non-admins (O-A1 open)"),
+       note="annotator replaced by verified subject; any signed-in user on own turns, admins on any "
+            "(owner decision O-A1)"),
     _p("R20", _M, "POST", "/api/chat", "chat.ask", on_als=False, note=_MODEL_API_NOTE),
     _p("R21", _M, "POST", "/v1/chat/completions", "chat.ask", on_als=False, note=_MODEL_API_NOTE),
     _p("R22", _M, "GET", "/api/tags", "chat.ask"),
@@ -608,9 +609,25 @@ ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
 }
 
 
+#: FastAPI's generated API reference pages, outside the 34-route inventory. Public on
+#: every profile, including ALS (owner decision O-A8, 2026-10-12). They bypass route
+#: dependencies, so they must expose no data beyond the API schema.
+FRAMEWORK_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
+    _p("F01", _A, "GET", "/docs", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
+    _p("F02", _A, "GET", "/docs/oauth2-redirect", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
+    _p("F03", _A, "GET", "/redoc", "health.read", public=True, note="FastAPI ReDoc (O-A8)"),
+    _p("F04", _A, "GET", "/openapi.json", "health.read", public=True, note="FastAPI OpenAPI schema (O-A8)"),
+)
+
+FRAMEWORK_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
+    (p.surface, p.method, p.path): p for p in FRAMEWORK_ROUTE_POLICIES
+}
+
+
 def route_capabilities(method: str, path: str, surface: str = AGENT_SURFACE) -> Optional[RoutePolicy]:
     """Return the policy for a route, or ``None`` (default-deny on ALS)."""
-    return ROUTE_CAPABILITIES.get((surface, method.upper(), path))
+    key = (surface, method.upper(), path)
+    return ROUTE_CAPABILITIES.get(key) or FRAMEWORK_ROUTE_CAPABILITIES.get(key)
 
 
 #: PUT /settings fields a non-admin may change for their own session (LLM-01).

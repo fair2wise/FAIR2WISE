@@ -111,6 +111,23 @@ Owner answers to the T25B open questions:
   has no `/docs` route today). This is separate from FastAPI's generated
   `/docs`, `/redoc` and `/openapi.json` pages (open item below).
 
-Still open from T25B: `workflow_mode` gating, Tiled service principals as
-callers, FastAPI's generated API docs on ALS, `PUT /settings json_graph_paths`
-for non-admins, O-A1 (annotations), O-A2 (role-check max age).
+Owner answers to the remaining T25B questions (2026-10-12):
+
+- **Service principals.** Refuse Tiled machine accounts as callers on ALS for
+  now; FORGE acts on behalf of a signed-in user. Revisit at T15. Already
+  implemented (`Unauthenticated("service_principal")`).
+- **O-A8 (FastAPI API docs).** `/docs`, `/docs/oauth2-redirect`, `/redoc` and
+  `/openapi.json` are public on ALS as well as local. Applied as
+  `FRAMEWORK_ROUTE_POLICIES` (F01-F04) in `authorization.py`. These pages
+  publish the full API schema to anyone who can reach the server.
+- **Default graph selection.** Add per-user graph selection, so no user changes
+  the selection for others. New work, scheduled with the settings/session
+  migration (T14/T18C). Until it exists, `PUT /settings json_graph_paths`
+  (the server-wide default) stays admin-only on ALS; local users can always
+  change it.
+- **O-A1 (annotations).** Any signed-in ALS user may annotate their own turns;
+  admins may annotate any turn. Recorded on route R19; enforced with the
+  own-or-any helper when the legacy routes are wired (T03/T18B).
+
+Still open: `workflow_mode` (recommended: leave admin-only; it has no effect in
+the UI API), O-A2 (role-check max age; default 60 s, capped at 900 s).

@@ -314,11 +314,14 @@ def test_als_default_deny_and_not_exposed_routes():
     assert client.get("/api/tags").status_code == 200
 
 
-def test_builtin_docs_routes_are_reported_as_undeclared():
-    """FastAPI's docs/openapi routes skip dependencies, so the route audit must flag them."""
+def test_builtin_docs_routes_are_declared_public():
+    """O-A8: FastAPI's /docs, /redoc and /openapi.json are declared public on ALS too."""
     app = FastAPI()
     install_access_control(app, AccessRuntime(staging_settings()))
-    assert set(undeclared_routes(app)) >= {"GET /openapi.json", "GET /docs", "GET /redoc"}
+    assert not {"GET /openapi.json", "GET /docs", "GET /redoc"} & set(undeclared_routes(app))
+    client = TestClient(app)
+    assert client.get("/openapi.json").status_code == 200
+    assert client.get("/docs").status_code == 200
 
 
 def test_chat_recording_never_uses_the_writer():
