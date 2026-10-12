@@ -26,27 +26,8 @@ import _legacy_ui_harness as H  # noqa: E402
 REPO_ROOT = HERE.parents[2]
 FIX = H.FIXTURE_DIR
 
-# Fixtures are frozen at baseline 222b1e7. The pre-migration commit 2430320 added
-# an optional ChatRequest.batch_id field (eval-batch trace tagging). Whether the
-# frozen contract adopts it is an owner decision at H1, so these cases are strict
-# expected failures while the field is present; refresh the fixtures once decided.
-_BATCH_ID_PENDING = {
-    "test_ui_openapi_matches_baseline",
-    "test_pydantic_model_fields_frozen[ChatRequest]",
-    "test_replayed_response_matches_fixture[traces_get]",
-}
-
-
-def _has_batch_id() -> bool:
-    api = REPO_ROOT / "app/modules/f2w_agent/api.py"
-    return "batch_id: Optional[str] = Field(" in api.read_text(encoding="utf-8")
-
-
-@pytest.fixture(autouse=True)
-def _batch_id_pending_h1(request):
-    if request.node.name in _BATCH_ID_PENDING and _has_batch_id():
-        request.applymarker(pytest.mark.xfail(
-            strict=True, reason="ChatRequest.batch_id from 2430320 is pending an H1 contract decision"))
+# Fixtures were recorded at baseline 222b1e7, then refreshed for the optional
+# ChatRequest.batch_id field (pre-migration commit 2430320), adopted at H1 (H1-6).
 
 # The 19 UI-agent routes (f2w_http_routes.json, api.py:6625-7029) and the six
 # model-compatible routes (kg_rag_api.py:246-316). FastAPI adds /openapi.json,
@@ -74,8 +55,8 @@ CHAT_RESPONSE_FIELDS = [
 ]
 # Pydantic field order is part of the serialized JSON key order.
 FROZEN_MODEL_FIELDS = {
-    "ChatRequest": ["message", "messages", "session_id", "client_turn_id", "ui_settings", "graph_source",
-                    "json_graph_path", "json_graph_paths", "source_rag", "use_live_tiled"],
+    "ChatRequest": ["message", "messages", "session_id", "client_turn_id", "ui_settings", "batch_id",
+                    "graph_source", "json_graph_path", "json_graph_paths", "source_rag", "use_live_tiled"],
     "ChatActionRequest": ["decision", "kind", "candidate_index", "messages", "session_id", "client_turn_id",
                           "parent_turn_id", "ui_settings", "graph_source", "json_graph_path"],
     "ChatResponse": CHAT_RESPONSE_FIELDS,

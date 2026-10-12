@@ -1,0 +1,37 @@
+{
+  "gate": "H1",
+  "status": "approved",
+  "approver": "project owner",
+  "decided_on": "2026-10-12",
+  "basis": "Owner answered every decision in review_packet.md section 5.1 (H1-1 to H1-8). The section 5.2 STOP items were not answered and are recorded as blocking T08B/T18C, as the packet allowed. The section 5.3 deferrals stand at their named gates.",
+  "owner_response_verbatim": [
+    "1. tiled version: use 0.2.18 for now",
+    "2. I approve: install as fair2wise, import as f2w, with no files moved.",
+    "3. yes we need a shared concurrency limit",
+    "4. approve",
+    "5. approve",
+    "6. adopt it",
+    "7. approve",
+    "8. approve"
+  ],
+  "decisions": {
+    "H1-1": "Pin Tiled 0.2.18 for now (interim owner exception to D22's exact 0.2.19 pin). See owner_decisions.md O-T1.",
+    "H1-2": "Distribution fair2wise, import namespace f2w over physical app/, no files moved; T04 implements the relative-import rewrite, removes sys.path hacks, makes scripts facades and removes import-time .env loading.",
+    "H1-3": "One shared CBORG admission controller for sync and async callers, including extract_terms.py and the cborg-openai backend, 429-aware.",
+    "H1-4": "Fail closed when CBORG_API_KEY is unset instead of falling back to OPENAI_API_KEY.",
+    "H1-5": "Separate publication gate: extraction rebuilds the JSON KG; Tiled import needs an ApprovalRecord for the exact plan.",
+    "H1-6": "Adopt ChatRequest.batch_id into the frozen UI contract; fixtures refreshed.",
+    "H1-7": "Capability vocabulary and per-route access policy approved as frozen in app/modules/contracts CAPABILITIES.",
+    "H1-8": "Shared contracts (CONTRACT_VERSION 1.0.0-draft.2), the ADR set and the public API spec are the H1 baseline."
+  },
+  "blocking_later_tasks": {
+    "T08B/T18C": "Legacy splash-to-Tiled STOP items 1-6 (review_packet.md section 5.2) need owner decisions before graph-edit implementation."
+  },
+  "unblocked": ["T02", "T25B"],
+  "not_authorized": [
+    "Any push, pull request, or remote write (F2W or FORGE)",
+    "Changes to main or rsoxs",
+    "Image builds for publication, central Tiled access, or live/paid model evaluation"
+  ],
+  "invalidated_by": "Any item in task_graph.json H1 approval invalidation rules, including a change of the pinned Tiled artifact, shared DTOs or access policy."
+}

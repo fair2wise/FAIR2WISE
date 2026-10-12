@@ -2,7 +2,7 @@
 
 Gate: H1
 Approver: project owner
-Status: **awaiting owner decision**
+Status: **approved 2026-10-12** (see decision.json)
 
 H1 asks the owner to approve the shared contracts, the D34 trusted-local and
 D30 ALS sign-in/admin implementation, Git promotion, and the remaining
@@ -159,8 +159,8 @@ central Tiled access, live model evaluation, or a FORGE change.
 
 ## Owner decision
 
-Decision:
-Limits:
-Date:
+Decision: approved. H1-1 Tiled 0.2.18 for now; H1-2 to H1-8 approved as recommended.
+Limits: section 5.2 STOP items block T08B/T18C; no push, publication or central Tiled access.
+Date: 2026-10-12
 
 Record the decision in `docs/migration/reviews/H1/decision.json`.

@@ -60,3 +60,33 @@ and not ignored.
 | `papers/rsoxs/beamline_blueprint/PubTempPubListExport9_11_26_14_05_24.rtf` | 490 KB | Publication-list export stored next to the blueprint |
 | `.cache/bl1101/pages`, `readmes` | 120 KB, 2.7 MB | Cached ALS beamline page and READMEs, indexed as ops documents |
 | `.cache/bl1101/repos` | 31 MB, part of 1264 files | Cloned third-party Git repositories indexed as ops documents (their own licenses apply) |
+
+## O-T1: Tiled version (2026-10-12)
+
+**Decision.** Use Tiled 0.2.18 for now.
+
+**Why it is needed.** D22 pins exactly 0.2.19, but no final 0.2.19 release
+exists (PyPI, GitHub releases and conda-forge stop at 0.2.18; only
+0.2.19rc1/rc2 are published).
+
+**Pin.** `tiled==0.2.18` (published 2026-09-02):
+
+| File | SHA-256 |
+| --- | --- |
+| `tiled-0.2.18-py3-none-any.whl` | `416079d4b5c9acc5498197d48c05a951ee8f7c699ac3b07920ae907a8da7fa06` |
+| `tiled-0.2.18.tar.gz` | `2f3943260c46824b162796fcb8a43c3d02f41205e2ccefc64e365b18b6ec1e27` |
+
+**Scope and risks to carry forward.**
+
+- An interim owner exception to D22 for the managed `:local` server and the
+  disposable test fixture. Revisit when a final 0.2.19 (or the central
+  servers' exact build) is available; changing the pin invalidates H1.
+- The T20A API description came from the 0.2.19rc2 wheel. Rc2 changed the
+  graph schema from 0.2.18 (`nodeId` -> `isNodeBound`, access blobs -> access
+  tags, four catalog migrations). T20B must re-check the capability contract
+  against 0.2.18 before building on it.
+- The central staging/production servers are reported to run 0.2.19 (D33). A
+  local 0.2.18 graph may not match them. External-mode tests must check the
+  central server's version and capabilities and fail clearly on mismatch.
+- Tiled's `pydantic-settings` constraint still conflicts with the F2W lock;
+  the managed server runs in its own environment (`optional-dependencies.md`).

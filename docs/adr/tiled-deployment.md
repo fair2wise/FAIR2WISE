@@ -10,6 +10,10 @@ Labels: **[Observed]** means checked directly in source, PyPI or package files o
 
 ---
 
+> **Owner decision 2026-10-12 (H1-1, O-T1):** use Tiled 0.2.18 for now as an interim exception
+> to D22. API references below come from 0.2.19rc2 and must be re-checked against 0.2.18 in
+> T20B. See `docs/migration/reviews/H1/owner_decisions.md`.
+
 ## 1. Blocking finding: there is no `tiled==0.2.19` release on PyPI
 
 **[Observed]** At 2026-10-09T22:27:56Z:

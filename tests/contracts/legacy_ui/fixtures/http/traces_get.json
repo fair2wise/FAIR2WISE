@@ -59,7 +59,8 @@
         "use_live_tiled": false,
         "ui_settings": {
           "graphSource": "splash_links"
-        }
+        },
+        "batch_id": null
       },
       "orchestration": {
         "raw_classifier_output": null,
