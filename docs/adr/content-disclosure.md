@@ -134,6 +134,7 @@ User-facing errors are typed codes with a correlation id. `str(exc)` goes to ser
 - The Tiled importer (T23A/T08B) imports the projected export, never raw MatKG things. This keeps Tiled properties, which are create-only in rc2, free of private evidence from the first write.
 - **Owner items, not decided here:**
   - **O-D1.** Whether the 47 tracked `storage/kg` and 58 `storage/terminology` files must be replaced by projected versions on `forge_merge` (a normal commit) and/or purged from history (a rewrite). This mirrors H0 E1.
+    **Decided 2026-10-12 (owner):** keep the KG JSON files, snippets included, in the repo and in the Docker image. This is an owner exception to D19 for stored KG artifacts only; it does not relax the projection rules for what routes, SSE, traces and exports return to users. See `docs/migration/reviews/H1/owner_decisions.md`.
   - **O-D2.** Initial `DisclosureBudget` values.
 
 ## 6. Preserving legacy snippet and citation behaviour
@@ -184,5 +185,5 @@ Semantic tests (N1, N3, N8) need a fake deterministic model that echoes context 
 
 - `/traces/{turn_id}` loses raw prompts. Evaluation tooling that reads raw traces (`scripts/check_trace.py` and `scripts/run_eval_batch.py` on HEAD) moves to the protected store. This needs a T18A/T03 compatibility note.
 - `ChatResponse.rounds` changes content but keeps its type (`List[Dict]`). The UI's use of it must be confirmed in T18A.
-- Graph publication needs an evidence-reference store before H4. Tracked KGs fail the reconstruction check until O-D1 is decided.
+- Graph publication needs an evidence-reference store before H4. Tracked KGs are exempt from the reconstruction check as stored artifacts (O-D1 owner exception); serving their snippets to users still goes through the projection.
 - The module paths (`security/content_access.py`, `security/disclosure.py`) are the ones proposed in CONTENT_ACCESS_POLICY section 4 and plan section 13. They do not exist yet.
