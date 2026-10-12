@@ -1,4 +1,7 @@
-"""T21B payload projections: SEC-04, SEC-05, SEC-01, FIG-04, DEP-10, TIL-05, REL-04, JSON-08 (ADR N2, N4-N6, N9, N10)."""
+"""T21B payload projections: SEC-04, SEC-05, SEC-01, FIG-04, DEP-10, TIL-05, REL-04, JSON-08.
+
+Covers ADR content-disclosure tests N2, N4, N5, N6, N9, N10 and P6.
+"""
 from __future__ import annotations
 
 import json
@@ -14,8 +17,9 @@ from app.modules.contracts.errors import ContractError, ErrorCode  # noqa: E402
 from app.modules.security.disclosure import PathRoots, source_route_denied  # noqa: E402
 
 PAGE = S.synthetic_page(2)
-LOCAL_PATHS = ["/Users/alice/f2w/run/kg.json", "/private/tmp/xyz/run/uploads/a.json", "/home/f2w/storage/kg/x.json",
-               "/var/folders/ab/T/tmp1/workflow_state.json", "C:\\Users\\bob\\run\\x.json", "~/papers/a.pdf"]
+LOCAL_PATHS = ["/Users/alice/f2w/run/kg.json", "/private/tmp/xyz/run/uploads/a.json",
+               "/home/f2w/storage/kg/x.json", "/var/folders/ab/T/tmp1/workflow_state.json",
+               "C:\\Users\\bob\\run\\x.json", "~/papers/a.pdf"]
 LONG_ABSTRACT = "Abstract sentence about polymer morphology. " * 200
 
 
@@ -27,8 +31,9 @@ def projector(**kw):
 def leaks(obj) -> list:
     text = json.dumps(obj, ensure_ascii=False)
     found = [p for p in LOCAL_PATHS if p in text or p.replace("\\", "\\\\") in text]
-    for marker in (S.SENTINEL, "/Users/", "/private/", "/var/folders", "/home/", "Traceback", "object has no attribute",
-                   "Errno", "sk-live", "context_snippets", "page_text", "merged_context\": \"", LONG_ABSTRACT[:1700]):
+    for marker in (S.SENTINEL, "/Users/", "/private/", "/var/folders", "/home/", "Traceback",
+                   "object has no attribute", "Errno", "sk-live", "context_snippets", "page_text",
+                   "merged_context\": \"", LONG_ABSTRACT[:1700]):
         if marker in text:
             found.append(marker)
     return found
@@ -58,7 +63,8 @@ def raw_rounds():
 
 
 def chat_payload(**overrides):
-    payload = {"status": "answered", "answer": "Answer [KG: rsoxs: A].", "sufficient": True, "node_ids": ["matkg:A"],
+    payload = {"status": "answered", "answer": "Answer [KG: rsoxs: A].", "sufficient": True,
+               "node_ids": ["matkg:A"],
                "publications": [{"source_paper": "x.pdf", "abstract_text": LONG_ABSTRACT,
                                  "pdf_path": "/Users/alice/f2w/papers/x.pdf"}],
                "confidence": 0.8, "rounds": raw_rounds(),
@@ -111,8 +117,8 @@ def test_progress_events_drop_private_data_and_keep_graph_shape():
     proj, viewer, _ = projector()
     node = {"id": "n", "label": "N", "description": "d", "properties": {"context_snippets": [{"text": PAGE}]}}
     data = {"phase": "graph_update", "message": "Mapping 1 node(s)", "turn_id": "t", "node_ids": ["n"],
-            "graph": {"nodes": [node], "edges": [{"source": "n", "target": "m", "predicate": "p",
-                                                   "has_evidence": [PAGE]}]},
+            "graph": {"nodes": [node],
+                      "edges": [{"source": "n", "target": "m", "predicate": "p", "has_evidence": [PAGE]}]},
             "titles": ["/Users/alice/f2w/run/pdfs/x.pdf"], "merged_context": PAGE,
             "error": "KeyError: 'x'"}
     out = proj.project_progress(data, viewer)
@@ -132,7 +138,8 @@ def raw_trace():
     trace["env"]["settings"]["F2W_TRACE_DIR"] = "/Users/alice/f2w/runs/traces"
     trace["env"]["graphs"][0]["path"] = "/Users/alice/f2w/storage/kg/matkg_contract_v1.json"
     trace["retrieval"].update({
-        "merged_context": "### KG\n[PDF: x.pdf p.2] " + PAGE, "raw_judge_output": '{"answer": "' + PAGE[:800] + '"}',
+        "merged_context": "### KG\n[PDF: x.pdf p.2] " + PAGE,
+        "raw_judge_output": '{"answer": "' + PAGE[:800] + '"}',
         "parsed_verdict": {"sufficient": True, "answer": PAGE[:2000], "missing_topics": []},
         "leeway_system_prompt": "SYSTEM " + PAGE[:500],
         "selected_hits": [{"id": "matkg:A", "label": "A", "score": 1.0, "graph_id": "kg", "snippet": PAGE}]})
@@ -211,7 +218,8 @@ def test_project_exception_never_returns_raw_str_exc():
 
 def test_settings_and_health_paths_become_opaque():
     proj, viewer, _ = projector()
-    settings = {"json_graph_path": "storage/kg/a.json", "available_graphs": [{"path": "/Users/alice/f2w/run/uploads/u.json"}],
+    settings = {"json_graph_path": "storage/kg/a.json",
+                "available_graphs": [{"path": "/Users/alice/f2w/run/uploads/u.json"}],
                 "tiled_uri": "http://user:pw@tiled.example:8000/api?api_key=sk-live-abcdefghijkl",
                 "tiled_error": "probe failed: HTTPConnectionPool(host='x') Max retries exceeded"}
     out = proj.project_settings(settings, viewer)
@@ -221,7 +229,8 @@ def test_settings_and_health_paths_become_opaque():
     assert "Max retries" not in out["tiled_error"]
     health = proj.project_paths_only({"status": "ok", "workdir": "/Users/alice/f2w/run",
                                       "session_memory": "/Users/alice/f2w/run/session_memory.json"})
-    assert health == {"status": "ok", "workdir": "f2w://workdir", "session_memory": "f2w://workdir/session_memory.json"}
+    assert health == {"status": "ok", "workdir": "f2w://workdir",
+                      "session_memory": "f2w://workdir/session_memory.json"}
 
 
 # ------------------------------------------------------------------ N9, N2: graph properties and artifact URLs
@@ -289,7 +298,8 @@ def test_repo_code_provenance_is_kept_and_local_urls_dropped():
 
 @pytest.mark.parametrize("path", [
     "/papers/rsoxs/2024/10.1002_x.pdf", "/static/papers/x.pdf", "/assets/crops/fig-1a.png", "/figures/fig1",
-    "/artifacts/sha256:abcd", "/fair2wise/api/papers/x.pdf", "/crops/x.png", "/source_index/literature/chunks.jsonl",
+    "/artifacts/sha256:abcd", "/fair2wise/api/papers/x.pdf", "/crops/x.png",
+    "/source_index/literature/chunks.jsonl",
     "/fulltext/work:1", "/sections/work:1/3", "/chunks/12", "/blobs/sha256/ab", "/files/x.pdf", "/api/pdf/x"])
 def test_guessed_source_urls_are_denied(path):
     assert source_route_denied(path)

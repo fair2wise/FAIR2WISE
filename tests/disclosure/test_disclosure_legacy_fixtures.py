@@ -23,7 +23,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 import pytest
 
@@ -45,14 +45,15 @@ CHAT_RESPONSE_FIELDS = ["status", "answer", "sufficient", "node_ids", "publicati
                         "graph", "graph_source_requested", "graph_source_used", "workdir", "pending",
                         "orchestration", "turn_id"]
 GRAPH_NODE_FIELDS = ["id", "label", "type", "description", "publications", "code_snippet", "code_language",
-                     "function_name", "linked_code_snippets", "graph_id", "graph_label", "formula", "source_papers",
-                     "properties", "extra_fields", "source_type", "repo_url", "repo_owner", "repo_name",
-                     "repo_commit_sha", "source_file_path", "source_file_url", "source_start_line",
+                     "function_name", "linked_code_snippets", "graph_id", "graph_label", "formula",
+                     "source_papers", "properties", "extra_fields", "source_type", "repo_url", "repo_owner",
+                     "repo_name", "repo_commit_sha", "source_file_path", "source_file_url", "source_start_line",
                      "source_end_line", "repository_license"]
 LINKED_SNIPPET_FIELDS = ["id", "label", "function_name", "code_language", "code_snippet", "publications",
-                         "source_type", "repo_url", "repo_owner", "repo_name", "repo_commit_sha", "source_file_path",
-                         "source_file_url", "source_start_line", "source_end_line"]
-PENDING_PAPER_FIELDS = {"title", "doi", "publication_year", "abstract", "score", "repository", "recommended", "index"}
+                         "source_type", "repo_url", "repo_owner", "repo_name", "repo_commit_sha",
+                         "source_file_path", "source_file_url", "source_start_line", "source_end_line"]
+PENDING_PAPER_FIELDS = {"title", "doi", "publication_year", "abstract", "score", "repository", "recommended",
+                        "index"}
 TOP_LEVEL_FIELDS = {
     "/settings": ["backend", "model", "graph_source", "workflow_mode", "extraction_mode", "targeted_max_pages",
                   "json_graph_path", "json_graph_paths", "kg_query_max_nodes", "kg_query_hops", "source_rag",
@@ -239,9 +240,10 @@ def assert_chat_contract(original, projected, fid):
     assert [r.get("round") for r in projected["rounds"]][:len(recorded)] == recorded, fid
     pending = projected["pending"]
     if pending and pending.get("kind") == "download":
+        visible = PENDING_PAPER_FIELDS - {"abstract"}
         for p, o in zip(pending["papers"], original["pending"]["papers"]):
-            assert set(p) >= PENDING_PAPER_FIELDS and {k: p[k] for k in PENDING_PAPER_FIELDS if k != "abstract"} == \
-                {k: o[k] for k in PENDING_PAPER_FIELDS if k != "abstract"}, fid
+            assert set(p) >= PENDING_PAPER_FIELDS, fid
+            assert {k: p[k] for k in visible} == {k: o[k] for k in visible}, fid
     if pending and pending.get("kind") == "extraction":
         assert pending["candidate"]["source_paper"] == original["pending"]["candidate"]["source_paper"], fid
     for pn, on in zip(projected["graph"]["nodes"], original["graph"]["nodes"]):
@@ -321,8 +323,8 @@ def check_ui_contract(fid: str, case, projected):
 def assert_no_source_serving(obj, fid):
     text = json.dumps(obj, ensure_ascii=False)
     hit = LEAK_RE.search(text)
-    assert hit is None, f"{fid}: {hit.group(0) if hit else ''} ...{text[max(0, hit.start() - 80):hit.end() + 40]}" \
-        if hit else fid
+    if hit:
+        raise AssertionError(f"{fid}: {hit.group(0)} ...{text[max(0, hit.start() - 80):hit.end() + 40]}")
     assert PAGE[:200] not in text and ECHO[:400] not in text, fid
     for key in ("merged_context", "raw_judge_output", "llm_calls"):
         for match in re.finditer(rf'"{key}": "', text):
@@ -385,7 +387,8 @@ def test_unchanged_fixtures_are_byte_identical_where_nothing_is_internal():
     changed = sorted(set(CASES) - set(unchanged))
     expected_changed = {
         # absolute workdir paths (internal-only): health, session reset, chat workdir/source_path, uploads
-        "health", "session_reset_named", "session_reset_legacy", "graph_upload", "graph_get", "graph_get_json_mode",
+        "health", "session_reset_named", "session_reset_legacy", "graph_upload", "graph_get",
+        "graph_get_json_mode",
         # ChatResponse.rounds summary and workdir/source_path
         "chat_answered", "chat_insufficient_to_download", "chat_insufficient_for_failed_download",
         "chat_action_decline", "chat_action_no_pending",

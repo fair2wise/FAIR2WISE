@@ -113,7 +113,8 @@ def test_issue_accepts_no_flag_arguments():
         authority.issue(context, purpose=ReadPurpose.RETRIEVAL, kinds=[SourceKind.PARSED_TEXT],
                         agent=True)  # type: ignore[call-arg]
     with pytest.raises(SourceAccessDenied):
-        authority.issue(context, purpose="paper_evidence", kinds=[SourceKind.PARSED_TEXT])  # type: ignore[arg-type]
+        authority.issue(context, purpose="paper_evidence",  # type: ignore[arg-type]
+                        kinds=[SourceKind.PARSED_TEXT])
     with pytest.raises(SourceAccessDenied):
         authority.issue(context, purpose=ReadPurpose.RETRIEVAL, kinds=["pdf_bytes"])  # type: ignore[list-item]
     with pytest.raises(SourceAccessDenied):
@@ -145,7 +146,8 @@ def test_forged_or_tampered_grants_fail_the_seal():
 
 def test_grant_is_bound_to_its_request_and_principal():
     authority, context, grant = _authority_and_grant()
-    for other in (S.local_context(request_id="req-other"), S.als_context(admin=True, request_id=context.request_id)):
+    others = (S.local_context(request_id="req-other"), S.als_context(admin=True, request_id=context.request_id))
+    for other in others:
         with pytest.raises(SourceAccessDenied):
             authority.check(other, grant, kind=SourceKind.PARSED_TEXT)
 

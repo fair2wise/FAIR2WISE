@@ -348,7 +348,8 @@ class QuoteVerifier:
         return QuoteVerification(True, MatchType.NORMALIZED, NORMALIZATION_PROFILE, locator, region, tuple(spans))
 
     @staticmethod
-    def _source_spans(indices: Sequence[int], src_words: Sequence[Tuple[int, int, str]]) -> Tuple[Tuple[int, int], ...]:
+    def _source_spans(indices: Sequence[int],
+                      src_words: Sequence[Tuple[int, int, str]]) -> Tuple[Tuple[int, int], ...]:
         """Merge consecutive source word indices into char intervals (spaces between them included)."""
         spans: List[Tuple[int, int]] = []
         prev = None
