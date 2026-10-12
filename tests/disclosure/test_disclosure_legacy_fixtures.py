@@ -363,7 +363,10 @@ def test_injected_source_content_never_survives(fid):
     check_ui_contract(fid, case, projected)
     plain = project_case(case)
     if not _path_of(case).startswith("/traces/"):
-        assert H.shape(_strip(projected, ("rounds",))) == H.shape(_strip(plain, ("rounds",))), fid
+        # Injection also fills allowed slots (a bounded abstract_text, a typed tiled_error); every other
+        # injected key must be gone, so the skeleton equals the plain projection.
+        allowed = ("rounds", "abstract_text", "tiled_error")
+        assert H.shape(_strip(projected, allowed)) == H.shape(_strip(plain, allowed)), fid
 
 
 @pytest.mark.parametrize("fid", ["chat_answered", "chat_stream_answered", "traces_get", "graph_node_get"])
