@@ -882,7 +882,8 @@ class DisclosureProjector:
                     viewer, state, echo.source.work_id, echo.region, echo.spans, chars, counts_as_quote=False):
                 out.append(run)
             else:
-                out.append(SOURCE_TEXT_OMITTED + ((" " + echo.source.citation) if echo.source.citation else ""))
+                # Citation tokens are never added or removed; the model's own tokens stay in place.
+                out.append(SOURCE_TEXT_OMITTED)
             state.decisions.append({"echo": True, "kept": out[-1] == run, "citation": echo.source.citation,
                                     "chars": len(run)})
             pos = echo.end

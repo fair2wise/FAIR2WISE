@@ -91,7 +91,7 @@ def test_normalized_match_is_verbatim_only_under_recorded_profile():
 
 def test_long_verified_quote_is_clipped_with_omission_marker():
     projector, viewer, _ = S.make_projector()
-    long_quote = span(20, 160)
+    long_quote = span(200, 160)
     text = answer_with(long_quote)
     out = projector.project_text(text, viewer, sources=[S.page_ref(3)])
     shown = out.split('"')[1]
@@ -120,7 +120,7 @@ def test_same_projection_for_every_role(make_ctx):
     ctx = make_ctx()
     projector, viewer, _ = S.make_projector(ctx)
     long_echo = " ".join(WORDS3[10:400])
-    text = f"{answer_with(span(20, 160))}\n{long_echo} {CITE3}"
+    text = f"{answer_with(span(200, 160))}\n{long_echo} {CITE3}"
     baseline_projector, baseline_viewer, _ = S.make_projector(S.als_context(admin=False))
     assert projector.project_text(text, viewer, sources=[S.page_ref(3)]) == baseline_projector.project_text(
         text, baseline_viewer, sources=[S.page_ref(3)])
