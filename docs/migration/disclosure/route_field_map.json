@@ -1,0 +1,1857 @@
+{
+  "schema_version": 1,
+  "task": "T21A",
+  "gate": "H1",
+  "status": "proposed",
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "line_basis": "All file:line values refer to the frozen 222b1e7 export. On forge_merge HEAD, app/modules/f2w_agent/api.py has +6 lines after line 140 (batch_id field) and further small shifts; route decorator lines move accordingly. Route 'line' is the handler def line, matching f2w_http_routes.json.",
+  "policy_refs": [
+    "D19",
+    "docs/migration/companion/CONTENT_ACCESS_POLICY.md",
+    "docs/migration/plan.md section 4.8",
+    "docs/adr/content-disclosure.md"
+  ],
+  "classes": {
+    "public-safe": "No source text beyond identifiers and bibliographic metadata, or no source-derived content at all. May be returned to any caller the profile allows.",
+    "quote-bounded": "May carry derived results or relevant bounded exact quotations with attribution. Allowed on the public surface only through the disclosure projection (exactness, locator, per-response and per-session bounds).",
+    "internal-only": "Agent/job/trace state, local paths, raw errors or private evidence payloads. Never on the browser/API/SSE/FORGE surface; may be kept in protected stores.",
+    "source-serving": "Returns raw source material (PDF bytes, page text, chunk text, full prompts containing them) to the caller. Not allowed on any user-facing surface under D19."
+  },
+  "method": "Read baseline source; measured tracked storage/kg and storage/terminology JSON with stdlib json; checked 300 random context_snippets against local PDF page text (PyMuPDF from the baseline venv, whitespace-normalized substring match). No server was started and no network was used. Scripts: docs/migration/disclosure/evidence/ (build_field_map.py, snip_check.py, coverage.py).",
+  "summary": {
+    "routes": 34,
+    "routes_by_route_class": {
+      "public-safe": 18,
+      "quote-bounded": 11,
+      "internal-only": 4,
+      "source-serving": 1
+    },
+    "shared_dto_fields_by_class": {
+      "public-safe": 8,
+      "quote-bounded": 12,
+      "internal-only": 10,
+      "source-serving": 2
+    },
+    "route_specific_fields_by_class": {
+      "public-safe": 21,
+      "internal-only": 3,
+      "quote-bounded": 4
+    },
+    "routes_serving_pdf_bytes": [],
+    "routes_serving_full_text": [
+      "R17"
+    ],
+    "routes_with_any_auth": []
+  },
+  "dto_fields": {
+    "GN.id_label_type": {
+      "field": "GraphNode.id/label/type/graph_id/graph_label",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "Node id, term name, category, graph id/label.",
+      "source_ref": "app/modules/f2w_agent/api.py:167-193,1056-1064,1084-1090",
+      "size_bound": "none (identifiers)",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "GN.description": {
+      "field": "GraphNode.description",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "MatKG: raw description|definition|code_description (LLM-written term definition). Tiled: title+description+identity props joined (tiled_graph.py:645-656).",
+      "source_ref": "app/modules/f2w_agent/api.py:1065-1069; app/modules/json2kg.py:332",
+      "size_bound": "none in code; tracked KGs max 530 chars (measured)",
+      "reconstruction_risk": "low per node; whole-graph enumeration via GET /graph returns every description. Verbatim-ness of definitions not verified.",
+      "conforms_to_D19_today": "unverified",
+      "notes": "Rendered as the citation popover snippet (ui/src/app/components/kgCitations.ts:548)."
+    },
+    "GN.publications": {
+      "field": "GraphNode.publications[] (_PUBLICATION_FIELDS incl. abstract_text, pages)",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Bibliographic records: source_paper filename, title, authors, DOI, journal, pages, keywords, abstract_text.",
+      "source_ref": "app/modules/f2w_agent/api.py:822-835,878-993",
+      "size_bound": "none on abstract_text in this path (candidate path truncates, see CR.publications)",
+      "reconstruction_risk": "none for paper body; abstract is publisher text shown whole",
+      "conforms_to_D19_today": "yes",
+      "notes": "Tracked KGs contain 0 abstract_text values (measured); OpenAlex abstracts enter via download candidates."
+    },
+    "GN.source_papers": {
+      "field": "GraphNode.source_papers",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "PDF filenames / DOIs (e.g. DOI-derived filenames, local names XRAY1). Not URLs, not paths.",
+      "source_ref": "app/modules/f2w_agent/api.py:640-654",
+      "size_bound": "list, unbounded count",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "GN.code_snippet": {
+      "field": "GraphNode.code_snippet and linked_code_snippets[].code_snippet",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Verbatim code text of CodeSnippet nodes (extracted from paper pages or source repos). Only when include_code=True: graph_node_from_file and graph_subset_from_file.",
+      "source_ref": "app/modules/f2w_agent/api.py:1073-1076,1031-1044,1150-1152,1418-1423",
+      "size_bound": "none in code; tracked KGs: 30 code nodes, max 859 chars (measured)",
+      "reconstruction_risk": "low (short listings); code transcribed from a paper is exact source text",
+      "conforms_to_D19_today": "yes",
+      "notes": "Code from repos carries repo/commit/line provenance; code from papers carries paper+page only."
+    },
+    "GN.properties": {
+      "field": "GraphNode.properties",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "MatKG property list passthrough, or the entire Tiled/Splash entity properties dict except haystack/outgoingLinks/relations.",
+      "source_ref": "app/modules/f2w_agent/api.py:657-676; app/modules/tiled_graph.py:639,666",
+      "size_bound": "none; tracked KGs max 3633 chars per property entry (measured)",
+      "reconstruction_risk": "CONDITIONAL HIGH: the dict path forwards every stored property. Splash import stores all non-core thing fields as properties (splash_links/scripts/import_kg.py:42-58), so context_snippets would pass through for any Tiled/Splash node imported from a MatKG JSON.",
+      "conforms_to_D19_today": "conditional",
+      "notes": "Live Tiled holds experiment identity entities today (tiled_graph.py:1-19,44), so no paper text observed on this path at baseline."
+    },
+    "GN.extra_fields": {
+      "field": "GraphNode.extra_fields",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "All non-core raw keys: strings cut at 800 chars + ellipsis, lists <=24 items, dicts <=16 keys (inner values unbounded), plus identity keys.",
+      "source_ref": "app/modules/f2w_agent/api.py:705-746",
+      "size_bound": "800 chars per string; nested values unbounded",
+      "reconstruction_risk": "low; context_snippets is a core key and excluded (api.py:598). Tracked KGs only carry raw_category here (measured).",
+      "conforms_to_D19_today": "yes",
+      "notes": "Any new passthrough slot (json2kg.py:61-73 copies unknown term keys) lands here automatically."
+    },
+    "GN.repo_provenance": {
+      "field": "GraphNode.repo_url/repo_owner/repo_name/repo_commit_sha/source_file_path/source_file_url/source_start_line/source_end_line/repository_license/formula",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "Code repository provenance and formula.",
+      "source_ref": "app/modules/f2w_agent/api.py:749-761,1082",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": "source_file_path is a repository-relative path, not a local storage path."
+    },
+    "GE.edge": {
+      "field": "GraphEdge.source/target/predicate",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "Edge endpoints and predicate only.",
+      "source_ref": "app/modules/f2w_agent/api.py:196-200,1366-1378,1436-1442",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": "Edge has_evidence (json2kg.py:405-411) is NOT projected; it stays internal. Tracked KGs carry 0 has_evidence values (measured)."
+    },
+    "GP.source_path": {
+      "field": "GraphPayload.source_path",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Absolute filesystem path of the graph JSON (or tiled://graphql).",
+      "source_ref": "app/modules/f2w_agent/api.py:1381,2876,1512",
+      "size_bound": "one string",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "no",
+      "notes": "CONTENT_ACCESS_POLICY s1: no storage paths in user output."
+    },
+    "CR.status_flags": {
+      "field": "ChatResponse.status/sufficient/confidence/node_ids/graph_source_requested/graph_source_used/turn_id",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "Status literal, flags, node ids, turn id.",
+      "source_ref": "app/modules/f2w_agent/api.py:210-225,6493-6508",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": "turn_id doubles as the only key needed to fetch the trace (GET /traces/{turn_id})."
+    },
+    "CR.answer": {
+      "field": "ChatResponse.answer",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "LLM answer grounded in KG context, optional hybrid literature/ops chunks (source_rag) and, for active-paper questions, eligible PDF page text. Citations [KG:..]/[PDF: f p.N]/[OPS:..].",
+      "source_ref": "app/modules/f2w_agent/api.py:6475,6495; app/modules/f2w_agent/paper_evidence_agent.py:366-448; app/modules/hybrid_rag/context.py:36-145",
+      "size_bound": "none (model output length)",
+      "reconstruction_risk": "MEDIUM [inferred]: no exact-quote verification and no output constraint; repeated prompts can ask the model to repeat supplied context. Only citation format/page eligibility is validated (paper_evidence_agent.py:83-120).",
+      "conforms_to_D19_today": "partial",
+      "notes": "Legacy snippet/citation behaviour to preserve (QA-01)."
+    },
+    "CR.publications": {
+      "field": "ChatResponse.publications[]",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Selected-node publications (as GN.publications) or candidate publication with abstract_text cut to 1600 chars.",
+      "source_ref": "app/modules/f2w_agent/api.py:6488-6492,6551-6559,2438-2477",
+      "size_bound": "abstract_text 1600 chars on candidate path; unbounded on KG path",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "CR.rounds": {
+      "field": "ChatResponse.rounds[]",
+      "class": "internal-only",
+      "source_derived": true,
+      "currently_returns": "Raw per-round internal state: retrieval verdict (answer, selected_hits id/label/score, hybrid_rag counts, live_tiled/materials_project meta, error str(exc)), download result, pending_pdfs names, extraction result (output_file path, page counts), kg rebuild, splash reimport, reload, candidate_search with full candidate dicts (OpenAlex abstract untruncated), debate summary, paper_evidence result, extraction_report.",
+      "source_ref": "app/modules/f2w_agent/api.py:4810-4815,4892-5016,5321,5388,5534-5702,6344,6368; app/modules/f2w_agent/retrieval_agent.py:1244-1400; app/modules/f2w_agent/download_agent.py:212",
+      "size_bound": "none",
+      "reconstruction_risk": "low for paper body (no chunk text observed in verdicts: retrieval_agent.py:1244-1252 keeps counts only); abstracts and raw error strings are forwarded whole",
+      "conforms_to_D19_today": "no",
+      "notes": "Forwards internal job/tool state to the browser and SSE; policy s1 row 'Job/checkpoint/tool/trace payloads' requires sanitizing."
+    },
+    "CR.graph": {
+      "field": "ChatResponse.graph (GraphPayload)",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Query subgraph via _query_graph_payload.",
+      "source_ref": "app/modules/f2w_agent/api.py:6486,2896-2907",
+      "size_bound": "kg_query_max_nodes (10..1000, api.py:424)",
+      "reconstruction_risk": "see GraphNode fields",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "CR.workdir": {
+      "field": "ChatResponse.workdir",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Session working directory path.",
+      "source_ref": "app/modules/f2w_agent/api.py:222,6504",
+      "size_bound": "one string",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "CR.pending": {
+      "field": "ChatResponse.pending",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Pending download/extraction card: title, DOI, year, abstract cut to 600 chars, score, repository, downloaded source_paper filename.",
+      "source_ref": "app/modules/f2w_agent/api.py:6511-6531,6581-6600",
+      "size_bound": "abstract 600 chars",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": "Rendered by ui/src/app/components/ChatSidebar.tsx:53-55."
+    },
+    "CR.orchestration": {
+      "field": "ChatResponse.orchestration",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "Classifier/orchestrator decision summary (action/agent/reason).",
+      "source_ref": "app/modules/f2w_agent/api.py:224,2576,4007,6506",
+      "size_bound": "none",
+      "reconstruction_risk": "none [inferred: reason is model text about the question, not source text]",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "SSE.progress": {
+      "field": "SSE event 'progress' {phase,message,turn_id,**data}",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Progress phases; graph_update carries graph={nodes,edges} built from GraphNode dicts with include_code=True; candidate titles; extraction counts; missing_topics.",
+      "source_ref": "app/modules/f2w_agent/api.py:6848-6858,3886-3901,4837,5141,6388,1418-1424",
+      "size_bound": "per event none",
+      "reconstruction_risk": "low (GraphNode content only)",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "SSE.complete": {
+      "field": "SSE event 'complete'",
+      "class": "internal-only",
+      "source_derived": true,
+      "currently_returns": "Full ChatResponse JSON (includes rounds and workdir).",
+      "source_ref": "app/modules/f2w_agent/api.py:6876-6881,6967-6972",
+      "size_bound": "none",
+      "reconstruction_risk": "see ChatResponse fields",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "SSE.error": {
+      "field": "SSE event 'error'",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Either ChatResponse with *_error status or {status:'stream_error', message:str(exc)}.",
+      "source_ref": "app/modules/f2w_agent/api.py:6878-6890,6969-6981",
+      "size_bound": "none",
+      "reconstruction_risk": "low; raw exception text may include paths or provider messages",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "TR.merged_context": {
+      "field": "trace.retrieval.merged_context",
+      "class": "source-serving",
+      "source_derived": true,
+      "currently_returns": "Exact prompt context: KG context plus hybrid literature/ops paper chunks (1200-char chunk text, packed into a 6000-char source budget) and Materials Project context.",
+      "source_ref": "app/modules/f2w_agent/retrieval_agent.py:1120-1130,1279-1291,1440; app/modules/hybrid_rag/context.py:9,120-145; app/modules/f2w_agent/trace.py:103",
+      "size_bound": "hybrid source budget 6000 chars + KG context budget",
+      "reconstruction_risk": "HIGH: verbatim paper chunks; repeated questions enumerate different chunks",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "TR.llm_messages": {
+      "field": "trace.llm_calls[].messages",
+      "class": "source-serving",
+      "source_derived": true,
+      "currently_returns": "Every rendered prompt: retrieval judge/leeway prompts with merged context; paper-evidence prompts with eligible PDF page text (up to 8 pages x 7000 chars in full mode; every selected page x 7000 chars in targeted mode, where selection follows targeted_max_pages 1..100) and a repair prompt that repeats the same pages.",
+      "source_ref": "app/modules/f2w_agent/trace.py:460-494; app/modules/kg_rag_api.py:1590-1637; app/modules/term_extractor/clients.py:16-45; app/modules/f2w_agent/paper_evidence_agent.py:16-17,336-339,358-377,402-410; app/modules/f2w_agent/api.py:417",
+      "size_bound": "no trace-side bound; prompt-side 7000 chars/page",
+      "reconstruction_risk": "HIGH: one paper-evidence turn can carry most of a paper's text; a few turns can carry all of it",
+      "conforms_to_D19_today": "no",
+      "notes": "Extraction prompts are probably not captured: ExtractorAgent runs in run_in_executor without bind_context (extractor_agent.py:106-107) [inferred; confirm with a runtime trace]."
+    },
+    "TR.llm_response": {
+      "field": "trace.llm_calls[].response, retrieval.raw_judge_output, retrieval.parsed_verdict, orchestration.raw_classifier_output",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Raw model outputs before post-processing.",
+      "source_ref": "app/modules/f2w_agent/trace.py:408-412,481-489; retrieval_agent.py:1356-1358",
+      "size_bound": "none",
+      "reconstruction_risk": "MEDIUM: raw outputs may repeat context verbatim",
+      "conforms_to_D19_today": "partial",
+      "notes": ""
+    },
+    "TR.request": {
+      "field": "trace.request.message/effective_question/history/ui_settings",
+      "class": "public-safe",
+      "source_derived": true,
+      "currently_returns": "The caller's own messages and settings.",
+      "source_ref": "app/modules/f2w_agent/trace.py:72-81,386-396",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": "Readable by any caller who knows the turn id: cross-user exposure on a shared deployment."
+    },
+    "TR.env": {
+      "field": "trace.env.settings/graphs/git_sha",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "F2W_*/KG_RAG_* environment values with secret-named keys redacted; graph file paths and SHA-256.",
+      "source_ref": "app/modules/f2w_agent/trace.py:206-275",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "no",
+      "notes": "Redaction is name/value based only (trace.py:44-47,206-243)."
+    },
+    "TR.errors": {
+      "field": "trace.errors[]",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Exception type/message/where.",
+      "source_ref": "app/modules/f2w_agent/trace.py:496-503",
+      "size_bound": "none",
+      "reconstruction_risk": "low",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "TR.response": {
+      "field": "trace.response.*",
+      "class": "quote-bounded",
+      "source_derived": true,
+      "currently_returns": "Answer, parsed citations, publications, pending, status.",
+      "source_ref": "app/modules/f2w_agent/trace.py:505-525",
+      "size_bound": "none",
+      "reconstruction_risk": "as ChatResponse.answer",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "ST.config": {
+      "field": "AgentSettingsResponse.backend/model/graph_source/workflow_mode/extraction_mode/targeted_max_pages/kg_query_*/source_rag/use_live_tiled/available_cborg_models/default_ollama_model/selected_graph_ids/tiled_status/tiled_api_key_set",
+      "class": "public-safe",
+      "source_derived": false,
+      "currently_returns": "Runtime configuration values and booleans.",
+      "source_ref": "app/modules/f2w_agent/api.py:383-407,2669-2711",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "yes",
+      "notes": ""
+    },
+    "ST.paths": {
+      "field": "AgentSettingsResponse.json_graph_path/json_graph_paths/available_json_graphs/available_graphs[].path/tiled_uri",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Graph file paths under storage/kg and uploads; configured Tiled URI.",
+      "source_ref": "app/modules/f2w_agent/api.py:391-403,465-476",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "ST.tiled_error": {
+      "field": "AgentSettingsResponse.tiled_error",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Probe/lookup error text with the Tiled key value redacted.",
+      "source_ref": "app/modules/tiled_graph.py:714-728; api.py:2713-2724",
+      "size_bound": "none",
+      "reconstruction_risk": "none",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    },
+    "ERR.detail": {
+      "field": "HTTPException.detail = str(exc)",
+      "class": "internal-only",
+      "source_derived": false,
+      "currently_returns": "Raw exception text (FileNotFoundError/ValueError/any Exception) returned as 400/404/502 detail.",
+      "source_ref": "app/modules/f2w_agent/api.py:6654-6655,6667-6668,6682-6683,6755-6760,6767-6768,6786-6787,6802-6803,6814-6815",
+      "size_bound": "none",
+      "reconstruction_risk": "low; may include local paths, Splash/Tiled responses",
+      "conforms_to_D19_today": "no",
+      "notes": ""
+    }
+  },
+  "routes": [
+    {
+      "route_id": "R01",
+      "method": "GET",
+      "path": "/health",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6625,
+      "handler": "create_app.health",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "status/kg_mode/backend/model/workflow_mode/extraction_mode/targeted_max_pages/session_memory_has_context/workflow_phase/pending_approval/max_rounds",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Process status and runtime settings.",
+          "source_ref": "app/modules/f2w_agent/api.py:6627-6642",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        },
+        {
+          "field": "workdir/session_memory/workflow_state",
+          "class": "internal-only",
+          "source_derived": false,
+          "currently_returns": "Absolute paths of workdir, session memory and workflow state files.",
+          "source_ref": "app/modules/f2w_agent/api.py:6629,6636,6638",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "no",
+          "notes": "ALS exposes health to not-signed-in callers; needs a reduced non-sensitive projection."
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [
+        "AUTH-01",
+        "DEP-10"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R02",
+      "method": "GET",
+      "path": "/settings",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6645,
+      "handler": "create_app.get_settings",
+      "effects": "read; outbound Tiled probe that sends the process TILED_API_KEY to runtime.tiled_uri (tiled_graph.py:225-247,183-190)",
+      "fields": [
+        "ST.config",
+        "ST.paths",
+        "ST.tiled_error"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [
+        "LOCAL-06",
+        "AUTH-06"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R03",
+      "method": "PUT",
+      "path": "/settings",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6650,
+      "handler": "create_app.update_settings",
+      "effects": "process-global mutation of model/graph/source_rag/live Tiled/tiled_uri (api.py:2726-2860); tiled_uri accepts any http(s) host except *.als.lbl.gov (tiled_graph.py:161-175)",
+      "fields": [
+        "ST.config",
+        "ST.paths",
+        "ST.tiled_error",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Not a source-disclosure leak, but a request can redirect the backend's Tiled key to an arbitrary host; see current_state.md.",
+      "binary_cases": [
+        "LOCAL-07",
+        "AUTH-08",
+        "LLM-01"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R04",
+      "method": "POST",
+      "path": "/session/reset",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6658,
+      "handler": "create_app.reset_session",
+      "effects": "clears session memory/workflow (api.py:4230-4245)",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "status/session_memory_has_context/workflow_state/workflow_phase",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Reset result.",
+          "source_ref": "app/modules/f2w_agent/api.py:364-370",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        },
+        {
+          "field": "session_memory",
+          "class": "internal-only",
+          "source_derived": false,
+          "currently_returns": "Session memory file path.",
+          "source_ref": "app/modules/f2w_agent/api.py:367",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "no",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R05",
+      "method": "DELETE",
+      "path": "/session/{session_id}",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6663,
+      "handler": "create_app.delete_session",
+      "effects": "deletes any named session; session ids are caller-chosen (api.py:128-133,4246-4258)",
+      "fields": [
+        "ERR.detail"
+      ],
+      "route_specific_fields": [
+        {
+          "field": "status/session_id",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "{'status':'deleted','session_id':key}",
+          "source_ref": "app/modules/f2w_agent/api.py:4258",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R06",
+      "method": "GET",
+      "path": "/graph",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6671,
+      "handler": "create_app.graph",
+      "effects": "read",
+      "fields": [
+        "GN.id_label_type",
+        "GN.description",
+        "GN.publications",
+        "GN.source_papers",
+        "GN.properties",
+        "GN.extra_fields",
+        "GN.repo_provenance",
+        "GE.edge",
+        "GP.source_path"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Whole active graph in one response; code_snippet omitted (include_code False at api.py:1362). Full-graph enumeration of descriptions/properties; no context_snippets.",
+      "binary_cases": [
+        "SEC-05",
+        "QUOTE-01"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R07",
+      "method": "POST",
+      "path": "/graph/nodes/search",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6676,
+      "handler": "create_app.search_graph_nodes",
+      "effects": "read",
+      "fields": [
+        "GN.id_label_type",
+        "GN.description",
+        "GN.publications",
+        "GN.source_papers",
+        "GN.code_snippet",
+        "GN.properties",
+        "GN.extra_fields",
+        "GN.repo_provenance",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "limit 1..25 (api.py:301); nodes from graph_node_from_file include code (api.py:2930).",
+      "binary_cases": [
+        "SEC-05"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R08",
+      "method": "GET",
+      "path": "/graph/neighborhood/{node_id:path}",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6686,
+      "handler": "create_app.graph_neighborhood",
+      "effects": "read",
+      "fields": [
+        "GN.id_label_type",
+        "GN.description",
+        "GN.publications",
+        "GN.source_papers",
+        "GN.properties",
+        "GN.extra_fields",
+        "GN.repo_provenance",
+        "GE.edge",
+        "GP.source_path"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Tiled lookup graph only (api.py:2971-3047, 1447-1513); 'hops' query param is accepted but CITE_FOCUS_HOPS is used. Properties = full Tiled entity props.",
+      "binary_cases": [
+        "SEC-05"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R09",
+      "method": "GET",
+      "path": "/graph/node/{node_id}",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6716,
+      "handler": "create_app.graph_node",
+      "effects": "read",
+      "fields": [
+        "GN.id_label_type",
+        "GN.description",
+        "GN.publications",
+        "GN.source_papers",
+        "GN.code_snippet",
+        "GN.properties",
+        "GN.extra_fields",
+        "GN.repo_provenance",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Node detail = the per-node evidence surface. Optional json_graph_path query param is confined to storage/kg or workdir/uploads (api.py:3396-3412). Arbitrary node ids may be enumerated; content is the GraphNode projection only.",
+      "binary_cases": [
+        "QUOTE-01",
+        "QUOTE-02",
+        "SEC-05"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R10",
+      "method": "PATCH",
+      "path": "/graph/node/{node_id}",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6751,
+      "handler": "create_app.patch_graph_node",
+      "effects": "writes Splash-links entity via unauthenticated GraphQL and the session graph JSON (api.py:2978-3046; kg_update.py:57-77,270-299)",
+      "fields": [
+        "GN.id_label_type",
+        "GN.description",
+        "GN.publications",
+        "GN.source_papers",
+        "GN.code_snippet",
+        "GN.properties",
+        "GN.extra_fields",
+        "GN.repo_provenance",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Caller-supplied description/code/publications become graph content; no exactness check on edited quotes.",
+      "binary_cases": [
+        "TIL-05",
+        "AUTH-04",
+        "JSON-10"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R11",
+      "method": "POST",
+      "path": "/graph/upload",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6763,
+      "handler": "create_app.upload_graph",
+      "effects": "writes arbitrary caller JSON to workdir/uploads/<name>.json with no size limit (api.py:3374-3394)",
+      "fields": [
+        "GN.id_label_type",
+        "GN.description",
+        "GN.publications",
+        "GN.source_papers",
+        "GN.properties",
+        "GN.extra_fields",
+        "GN.repo_provenance",
+        "GE.edge",
+        "GP.source_path",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [
+        {
+          "field": "graph_path",
+          "class": "internal-only",
+          "source_derived": false,
+          "currently_returns": "Absolute path of the written upload.",
+          "source_ref": "app/modules/f2w_agent/api.py:294,3394",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "no",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Echoes the caller's own upload through the GraphNode projection.",
+      "binary_cases": [
+        "AUTH-04"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R12",
+      "method": "POST",
+      "path": "/chat",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6771,
+      "handler": "create_app.chat",
+      "effects": "model calls; may set pending download/extraction; writes trace when F2W_TRACE_ENABLED",
+      "fields": [
+        "CR.status_flags",
+        "CR.answer",
+        "CR.publications",
+        "CR.rounds",
+        "CR.graph",
+        "CR.workdir",
+        "CR.pending",
+        "CR.orchestration",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [
+        "QA-01",
+        "QUOTE-01",
+        "QUOTE-02",
+        "SEC-04",
+        "AUTH-01",
+        "AUTH-02"
+      ],
+      "route_class": "internal-only",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R13",
+      "method": "POST",
+      "path": "/chat/action",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6790,
+      "handler": "create_app.chat_action",
+      "effects": "yes/no on pending: paper download, extraction, KG rebuild, Splash wipe+reimport, retrieval reload (api.py:5919-5971,5504-5702)",
+      "fields": [
+        "CR.status_flags",
+        "CR.answer",
+        "CR.publications",
+        "CR.rounds",
+        "CR.graph",
+        "CR.workdir",
+        "CR.pending",
+        "CR.orchestration",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [
+        "AUTH-03",
+        "LOCAL-02",
+        "SEC-04"
+      ],
+      "route_class": "internal-only",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R14",
+      "method": "POST",
+      "path": "/publications/search",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6806,
+      "handler": "create_app.publication_search",
+      "effects": "read; optional outbound OpenAlex query (api.py:2416-2436)",
+      "fields": [
+        "GN.publications",
+        "ERR.detail"
+      ],
+      "route_specific_fields": [
+        {
+          "field": "status/query/matched_node_ids/source",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Search metadata.",
+          "source_ref": "app/modules/f2w_agent/api.py:355-361,3361-3367",
+          "size_bound": "max_results 1..50",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Returns bibliographic records only; abstract_text unbounded on the KG path.",
+      "binary_cases": [
+        "SEC-05"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R15",
+      "method": "POST",
+      "path": "/chat/stream",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6818,
+      "handler": "create_app.chat_stream",
+      "effects": "as /chat",
+      "fields": [
+        "SSE.progress",
+        "SSE.complete",
+        "SSE.error",
+        "CR.status_flags",
+        "CR.answer",
+        "CR.publications",
+        "CR.rounds",
+        "CR.graph",
+        "CR.workdir",
+        "CR.pending",
+        "CR.orchestration"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [
+        "SEC-04",
+        "QUOTE-01",
+        "DEP-08"
+      ],
+      "route_class": "internal-only",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R16",
+      "method": "POST",
+      "path": "/chat/action/stream",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 6911,
+      "handler": "create_app.chat_action_stream",
+      "effects": "as /chat/action",
+      "fields": [
+        "SSE.progress",
+        "SSE.complete",
+        "SSE.error",
+        "CR.status_flags",
+        "CR.answer",
+        "CR.publications",
+        "CR.rounds",
+        "CR.graph",
+        "CR.workdir",
+        "CR.pending",
+        "CR.orchestration"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [
+        "SEC-04",
+        "AUTH-03"
+      ],
+      "route_class": "internal-only",
+      "route_class_incl_non_source_fields": "internal-only",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R17",
+      "method": "GET",
+      "path": "/traces/{turn_id}",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 7002,
+      "handler": "create_app.get_trace",
+      "effects": "reads runs/traces/*/turns/<turn_id>.json (trace.py:778-787,813-823)",
+      "fields": [
+        "TR.merged_context",
+        "TR.llm_messages",
+        "TR.llm_response",
+        "TR.request",
+        "TR.env",
+        "TR.errors",
+        "TR.response"
+      ],
+      "route_specific_fields": [],
+      "serves_pdf": false,
+      "serves_full_text": true,
+      "notes": "Returns the unclipped detail record (docstring api.py:7003) to any caller that knows a turn id. Turn ids are uuid4 or caller-chosen (trace.py:346-350); the UI copies the URL to the clipboard (ChatSidebar.tsx:1043-1045, uiTelemetry.ts:98-103). Active whenever F2W_TRACE_ENABLED is on, which docker-compose.yml:43 sets while publishing 8090 on all interfaces (:51).",
+      "binary_cases": [
+        "SEC-04",
+        "SEC-01",
+        "SEC-03"
+      ],
+      "route_class": "source-serving",
+      "route_class_incl_non_source_fields": "source-serving",
+      "exposes_internal_paths_or_raw_errors": true,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R18",
+      "method": "POST",
+      "path": "/telemetry/ui",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 7010,
+      "handler": "create_app.telemetry_ui",
+      "effects": "appends browser events to runs/traces/<day>/ui_events.jsonl (trace.py:789-799)",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "status/written",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Write count.",
+          "source_ref": "app/modules/f2w_agent/api.py:7012-7016",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R19",
+      "method": "POST",
+      "path": "/annotations",
+      "file": "app/modules/f2w_agent/api.py",
+      "line": 7019,
+      "handler": "create_app.create_annotation",
+      "effects": "appends pass/fail label to runs/traces/annotations.jsonl (trace.py:802-810)",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "status/turn_id/verdict",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Echo.",
+          "source_ref": "app/modules/f2w_agent/api.py:7029",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "'annotator' is a free-text caller label, not an identity (api.py:281).",
+      "binary_cases": [],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R20",
+      "method": "POST",
+      "path": "/api/chat",
+      "file": "app/modules/kg_rag_api.py",
+      "line": 246,
+      "handler": "create_fastapi_app.api_chat",
+      "effects": "model call; MissingNodeTracker log write",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "message.content / choices[0].message.content",
+          "class": "quote-bounded",
+          "source_derived": true,
+          "currently_returns": "LLM answer from RAG_SYSTEM prompt over KG context that includes, per source paper of each rendered node, a 1000-char window of the full PDF text centred on query terms ([PDF name] blocks).",
+          "source_ref": "app/modules/kg_rag_api.py:141-143,458-471,760-775,1242-1247; app/modules/kg_rag_api.py:246-282",
+          "size_bound": "context: CONTEXT_CHAR_BUDGET*0.75 = 12000 chars; snippet KG_RAG_SNIP=1000 (env-tunable); answer unbounded",
+          "reconstruction_risk": "HIGH [inferred]: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; no output constraint or exact-quote check.",
+          "conforms_to_D19_today": "no",
+          "notes": ""
+        },
+        {
+          "field": "error",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "{'error':'No messages'}",
+          "source_ref": "app/modules/kg_rag_api.py:246",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "binary_cases": [
+        "SEC-04",
+        "QUOTE-02",
+        "DEP-07"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "quote-bounded",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R21",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "file": "app/modules/kg_rag_api.py",
+      "line": 262,
+      "handler": "create_fastapi_app.openai_chat_completions",
+      "effects": "model call",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "message.content / choices[0].message.content",
+          "class": "quote-bounded",
+          "source_derived": true,
+          "currently_returns": "LLM answer from RAG_SYSTEM prompt over KG context that includes, per source paper of each rendered node, a 1000-char window of the full PDF text centred on query terms ([PDF name] blocks).",
+          "source_ref": "app/modules/kg_rag_api.py:141-143,458-471,760-775,1242-1247; app/modules/kg_rag_api.py:246-282",
+          "size_bound": "context: CONTEXT_CHAR_BUDGET*0.75 = 12000 chars; snippet KG_RAG_SNIP=1000 (env-tunable); answer unbounded",
+          "reconstruction_risk": "HIGH [inferred]: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; no output constraint or exact-quote check.",
+          "conforms_to_D19_today": "no",
+          "notes": ""
+        },
+        {
+          "field": "error",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "{'error':'No messages'}",
+          "source_ref": "app/modules/kg_rag_api.py:246",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "binary_cases": [
+        "SEC-04",
+        "QUOTE-02",
+        "DEP-07"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "quote-bounded",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R22",
+      "method": "GET",
+      "path": "/api/tags",
+      "file": "app/modules/kg_rag_api.py",
+      "line": 285,
+      "handler": "create_fastapi_app.list_models",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "app/modules/kg_rag_api.py:285-295",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R23",
+      "method": "GET",
+      "path": "/api/version",
+      "file": "app/modules/kg_rag_api.py",
+      "line": 294,
+      "handler": "create_fastapi_app.ollama_version",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "app/modules/kg_rag_api.py:294-304",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R24",
+      "method": "GET",
+      "path": "/v1/models",
+      "file": "app/modules/kg_rag_api.py",
+      "line": 299,
+      "handler": "create_fastapi_app.openai_models",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "app/modules/kg_rag_api.py:299-309",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R25",
+      "method": "GET",
+      "path": "/api/ps",
+      "file": "app/modules/kg_rag_api.py",
+      "line": 314,
+      "handler": "create_fastapi_app.list_processes",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "app/modules/kg_rag_api.py:314-324",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R26",
+      "method": "POST",
+      "path": "/api/chat",
+      "file": "scripts/app/modules/kg_rag_api.py",
+      "line": 221,
+      "handler": "create_fastapi_app.api_chat",
+      "effects": "model call; MissingNodeTracker log write",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "message.content / choices[0].message.content",
+          "class": "quote-bounded",
+          "source_derived": true,
+          "currently_returns": "LLM answer from RAG_SYSTEM prompt over KG context that includes, per source paper of each rendered node, a 1000-char window of the full PDF text centred on query terms ([PDF name] blocks).",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:117-118,428,1116; scripts/app/modules/kg_rag_api.py:221-257",
+          "size_bound": "context: CONTEXT_CHAR_BUDGET*0.75 = 12000 chars; snippet KG_RAG_SNIP=1000 (env-tunable); answer unbounded",
+          "reconstruction_risk": "HIGH [inferred]: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; no output constraint or exact-quote check.",
+          "conforms_to_D19_today": "no",
+          "notes": ""
+        },
+        {
+          "field": "error",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "{'error':'No messages'}",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:221",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (scripts/app/modules/kg_rag_api.py:296-305). Duplicate of app/modules/kg_rag_api.py.",
+      "binary_cases": [
+        "SEC-04",
+        "QUOTE-02",
+        "DEP-07"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "quote-bounded",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R27",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "file": "scripts/app/modules/kg_rag_api.py",
+      "line": 237,
+      "handler": "create_fastapi_app.openai_chat_completions",
+      "effects": "model call",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "message.content / choices[0].message.content",
+          "class": "quote-bounded",
+          "source_derived": true,
+          "currently_returns": "LLM answer from RAG_SYSTEM prompt over KG context that includes, per source paper of each rendered node, a 1000-char window of the full PDF text centred on query terms ([PDF name] blocks).",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:117-118,428,1116; scripts/app/modules/kg_rag_api.py:221-257",
+          "size_bound": "context: CONTEXT_CHAR_BUDGET*0.75 = 12000 chars; snippet KG_RAG_SNIP=1000 (env-tunable); answer unbounded",
+          "reconstruction_risk": "HIGH [inferred]: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; no output constraint or exact-quote check.",
+          "conforms_to_D19_today": "no",
+          "notes": ""
+        },
+        {
+          "field": "error",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "{'error':'No messages'}",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:221",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (scripts/app/modules/kg_rag_api.py:296-305). Duplicate of app/modules/kg_rag_api.py.",
+      "binary_cases": [
+        "SEC-04",
+        "QUOTE-02",
+        "DEP-07"
+      ],
+      "route_class": "quote-bounded",
+      "route_class_incl_non_source_fields": "quote-bounded",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R28",
+      "method": "GET",
+      "path": "/api/tags",
+      "file": "scripts/app/modules/kg_rag_api.py",
+      "line": 260,
+      "handler": "create_fastapi_app.list_models",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:260-270",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (scripts/app/modules/kg_rag_api.py:296-305). Duplicate of app/modules/kg_rag_api.py.",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R29",
+      "method": "GET",
+      "path": "/api/version",
+      "file": "scripts/app/modules/kg_rag_api.py",
+      "line": 269,
+      "handler": "create_fastapi_app.ollama_version",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:269-279",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (scripts/app/modules/kg_rag_api.py:296-305). Duplicate of app/modules/kg_rag_api.py.",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R30",
+      "method": "GET",
+      "path": "/v1/models",
+      "file": "scripts/app/modules/kg_rag_api.py",
+      "line": 274,
+      "handler": "create_fastapi_app.openai_models",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:274-284",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (scripts/app/modules/kg_rag_api.py:296-305). Duplicate of app/modules/kg_rag_api.py.",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R31",
+      "method": "GET",
+      "path": "/api/ps",
+      "file": "scripts/app/modules/kg_rag_api.py",
+      "line": 289,
+      "handler": "create_fastapi_app.list_processes",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "static body",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Static model/version/process stub.",
+          "source_ref": "scripts/app/modules/kg_rag_api.py:289-299",
+          "size_bound": "constant",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (scripts/app/modules/kg_rag_api.py:296-305). Duplicate of app/modules/kg_rag_api.py.",
+      "binary_cases": [
+        "DEP-07"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none"
+    },
+    {
+      "route_id": "R32",
+      "method": "GET",
+      "path": "/",
+      "file": "scripts/paper_finder.py",
+      "line": 601,
+      "handler": "create_app.index",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "HTML page",
+          "class": "public-safe",
+          "source_derived": true,
+          "currently_returns": "Harvest-queue paper title, journal, year, DOI/arXiv id, staging filenames, 'open' link target (publisher/arXiv URL).",
+          "source_ref": "scripts/paper_finder.py:492-555,601-616",
+          "size_bound": "one paper",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "Operator tool; binds 127.0.0.1 only and refuses other hosts (paper_finder.py:61-82). Never fetches or serves the PDF (comment :636).",
+      "binary_cases": [
+        "LOCAL-08"
+      ],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none (loopback-only bind enforced)"
+    },
+    {
+      "route_id": "R33",
+      "method": "GET",
+      "path": "/detected",
+      "file": "scripts/paper_finder.py",
+      "line": 619,
+      "handler": "create_app.detected",
+      "effects": "read",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "detected[]",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Local staging PDF filenames only.",
+          "source_ref": "scripts/paper_finder.py:619-625",
+          "size_bound": "list",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none (loopback-only bind enforced)"
+    },
+    {
+      "route_id": "R34",
+      "method": "POST",
+      "path": "/action",
+      "file": "scripts/paper_finder.py",
+      "line": 627,
+      "handler": "create_app.action",
+      "effects": "open in OS browser / mark restricted / skip / assign (move a staged PDF into papers/<corpus>/<year>/) / dismiss",
+      "fields": [],
+      "route_specific_fields": [
+        {
+          "field": "302 redirect",
+          "class": "public-safe",
+          "source_derived": false,
+          "currently_returns": "Redirect to index.",
+          "source_ref": "scripts/paper_finder.py:627-702",
+          "size_bound": "none",
+          "reconstruction_risk": "none",
+          "conforms_to_D19_today": "yes",
+          "notes": ""
+        }
+      ],
+      "serves_pdf": false,
+      "serves_full_text": false,
+      "notes": "",
+      "binary_cases": [],
+      "route_class": "public-safe",
+      "route_class_incl_non_source_fields": "public-safe",
+      "exposes_internal_paths_or_raw_errors": false,
+      "current_auth": "none (loopback-only bind enforced)"
+    }
+  ],
+  "stores_and_exports": [
+    {
+      "id": "S01",
+      "store": "storage/kg/*.json (47 files tracked in Git at 222b1e7)",
+      "class": "internal-only",
+      "content": "things[].context_snippets[{text,source_paper,page}]",
+      "measured": {
+        "files_parsed": 45,
+        "snippets": 126977,
+        "snippet_chars": 28342058,
+        "max_snippet_chars": 1890,
+        "verbatim_sample": "300 of 300 random snippets whose PDF is in papers/ occur verbatim (whitespace-normalized) on the cited page",
+        "per_paper_coverage_of_normalized_text": {
+          "papers": 90,
+          "median": 0.307,
+          "max": 0.478,
+          "papers_over_25pct": 57,
+          "papers_over_50pct": 0
+        }
+      },
+      "source_ref": "app/modules/json2kg.py:334; app/modules/term_extractor/orchestrator.py:339-341; app/modules/extract_terms.py:1393,1465",
+      "risk": "Cumulative reconstruction: the union of snippets reproduces about a third of each paper's text verbatim, in a public Git repository. Not served by any F2W route (GraphNode excludes context_snippets, api.py:598), but it is a graph export under D19/D31 and blocks commit-ready status (REL-04).",
+      "binary_cases": [
+        "REL-04",
+        "SEC-05",
+        "DEP-09"
+      ]
+    },
+    {
+      "id": "S02",
+      "store": "storage/terminology/*.json (58 files tracked)",
+      "class": "internal-only",
+      "content": "terms[].context_snippets",
+      "measured": {
+        "files_parsed": 56,
+        "snippets": 141458,
+        "snippet_chars": 31632709,
+        "verbatim_sample": "not checked [inferred same producer as S01]"
+      },
+      "source_ref": "app/modules/term_extractor/models.py:112,134; store.py:164-169",
+      "risk": "As S01.",
+      "binary_cases": [
+        "REL-04"
+      ]
+    },
+    {
+      "id": "S03",
+      "store": "papers/ (90 PDFs tracked at 222b1e7; untracked on forge_merge by f0c6ce3, still in history)",
+      "class": "source-serving",
+      "content": "Full publisher PDFs",
+      "source_ref": "docs/migration/reviews/H0/license_dependency_audit.md E1",
+      "risk": "Full papers are publicly retrievable from Git history. Outside the HTTP API; owner decision E1 pending.",
+      "binary_cases": [
+        "SEC-01",
+        "DEP-09",
+        "REL-04"
+      ]
+    },
+    {
+      "id": "S04",
+      "store": "storage/source_index/*/chunks.jsonl (gitignored, local)",
+      "class": "internal-only",
+      "content": "1200-char paper and ops text chunks with work_id/page/locator",
+      "source_ref": "license_dependency_audit.md E4; app/modules/hybrid_rag/evidence.py:126-159",
+      "risk": "Agent-private index; its chunks reach users only through prompts (trace R17) and answers.",
+      "binary_cases": [
+        "SEC-02",
+        "DEP-09"
+      ]
+    },
+    {
+      "id": "S05",
+      "store": "runs/traces/<day>/turns/<turn_id>.json (F2W_TRACE_DIR)",
+      "class": "source-serving",
+      "content": "Unclipped per-turn detail incl. prompts with page/chunk text",
+      "source_ref": "app/modules/f2w_agent/trace.py:1-6,612-627",
+      "risk": "At rest it is a protected evaluation store; it becomes source-serving because R17 returns it.",
+      "binary_cases": [
+        "SEC-04"
+      ]
+    },
+    {
+      "id": "S06",
+      "store": "Splash-links entities (splash_links/scripts/import_kg.py; GraphQL :8081)",
+      "class": "internal-only",
+      "content": "Entity properties = every non-core MatKG thing field, including context_snippets; link properties include has_evidence",
+      "source_ref": "splash_links/scripts/import_kg.py:42-58,156-163; app/modules/f2w_agent/kg_update.py:57-77",
+      "risk": "Unauthenticated GraphQL store holding the S01 snippets; the GN.properties dict path would forward them for Splash/Tiled-sourced nodes.",
+      "binary_cases": [
+        "SEC-05",
+        "TIL-03"
+      ]
+    },
+    {
+      "id": "S07",
+      "store": "Live Tiled graph (local :8765, allow_anonymous_access: true)",
+      "class": "internal-only",
+      "content": "Experiment identity entities today; literature KG after T08B import",
+      "source_ref": "storage/tiled_config.yml:14-16; app/modules/tiled_graph.py:1-19,44",
+      "risk": "Anonymous read today; a literature import that copies properties wholesale would publish snippets to any anonymous reader.",
+      "binary_cases": [
+        "SEC-05",
+        "TIL-03"
+      ]
+    }
+  ],
+  "http_surfaces_outside_inventory": [
+    {
+      "surface": "term_extractor agent dashboard (Flask)",
+      "routes": [
+        "GET /",
+        "GET /events (SSE of agent logs/prompts)",
+        "GET /assets/<path>",
+        "POST /dismiss/<id>",
+        "POST /respond/<id>",
+        "POST /shutdown/<agent_id>"
+      ],
+      "source_ref": "app/modules/term_extractor/dashboard.py:1080-1106,1273-1323; user_agent.py:23-27",
+      "bind": "0.0.0.0:8000 default, no auth",
+      "reachability": "Only through academy_agent.py UserAgent; no launcher reaches it from the API or images [inferred dormant]",
+      "class": "internal-only",
+      "note": "Log stream content not audited; treat as internal."
+    },
+    {
+      "surface": "splash-links GraphQL",
+      "routes": [
+        "POST /splash_links/graphql"
+      ],
+      "source_ref": "app/modules/f2w_agent/kg_update.py:57-77",
+      "bind": "localhost:8081 default",
+      "class": "internal-only"
+    },
+    {
+      "surface": "local Tiled server",
+      "routes": [
+        "/api/v1/*",
+        "/api/graphql"
+      ],
+      "source_ref": "storage/tiled_config.yml:1-22; docker-compose.yml:79-98",
+      "bind": "127.0.0.1:8765 (compose publishes loopback)",
+      "class": "internal-only"
+    },
+    {
+      "surface": "nginx UI container",
+      "routes": [
+        "/healthz",
+        "/api/* -> agent:8090/*",
+        "/ static UI"
+      ],
+      "source_ref": "docker/nginx.conf:8-28",
+      "class": "public-safe",
+      "note": "Proxies every F2W API route including /traces."
+    }
+  ],
+  "browser_rendering": [
+    {
+      "what": "Answer text with [KG]/[PDF]/[OPS] citation chips",
+      "source_ref": "ui/src/app/components/kgCitations.ts:5-160",
+      "class": "quote-bounded"
+    },
+    {
+      "what": "Citation popover snippet = node.description or publication abstract_text",
+      "source_ref": "ui/src/app/components/kgCitations.ts:548",
+      "class": "quote-bounded"
+    },
+    {
+      "what": "Pending paper card abstract",
+      "source_ref": "ui/src/app/components/ChatSidebar.tsx:53-55",
+      "class": "quote-bounded"
+    },
+    {
+      "what": "Publication links: doi.org / arXiv / Semantic Scholar search; no local PDF link",
+      "source_ref": "ui/src/app/components/publicationLinks.ts:60-125",
+      "class": "public-safe"
+    },
+    {
+      "what": "Copy trace link (absolute /traces/<turn_id> URL)",
+      "source_ref": "ui/src/app/components/uiTelemetry.ts:98-103; ChatSidebar.tsx:1043-1045",
+      "class": "source-serving (target R17)"
+    },
+    {
+      "what": "Graph node card: description, publications, code snippets, properties, extra fields; edit form",
+      "source_ref": "ui/src/app/components/nodeCardDetails.ts:150-200; GraphMockup.tsx:447-1070",
+      "class": "quote-bounded"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "high",
+      "summary": "GET /traces/{turn_id} returns full prompts containing PDF page text and paper chunks to any caller who has a turn id; no auth.",
+      "refs": [
+        "R17",
+        "TR.llm_messages",
+        "TR.merged_context"
+      ]
+    },
+    {
+      "id": "F2",
+      "severity": "high",
+      "summary": "Tracked KG/terminology JSON holds ~127k/141k verbatim context snippets; their union reproduces a median 31% (max 48%) of each paper's text, in public Git.",
+      "refs": [
+        "S01",
+        "S02"
+      ]
+    },
+    {
+      "id": "F3",
+      "severity": "high",
+      "summary": "Full publisher PDFs are in public Git history (H0 E1).",
+      "refs": [
+        "S03"
+      ]
+    },
+    {
+      "id": "F4",
+      "severity": "medium",
+      "summary": "Model-compatible proxy injects query-positioned 1000-char PDF text windows into prompts and returns unconstrained model output; binds 0.0.0.0 without auth.",
+      "refs": [
+        "R20",
+        "R21",
+        "R26",
+        "R27"
+      ]
+    },
+    {
+      "id": "F5",
+      "severity": "medium",
+      "summary": "ChatResponse.rounds and SSE complete/error forward raw internal state, untruncated OpenAlex abstracts, local paths and str(exc).",
+      "refs": [
+        "CR.rounds",
+        "SSE.complete",
+        "SSE.error",
+        "ERR.detail"
+      ]
+    },
+    {
+      "id": "F6",
+      "severity": "medium",
+      "summary": "GraphNode.properties forwards every stored property for dict-shaped (Tiled/Splash) nodes; a literature import that keeps context_snippets in properties would serve them.",
+      "refs": [
+        "GN.properties",
+        "S06",
+        "S07"
+      ]
+    },
+    {
+      "id": "F7",
+      "severity": "low",
+      "summary": "No route serves PDF bytes. No route returns a parsed section or crop. Paper Finder never fetches PDFs.",
+      "refs": [
+        "R32",
+        "R33",
+        "R34"
+      ]
+    },
+    {
+      "id": "F8",
+      "severity": "low",
+      "summary": "No exact-quote verification exists anywhere: answers, graph descriptions and code snippets are labelled by citation only.",
+      "refs": [
+        "CR.answer",
+        "GN.description",
+        "GN.code_snippet"
+      ]
+    }
+  ]
+}

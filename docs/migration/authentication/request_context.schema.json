@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fair2wise.local/schemas/migration/authentication/request_context.schema.json",
+  "title": "RequestContext",
+  "description": "T25A (gate H1, Proposed). Server-constructed context passed to every service, Tool, job and FORGE delegate. Built only from trusted startup configuration and, on ALS profiles, from a verified Tiled identity; never accepted from a request body, header, cookie claim or model argument. Core fields mirror app/modules/contracts/context.py:RequestContext and Principal (extra='forbid', frozen). Fields with \"x-f2w-status\": \"proposed_extension\" are NOT in the Pydantic model yet: a record that sets them fails RequestContext validation until the integrator adds them (see access_contract.md section 10). An ALS caller who is not signed in has no RequestContext; only sign-in and health handlers run (access_contract.md section 4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "mode", "principal", "request_id"],
+  "properties": {
+    "profile": {
+      "description": "Deployment profile from startup configuration (DeploymentProfile).",
+      "enum": ["local", "als-dev", "als-prod"]
+    },
+    "mode": {
+      "description": "Authorization mode implied by profile (AuthorizationMode).",
+      "enum": ["local_trusted", "tiled_authenticated"]
+    },
+    "principal": { "$ref": "#/$defs/Principal" },
+    "capabilities": {
+      "description": "Capability names granted for this request. Vocabulary in access_contract.md section 6. Pydantic type: FrozenSet[str], default empty.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/Capability" },
+      "default": []
+    },
+    "corpus_scope": {
+      "description": "Corpora this request may read or affect. FrozenSet[str], default empty.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "request_id": { "description": "Server-generated correlation id. Never the caller's client_turn_id.", "type": "string", "minLength": 1 },
+    "run_id": { "description": "Agent/job run this request belongs to, if any.", "type": ["string", "null"], "default": null },
+    "deadline": { "description": "Absolute time after which work must stop.", "type": ["string", "null"], "format": "date-time", "default": null },
+    "budget_ref": { "description": "Reference to the configured cost/rate budget, if any.", "type": ["string", "null"], "default": null },
+    "session_id": {
+      "x-f2w-status": "proposed_extension",
+      "description": "F2W chat session id bound server-side to this principal (ALS) or to the local operator. Used for own-session and own-trace checks. Never a credential.",
+      "type": ["string", "null"],
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+    },
+    "tiled_target": {
+      "x-f2w-status": "proposed_extension",
+      "description": "Normalized base URL of the profile's Tiled instance (local managed http://127.0.0.1:8765, als-dev https://tiled-staging.als.lbl.gov, als-prod https://tiled.als.lbl.gov). Binds identity and grants to one environment (AUTH-08, LOCAL-10).",
+      "type": ["string", "null"]
+    },
+    "actor_kind": {
+      "x-f2w-status": "proposed_extension",
+      "description": "Who is driving the request: an interactive caller, or a background worker resuming a recorded job context.",
+      "enum": ["interactive", "worker", "forge_delegate", "cli"]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "local_trusted" } }, "required": ["mode"] },
+      "then": {
+        "description": "Mirrors context.py:90-96. local_trusted only on :local; principal is local-operator with no synthetic Tiled identity or role check.",
+        "properties": {
+          "profile": { "const": "local" },
+          "principal": { "$ref": "#/$defs/LocalOperatorPrincipal" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "tiled_authenticated" } }, "required": ["mode"] },
+      "then": {
+        "description": "Mirrors context.py:97-101. ALS only; principal must carry issuer, verified_at and a role-check result.",
+        "properties": {
+          "profile": { "enum": ["als-dev", "als-prod"] },
+          "principal": { "$ref": "#/$defs/VerifiedTiledPrincipal" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "local" } }, "required": ["profile"] },
+      "then": { "properties": { "mode": { "const": "local_trusted" } } }
+    }
+  ],
+  "$defs": {
+    "Principal": {
+      "description": "Mirrors context.py:41-57 (frozen, extra='forbid').",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject"],
+      "properties": {
+        "subject": { "type": "string", "minLength": 1 },
+        "issuer": { "type": ["string", "null"], "default": null },
+        "is_admin": { "type": ["boolean", "null"], "default": null },
+        "verified_at": { "type": ["string", "null"], "format": "date-time", "default": null },
+        "identity_provider": {
+          "x-f2w-status": "proposed_extension",
+          "description": "Tiled authentication provider name of the identity used to sign in, from whoami (confirm field against final 0.2.19, T20A).",
+          "type": ["string", "null"]
+        },
+        "roles": {
+          "x-f2w-status": "proposed_extension",
+          "description": "Role names reported by the profile's Tiled whoami at verified_at. is_admin is derived from these on the server, never from a client claim.",
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "credential_expires_at": {
+          "x-f2w-status": "proposed_extension",
+          "description": "Expiry of the user's Tiled access credential, so protected effects can refuse an expired credential without a round trip. The credential itself is never stored here.",
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    },
+    "LocalOperatorPrincipal": {
+      "allOf": [{ "$ref": "#/$defs/Principal" }],
+      "properties": {
+        "subject": { "const": "local-operator" },
+        "issuer": { "type": "null" },
+        "is_admin": { "type": "null" },
+        "verified_at": { "type": "null" },
+        "identity_provider": { "type": "null" },
+        "roles": { "type": "null" },
+        "credential_expires_at": { "type": "null" }
+      }
+    },
+    "VerifiedTiledPrincipal": {
+      "allOf": [{ "$ref": "#/$defs/Principal" }],
+      "required": ["subject", "issuer", "is_admin", "verified_at"],
+      "properties": {
+        "subject": { "type": "string", "minLength": 1, "not": { "const": "local-operator" } },
+        "issuer": { "type": "string", "minLength": 1 },
+        "is_admin": { "type": "boolean" },
+        "verified_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Capability": {
+      "description": "Proposed capability vocabulary (access_contract.md section 6). Pydantic accepts any string; this enum is the proposal to freeze.",
+      "enum": [
+        "health.read",
+        "auth.session",
+        "chat.ask",
+        "chat.read_support",
+        "session.own",
+        "trace.read_own",
+        "settings.personal",
+        "telemetry.write",
+        "annotation.write",
+        "chat.decline_pending",
+        "settings.global",
+        "session.any",
+        "trace.read_any",
+        "ingest.acquire",
+        "ingest.extract",
+        "figures.process",
+        "ops.run",
+        "graph.edit",
+        "graph.upload",
+        "curation.approve",
+        "json.build",
+        "graph.publish",
+        "jobs.admin"
+      ]
+    }
+  },
+  "examples": [
+    {
+      "profile": "local",
+      "mode": "local_trusted",
+      "principal": { "subject": "local-operator", "issuer": null, "is_admin": null, "verified_at": null },
+      "capabilities": ["health.read", "chat.ask", "chat.read_support", "session.own", "trace.read_own", "settings.personal", "telemetry.write", "annotation.write", "chat.decline_pending", "settings.global", "session.any", "trace.read_any", "ingest.acquire", "ingest.extract", "figures.process", "ops.run", "graph.edit", "graph.upload", "curation.approve", "json.build", "graph.publish", "jobs.admin"],
+      "corpus_scope": ["rsoxs"],
+      "request_id": "req-0001"
+    },
+    {
+      "profile": "als-dev",
+      "mode": "tiled_authenticated",
+      "principal": { "subject": "<tiled-principal-uuid>", "issuer": "https://tiled-staging.als.lbl.gov", "is_admin": false, "verified_at": "2026-10-12T17:00:00Z" },
+      "capabilities": ["health.read", "auth.session", "chat.ask", "chat.read_support", "session.own", "trace.read_own", "settings.personal", "telemetry.write", "annotation.write", "chat.decline_pending"],
+      "corpus_scope": ["rsoxs"],
+      "request_id": "req-0002"
+    }
+  ]
+}
