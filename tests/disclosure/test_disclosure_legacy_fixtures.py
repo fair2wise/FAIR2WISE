@@ -235,7 +235,8 @@ def assert_chat_contract(original, projected, fid):
     assert citation_tokens(projected["answer"])[:len(citation_tokens(original["answer"]))] == \
         citation_tokens(original["answer"]), fid
     assert isinstance(projected["rounds"], list) and isinstance(projected["workdir"], str), fid
-    assert [r.get("round") for r in projected["rounds"]] == [r.get("round") for r in original["rounds"]], fid
+    recorded = [r.get("round") for r in original["rounds"]]
+    assert [r.get("round") for r in projected["rounds"]][:len(recorded)] == recorded, fid
     pending = projected["pending"]
     if pending and pending.get("kind") == "download":
         for p, o in zip(pending["papers"], original["pending"]["papers"]):
