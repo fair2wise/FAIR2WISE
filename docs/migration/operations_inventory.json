@@ -1,0 +1,2193 @@
+{
+  "record": "T19A Knowledge Operations inventory and population semantics",
+  "gate": "H1",
+  "status": "inventory and proposal only; no Tool registered, no behavior changed",
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "generated_on": "2026-10-12",
+  "method": "Static reading plus AST of the clean export. Read-only spot computations (corpus_qa.audit_summary_stats/audit_zero_measurement_papers, analyze_kgs.load_kg/calculate_structural_metrics) were run under env -i with the baseline venv on committed storage/ files. No network, LLM, Tiled or .env.",
+  "legend": {
+    "dispositions": {
+      "eligible_knowledge_operation": "proposed agent Tool after T19B/T19C, with a stated reason",
+      "cli_only": "keep as CLI/job; effects require separate approval",
+      "out_of_scope": "launcher, deployment, development, Splash or extraction",
+      "needs_owner": "owner decision required"
+    },
+    "effects": "read_only means no writes except optional explicit report output; destructive means it deletes or overwrites existing data without versioning"
+  },
+  "summary": {
+    "items_total": 48,
+    "scripts_dir_entries": 36,
+    "by_disposition": {
+      "eligible_knowledge_operation": 5,
+      "cli_only": 13,
+      "needs_owner": 5,
+      "out_of_scope": 25
+    },
+    "destructive": [
+      "OP09 scripts/repair_corpus.py",
+      "OP10 scripts/ingest_rsoxs_v3.py",
+      "OP11 scripts/build_v7_kg.py",
+      "OP12 scripts/ingest_bl1101_v7.py",
+      "OP13 scripts/ingest_bl1101.py",
+      "OP27 scripts/build_kg.sh",
+      "OP28 scripts/reimport_merged_kg.sh",
+      "OP29 scripts/wipe_splash_db.sh",
+      "OP34 scripts/test_compose.sh"
+    ],
+    "reads_repo_dotenv": [
+      "OP06 app/modules/tiled_sim.py",
+      "OP15 scripts/ingest_tiled_sim.py",
+      "OP17 scripts/harvest_rsoxs.py",
+      "OP18 scripts/harvest_xray.py",
+      "OP22 scripts/run.py",
+      "OP23 scripts/test_chat_apis.py",
+      "OP25 scripts/app/modules/kg_rag_api.py",
+      "OP28 scripts/reimport_merged_kg.sh",
+      "OP30 scripts/start_agent_backend.sh",
+      "OP33 scripts/start_rsoxs_stack.sh",
+      "OP36 scripts/write_nersc_env.sh",
+      "OP43 app/modules/extract_terms.py",
+      "OP45 app/modules/kg_rag_api.py",
+      "OP46 app/run_pipeline_cborg.py",
+      "OP47 app/modules/launchers/academy_extractor.py"
+    ],
+    "proposed_tools": [
+      "curate_audit_corpus",
+      "kg_compute_statistics; kg_compare_snapshots",
+      "lit_inspect_publication_dates",
+      "lit_list_missing_papers",
+      "lit_summarize_extracted_terms (or typed mode of lit_summarize_paper)"
+    ],
+    "counts_that_could_be_mistaken_for_exhaustive": [
+      "OP07 tiled_graph count nodes capped at 800/type",
+      "OP02 corpus_qa section 8 papers-per-year histogram (per-term increments)",
+      "OP02 corpus_qa section 6 under-merge pairs (adjacent-only heuristic)",
+      "OP02/OP06 'papers' = PDF filename keys, not Works",
+      "OP03 analyze_kgs paper denominators from filenames; silently skipped checkpoints",
+      "OP05 get_pdf_years non-recursive scan",
+      "OP16 gold index default of 12 Works",
+      "OP01 omitted-count in query-scoped term summaries",
+      "OP45 kg_rag_api top-k retrieval",
+      "OP17/OP18/OP19 search-capped harvests"
+    ]
+  },
+  "items": [
+    {
+      "id": "OP01",
+      "path": "app/modules/f2w_agent/paper_evidence_agent.py",
+      "sha256": "37ecadc341f796d1b8c37386eeb886d39f348bf7d850d624408646d3358305ba",
+      "lines": 458,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability",
+      "symbols": [
+        "summarize_extracted_terms 122-292",
+        "_eligible_pages 54-80 (NOT used by summarize_extracted_terms; it re-implements eligibility at 148-161 with a different 'full' rule)",
+        "_citation_errors 88-119"
+      ],
+      "effects": {
+        "read_only": true,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Pure function over two local JSON files; no LLM. Callers: api.py:4091 (default max_terms=16) and api.py:6355 (max_terms=6, query-scoped)."
+      },
+      "inputs": [
+        "session extracted-terms JSON (coord.session_terms)",
+        "extraction manifest JSON (coord.extraction_manifest)",
+        "PDF filename"
+      ],
+      "outputs": "dict: status/sufficient/answer (page-cited bullet list)/used_pages/term_count/relevant_term_count/displayed_term_count/relevance_mode",
+      "population": "Term records in the terms file whose source_papers contains the exact filename, restricted to manifest-eligible pages (selected_pages, else latest partial, else for extraction_state=full the pages the terms themselves cite) [paper_evidence_agent.py:148-188]",
+      "counting_unit": "raw extracted term records for ONE PDF filename (not canonical entities, not Works); duplicate term labels count separately (inference: no dedup in code)",
+      "completeness": "Full scan of records; display capped at max_terms (16 or 6), or min(limit,3) when query-scoped with no match [:242]. Omitted count printed [:282-284], but in query-scoped mode it counts only omitted RELEVANT terms, not all records.",
+      "cli_flags": [],
+      "tests": [
+        "tests/test_paper_evidence_agent.py:170 (deterministic, page-bounded)",
+        "tests/test_paper_evidence_agent.py:216 (query relevance priority)",
+        "tests/test_f2w_api.py:1865 (monkeypatched in API flow)"
+      ],
+      "proposal": {
+        "service": "app/modules/operations/papers.py: summarize_extracted_terms (moved unchanged, old import re-exported)",
+        "tool": "lit_summarize_extracted_terms (or typed mode of lit_summarize_paper)",
+        "skill": "summarize_literature",
+        "disposition": "eligible_knowledge_operation",
+        "reason": "Already deterministic, page-cited, bounded and tested; T19B wraps it unchanged first. It is a compact term summary, not a paper abstract."
+      },
+      "warnings": [
+        "Eligibility for extraction_state=full differs from _eligible_pages (which uses all pages): pages are derived from the terms' own pages fields. Preserve; flag for H3.",
+        "'N additional terms omitted' in query-scoped mode excludes non-matching records; do not read it as the total omitted."
+      ]
+    },
+    {
+      "id": "OP02",
+      "path": "scripts/corpus_qa.py",
+      "sha256": "199e7434b19f28c556aea779a430e8e938115ceb9c12bcbe26f807055409433f",
+      "lines": 916,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability",
+      "symbols": [
+        "audit_duplicate_works 173-278",
+        "audit_stubs 281-343",
+        "audit_technique_measurement 346-410",
+        "audit_numeric_values 413-515",
+        "audit_zero_measurement_papers 518-565",
+        "audit_aliases 568-634",
+        "audit_relations 637-735",
+        "audit_summary_stats 738-799",
+        "audit 814-912"
+      ],
+      "effects": {
+        "read_only": true,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Reads one terms JSON fully into memory; optional --output writes a JSON summary (mkdir parents). Never writes the input (docstring :13, :831)."
+      },
+      "inputs": [
+        "extracted_terms JSON (--terms, default storage/terminology/extracted_terms_rsoxs_v1.json which is absent from the export)"
+      ],
+      "outputs": "stdout report sections 1-8 + optional JSON summary dict",
+      "population": "All entries of data['terms'] in one terms file",
+      "counting_unit": "Mixed and section-specific: section 1/5/8 'papers' = distinct source_papers filename keys minus .pdf (PDF/filename keys, NOT Works: arXiv and journal versions count twice; 147papers file has 145 keys); section 2/3/6 = raw term entries; section 4/7 = raw relation dicts per term (not deduplicated edges); section 8 histogram = term x source_metadata entries.",
+      "completeness": "Counts are full scans; displayed examples capped at first 10/20 and top-10/top-15. Section 6 under-merge detection compares only ADJACENT labels after sort (heuristic sample, not all pairs) [:612-622]. Section 1 near-dup pairs consider only papers with a source_metadata title.",
+      "cli_flags": [
+        "audit --terms PATH (default storage/terminology/extracted_terms_rsoxs_v1.json)",
+        "audit --output/-o PATH"
+      ],
+      "tests": [
+        "none found (no test references corpus_qa)"
+      ],
+      "proposal": {
+        "service": "app/modules/curation/checks.py (audit_* moved unchanged) + app/modules/operations/corpus.py (report assembly); scripts/corpus_qa.py stays a typer facade",
+        "tool": "curate_audit_corpus",
+        "skill": "audit_literature_corpus",
+        "disposition": "eligible_knowledge_operation",
+        "reason": "Read-only, deterministic, complete-scan diagnostics with an existing CLI; matches KNOWLEDGE_OPERATIONS section 4. Must ship with explicit counting units and the histogram/measurement caveats below; no repair path."
+      },
+      "warnings": [
+        "HISTOGRAM OVERCOUNT (confirmed): audit_summary_stats increments year_counter once per (term, source_metadata entry) [:766-771] while the label says 'unique DOI/year combos' [:787]. On extracted_terms_xray_papers_cborg_chat.json the histogram sums to 155 against 4 distinct papers with a year and 7 source-paper keys. Older terms files have no source_metadata, so the histogram is empty there.",
+        "D20 CONFLICT RISK: section 3 labels ExperimentalTechnique terms with paper evidence as 'candidates for reclassification' and section 5 counts papers lacking MEASUREMENT_TYPES {RSoXSMeasurement, MeasurementInstance, Measurement, ScatteringMeasurement, DiffractionMeasurement} [:36-39]. Three of those are not schema classes. On baseline terms files section 5 reports 145/145 and 25/25 papers as 'zero-measurement'. Under D20 these are diagnostics only; a Tool must not present them as defects or recommend reclassification.",
+        "int(yr) at :771 raises on a non-integer publication_year (inference from code; not observed).",
+        "'Total relation edges' counts raw per-term relation dicts, not KG edges after json2kg dedup."
+      ]
+    },
+    {
+      "id": "OP03",
+      "path": "scripts/analyze_kgs.py",
+      "sha256": "155c1cea7fdc1a9074a147c9b58bf04ab12f30c82e9a767c2c874769df2cac91",
+      "lines": 272,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "domain_capability",
+      "symbols": [
+        "load_kg 9-17",
+        "calculate_structural_metrics 19-48",
+        "calculate_growth_metrics 50-75",
+        "evaluate_kgs_independent 78-234"
+      ],
+      "effects": {
+        "read_only": true,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Writes kg_independent_eval.csv and .json into the CWD, overwriting without prompt [:127,:196]."
+      },
+      "inputs": [
+        "hard-coded list of 30 storage/kg/matkg_* checkpoint filenames [:240-271]; folder storage/kg"
+      ],
+      "outputs": "stdout tables + CSV + JSON grouped by model",
+      "population": "Things/associations of each listed KG JSON; model and paper count parsed from the FILENAME [:92-104]",
+      "counting_unit": "entities = distinct things[].id; relations = distinct (subject,predicate,object) triples (duplicates collapsed by set) [:13-16]; 'papers' = the number in the filename, not counted from the data",
+      "completeness": "Each file is fully loaded into memory. Files whose names match none of deepseek/qwen/gpt-oss are SILENTLY skipped [:103-104] (gemini and cborg checkpoints in storage/kg are ignored). Missing files are skipped with a warning.",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": "app/modules/graph/metrics.py (calculate_structural_metrics, calculate_growth_metrics unchanged) + app/modules/operations/graph.py (explicit checkpoint metadata instead of filename parsing)",
+        "tool": "kg_compute_statistics; kg_compare_snapshots",
+        "skill": "query_knowledge_graph",
+        "disposition": "eligible_knowledge_operation",
+        "reason": "Deterministic structural/growth metrics are the only existing graph-statistics code; KNOWLEDGE_OPERATIONS section 4 maps them. The legacy CLI keeps its filename interpretation; the new API takes explicit metadata."
+      },
+      "warnings": [
+        "Denominator pitfall: '147papers' filename vs 145 distinct source-paper keys in the matching terms file.",
+        "avg_relations_per_entity counts endpoints that are not in entities (dangling) but divides by len(entities) [:34-46]. No dangling endpoints were found in the two checked KGs; still characterize this before exposing the metric.",
+        "relation_retention returns 0 (not None) when the previous checkpoint has no relations [:70]; a previous checkpoint with zero entities is treated as the first checkpoint [:54].",
+        "load_kg only reads things/associations; KGs written as nodes/edges (scripts/ingest_rsoxs_v3.py) would yield 0 entities.",
+        "Structural counts are not measures of scientific truth (KNOWLEDGE_OPERATIONS)."
+      ]
+    },
+    {
+      "id": "OP04",
+      "path": "scripts/list_missing_rsoxs_papers.py",
+      "sha256": "0184d217870359fa6cd966894c1e7968194bebd027471cfe9590a8e81eb2e1fb",
+      "lines": 355,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "domain_capability",
+      "symbols": [
+        "collect_missing_citations 99-204",
+        "verify_written_against_rtf 219-277",
+        "write_outputs 298-314"
+      ],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Default --out writes REPO_ROOT/missing_rsoxs_papers.txt, a TRACKED file in the baseline tree, overwriting it; --audit writes logs/missing_rsoxs_papers_audit.json [:44-45,:298-314]."
+      },
+      "inputs": [
+        "PubTemp RTF (--rtf, default papers/rsoxs/beamline_blueprint/PubTempPubListExport9_11_26_14_05_24.rtf)",
+        "harvest manifest (--manifest papers/rsoxs/manifest.json)",
+        "PDF presence on disk (harvest_rsoxs._pdf_on_disk)"
+      ],
+      "outputs": "text list of verbatim RTF citations + audit JSON with counters",
+      "population": "RTF records of publication kinds {journal, conference, thesis, patent} that match an INCLUDED manifest Work (DOI then exact normalized title, first-author tie-break) with no PDF on disk",
+      "counting_unit": "PubTemp RTF records (publications); awards/talks are counted but excluded",
+      "completeness": "Full scan of RTF and manifest. Constrained to ALS PubTemp and manifest scope: NOT 'all missing RSoXS literature'. verify_written_against_rtf aborts if any line fails verification.",
+      "cli_flags": [
+        "--rtf (default PUBTEMP_DEFAULT)",
+        "--manifest (default HARVEST_ROOT / 'papers' / 'rsoxs' / 'manifest.json')",
+        "--out (default DEFAULT_OUT)",
+        "--audit (default DEFAULT_AUDIT)"
+      ],
+      "tests": [
+        "tests/test_list_missing_rsoxs_papers.py"
+      ],
+      "proposal": {
+        "service": "app/modules/operations/corpus.py: missing_publications(report) reusing collect_missing_citations and verify_written_against_rtf; writing moves to artifacts/",
+        "tool": "lit_list_missing_papers",
+        "skill": "audit_literature_corpus",
+        "disposition": "eligible_knowledge_operation",
+        "reason": "Deterministic, verified, tested coverage report. Tool output must name the population (PubTemp RTF x manifest) and return an artifact instead of overwriting a repo file. The agent path must be write-free apart from an artifact."
+      },
+      "warnings": [
+        "Default output overwrites tracked repo-root file missing_rsoxs_papers.txt.",
+        "Emits verbatim RTF citation text (bibliographic, not paper bodies)."
+      ]
+    },
+    {
+      "id": "OP05",
+      "path": "scripts/get_pdf_years.py",
+      "sha256": "f94d0de73b788d94836a0c8a76f7b4f5073ed7cbf1ffa4ff8eb4f10a2f58b046",
+      "lines": 133,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "domain_capability",
+      "symbols": [
+        "guess_year 102-113",
+        "scan_folder 116-130"
+      ],
+      "effects": {
+        "read_only": true,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Writes pdf_years.csv in the CWD (overwrite) [:126]; reads PDFs (metadata + text)."
+      },
+      "inputs": [
+        "folder of PDFs; __main__ hard-codes 'papers' [:133]"
+      ],
+      "outputs": "CSV filename,year + stdout",
+      "population": "*.pdf files DIRECTLY in the folder (os.listdir, non-recursive) [:118-121]",
+      "counting_unit": "PDF files (not Works; duplicate versions count separately)",
+      "completeness": "Every top-level PDF; nested year folders (papers/rsoxs/{year}/) are NOT scanned. Undetermined years are written as blanks.",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": "app/modules/literature/dates.py (guess_year unchanged + method/source returned) + operations/corpus.py",
+        "tool": "lit_inspect_publication_dates",
+        "skill": "audit_literature_corpus",
+        "disposition": "eligible_knowledge_operation",
+        "reason": "Read-only, deterministic. Required change for Tool use: return which method fired (arXiv filename / PDF metadata / text) plus uncertainty. Today guess_year returns only a year [:102-113], so the 'provenance-aware' requirement in KNOWLEDGE_OPERATIONS is not met by the existing code."
+      },
+      "warnings": [
+        "Year estimates, not authoritative publication years.",
+        "Non-recursive scan: run against papers/rsoxs it would find 0 PDFs at top level (inference from harvest layout papers/rsoxs/{year}/)."
+      ]
+    },
+    {
+      "id": "OP06",
+      "path": "app/modules/tiled_sim.py",
+      "sha256": "47838f7a8d6dea4f6a075d9b69a164268dbbbdc268d55bfa419809f6aca74874",
+      "lines": 1099,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability (shared module behind scripts OP16/OP17)",
+      "symbols": [
+        "fixture_stats 251-261",
+        "_count_unique_papers 905-914",
+        "snapshot_copy_terms 929-938",
+        "promote_rsoxs_snapshot 941-1005",
+        "main 1040-1095"
+      ],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "load_dotenv at import (baseline inventory flag); --to-tiled writes to local Tiled GraphQL (TILED_URI default http://127.0.0.1:8001; requires TILED_API_KEY). promote writes new KG snapshot + terms copy."
+      },
+      "inputs": [
+        "seed YAML, fixture JSON, source bl1101 KG, live RSoXS terms file"
+      ],
+      "outputs": "new matkg_bl1101_vN / matkg_rsoxs_vN snapshots, fixture JSON, sidecar stats",
+      "population": "_count_unique_papers: distinct source_papers/source_paper strings across terms [:905-914]; fixture_stats: ESAF/proposal/scan/sample list lengths [:251-261]",
+      "counting_unit": "unique_papers = distinct source-paper filename strings (not Works)",
+      "completeness": "Full scan of the provided terms/fixture.",
+      "cli_flags": [
+        "--seed-yaml (default SEED_PATH)",
+        "--fixture (default FIXTURE_PATH)",
+        "--from-graph (default KG_DIR / 'matkg_bl1101_v4.json')",
+        "--snapshot (default None)",
+        "--generate-only ['store_true']",
+        "--include-sim-nodes (default False) ['store_true']",
+        "--to-tiled ['store_true']",
+        "--tiled-uri (default None)",
+        "--verbose -v ['store_true']"
+      ],
+      "tests": [
+        "tests/test_tiled_sim.py"
+      ],
+      "proposal": {
+        "service": "graph/imports + operations/reports (stats only)",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Snapshot promotion and Tiled writes are publication/ingest actions that need their own approval (plan 4.10); only the stats helpers could feed a report later. No agent Tool."
+      },
+      "warnings": [
+        "'unique_papers' in storage/fixtures/rsoxs_snapshot_promote.json is a filename-key count; do not present it as distinct Works."
+      ]
+    },
+    {
+      "id": "OP07",
+      "path": "app/modules/tiled_graph.py",
+      "sha256": "99542ba7c42edd349707ea8d57c46f5f4a6692411c0bb39b206501fa28e1e903",
+      "lines": 1053,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability (retrieval-time inventory count)",
+      "symbols": [
+        "PAGE_SIZE/MAX_PAGES 45-46",
+        "_page_entities 770-810",
+        "_count_node 812-824",
+        "lookup_experiment_identity 962-1040"
+      ],
+      "effects": {
+        "read_only": true,
+        "writes_local": false,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Live Tiled GraphQL paging for experiment-identity questions (ESAF/Proposal/Sample/BlueskyRun)."
+      },
+      "inputs": [
+        "Tiled GraphQL (TILED_URI, TILED_API_KEY)"
+      ],
+      "outputs": "synthetic count nodes 'Live Tiled GraphQL currently lists N <type> entities' injected into retrieval [:812-824,:1017,:1029]",
+      "population": "Entities per entityType returned by paged GraphQL",
+      "counting_unit": "Tiled entities as returned (no dedup)",
+      "completeness": "CAPPED: _page_entities stops after MAX_PAGES=8 x PAGE_SIZE=100 = 800 entities per type [:44-46,:770-810]. The count text does not disclose the cap. Unsigned requests return 0 counts, reported as status 'unsigned' only when ALL types are zero [:999-1014].",
+      "cli_flags": [],
+      "tests": [
+        "tests/test_tiled_graph.py"
+      ],
+      "proposal": {
+        "service": "graph/ (Tiled adapter) + operations/graph.py counting with complete paging",
+        "tool": "(future) kg_compute_statistics over the Tiled identity graph",
+        "skill": null,
+        "disposition": "needs_owner",
+        "reason": "Experiment-identity inventory sits outside the literature-KG scope stated in KNOWLEDGE_OPERATIONS section 1. If kept, it must page to completion or report 'partial' with the cap; today a truncated count reads as exhaustive."
+      },
+      "warnings": [
+        "EXHAUSTIVE-LOOKING CAPPED COUNT: any type with more than 800 entities is reported as exactly 800, with no disclosure."
+      ]
+    },
+    {
+      "id": "OP08",
+      "path": "app/modules/json2kg.py",
+      "sha256": "81dba522cff892cda7d5bf1e98a67b10cb7ccb990972d0b995c76b65e755527f",
+      "lines": 630,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability (KG build; D21 boundary)",
+      "symbols": [
+        "build_graph 263-454",
+        "convert_terms_to_graph 457-482",
+        "main 505-533"
+      ],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "CLI input_json output_json writes the KG; prints node/edge/CodeSnippet counts [:505-533]. Writes output_json even if it already exists (inference: no existence guard in main)."
+      },
+      "inputs": [
+        "extracted terms JSON"
+      ],
+      "outputs": "KG JSON things/associations",
+      "population": "Terms -> nodes (merged by make_id), relations -> edges",
+      "counting_unit": "nodes, edges, CodeSnippet nodes",
+      "completeness": "Full",
+      "cli_flags": [
+        "input_json",
+        "output_json",
+        "--verbose -v ['store_true']"
+      ],
+      "tests": [
+        "tests/test_json2kg.py",
+        "tests/test_json2kg_extended.py"
+      ],
+      "proposal": {
+        "service": "json2kg unchanged (T23A/T23B)",
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "KG creation, not a Knowledge Operation (D21; JSON_KG_PUBLICATION_SPEC). Its counts may be reused by report assembly."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP09",
+      "path": "scripts/repair_corpus.py",
+      "sha256": "52796a6d36825463c757cb43ca9c00c9ff60d3af183925c740482b72d56a13f1",
+      "lines": 482,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "operator_maintenance (repair)",
+      "symbols": [
+        "_reclassify 107-134",
+        "step_quarantine_hard_stubs 142-165",
+        "step_reclassify_untyped 168-194",
+        "step_fix_known_bad_relations 197-245",
+        "step_merge_near_duplicates 248-363",
+        "repair 379-478"
+      ],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Writes a repaired copy (default storage/terminology/extracted_terms_rsoxs_v1_repaired.json), overwriting an existing output without prompt; only refuses output == input [:420-423]. --dry-run writes nothing. Quarantines stubs, rewrites categories/predicates, merges near-duplicates."
+      },
+      "inputs": [
+        "extracted_terms JSON (--terms)"
+      ],
+      "outputs": "repaired terms JSON with repair_stats + _quarantined_stubs",
+      "population": "All term entries",
+      "counting_unit": "term entries; relations fixed; near-dupes merged",
+      "completeness": "Full scan",
+      "cli_flags": [
+        "repair --terms PATH",
+        "repair --output PATH (default storage/terminology/extracted_terms_rsoxs_v1_repaired.json)",
+        "repair --dry-run"
+      ],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": "app/modules/curation/repair.py (existing v3 repair service); operations/ may reference repair PLANS only",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Repair modifies scientific knowledge and needs its own approval (KNOWLEDGE_OPERATIONS section 4, plan 4.10). An audit Tool may propose; it must never apply. No agent Tool in this migration."
+      },
+      "warnings": [
+        "Introduces values outside every schema closure: categories 'Instrument' (no schema) and 'Detector' (bl1101 only) into literature terms [:120-123]; predicates 'characterized_by' and 'simulates' (no schema) [:66-70]. See ADR schema-ownership section 2.5.",
+        "Silently overwrites a previous repaired output."
+      ]
+    },
+    {
+      "id": "OP10",
+      "path": "scripts/ingest_rsoxs_v3.py",
+      "sha256": "3680a1d15bc35992f95d36b47cac089cb41c9b39b582e2c903a5cb36a81486ed",
+      "lines": 510,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (one-off KG build)",
+      "symbols": [
+        "build_v3_kg 229-465",
+        "main 468-506"
+      ],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Unconditionally overwrites storage/kg/matkg_rsoxs_v3.json [:29,:474]."
+      },
+      "inputs": [
+        "storage/terminology/extracted_terms_rsoxs_v1_repaired.json",
+        "storage/kg/matkg_rsoxs_v2.json"
+      ],
+      "outputs": "matkg_rsoxs_v3.json written with keys nodes/edges (NOT things/associations) + PROV edges",
+      "population": "repaired terms",
+      "counting_unit": "nodes/edges by entityType",
+      "completeness": "Full",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "needs_owner",
+        "reason": "One-off version builder that bypasses json2kg and writes a different JSON shape; overwrites a versioned snapshot. Decide whether to retire it or keep it as historical CLI. Not agent-callable."
+      },
+      "warnings": [
+        "RSOXS_SLOTS [:52-59] includes geometry/q_range/contrast_mechanism, which are not schema slots.",
+        "Output shape nodes/edges is incompatible with analyze_kgs.load_kg and json2kg consumers."
+      ]
+    },
+    {
+      "id": "OP11",
+      "path": "scripts/build_v7_kg.py",
+      "sha256": "fa8ded278305db719982298a28b956bf461e647339eec634f88dbb4acf65e777",
+      "lines": 563,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (one-off KG build)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Fetches https://als.lbl.gov/beamlines/11-0-1-2/ (urllib) [:39]; unconditionally overwrites storage/kg/matkg_bl1101_v7.json [:549-551]."
+      },
+      "inputs": [
+        "v6 KG",
+        "blueprint HTML",
+        ".cache/bl1101/.../bl1101knowledge.md",
+        "ALS public page"
+      ],
+      "outputs": "matkg_bl1101_v7.json",
+      "population": "ops docs",
+      "counting_unit": "DocumentChunk nodes",
+      "completeness": "Full",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "needs_owner",
+        "reason": "Duplicates OP12 (same output path, different implementation). Ops ingest belongs to bl1101_ingest; not a Knowledge Operation."
+      },
+      "warnings": [
+        "Two scripts write the same versioned snapshot path (with OP12); the last run wins.",
+        "Adds category 'Instrument', which is not in bl1101_schema."
+      ]
+    },
+    {
+      "id": "OP12",
+      "path": "scripts/ingest_bl1101_v7.py",
+      "sha256": "2f5ee126cb763bff58e79f9c4c71fbff04c110bb203cee5a6e33d882c013de94",
+      "lines": 564,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (one-off KG build)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "requests.get ALS page [:356]; unconditionally overwrites storage/kg/matkg_bl1101_v7.json [:498-499]; writes both things/associations and nodes/edges aliases."
+      },
+      "inputs": [
+        "v6 KG",
+        "blueprint HTML",
+        "bl1101knowledge.md",
+        "ALS page"
+      ],
+      "outputs": "matkg_bl1101_v7.json",
+      "population": "ops docs",
+      "counting_unit": "nodes/chunks",
+      "completeness": "Full",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "needs_owner",
+        "reason": "See OP11; duplicate writer of the same snapshot."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP13",
+      "path": "scripts/ingest_bl1101.py",
+      "sha256": "8a2f4631baf32a868c976d0ad68f4124037583b5143d366716b91a356428ef47",
+      "lines": 21,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (wrapper)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "Wraps app/modules/bl1101_ingest.main: fetches ALS pages and git-clones repos (subprocess git, bl1101_ingest.py:852-866) unless --offline; --from-scratch rmtree's the .cache/bl1101 work and pages dirs [:2109-2112]; writes the next vN (never overwrites the source with --from-graph)."
+      },
+      "inputs": [
+        "ALS public page, blueprint, GitHub repos, motor-stage map"
+      ],
+      "outputs": "matkg_bl1101_vN.json + terms",
+      "population": "ops sources",
+      "counting_unit": "nodes/edges; motor links",
+      "completeness": "Full",
+      "cli_flags": [
+        "--from-scratch ['store_true']",
+        "--offline ['store_true']",
+        "--from-graph",
+        "--snapshot",
+        "--motor-stage-map (default None)",
+        "--verbose -v ['store_true']"
+      ],
+      "tests": [
+        "tests/test_bl1101_ingest.py"
+      ],
+      "proposal": {
+        "service": "existing app/modules/bl1101_ingest (unchanged) behind jobs/",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Ingest/publication path with network and cache deletion; requires admin approval flow, not an analytics Tool."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP14",
+      "path": "scripts/promote_rsoxs_snapshot.py",
+      "sha256": "40bbd6061dfba1bcf6090216686e0432ac80b73e77d1e7de8d4ff7009fe476f8",
+      "lines": 81,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (wrapper)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Copies live terms to a timestamped snapshot (never writes live file), json2kg's it into the next matkg_rsoxs_vN, and OVERWRITES the tracked sidecar storage/fixtures/rsoxs_snapshot_promote.json [:27,:55-69]."
+      },
+      "inputs": [
+        "storage/terminology/extracted_terms_rsoxs_v1.json"
+      ],
+      "outputs": "matkg_rsoxs_vN.json + sidecar",
+      "population": "live RSoXS terms",
+      "counting_unit": "nodes/edges/term_count/unique_papers (filename keys)",
+      "completeness": "Full",
+      "cli_flags": [
+        "--terms-snapshot (default None)",
+        "--live-terms (default LIVE_TERMS)",
+        "--output (default None)",
+        "--sidecar (default SIDECAR)",
+        "--verbose -v ['store_true']"
+      ],
+      "tests": [
+        "tests/test_tiled_sim.py"
+      ],
+      "proposal": {
+        "service": "graph/imports (JSON snapshot creation, T23B)",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Snapshot promotion requires approval; overlaps T23B versioned JSON."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP15",
+      "path": "scripts/ingest_tiled_sim.py",
+      "sha256": "a2028e60039ecd158adaa1e5168e9cdd0c2622476e70d243bb1b69463c0883c8",
+      "lines": 25,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (wrapper)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "Wraps tiled_sim.main; --to-tiled writes ESAF/Proposal/Sample/BlueskyRun into local Tiled (idempotent by uri/name per docstring)."
+      },
+      "inputs": [
+        "seed YAML, bl1101 KG"
+      ],
+      "outputs": "fixture/new bl1101 vN / local Tiled entities",
+      "population": "simulated identity",
+      "counting_unit": "fixture_stats counts",
+      "completeness": "Full",
+      "cli_flags": [
+        "--seed-yaml (default SEED_PATH)",
+        "--fixture (default FIXTURE_PATH)",
+        "--from-graph (default KG_DIR / 'matkg_bl1101_v4.json')",
+        "--snapshot (default None)",
+        "--generate-only ['store_true']",
+        "--include-sim-nodes (default False) ['store_true']",
+        "--to-tiled ['store_true']",
+        "--tiled-uri (default None)",
+        "--verbose -v ['store_true']"
+      ],
+      "tests": [
+        "tests/test_tiled_sim.py"
+      ],
+      "proposal": {
+        "service": "Disposable Tiled test fixture (D14, T20A)",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Test-fixture provisioning, not a Knowledge Operation."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP16",
+      "path": "scripts/index_source_rag.py",
+      "sha256": "8d45b2a51d89485b97baf7b06fbd62af3209e91dcb8cd85b0377148741c51c2a",
+      "lines": 93,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (index build)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Builds storage/source_index/literature and ops_bl1101; --from-scratch rewrites indexes. No network/LLM imports in hybrid_rag/pipeline.py (inference from AST imports)."
+      },
+      "inputs": [
+        "harvested PDFs (manifest), bl1101 ops docs"
+      ],
+      "outputs": "hybrid source-RAG index + JSON stats on stdout",
+      "population": "Literature: one PDF per canonical Work (sources.py:100), DEFAULT gold sample",
+      "counting_unit": "Works (one PDF each)",
+      "completeness": "SAMPLED BY DEFAULT: --literature gold --limit 12 [:43-55]; 'all' indexes every on-disk PDF. Retrieval over a gold index covers only that sample.",
+      "cli_flags": [
+        "--literature (default 'gold')",
+        "--limit (default 12)",
+        "--ops (default True) ['store_true']",
+        "--no-ops ['store_true']",
+        "--ops-only ['store_true']",
+        "--from-scratch ['store_true']",
+        "-v --verbose ['store_true']"
+      ],
+      "tests": [
+        "tests/test_hybrid_rag.py (pipeline)"
+      ],
+      "proposal": {
+        "service": "retrieval/ index build behind jobs/",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Index maintenance with write effects; should record schema/source fingerprints (ADR). Not an agent Tool."
+      },
+      "warnings": [
+        "Retrieval results derived from the default gold index are a 12-Work sample and must not support corpus-wide counts."
+      ]
+    },
+    {
+      "id": "OP17",
+      "path": "scripts/harvest_rsoxs.py",
+      "sha256": "e5f58771aab7e2c7b2832a171876c0f05a3131317012f01c4868be5d22191a0f",
+      "lines": 2435,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "operator_maintenance (corpus acquisition)",
+      "symbols": [
+        "score_rsoxs 351-525",
+        "collapse_near_duplicates 835-874",
+        "harvest 1225-1388",
+        "rescore_manifest 1391-1434",
+        "ingest_known_works 1554-1644",
+        "import_pubtemp 1945-2038",
+        "harvest_pending_pdfs 2228-2330",
+        "main 2390-2431"
+      ],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "load_dotenv(REPO_ROOT/.env) in main [:2392-2397]. arXiv/OpenAlex/Crossref/Unpaywall/CORE/EuropePMC lookups and PDF downloads into papers/rsoxs/{year}/. Rewrites manifest.json atomically [:753-765]; --rescore and the default run rewrite manifest scores [:1391-1434,:2425]. Imported as a library by list_missing_rsoxs_papers, paper_finder, match_als_zips, harvest_xray."
+      },
+      "inputs": [
+        "search queries, PubTemp RTF (--import-pubtemp)",
+        "papers/rsoxs/manifest.json"
+      ],
+      "outputs": "PDFs + manifest.json",
+      "population": "Candidate Works from arXiv/OpenAlex; tiers A/B kept",
+      "counting_unit": "Works (near-duplicate preprint/journal collapse, collapse_near_duplicates 835-874)",
+      "completeness": "Capped: --max-pdfs 200, --per-query 50, --harvest-limit; sources are searched, not enumerated.",
+      "cli_flags": [
+        "--dest (default REPO_ROOT / 'papers' / 'rsoxs')",
+        "--max-pdfs (default 200)",
+        "--per-query (default 50)",
+        "--delay (default 1.0)",
+        "--mailto (default os.environ.get('OPENALEX_EMAIL'))",
+        "--rescore ['store_true']",
+        "--add-work (default []) ['append']",
+        "--import-pubtemp (default None)",
+        "--harvest-pending ['store_true']",
+        "--resolve-oa ['store_true']",
+        "--harvest-limit (default None)",
+        "--log-level (default 'INFO')"
+      ],
+      "tests": [
+        "tests/test_harvest_rsoxs.py"
+      ],
+      "proposal": {
+        "service": "literature/ acquisition behind jobs/ with source-policy and rate limits",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Network acquisition with external rate limits and source policy; no silent corpus ingestion from analytics questions (KNOWLEDGE_OPERATIONS section 6). Pure helpers (score_rsoxs, classify_rsoxs, works_same_identity) may be reused by services."
+      },
+      "warnings": [
+        "Reads the repo .env (not inspected here).",
+        "Even the plain default run rewrites manifest scores before harvesting."
+      ]
+    },
+    {
+      "id": "OP18",
+      "path": "scripts/harvest_xray.py",
+      "sha256": "e3f392dfe297147f69366863ce76b6291bde06539ff4d30c54100d5f157b494e",
+      "lines": 666,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (corpus acquisition)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "load_dotenv(.env) [:640-645]; refuses dest papers/rsoxs [:417-420]; downloads into papers/xray/{year}/; rewrites its manifest."
+      },
+      "inputs": [
+        "OpenAlex/arXiv via harvest_rsoxs/download_pdfs"
+      ],
+      "outputs": "PDFs + papers/xray manifest",
+      "population": "X-ray principle Works",
+      "counting_unit": "Works (dedup vs RSoXS manifest by DOI/arXiv)",
+      "completeness": "Capped: --max-pdfs 40, --per-query 25",
+      "cli_flags": [
+        "--dest (default XRAY_DEST)",
+        "--max-pdfs (default 40)",
+        "--per-query (default 25)",
+        "--delay (default 1.0)",
+        "--mailto (default os.environ.get('OPENALEX_EMAIL'))",
+        "--rescore ['store_true']",
+        "--log-level (default 'INFO')"
+      ],
+      "tests": [
+        "tests/test_harvest_xray.py"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Same reasoning as OP17."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP19",
+      "path": "scripts/download_pdfs.py",
+      "sha256": "f8699f3f866085b42a7f050b83bbb6699c110f875235f4bd7aaf6439d6499ed2",
+      "lines": 933,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (corpus acquisition library + CLI)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "requests to arXiv/OpenAlex/Unpaywall/Semantic Scholar/CORE/OSTI/EuropePMC/Crossref; deletes partial downloads (_cleanup_partial path.unlink :814-818); CORE_API_KEY env."
+      },
+      "inputs": [
+        "--keyword"
+      ],
+      "outputs": "PDFs in --target",
+      "population": "search hits",
+      "counting_unit": "PDF files",
+      "completeness": "Capped: --max-results 500",
+      "cli_flags": [
+        "--keyword",
+        "--target (default './pdfs')",
+        "--max-results (default 500)",
+        "--source (default 'arxiv')"
+      ],
+      "tests": [
+        "tests/test_download_pdfs.py",
+        "tests/test_download_agent.py"
+      ],
+      "proposal": {
+        "service": "literature/ download primitives (used by download_agent)",
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Network acquisition; already used through DownloadAgent with existing approval flow."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP20",
+      "path": "scripts/match_als_zips.py",
+      "sha256": "2d5373b4fcc47c29d03f02a8d5ebe268ac1a91a5a07f140e7eb116ec81276fe6",
+      "lines": 503,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (corpus acquisition)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "--copy extracts PDFs from ALS zips into papers/rsoxs; --merge rewrites manifest.json from the sidecar; default --zip-dir is a hard-coded personal path /Users/david/Documents/data/fair2wise [:446]; --watch-pid polls a live harvest."
+      },
+      "inputs": [
+        "ALS-*.zip",
+        "papers/rsoxs/manifest.json"
+      ],
+      "outputs": "logs/als_zip_matches.json sidecar, copied PDFs, merged manifest",
+      "population": "skipped included Works",
+      "counting_unit": "Works matched by exact DOI compact key",
+      "completeness": "Full over zips",
+      "cli_flags": [
+        "--zip-dir (default Path('/Users/david/Documents/data/fair2wise'))",
+        "--dest (default REPO_ROOT / 'papers' / 'rsoxs')",
+        "--sidecar (default REPO_ROOT / 'logs' / 'als_zip_matches.json')",
+        "--copy ['store_true']",
+        "--merge ['store_true']",
+        "--watch-pid (default None)"
+      ],
+      "tests": [
+        "tests/test_match_als_zips.py"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Local acquisition and manifest mutation; operator-only."
+      },
+      "warnings": [
+        "Hard-coded user-specific default path."
+      ]
+    },
+    {
+      "id": "OP21",
+      "path": "scripts/paper_finder.py",
+      "sha256": "fe2bebcad05d21107f6c28f32901a509274fad5441de2605a23c31febe0cc9ce",
+      "lines": 845,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "operator_maintenance (human-paced UI)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "Flask on 127.0.0.1 only [:61-82]; opens a browser on DOIs; Assign shutil.move's staged PDFs into papers/rsoxs/{year}/ [:251-296]; reset unlinks the queue state [:698-713]. No scripted publisher GET."
+      },
+      "inputs": [
+        "manifest rows status skipped/failed with no PDF"
+      ],
+      "outputs": "moved PDFs, queue state",
+      "population": "paywalled Works",
+      "counting_unit": "Works",
+      "completeness": "Queue over all matching rows",
+      "cli_flags": [
+        "serve --dest --port --staging-dir/--downloads-dir --dry-run --log-level",
+        "reset --dest --log-level"
+      ],
+      "tests": [
+        "tests/test_paper_finder.py"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Interactive human-in-the-loop tool; never agent-driven (publisher access policy)."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP22",
+      "path": "scripts/run.py",
+      "sha256": "4ee5af54e9ac48267ea4ed8aad1dc62d923cd7d57cde25dff2e9c09b6ccd276c",
+      "lines": 153,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability (LLM extraction CLI)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "load_dotenv() at import from CWD [:16-17]; runs term_extractor.run_extraction with CBorg/Ollama."
+      },
+      "inputs": [
+        "--pdf-dir (default papers_test)"
+      ],
+      "outputs": "terms JSON (--output default storage/terminology/terms_test.json)",
+      "population": "PDFs in dir",
+      "counting_unit": "terms",
+      "completeness": "Full over the dir",
+      "cli_flags": [
+        "--pdf-dir (default Path('papers_test'))",
+        "--output (default Path('storage/terminology/terms_test.json'))",
+        "--model (default 'amazon/gpt-oss-20b')",
+        "--backend (default 'cborg')",
+        "--workers (default 4)",
+        "--temperature (default 0.0)",
+        "--schema (default 'storage/schema/matkg_schema.yaml')",
+        "--chebi (default 'storage/ontologies/chebi.obo')",
+        "--ollama-url (default 'http://localhost:11434')",
+        "--dry-run ['store_true']",
+        "--log-level (default 'INFO')",
+        "--log-file (default Path('logs/run.log'))"
+      ],
+      "tests": [
+        "none found directly (extraction covered by tests/test_extractor_agent.py)"
+      ],
+      "proposal": {
+        "service": "existing term_extractor via jobs/ with shared admission (D18)",
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Extraction/ingestion is an existing workflow, not a read-only Knowledge Operation; it stays a CLI and agent workflow under its own approvals."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP23",
+      "path": "scripts/test_chat_apis.py",
+      "sha256": "a9d99b58b17cf98e6a1840549d965d0a0ebfe74ca8942b9c18e4b8acc7a66b11",
+      "lines": 85,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "development_only",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "Live CBorg chat call 'Explain the significance of the Higgs boson' [:74-85]."
+      },
+      "inputs": [],
+      "outputs": "stdout",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "n/a"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Manual smoke test with paid inference; never a Tool."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP24",
+      "path": "scripts/update_readme_tree.py",
+      "sha256": "f8dfa9c8dab8c5f20ad75cbb910f418d3486319c71783e346a50484c8c622626",
+      "lines": 251,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "development_only",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "subprocess 'tree' [:56]; rewrites README.md in place between markers [:175]."
+      },
+      "inputs": [],
+      "outputs": "README.md",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--readme (default 'README.md')",
+        "--dir (default '.')",
+        "--repo-url (default '')",
+        "--branch (default 'main')"
+      ],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Repository maintenance."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP25",
+      "path": "scripts/app/modules/kg_rag_api.py",
+      "sha256": "12910adedc50b31f9399c968e6179c73d1df4b09d1443521d9b30d5078abc562",
+      "lines": 1621,
+      "baseline_disposition": "retain_cli_facade_T19A_review",
+      "kind": "stray_copy",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "Older divergent copy of app/modules/kg_rag_api.py (1621 vs 1799 lines; differs from line 37). FastAPI/LLM RAG CLI."
+      },
+      "inputs": [],
+      "outputs": "n/a",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--graph (default GRAPH_FILE)",
+        "--graph-source (default GRAPH_SOURCE)",
+        "--splash-uri (default SPLASH_LINKS_URI)",
+        "--splash-page-size (default SPLASH_LINKS_PAGE_SIZE)",
+        "--question",
+        "--competency ['store_true']",
+        "--api ['store_true']",
+        "--backend (default LLM_BACKEND)",
+        "--model (default None)",
+        "--timeout (default LLM_TIMEOUT)",
+        "--show-baseline (default SHOW_BASELINE) ['store_true']"
+      ],
+      "tests": [
+        "none (tests target app/modules/kg_rag_api.py)"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "needs_owner",
+        "reason": "Appears accidental; the baseline inventory marks it retain_cli_facade_T19A_review. Deletion needs owner approval (T16)."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP26",
+      "path": "storage/terminology/parse_terms.py",
+      "sha256": "a607fddfe793525a9b5713abb6bb15b4ad0bbfd0a1b3f7753d53d94fd089aa42",
+      "lines": 42,
+      "baseline_disposition": "retain_unmapped_needs_H1_crosswalk",
+      "kind": "development_only",
+      "symbols": [],
+      "effects": {
+        "read_only": true,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "Prints term names from extracted_terms.json in the CWD."
+      },
+      "inputs": [
+        "extracted_terms.json"
+      ],
+      "outputs": "stdout list + len",
+      "population": "terms",
+      "counting_unit": "raw term entries",
+      "completeness": "Full",
+      "cli_flags": [],
+      "tests": [
+        "none"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Trivial helper; superseded by corpus_qa section 8."
+      },
+      "warnings": [
+        "Baseline inventory records has_main_guard=false, but the file has an __main__ guard (line 35)."
+      ]
+    },
+    {
+      "id": "OP27",
+      "path": "scripts/build_kg.sh",
+      "sha256": "1fa79a799f42dd2cb33ce63983c456a161d316a6ada003fb44983d86aa2ef9bc",
+      "lines": 111,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "operator_maintenance (LLM extraction + KG build)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": true,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "extract_terms.py (DIVERGENT SchemaHelper copy, default matkg_schema) then json2kg; moves the previous outputs to .bak, overwriting any earlier .bak [:94-101]."
+      },
+      "inputs": [
+        "papers/*.pdf"
+      ],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Extraction pipeline; uses the legacy extract_terms normalizer (schema_inventory F4)."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP28",
+      "path": "scripts/reimport_merged_kg.sh",
+      "sha256": "81eaad2eccfb10d272deb1b27dc21e5fcde8716bbf97e5943152e3d0a58d8a71",
+      "lines": 196,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "operator_maintenance (Splash publish)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": true,
+        "notes": "Parses the repo .env for KG_RAG_GRAPH [:17-31]; overwrites storage/kg/matkg_with_code.json [:9,:148]; starts splash-links; splash_reimport(allow_wipe=True) WIPES and reimports the Splash DB [:185-191; kg_update.py:119-214]."
+      },
+      "inputs": [
+        "current KG",
+        "large KG"
+      ],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Splash is deprecated (D03/D16). DESTRUCTIVE: wipes the Splash database and overwrites the KG file; never exposed."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP29",
+      "path": "scripts/wipe_splash_db.sh",
+      "sha256": "cb7d7443784d79465b563077351c416c1a51576b640ec3a23c0e8a514d75f983",
+      "lines": 107,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "destructive",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "rm -f of the splash-links SQLite DB and its WAL/SHM/journal after typed confirmation 'WIPE splash_links'; guards for path inside the repo and a running service [:63-106]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "tests/test_wipe_splash_db_script.py"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "DESTRUCTIVE; Splash deprecated. Never a Tool."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP30",
+      "path": "scripts/start_agent_backend.sh",
+      "sha256": "e19c0c1aaf195897303ab10fea608516030dcd8ab46515a5f829045d8156b1b3",
+      "lines": 297,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": true,
+        "notes": "Sources .env [:74-77]; launches the agent API with --schema $F2W_SCHEMA and --allow-splash-wipe [:250-261]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Process launcher (Dockerfile:72 CMD); deployment concern (T24A)."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP31",
+      "path": "scripts/start_agent_frontend.sh",
+      "sha256": "90ebb61391d7b59aab16eef06e82475458a27b5f4046cf4f20bbfbdb9b2d5a95",
+      "lines": 40,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "Vite UI."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Launcher."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP32",
+      "path": "scripts/start_all.sh",
+      "sha256": "81fd9af1aad16dbfb4955b4d886744b4f3dc705d0dd985812231da3a53bd4377",
+      "lines": 199,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "splash-links + backend + frontend; kills child PIDs on exit."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Launcher (Splash path deprecated)."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP33",
+      "path": "scripts/start_rsoxs_stack.sh",
+      "sha256": "274c0296f49d260144c88dc416efb44f482c5a2090076180f5e6d6e287da366f",
+      "lines": 220,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": true,
+        "notes": "Sources .env [:95-98]; F2W_SCHEMA default rsoxs_schema.yaml [:143]; local Tiled only [:151]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Launcher."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP34",
+      "path": "scripts/test_compose.sh",
+      "sha256": "d576a1fe593cb8d4da47b7cd061ed30054207e55620c06fdb4f795e97cc490e7",
+      "lines": 53,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "development_only",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": true,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "docker compose -f compose.splash.yaml down --volumes on its own project name [:10]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "CI/dev check; removes its own compose volumes."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP35",
+      "path": "scripts/deploy_nersc.sh",
+      "sha256": "daddad96379bec0a52b01c18f87ad6b3f176b70cdcd91cde0bd397482737a09f",
+      "lines": 197,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "deployment",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "rsync to NERSC over ssh (uncommitted edits included) [:34,:124-134]; does not copy .env."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Deployment."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP36",
+      "path": "scripts/write_nersc_env.sh",
+      "sha256": "67098c952b858fc2fe7f9ef0f371db17218ac2f3545e58970f4d9760475a2c50",
+      "lines": 48,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "deployment (secrets)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": true,
+        "notes": "Reads CBORG_API_KEY etc. from the local .env and writes ~/.f2w_nersc_env on NERSC via ssh [:25-47]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Moves secrets; never agent-callable."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP37",
+      "path": "scripts/run_nersc_3agent.sh",
+      "sha256": "cbc45baece45f8eba168f37cac30df4c3d92c30d84c0bbba77d1208fb4491946",
+      "lines": 117,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "deployment",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "ssh to NERSC and runs the agent [:94,:117]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Remote execution."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP38",
+      "path": "scripts/f2w_nersc_api.sh",
+      "sha256": "558d6931b737e38fca169a67205eeca1b765b47c0d8736cc35d35af8b68f0c0b",
+      "lines": 37,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "Agent API on NERSC."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Launcher."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP39",
+      "path": "scripts/f2w_nersc_smoke.sh",
+      "sha256": "6c2000c0b12b0d963dd9bdfb95c6ce0609443f971f162ace3ac6b6c918434265",
+      "lines": 33,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "development_only",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "Agent smoke run on NERSC."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Smoke test."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP40",
+      "path": "scripts/nersc_remote_setup.sh",
+      "sha256": "2659b32e36df27119ccb3064b33a6e0065fa9825592dec8d375d7f884f418133",
+      "lines": 42,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "deployment",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "pip install -r requirements.txt."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Environment setup."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP41",
+      "path": "scripts/install_pixi.sh",
+      "sha256": "5821df293dc37519306bd67fea7a8654bcf50c2362004e1dc6d8fa6f5863dfef",
+      "lines": 65,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "deployment",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "curl https://pixi.sh/install.sh."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Tool install."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP42",
+      "path": "slurm_scripts/run_ollama.sh",
+      "sha256": "f3891208d71f89c41dcd573c7a0960d86fbedb165d9b6cca13510cf692160013",
+      "lines": 33,
+      "baseline_disposition": "not_in_f2w_baseline_inventory",
+      "kind": "deployment (template)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "SBATCH template; ollama serve + scripts/run.py; kills ollama at the end."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [],
+      "tests": [
+        "none found"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "HPC template."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP43",
+      "path": "app/modules/extract_terms.py",
+      "sha256": "3ab128b710b4a7068ce27ca38ece93119507fc2aba630edd0d9d0a8b9db61b5a",
+      "lines": 2100,
+      "baseline_disposition": "retain_unmapped_needs_H1_crosswalk",
+      "kind": "domain_capability (legacy LLM extraction CLI)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "load_dotenv at import; CBorg/Ollama; divergent SchemaHelper."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--pdf-dir (default Path('papers'))",
+        "--output (default Path('storage/terminology/extracted_terms.json'))",
+        "--backend (default os.environ.get('EXTRACT_TERMS_BACKEND', 'cborg'))",
+        "--model (default os.environ.get('EXTRACT_TERMS_MODEL', 'lbl/cborg-chat'))",
+        "--ollama-url --ollama-base-url (default os.environ.get('OLLAMA_URL', 'http://localhost:11434'))",
+        "--cborg-base (default os.environ.get('CBORG_BASE_URL', 'https://api.cborg.lbl.gov'))",
+        "--cborg-api-key (default os.environ.get('CBORG_API_KEY'))",
+        "--schema-path (default Path('storage/schema/matkg_schema.yaml'))",
+        "--chebi-obo (default os.environ.get('CHEBI_OBO_PATH'))",
+        "--temperature (default 0.0)",
+        "--context-length (default 50)",
+        "--max-workers (default 4)"
+      ],
+      "tests": [
+        "see baseline inventory"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Extraction, not analytics; see schema ADR Q3."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP44",
+      "path": "app/modules/f2w_agent/cli.py",
+      "sha256": "0654f4b5d7e25f33647e7dac729a251bffa934ca971a45301efa61075fbe1caf",
+      "lines": 189,
+      "baseline_disposition": "retain_unmapped_needs_H1_crosswalk",
+      "kind": "service_launcher / agent CLI",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": false,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": true,
+        "notes": "api / ask subcommands; --auto-approve and --allow-splash-wipe flags exist [:109,:125]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--backend (default 'cborg')",
+        "--model (default None)",
+        "--graph (default None) ['append']",
+        "--graphs (default None) ['append']",
+        "--seed-terms (default None)",
+        "--kg-mode (default 'json')",
+        "--workdir (default 'runs/session')",
+        "--schema (default 'storage/schema/matkg_schema.yaml')",
+        "--chebi (default None)",
+        "--max-rounds (default 3)",
+        "--max-papers (default 3)",
+        "--candidate-pool (default 25)",
+        "--workflow-mode (default default_workflow_mode())",
+        "--agentic ['store_true']",
+        "--auto-approve ['store_true']",
+        "--max-orchestration-steps (default 12)",
+        "--extraction-mode (default default_extraction_mode())",
+        "--targeted-max-pages (default default_targeted_max_pages())",
+        "--download-delay (default 1.0)",
+        "--no-download-validation ['store_true']",
+        "--workers (default default_workers())",
+        "--splash-repo (default None)",
+        "--allow-splash-wipe ['store_true']",
+        "--host (default '127.0.0.1')",
+        "--port (default 8090)",
+        "--cors-origin (default None) ['append']",
+        "question"
+      ],
+      "tests": [
+        "see baseline inventory"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Existing agent entrypoint (retained)."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP45",
+      "path": "app/modules/kg_rag_api.py",
+      "sha256": "eee8f57331895a0c5b8f65eeab99bad0147a77e621655a427a3aa3e9727106c8",
+      "lines": 1799,
+      "baseline_disposition": "retain_baseline_seam",
+      "kind": "domain_capability (RAG API + competency CLI)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "--competency runs competency questions (run_competency_questions 1339-1392) with LLM; retrieve_nodes 1279-1334 is top-k retrieval."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--graph (default GRAPH_FILE)",
+        "--graph-source (default GRAPH_SOURCE)",
+        "--splash-uri (default SPLASH_LINKS_URI)",
+        "--splash-page-size (default SPLASH_LINKS_PAGE_SIZE)",
+        "--question",
+        "--competency ['store_true']",
+        "--api ['store_true']",
+        "--backend (default LLM_BACKEND)",
+        "--model (default None)",
+        "--timeout (default LLM_TIMEOUT)",
+        "--show-baseline (default SHOW_BASELINE) ['store_true']"
+      ],
+      "tests": [
+        "see baseline inventory"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Retrieval/answering path (evidence retrieval, not population computation). Its top-k results must never be used as counts."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP46",
+      "path": "app/run_pipeline_cborg.py",
+      "sha256": "06686d3ba9dc1708c8756e3fc747b9a872553981bfad8629bdc07ab2e368a1f0",
+      "lines": 181,
+      "baseline_disposition": "retain_unmapped_needs_H1_crosswalk",
+      "kind": "evaluation (multi-model extraction pipeline)",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "Copies PDFs into paper_NN folders (--organize) and extracts per model; produces the checkpoint KGs that analyze_kgs reads."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--pdf-root (default DEFAULT_PDF_ROOT)",
+        "--source-dir",
+        "--organize ['store_true']",
+        "--models (default EVALUATION_MODELS)",
+        "--dry-run ['store_true']"
+      ],
+      "tests": [
+        "see baseline inventory"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "cli_only",
+        "reason": "Evaluation pipeline with paid inference."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP47",
+      "path": "app/modules/launchers/academy_extractor.py",
+      "sha256": "3d46818df5616f30ce674450624181895d5c4cae40ca9d2536cd09f6b952562d",
+      "lines": 145,
+      "baseline_disposition": "retain_entrypoint",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": false,
+        "network": true,
+        "llm": true,
+        "destructive": false,
+        "reads_repo_dotenv": true,
+        "subprocess_or_service": false,
+        "notes": "Globus Compute endpoint extraction."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "--data-dir",
+        "--output",
+        "--model (default 'qwen3.5:9b')",
+        "--backend (default 'ollama')",
+        "--schema-path (default 'storage/schema/matkg_schema.yaml')",
+        "--max-workers (default 2)",
+        "--log-file (default None)"
+      ],
+      "tests": [
+        "see baseline inventory"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Launcher."
+      },
+      "warnings": []
+    },
+    {
+      "id": "OP48",
+      "path": "app/modules/launchers/user_agent.py",
+      "sha256": "22c370fc8ea16461a7b34e20521772818b1fb7836f1afd74a6a45108f426a95b",
+      "lines": 94,
+      "baseline_disposition": "retain_entrypoint",
+      "kind": "service_launcher",
+      "symbols": [],
+      "effects": {
+        "read_only": false,
+        "writes_local": true,
+        "network": false,
+        "llm": false,
+        "destructive": false,
+        "reads_repo_dotenv": false,
+        "subprocess_or_service": false,
+        "notes": "pickle.dump of a token DB [:66-67]."
+      },
+      "inputs": [],
+      "outputs": "see effects",
+      "population": "n/a",
+      "counting_unit": "n/a",
+      "completeness": "n/a",
+      "cli_flags": [
+        "-p --port (default 8000)",
+        "-u --user_agent_id",
+        "--token-db (default DEFAULT_TOKEN_DB)"
+      ],
+      "tests": [
+        "see baseline inventory"
+      ],
+      "proposal": {
+        "service": null,
+        "tool": null,
+        "skill": null,
+        "disposition": "out_of_scope",
+        "reason": "Launcher; stores tokens."
+      },
+      "warnings": []
+    }
+  ],
+  "reconciliation_with_knowledge_operations_source_map": {
+    "line_numbers": "All 23 symbol ranges in companion/knowledge_operations_source_map.json match the baseline export (AST), and the 6 file sha256 values match the baseline inventory.",
+    "discrepancies": [
+      "D-1 Baseline inventory dispositions: corpus_qa.py, repair_corpus.py, harvest_rsoxs.py and run.py are 'retain_baseline_seam', not 'retain_cli_facade_T19A_review'; the other 17 scripts/*.py are the latter. The 15 scripts/*.sh files, slurm_scripts/run_ollama.sh and scripts/.env.example are absent from f2w_baseline_inventory.json.",
+      "D-2 get_pdf_years: KNOWLEDGE_OPERATIONS says 'Preserve source/method and uncertainty', but guess_year returns only a year and scan_folder writes filename,year. Exposing provenance is new output (additive), not preservation.",
+      "D-3 get_pdf_years.scan_folder is non-recursive; the harvest layout papers/rsoxs/{year}/ is not covered. Not mentioned in the source map.",
+      "D-4 The corpus_qa histogram caveat is confirmed: 155 histogram increments against 4 distinct papers with a year on extracted_terms_xray_papers_cborg_chat.json.",
+      "D-5 Not in the source map: corpus_qa sections 3 and 5 encode measurement-vs-technique expectations (including non-schema classes) that conflict with D20 if presented as defects; on baseline data section 5 reports every paper as 'zero-measurement'.",
+      "D-6 Not in the source map: analyze_kgs silently skips gemini/cborg checkpoints and uses filename paper counts (147 vs 145).",
+      "D-7 Not in the source map: tiled_graph experiment-identity counts are capped at 800 per type without disclosure (OP07).",
+      "D-8 Not in the source map: repair_corpus emits non-schema categories and predicates (OP09); ingest_rsoxs_v3 writes nodes/edges-shaped KG (OP10); two scripts overwrite matkg_bl1101_v7.json (OP11/OP12).",
+      "D-9 The source map lists list_missing_rsoxs_papers as read-only diagnostics; its default output overwrites tracked repo-root missing_rsoxs_papers.txt.",
+      "D-10 summarize_extracted_terms does not call _eligible_pages; it has its own eligibility logic with a different rule for extraction_state=full.",
+      "D-11 The proposed scripts/ facade list in KNOWLEDGE_OPERATIONS section 2 omits repair_corpus.py (CLI-only here) and corpus_qa's dependency on typer."
+    ]
+  },
+  "owner_questions": [
+    "OQ1 corpus_qa histogram: keep the legacy label and value in the CLI and add a separately versioned distinct-paper histogram, or correct the CLI (versioned behavior change)?",
+    "OQ2 corpus_qa sections 3 and 5: keep as legacy diagnostics but exclude them from the curate_audit_corpus Tool output, or include them with a D20 caveat?",
+    "OQ3 Counting unit for 'papers' in Tool results: filename keys (current), WorkVersions, or distinct Works via harvest_rsoxs.works_same_identity / collapse_near_duplicates?",
+    "OQ4 tiled_graph experiment-identity counts: in scope for Knowledge Operations? If yes, approve complete paging or explicit 'partial' disclosure.",
+    "OQ5 Retire or keep as historical CLIs: ingest_rsoxs_v3.py, build_v7_kg.py, ingest_bl1101_v7.py (duplicate v7 writers), scripts/app/modules/kg_rag_api.py (stray copy).",
+    "OQ6 list_missing_rsoxs_papers default output path: keep writing repo-root missing_rsoxs_papers.txt from the CLI (preserved) while the Tool writes only artifacts?",
+    "OQ7 analyze_kgs: should the legacy CLI keep silently skipping non-deepseek/qwen/gpt-oss checkpoints?"
+  ]
+}

@@ -1,0 +1,869 @@
+{
+  "record": "T22A existing schema assets and architectural contract inventory",
+  "gate": "H1",
+  "status": "inventory only; no behavior change; proposals are not approvals",
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "inspected_tree": "clean export f2w-222b1e7 (no .env); YAML parsed with PyYAML 6.0.3 and linkml_runtime 1.11.1 from venv-baseline under env -i; no network/LLM/Tiled",
+  "generated_on": "2026-10-12",
+  "metamodel": {
+    "linkml_runtime_pinned": "requirements/runtime.in:13 linkml-runtime>=1.11.1; requirements/dev.txt:245 linkml-runtime==1.11.1",
+    "pyyaml": "requirements/runtime.in:23 PyYAML>=6.0.3",
+    "schema_files_declare_metamodel_version": false,
+    "note": "No schema declares a LinkML metamodel_version or generation_date; all import linkml:types (directly or transitively). 'version' fields are free-form labels (0.2.0, rsoxs_v1, bl1101_v2, xray_v1), not semver of content.",
+    "repo_license": "LICENSE.txt LBNL BSD-style 'FAIR to WISE (F2W) Copyright (c) 2025 Regents of UC'; every LinkML schema declares license: MIT (mismatch to flag for owner, not to change)"
+  },
+  "rsoxs_measurement_inheritance": {
+    "class": "RSoXSMeasurement",
+    "defined_in": "storage/schema/rsoxs_schema.yaml:21-38 (also duplicated in rsoxs_schema_extract.yaml:21-38)",
+    "is_a": "ExperimentalTechnique",
+    "ancestors_linkml": [
+      "RSoXSMeasurement",
+      "ExperimentalTechnique",
+      "Thing"
+    ],
+    "description": "A resonant soft X-ray scattering measurement or simulation of one (RSoXS, R-SoXS, P-RSoXS, CyRSoXS). Prefer this class over the parent ExperimentalTechnique for RSoXS, polarized RSoXS, and resonant elastic soft X-ray scattering.",
+    "parent_ExperimentalTechnique": {
+      "defined_in": "storage/schema/matkg_schema.yaml",
+      "description": "A technique or method used to characterize or analyze materials",
+      "is_a": "Thing"
+    },
+    "induced_slots": [
+      "photon_energy_eV",
+      "absorption_edge",
+      "scattering_technique",
+      "polarization",
+      "measured_property",
+      "technique_type",
+      "peak_positions",
+      "d_spacing",
+      "peak_assignments",
+      "id",
+      "name",
+      "category",
+      "raw_category",
+      "type",
+      "description",
+      "provided_by",
+      "publication_year",
+      "paper_title",
+      "authors",
+      "institutions",
+      "doi",
+      "journal",
+      "volume",
+      "issue",
+      "pages_range",
+      "abstract_text",
+      "keywords",
+      "publications",
+      "has_code_snippet"
+    ],
+    "slot_usage": {
+      "technique_type": "string_serialization 'rsoxs'",
+      "scattering_technique": "string_serialization 'RSoXS'"
+    },
+    "disposition": "PRESERVE (D20, O01 resolved). No measurement/technique split; historical records using this inheritance stay valid.",
+    "test_coverage": "No baseline test asserts this inheritance (grep tests/ for is_a/RSoXSMeasurement). T22B should add a preservation test."
+  },
+  "assets": [
+    {
+      "id": "schema:README",
+      "file": "storage/schema/README.md",
+      "sha256": "5f2a6b765a9fd0b56655bb556fa05aa404b965634031acd73e7138bfd921e788",
+      "bytes": 3438,
+      "classification": "documentation",
+      "description": "Classification table for this directory (authoritative per SCHEMA_ARCHITECTURE.md section 2).",
+      "is_linkml": false,
+      "loaded_by": {
+        "note": "documentation; not loaded"
+      }
+    },
+    {
+      "id": "schema:bl1101_motor_stage_map",
+      "file": "storage/schema/bl1101_motor_stage_map.yaml",
+      "sha256": "74a131e5a11a9c22d3e78ce2aaf1ce3b0dbb747475427f90f2b909fc98beb687",
+      "bytes": 3703,
+      "classification": "ingest_mapping_data",
+      "description": "Motor -> BeamlineStage mapping consumed by bl1101 ops ingest. Not LinkML.",
+      "is_linkml": false,
+      "version": 4,
+      "top_level_keys": [
+        "version",
+        "source",
+        "leave_on_beamline",
+        "aliases",
+        "motors"
+      ],
+      "linkml_parse": {
+        "loads": false,
+        "error": "TypeError: SchemaDefinition.__init__() got an unexpected keyword argument 'leave_on_beamline'"
+      },
+      "loaded_by": {
+        "runtime": [
+          "bl1101_ingest.py:45 MOTOR_STAGE_MAP_PATH; :1605-1611 load_motor_stage_map (yaml.safe_load; missing file -> empty map with WARNING); :1692,1744,1879,2049 apply; CLI override --motor-stage-map :2351-2355"
+        ],
+        "tests": [
+          "tests/test_bl1101_ingest.py (inferred from module tests; not individually line-checked)"
+        ],
+        "loaded_anywhere": true,
+        "note": "Missing map silently degrades to version 0 / no links (bl1101_ingest.py:1607-1609) rather than failing."
+      }
+    },
+    {
+      "id": "schema:bl1101_schema",
+      "file": "storage/schema/bl1101_schema.yaml",
+      "sha256": "5b41ba99a8c5344eea9422ff0e51cf8a74c67fd86d48c4d0245ce40d7c6461f3",
+      "bytes": 12500,
+      "classification": "linkml_overlay",
+      "description": "ALS 11.0.1.2 ops overlay (beamline: namespace). Shares class names Beamline/Detector/Polarization/PhotonEnergy/AbsorptionEdge/ScatteringGeometry/Sample with other overlays but distinct by namespace.",
+      "is_linkml": true,
+      "linkml_id": "https://w3id.org/matkg/beamline/bl1101",
+      "name": "bl1101",
+      "title": "Beamline 11.0.1.2 ops overlay",
+      "version": "bl1101_v2",
+      "license": "MIT",
+      "imports": [
+        "matkg_schema"
+      ],
+      "default_prefix": "beamline",
+      "linkml_parse": {
+        "tool": "linkml_runtime 1.11.1 SchemaView (baseline venv, env -i)",
+        "imports_closure": [
+          "linkml:types",
+          "matkg_schema",
+          "bl1101"
+        ],
+        "classes_with_imports": 58,
+        "slots_with_imports": 109,
+        "enums_with_imports": 0,
+        "class_slot_refs_undefined_in_closure": [],
+        "class_induced_slot_errors": []
+      },
+      "local_counts": {
+        "local_classes": 26,
+        "local_slots": 26,
+        "local_enums": 0,
+        "local_types": 0
+      },
+      "inheritance_is_a": {
+        "Beamline": "Thing",
+        "Endstation": "Device",
+        "BeamlineStage": "Component",
+        "Motor": "Device",
+        "AnalogInput": "Device",
+        "DigitalIO": "Device",
+        "Detector": "Device",
+        "ProcessVariable": "Parameter",
+        "OphydDevice": "Device",
+        "BlueskyPlan": "Method",
+        "Software": "Method",
+        "ComposeService": "Software",
+        "DataPath": "Thing",
+        "Polarization": "Parameter",
+        "PhotonEnergy": "Parameter",
+        "AbsorptionEdge": "Parameter",
+        "ScatteringGeometry": "Structure",
+        "Sample": "Material",
+        "ESAF": "Thing",
+        "Proposal": "Thing",
+        "BlueskyRun": "Thing",
+        "Person": "Thing",
+        "Role": "Thing",
+        "BeamlineScientist": "Role",
+        "OpsDoc": "Thing",
+        "DocumentChunk": "Thing"
+      },
+      "abstract_classes": [],
+      "tree_root": [],
+      "loaded_by": {
+        "runtime": [
+          "multi_kg.py:38,136-137 schema_path_for_graph (value stored at retrieval_agent.py:440, never read)",
+          "bl1101_ingest.py:44 SCHEMA_PATH used only as metadata string at :2266; tiled_sim.py:868 same",
+          "compose.yaml:64 bind-mounts it read-only"
+        ],
+        "tests": [
+          "tests/test_prov.py:24,99-101,511-516 (yaml.safe_load only)",
+          "tests/test_docker_startup.py:24 (string)"
+        ],
+        "loaded_anywhere": false,
+        "note": "No LinkML/SchemaHelper load at runtime or in tests; ops snapshots are not validated against it. Only its path string is recorded. Version is tracked separately as bl1101_ingest.py:57 SCHEMA_VERSION='bl1101_v2' (matches file version, but not mechanically bound)."
+      }
+    },
+    {
+      "id": "schema:matkg_schema",
+      "file": "storage/schema/matkg_schema.yaml",
+      "sha256": "0214a61a200b1f7c98cdb641a97c5cfc2a29a1517147342c04eb470f2a4abf68",
+      "bytes": 27219,
+      "classification": "linkml_base",
+      "description": "Shared MatKG base: classes/slots imported by every overlay. Default extraction schema when F2W_SCHEMA/--schema is unset.",
+      "is_linkml": true,
+      "linkml_id": "https://w3id.org/matkg",
+      "name": "matkg",
+      "version": "0.2.0",
+      "license": "MIT",
+      "imports": [
+        "linkml:types"
+      ],
+      "default_prefix": "matkg",
+      "linkml_parse": {
+        "tool": "linkml_runtime 1.11.1 SchemaView (baseline venv, env -i)",
+        "imports_closure": [
+          "linkml:types",
+          "matkg"
+        ],
+        "classes_with_imports": 32,
+        "slots_with_imports": 83,
+        "enums_with_imports": 0,
+        "class_slot_refs_undefined_in_closure": [],
+        "class_induced_slot_errors": []
+      },
+      "local_counts": {
+        "local_classes": 32,
+        "local_slots": 83,
+        "local_enums": 0,
+        "local_types": 0
+      },
+      "inheritance_is_a": {
+        "Graph": null,
+        "Thing": null,
+        "Publication": null,
+        "Material": "Thing",
+        "Component": "Thing",
+        "Condition": "Thing",
+        "Interface": "Thing",
+        "Measurement": "Thing",
+        "Method": "Thing",
+        "Parameter": "Thing",
+        "Phenomenon": "Thing",
+        "Process": "Thing",
+        "Property": "Thing",
+        "Structure": "Thing",
+        "ConjugatedPolymer": "Material",
+        "ChemicalEntity": "Thing",
+        "Compound": "ChemicalEntity",
+        "Element": "ChemicalEntity",
+        "Device": "Thing",
+        "PhotovoltaicCell": "Device",
+        "OFET": "Device",
+        "MaterialProperty": "Property",
+        "ElectronicProperty": "MaterialProperty",
+        "ProcessingMethod": "Method",
+        "ExperimentalTechnique": "Thing",
+        "CodeSnippet": "Thing",
+        "DomainFeature": "Thing",
+        "Association": null,
+        "MaterialHasProperty": "Association",
+        "DeviceContainsMaterial": "Association",
+        "MaterialProcessedBy": "Association",
+        "PropertyMeasuredBy": "Association"
+      },
+      "abstract_classes": [
+        "Thing",
+        "Association"
+      ],
+      "tree_root": [
+        "Graph"
+      ],
+      "loaded_by": {
+        "runtime": [
+          "Default schema_path for SchemaHelper in every extraction path: term_extractor/orchestrator.py:159,181,664; f2w_agent/coordinator.py:80; f2w_agent/cli.py:102; f2w_agent/extractor_agent.py:29; term_extractor/academy_agent.py:31; launchers/academy_extractor.py:119-121; extract_terms.py:1930,2040; scripts/run.py:38; app/run_pipeline_cborg.py:138; scripts/start_agent_backend.sh:118 (when F2W_SCHEMA unset); scripts/deploy_nersc.sh:131,192",
+          "Transitively via imports: from rsoxs_schema.yaml, rsoxs_schema_extract.yaml, bl1101_schema.yaml, xray_schema.yaml"
+        ],
+        "tests": [
+          "tests/test_extractor_agent.py:298,351,373,460 (SchemaHelper)"
+        ],
+        "loaded_anywhere": true
+      }
+    },
+    {
+      "id": "schema:prov_vocabulary",
+      "file": "storage/schema/prov_vocabulary.yaml",
+      "sha256": "0120f16f4fab7bf7fce763cc13536f2bf23f1946bd0ba37635a41574c278dc61",
+      "bytes": 2870,
+      "classification": "reference_vocabulary",
+      "description": "W3C PROV-O reference document; NOT LinkML (top-level key prov_vocabulary rejected by SchemaDefinition). Helpers hard-coded in app/modules/prov.py.",
+      "is_linkml": false,
+      "top_level_keys": [
+        "prov_vocabulary"
+      ],
+      "linkml_parse": {
+        "loads": false,
+        "error": "TypeError: SchemaDefinition.__init__() got an unexpected keyword argument 'prov_vocabulary'"
+      },
+      "loaded_by": {
+        "runtime": [],
+        "tests": [
+          "tests/test_prov.py:25,105-107,427-502 (yaml.safe_load; key/namespace/relations present)"
+        ],
+        "loaded_anywhere": true,
+        "note": "Tests only. app/modules/prov.py hard-codes the same terms; no code reads the YAML, so drift between the two is not detected except by test_prov expectations."
+      }
+    },
+    {
+      "id": "schema:rsoxs_schema",
+      "file": "storage/schema/rsoxs_schema.yaml",
+      "sha256": "8269251b1bdaaf92750b58db04013910f596f35519b6cebbcbb036241d51b175",
+      "bytes": 1884,
+      "classification": "linkml_overlay",
+      "description": "RSoXS literature overlay (viewer/json2kg source of truth per storage/schema/README.md). Adds RSoXSMeasurement + 3 resonant slots.",
+      "is_linkml": true,
+      "linkml_id": "https://w3id.org/matkg/rsoxs",
+      "name": "rsoxs",
+      "title": "RSoXS v1 overlay",
+      "version": "rsoxs_v1",
+      "license": "MIT",
+      "imports": [
+        "matkg_schema"
+      ],
+      "default_prefix": "matkg",
+      "linkml_parse": {
+        "tool": "linkml_runtime 1.11.1 SchemaView (baseline venv, env -i)",
+        "imports_closure": [
+          "linkml:types",
+          "matkg_schema",
+          "rsoxs"
+        ],
+        "classes_with_imports": 33,
+        "slots_with_imports": 86,
+        "enums_with_imports": 0,
+        "class_slot_refs_undefined_in_closure": [],
+        "class_induced_slot_errors": []
+      },
+      "local_counts": {
+        "local_classes": 1,
+        "local_slots": 3,
+        "local_enums": 0,
+        "local_types": 0
+      },
+      "inheritance_is_a": {
+        "RSoXSMeasurement": "ExperimentalTechnique"
+      },
+      "abstract_classes": [],
+      "tree_root": [],
+      "loaded_by": {
+        "runtime": [
+          "compose.yaml:47 F2W_SCHEMA=storage/schema/rsoxs_schema.yaml -> Dockerfile:72 start_agent_backend.sh:118,250 --schema -> f2w_agent/cli.py:47 -> api.py:2635 ExtractorAgent -> term_extractor/orchestrator.py:181 SchemaHelper",
+          "scripts/start_rsoxs_stack.sh:143 F2W_SCHEMA default",
+          "multi_kg.py:36-39,131-140 schema_path_for_graph returns it for matkg_rsoxs_* graphs; retrieval_agent.py:440 stores kg.schema_path but NO reader of kg.schema_path exists (grep app/, scripts/)",
+          "Recorded as a string only (no hash) in scripts/harvest_rsoxs.py:228 DEFAULT_MANIFEST.schema"
+        ],
+        "tests": [
+          "tests/test_prov.py:23,93-96,504-509 (yaml.safe_load only, not LinkML)",
+          "tests/test_docker_startup.py:23 (string presence in compose.yaml)",
+          "tests/test_harvest_rsoxs.py:446 (manifest string)"
+        ],
+        "loaded_anywhere": true,
+        "note": "Loaded by LinkML only in the compose/rsoxs-stack profile. In the default local launcher profile (F2W_SCHEMA unset) extraction uses matkg_schema.yaml, which has no RSoXSMeasurement class (see findings)."
+      }
+    },
+    {
+      "id": "schema:rsoxs_schema_extract",
+      "file": "storage/schema/rsoxs_schema_extract.yaml",
+      "sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca",
+      "bytes": 1085,
+      "classification": "linkml_overlay_extract",
+      "description": "Documented as 'extract-time import of the RSoXS overlay'. ACTUAL: byte-identical to the first 40 lines of rsoxs_schema.yaml; imports matkg_schema (not rsoxs_schema); omits the slots: block; same id/name 'rsoxs' as the overlay.",
+      "is_linkml": true,
+      "linkml_id": "https://w3id.org/matkg/rsoxs",
+      "name": "rsoxs",
+      "title": "RSoXS v1 overlay",
+      "version": "rsoxs_v1",
+      "license": "MIT",
+      "imports": [
+        "matkg_schema"
+      ],
+      "default_prefix": "matkg",
+      "linkml_parse": {
+        "tool": "linkml_runtime 1.11.1 SchemaView (baseline venv, env -i)",
+        "imports_closure": [
+          "linkml:types",
+          "matkg_schema",
+          "rsoxs"
+        ],
+        "classes_with_imports": 33,
+        "slots_with_imports": 83,
+        "enums_with_imports": 0,
+        "class_slot_refs_undefined_in_closure": [
+          "absorption_edge",
+          "photon_energy_eV",
+          "polarization"
+        ],
+        "class_induced_slot_errors": [
+          "RSoXSMeasurement: ValueError: No such slot photon_energy_eV as an attribute of RSoXSMeasurement ancestors or as a slot definition in the schema"
+        ]
+      },
+      "local_counts": {
+        "local_classes": 1,
+        "local_slots": 0,
+        "local_enums": 0,
+        "local_types": 0
+      },
+      "inheritance_is_a": {
+        "RSoXSMeasurement": "ExperimentalTechnique"
+      },
+      "abstract_classes": [],
+      "tree_root": [],
+      "loaded_by": {
+        "runtime": [],
+        "tests": [],
+        "loaded_anywhere": false,
+        "note": "Referenced only in storage/schema/README.md:17 and mkdocs/docs/schemas.md:14. Not loaded by any code, script, config or test."
+      }
+    },
+    {
+      "id": "schema:tiled_sim_seed",
+      "file": "storage/schema/tiled_sim_seed.yaml",
+      "sha256": "64f5edb17dea7a1f23284ee2cc6ed60060e725cd7ece1a48506db36094754f07",
+      "bytes": 5048,
+      "classification": "simulation_seed_data",
+      "description": "RNG seed + ESAF/proposal/sample templates for Tiled-sim fixture. Not LinkML.",
+      "is_linkml": false,
+      "top_level_keys": [
+        "seed",
+        "n_esafs",
+        "proposals_per_esaf",
+        "scans_per_proposal",
+        "samples_per_proposal",
+        "beamline_id",
+        "facility",
+        "beamline_name",
+        "endstation",
+        "esafs",
+        "themes",
+        "plans",
+        "motors",
+        "detector_id",
+        "sample_stage_id",
+        "tiled_software_id",
+        "bluesky_software_id",
+        "finch_repo_id",
+        "axis_repo_id",
+        "tiled_repo_id",
+        "energy_eV",
+        "polarizations"
+      ],
+      "linkml_parse": {
+        "loads": false,
+        "error": "TypeError: SchemaDefinition.__init__() got an unexpected keyword argument 'seed'"
+      },
+      "loaded_by": {
+        "runtime": [
+          "tiled_sim.py:48 SEED_PATH; :98-104 load_seed (yaml.safe_load); CLI --seed-yaml tiled_sim.py:1011"
+        ],
+        "tests": [
+          "tests/test_tiled_sim.py"
+        ],
+        "loaded_anywhere": true
+      }
+    },
+    {
+      "id": "schema:xray_schema",
+      "file": "storage/schema/xray_schema.yaml",
+      "sha256": "2d0742fb0f8d757f2860c755c6b11dbf001d226caad3057313f6adcbc15b9d08",
+      "bytes": 14962,
+      "classification": "linkml_overlay",
+      "description": "X-ray principles overlay (xray: namespace). Planned matkg_xray_vN.json; not wired to any graph by multi_kg.",
+      "is_linkml": true,
+      "linkml_id": "https://w3id.org/matkg/xray",
+      "name": "xray",
+      "title": "General X-ray fundamentals overlay",
+      "version": "xray_v1",
+      "license": "MIT",
+      "imports": [
+        "matkg_schema"
+      ],
+      "default_prefix": "xray",
+      "linkml_parse": {
+        "tool": "linkml_runtime 1.11.1 SchemaView (baseline venv, env -i)",
+        "imports_closure": [
+          "linkml:types",
+          "matkg_schema",
+          "xray"
+        ],
+        "classes_with_imports": 48,
+        "slots_with_imports": 136,
+        "enums_with_imports": 1,
+        "class_slot_refs_undefined_in_closure": [],
+        "class_induced_slot_errors": []
+      },
+      "local_counts": {
+        "local_classes": 16,
+        "local_slots": 53,
+        "local_enums": 1,
+        "local_types": 0
+      },
+      "inheritance_is_a": {
+        "XRayPhenomenon": "Phenomenon",
+        "XRaySource": "Process",
+        "XRayBeamProperty": "Property",
+        "XRayOpticalConstant": "Property",
+        "AbsorptionEdge": "Parameter",
+        "SecondaryProcess": "Phenomenon",
+        "MaterialXRayInteraction": "Phenomenon",
+        "XRaySafetyConcept": "Phenomenon",
+        "CosmicXRayProcess": "Phenomenon",
+        "ScatteringGeometry": "ExperimentalTechnique",
+        "XRayTechniqueFamily": "ExperimentalTechnique",
+        "InteractionCrossSection": "Property",
+        "ReciprocalSpaceConcept": "Parameter",
+        "WaveOpticsConcept": "Parameter",
+        "AtomicTransition": "Parameter",
+        "DetectionPrinciple": "Phenomenon"
+      },
+      "abstract_classes": [],
+      "tree_root": [],
+      "loaded_by": {
+        "runtime": [
+          "scripts/harvest_xray.py:210 DEFAULT_MANIFEST.schema (string only)",
+          "Usable via --schema/F2W_SCHEMA but no default points at it; multi_kg.schema_path_for_graph returns None for matkg_xray_* and the xray demo graph (multi_kg.py:131-140)"
+        ],
+        "tests": [
+          "tests/test_xray_schema.py:16,81-87 (SchemaView load + required classes)",
+          "tests/test_xray_schema.py:99-160 (yaml-level checks)"
+        ],
+        "loaded_anywhere": true,
+        "note": "Loaded by LinkML in tests only."
+      }
+    },
+    {
+      "id": "schema:xray_schema_extract",
+      "file": "storage/schema/xray_schema_extract.yaml",
+      "sha256": "a80fd18354f7f957a39ab6fe2f2b2cf737de6ede639c576ac5ce13ce18b07d5b",
+      "bytes": 598,
+      "classification": "linkml_overlay_extract",
+      "description": "Thin extract overlay; imports xray_schema (genuinely imports its overlay, unlike rsoxs_schema_extract).",
+      "is_linkml": true,
+      "linkml_id": "https://w3id.org/matkg/xray/extract",
+      "name": "xray_extract",
+      "title": "General X-ray fundamentals extract overlay",
+      "version": "xray_v1",
+      "license": "MIT",
+      "imports": [
+        "xray_schema"
+      ],
+      "default_prefix": "xray",
+      "linkml_parse": {
+        "tool": "linkml_runtime 1.11.1 SchemaView (baseline venv, env -i)",
+        "imports_closure": [
+          "linkml:types",
+          "matkg_schema",
+          "xray_schema",
+          "xray_extract"
+        ],
+        "classes_with_imports": 48,
+        "slots_with_imports": 136,
+        "enums_with_imports": 1,
+        "class_slot_refs_undefined_in_closure": [],
+        "class_induced_slot_errors": []
+      },
+      "loaded_by": {
+        "runtime": [
+          "scripts/harvest_xray.py:211 DEFAULT_MANIFEST.extract_schema (string only)"
+        ],
+        "tests": [
+          "tests/test_xray_schema.py:17,90-96 (SchemaView load)",
+          "tests/test_xray_schema.py:122-125 (imports xray_schema)"
+        ],
+        "loaded_anywhere": true,
+        "note": "Loaded by LinkML in tests only."
+      }
+    },
+    {
+      "id": "schema:xray_seed_instances",
+      "file": "storage/schema/xray_seed_instances.yaml",
+      "sha256": "64c86053fcabf0069a6522481e85e4524bb92c4893a2a36b50ac263d28574bbc",
+      "bytes": 2579,
+      "classification": "example_instances",
+      "description": "Example X-ray principle nodes. README says 'for tests / extract prompts'; only tests load it (no prompt loader found).",
+      "is_linkml": false,
+      "top_level_keys": [
+        "coverage",
+        "instances"
+      ],
+      "linkml_parse": {
+        "loads": false,
+        "error": "TypeError: SchemaDefinition.__init__() got an unexpected keyword argument 'coverage'"
+      },
+      "loaded_by": {
+        "runtime": [],
+        "tests": [
+          "tests/test_xray_schema.py:18,76-78,139-152"
+        ],
+        "loaded_anywhere": true,
+        "note": "Tests only."
+      }
+    }
+  ],
+  "class_name_collisions_across_overlays": [
+    {
+      "class": "AbsorptionEdge",
+      "bl1101_schema": "is_a Parameter",
+      "xray_schema": "is_a Parameter",
+      "note": "same parent, different namespace/slots"
+    },
+    {
+      "class": "ScatteringGeometry",
+      "bl1101_schema": "is_a Structure",
+      "xray_schema": "is_a ExperimentalTechnique",
+      "note": "DIFFERENT parents; a registry keyed on bare class name would conflate them. Never merged today (graphs not concatenated)."
+    },
+    {
+      "class": "Detector",
+      "bl1101_schema": "is_a Device",
+      "other": "not in matkg/rsoxs/xray; repair_corpus.py:120 assigns it to literature terms"
+    }
+  ],
+  "callsites": [
+    {
+      "file": "app/modules/term_extractor/schema.py",
+      "lines": "5,107-345",
+      "symbol": "SchemaHelper",
+      "validates": "Loads SchemaView(schema_path) (:119) with a CWD-relative path; all_classes()/all_slots() include imports (:126,:132). validate_and_fix_term (:252-323): unknown category -> GENERAL_CATEGORY_ALIASES (:15-66) or RapidFuzz QRatio>=80 (:220-230) else 'Thing' with raw_category kept; relations: drops description/category predicates, exact slot -> verified, alias/fuzzy -> verified with raw_predicate, else 'related_to' fallback. check_relation_validity (:335-345): domain/range via is_a chain (:325-333; mixins ignored). get_code_domain_feature_context (:173-218): slots annotated code_domain_feature, fallback ExperimentalTechnique class_slots.",
+      "kind": "scientific LinkML, extraction-time normalization (not instance validation)"
+    },
+    {
+      "file": "app/modules/extract_terms.py",
+      "lines": "19,262-521,577,1307,1354,1422,1495,1930,2040",
+      "symbol": "SchemaHelper (second copy) / extractor",
+      "validates": "Near-duplicate of term_extractor/schema.py. DIVERGENT: its GENERAL_CATEGORY_ALIASES (:155) lacks all RSoXS and X-ray aliases (rsoxs, prsoxs, cyrsoxs, absorptionedge, xrayphenomenon ... 23 entries) and GENERAL_RELATION_ALIASES (:186) lacks produces/described_by/involves/governs/uses/follows_from/same_physics_as; class_slots fallback lacks try/except (:336-377). Used by scripts/build_kg.sh:64 with default --schema-path matkg_schema.yaml.",
+      "kind": "scientific LinkML, legacy extraction path"
+    },
+    {
+      "file": "app/modules/term_extractor/orchestrator.py",
+      "lines": "159,181,241,328,381,517,664-676",
+      "symbol": "Orchestrator / run_extraction",
+      "validates": "Constructs SchemaHelper; injects schema context into prompts (:241); validate_and_fix_term on every raw term (:328).",
+      "kind": "extraction"
+    },
+    {
+      "file": "app/modules/term_extractor/tools.py",
+      "lines": "11,21,258,268",
+      "symbol": "register_term tool",
+      "validates": "validate_and_fix_term then downgrades verified relations failing domain/range to verified=False (logs WARNING); does not drop them.",
+      "kind": "extraction"
+    },
+    {
+      "file": "app/modules/term_extractor/provenance.py",
+      "lines": "118-121,147-152,273",
+      "symbol": "normalize_domain_features / code-snippet prompt",
+      "validates": "Keeps only schema-annotated code_domain_feature names on CodeSnippet domain_features.",
+      "kind": "extraction"
+    },
+    {
+      "file": "app/modules/f2w_agent/api.py",
+      "lines": "2635",
+      "symbol": "F2W agent API ExtractorAgent wiring",
+      "validates": "Passes cfg.schema_path (from --schema / F2W_SCHEMA) to ExtractorAgent; API does not itself validate or expose schema identity.",
+      "kind": "API wiring"
+    },
+    {
+      "file": "app/modules/f2w_agent/extractor_agent.py",
+      "lines": "29,39,56,83",
+      "symbol": "ExtractorAgent",
+      "validates": "Forwards schema_path to Orchestrator for full/targeted extraction.",
+      "kind": "extraction wiring"
+    },
+    {
+      "file": "app/modules/f2w_agent/multi_kg.py",
+      "lines": "36-39,131-140",
+      "symbol": "schema_path_for_graph",
+      "validates": "Filename-pattern selection: matkg_rsoxs_* -> rsoxs_schema.yaml, matkg_bl1101_* -> bl1101_schema.yaml, else None (incl. xray graphs, matkg_qwen3_*/matkg_with_code.json).",
+      "kind": "selection only"
+    },
+    {
+      "file": "app/modules/f2w_agent/retrieval_agent.py",
+      "lines": "440",
+      "symbol": "_stamp_graph",
+      "validates": "Sets kg.schema_path; no consumer found anywhere (dead binding).",
+      "kind": "selection only"
+    },
+    {
+      "file": "app/modules/json2kg.py",
+      "lines": "40-47,61-73,314-322,326-331",
+      "symbol": "build_graph / copy_passthrough_slots",
+      "validates": "NO LinkML validation. Passthrough of overlay slots (photon_energy_eV, absorption_edge, scattering_technique, polarization, technique_type, importance) plus any unknown term keys; category CodeSnippet->Unknown, XRayScatteringAnalysis->ExperimentalTechnique; default category 'Unknown' (not a schema class); predicates emitted as 'rel:<name>' (prefix not declared in any schema).",
+      "kind": "field mapping (D21 preserve)"
+    },
+    {
+      "file": "app/modules/bl1101_ingest.py",
+      "lines": "44-45,57,1605-1611,2266",
+      "symbol": "ops ingest",
+      "validates": "yaml.safe_load motor map; records schema path string + SCHEMA_VERSION in snapshot metadata; no LinkML validation.",
+      "kind": "ingest mapping + metadata"
+    },
+    {
+      "file": "app/modules/tiled_sim.py",
+      "lines": "48,98-104,868",
+      "symbol": "load_seed / promote",
+      "validates": "yaml.safe_load seed; records bl1101 schema path string in metadata.",
+      "kind": "seed data"
+    },
+    {
+      "file": "scripts/ingest_rsoxs_v3.py",
+      "lines": "49-59",
+      "symbol": "RSOXS_SLOTS",
+      "validates": "Hard-coded list claimed 'from rsoxs_schema.yaml' includes geometry, q_range, contrast_mechanism which are NOT slots in the rsoxs closure (verified with SchemaView).",
+      "kind": "script field mapping"
+    },
+    {
+      "file": "scripts/run.py",
+      "lines": "38,134",
+      "symbol": "--schema",
+      "validates": "Default matkg_schema.yaml into term_extractor.run_extraction.",
+      "kind": "CLI wiring"
+    },
+    {
+      "file": "app/modules/launchers/academy_extractor.py",
+      "lines": "119-121,137",
+      "symbol": "--schema-path",
+      "validates": "Default matkg_schema.yaml.",
+      "kind": "CLI wiring"
+    },
+    {
+      "file": "app/run_pipeline_cborg.py",
+      "lines": "138",
+      "symbol": "pipeline",
+      "validates": "Hard-coded matkg_schema.yaml.",
+      "kind": "CLI wiring"
+    },
+    {
+      "file": "config.yml",
+      "lines": "14,173,194",
+      "symbol": "paths.schema / *.default_schema",
+      "validates": "No reader found via grep for config_value(...schema...) (inference: unused config).",
+      "kind": "config"
+    },
+    {
+      "file": "compose.yaml",
+      "lines": "47,63-64",
+      "symbol": "F2W_SCHEMA + ro mounts",
+      "validates": "Selects rsoxs overlay for the product stack; mounts rsoxs/bl1101 schemas over the image copy (Dockerfile:64 COPY . . supplies matkg_schema.yaml).",
+      "kind": "deployment"
+    },
+    {
+      "file": "tests/test_xray_schema.py",
+      "lines": "81-97,99-160",
+      "symbol": "xray schema tests",
+      "validates": "Only tests that load a schema via SchemaView (xray_schema, xray_schema_extract); yaml-level structure checks.",
+      "kind": "test"
+    },
+    {
+      "file": "tests/test_prov.py",
+      "lines": "93-107,422-516",
+      "symbol": "prov/schema yaml tests",
+      "validates": "yaml.safe_load: no prov_vocabulary key in rsoxs/bl1101; prov_vocabulary.yaml shape.",
+      "kind": "test"
+    },
+    {
+      "file": "tests/test_extractor_agent.py",
+      "lines": "298,351,373,460",
+      "symbol": "SchemaHelper(matkg)",
+      "validates": "SchemaHelper behaviour against matkg_schema.yaml only.",
+      "kind": "test"
+    },
+    {
+      "file": "tests/test_extract_terms.py",
+      "lines": "308,343,389,412",
+      "symbol": "SchemaHelper.__new__",
+      "validates": "Bypasses schema loading (hand-built classes/slots).",
+      "kind": "test"
+    },
+    {
+      "file": "tests/test_docker_startup.py",
+      "lines": "23-24",
+      "symbol": "compose strings",
+      "validates": "String presence of rsoxs/bl1101 schema names in compose.yaml.",
+      "kind": "test"
+    }
+  ],
+  "schema_identity_in_outputs": {
+    "kg_json": "storage/kg/*.json payload keys are only things/associations (checked matkg_with_code.json, matkg_xray_papers_cborg_chat.json); no schema id/version/hash.",
+    "extracted_terms_json": "metadata has extraction_date/processed_files/pages/version '2.1' (storage/terminology/extracted_terms_xray_papers_cborg_chat.json); no schema id/hash.",
+    "bl1101_ops_snapshots": "metadata.schema (path string) + schema_version 'bl1101_v2' (bl1101_ingest.py:2258-2266); no content hash.",
+    "harvest_manifests": "DEFAULT_MANIFEST.schema path string (harvest_rsoxs.py:228, harvest_xray.py:210-211).",
+    "trace_records": "f2w_agent/trace.py:30 SCHEMA_VERSION=1 is a trace-record format version, unrelated to LinkML.",
+    "conclusion": "No artifact binds an exact schema fingerprint today. T22B must add adjacent-manifest fingerprints without altering payloads."
+  },
+  "observed_conformance_of_existing_graphs": {
+    "method": "SchemaView(rsoxs_schema.yaml) closure (33 classes / 86 slots) vs category and predicate (after stripping 'rel:') of existing KG JSON; read-only",
+    "storage/kg/matkg_with_code.json": {
+      "nodes": 15986,
+      "nodes_category_not_in_closure": 7878,
+      "examples": [
+        "Unknown",
+        "Polymer",
+        "Technique",
+        "MaterialState",
+        "Chemical",
+        "ExperimentalMethod"
+      ],
+      "edges": 20203,
+      "edges_predicate_not_a_slot": 744,
+      "distinct_non_slot_predicates": 279
+    },
+    "storage/kg/matkg_xray_papers_cborg_chat.json": {
+      "nodes": 206,
+      "nodes_category_not_in_closure": 8,
+      "edges": 107,
+      "edges_predicate_not_a_slot": 9,
+      "non_slot_predicate_examples": [
+        "PropertyMeasuredBy",
+        "MaterialProcessedBy",
+        "MaterialHasProperty"
+      ],
+      "note": "Association class names used as predicates."
+    },
+    "implication": "A strict validator applied retroactively would fail most existing graphs. Mismatches must be reported as legacy warnings, not used to reclassify or reject historical snapshots (ADR schema-ownership)."
+  },
+  "distinct_contracts_present": {
+    "scientific_linkml": [
+      "matkg_schema.yaml",
+      "rsoxs_schema.yaml",
+      "bl1101_schema.yaml",
+      "xray_schema.yaml",
+      "rsoxs_schema_extract.yaml",
+      "xray_schema_extract.yaml"
+    ],
+    "reference_vocabularies": [
+      "prov_vocabulary.yaml (+ app/modules/prov.py constants)"
+    ],
+    "ingest_mapping_and_seed_data": [
+      "bl1101_motor_stage_map.yaml",
+      "tiled_sim_seed.yaml",
+      "xray_seed_instances.yaml"
+    ],
+    "parser_job_records": [
+      "term_extractor/models.py (4 dataclass/pydantic)",
+      "term_extractor/message.py (4)",
+      "extraction manifest consumed by paper_evidence_agent._manifest_entry",
+      "f2w_agent/trace.py trace schema_version=1",
+      "workflow_state.py"
+    ],
+    "api_dtos": [
+      "f2w_agent/api.py (25 BaseModel classes, e.g. GraphPayload, GraphNode)",
+      "kg_rag_api.py (3)"
+    ],
+    "out_of_scope": [
+      "splash_links/src/splash_links/schema.py (Splash GraphQL; deprecated per D03/D16)",
+      "storage/tiled_config.yml (server config, not a schema)"
+    ]
+  },
+  "findings": [
+    "F1 rsoxs_schema_extract.yaml is not loaded anywhere and is broken as a standalone schema: it redeclares RSoXSMeasurement with slots photon_energy_eV/absorption_edge/polarization that are undefined in its closure; SchemaView.class_induced_slots('RSoXSMeasurement') raises ValueError. It also shares id/name 'rsoxs' with rsoxs_schema.yaml, so a registry keyed on schema id would collide. Contrary to README it does not import the overlay.",
+    "F2 bl1101_schema.yaml is never loaded by LinkML at runtime or in tests; only its path string is recorded. multi_kg.schema_path_for_graph result is stored on kg.schema_path (retrieval_agent.py:440) and never read.",
+    "F3 Extraction semantics depend on launch profile: compose/rsoxs-stack use rsoxs_schema.yaml; default local launcher, scripts/run.py, academy launchers, run_pipeline_cborg and build_kg.sh use matkg_schema.yaml, where RSoXSMeasurement does not exist, so 'RSoXS' categories map to whatever fuzzy/alias resolution yields (alias target RSoXSMeasurement is filtered by 'broad in self.classes', term_extractor/schema.py:244-246).",
+    "F4 Two divergent SchemaHelper implementations (term_extractor/schema.py vs extract_terms.py); the extract_terms copy lacks 23 category and 7 relation aliases. Same schema, different normalization outcomes depending on entrypoint.",
+    "F5 Schema paths are CWD-relative strings everywhere; SchemaView resolves imports relative to the schema file, but the initial path requires repo-root CWD.",
+    "F6 No schema fingerprint is bound to any artifact (KG JSON, terms JSON, manifests, indexes).",
+    "F7 Existing graphs and repair outputs contain categories/predicates outside every schema closure (Unknown, Instrument, Detector in literature, characterized_by, simulates, 'rel:' prefix).",
+    "F8 License mismatch: schemas say MIT, repository LICENSE.txt is LBNL BSD-style. Owner question; no change.",
+    "F9 No test protects RSoXSMeasurement is_a ExperimentalTechnique, nor loads rsoxs/bl1101 overlays via LinkML."
+  ],
+  "owner_questions": [
+    "Q1 rsoxs_schema_extract.yaml: keep byte-identical as a legacy asset and register it as 'known-broken, not selectable', or approve a separate versioned fix (import rsoxs_schema)? Either way no change in this migration without approval.",
+    "Q2 Which schema is authoritative for local-profile extraction: matkg_schema.yaml (current default) or rsoxs_schema.yaml (compose)? Current behavior is preserved until answered; the registry will record whichever was used.",
+    "Q3 Should the extract_terms.py SchemaHelper divergence be preserved as a distinct legacy behavior (build_kg.sh) or routed to term_extractor/schema.py (a behavior change needing its own review)?",
+    "Q4 Schema license (MIT) vs repository license: confirm.",
+    "Q5 xray_schema.yaml is not selected for xray graphs by multi_kg; register the mapping or leave unbound?"
+  ]
+}
