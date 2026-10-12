@@ -19,6 +19,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.modules.contracts import (
+    ADMIN_CAPABILITIES,
+    CAPABILITIES,
+    CHAT_CAPABILITIES,
     ApprovalRecord,
     AuthorizationMode,
     CapabilityError,
@@ -34,6 +37,7 @@ from app.modules.contracts import (
     MatchType,
     Principal,
     RequestContext,
+    RoleCheckEvidence,
     SourceLocator,
     ToolResult,
     ToolSpec,
@@ -155,6 +159,23 @@ def test_als_context_requires_verified_principal():
                        request_id="r")
 
 
+def test_capability_vocabulary_is_frozen():
+    assert CHAT_CAPABILITIES <= CAPABILITIES and not CHAT_CAPABILITIES & ADMIN_CAPABILITIES
+    assert local_ctx(capabilities=frozenset(CAPABILITIES)).has("graph.publish")
+    with pytest.raises(ValidationError):
+        local_ctx(capabilities=frozenset({"graph.everything"}))
+
+
+def test_local_operator_cannot_carry_als_identity_fields():
+    with pytest.raises(ValidationError):
+        RequestContext(profile=DeploymentProfile.LOCAL, mode=AuthorizationMode.LOCAL_TRUSTED,
+                       principal=Principal(subject="local-operator", roles=("admin",)), request_id="r")
+    with pytest.raises(ValidationError):
+        RequestContext(profile=DeploymentProfile.ALS_DEV, mode=AuthorizationMode.TILED_AUTHENTICATED,
+                       principal=Principal(subject="local-operator", issuer="i", is_admin=True,
+                                           verified_at=NOW), request_id="r")
+
+
 def test_context_is_immutable():
     ctx = local_ctx()
     with pytest.raises(ValidationError):
@@ -176,15 +197,30 @@ def test_local_approval_rules_and_binding():
         local_approval(executed_as="local-operator")
 
 
+ALS_APPROVAL = dict(profile=DeploymentProfile.ALS_PROD, mode=AuthorizationMode.TILED_AUTHENTICATED,
+                    requested_by="bob", approved_by="alice", approver_issuer="https://tiled.als.lbl.gov/",
+                    requester_issuer="https://tiled.als.lbl.gov/", role_checked_at=NOW, approver_is_admin=True,
+                    role_check_evidence=RoleCheckEvidence(tiled_target="https://tiled.als.lbl.gov/",
+                                                          roles=("admin",)))
+
+
 def test_als_approval_requires_verified_admin_evidence():
-    ok = local_approval(profile=DeploymentProfile.ALS_PROD, mode=AuthorizationMode.TILED_AUTHENTICATED,
-                        approved_by="alice", approver_issuer="https://tiled.als.lbl.gov/", role_checked_at=NOW)
-    assert ok.approved_by == "alice"
-    with pytest.raises(ValidationError):
-        local_approval(profile=DeploymentProfile.ALS_PROD, mode=AuthorizationMode.TILED_AUTHENTICATED,
-                       approved_by="alice")
+    ok = local_approval(**ALS_APPROVAL)
+    assert ok.approved_by == "alice" and ok.role_check_evidence.method == "tiled_whoami"
+    for override in ({"approver_is_admin": False}, {"approver_is_admin": None}, {"requester_issuer": None},
+                     {"role_checked_at": None}, {"requested_by": "local-operator"},
+                     {"approved_by": "local-operator"}):
+        with pytest.raises(ValidationError):
+            local_approval(**{**ALS_APPROVAL, **override})
     with pytest.raises(ValidationError):
         local_approval(profile=DeploymentProfile.ALS_DEV, mode=AuthorizationMode.LOCAL_TRUSTED)
+
+
+def test_local_approval_requester_is_local_operator():
+    with pytest.raises(ValidationError):
+        local_approval(requested_by="someone")
+    with pytest.raises(ValidationError):
+        local_approval(approver_is_admin=True)
 
 
 # --- tools ----------------------------------------------------------------------

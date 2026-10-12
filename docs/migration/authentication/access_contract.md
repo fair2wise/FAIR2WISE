@@ -224,6 +224,24 @@ Disagreements for the integrator (the Python files were not edited):
 
 Any record that sets a proposed extension field fails Pydantic (`extra="forbid"`) until C3, C4, C5, C8 and C9 are adopted or rejected.
 
+**Integrator resolution (2026-10-12, `CONTRACT_VERSION` 1.0.0-draft.2):**
+
+| # | Resolution |
+| --- | --- |
+| C1, C2 | Adopted. Local approvals require `requested_by == local-operator`; ALS approvals forbid local-operator as requester or approver. |
+| C3 | Adopted. `approver_is_admin` must be `true` on ALS and `null` on local; `role_check_evidence` (`RoleCheckEvidence`, method `tiled_whoami`) added, optional. |
+| C4 | Adopted and required on ALS: `requester_issuer`. |
+| C5 | Adopted: optional `operation_id`. |
+| C6 | Kept as a Pydantic-only rule (JSON Schema cannot express it). |
+| C7 | Unchanged by design: no RequestContext for signed-out ALS callers. |
+| C8 | Adopted: `Principal.identity_provider`, `roles`, `credential_expires_at`, all forbidden on local-operator. Field names still need confirming against the final Tiled build (D-T3 to D-T5). |
+| C9 | Adopted: `RequestContext.session_id`, `tiled_target`, `actor_kind` (`ActorKind`). |
+| C10 | Adopted: the section 6 vocabulary is frozen as `CAPABILITIES` (`CHAT_CAPABILITIES` + `ADMIN_CAPABILITIES`); unknown names are rejected. |
+| C11 | Open: H1 policy choice. |
+| C12 | Adopted in the `MatchType` docstring; the T21B projector must follow it. |
+
+`check_schemas.py` re-run: all examples valid in both; every negative case rejected by both except C6 (Pydantic only).
+
 ## 11. Approvals, jobs and FORGE
 
 - An `ApprovalRecord` is created only by an explicit human action:

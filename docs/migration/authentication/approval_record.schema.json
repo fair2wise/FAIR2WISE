@@ -5,98 +5,298 @@
   "description": "T25A (gate H1, Proposed). An explicit human approval of one ChangePlan through a trusted interface; never created by a model or Tool call. Core fields mirror app/modules/contracts/changes.py:ApprovalRecord (frozen, extra='forbid'). Profile rules: :local records requested_by/approved_by = local-operator, executed_as = the configured local Tiled writer principal id, and no Tiled subject, issuer or role-check timestamp; ALS records verified subject/issuer/role-check evidence. Fields marked \"x-f2w-status\": \"proposed_extension\" are not in the Pydantic model yet and are listed as disagreements in access_contract.md section 10. Before an explicit approval action no ApprovalRecord exists (approved_by is never pre-filled). Tokens and secrets never appear in any field.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["approval_id", "profile", "mode", "plan_id", "plan_sha256", "target", "scope", "requested_by", "approved_by", "executed_as", "approved_at"],
+  "required": [
+    "approval_id",
+    "profile",
+    "mode",
+    "plan_id",
+    "plan_sha256",
+    "target",
+    "scope",
+    "requested_by",
+    "approved_by",
+    "executed_as",
+    "approved_at"
+  ],
   "properties": {
-    "approval_id": { "type": "string", "minLength": 1 },
-    "profile": { "enum": ["local", "als-dev", "als-prod"] },
-    "mode": { "enum": ["local_trusted", "tiled_authenticated"] },
-    "plan_id": { "type": "string", "minLength": 1 },
-    "plan_sha256": { "$ref": "#/$defs/sha256" },
-    "target": { "description": "Target graph instance (normalized Tiled base URL + namespace). Must equal the approving deployment's own profile target (LOCAL-10, AUTH-08).", "type": "string", "minLength": 1 },
-    "scope": { "description": "Corpora the approval covers. Tuple[str, ...].", "type": "array", "items": { "type": "string", "minLength": 1 } },
-    "requested_by": { "description": "local-operator on :local; verified Tiled subject on ALS.", "type": "string", "minLength": 1 },
-    "approved_by": { "description": "local-operator on :local (after an explicit approval click); verified Tiled admin subject on ALS.", "type": "string", "minLength": 1 },
-    "executed_as": { "description": "Principal id of the configured F2W technical Tiled writer (D27), from the writer whoami check (T20A C4). Never a token. Never equal to approved_by (changes.py:144-145).", "type": "string", "minLength": 1 },
-    "approver_issuer": { "description": "ALS only: issuer that verified approved_by. Null on :local.", "type": ["string", "null"], "default": null },
-    "role_checked_at": { "description": "ALS only: when approved_by's admin status was verified. Null on :local.", "type": ["string", "null"], "format": "date-time", "default": null },
-    "limits": { "description": "Numeric limits on the approved operation (Dict[str, int]).", "type": "object", "additionalProperties": { "type": "integer" }, "default": {} },
-    "expires_at": { "type": ["string", "null"], "format": "date-time", "default": null },
-    "approved_at": { "type": "string", "format": "date-time" },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "enum": [
+        "local",
+        "als-dev",
+        "als-prod"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "local_trusted",
+        "tiled_authenticated"
+      ]
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "target": {
+      "description": "Target graph instance (normalized Tiled base URL + namespace). Must equal the approving deployment's own profile target (LOCAL-10, AUTH-08).",
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "description": "Corpora the approval covers. Tuple[str, ...].",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "requested_by": {
+      "description": "local-operator on :local; verified Tiled subject on ALS.",
+      "type": "string",
+      "minLength": 1
+    },
+    "approved_by": {
+      "description": "local-operator on :local (after an explicit approval click); verified Tiled admin subject on ALS.",
+      "type": "string",
+      "minLength": 1
+    },
+    "executed_as": {
+      "description": "Principal id of the configured F2W technical Tiled writer (D27), from the writer whoami check (T20A C4). Never a token. Never equal to approved_by (changes.py:144-145).",
+      "type": "string",
+      "minLength": 1
+    },
+    "approver_issuer": {
+      "description": "ALS only: issuer that verified approved_by. Null on :local.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "role_checked_at": {
+      "description": "ALS only: when approved_by's admin status was verified. Null on :local.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null
+    },
+    "limits": {
+      "description": "Numeric limits on the approved operation (Dict[str, int]).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "default": {}
+    },
+    "expires_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "default": null
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "requester_issuer": {
-      "x-f2w-status": "proposed_extension",
       "description": "ALS only: issuer that verified requested_by. Null on :local.",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "approver_is_admin": {
-      "x-f2w-status": "proposed_extension",
       "description": "ALS only: the role-check result at role_checked_at. Must be true for a valid ALS approval. Null on :local (no role check).",
-      "type": ["boolean", "null"]
+      "type": [
+        "boolean",
+        "null"
+      ]
     },
     "role_check_evidence": {
-      "x-f2w-status": "proposed_extension",
       "description": "ALS only: how the admin status was established. Null on :local.",
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["method", "tiled_target", "roles"],
+          "required": [
+            "method",
+            "tiled_target",
+            "roles"
+          ],
           "properties": {
-            "method": { "const": "tiled_whoami", "description": "Live whoami against the profile Tiled with the caller's own credential (T20A C5). Never the writer credential." },
-            "tiled_target": { "type": "string" },
-            "identity_provider": { "type": ["string", "null"] },
-            "roles": { "type": "array", "items": { "type": "string" } },
-            "tiled_library_version": { "type": ["string", "null"], "description": "about.library_version at check time (T20A C1)." }
+            "method": {
+              "const": "tiled_whoami",
+              "description": "Live whoami against the profile Tiled with the caller's own credential (T20A C5). Never the writer credential."
+            },
+            "tiled_target": {
+              "type": "string"
+            },
+            "identity_provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "tiled_library_version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "about.library_version at check time (T20A C1)."
+            }
           }
         }
       ]
     },
     "operation_id": {
-      "x-f2w-status": "proposed_extension",
       "description": "Job/operation id that requested the plan, to distinguish local-operator operations without inventing an identity.",
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "mode": { "const": "local_trusted" } }, "required": ["mode"] },
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "local_trusted"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
       "then": {
         "description": "Mirrors changes.py:130-136, plus requested_by=local-operator (not enforced in Pydantic today).",
         "properties": {
-          "profile": { "const": "local" },
-          "requested_by": { "const": "local-operator" },
-          "approved_by": { "const": "local-operator" },
-          "executed_as": { "not": { "const": "local-operator" } },
-          "approver_issuer": { "type": "null" },
-          "role_checked_at": { "type": "null" },
-          "requester_issuer": { "type": "null" },
-          "approver_is_admin": { "type": "null" },
-          "role_check_evidence": { "type": "null" }
+          "profile": {
+            "const": "local"
+          },
+          "requested_by": {
+            "const": "local-operator"
+          },
+          "approved_by": {
+            "const": "local-operator"
+          },
+          "executed_as": {
+            "not": {
+              "const": "local-operator"
+            }
+          },
+          "approver_issuer": {
+            "type": "null"
+          },
+          "role_checked_at": {
+            "type": "null"
+          },
+          "requester_issuer": {
+            "type": "null"
+          },
+          "approver_is_admin": {
+            "type": "null"
+          },
+          "role_check_evidence": {
+            "type": "null"
+          }
         }
       }
     },
     {
-      "if": { "properties": { "mode": { "const": "tiled_authenticated" } }, "required": ["mode"] },
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "tiled_authenticated"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
       "then": {
         "description": "Mirrors changes.py:137-143, plus requester checks and approver_is_admin=true (proposed).",
-        "required": ["approver_issuer", "role_checked_at"],
+        "required": [
+          "approver_issuer",
+          "role_checked_at",
+          "requester_issuer",
+          "approver_is_admin"
+        ],
         "properties": {
-          "profile": { "enum": ["als-dev", "als-prod"] },
-          "requested_by": { "not": { "const": "local-operator" } },
-          "approved_by": { "not": { "const": "local-operator" } },
-          "approver_issuer": { "type": "string", "minLength": 1 },
-          "role_checked_at": { "type": "string", "format": "date-time" },
-          "approver_is_admin": { "enum": [true, null] }
+          "profile": {
+            "enum": [
+              "als-dev",
+              "als-prod"
+            ]
+          },
+          "requested_by": {
+            "not": {
+              "const": "local-operator"
+            }
+          },
+          "approved_by": {
+            "not": {
+              "const": "local-operator"
+            }
+          },
+          "approver_issuer": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role_checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approver_is_admin": {
+            "const": true
+          }
         }
       }
     },
     {
-      "if": { "properties": { "profile": { "const": "local" } }, "required": ["profile"] },
-      "then": { "properties": { "mode": { "const": "local_trusted" } } }
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "local"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mode": {
+            "const": "local_trusted"
+          }
+        }
+      }
     }
   ],
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
   },
   "examples": [
     {
@@ -106,13 +306,17 @@
       "plan_id": "plan-0001",
       "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "target": "http://127.0.0.1:8765#f2w-literature",
-      "scope": ["rsoxs"],
+      "scope": [
+        "rsoxs"
+      ],
       "requested_by": "local-operator",
       "approved_by": "local-operator",
       "executed_as": "<local-writer-principal-id>",
       "approver_issuer": null,
       "role_checked_at": null,
-      "limits": { "max_creates": 500 },
+      "limits": {
+        "max_creates": 500
+      },
       "approved_at": "2026-10-12T17:00:00Z"
     },
     {
@@ -122,7 +326,9 @@
       "plan_id": "plan-0002",
       "plan_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "target": "https://tiled-staging.als.lbl.gov#f2w-literature",
-      "scope": ["rsoxs"],
+      "scope": [
+        "rsoxs"
+      ],
       "requested_by": "<verified-tiled-subject>",
       "approved_by": "<verified-tiled-admin-subject>",
       "executed_as": "<f2w-writer-principal-id>",
@@ -130,7 +336,16 @@
       "role_checked_at": "2026-10-12T16:59:58Z",
       "limits": {},
       "expires_at": "2026-10-12T18:00:00Z",
-      "approved_at": "2026-10-12T17:00:00Z"
+      "approved_at": "2026-10-12T17:00:00Z",
+      "requester_issuer": "https://tiled-staging.als.lbl.gov",
+      "approver_is_admin": true,
+      "role_check_evidence": {
+        "method": "tiled_whoami",
+        "tiled_target": "https://tiled-staging.als.lbl.gov",
+        "roles": [
+          "admin"
+        ]
+      }
     }
   ]
 }

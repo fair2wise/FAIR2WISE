@@ -8,7 +8,7 @@ binds to one plan hash and target; it never authorizes a different plan.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Optional, Tuple
+from typing import Dict, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -83,6 +83,27 @@ class ChangePlan(BaseModel):
     plan_sha256: str = Field(pattern=_SHA256)
 
 
+class RoleCheckEvidence(BaseModel):
+    """How an ALS approver's admin status was established.
+
+    Attributes:
+        method: Always ``"tiled_whoami"``: a live check against the profile's Tiled
+            with the approver's own credential, never the writer's.
+        tiled_target: Tiled base URL the check ran against.
+        roles: Role names Tiled reported.
+        identity_provider: Tiled authentication provider, if reported.
+        tiled_library_version: Tiled server version, if reported.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    method: Literal["tiled_whoami"] = "tiled_whoami"
+    tiled_target: str
+    roles: Tuple[str, ...]
+    identity_provider: Optional[str] = None
+    tiled_library_version: Optional[str] = None
+
+
 class ApprovalRecord(BaseModel):
     """An explicit approval of one plan, made by a human through a trusted interface.
 
@@ -101,6 +122,10 @@ class ApprovalRecord(BaseModel):
         executed_as: Technical writer identity that will perform the import (D27).
         approver_issuer: Verified issuer of ``approved_by`` (ALS only).
         role_checked_at: When ``approved_by``'s admin status was verified (ALS only).
+        approver_is_admin: Result of that role check; must be ``True`` on ALS (ALS only).
+        role_check_evidence: How the role check was made (ALS only).
+        requester_issuer: Verified issuer of ``requested_by`` (ALS only).
+        operation_id: Job/operation that requested the plan.
         limits: Numeric limits on the approved operation (for example max creates).
         expires_at: Time after which the approval is void.
         approved_at: Approval time.
@@ -120,6 +145,10 @@ class ApprovalRecord(BaseModel):
     executed_as: str
     approver_issuer: Optional[str] = None
     role_checked_at: Optional[datetime] = None
+    approver_is_admin: Optional[bool] = None
+    role_check_evidence: Optional[RoleCheckEvidence] = None
+    requester_issuer: Optional[str] = None
+    operation_id: Optional[str] = None
     limits: Dict[str, int] = Field(default_factory=dict)
     expires_at: Optional[datetime] = None
     approved_at: datetime
@@ -130,17 +159,24 @@ class ApprovalRecord(BaseModel):
         if self.mode is AuthorizationMode.LOCAL_TRUSTED:
             if self.profile is not DeploymentProfile.LOCAL:
                 raise ValueError("local_trusted approvals are only valid for the local profile")
-            if self.approved_by != LOCAL_OPERATOR:
-                raise ValueError("local approvals are recorded as local-operator")
-            if self.approver_issuer or self.role_checked_at:
+            if self.approved_by != LOCAL_OPERATOR or self.requested_by != LOCAL_OPERATOR:
+                raise ValueError("local approvals record requested_by and approved_by as local-operator")
+            als_fields = (
+                self.approver_issuer, self.role_checked_at, self.role_check_evidence, self.requester_issuer
+            )
+            if any(als_fields) or self.approver_is_admin is not None:
                 raise ValueError("local approvals must not carry a synthetic Tiled identity or role check")
         else:
             if self.profile is DeploymentProfile.LOCAL:
                 raise ValueError("the local profile uses local_trusted approvals")
-            if not (self.approver_issuer and self.role_checked_at):
-                raise ValueError("ALS approvals require a verified issuer and role check time")
-            if self.approved_by == LOCAL_OPERATOR:
-                raise ValueError("ALS approvals cannot be made by local-operator")
+            if not (self.approver_issuer and self.role_checked_at and self.requester_issuer):
+                raise ValueError(
+                    "ALS approvals require verified approver and requester issuers and a role check time"
+                )
+            if self.approver_is_admin is not True:
+                raise ValueError("ALS approvals require a role check showing the approver is an admin")
+            if LOCAL_OPERATOR in (self.approved_by, self.requested_by):
+                raise ValueError("ALS approvals cannot be requested or made by local-operator")
         if self.executed_as == self.approved_by:
             raise ValueError("executed_as (technical writer) must be recorded separately from approved_by")
         return self

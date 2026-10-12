@@ -12,18 +12,31 @@ Status: draft for gate H1. See the ADRs in ``docs/adr/`` and
 
 from __future__ import annotations
 
-from .changes import ApprovalRecord, ChangePlan, ImportReceipt, SnapshotManifest
-from .context import AuthorizationMode, DeploymentProfile, Principal, RequestContext
+from .changes import ApprovalRecord, ChangePlan, ImportReceipt, RoleCheckEvidence, SnapshotManifest
+from .context import (
+    ADMIN_CAPABILITIES,
+    CAPABILITIES,
+    CHAT_CAPABILITIES,
+    ActorKind,
+    AuthorizationMode,
+    DeploymentProfile,
+    Principal,
+    RequestContext,
+)
 from .errors import CapabilityError, ContractError, ErrorCode
 from .evidence import EvidenceRef, MatchType, SourceLocator
 from .jobs import JobEvent, JobHandle, JobState, StageOutcome
 from .ports import DocumentStore, GraphCapabilities, GraphPort
 from .tools import CostClass, Effect, ToolResult, ToolSpec, ToolStatus
 
-CONTRACT_VERSION = "1.0.0-draft.1"
+CONTRACT_VERSION = "1.0.0-draft.2"
 
 __all__ = [
+    "ADMIN_CAPABILITIES",
+    "CAPABILITIES",
+    "CHAT_CAPABILITIES",
     "CONTRACT_VERSION",
+    "ActorKind",
     "ApprovalRecord",
     "AuthorizationMode",
     "CapabilityError",
@@ -44,6 +57,7 @@ __all__ = [
     "MatchType",
     "Principal",
     "RequestContext",
+    "RoleCheckEvidence",
     "SnapshotManifest",
     "SourceLocator",
     "StageOutcome",

@@ -14,7 +14,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class MatchType(str, Enum):
-    """How ``quote`` relates to the source text."""
+    """How ``quote`` relates to the source text.
+
+    ``NORMALIZED`` means the quote equals the source after the recorded
+    normalization profile (whitespace and hyphenation only). It may be shown as
+    verbatim only under that profile (docs/adr/content-disclosure.md); a
+    ``PARAPHRASE`` is never shown as a quotation.
+    """
 
     EXACT = "exact"
     NORMALIZED = "normalized"

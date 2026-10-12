@@ -9,11 +9,27 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import FrozenSet, Optional
+from typing import FrozenSet, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 LOCAL_OPERATOR = "local-operator"
+
+#: Capabilities an ordinary signed-in ALS user holds (chat-only, D30).
+CHAT_CAPABILITIES = frozenset({
+    "health.read", "auth.session", "chat.ask", "chat.read_support", "session.own", "trace.read_own",
+    "settings.personal", "telemetry.write", "annotation.write", "chat.decline_pending",
+})
+
+#: Privileged capabilities: local-operator (D34) or verified ALS Tiled admin (D30).
+ADMIN_CAPABILITIES = frozenset({
+    "settings.global", "session.any", "trace.read_any", "ingest.acquire", "ingest.extract",
+    "figures.process", "ops.run", "graph.edit", "graph.upload", "curation.approve", "json.build",
+    "graph.publish", "jobs.admin",
+})
+
+#: Frozen capability vocabulary (docs/migration/authentication/access_contract.md section 6).
+CAPABILITIES = CHAT_CAPABILITIES | ADMIN_CAPABILITIES
 
 
 class DeploymentProfile(str, Enum):
@@ -38,15 +54,28 @@ class AuthorizationMode(str, Enum):
     TILED_AUTHENTICATED = "tiled_authenticated"
 
 
+class ActorKind(str, Enum):
+    """What is driving the request."""
+
+    INTERACTIVE = "interactive"
+    WORKER = "worker"
+    FORGE_DELEGATE = "forge_delegate"
+    CLI = "cli"
+
+
 class Principal(BaseModel):
     """The acting identity recorded in audit and approvals.
 
     Attributes:
         subject: ``"local-operator"`` in local mode, else the verified Tiled subject.
         issuer: Tiled server that verified the subject; ``None`` in local mode.
-        is_admin: Verified admin status at ``verified_at``; ``None`` in local mode,
-            where no role check is performed.
+        is_admin: Verified admin status at ``verified_at``, derived server-side from
+            ``roles``; ``None`` in local mode, where no role check is performed.
         verified_at: When identity/role was checked; ``None`` in local mode.
+        identity_provider: Tiled authentication provider of the sign-in (ALS only).
+        roles: Role names reported by Tiled at ``verified_at`` (ALS only).
+        credential_expires_at: Expiry of the user's Tiled credential (ALS only).
+            The credential itself is never stored.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -55,6 +84,15 @@ class Principal(BaseModel):
     issuer: Optional[str] = None
     is_admin: Optional[bool] = None
     verified_at: Optional[datetime] = None
+    identity_provider: Optional[str] = None
+    roles: Optional[Tuple[str, ...]] = None
+    credential_expires_at: Optional[datetime] = None
+
+    def is_local_operator(self) -> bool:
+        """Return whether this is the local-operator with no Tiled identity fields."""
+        return self.subject == LOCAL_OPERATOR and not any(
+            (self.issuer, self.verified_at, self.identity_provider, self.roles, self.credential_expires_at)
+        ) and self.is_admin is None
 
 
 class RequestContext(BaseModel):
@@ -70,6 +108,10 @@ class RequestContext(BaseModel):
         run_id: Agent/job run this request belongs to, if any.
         deadline: Absolute time after which work must stop.
         budget_ref: Reference to the configured cost/rate budget, if any.
+        session_id: Chat session bound server-side to this principal; never a credential.
+        tiled_target: Normalized base URL of the profile's Tiled instance; binds
+            identity and grants to one environment.
+        actor_kind: Whether an interactive caller, worker, FORGE delegate or CLI drives it.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -83,18 +125,27 @@ class RequestContext(BaseModel):
     run_id: Optional[str] = None
     deadline: Optional[datetime] = None
     budget_ref: Optional[str] = None
+    session_id: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+    tiled_target: Optional[str] = None
+    actor_kind: ActorKind = ActorKind.INTERACTIVE
 
     @model_validator(mode="after")
     def _profile_matches_mode(self) -> "RequestContext":
-        """Reject trusted-local mode outside ``:local`` and unverified ALS principals."""
+        """Reject trusted-local mode outside ``:local``, unverified ALS principals and
+        capability names outside the frozen vocabulary."""
+        unknown = self.capabilities - CAPABILITIES
+        if unknown:
+            raise ValueError(f"unknown capabilities: {sorted(unknown)}")
         if self.mode is AuthorizationMode.LOCAL_TRUSTED:
             if self.profile is not DeploymentProfile.LOCAL:
                 raise ValueError("local_trusted mode is only valid for the local profile")
             if self.principal.subject != LOCAL_OPERATOR:
                 raise ValueError("local_trusted mode must act as the local-operator")
-            if self.principal.issuer or self.principal.verified_at or self.principal.is_admin is not None:
+            if not self.principal.is_local_operator():
                 raise ValueError("local-operator must not carry a synthetic Tiled identity or role check")
         else:
+            if self.principal.subject == LOCAL_OPERATOR:
+                raise ValueError("ALS requests cannot act as local-operator")
             if self.profile is DeploymentProfile.LOCAL:
                 raise ValueError("the local profile uses local_trusted mode")
             if not (self.principal.issuer and self.principal.verified_at and self.principal.is_admin is not None):
