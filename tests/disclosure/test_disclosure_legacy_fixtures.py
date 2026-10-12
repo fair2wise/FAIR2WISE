@@ -385,7 +385,7 @@ def test_unchanged_fixtures_are_byte_identical_where_nothing_is_internal():
     changed = sorted(set(CASES) - set(unchanged))
     expected_changed = {
         # absolute workdir paths (internal-only): health, session reset, chat workdir/source_path, uploads
-        "health", "session_reset_named", "session_reset_legacy", "graph_upload",
+        "health", "session_reset_named", "session_reset_legacy", "graph_upload", "graph_get", "graph_get_json_mode",
         # ChatResponse.rounds summary and workdir/source_path
         "chat_answered", "chat_insufficient_to_download", "chat_insufficient_for_failed_download",
         "chat_action_decline", "chat_action_no_pending",
@@ -407,6 +407,10 @@ def test_known_conflicts_are_the_documented_ones():
     assert "/uploads/" in up["graph"]["source_path"]
     req_path = CASES["graph_node_get_uploaded"]["request"]
     assert "<WORKSPACE>" in json.dumps(req_path)  # the UI sent back the absolute path it had received
+    # kgCatalog.graphIdFromPath reads only the file name, so the primary graph id survives the opaque id.
+    json_mode = project_case(CASES["graph_get_json_mode"])
+    assert json_mode["source_path"] == "f2w://workspace/storage/kg/matkg_contract_v1.json"
+    assert project_case(CASES["graph_get"])["source_path"] == "f2w://workdir/kg.json"
     settings = project_case(CASES["settings_get"])
     assert settings["tiled_uri"] == CASES["settings_get"]["response"]["json"]["tiled_uri"]
     assert set(KNOWN_CONFLICTS) == {"graph_upload", "graph_node_get_uploaded", "settings_get", "traces_get"}
