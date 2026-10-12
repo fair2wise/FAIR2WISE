@@ -93,6 +93,7 @@ from app.modules.tiled_graph import (
     tiled_neighborhood_ids,
 )
 from app.modules.project_config import config_value, get_config
+from app.modules.runtime_bridge.selection import attach_read_path
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
@@ -2538,6 +2539,8 @@ class AgentPipelineService:
         self._rebuild_agents()
         if self.runtime.graph_source == "splash":
             self._sync_session_graph_from_splash()
+        # F2W_RUNTIME, read once at startup: None (default "legacy") keeps the path below unchanged.
+        self._read_path = attach_read_path(self)
 
     @staticmethod
     def _session_key(session_id: Optional[str]) -> str:
@@ -3488,6 +3491,11 @@ class AgentPipelineService:
         tiled_enabled = (
             self.runtime.use_live_tiled if use_live_tiled is None else bool(use_live_tiled)
         )
+        read_path = getattr(self, "_read_path", None)
+        if read_path is not None:
+            return await read_path.query(
+                question, history=history, source_rag=enabled, use_live_tiled=tiled_enabled
+            )
         tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
         if callable(tiled_setter):
             tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
