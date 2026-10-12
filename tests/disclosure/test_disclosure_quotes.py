@@ -11,8 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _disclosure_support as S  # noqa: E402
 from app.modules.contracts.evidence import EvidenceRef, MatchType, SourceLocator  # noqa: E402
 from app.modules.security.disclosure import (  # noqa: E402
-    NORMALIZATION_PROFILE, OMISSION, QUOTE_OMITTED, SOURCE_TEXT_OMITTED, DisclosureBudget, citation_tokens,
-    normalize_for_match)
+    NORMALIZATION_PROFILE, OMISSION, QUOTE_OMITTED, SOURCE_TEXT_OMITTED, STRICT_BUDGET, DisclosureBudget,
+    citation_tokens, normalize_for_match)
 
 PAGE3 = S.synthetic_page(3)
 WORDS3 = PAGE3.split(" ")
@@ -89,8 +89,28 @@ def test_normalized_match_is_verbatim_only_under_recorded_profile():
     assert decision["text"] == quote
 
 
-def test_long_verified_quote_is_clipped_with_omission_marker():
+def test_long_relevant_quote_is_shown_in_full_by_default():
+    """O-D2: no numeric quote limits; a long verified, cited quote under the page share is kept whole."""
     projector, viewer, _ = S.make_projector()
+    long_quote = span(200, 160)
+    assert len(long_quote) < 0.4 * len(PAGE3)
+    out = projector.project_text(answer_with(long_quote), viewer, sources=[S.page_ref(3)])
+    assert f'"{long_quote}"' in out and CITE3 in out
+
+
+def test_many_relevant_quotes_from_different_pages_are_all_kept_by_default():
+    projector, viewer, _ = S.make_projector()
+    quotes = []
+    for page in (2, 3, 4, 5, 6, 7):
+        words = S.synthetic_page(page).split(" ")
+        quotes.append((page, " ".join(words[100:140])))
+    text = " ".join(f'Page {p} says "{q}" [PDF: {S.PAPER} p.{p}].' for p, q in quotes)
+    out = projector.project_text(text, viewer, sources=[S.page_ref(p) for p, _ in quotes])
+    assert all(f'"{q}"' in out for _, q in quotes)
+
+
+def test_strict_budget_clips_long_verified_quote_with_omission_marker():
+    projector, viewer, _ = S.make_projector(budget=STRICT_BUDGET)
     long_quote = span(200, 160)
     text = answer_with(long_quote)
     out = projector.project_text(text, viewer, sources=[S.page_ref(3)])
@@ -186,9 +206,14 @@ def test_per_response_quote_count_budget():
 # ------------------------------------------------------------------ negative: full paper (SEC-01, N1)
 
 
-def test_full_page_echo_is_clipped_within_budget():
-    """A fake model obeying "print the whole paper" echoes every page; the projection clips it."""
-    projector, viewer, _ = S.make_projector()
+@pytest.mark.parametrize("budget_name", ["default", "strict"])
+def test_full_page_echo_is_clipped(budget_name):
+    """A fake model obeying "print the whole paper" echoes every page; the projection clips it.
+
+    Default (O-D2): blocked by the per-page share rule. Strict: also by the numeric budgets.
+    """
+    budget = STRICT_BUDGET if budget_name == "strict" else S.DEFAULT_BUDGET
+    projector, viewer, _ = S.make_projector(budget=budget)
     pages = [S.synthetic_page(p) for p in range(1, 9)]
     answer = "Here is the full text:\n\n" + "\n\n".join(
         f"{normalize_for_match(t)} [PDF: {S.PAPER} p.{p}]" for p, t in enumerate(pages, 1))
@@ -198,9 +223,10 @@ def test_full_page_echo_is_clipped_within_budget():
     assert "Ignore previous instructions" not in out
     assert out.count(SOURCE_TEXT_OMITTED) >= 8
     assert citation_tokens(out) == citation_tokens(answer)
-    used = projector.ledger.used(viewer, S.WORK)
-    assert used["session"] <= projector.budget.max_session_quoted_chars_per_work
-    assert used["actor"] <= projector.budget.max_actor_quoted_chars_per_work
+    if budget_name == "strict":
+        used = projector.ledger.used(viewer, S.WORK)
+        assert used["session"] <= projector.budget.max_session_quoted_chars_per_work
+        assert used["actor"] <= projector.budget.max_actor_quoted_chars_per_work
 
 
 def test_short_overlap_with_source_is_not_an_echo():

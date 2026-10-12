@@ -332,3 +332,15 @@ def test_graph_export_keeps_facts_and_moves_snippets_to_private_evidence():
     assert len(private) == 3 and all(r["text"] for r in private)
     # Re-projection of the public part is stable (re-import / readback).
     assert proj.split_graph_export(public)[0]["things"][0]["context_snippets"][0]["source_paper"] == "x.pdf"
+
+
+def test_trace_route_gives_admins_and_local_raw_and_others_the_summary():
+    """Owner decision 2026-10-12: admins get the raw trace from the route."""
+    record = {"turn_id": "t1", "request": {"prompt": "PAGE TEXT " * 50}, "env": {"backend": "cborg"}}
+    projector, _, _ = S.make_projector()
+    assert projector.project_trace_for(record, S.local_context()) is record
+    assert projector.project_trace_for(record, S.als_context(admin=True)) is record
+    summary = projector.project_trace_for(record, S.als_context(admin=False))
+    assert summary is not record and "PAGE TEXT" not in str(summary)
+    with pytest.raises(TypeError):
+        projector.project_trace_for(record, {"capabilities": ["trace.read_any"]})

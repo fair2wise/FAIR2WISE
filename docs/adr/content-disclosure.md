@@ -136,6 +136,8 @@ User-facing errors are typed codes with a correlation id. `str(exc)` goes to ser
   - **O-D1.** Whether the 47 tracked `storage/kg` and 58 `storage/terminology` files must be replaced by projected versions on `forge_merge` (a normal commit) and/or purged from history (a rewrite). This mirrors H0 E1.
     **Decided 2026-10-12 (owner):** keep the KG JSON files, snippets included, in the repo and in the Docker image. This is an owner exception to D19 for stored KG artifacts only; it does not relax the projection rules for what routes, SSE, traces and exports return to users. See `docs/migration/reviews/H1/owner_decisions.md`.
   - **O-D2.** Initial `DisclosureBudget` values.
+    **Decided 2026-10-12 (owner):** no count limits; block page dumps (one response may not
+    reproduce more than 40% of any single page/section verbatim). See `reviews/H1/owner_decisions.md`.
 
 ## 6. Preserving legacy snippet and citation behaviour
 

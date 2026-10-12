@@ -51,8 +51,11 @@ from .content_access import SourceAccessScope, SourceKind
 
 # --------------------------------------------------------------------------- configuration
 
-#: Status of the default budget numbers: proposals awaiting owner decision O-D2.
-BUDGET_STATUS = "proposed-pending-owner-O-D2"
+#: Owner decision O-D2 (2026-10-12): "don't worry about quote limits as long as they are
+#: relevant". The default budget sets no numeric quote limits; a quote is relevant when it
+#: verifies against a source retrieved and cited for the turn. STRICT_BUDGET keeps the
+#: earlier proposed numbers for deployments that configure limits.
+BUDGET_STATUS = "owner-O-D2-relevance-only"
 
 #: Versioned Q1 normalization profile: whitespace runs and line-break hyphenation only.
 NORMALIZATION_PROFILE = "ws-hyphen-v1"
@@ -96,15 +99,18 @@ class DisclosureBudget:
         max_code_snippet_chars: ``code_snippet`` cut.
         max_progress_text_chars: Cut for free text in progress/rounds data.
         max_error_chars: Longest error message passed through as written.
+        max_region_fraction: Largest share of one source region (page/section) that
+            one response may reproduce verbatim, counting quotes and echoed runs
+            (``None``: no region rule). Blocks page/section dumps without a count limit.
         status: Approval status of these numbers.
     """
 
-    max_quote_chars: int = 600
+    max_quote_chars: Optional[int] = 600
     quote_min_words: int = 6
-    max_quotes_per_response: int = 5
-    max_quoted_chars_per_work_per_response: int = 1500
-    max_session_quoted_chars_per_work: int = 3000
-    max_actor_quoted_chars_per_work: int = 6000
+    max_quotes_per_response: Optional[int] = 5
+    max_quoted_chars_per_work_per_response: Optional[int] = 1500
+    max_session_quoted_chars_per_work: Optional[int] = 3000
+    max_actor_quoted_chars_per_work: Optional[int] = 6000
     window_seconds: int = 7 * 24 * 3600
     echo_min_chars: int = 200
     echo_shingle_words: int = 8
@@ -115,10 +121,25 @@ class DisclosureBudget:
     max_code_snippet_chars: int = 8000
     max_progress_text_chars: int = 600
     max_error_chars: int = 300
+    max_region_fraction: Optional[float] = None
     status: str = BUDGET_STATUS
 
 
-DEFAULT_BUDGET = DisclosureBudget()
+#: The earlier proposed numeric limits, available by configuration.
+STRICT_BUDGET = DisclosureBudget(status="configured-strict")
+
+#: Default (O-D2): no numeric quote limits (``None`` means unlimited), but one response may
+#: not reproduce more than 40% of any single page/section verbatim (owner: "no count limits,
+#: block page dumps"). Field cuts that exist today (abstracts, properties, descriptions,
+#: errors) are unchanged.
+DEFAULT_BUDGET = DisclosureBudget(
+    max_quote_chars=None,
+    max_quotes_per_response=None,
+    max_quoted_chars_per_work_per_response=None,
+    max_session_quoted_chars_per_work=None,
+    max_actor_quoted_chars_per_work=None,
+    max_region_fraction=0.4,
+)
 
 # --------------------------------------------------------------------------- patterns
 
@@ -208,9 +229,9 @@ def _basename(path: Any) -> str:
     return re.split(r"[/\\]", str(path))[-1]
 
 
-def _clip(text: str, limit: int) -> str:
-    """Cut ``text`` to ``limit`` chars at a word boundary and mark the omission."""
-    if len(text) <= limit:
+def _clip(text: str, limit: Optional[int]) -> str:
+    """Cut ``text`` to ``limit`` chars at a word boundary and mark the omission (``None``: no cut)."""
+    if limit is None or len(text) <= limit:
         return text
     cut = text[:limit]
     space = cut.rfind(" ")
@@ -320,11 +341,19 @@ class QuoteVerifier:
             raise TypeError("QuoteVerifier requires a SourceAccessScope")
         self._reader = reader
         self._scope = scope
+        self._region_lengths: Dict[str, int] = {}
+
+    def region_length(self, region: str) -> Optional[int]:
+        """Length of a region's retained text, if it has been read in this verifier."""
+        return self._region_lengths.get(region)
 
     def _text(self, work_id: str, source_version: str, locator: SourceLocator) -> Optional[str]:
         text = self._scope.read(SourceKind.PARSED_TEXT, lambda: self._reader(source_version, locator),
                                 work_id=work_id)
-        return text if isinstance(text, str) and text else None
+        if not (isinstance(text, str) and text):
+            return None
+        self._region_lengths[_region(work_id, source_version, locator)] = len(text)
+        return text
 
     def verify(self, quote: str, *, work_id: str, source_version: str,
                locator: SourceLocator) -> QuoteVerification:
@@ -484,7 +513,7 @@ class DisclosureLedger:
         self._lock = threading.Lock()
         self._entries: Dict[Tuple[str, str, str], List[Tuple[float, str, int, int]]] = {}
 
-    def _limit(self, scope: str) -> int:
+    def _limit(self, scope: str) -> Optional[int]:
         return (self._budget.max_session_quoted_chars_per_work if scope == "session"
                 else self._budget.max_actor_quoted_chars_per_work)
 
@@ -514,8 +543,11 @@ class DisclosureLedger:
         new = [(now, region, int(s), int(e)) for s, e in spans if e > s]
         with self._lock:
             for scope, key in viewer.ledger_keys():
+                limit = self._limit(scope)
+                if limit is None:
+                    continue
                 live = self._live((scope, key, work_id), now)
-                if self._distinct(live + new) > self._limit(scope):
+                if self._distinct(live + new) > limit:
                     return False
             for scope, key in viewer.ledger_keys():
                 self._entries.setdefault((scope, key, work_id), []).extend(new)
@@ -560,6 +592,7 @@ class PathRoots:
 class _ResponseState:
     quotes: int = 0
     per_work: Dict[str, int] = field(default_factory=dict)
+    per_region: Dict[str, List[Tuple[int, int]]] = field(default_factory=dict)
     decisions: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -688,12 +721,24 @@ class DisclosureProjector:
 
     def _consume(self, viewer: Viewer, state: _ResponseState, work_id: str, region: str,
                  spans: Sequence[Tuple[int, int]], chars: int, *, counts_as_quote: bool) -> bool:
-        if counts_as_quote and state.quotes >= self.budget.max_quotes_per_response:
+        max_quotes = self.budget.max_quotes_per_response
+        if counts_as_quote and max_quotes is not None and state.quotes >= max_quotes:
             return False
-        if state.per_work.get(work_id, 0) + chars > self.budget.max_quoted_chars_per_work_per_response:
+        max_work = self.budget.max_quoted_chars_per_work_per_response
+        if max_work is not None and state.per_work.get(work_id, 0) + chars > max_work:
             return False
+        fraction = self.budget.max_region_fraction
+        region_spans = [(int(a), int(b)) for a, b in spans if b > a]
+        if fraction is not None:
+            length = self.verifier.region_length(region) if self.verifier is not None else None
+            if not length:
+                return False  # unknown region size: cannot show the share is bounded
+            covered = _union_length(state.per_region.get(region, []) + region_spans)
+            if covered > fraction * length:
+                return False
         if not self.ledger.try_consume(viewer, work_id, region, spans):
             return False
+        state.per_region.setdefault(region, []).extend(region_spans)
         state.per_work[work_id] = state.per_work.get(work_id, 0) + chars
         if counts_as_quote:
             state.quotes += 1
@@ -893,7 +938,8 @@ class DisclosureProjector:
             out.append(text[pos:echo.start])
             run = text[echo.start:echo.end]
             chars = sum(e - s for s, e in echo.spans)
-            if len(run) <= self.budget.max_quote_chars and self._consume(
+            max_quote = self.budget.max_quote_chars
+            if (max_quote is None or len(run) <= max_quote) and self._consume(
                     viewer, state, echo.source.work_id, echo.region, echo.spans, chars, counts_as_quote=False):
                 out.append(run)
             else:
@@ -1223,6 +1269,22 @@ class DisclosureProjector:
         return self.project_chat_response(data, viewer, evidence=evidence, sources=sources)
 
     # ------------------------------------------------------------------ traces
+
+    def project_trace_for(self, record: Any, context: RequestContext, *,
+                          sources: Sequence[SourceRef] = ()) -> Any:
+        """Return the trace for ``GET /traces/{turn_id}`` as this caller may see it.
+
+        Owner decision (2026-10-12): admins get the raw trace from the route. A
+        server-built context holding ``trace.read_any`` (every ``:local`` user; on ALS
+        only verified Tiled admins) receives the unprojected record; everyone else
+        receives :meth:`project_trace`. Ownership of the turn is checked by the route
+        (own-or-any), not here.
+        """
+        if not isinstance(context, RequestContext):
+            raise TypeError("project_trace_for requires a server-built RequestContext")
+        if context.has("trace.read_any"):
+            return record
+        return self.project_trace(record, Viewer.from_context(context), sources=sources)
 
     def project_trace(self, record: Any, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> Any:
         """Project a trace detail record for ``GET /traces/{turn_id}`` (ADR 4.3).

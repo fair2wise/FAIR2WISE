@@ -131,3 +131,26 @@ Owner answers to the remaining T25B questions (2026-10-12):
 
 Still open: `workflow_mode` (recommended: leave admin-only; it has no effect in
 the UI API), O-A2 (role-check max age; default 60 s, capped at 900 s).
+
+## O-D2 and T21B follow-ups (2026-10-12)
+
+- **O-D2 (quote limits).** First answer: "dont worry about quote limits as long
+  as they are relevant". Tests then showed that with no limits at all, a whole
+  retrieved page passes through verbatim, which D19 forbids. Clarified answer:
+  **no count limits, block page dumps.** Applied in
+  `security/disclosure.py`: the default budget has no per-quote, per-answer,
+  per-session or per-user limits; a quote is shown verbatim when it verifies
+  against a source retrieved and cited for the turn; one response may not
+  reproduce more than 40% of any single page/section verbatim
+  (`max_region_fraction=0.4`, counting quotes and echoed runs). The earlier
+  proposed numbers remain available as `STRICT_BUDGET`. Existing field cuts
+  (abstracts, properties, descriptions, errors) are unchanged.
+- **Tiled URL in settings.** Editable on `:local` only; never writable at
+  runtime on ALS (`settings_update_capabilities(..., local=...)`).
+- **Traces.** Admins get the raw trace from `GET /traces/{turn_id}`:
+  `DisclosureProjector.project_trace_for(record, context)` returns the raw
+  record when the server-built context holds `trace.read_any` (every `:local`
+  user; verified ALS admins) and the projected summary otherwise.
+- Remaining T21B conflict for wiring (no owner decision needed): the uploaded
+  graph path becomes an opaque `f2w://` id, so `GET /graph/node` must accept
+  that id before the projection is wired into routes.

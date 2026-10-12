@@ -562,7 +562,7 @@ ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("R02", _A, "GET", "/settings", "settings.personal",
        note="paths, tiled_uri, tiled_error need settings.global"),
     _p("R03", _A, "PUT", "/settings", "settings.personal",
-       note="settings_update_capabilities(fields); tiled_uri never writable"),
+       note="settings_update_capabilities(fields, local=...); tiled_uri writable on :local only"),
     _p("R04", _A, "POST", "/session/reset", "session.own", note="session.any for another principal's session"),
     _p("R05", _A, "DELETE", "/session/{session_id}", "session.own",
        note="session.any for another principal's session"),
@@ -632,17 +632,22 @@ def route_capabilities(method: str, path: str, surface: str = AGENT_SURFACE) -> 
 
 #: PUT /settings fields a non-admin may change for their own session (LLM-01).
 SETTINGS_PERSONAL_FIELDS = frozenset({"backend", "model", "provider"})
-#: Never writable at runtime in any profile (S4); ignored with ``setting_not_writable``.
+#: Not writable at runtime on ALS; ignored there with ``setting_not_writable``. On ``:local``
+#: they are global settings (owner decision 2026-10-12: Tiled URL editable on local only).
 SETTINGS_NOT_WRITABLE = frozenset({"tiled_uri"})
 
 
-def settings_update_capabilities(fields: Iterable[str]) -> Tuple[FrozenSet[str], FrozenSet[str]]:
+def settings_update_capabilities(
+        fields: Iterable[str], *, local: bool = False
+) -> Tuple[FrozenSet[str], FrozenSet[str]]:
     """Return ``(required capabilities, ignored fields)`` for a PUT /settings body.
 
-    Unknown fields count as global (fail closed).
+    Unknown fields count as global (fail closed). ``tiled_uri`` is ignored on ALS and is
+    a global setting on ``:local`` (``local`` must come from startup settings, never
+    from the request).
     """
     names = frozenset(fields)
-    ignored = names & SETTINGS_NOT_WRITABLE
+    ignored = frozenset() if local else names & SETTINGS_NOT_WRITABLE
     caps = {"settings.personal"}
     if names - ignored - SETTINGS_PERSONAL_FIELDS:
         caps.add("settings.global")

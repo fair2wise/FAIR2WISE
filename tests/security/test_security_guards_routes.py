@@ -192,3 +192,11 @@ def test_health_projection():
     assert health_projection(None) == "reduced"
     assert health_projection(_ctx("u")) == "reduced"
     assert health_projection(_ctx("a")) == "full" == health_projection(_ctx("local"))
+
+
+def test_tiled_uri_editable_on_local_only():
+    """Owner decision 2026-10-12: tiled_uri is a global setting on :local, ignored on ALS."""
+    caps, ignored = settings_update_capabilities({"tiled_uri"}, local=True)
+    assert ignored == frozenset() and "settings.global" in caps
+    caps, ignored = settings_update_capabilities({"tiled_uri"})
+    assert ignored == frozenset({"tiled_uri"}) and caps == frozenset({"settings.personal"})
