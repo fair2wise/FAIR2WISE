@@ -10,8 +10,11 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 RUNTIME_DIRS = [REPO / "app" / "modules" / "agent_runtime", REPO / "app" / "modules" / "tools"]
+#: Never loaded, even after the supervisor (and so LangGraph) is imported.
 HEAVY = {"torch", "faiss", "sentence_transformers", "fitz", "openai", "langchain_openai", "tiled", "dotenv",
-         "academy", "requests", "httpx", "aiosqlite"}
+         "academy", "aiosqlite"}
+#: Not loaded by the bare package import (LangGraph's langsmith dependency pulls these in later).
+BARE_ONLY = HEAVY | {"requests", "httpx"}
 
 _PROBE = """
 import gc, json, os, sys
@@ -39,7 +42,7 @@ def _probe():
 def test_import_has_no_side_effects():
     result = _probe()
     roots = {m.split(".")[0] for m in result["bare"]}
-    assert not HEAVY & roots, HEAVY & roots
+    assert not BARE_ONLY & roots, BARE_ONLY & roots
     assert "langgraph" not in roots and "langchain_core" not in roots  # bare import stays light
     app_mods = [m for m in result["bare"] if m.startswith("app")]
     allowed = ("app.modules.contracts", "app.modules.agent_runtime", "app.modules.tools")
