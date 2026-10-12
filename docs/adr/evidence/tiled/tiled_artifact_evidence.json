@@ -1,0 +1,18 @@
+{
+  "checked_utc": "2026-10-09T22:27:56Z",
+  "requested": "tiled==0.2.19",
+  "pypi_json_0_2_19": "HTTP 404 {\"message\": \"Not Found\"} at https://pypi.org/pypi/tiled/0.2.19/json",
+  "pip_download_0_2_19": "ERROR: No matching distribution found for tiled==0.2.19",
+  "pypi_latest_final": "0.2.18",
+  "simple_index_versions_tail": ["0.2.17", "0.2.18", "0.2.19rc1", "0.2.19rc2"],
+  "files": {
+    "tiled-0.2.18-py3-none-any.whl": "416079d4b5c9acc5498197d48c05a951ee8f7c699ac3b07920ae907a8da7fa06",
+    "tiled-0.2.18.tar.gz": "2f3943260c46824b162796fcb8a43c3d02f41205e2ccefc64e365b18b6ec1e27",
+    "tiled-0.2.19rc1-py3-none-any.whl": "65f4d05de08f1006dcb311a8998877f0bafb2f2a6e9e0fdc1c13971141a54084",
+    "tiled-0.2.19rc1.tar.gz": "31ecf11d149a803fae4b68fba3510a67624eac7345aee78d535a58779db361b2",
+    "tiled-0.2.19rc2-py3-none-any.whl": "981bd63b45a27a8720bfb2a08e19761206b2ee747906f5eece2302cf26c2170b",
+    "tiled-0.2.19rc2.tar.gz": "e34586dbac7bef059b1f824375921cb438d58d0cfe5cde203615abc8b2c54105"
+  },
+  "local_shasum_verified": ["tiled-0.2.19rc2-py3-none-any.whl", "tiled-0.2.18-py3-none-any.whl"],
+  "inspection": "static unzip of wheels only; not installed; no server started"
+}
