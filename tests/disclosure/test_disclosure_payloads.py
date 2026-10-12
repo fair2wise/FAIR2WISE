@@ -28,7 +28,7 @@ def leaks(obj) -> list:
     text = json.dumps(obj, ensure_ascii=False)
     found = [p for p in LOCAL_PATHS if p in text or p.replace("\\", "\\\\") in text]
     for marker in (S.SENTINEL, "/Users/", "/private/", "/var/folders", "/home/", "Traceback", "object has no attribute",
-                   "Errno", "sk-live", "context_snippets", "page_text", "merged_context\": \"", LONG_ABSTRACT[:400]):
+                   "Errno", "sk-live", "context_snippets", "page_text", "merged_context\": \"", LONG_ABSTRACT[:1700]):
         if marker in text:
             found.append(marker)
     return found
