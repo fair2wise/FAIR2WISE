@@ -36,9 +36,10 @@ Usage::
         out = graph.invoke(Command(resume={tool_call_id: approval_record}), cfg, context=RunContext(ctx))
 
 Resume values: ``{tool_call_id: ApprovalRecord | its JSON dict}``, or a single record when one
-call is pending. Anything else (for example ``"reject"`` or ``{}``) rejects every pending write.
-Do not resume with ``None``: langgraph 1.2.10 treats ``Command(resume=None)`` as no resume and
-fails (``UnboundLocalError`` in ``pregel/_loop.py``).
+call is pending. Anything else (for example ``"reject"`` or ``{tool_call_id: None}``) rejects
+the pending writes. Two langgraph 1.2.10 pitfalls: ``Command(resume=None)`` fails
+(``UnboundLocalError`` in ``pregel/_loop.py``), and ``Command(resume={})`` is read as an empty
+interrupt-id map, so the interrupt simply stays pending.
 """
 
 from __future__ import annotations

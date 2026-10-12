@@ -204,7 +204,7 @@ def test_resume_accepts_single_record_as_json_dict():
     ({"w1": local_approval(target="tiled-elsewhere")}, "stale_approval"),
     ({"w1": local_approval(expires_at=NOW - timedelta(minutes=1))}, "stale_approval"),
     ("reject", "denied"),  # langgraph 1.2.10 cannot resume with None; any non-record value rejects
-    ({}, "denied"),
+    ({"w1": None}, "denied"),
     ({"w1": {"not": "an approval"}}, "denied"),
 ])
 def test_resume_without_matching_approval_never_writes(resume, code):
