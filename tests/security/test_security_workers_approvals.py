@@ -72,8 +72,8 @@ def test_als_worker_stops_on_downgrade_expiry_revocation(change):
     port = FakeTiledIdentityPort(tokens={"a": admin_user(), "u": plain_user()})
     store = {"cred": TiledCredential("a", tiled_target=STAGING)}
     ctx = worker_context(_als_ctx(port, "a", clock=clock), run_id="run-1")
-    authority = WorkerAuthority(ctx, staging_settings(), identity_port=port, credential_provider=lambda: store["cred"],
-                                clock=clock)
+    authority = WorkerAuthority(ctx, staging_settings(), identity_port=port,
+                                credential_provider=lambda: store["cred"], clock=clock)
     effects = []
     authority.check("graph.publish")
     effects.append("write-1")
@@ -176,7 +176,8 @@ def test_als_approval_refused_for_non_admin_downgrade_worker_or_wrong_target():
         create_approval(_als_ctx(port, "u"), plan, settings, approver_credential=TiledCredential("u"), **kw)
     admin_ctx = _als_ctx(port, "a")
     with pytest.raises(ContractError):  # wrong target
-        create_approval(admin_ctx, make_plan(PROD_TARGET), settings, approver_credential=TiledCredential("a"), **kw)
+        create_approval(admin_ctx, make_plan(PROD_TARGET), settings,
+                        approver_credential=TiledCredential("a"), **kw)
     with pytest.raises(ContractError):  # a worker never approves
         create_approval(worker_context(admin_ctx, run_id="r"), plan, settings,
                         approver_credential=TiledCredential("a"), **kw)
