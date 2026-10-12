@@ -1,0 +1,23 @@
+# Evidence copy (T01 prototype). Not used by the build; see docs/adr/package-and-imports.md.
+# PROTOTYPE ONLY (T01 import-mapping evidence). Maps the physical app/ tree to the
+# installed canonical namespace `f2w` without moving any source file.
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fair2wise"
+version = "0.0.0.dev0"
+requires-python = ">=3.12"
+
+[tool.setuptools]
+package-dir = {"f2w" = "app"}
+packages = [
+  "f2w",
+  "f2w.modules",
+  "f2w.modules.agents",
+  "f2w.modules.f2w_agent",
+  "f2w.modules.hybrid_rag",
+  "f2w.modules.launchers",
+  "f2w.modules.term_extractor",
+]
