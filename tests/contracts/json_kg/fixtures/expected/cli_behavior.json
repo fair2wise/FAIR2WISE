@@ -1,0 +1,65 @@
+{
+  "success": {
+    "core_dict": {
+      "exit_code": 0,
+      "stdout": "INFO: Wrote 14 nodes (3 snippets) and 9 edges → {output}\n",
+      "stderr": ""
+    },
+    "list_input": {
+      "exit_code": 0,
+      "stdout": "INFO: Wrote 2 nodes (0 snippets) and 1 edges → {output}\n",
+      "stderr": ""
+    },
+    "empty_metadata": {
+      "exit_code": 0,
+      "stdout": "INFO: Wrote 1 nodes (0 snippets) and 0 edges → {output}\n",
+      "stderr": ""
+    },
+    "custom_prefix": {
+      "exit_code": 0,
+      "stdout": "INFO: Wrote 5 nodes (1 snippets) and 3 edges → {output}\n",
+      "stderr": ""
+    }
+  },
+  "errors": {
+    "error_no_terms_key": {
+      "exit_code": 1,
+      "stdout_observed": "ERROR: Failed: 'str' object has no attribute 'get'\n",
+      "stderr": "",
+      "output_written": false
+    },
+    "error_relation_not_object": {
+      "exit_code": 1,
+      "stdout_observed": "ERROR: Failed: 'str' object has no attribute 'get'\n",
+      "stderr": "",
+      "output_written": false
+    },
+    "error_invalid_json": {
+      "exit_code": 1,
+      "stdout_observed": "ERROR: Failed: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)\n",
+      "stderr": "",
+      "output_written": false
+    },
+    "error_missing_input": {
+      "exit_code": 1,
+      "stdout_observed": "ERROR: Failed: [Errno 2] No such file or directory: '{input}'\n",
+      "stderr": "",
+      "output_written": false
+    },
+    "error_no_arguments": {
+      "exit_code": 2,
+      "stdout_observed": "",
+      "stderr_first_line": "usage: json2kg.py [-h] [--verbose] input_json output_json",
+      "output_written": false
+    }
+  },
+  "help": {
+    "exit_code": 0,
+    "stdout": "usage: json2kg.py [-h] [--verbose] input_json output_json\n\nConvert extracted_terms JSON → MatKG graph JSON\n\npositional arguments:\n  input_json     Path to input JSON file\n  output_json    Path to output graph JSON file\n\noptions:\n  -h, --help     show this help message and exit\n  --verbose, -v  Increase output verbosity\n"
+  },
+  "verbose_core_dict": {
+    "exit_code": 0,
+    "stdout": "DEBUG: Skipping snippet (curated=False, len=29): 'def too_short():\\n    return 1'\nDEBUG: Skipping snippet (curated=False, len=181): 'def unbalanced(x):\\n    return (x + 1\\n    # filler line for l'\nINFO: Wrote 14 nodes (3 snippets) and 9 edges → {output}\n",
+    "bytes_equal_non_verbose": true
+  }
+}

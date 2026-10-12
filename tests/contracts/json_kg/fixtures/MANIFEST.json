@@ -1,0 +1,22 @@
+{
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "contract": "T23A json2kg compatibility fixtures",
+  "files": {
+    "expected/api_cases.expected.json": "c42014b5ac905797d611bb25f7971fee0f6c0d8cfb379620b15fde6d5be295b9",
+    "expected/cli_behavior.json": "5f24b9d9f84889604a732ac415fcd3cced6d576f3c6243c57fbe92c46da76ccf",
+    "expected/core_dict.graph.json": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510",
+    "expected/custom_prefix.graph.json": "928c6a1e0342cd3077f9209c1d1f3471d812851ae7101672f5391ac238ed06e8",
+    "expected/empty_metadata.graph.json": "e26817ddf869c4268f5bce97a1526e71ad5fa116d09c3673bc2494dd9a3697c5",
+    "expected/list_input.graph.json": "47320b772cc113f6e66943d7a460f03ea0a74ec4ecd4c59197c286a184a71935",
+    "inputs/api_cases.json": "541d9fa4c6a4c4d19ec633fa11e6b7313dd95222360816550808e2d7c9a9b8ed",
+    "inputs/core_dict.terms.json": "09e5d6be2482e6df9495b1491b0219c1054a520609d8941d1cb2d8e97514c89f",
+    "inputs/custom_prefix.terms.json": "7f43d857e7cfc8ecdc11db1dde43876052a4597665c772b77f0c173e5c8e82b4",
+    "inputs/empty_metadata.terms.json": "6eef6802992d47502c69c8a84342178dd616b7d7b47279c905bd34813050ba30",
+    "inputs/error_invalid_json.terms.json": "1109331531e6c150c66244eb55c71043985a2f2e5ccc662a3be56fed34188aa2",
+    "inputs/error_no_terms_key.terms.json": "a61751c7221b62db87f52323349552f84b7a786db54a77d48fa904152d0de993",
+    "inputs/error_relation_not_object.terms.json": "ec449537670877f9c0b5d8ff866505ea66d6c5fc5a08839ba92ae7ff4b221cdc",
+    "inputs/list_input.terms.json": "8302d1751874d9d65223b5a62718842b52cdd68f40c6a05438fdaa093c29b5d6"
+  },
+  "generated_from_json2kg_sha256": "81dba522cff892cda7d5bf1e98a67b10cb7ccb990972d0b995c76b65e755527f",
+  "python": "3.12.11"
+}

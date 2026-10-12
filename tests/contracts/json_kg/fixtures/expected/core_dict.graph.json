@@ -1,0 +1,553 @@
+{
+  "things": [
+    {
+      "id": "matkg:snippetsynthfitpaperalphapdfp2ca4dd246",
+      "name": "synth_fit snippet",
+      "category": "CodeSnippet",
+      "type": "matkg:CodeSnippet",
+      "description": "Synthetic fitting routine.",
+      "pages": [
+        2
+      ],
+      "source_papers": [
+        "paper_alpha.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_alpha.pdf",
+          "authors": "Snippet Author"
+        }
+      ],
+      "authors": [
+        "Snippet Author"
+      ],
+      "paper_authors": [],
+      "doi": null,
+      "function_name": "synth_fit",
+      "code_snippet": "import math\ndef synth_fit(xs, ys):\n    total = 0.0\n    for x, y in zip(xs, ys):\n        total += (y - math.sin(x)) ** 2\n    values = [total, len(xs)]\n    return values[0] / max(values[1], 1)\n",
+      "code_language": "python",
+      "code_description": "Synthetic fitting routine.",
+      "code_domain": "synthetic",
+      "domain_features": [
+        {
+          "feature_name": "q_range",
+          "feature_value": "0.5",
+          "feature_units": "A^-1",
+          "feature_source_text": "synthetic"
+        }
+      ],
+      "source_type": "github",
+      "repo_url": "https://github.com/example/synthetic",
+      "repo_owner": "example",
+      "repo_name": "synthetic",
+      "repo_default_branch": "main",
+      "repo_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+      "source_file_path": "src/synth.py",
+      "source_file_url": "https://github.com/example/synthetic/blob/0123456/src/synth.py",
+      "source_start_line": 10,
+      "source_end_line": 20,
+      "repository_license": "MIT",
+      "license_warning": null,
+      "source_score": 3.5
+    },
+    {
+      "id": "matkg:snippetpaperalphapdfp7de8a3abe",
+      "name": "code snippet (paper_alpha.pdf p.7)",
+      "category": "CodeSnippet",
+      "type": "matkg:CodeSnippet",
+      "description": "",
+      "pages": [
+        7
+      ],
+      "source_papers": [
+        "paper_alpha.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_alpha.pdf"
+        }
+      ],
+      "authors": [],
+      "paper_authors": [],
+      "doi": null,
+      "function_name": null,
+      "code_snippet": "import os\nresult_values = []\nfor index in range(10):\n    result_values.append(index * 2)\nsummary = {'count': len(result_values), 'total': sum(result_values)}\nprint(summary, os.sep)\n",
+      "code_language": "python",
+      "code_description": null,
+      "code_domain": null,
+      "domain_features": [],
+      "source_type": null,
+      "repo_url": null,
+      "repo_owner": null,
+      "repo_name": null,
+      "repo_default_branch": null,
+      "repo_commit_sha": null,
+      "source_file_path": null,
+      "source_file_url": null,
+      "source_start_line": null,
+      "source_end_line": null,
+      "repository_license": null,
+      "license_warning": null,
+      "source_score": null
+    },
+    {
+      "id": "matkg:SynthCuratedSnip",
+      "name": "code snippet (paper_beta.pdf p.0)",
+      "category": "CodeSnippet",
+      "type": "matkg:CodeSnippet",
+      "description": "",
+      "pages": [],
+      "source_papers": [
+        "paper_beta.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_beta.pdf"
+        }
+      ],
+      "authors": [],
+      "paper_authors": [],
+      "doi": null,
+      "function_name": null,
+      "code_snippet": "x = 1",
+      "code_language": null,
+      "code_description": null,
+      "code_domain": null,
+      "domain_features": [],
+      "source_type": null,
+      "repo_url": null,
+      "repo_owner": null,
+      "repo_name": null,
+      "repo_default_branch": null,
+      "repo_commit_sha": null,
+      "source_file_path": null,
+      "source_file_url": null,
+      "source_start_line": null,
+      "source_end_line": null,
+      "repository_license": null,
+      "license_warning": null,
+      "source_score": null
+    },
+    {
+      "id": "matkg:SynthPolymerA",
+      "name": "Synth Polymer A",
+      "category": "ConjugatedPolymer",
+      "raw_category": null,
+      "description": "Synthetic placeholder polymer.",
+      "pages": [
+        2
+      ],
+      "source_papers": [
+        "paper_alpha.pdf",
+        "paper_beta.pdf"
+      ],
+      "context_snippets": [
+        {
+          "text": "Synthetic placeholder sentence one.",
+          "source_paper": "paper_alpha.pdf",
+          "page": 2
+        }
+      ],
+      "formula": "C4H4S",
+      "formula_validation": {
+        "status": "ok",
+        "canonical": "C4H4S"
+      },
+      "properties": [
+        {
+          "property": "bandgap",
+          "value": 1.9,
+          "unit": "eV"
+        }
+      ],
+      "publication_year": 2001,
+      "paper_title": "Synthetic Title Alpha",
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_alpha.pdf",
+          "publication_year": 2001,
+          "paper_title": "Synthetic Title Alpha",
+          "authors": "Author One",
+          "doi": "10.0000/synthetic.alpha"
+        }
+      ],
+      "authors": [
+        "Author One"
+      ],
+      "institutions": [],
+      "doi": "10.0000/synthetic.alpha",
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": [],
+      "importance": "high",
+      "confidence": 0.9,
+      "evidence_ref": {
+        "store": "private",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "polarization": "linear"
+    },
+    {
+      "id": "matkg:SynthDevice",
+      "name": "Synth Device",
+      "category": "Device",
+      "raw_category": "DeviceRaw",
+      "description": "Fills the empty stub description.",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publications": []
+    },
+    {
+      "id": "matkg:Synth-Technique",
+      "name": "Synth Technique",
+      "category": "ExperimentalTechnique",
+      "raw_category": "XRayScatteringAnalysis",
+      "description": "",
+      "pages": [],
+      "source_papers": [
+        "paper_alpha.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publications": []
+    },
+    {
+      "id": "matkg:SynthTargetTwo",
+      "name": "Synth Target Two",
+      "category": "Unknown",
+      "raw_category": null,
+      "description": "",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publications": []
+    },
+    {
+      "id": "matkg:SynthRoutine",
+      "name": "Synth Routine",
+      "category": "Unknown",
+      "raw_category": "CodeSnippet",
+      "description": "N/A",
+      "pages": [
+        3
+      ],
+      "source_papers": [
+        "paper_alpha.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_alpha.pdf"
+        }
+      ],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    },
+    {
+      "id": "matkg:UNKNOWN",
+      "name": "UNKNOWN",
+      "category": "Material",
+      "raw_category": null,
+      "description": "Nameless term becomes UNKNOWN.",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    },
+    {
+      "id": "matkg:Polymre-phasex",
+      "name": "Polymère β-phase_x",
+      "category": "Material",
+      "raw_category": null,
+      "description": "Non-ASCII label; ID keeps only [A-Za-z0-9-].",
+      "pages": [
+        4
+      ],
+      "source_papers": [
+        "paper_gamma.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_gamma.pdf"
+        }
+      ],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    },
+    {
+      "id": "beamline:SynthMotor",
+      "name": "Synth Motor",
+      "category": "Motor",
+      "raw_category": null,
+      "description": "N/A",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    },
+    {
+      "id": "beamline:SynthStage",
+      "name": "Synth Stage",
+      "category": "Unknown",
+      "raw_category": null,
+      "description": "",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publications": []
+    },
+    {
+      "id": "matkg:SynthMultiPaper",
+      "name": "Synth Multi Paper",
+      "category": "Material",
+      "raw_category": null,
+      "description": "N/A",
+      "pages": [],
+      "source_papers": [
+        "paper_beta.pdf",
+        "paper_alpha.pdf"
+      ],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": "Stale scalar title is not smeared",
+      "source_metadata": {
+        "paper_beta.pdf": {
+          "paper_title": "Synthetic Title Beta",
+          "publication_year": 2003,
+          "keywords": [
+            "k1",
+            "k2"
+          ]
+        },
+        "paper_alpha.pdf": {
+          "paper_title": "Synthetic Title Alpha",
+          "doi": "10.0000/synthetic.alpha",
+          "unknown_field": "dropped"
+        }
+      },
+      "publications": [
+        {
+          "source_paper": "paper_alpha.pdf",
+          "paper_title": "Synthetic Title Alpha",
+          "doi": "10.0000/synthetic.alpha"
+        },
+        {
+          "source_paper": "paper_beta.pdf",
+          "publication_year": 2003,
+          "paper_title": "Synthetic Title Beta",
+          "keywords": [
+            "k1",
+            "k2"
+          ]
+        }
+      ],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    },
+    {
+      "id": "matkg:SynthExplicitPubs",
+      "name": "Synth Explicit Pubs",
+      "category": "Material",
+      "raw_category": null,
+      "description": "N/A",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [
+        {
+          "source_paper": "paper_eta.pdf",
+          "volume": "7",
+          "issue": "2",
+          "pages_range": "1-9"
+        },
+        {
+          "source_paper": "paper_zeta.pdf",
+          "paper_title": "Synthetic Title Zeta"
+        }
+      ],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    }
+  ],
+  "associations": [
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:has_application",
+      "object": "matkg:SynthDevice",
+      "has_evidence": "ev one; ev two"
+    },
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:measured_by",
+      "object": "matkg:Synth-Technique",
+      "has_evidence": "scalar ev",
+      "raw_predicate": "MeasuredBy"
+    },
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:RELATED_TO",
+      "object": "matkg:SynthTargetTwo",
+      "has_evidence": null
+    },
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:uses_raw_relation",
+      "object": "matkg:SynthDevice",
+      "has_evidence": null,
+      "raw_predicate": "UsesRawRelation"
+    },
+    {
+      "subject": "beamline:SynthMotor",
+      "predicate": "rel:mounted_on",
+      "object": "beamline:SynthStage",
+      "has_evidence": null
+    },
+    {
+      "subject": "beamline:SynthMotor",
+      "predicate": "rel:same_prefix_curie",
+      "object": "matkg:SynthPolymerA",
+      "has_evidence": null
+    },
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:has_code_snippet",
+      "object": "matkg:snippetsynthfitpaperalphapdfp2ca4dd246",
+      "has_evidence": null
+    },
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:has_code_snippet",
+      "object": "matkg:snippetpaperalphapdfp7de8a3abe",
+      "has_evidence": null
+    },
+    {
+      "subject": "matkg:SynthPolymerA",
+      "predicate": "rel:has_code_snippet",
+      "object": "matkg:SynthCuratedSnip",
+      "has_evidence": null
+    }
+  ],
+  "metadata": {
+    "id_prefix": "matkg",
+    "kg": "synthetic_contract",
+    "schema_version": "contract-fixture-1",
+    "note": "Synthetic T23A fixture. No real paper text."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "things": [
+    {
+      "id": "matkg:SynthListA",
+      "name": "Synth List A",
+      "category": "Unknown",
+      "raw_category": null,
+      "description": "N/A",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    },
+    {
+      "id": "matkg:SynthListB",
+      "name": "Synth List B",
+      "category": "Material",
+      "raw_category": null,
+      "description": "Defined after its stub was created.",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publications": []
+    }
+  ],
+  "associations": [
+    {
+      "subject": "matkg:SynthListA",
+      "predicate": "rel:TEST",
+      "object": "matkg:SynthListB",
+      "has_evidence": null
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "metadata": {"id_prefix": "beamline", "kg": "synthetic_ops"},
+  "terms": [
+    {"term": "Synth Slit", "category": "Device", "pages": [1], "source_papers": ["ops_doc.md"],
+     "relations": [{"relation": "part_of", "related_term": "Synth Beamline"}, {"relation": "documented_in", "related_id": "matkg:Synth Manual"}]},
+    {"id": "beamline:Synth_Beamline", "name": "Synth Beamline", "category": "Beamline"}
+  ],
+  "code_snippets": [
+    {"function_name": "move_slit", "source_paper": "ops_doc.md", "page": 1,
+     "code_snippet": "import time\ndef move_slit(position):\n    target = float(position)\n    for step in range(3):\n        time.sleep(0)\n        target = target + step * 0.0\n    return {'position': target, 'ok': True}\n"}
+  ]
+}

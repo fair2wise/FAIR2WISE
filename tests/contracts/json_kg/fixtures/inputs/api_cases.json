@@ -1,0 +1,46 @@
+{
+  "note": "build_graph keyword cases (not reachable from the CLI). Synthetic.",
+  "cases": {
+    "strict_snippets_false_accepts_unbalanced": {
+      "kwargs": {"default_id_prefix": "matkg", "strict_snippets": false},
+      "terms": [{"term": "Synth Loose", "pages": [1], "source_papers": ["paper_loose.pdf"]}],
+      "code_snippets": [{"function_name": "loose", "source_paper": "paper_loose.pdf", "page": 1,
+        "code_snippet": "def loose(x):\n    return (x + 1\n    # filler line for length\n    # filler line for length\n    # filler line for length\n    # filler line for length\n    # filler line for length\n"}]
+    },
+    "default_id_prefix_beamline": {
+      "kwargs": {"default_id_prefix": "beamline"},
+      "terms": [{"term": "Synth Ops Term", "relations": [{"relation": "rel", "related_term": "Synth Ops Target"}]}],
+      "code_snippets": []
+    },
+    "no_snippets_argument": {
+      "kwargs": {},
+      "terms": [{"term": "Synth Only"}],
+      "code_snippets": null
+    }
+  },
+  "make_id": [
+    ["Bulk Heterojunction OPV", "matkg"],
+    ["pAQM-2TV!", "matkg"],
+    ["a_b c", "matkg"],
+    ["matkg:Foo_Bar baz", "matkg"],
+    ["beamline:M1 X_y", "matkg"],
+    ["matkg:Foo", "beamline"],
+    ["Polymère β", "matkg"],
+    ["α", "matkg"],
+    ["", "matkg"],
+    ["A B", "matkg"],
+    ["AB", "matkg"],
+    ["A.B", "matkg"],
+    ["Plain", "custom"],
+    ["tiled:Thing", "matkg"]
+  ],
+  "code_snippet_ids": [
+    {"function_name": "f", "source_paper": "paper_x.pdf", "page": 3, "code_snippet": "def f(): pass"},
+    {"source_paper": "paper_x.pdf", "page": 3, "code_snippet": "def f(): pass"},
+    {"function_name": "f", "page": 3, "code_snippet": "def f(): pass"},
+    {"function_name": "f", "source_paper": null, "page": 3, "code_snippet": "def f(): pass"},
+    {"id": "Explicit Snip_1", "code_snippet": "anything"},
+    {"id": "Explicit", "id_prefix": "beamline", "code_snippet": "anything"},
+    {"function_name": "f", "source_paper": "p.pdf", "code_snippet": null}
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "manifest_version": "1",
+  "artifact_type": "f2w.kg_snapshot",
+  "corpus": "synthetic",
+  "snapshot_id": "v1",
+  "graph_id": "synthetic_v1",
+  "graph": {
+    "path": "graph.json",
+    "sha256": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510",
+    "size_bytes": 14662,
+    "format": "f2w.json2kg.things_associations.v1",
+    "serialization": "json.dumps(indent=2, ensure_ascii=False); utf-8; no trailing newline",
+    "node_count": 14,
+    "edge_count": 9,
+    "codesnippet_count": 3
+  },
+  "compat_paths": [
+    {"path": "storage/kg/matkg_synthetic_v1.json", "sha256": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510"}
+  ],
+  "parent": null,
+  "created": {
+    "at": "2026-10-12T00:00:00Z",
+    "tool": "app.modules.json2kg.convert_terms_to_graph",
+    "code_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+    "json2kg_sha256": "81dba522cff892cda7d5bf1e98a67b10cb7ccb990972d0b995c76b65e755527f",
+    "run_id": "example-run",
+    "profile": "ci"
+  },
+  "schema": {
+    "name": "synthetic",
+    "path": "storage/schema/rsoxs_schema.yaml",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "version": "contract-fixture-1"
+  },
+  "extraction": {
+    "revisions": [
+      {"extractor": "synthetic-fixture", "version": "0", "model": null, "unknown": false}
+    ]
+  },
+  "corpus_revision": {
+    "id": "synthetic-r1",
+    "source_count": 0,
+    "sources_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "inputs": [
+    {"role": "terms_snapshot", "sha256": "09e5d6be2482e6df9495b1491b0219c1054a520609d8941d1cb2d8e97514c89f", "ref": "tests/contracts/json_kg/fixtures/inputs/core_dict.terms.json"}
+  ],
+  "validation": {"status": "pass", "report_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "suite": "example"},
+  "disclosure": {"check_version": "0-example", "status": "pass", "report_sha256": "2222222222222222222222222222222222222222222222222222222222222222"}
+}

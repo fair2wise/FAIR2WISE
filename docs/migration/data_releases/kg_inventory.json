@@ -1,0 +1,5894 @@
+{
+  "inventory_version": "1",
+  "task": "T23A/T26A",
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "generated_by": "tests/contracts/json_kg/tools/kg_inventory.py (run from clean export; no text content copied, lengths/counts only)",
+  "method_notes": [
+    "Tracked set = `git ls-tree -r 222b1e7 storage/kg` (47 paths); bytes read from the clean baseline export.",
+    "Lengths are Python str lengths (code points). 'Long' means >=500 chars. Whether a long value is verbatim source text cannot be proven without the private papers; it is an inference from length, field semantics (context_snippets, has_evidence, abstract_text) and the extractor design.",
+    "Local path / secret detection is a regex heuristic over every string; counts only, values not recorded.",
+    "untracked_working_tree section covers storage/kg/*.json present in the working tree but gitignored (.gitignore:182) and therefore NOT in the 47; these include the default graphs named in app/modules/f2w_agent/multi_kg.py:13-16."
+  ],
+  "summary_tracked": {
+    "files": 47,
+    "total_bytes": 158641676,
+    "by_shape_family": {
+      "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)": 38,
+      "empty_things_associations_placeholder": 5,
+      "json2kg_publication_aware": 2,
+      "json2kg_pre_publications_variant": 1,
+      "non_json (html viewer)": 1
+    },
+    "with_prov_metadata": 0,
+    "with_top_level_metadata": 0,
+    "duplicate_sha256_groups": [
+      [
+        "storage/kg/matkg_google_gemini-flash-lite_100_20260603_182319.json",
+        "storage/kg/matkg_google_gemini-flash-lite_25_20260603_182319.json",
+        "storage/kg/matkg_google_gemini-flash-lite_50_20260603_182319.json",
+        "storage/kg/matkg_google_gemini-flash-lite_75_20260603_182319.json",
+        "storage/kg/matkg_resources_saxs_algorithms_20260603_181120.json"
+      ]
+    ],
+    "edge.has_evidence_values_ge_500": 0,
+    "edge.has_evidence_values_ge_1000": 0,
+    "edge.has_evidence_max": 0,
+    "edge.has_evidence_files_with_ge_500": 0,
+    "node.context_snippets[].text_values_ge_500": 645,
+    "node.context_snippets[].text_values_ge_1000": 90,
+    "node.context_snippets[].text_max": 1890,
+    "node.context_snippets[].text_files_with_ge_500": 38,
+    "node.abstract_text_values_ge_500": 0,
+    "node.abstract_text_values_ge_1000": 0,
+    "node.abstract_text_max": 0,
+    "node.abstract_text_files_with_ge_500": 0,
+    "node.description_values_ge_500": 1,
+    "node.description_values_ge_1000": 0,
+    "node.description_max": 530,
+    "node.description_files_with_ge_500": 1,
+    "node.code_snippet_values_ge_500": 24,
+    "node.code_snippet_values_ge_1000": 0,
+    "node.code_snippet_max": 859,
+    "node.code_snippet_files_with_ge_500": 3,
+    "context_text_distinct_total_chars": 17922311,
+    "context_text_max_distinct_chars_for_one_source_paper": 34127,
+    "edge_has_evidence_non_null_total": 0,
+    "files_with_local_path_strings": 0,
+    "files_with_secret_pattern_strings": 0
+  },
+  "summary_untracked_working_tree": {
+    "files": 12,
+    "total_bytes": 70440886,
+    "by_shape_family": {
+      "json2kg_publication_aware+metadata": 10,
+      "json2kg_publication_aware": 1,
+      "nodes_edges_papers_prov (ingest_rsoxs_v3 style; not json2kg output)": 1
+    },
+    "with_prov_metadata": 1,
+    "with_top_level_metadata": 10,
+    "duplicate_sha256_groups": [],
+    "edge.has_evidence_values_ge_500": 0,
+    "edge.has_evidence_values_ge_1000": 0,
+    "edge.has_evidence_max": 149,
+    "edge.has_evidence_files_with_ge_500": 0,
+    "node.context_snippets[].text_values_ge_500": 41,
+    "node.context_snippets[].text_values_ge_1000": 2,
+    "node.context_snippets[].text_max": 1009,
+    "node.context_snippets[].text_files_with_ge_500": 2,
+    "node.abstract_text_values_ge_500": 0,
+    "node.abstract_text_values_ge_1000": 0,
+    "node.abstract_text_max": 0,
+    "node.abstract_text_files_with_ge_500": 0,
+    "node.description_values_ge_500": 93,
+    "node.description_values_ge_1000": 18,
+    "node.description_max": 7015,
+    "node.description_files_with_ge_500": 9,
+    "node.code_snippet_values_ge_500": 274,
+    "node.code_snippet_values_ge_1000": 208,
+    "node.code_snippet_max": 9152,
+    "node.code_snippet_files_with_ge_500": 11,
+    "context_text_distinct_total_chars": 37319,
+    "context_text_max_distinct_chars_for_one_source_paper": 6813,
+    "edge_has_evidence_non_null_total": 19255,
+    "files_with_local_path_strings": 9,
+    "files_with_secret_pattern_strings": 9
+  },
+  "files": [
+    {
+      "path": "storage/kg/matkg_deepseek-r1_14b_100_20250918_095748.json",
+      "size_bytes": 5614327,
+      "sha256": "2bc1ab345e6d286b5f20a09ae55e17b9776c00a67837219e93ca82456a999e44",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 7077,
+      "edge_count": 6067,
+      "node_keys": {
+        "category": 7077,
+        "context_snippets": 7077,
+        "description": 7077,
+        "formula": 7077,
+        "formula_validation": 7077,
+        "id": 7077,
+        "name": 7077,
+        "pages": 7077,
+        "properties": 7077,
+        "source_papers": 7077
+      },
+      "edge_keys": {
+        "has_evidence": 6067,
+        "object": 6067,
+        "predicate": 6067,
+        "subject": 6067
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 502,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 4065,
+          "max": 1041,
+          "median": 269,
+          "p95": 381,
+          "ge_200": 2697,
+          "ge_500": 10,
+          "ge_1000": 3,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 7077,
+          "max": 314,
+          "median": 60,
+          "p95": 134,
+          "ge_200": 24,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 2721,
+      "context_text_distinct_total_chars": 627252,
+      "context_text_max_distinct_chars_for_one_source_paper": 22962,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 100,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 61,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_14b_25_20250915_185643.json",
+      "size_bytes": 2053596,
+      "sha256": "038ddddc96536961379b58e6b5dc119ac471b8ea15d3f4eee2bf8b473b13109f",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 2696,
+      "edge_count": 2163,
+      "node_keys": {
+        "category": 2696,
+        "context_snippets": 2696,
+        "description": 2696,
+        "formula": 2696,
+        "formula_validation": 2696,
+        "id": 2696,
+        "name": 2696,
+        "pages": 2696,
+        "properties": 2696,
+        "source_papers": 2696
+      },
+      "edge_keys": {
+        "has_evidence": 2163,
+        "object": 2163,
+        "predicate": 2163,
+        "subject": 2163
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 238,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 1482,
+          "max": 546,
+          "median": 256,
+          "p95": 375,
+          "ge_200": 959,
+          "ge_500": 2,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 2696,
+          "max": 314,
+          "median": 55,
+          "p95": 137,
+          "ge_200": 13,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 947,
+      "context_text_distinct_total_chars": 207075,
+      "context_text_max_distinct_chars_for_one_source_paper": 25146,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 25,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 6,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_14b_50_20250916_162508.json",
+      "size_bytes": 3485286,
+      "sha256": "a2eb0a002546551e27668a9d86222d8da0a17ee7f4be21ee3263b7132e856a8f",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 4530,
+      "edge_count": 3721,
+      "node_keys": {
+        "category": 4530,
+        "context_snippets": 4530,
+        "description": 4530,
+        "formula": 4530,
+        "formula_validation": 4530,
+        "id": 4530,
+        "name": 4530,
+        "pages": 4530,
+        "properties": 4530,
+        "source_papers": 4530
+      },
+      "edge_keys": {
+        "has_evidence": 3721,
+        "object": 3721,
+        "predicate": 3721,
+        "subject": 3721
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 355,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2514,
+          "max": 1041,
+          "median": 259,
+          "p95": 379,
+          "ge_200": 1619,
+          "ge_500": 8,
+          "ge_1000": 3,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 4530,
+          "max": 314,
+          "median": 56,
+          "p95": 135,
+          "ge_200": 18,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1642,
+      "context_text_distinct_total_chars": 368974,
+      "context_text_max_distinct_chars_for_one_source_paper": 24548,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 50,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 35,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_14b_75_20250917_143348.json",
+      "size_bytes": 4580698,
+      "sha256": "a16e8bcf36869ecede39c4f81d46d4957e151eda1330b80083d96e17ad0e6832",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 5903,
+      "edge_count": 4941,
+      "node_keys": {
+        "category": 5903,
+        "context_snippets": 5903,
+        "description": 5903,
+        "formula": 5903,
+        "formula_validation": 5903,
+        "id": 5903,
+        "name": 5903,
+        "pages": 5903,
+        "properties": 5903,
+        "source_papers": 5903
+      },
+      "edge_keys": {
+        "has_evidence": 4941,
+        "object": 4941,
+        "predicate": 4941,
+        "subject": 4941
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 436,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 3319,
+          "max": 1041,
+          "median": 263,
+          "p95": 381,
+          "ge_200": 2173,
+          "ge_500": 8,
+          "ge_1000": 3,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 5903,
+          "max": 314,
+          "median": 58,
+          "p95": 134,
+          "ge_200": 20,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 2196,
+      "context_text_distinct_total_chars": 501329,
+      "context_text_max_distinct_chars_for_one_source_paper": 23785,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 75,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 56,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_32b_100_20250922_191851.json",
+      "size_bytes": 2778000,
+      "sha256": "7bda9535287dba7b514c626d75bea6c500317f42c51726d064ab0ae7fcd84c1f",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 3555,
+      "edge_count": 3220,
+      "node_keys": {
+        "category": 3555,
+        "context_snippets": 3555,
+        "description": 3555,
+        "formula": 3555,
+        "formula_validation": 3555,
+        "id": 3555,
+        "name": 3555,
+        "pages": 3555,
+        "properties": 3555,
+        "source_papers": 3555
+      },
+      "edge_keys": {
+        "has_evidence": 3220,
+        "object": 3220,
+        "predicate": 3220,
+        "subject": 3220
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 179,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2044,
+          "max": 609,
+          "median": 244,
+          "p95": 373,
+          "ge_200": 1221,
+          "ge_500": 4,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 3555,
+          "max": 436,
+          "median": 57,
+          "p95": 128,
+          "ge_200": 6,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1479,
+      "context_text_distinct_total_chars": 330185,
+      "context_text_max_distinct_chars_for_one_source_paper": 10282,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 99,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 62,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_32b_25_20250919_065133.json",
+      "size_bytes": 1004246,
+      "sha256": "41673370d94514371ec38a9ef90fed1b7b3a0390ca48d68fdbfcf8be9b9bf59e",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1315,
+      "edge_count": 1123,
+      "node_keys": {
+        "category": 1315,
+        "context_snippets": 1315,
+        "description": 1315,
+        "formula": 1315,
+        "formula_validation": 1315,
+        "id": 1315,
+        "name": 1315,
+        "pages": 1315,
+        "properties": 1315,
+        "source_papers": 1315
+      },
+      "edge_keys": {
+        "has_evidence": 1123,
+        "object": 1123,
+        "predicate": 1123,
+        "subject": 1123
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 93,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 748,
+          "max": 546,
+          "median": 235,
+          "p95": 365,
+          "ge_200": 440,
+          "ge_500": 3,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1315,
+          "max": 242,
+          "median": 59,
+          "p95": 126,
+          "ge_200": 2,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 514,
+      "context_text_distinct_total_chars": 107331,
+      "context_text_max_distinct_chars_for_one_source_paper": 10293,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 24,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 5,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_32b_50_20250920_125000.json",
+      "size_bytes": 1776408,
+      "sha256": "d51186b85bc468432923b66c5176ee2d1e7a899eefd61b8eb9f3d8ca57599877",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 2308,
+      "edge_count": 2025,
+      "node_keys": {
+        "category": 2308,
+        "context_snippets": 2308,
+        "description": 2308,
+        "formula": 2308,
+        "formula_validation": 2308,
+        "id": 2308,
+        "name": 2308,
+        "pages": 2308,
+        "properties": 2308,
+        "source_papers": 2308
+      },
+      "edge_keys": {
+        "has_evidence": 2025,
+        "object": 2025,
+        "predicate": 2025,
+        "subject": 2025
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 129,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 1312,
+          "max": 609,
+          "median": 242,
+          "p95": 372,
+          "ge_200": 787,
+          "ge_500": 4,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 2308,
+          "max": 242,
+          "median": 57,
+          "p95": 129,
+          "ge_200": 3,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 924,
+      "context_text_distinct_total_chars": 202343,
+      "context_text_max_distinct_chars_for_one_source_paper": 10093,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 49,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 35,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_32b_75_20250921_180642.json",
+      "size_bytes": 2340283,
+      "sha256": "aa8e549556684bc8a8ec8a8a025e361d038ffcdad429681a206a429b80ed5d83",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 3017,
+      "edge_count": 2723,
+      "node_keys": {
+        "category": 3017,
+        "context_snippets": 3017,
+        "description": 3017,
+        "formula": 3017,
+        "formula_validation": 3017,
+        "id": 3017,
+        "name": 3017,
+        "pages": 3017,
+        "properties": 3017,
+        "source_papers": 3017
+      },
+      "edge_keys": {
+        "has_evidence": 2723,
+        "object": 2723,
+        "predicate": 2723,
+        "subject": 2723
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 159,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 1705,
+          "max": 609,
+          "median": 242,
+          "p95": 373,
+          "ge_200": 1020,
+          "ge_500": 5,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 3017,
+          "max": 242,
+          "median": 56,
+          "p95": 126,
+          "ge_200": 3,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1220,
+      "context_text_distinct_total_chars": 271858,
+      "context_text_max_distinct_chars_for_one_source_paper": 10093,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 74,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 54,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_70b_100_20250929_004942.json",
+      "size_bytes": 515578,
+      "sha256": "9254ba5e0ce9210bdce57edb6e378638556c3ba916fe0d01a9221cda0862aede",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 725,
+      "edge_count": 533,
+      "node_keys": {
+        "category": 725,
+        "context_snippets": 725,
+        "description": 725,
+        "formula": 725,
+        "formula_validation": 725,
+        "id": 725,
+        "name": 725,
+        "pages": 725,
+        "properties": 725,
+        "source_papers": 725
+      },
+      "edge_keys": {
+        "has_evidence": 533,
+        "object": 533,
+        "predicate": 533,
+        "subject": 533
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 126,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 384,
+          "max": 609,
+          "median": 227,
+          "p95": 375,
+          "ge_200": 212,
+          "ge_500": 2,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 725,
+          "max": 307,
+          "median": 48,
+          "p95": 115,
+          "ge_200": 1,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 295,
+      "context_text_distinct_total_chars": 63521,
+      "context_text_max_distinct_chars_for_one_source_paper": 2305,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 73,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 24,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_70b_25_20250925_103657.json",
+      "size_bytes": 170136,
+      "sha256": "ff1c6b70b5e0a3777507888f61433aefb5c205f2dc38cb6430d465d4a45858dc",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 247,
+      "edge_count": 165,
+      "node_keys": {
+        "category": 247,
+        "context_snippets": 247,
+        "description": 247,
+        "formula": 247,
+        "formula_validation": 247,
+        "id": 247,
+        "name": 247,
+        "pages": 247,
+        "properties": 247,
+        "source_papers": 247
+      },
+      "edge_keys": {
+        "has_evidence": 165,
+        "object": 165,
+        "predicate": 165,
+        "subject": 165
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 55,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 130,
+          "max": 392,
+          "median": 200,
+          "p95": 370,
+          "ge_200": 65,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 247,
+          "max": 307,
+          "median": 45,
+          "p95": 121,
+          "ge_200": 1,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 99,
+      "context_text_distinct_total_chars": 19301,
+      "context_text_max_distinct_chars_for_one_source_paper": 1983,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 21,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 0,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_70b_50_20250926_144206.json",
+      "size_bytes": 343402,
+      "sha256": "0e8e0454a6972369ee199e281d49d6cd1e02469ed7e098e649acbd2b04585cfc",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 490,
+      "edge_count": 344,
+      "node_keys": {
+        "category": 490,
+        "context_snippets": 490,
+        "description": 490,
+        "formula": 490,
+        "formula_validation": 490,
+        "id": 490,
+        "name": 490,
+        "pages": 490,
+        "properties": 490,
+        "source_papers": 490
+      },
+      "edge_keys": {
+        "has_evidence": 344,
+        "object": 344,
+        "predicate": 344,
+        "subject": 344
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 90,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 261,
+          "max": 609,
+          "median": 209,
+          "p95": 384,
+          "ge_200": 136,
+          "ge_500": 2,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 490,
+          "max": 307,
+          "median": 49,
+          "p95": 118,
+          "ge_200": 1,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 201,
+      "context_text_distinct_total_chars": 41835,
+      "context_text_max_distinct_chars_for_one_source_paper": 2626,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 42,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 11,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_deepseek-r1_70b_75_20250927_214641.json",
+      "size_bytes": 456812,
+      "sha256": "9d834268c9987f8abb61ce2e1bf0e15621a4d44df64917edfcd2c19d50bb967d",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 639,
+      "edge_count": 467,
+      "node_keys": {
+        "category": 639,
+        "context_snippets": 639,
+        "description": 639,
+        "formula": 639,
+        "formula_validation": 639,
+        "id": 639,
+        "name": 639,
+        "pages": 639,
+        "properties": 639,
+        "source_papers": 639
+      },
+      "edge_keys": {
+        "has_evidence": 467,
+        "object": 467,
+        "predicate": 467,
+        "subject": 467
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 113,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 344,
+          "max": 609,
+          "median": 230,
+          "p95": 384,
+          "ge_200": 193,
+          "ge_500": 2,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 639,
+          "max": 307,
+          "median": 49,
+          "p95": 116,
+          "ge_200": 1,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 260,
+      "context_text_distinct_total_chars": 56000,
+      "context_text_max_distinct_chars_for_one_source_paper": 2305,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 59,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 23,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_100_20251008_230232.json",
+      "size_bytes": 5472677,
+      "sha256": "f5b54cee0da0f2d2f566bad4f1473f5ddc479827080bccedf97bf85a2214c3bb",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 5729,
+      "edge_count": 762,
+      "node_keys": {
+        "category": 5729,
+        "context_snippets": 5729,
+        "description": 5729,
+        "formula": 5729,
+        "formula_validation": 5729,
+        "id": 5729,
+        "name": 5729,
+        "pages": 5729,
+        "properties": 5729,
+        "source_papers": 5729
+      },
+      "edge_keys": {
+        "has_evidence": 762,
+        "object": 762,
+        "predicate": 762,
+        "subject": 762
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 34,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 6837,
+          "max": 903,
+          "median": 219,
+          "p95": 372,
+          "ge_200": 3779,
+          "ge_500": 18,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 5729,
+          "max": 530,
+          "median": 42,
+          "p95": 92,
+          "ge_200": 5,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 4578,
+      "context_text_distinct_total_chars": 962956,
+      "context_text_max_distinct_chars_for_one_source_paper": 28328,
+      "description_ge_500_by_category": {
+        "MaterialProperty": 1
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 100,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 75,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_100_20260603_182319.json",
+      "size_bytes": 40,
+      "sha256": "046666ce7892f89dae90698fd8a098a00a987757c0a95f0826354cd953ae2a50",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "empty_things_associations_placeholder",
+      "node_count": 0,
+      "edge_count": 0,
+      "node_keys": {},
+      "edge_keys": {},
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 0,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 0,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 0,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_25_20251008_185312.json",
+      "size_bytes": 1856523,
+      "sha256": "a2a3967ce5556fa067cbacd8cf82c7e1ca2a508d378c0c9bc7680b67a54224bc",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1915,
+      "edge_count": 227,
+      "node_keys": {
+        "category": 1915,
+        "context_snippets": 1915,
+        "description": 1915,
+        "formula": 1915,
+        "formula_validation": 1915,
+        "id": 1915,
+        "name": 1915,
+        "pages": 1915,
+        "properties": 1915,
+        "source_papers": 1915
+      },
+      "edge_keys": {
+        "has_evidence": 227,
+        "object": 227,
+        "predicate": 227,
+        "subject": 227
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 23,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2490,
+          "max": 713,
+          "median": 218,
+          "p95": 357,
+          "ge_200": 1398,
+          "ge_500": 8,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1915,
+          "max": 216,
+          "median": 46,
+          "p95": 100,
+          "ge_200": 2,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1499,
+      "context_text_distinct_total_chars": 302553,
+      "context_text_max_distinct_chars_for_one_source_paper": 30557,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 25,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 2,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_25_20260603_182319.json",
+      "size_bytes": 40,
+      "sha256": "046666ce7892f89dae90698fd8a098a00a987757c0a95f0826354cd953ae2a50",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "empty_things_associations_placeholder",
+      "node_count": 0,
+      "edge_count": 0,
+      "node_keys": {},
+      "edge_keys": {},
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 0,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 0,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 0,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_50_20251008_200746.json",
+      "size_bytes": 3384208,
+      "sha256": "0b272159f8f6e1a7adaefa343b54f72c96a58f9cc9b161a7df8680f9955ebb0e",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 3586,
+      "edge_count": 452,
+      "node_keys": {
+        "category": 3586,
+        "context_snippets": 3586,
+        "description": 3586,
+        "formula": 3586,
+        "formula_validation": 3586,
+        "id": 3586,
+        "name": 3586,
+        "pages": 3586,
+        "properties": 3586,
+        "source_papers": 3586
+      },
+      "edge_keys": {
+        "has_evidence": 452,
+        "object": 452,
+        "predicate": 452,
+        "subject": 452
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 27,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 4460,
+          "max": 903,
+          "median": 216,
+          "p95": 368,
+          "ge_200": 2450,
+          "ge_500": 16,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 3586,
+          "max": 216,
+          "median": 42,
+          "p95": 93,
+          "ge_200": 2,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 2822,
+      "context_text_distinct_total_chars": 581154,
+      "context_text_max_distinct_chars_for_one_source_paper": 29454,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 50,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 38,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_50_20260603_182319.json",
+      "size_bytes": 40,
+      "sha256": "046666ce7892f89dae90698fd8a098a00a987757c0a95f0826354cd953ae2a50",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "empty_things_associations_placeholder",
+      "node_count": 0,
+      "edge_count": 0,
+      "node_keys": {},
+      "edge_keys": {},
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 0,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 0,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 0,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_75_20251008_213611.json",
+      "size_bytes": 4466273,
+      "sha256": "b12424f20830d97e455db4f10276227fb96d5d37692935251a8c992b49f2cd8e",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 4688,
+      "edge_count": 626,
+      "node_keys": {
+        "category": 4688,
+        "context_snippets": 4688,
+        "description": 4688,
+        "formula": 4688,
+        "formula_validation": 4688,
+        "id": 4688,
+        "name": 4688,
+        "pages": 4688,
+        "properties": 4688,
+        "source_papers": 4688
+      },
+      "edge_keys": {
+        "has_evidence": 626,
+        "object": 626,
+        "predicate": 626,
+        "subject": 626
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 30,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 5700,
+          "max": 903,
+          "median": 219,
+          "p95": 370,
+          "ge_200": 3164,
+          "ge_500": 16,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 4688,
+          "max": 234,
+          "median": 43,
+          "p95": 92,
+          "ge_200": 3,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 3712,
+      "context_text_distinct_total_chars": 778629,
+      "context_text_max_distinct_chars_for_one_source_paper": 28633,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 75,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 70,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_google_gemini-flash-lite_75_20260603_182319.json",
+      "size_bytes": 40,
+      "sha256": "046666ce7892f89dae90698fd8a098a00a987757c0a95f0826354cd953ae2a50",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "empty_things_associations_placeholder",
+      "node_count": 0,
+      "edge_count": 0,
+      "node_keys": {},
+      "edge_keys": {},
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 0,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 0,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 0,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_120b_100_20250925_002056.json",
+      "size_bytes": 3201764,
+      "sha256": "239d810577d0def0e499f020954fe249cabb9f4cbda509501891549d02e0ab09",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 3552,
+      "edge_count": 3289,
+      "node_keys": {
+        "category": 3552,
+        "context_snippets": 3552,
+        "description": 3552,
+        "formula": 3552,
+        "formula_validation": 3552,
+        "id": 3552,
+        "name": 3552,
+        "pages": 3552,
+        "properties": 3552,
+        "source_papers": 3552
+      },
+      "edge_keys": {
+        "has_evidence": 3289,
+        "object": 3289,
+        "predicate": 3289,
+        "subject": 3289
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 58,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2495,
+          "max": 609,
+          "median": 280,
+          "p95": 377,
+          "ge_200": 1666,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 3552,
+          "max": 449,
+          "median": 92,
+          "p95": 175,
+          "ge_200": 54,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1420,
+      "context_text_distinct_total_chars": 325440,
+      "context_text_max_distinct_chars_for_one_source_paper": 7913,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 99,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 48,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_120b_25_20250923_213915.json",
+      "size_bytes": 1126258,
+      "sha256": "bba975fae4554313548b414f28b08298bfb378dc15a4a408d8b62a7be7c900f2",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1295,
+      "edge_count": 1210,
+      "node_keys": {
+        "category": 1295,
+        "context_snippets": 1295,
+        "description": 1295,
+        "formula": 1295,
+        "formula_validation": 1295,
+        "id": 1295,
+        "name": 1295,
+        "pages": 1295,
+        "properties": 1295,
+        "source_papers": 1295
+      },
+      "edge_keys": {
+        "has_evidence": 1210,
+        "object": 1210,
+        "predicate": 1210,
+        "subject": 1210
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 37,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 911,
+          "max": 471,
+          "median": 252,
+          "p95": 362,
+          "ge_200": 580,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1295,
+          "max": 239,
+          "median": 76,
+          "p95": 175,
+          "ge_200": 22,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 479,
+      "context_text_distinct_total_chars": 102065,
+      "context_text_max_distinct_chars_for_one_source_paper": 8047,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 25,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 4,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_120b_50_20250924_042317.json",
+      "size_bytes": 2002631,
+      "sha256": "f1e63b1f406b1f06c69eb1b3bb415c3bf103bac1b21769519de2347297151269",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 2313,
+      "edge_count": 2098,
+      "node_keys": {
+        "category": 2313,
+        "context_snippets": 2313,
+        "description": 2313,
+        "formula": 2313,
+        "formula_validation": 2313,
+        "id": 2313,
+        "name": 2313,
+        "pages": 2313,
+        "properties": 2313,
+        "source_papers": 2313
+      },
+      "edge_keys": {
+        "has_evidence": 2098,
+        "object": 2098,
+        "predicate": 2098,
+        "subject": 2098
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 50,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 1572,
+          "max": 609,
+          "median": 263,
+          "p95": 374,
+          "ge_200": 1013,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 2313,
+          "max": 449,
+          "median": 83,
+          "p95": 174,
+          "ge_200": 41,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 869,
+      "context_text_distinct_total_chars": 191633,
+      "context_text_max_distinct_chars_for_one_source_paper": 8047,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 50,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 22,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_120b_75_20250924_135625.json",
+      "size_bytes": 2678032,
+      "sha256": "4f1970803081e83bec82561aaf6225edd36feb04b007c119ab99aaf37d1d9793",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 3027,
+      "edge_count": 2744,
+      "node_keys": {
+        "category": 3027,
+        "context_snippets": 3027,
+        "description": 3027,
+        "formula": 3027,
+        "formula_validation": 3027,
+        "id": 3027,
+        "name": 3027,
+        "pages": 3027,
+        "properties": 3027,
+        "source_papers": 3027
+      },
+      "edge_keys": {
+        "has_evidence": 2744,
+        "object": 2744,
+        "predicate": 2744,
+        "subject": 2744
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 53,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2112,
+          "max": 609,
+          "median": 280,
+          "p95": 374,
+          "ge_200": 1422,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 3027,
+          "max": 449,
+          "median": 90,
+          "p95": 174,
+          "ge_200": 48,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1177,
+      "context_text_distinct_total_chars": 268821,
+      "context_text_max_distinct_chars_for_one_source_paper": 7925,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 75,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 37,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_20b_100_20251001_115740.json",
+      "size_bytes": 1284377,
+      "sha256": "051a685f6e4823cb06fe361d039e0ef95798c393051b9f1d9c1e69d79d03c823",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1388,
+      "edge_count": 1446,
+      "node_keys": {
+        "category": 1388,
+        "context_snippets": 1388,
+        "description": 1388,
+        "formula": 1388,
+        "formula_validation": 1388,
+        "id": 1388,
+        "name": 1388,
+        "pages": 1388,
+        "properties": 1388,
+        "source_papers": 1388
+      },
+      "edge_keys": {
+        "has_evidence": 1446,
+        "object": 1446,
+        "predicate": 1446,
+        "subject": 1446
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 48,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 935,
+          "max": 609,
+          "median": 230,
+          "p95": 379,
+          "ge_200": 530,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1388,
+          "max": 254,
+          "median": 63,
+          "p95": 160,
+          "ge_200": 12,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 542,
+      "context_text_distinct_total_chars": 112908,
+      "context_text_max_distinct_chars_for_one_source_paper": 6658,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 41,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 33,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_20b_25_20250930_172105.json",
+      "size_bytes": 837908,
+      "sha256": "8251ad54ada5220f76cb96e5261babccc1e1a87db2e28ae33abdd41bc010187a",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 992,
+      "edge_count": 1003,
+      "node_keys": {
+        "category": 992,
+        "context_snippets": 992,
+        "description": 992,
+        "formula": 992,
+        "formula_validation": 992,
+        "id": 992,
+        "name": 992,
+        "pages": 992,
+        "properties": 992,
+        "source_papers": 992
+      },
+      "edge_keys": {
+        "has_evidence": 1003,
+        "object": 1003,
+        "predicate": 1003,
+        "subject": 1003
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 43,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 668,
+          "max": 456,
+          "median": 218,
+          "p95": 366,
+          "ge_200": 361,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 992,
+          "max": 241,
+          "median": 63,
+          "p95": 160,
+          "ge_200": 8,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 378,
+      "context_text_distinct_total_chars": 74035,
+      "context_text_max_distinct_chars_for_one_source_paper": 6658,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 25,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 1,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_20b_50_20251001_025118.json",
+      "size_bytes": 1202254,
+      "sha256": "b6de612bab761b5ca8987fd70e7b32e2c82bacf11b6f1669920e1d7c7a2ca542",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1388,
+      "edge_count": 1446,
+      "node_keys": {
+        "category": 1388,
+        "context_snippets": 1388,
+        "description": 1388,
+        "formula": 1388,
+        "formula_validation": 1388,
+        "id": 1388,
+        "name": 1388,
+        "pages": 1388,
+        "properties": 1388,
+        "source_papers": 1388
+      },
+      "edge_keys": {
+        "has_evidence": 1446,
+        "object": 1446,
+        "predicate": 1446,
+        "subject": 1446
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 48,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 935,
+          "max": 609,
+          "median": 230,
+          "p95": 379,
+          "ge_200": 530,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1388,
+          "max": 254,
+          "median": 63,
+          "p95": 160,
+          "ge_200": 12,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 542,
+      "context_text_distinct_total_chars": 112908,
+      "context_text_max_distinct_chars_for_one_source_paper": 6658,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 41,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 24,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_gpt-oss_20b_75_20251001_115100.json",
+      "size_bytes": 1234159,
+      "sha256": "e541452c886511ffbb58e52f863a3befe754907468e14610961312d26decba95",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1388,
+      "edge_count": 1446,
+      "node_keys": {
+        "category": 1388,
+        "context_snippets": 1388,
+        "description": 1388,
+        "formula": 1388,
+        "formula_validation": 1388,
+        "id": 1388,
+        "name": 1388,
+        "pages": 1388,
+        "properties": 1388,
+        "source_papers": 1388
+      },
+      "edge_keys": {
+        "has_evidence": 1446,
+        "object": 1446,
+        "predicate": 1446,
+        "subject": 1446
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 48,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 935,
+          "max": 609,
+          "median": 230,
+          "p95": 379,
+          "ge_200": 530,
+          "ge_500": 1,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1388,
+          "max": 254,
+          "median": 63,
+          "p95": 160,
+          "ge_200": 12,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 542,
+      "context_text_distinct_total_chars": 112908,
+      "context_text_max_distinct_chars_for_one_source_paper": 6658,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 41,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 31,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_lbl_cborg-chat_latest_100_20251008_010852.json",
+      "size_bytes": 6147480,
+      "sha256": "a63825edc8ccc7293895e16faa774d37a6699422ad15c82d565d8cdfbced83bb",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 6659,
+      "edge_count": 7642,
+      "node_keys": {
+        "category": 6659,
+        "context_snippets": 6659,
+        "description": 6659,
+        "formula": 6659,
+        "formula_validation": 6659,
+        "id": 6659,
+        "name": 6659,
+        "pages": 6659,
+        "properties": 6659,
+        "source_papers": 6659
+      },
+      "edge_keys": {
+        "has_evidence": 7642,
+        "object": 7642,
+        "predicate": 7642,
+        "subject": 7642
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 315,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 5833,
+          "max": 903,
+          "median": 219,
+          "p95": 371,
+          "ge_200": 3240,
+          "ge_500": 15,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 6659,
+          "max": 195,
+          "median": 30,
+          "p95": 82,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 4147,
+      "context_text_distinct_total_chars": 890259,
+      "context_text_max_distinct_chars_for_one_source_paper": 27385,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 100,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 97,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_lbl_cborg-chat_latest_25_20251007_224848.json",
+      "size_bytes": 2139860,
+      "sha256": "4fb01b3fff4518fc4bdc711c3a835de297d23a1fa3d443ec13da6ffc2a88259a",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 2403,
+      "edge_count": 2640,
+      "node_keys": {
+        "category": 2403,
+        "context_snippets": 2403,
+        "description": 2403,
+        "formula": 2403,
+        "formula_validation": 2403,
+        "id": 2403,
+        "name": 2403,
+        "pages": 2403,
+        "properties": 2403,
+        "source_papers": 2403
+      },
+      "edge_keys": {
+        "has_evidence": 2640,
+        "object": 2640,
+        "predicate": 2640,
+        "subject": 2640
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 168,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2097,
+          "max": 546,
+          "median": 209,
+          "p95": 364,
+          "ge_200": 1124,
+          "ge_500": 5,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 2403,
+          "max": 181,
+          "median": 22,
+          "p95": 83,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1372,
+      "context_text_distinct_total_chars": 279875,
+      "context_text_max_distinct_chars_for_one_source_paper": 28476,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 25,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 6,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_lbl_cborg-chat_latest_50_20251007_232938.json",
+      "size_bytes": 3975276,
+      "sha256": "e938f7f3571c8b737dbe34e0cdab21ccaddf3bc22f02479999f8942b2c2c4325",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 4391,
+      "edge_count": 4855,
+      "node_keys": {
+        "category": 4391,
+        "context_snippets": 4391,
+        "description": 4391,
+        "formula": 4391,
+        "formula_validation": 4391,
+        "id": 4391,
+        "name": 4391,
+        "pages": 4391,
+        "properties": 4391,
+        "source_papers": 4391
+      },
+      "edge_keys": {
+        "has_evidence": 4855,
+        "object": 4855,
+        "predicate": 4855,
+        "subject": 4855
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 251,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 3813,
+          "max": 903,
+          "median": 219,
+          "p95": 369,
+          "ge_200": 2106,
+          "ge_500": 10,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 4391,
+          "max": 181,
+          "median": 28,
+          "p95": 81,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 2593,
+      "context_text_distinct_total_chars": 552781,
+      "context_text_max_distinct_chars_for_one_source_paper": 28476,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 50,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 53,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_lbl_cborg-chat_latest_75_20251008_001702.json",
+      "size_bytes": 5138904,
+      "sha256": "4353649f0ba63c726d703061f480bc24d6d7e8f4cbac77973e9a3bbd3a7a7fda",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 5694,
+      "edge_count": 6327,
+      "node_keys": {
+        "category": 5694,
+        "context_snippets": 5694,
+        "description": 5694,
+        "formula": 5694,
+        "formula_validation": 5694,
+        "id": 5694,
+        "name": 5694,
+        "pages": 5694,
+        "properties": 5694,
+        "source_papers": 5694
+      },
+      "edge_keys": {
+        "has_evidence": 6327,
+        "object": 6327,
+        "predicate": 6327,
+        "subject": 6327
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 292,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 4902,
+          "max": 903,
+          "median": 219,
+          "p95": 371,
+          "ge_200": 2710,
+          "ge_500": 11,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 5694,
+          "max": 181,
+          "median": 28,
+          "p95": 81,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 3413,
+      "context_text_distinct_total_chars": 729321,
+      "context_text_max_distinct_chars_for_one_source_paper": 27385,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 75,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 94,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_100_20251004_054233.json",
+      "size_bytes": 2823096,
+      "sha256": "65d49d9427fc06c40923325001f8e150c0a0913a1ca9246823f26f2fd11e340d",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 3400,
+      "edge_count": 4091,
+      "node_keys": {
+        "category": 3400,
+        "context_snippets": 3400,
+        "description": 3400,
+        "formula": 3400,
+        "formula_validation": 3400,
+        "id": 3400,
+        "name": 3400,
+        "pages": 3400,
+        "properties": 3400,
+        "source_papers": 3400
+      },
+      "edge_keys": {
+        "has_evidence": 4091,
+        "object": 4091,
+        "predicate": 4091,
+        "subject": 4091
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 172,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 2103,
+          "max": 903,
+          "median": 206,
+          "p95": 371,
+          "ge_200": 1101,
+          "ge_500": 9,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 3400,
+          "max": 262,
+          "median": 0,
+          "p95": 186,
+          "ge_200": 81,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1320,
+      "context_text_distinct_total_chars": 270638,
+      "context_text_max_distinct_chars_for_one_source_paper": 11061,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 91,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 43,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_147papers.json",
+      "size_bytes": 5315156,
+      "sha256": "da1a0fe07f8c0a443b1ee3969c0bceafa4bf9b4a7ad76ff4f8060f4ab18a77e0",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 6413,
+      "edge_count": 7792,
+      "node_keys": {
+        "category": 6413,
+        "context_snippets": 6413,
+        "description": 6413,
+        "formula": 6413,
+        "formula_validation": 6413,
+        "id": 6413,
+        "name": 6413,
+        "pages": 6413,
+        "properties": 6413,
+        "source_papers": 6413
+      },
+      "edge_keys": {
+        "has_evidence": 7792,
+        "object": 7792,
+        "predicate": 7792,
+        "subject": 7792
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 201,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 3750,
+          "max": 1890,
+          "median": 205,
+          "p95": 381,
+          "ge_200": 1959,
+          "ge_500": 12,
+          "ge_1000": 11,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 6413,
+          "max": 276,
+          "median": 0,
+          "p95": 185,
+          "ge_200": 146,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 2530,
+      "context_text_distinct_total_chars": 518497,
+      "context_text_max_distinct_chars_for_one_source_paper": 19917,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 145,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 26,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_257papers.json",
+      "size_bytes": 9041097,
+      "sha256": "47c30b0ed4fe75036c53d7aaea64dfdd436774ba7ac8f1ec27704c8505981da8",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 10625,
+      "edge_count": 13309,
+      "node_keys": {
+        "category": 10625,
+        "context_snippets": 10625,
+        "description": 10625,
+        "formula": 10625,
+        "formula_validation": 10625,
+        "id": 10625,
+        "name": 10625,
+        "pages": 10625,
+        "properties": 10625,
+        "source_papers": 10625
+      },
+      "edge_keys": {
+        "has_evidence": 13309,
+        "object": 13309,
+        "predicate": 13309,
+        "subject": 13309
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 277,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 6451,
+          "max": 1890,
+          "median": 201,
+          "p95": 378,
+          "ge_200": 3257,
+          "ge_500": 22,
+          "ge_1000": 10,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 10625,
+          "max": 276,
+          "median": 0,
+          "p95": 184,
+          "ge_200": 218,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 4517,
+      "context_text_distinct_total_chars": 916392,
+      "context_text_max_distinct_chars_for_one_source_paper": 34127,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 253,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 48,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_25_20251001_120436.json",
+      "size_bytes": 1011795,
+      "sha256": "9080fa2d7a8a5f0d9366ba7c1459359ab7639ff7dd23145acd474f8028eefb0c",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 1285,
+      "edge_count": 1449,
+      "node_keys": {
+        "category": 1285,
+        "context_snippets": 1285,
+        "description": 1285,
+        "formula": 1285,
+        "formula_validation": 1285,
+        "id": 1285,
+        "name": 1285,
+        "pages": 1285,
+        "properties": 1285,
+        "source_papers": 1285
+      },
+      "edge_keys": {
+        "has_evidence": 1449,
+        "object": 1449,
+        "predicate": 1449,
+        "subject": 1449
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 71,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 774,
+          "max": 546,
+          "median": 198,
+          "p95": 361,
+          "ge_200": 380,
+          "ge_500": 4,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 1285,
+          "max": 261,
+          "median": 0,
+          "p95": 183,
+          "ge_200": 28,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 442,
+      "context_text_distinct_total_chars": 84155,
+      "context_text_max_distinct_chars_for_one_source_paper": 11061,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 24,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 6,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_333papers.json",
+      "size_bytes": 11369220,
+      "sha256": "65e906c6ee222b247f0a05d776d9897e42309d6c42b300ae78c79c731e879c74",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 13176,
+      "edge_count": 16816,
+      "node_keys": {
+        "category": 13176,
+        "context_snippets": 13176,
+        "description": 13176,
+        "formula": 13176,
+        "formula_validation": 13176,
+        "id": 13176,
+        "name": 13176,
+        "pages": 13176,
+        "properties": 13176,
+        "source_papers": 13176
+      },
+      "edge_keys": {
+        "has_evidence": 16816,
+        "object": 16816,
+        "predicate": 16816,
+        "subject": 16816
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 298,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 8080,
+          "max": 1890,
+          "median": 201,
+          "p95": 376,
+          "ge_200": 4092,
+          "ge_500": 24,
+          "ge_1000": 9,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 13176,
+          "max": 276,
+          "median": 0,
+          "p95": 185,
+          "ge_200": 276,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 5739,
+      "context_text_distinct_total_chars": 1164034,
+      "context_text_max_distinct_chars_for_one_source_paper": 30681,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 326,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 61,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_361papers.json",
+      "size_bytes": 12127743,
+      "sha256": "2fc53b346596174c2083e18d7d3dc0474602c5080f53bf0f8155a76374c7c9ed",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 14010,
+      "edge_count": 17961,
+      "node_keys": {
+        "category": 14010,
+        "context_snippets": 14010,
+        "description": 14010,
+        "formula": 14010,
+        "formula_validation": 14010,
+        "id": 14010,
+        "name": 14010,
+        "pages": 14010,
+        "properties": 14010,
+        "source_papers": 14010
+      },
+      "edge_keys": {
+        "has_evidence": 17961,
+        "object": 17961,
+        "predicate": 17961,
+        "subject": 17961
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 312,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 8630,
+          "max": 1890,
+          "median": 201,
+          "p95": 375,
+          "ge_200": 4368,
+          "ge_500": 23,
+          "ge_1000": 9,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 14010,
+          "max": 276,
+          "median": 0,
+          "p95": 185,
+          "ge_200": 282,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 6098,
+      "context_text_distinct_total_chars": 1238363,
+      "context_text_max_distinct_chars_for_one_source_paper": 30035,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 353,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 65,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_444papers.json",
+      "size_bytes": 12714375,
+      "sha256": "201bf6c3758aefae12e91bd19bda83b46da24cc44e5bf04fceca76c913c4e04d",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 14693,
+      "edge_count": 18766,
+      "node_keys": {
+        "category": 14693,
+        "context_snippets": 14693,
+        "description": 14693,
+        "formula": 14693,
+        "formula_validation": 14693,
+        "id": 14693,
+        "name": 14693,
+        "pages": 14693,
+        "properties": 14693,
+        "source_papers": 14693
+      },
+      "edge_keys": {
+        "has_evidence": 18766,
+        "object": 18766,
+        "predicate": 18766,
+        "subject": 18766
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 310,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 9056,
+          "max": 1890,
+          "median": 201,
+          "p95": 375,
+          "ge_200": 4569,
+          "ge_500": 24,
+          "ge_1000": 9,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 14693,
+          "max": 276,
+          "median": 71,
+          "p95": 185,
+          "ge_200": 299,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 6437,
+      "context_text_distinct_total_chars": 1304091,
+      "context_text_max_distinct_chars_for_one_source_paper": 30142,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 418,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 76,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_50_20251002_095006.json",
+      "size_bytes": 1758509,
+      "sha256": "78e99f837fec600fccfffe96ffece2c6f1d488b953675916890db983407f329f",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 2186,
+      "edge_count": 2564,
+      "node_keys": {
+        "category": 2186,
+        "context_snippets": 2186,
+        "description": 2186,
+        "formula": 2186,
+        "formula_validation": 2186,
+        "id": 2186,
+        "name": 2186,
+        "pages": 2186,
+        "properties": 2186,
+        "source_papers": 2186
+      },
+      "edge_keys": {
+        "has_evidence": 2564,
+        "object": 2564,
+        "predicate": 2564,
+        "subject": 2564
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 107,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 1304,
+          "max": 903,
+          "median": 204,
+          "p95": 365,
+          "ge_200": 665,
+          "ge_500": 9,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 2186,
+          "max": 261,
+          "median": 0,
+          "p95": 183,
+          "ge_200": 45,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 779,
+      "context_text_distinct_total_chars": 155802,
+      "context_text_max_distinct_chars_for_one_source_paper": 11061,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 48,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 21,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_580papers.json",
+      "size_bytes": 13666812,
+      "sha256": "ff4625739e1c8f1c6cb35fc10267c1a6011d804da2507a39bb18cf2be0cb8e32",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 15815,
+      "edge_count": 20096,
+      "node_keys": {
+        "category": 15815,
+        "context_snippets": 15815,
+        "description": 15815,
+        "formula": 15815,
+        "formula_validation": 15815,
+        "id": 15815,
+        "name": 15815,
+        "pages": 15815,
+        "properties": 15815,
+        "source_papers": 15815
+      },
+      "edge_keys": {
+        "has_evidence": 20096,
+        "object": 20096,
+        "predicate": 20096,
+        "subject": 20096
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 328,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 9716,
+          "max": 1890,
+          "median": 200,
+          "p95": 375,
+          "ge_200": 4871,
+          "ge_500": 25,
+          "ge_1000": 9,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 15815,
+          "max": 276,
+          "median": 84,
+          "p95": 185,
+          "ge_200": 329,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 6903,
+      "context_text_distinct_total_chars": 1397333,
+      "context_text_max_distinct_chars_for_one_source_paper": 29426,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 521,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 76,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_qwen3_235b_75_20251003_084431.json",
+      "size_bytes": 2406977,
+      "sha256": "9e41ade42c53bfea31629dc6986a7e390bee5b1f1915cc708f0dee77af08b8f8",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "legacy_json2kg_core10 (app/modules/legacy/json2kg.py shape)",
+      "node_count": 2921,
+      "edge_count": 3466,
+      "node_keys": {
+        "category": 2921,
+        "context_snippets": 2921,
+        "description": 2921,
+        "formula": 2921,
+        "formula_validation": 2921,
+        "id": 2921,
+        "name": 2921,
+        "pages": 2921,
+        "properties": 2921,
+        "source_papers": 2921
+      },
+      "edge_keys": {
+        "has_evidence": 3466,
+        "object": 3466,
+        "predicate": 3466,
+        "subject": 3466
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 128,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 1810,
+          "max": 903,
+          "median": 205,
+          "p95": 367,
+          "ge_200": 941,
+          "ge_500": 9,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 2921,
+          "max": 261,
+          "median": 0,
+          "p95": 184,
+          "ge_200": 54,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 1109,
+      "context_text_distinct_total_chars": 226768,
+      "context_text_max_distinct_chars_for_one_source_paper": 11061,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 71,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 37,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_resources_saxs_algorithms_20260603_181120.json",
+      "size_bytes": 40,
+      "sha256": "046666ce7892f89dae90698fd8a098a00a987757c0a95f0826354cd953ae2a50",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "empty_things_associations_placeholder",
+      "node_count": 0,
+      "edge_count": 0,
+      "node_keys": {},
+      "edge_keys": {},
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 0,
+      "predicates_distinct": 0,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 0,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 0,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_with_code.json",
+      "size_bytes": 14211961,
+      "sha256": "3ccacaf1099e2f9da3a9b0cf4394627f2ff0acee15beddbd4355b02232dee4a5",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware",
+      "node_count": 15986,
+      "edge_count": 20203,
+      "node_keys": {
+        "abstract_text": 183,
+        "authors": 198,
+        "category": 15986,
+        "code_description": 15,
+        "code_domain": 15,
+        "code_language": 15,
+        "code_snippet": 15,
+        "context_snippets": 15986,
+        "description": 15986,
+        "doi": 198,
+        "domain_features": 15,
+        "formula": 15986,
+        "formula_validation": 15986,
+        "function_name": 15,
+        "id": 15986,
+        "institutions": 183,
+        "issue": 183,
+        "journal": 183,
+        "keywords": 183,
+        "license_warning": 15,
+        "name": 15986,
+        "pages": 15986,
+        "pages_range": 183,
+        "paper_authors": 15,
+        "paper_title": 198,
+        "properties": 15986,
+        "publication_year": 198,
+        "publications": 206,
+        "raw_category": 191,
+        "repo_commit_sha": 15,
+        "repo_default_branch": 15,
+        "repo_name": 15,
+        "repo_owner": 15,
+        "repo_url": 15,
+        "repository_license": 15,
+        "source_end_line": 15,
+        "source_file_path": 15,
+        "source_file_url": 15,
+        "source_metadata": 198,
+        "source_papers": 15986,
+        "source_score": 15,
+        "source_start_line": 15,
+        "source_type": 15,
+        "type": 15,
+        "volume": 183
+      },
+      "edge_keys": {
+        "has_evidence": 20203,
+        "object": 20203,
+        "predicate": 20203,
+        "subject": 20203
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 15,
+      "predicates_distinct": 329,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 10003,
+          "max": 1890,
+          "median": 201,
+          "p95": 384,
+          "ge_200": 5068,
+          "ge_500": 126,
+          "ge_1000": 14,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 15986,
+          "max": 276,
+          "median": 82,
+          "p95": 185,
+          "ge_200": 329,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 15,
+          "max": 859,
+          "median": 529,
+          "p95": 859,
+          "ge_200": 15,
+          "ge_500": 8,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 7018,
+      "context_text_distinct_total_chars": 1422757,
+      "context_text_max_distinct_chars_for_one_source_paper": 29426,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 528,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 134,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_xray_papers_cborg_chat.json",
+      "size_bytes": 562262,
+      "sha256": "e28b5916deddb4f7adc3b32494efffd7d8d8de0ecdd666d0f50406711f318b59",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware",
+      "node_count": 206,
+      "edge_count": 107,
+      "node_keys": {
+        "abstract_text": 183,
+        "authors": 198,
+        "category": 206,
+        "code_description": 15,
+        "code_domain": 15,
+        "code_language": 15,
+        "code_snippet": 15,
+        "context_snippets": 206,
+        "description": 206,
+        "doi": 198,
+        "domain_features": 15,
+        "formula": 206,
+        "formula_validation": 206,
+        "function_name": 15,
+        "id": 206,
+        "institutions": 183,
+        "issue": 183,
+        "journal": 183,
+        "keywords": 183,
+        "license_warning": 15,
+        "name": 206,
+        "pages": 206,
+        "pages_range": 183,
+        "paper_authors": 15,
+        "paper_title": 198,
+        "properties": 206,
+        "publication_year": 198,
+        "publications": 206,
+        "raw_category": 191,
+        "repo_commit_sha": 15,
+        "repo_default_branch": 15,
+        "repo_name": 15,
+        "repo_owner": 15,
+        "repo_url": 15,
+        "repository_license": 15,
+        "source_end_line": 15,
+        "source_file_path": 15,
+        "source_file_url": 15,
+        "source_metadata": 198,
+        "source_papers": 206,
+        "source_score": 15,
+        "source_start_line": 15,
+        "source_type": 15,
+        "type": 15,
+        "volume": 183
+      },
+      "edge_keys": {
+        "has_evidence": 107,
+        "object": 107,
+        "predicate": 107,
+        "subject": 107
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 15,
+      "predicates_distinct": 6,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 297,
+          "max": 1120,
+          "median": 287,
+          "p95": 617,
+          "ge_200": 200,
+          "ge_500": 102,
+          "ge_1000": 5,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 206,
+          "max": 186,
+          "median": 72,
+          "p95": 126,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 15,
+          "max": 859,
+          "median": 529,
+          "p95": 859,
+          "ge_200": 15,
+          "ge_500": 8,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 119,
+      "context_text_distinct_total_chars": 26068,
+      "context_text_max_distinct_chars_for_one_source_paper": 10937,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 7,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 59,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/matkg_xray_papers_cborg_chat.json.bak",
+      "size_bytes": 353952,
+      "sha256": "849fd3ef9426a59cd57efbc1a9afefde392bb99888de3ac790033ca542940f47",
+      "git_blob": "blob",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "json2kg_pre_publications_variant",
+      "node_count": 182,
+      "edge_count": 88,
+      "node_keys": {
+        "abstract_text": 160,
+        "authors": 175,
+        "category": 182,
+        "code_description": 15,
+        "code_domain": 15,
+        "code_language": 15,
+        "code_snippet": 15,
+        "context_snippets": 182,
+        "d_spacing": 15,
+        "description": 182,
+        "doi": 175,
+        "formula": 182,
+        "formula_validation": 182,
+        "function_name": 15,
+        "id": 182,
+        "institutions": 160,
+        "issue": 160,
+        "journal": 160,
+        "keywords": 160,
+        "name": 182,
+        "pages": 182,
+        "pages_range": 160,
+        "paper_authors": 15,
+        "paper_title": 175,
+        "peak_assignments": 15,
+        "peak_positions": 15,
+        "properties": 182,
+        "publication_year": 175,
+        "scattering_technique": 15,
+        "source_papers": 182,
+        "type": 15,
+        "volume": 160
+      },
+      "edge_keys": {
+        "has_evidence": 88,
+        "object": 88,
+        "predicate": 88,
+        "subject": 88
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 15,
+      "predicates_distinct": 5,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 259,
+          "max": 1120,
+          "median": 302,
+          "p95": 617,
+          "ge_200": 182,
+          "ge_500": 101,
+          "ge_1000": 5,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 182,
+          "max": 186,
+          "median": 59,
+          "p95": 124,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 15,
+          "max": 859,
+          "median": 529,
+          "p95": 859,
+          "ge_200": 15,
+          "ge_500": 8,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 95,
+      "context_text_distinct_total_chars": 22163,
+      "context_text_max_distinct_chars_for_one_source_paper": 9729,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 7,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 89,
+      "tracked_at_baseline": true
+    },
+    {
+      "path": "storage/kg/view_kg.html",
+      "size_bytes": 11165,
+      "sha256": "dbcb07971abcfa23c965cfcd410f1ccd75dad0516595bffdcf33b79b7df13d81",
+      "git_blob": "blob",
+      "shape_family": "non_json (html viewer)",
+      "tracked_at_baseline": true
+    }
+  ],
+  "untracked_working_tree": [
+    {
+      "path": "storage/kg/matkg_bl1101_v1.json",
+      "size_bytes": 589101,
+      "sha256": "b084f733c6adb93c97cf1a998b5655c023eca52a047bfd8c2fa344486f8f2922",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 416,
+      "edge_count": 805,
+      "node_keys": {
+        "abstract_text": 116,
+        "authors": 148,
+        "category": 416,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "context_snippets": 416,
+        "description": 416,
+        "device_kind": 124,
+        "doi": 148,
+        "domain_features": 32,
+        "formula": 416,
+        "formula_validation": 416,
+        "function_name": 32,
+        "id": 416,
+        "institutions": 116,
+        "ioc_record": 124,
+        "issue": 116,
+        "journal": 116,
+        "keywords": 116,
+        "license_warning": 32,
+        "mapping_file": 124,
+        "name": 416,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "pages": 416,
+        "pages_range": 116,
+        "paper_authors": 32,
+        "paper_title": 148,
+        "photon_energy_eV": 1,
+        "properties": 416,
+        "publication_year": 148,
+        "publications": 416,
+        "pv": 248,
+        "raw_category": 384,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "source_end_line": 61,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_metadata": 148,
+        "source_papers": 416,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "type": 416,
+        "volume": 116
+      },
+      "edge_keys": {
+        "has_evidence": 805,
+        "object": 805,
+        "predicate": 805,
+        "subject": 805
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 12,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 805,
+          "max": 54,
+          "median": 27,
+          "p95": 38,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 416,
+          "max": 7015,
+          "median": 78,
+          "p95": 400,
+          "ge_200": 69,
+          "ge_500": 7,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 805,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 51,
+      "source_paper_values_with_slash": 1,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 96,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v2.json",
+      "size_bytes": 613511,
+      "sha256": "8767f058385417384f05f256f980b2d6d429f2f2a04967798490eb53d57d8351",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 421,
+      "edge_count": 871,
+      "node_keys": {
+        "abstract_text": 118,
+        "authors": 150,
+        "beam_path_index": 16,
+        "category": 421,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "context_snippets": 421,
+        "description": 421,
+        "device_kind": 124,
+        "doi": 150,
+        "domain_features": 32,
+        "email": 2,
+        "formula": 421,
+        "formula_validation": 421,
+        "function_name": 32,
+        "id": 421,
+        "institutions": 118,
+        "ioc_record": 124,
+        "issue": 118,
+        "journal": 118,
+        "keywords": 118,
+        "license_warning": 32,
+        "mapping_file": 124,
+        "name": 421,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "pages": 421,
+        "pages_range": 118,
+        "paper_authors": 32,
+        "paper_title": 150,
+        "photon_energy_eV": 1,
+        "properties": 421,
+        "publication_year": 150,
+        "publications": 421,
+        "pv": 248,
+        "raw_category": 389,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "role": 2,
+        "source_end_line": 61,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_metadata": 150,
+        "source_papers": 421,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "type": 421,
+        "volume": 118
+      },
+      "edge_keys": {
+        "has_evidence": 871,
+        "object": 871,
+        "predicate": 871,
+        "subject": 871
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 18,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 871,
+          "max": 149,
+          "median": 29,
+          "p95": 126,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 421,
+          "max": 7015,
+          "median": 78,
+          "p95": 400,
+          "ge_200": 69,
+          "ge_500": 7,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 60,
+      "edge_has_evidence_non_null": 871,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 52,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 103,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v3.json",
+      "size_bytes": 613511,
+      "sha256": "91792ff3dce2deba1723240866872045c0609c6c1b572fe368719ca13ca2201c",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 421,
+      "edge_count": 871,
+      "node_keys": {
+        "abstract_text": 118,
+        "authors": 150,
+        "beam_path_index": 16,
+        "category": 421,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "context_snippets": 421,
+        "description": 421,
+        "device_kind": 124,
+        "doi": 150,
+        "domain_features": 32,
+        "email": 2,
+        "formula": 421,
+        "formula_validation": 421,
+        "function_name": 32,
+        "id": 421,
+        "institutions": 118,
+        "ioc_record": 124,
+        "issue": 118,
+        "journal": 118,
+        "keywords": 118,
+        "license_warning": 32,
+        "mapping_file": 124,
+        "name": 421,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "pages": 421,
+        "pages_range": 118,
+        "paper_authors": 32,
+        "paper_title": 150,
+        "photon_energy_eV": 1,
+        "properties": 421,
+        "publication_year": 150,
+        "publications": 421,
+        "pv": 248,
+        "raw_category": 389,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "role": 2,
+        "source_end_line": 61,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_metadata": 150,
+        "source_papers": 421,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "type": 421,
+        "volume": 118
+      },
+      "edge_keys": {
+        "has_evidence": 871,
+        "object": 871,
+        "predicate": 871,
+        "subject": 871
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 18,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 871,
+          "max": 149,
+          "median": 29,
+          "p95": 126,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 421,
+          "max": 7015,
+          "median": 78,
+          "p95": 400,
+          "ge_200": 69,
+          "ge_500": 7,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 60,
+      "edge_has_evidence_non_null": 871,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 52,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 103,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v4.json",
+      "size_bytes": 629243,
+      "sha256": "1a7facf48b565db54b69ede4b897b44dc071188650fb8fefcc8d88199d1cc445",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 421,
+      "edge_count": 937,
+      "node_keys": {
+        "abstract_text": 118,
+        "authors": 150,
+        "beam_path_index": 16,
+        "category": 421,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "context_snippets": 421,
+        "description": 421,
+        "device_kind": 124,
+        "doi": 150,
+        "domain_features": 32,
+        "email": 2,
+        "formula": 421,
+        "formula_validation": 421,
+        "function_name": 32,
+        "id": 421,
+        "institutions": 118,
+        "ioc_record": 124,
+        "issue": 118,
+        "journal": 118,
+        "keywords": 118,
+        "license_warning": 32,
+        "mapping_file": 124,
+        "name": 421,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "pages": 421,
+        "pages_range": 118,
+        "paper_authors": 32,
+        "paper_title": 150,
+        "photon_energy_eV": 1,
+        "properties": 421,
+        "publication_year": 150,
+        "publications": 421,
+        "pv": 248,
+        "raw_category": 389,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "role": 2,
+        "source_end_line": 61,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_metadata": 150,
+        "source_papers": 421,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "type": 421,
+        "volume": 118
+      },
+      "edge_keys": {
+        "has_evidence": 937,
+        "object": 937,
+        "predicate": 937,
+        "subject": 937
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "promote",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 18,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 937,
+          "max": 149,
+          "median": 31,
+          "p95": 124,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 421,
+          "max": 7015,
+          "median": 78,
+          "p95": 400,
+          "ge_200": 69,
+          "ge_500": 7,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 60,
+      "edge_has_evidence_non_null": 937,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 52,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 103,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v5.json",
+      "size_bytes": 2294647,
+      "sha256": "278aa0374178f1267acec8b502506c87857b22c0677ab29ec6d589e8bd582a30",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 1129,
+      "edge_count": 4574,
+      "node_keys": {
+        "absorption_edge": 444,
+        "abstract_text": 800,
+        "authors": 832,
+        "bar_position": 238,
+        "beam_path_index": 16,
+        "beamline_name": 5,
+        "catalog_path": 222,
+        "category": 1129,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "context_snippets": 1129,
+        "contrast": 222,
+        "description": 1129,
+        "device_kind": 124,
+        "doi": 832,
+        "domain_features": 32,
+        "email": 2,
+        "esaf_number": 26,
+        "facility": 5,
+        "formula": 1129,
+        "formula_validation": 1129,
+        "function_name": 32,
+        "geometry": 222,
+        "id": 1129,
+        "institutions": 800,
+        "ioc_record": 124,
+        "issue": 800,
+        "journal": 800,
+        "keywords": 800,
+        "license_warning": 32,
+        "literature_material": 238,
+        "literature_technique": 222,
+        "mapping_file": 124,
+        "material": 460,
+        "name": 1129,
+        "nodeId": 222,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "pages": 1129,
+        "pages_range": 800,
+        "paper_authors": 32,
+        "paper_title": 832,
+        "photon_energy_eV": 445,
+        "plan_name": 222,
+        "polarization": 444,
+        "properties": 1129,
+        "proposal_code": 21,
+        "publication_year": 832,
+        "publications": 1129,
+        "pv": 248,
+        "raw_category": 1097,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "role": 2,
+        "sample_code": 238,
+        "scan_id": 222,
+        "scan_mode": 222,
+        "scattering_technique": 444,
+        "source_end_line": 61,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_metadata": 832,
+        "source_papers": 1129,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "start_time": 222,
+        "technique_type": 222,
+        "type": 1129,
+        "uid": 222,
+        "uri": 222,
+        "volume": 800
+      },
+      "edge_keys": {
+        "has_evidence": 4574,
+        "object": 4574,
+        "predicate": 4574,
+        "subject": 4574
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "promote",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 24,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 4574,
+          "max": 149,
+          "median": 9,
+          "p95": 38,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 1129,
+          "max": 7015,
+          "median": 94,
+          "p95": 250,
+          "ge_200": 69,
+          "ge_500": 7,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 60,
+      "edge_has_evidence_non_null": 4574,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 53,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 103,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v6.json",
+      "size_bytes": 2303464,
+      "sha256": "e1a866fc6e9e2a99075662e90176badfcf29ec09e9c95ebf3f6806e8580c523f",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 1129,
+      "edge_count": 4602,
+      "node_keys": {
+        "absorption_edge": 444,
+        "abstract_text": 800,
+        "authors": 832,
+        "bar_position": 238,
+        "beam_path_index": 16,
+        "beamline_name": 5,
+        "catalog_path": 222,
+        "category": 1129,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "context_snippets": 1129,
+        "contrast": 222,
+        "description": 1129,
+        "device_kind": 124,
+        "doi": 832,
+        "domain_features": 32,
+        "email": 2,
+        "esaf_number": 26,
+        "facility": 5,
+        "formula": 1129,
+        "formula_validation": 1129,
+        "function_name": 32,
+        "geometry": 222,
+        "id": 1129,
+        "institutions": 800,
+        "ioc_record": 124,
+        "issue": 800,
+        "journal": 800,
+        "keywords": 800,
+        "license_warning": 32,
+        "literature_material": 238,
+        "literature_technique": 222,
+        "mapping_file": 124,
+        "material": 460,
+        "name": 1129,
+        "nodeId": 222,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "pages": 1129,
+        "pages_range": 800,
+        "paper_authors": 32,
+        "paper_title": 832,
+        "photon_energy_eV": 445,
+        "plan_name": 222,
+        "polarization": 444,
+        "properties": 1129,
+        "proposal_code": 21,
+        "publication_year": 832,
+        "publications": 1129,
+        "pv": 248,
+        "raw_category": 1097,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "role": 2,
+        "sample_code": 238,
+        "scan_id": 222,
+        "scan_mode": 222,
+        "scattering_technique": 444,
+        "source_end_line": 61,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_metadata": 832,
+        "source_papers": 1129,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "start_time": 222,
+        "technique_type": 222,
+        "type": 1129,
+        "uid": 222,
+        "uri": 222,
+        "volume": 800
+      },
+      "edge_keys": {
+        "has_evidence": 4602,
+        "object": 4602,
+        "predicate": 4602,
+        "subject": 4602
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "promote",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 24,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 4602,
+          "max": 149,
+          "median": 9,
+          "p95": 38,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 1129,
+          "max": 7015,
+          "median": 94,
+          "p95": 251,
+          "ge_200": 70,
+          "ge_500": 8,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 61,
+      "edge_has_evidence_non_null": 4602,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Detector": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 53,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 103,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v7.json",
+      "size_bytes": 2350374,
+      "sha256": "62d5ac887b8ea9254b0fdd545c4122b71dc5f25270f704768ce02a11d4040968",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 1143,
+      "edge_count": 4623,
+      "node_keys": {
+        "absorption_edge": 444,
+        "abstract_text": 814,
+        "access_modes": 1,
+        "als_u_status": 2,
+        "authors": 846,
+        "bar_position": 238,
+        "beam_path_index": 16,
+        "beamline_name": 5,
+        "beamline_phone": 1,
+        "catalog_path": 222,
+        "category": 1143,
+        "chunk_index": 9,
+        "chunk_text": 9,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "contacts": 1,
+        "context_snippets": 1143,
+        "contrast": 222,
+        "corpus": 10,
+        "corpus_revision": 8,
+        "description": 1143,
+        "device_kind": 124,
+        "doi": 846,
+        "domain_features": 32,
+        "email": 2,
+        "energy_range_eV": 2,
+        "entityType": 9,
+        "esaf_number": 26,
+        "facility": 5,
+        "fetch_status": 1,
+        "flux": 2,
+        "formula": 1143,
+        "formula_validation": 1143,
+        "function_name": 32,
+        "geometry": 222,
+        "id": 1143,
+        "ingested_at": 1,
+        "institutions": 814,
+        "ioc_record": 124,
+        "issue": 814,
+        "journal": 814,
+        "keywords": 814,
+        "license_warning": 32,
+        "literature_material": 238,
+        "literature_technique": 222,
+        "mapping_file": 124,
+        "material": 460,
+        "name": 1143,
+        "nodeId": 222,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "page_text": 1,
+        "pages": 1143,
+        "pages_range": 814,
+        "paper_authors": 32,
+        "paper_title": 846,
+        "phone": 2,
+        "photon_energy_eV": 445,
+        "plan_name": 222,
+        "polarization": 446,
+        "properties": 1143,
+        "proposal_code": 21,
+        "provenance": 9,
+        "provenance_url": 8,
+        "publication_year": 846,
+        "publications": 1143,
+        "pv": 248,
+        "raw_category": 1111,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "resolution_nm": 2,
+        "resolving_power": 2,
+        "retrieval_date": 1,
+        "role": 2,
+        "sample_code": 238,
+        "samples": 1,
+        "scan_id": 222,
+        "scan_mode": 222,
+        "scattering_technique": 444,
+        "section": 9,
+        "source_end_line": 61,
+        "source_epu": 1,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_kind": 10,
+        "source_metadata": 846,
+        "source_papers": 1143,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "spot_size_um": 2,
+        "start_time": 222,
+        "technique_type": 222,
+        "techniques": 1,
+        "type": 1143,
+        "uid": 222,
+        "uri": 222,
+        "volume": 814
+      },
+      "edge_keys": {
+        "has_evidence": 4623,
+        "object": 4623,
+        "predicate": 4623,
+        "subject": 4623
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "promote",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 27,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 4623,
+          "max": 149,
+          "median": 9,
+          "p95": 38,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 1143,
+          "max": 7015,
+          "median": 95,
+          "p95": 291,
+          "ge_200": 84,
+          "ge_500": 17,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 61,
+      "edge_has_evidence_non_null": 4623,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Detector": 1,
+        "Endstation": 1,
+        "DocumentChunk": 9,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 54,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 133,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v8.json",
+      "size_bytes": 938451,
+      "sha256": "cae1c7435cb9b477c2f6a3c1b0af200492c70b3c1a0a7eeda655e04f98685319",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 654,
+      "edge_count": 986,
+      "node_keys": {
+        "absorption_edge": 222,
+        "abstract_text": 351,
+        "access_modes": 1,
+        "als_u_status": 2,
+        "authors": 383,
+        "beam_path_index": 16,
+        "beamline_phone": 1,
+        "category": 654,
+        "chunk_index": 9,
+        "chunk_text": 9,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "contacts": 1,
+        "context_snippets": 654,
+        "corpus": 10,
+        "corpus_revision": 8,
+        "description": 654,
+        "device_kind": 124,
+        "doi": 383,
+        "domain_features": 32,
+        "email": 2,
+        "energy_range_eV": 2,
+        "entityType": 9,
+        "fetch_status": 1,
+        "flux": 2,
+        "formula": 654,
+        "formula_validation": 654,
+        "function_name": 32,
+        "id": 654,
+        "ingested_at": 1,
+        "institutions": 351,
+        "ioc_record": 124,
+        "issue": 351,
+        "journal": 351,
+        "keywords": 351,
+        "license_warning": 32,
+        "mapping_file": 124,
+        "name": 654,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "page_text": 1,
+        "pages": 654,
+        "pages_range": 351,
+        "paper_authors": 32,
+        "paper_title": 383,
+        "phone": 2,
+        "photon_energy_eV": 223,
+        "polarization": 224,
+        "properties": 654,
+        "provenance": 9,
+        "provenance_url": 8,
+        "publication_year": 383,
+        "publications": 654,
+        "pv": 248,
+        "raw_category": 622,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "resolution_nm": 2,
+        "resolving_power": 2,
+        "retrieval_date": 1,
+        "role": 2,
+        "samples": 1,
+        "scattering_technique": 222,
+        "section": 9,
+        "source_end_line": 61,
+        "source_epu": 1,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_kind": 10,
+        "source_metadata": 383,
+        "source_papers": 654,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "spot_size_um": 2,
+        "technique_type": 222,
+        "techniques": 1,
+        "type": 654,
+        "volume": 351
+      },
+      "edge_keys": {
+        "has_evidence": 986,
+        "object": 986,
+        "predicate": 986,
+        "subject": 986
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "promote",
+        "schema",
+        "schema_version",
+        "sim_nodes_removed",
+        "sim_nodes_removed_at",
+        "sim_nodes_removed_categories",
+        "sim_nodes_removed_count",
+        "sim_nodes_removed_edges_count",
+        "sources_landed",
+        "sources_skipped"
+      ],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 21,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 986,
+          "max": 149,
+          "median": 32,
+          "p95": 126,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 654,
+          "max": 7015,
+          "median": 95,
+          "p95": 400,
+          "ge_200": 84,
+          "ge_500": 17,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 61,
+      "edge_has_evidence_non_null": 986,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Detector": 1,
+        "Endstation": 1,
+        "DocumentChunk": 9,
+        "Condition": 1,
+        "BeamlineStage": 4
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 54,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 133,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_bl1101_v9.json",
+      "size_bytes": 686074,
+      "sha256": "60bc5df174dcf70917882c94f552909183279cc4a1894183364e1a1700b29534",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 435,
+      "edge_count": 986,
+      "node_keys": {
+        "abstract_text": 132,
+        "als_u_status": 1,
+        "authors": 164,
+        "beam_path_index": 16,
+        "beamline_phone": 1,
+        "category": 435,
+        "chunk_index": 9,
+        "chunk_text": 9,
+        "code_description": 32,
+        "code_domain": 32,
+        "code_language": 32,
+        "code_snippet": 32,
+        "contacts": 1,
+        "context_snippets": 435,
+        "corpus": 10,
+        "corpus_revision": 5,
+        "description": 435,
+        "device_kind": 124,
+        "doi": 164,
+        "domain_features": 32,
+        "email": 2,
+        "energy_range_eV": 1,
+        "entityType": 9,
+        "fetch_status": 1,
+        "flux": 1,
+        "formula": 435,
+        "formula_validation": 435,
+        "function_name": 32,
+        "id": 435,
+        "ingested_at": 1,
+        "institutions": 132,
+        "ioc_record": 124,
+        "issue": 132,
+        "journal": 132,
+        "keywords": 132,
+        "license_warning": 32,
+        "mapping_file": 124,
+        "name": 435,
+        "ophyd_class": 124,
+        "ophyd_name": 124,
+        "page_text": 1,
+        "pages": 435,
+        "pages_range": 132,
+        "paper_authors": 32,
+        "paper_title": 164,
+        "photon_energy_eV": 1,
+        "polarization": 1,
+        "properties": 435,
+        "provenance": 9,
+        "provenance_url": 5,
+        "publication_year": 164,
+        "publications": 435,
+        "pv": 248,
+        "raw_category": 403,
+        "repo_commit_sha": 69,
+        "repo_default_branch": 32,
+        "repo_name": 32,
+        "repo_owner": 32,
+        "repo_url": 40,
+        "repository_license": 32,
+        "resolution_nm": 1,
+        "resolving_power": 1,
+        "retrieval_date": 1,
+        "role": 2,
+        "samples": 1,
+        "section": 9,
+        "source_end_line": 61,
+        "source_epu": 1,
+        "source_file_path": 61,
+        "source_file_url": 32,
+        "source_kind": 10,
+        "source_metadata": 164,
+        "source_papers": 435,
+        "source_score": 32,
+        "source_start_line": 61,
+        "source_type": 32,
+        "source_url": 3,
+        "spot_size_um": 1,
+        "techniques": 1,
+        "type": 435,
+        "volume": 132
+      },
+      "edge_keys": {
+        "has_evidence": 986,
+        "object": 986,
+        "predicate": 986,
+        "subject": 986
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "created",
+        "description",
+        "extraction_version",
+        "graph_snapshot",
+        "id_prefix",
+        "ingest_version",
+        "kg",
+        "namespace",
+        "promote",
+        "schema",
+        "schema_version",
+        "sources_landed",
+        "sources_skipped",
+        "version"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 32,
+      "predicates_distinct": 21,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 986,
+          "max": 149,
+          "median": 32,
+          "p95": 126,
+          "ge_200": 0,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 435,
+          "max": 7015,
+          "median": 79,
+          "p95": 410,
+          "ge_200": 83,
+          "ge_500": 16,
+          "ge_1000": 2,
+          "ge_2000": 1
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 32,
+          "max": 3692,
+          "median": 1310,
+          "p95": 3458,
+          "ge_200": 28,
+          "ge_500": 24,
+          "ge_1000": 18,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 61,
+      "edge_has_evidence_non_null": 986,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {
+        "Beamline": 1,
+        "Endstation": 1,
+        "Condition": 1,
+        "BeamlineStage": 4,
+        "DocumentChunk": 9
+      },
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 53,
+      "source_paper_values_with_slash": 2,
+      "strings_matching_local_path_pattern": 2,
+      "strings_matching_secret_pattern": 1,
+      "pattern_hits_by_field": {
+        "secret_like@node.code_snippet": 1,
+        "local_path@node.code_snippet": 2
+      },
+      "strings_with_http_url": 128,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_rsoxs_v1.json",
+      "size_bytes": 9409120,
+      "sha256": "273a4501ee424e0a1193124c49cddb6fa42b834a6a4f9026d74f1c9af47579b5",
+      "top_level_keys": [
+        "associations",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware",
+      "node_count": 7022,
+      "edge_count": 13848,
+      "node_keys": {
+        "abstract_text": 3216,
+        "authors": 3247,
+        "category": 7022,
+        "code_description": 31,
+        "code_domain": 31,
+        "code_language": 31,
+        "code_snippet": 31,
+        "context_snippets": 7022,
+        "description": 7022,
+        "doi": 3247,
+        "domain_features": 31,
+        "formula": 7022,
+        "formula_validation": 7022,
+        "function_name": 31,
+        "id": 7022,
+        "importance": 3216,
+        "institutions": 3216,
+        "issue": 3216,
+        "journal": 3216,
+        "keywords": 3216,
+        "license_warning": 31,
+        "name": 7022,
+        "pages": 7022,
+        "pages_range": 3216,
+        "paper_authors": 31,
+        "paper_title": 3247,
+        "properties": 7022,
+        "publication_year": 3247,
+        "publications": 7022,
+        "raw_category": 6991,
+        "repo_commit_sha": 31,
+        "repo_default_branch": 31,
+        "repo_name": 31,
+        "repo_owner": 31,
+        "repo_url": 31,
+        "repository_license": 31,
+        "source_end_line": 31,
+        "source_file_path": 31,
+        "source_file_url": 31,
+        "source_metadata": 3247,
+        "source_papers": 7022,
+        "source_score": 31,
+        "source_start_line": 31,
+        "source_type": 31,
+        "type": 31,
+        "volume": 3216
+      },
+      "edge_keys": {
+        "has_evidence": 13848,
+        "object": 13848,
+        "predicate": 13848,
+        "raw_predicate": 80,
+        "subject": 13848
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": false,
+      "codesnippet_nodes": 31,
+      "predicates_distinct": 23,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 71,
+          "max": 1009,
+          "median": 247,
+          "p95": 500,
+          "ge_200": 39,
+          "ge_500": 20,
+          "ge_1000": 1,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 7022,
+          "max": 231,
+          "median": 0,
+          "p95": 128,
+          "ge_200": 5,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 31,
+          "max": 9152,
+          "median": 1408,
+          "p95": 4862,
+          "ge_200": 31,
+          "ge_500": 29,
+          "ge_1000": 23,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 61,
+      "context_text_distinct_total_chars": 17301,
+      "context_text_max_distinct_chars_for_one_source_paper": 6813,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 86,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 127,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_rsoxs_v2.json",
+      "size_bytes": 20931632,
+      "sha256": "2e5b6d4d6428519f86f59355042027f3ad091342718620e53dcf0dc1b6352092",
+      "top_level_keys": [
+        "associations",
+        "metadata",
+        "things"
+      ],
+      "shape_family": "json2kg_publication_aware+metadata",
+      "node_count": 12014,
+      "edge_count": 27919,
+      "node_keys": {
+        "abstract_text": 5225,
+        "authors": 5256,
+        "category": 12014,
+        "code_description": 31,
+        "code_domain": 31,
+        "code_language": 31,
+        "code_snippet": 31,
+        "context_snippets": 12014,
+        "description": 12014,
+        "doi": 5256,
+        "domain_features": 31,
+        "formula": 12014,
+        "formula_validation": 12014,
+        "function_name": 31,
+        "id": 12014,
+        "importance": 5727,
+        "institutions": 5225,
+        "issue": 5225,
+        "journal": 5225,
+        "keywords": 5225,
+        "license_warning": 31,
+        "name": 12014,
+        "pages": 12014,
+        "pages_range": 5225,
+        "paper_authors": 31,
+        "paper_title": 5256,
+        "properties": 12014,
+        "publication_year": 5256,
+        "publications": 12014,
+        "raw_category": 11983,
+        "repo_commit_sha": 31,
+        "repo_default_branch": 31,
+        "repo_name": 31,
+        "repo_owner": 31,
+        "repo_url": 31,
+        "repository_license": 31,
+        "source_end_line": 31,
+        "source_file_path": 31,
+        "source_file_url": 31,
+        "source_metadata": 9809,
+        "source_papers": 12014,
+        "source_score": 31,
+        "source_start_line": 31,
+        "source_type": 31,
+        "type": 31,
+        "volume": 5225
+      },
+      "edge_keys": {
+        "has_evidence": 27919,
+        "object": 27919,
+        "predicate": 27919,
+        "raw_predicate": 248,
+        "subject": 27919
+      },
+      "has_top_level_metadata": true,
+      "metadata_keys": [
+        "corpus_revision",
+        "extraction_date",
+        "github_code_snippets",
+        "graph_snapshot",
+        "id_prefix",
+        "kg",
+        "processed_files",
+        "processed_pages_total",
+        "processed_pages_with_terms",
+        "schema_version",
+        "source_terms",
+        "version"
+      ],
+      "has_prov_metadata": false,
+      "embedded_graph_snapshot_sha256_matches_file": false,
+      "codesnippet_nodes": 31,
+      "predicates_distinct": 33,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 86,
+          "max": 1009,
+          "median": 247,
+          "p95": 500,
+          "ge_200": 49,
+          "ge_500": 21,
+          "ge_1000": 1,
+          "ge_2000": 0
+        },
+        "node.description": {
+          "count": 12014,
+          "max": 315,
+          "median": 80,
+          "p95": 134,
+          "ge_200": 16,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 31,
+          "max": 9152,
+          "median": 1408,
+          "p95": 4862,
+          "ge_200": 31,
+          "ge_500": 29,
+          "ge_1000": 23,
+          "ge_2000": 12
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 73,
+      "context_text_distinct_total_chars": 20018,
+      "context_text_max_distinct_chars_for_one_source_paper": 6313,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 135,
+      "source_paper_values_with_slash": 0,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 129,
+      "tracked_at_baseline": false
+    },
+    {
+      "path": "storage/kg/matkg_rsoxs_v3.json",
+      "size_bytes": 29081758,
+      "sha256": "55cbed5779066e3bb854c997d9443a6108cefe4358d9f3a66a42cff2c8d82c95",
+      "top_level_keys": [
+        "corpus_revision",
+        "edges",
+        "generated_at",
+        "graph_id",
+        "nodes",
+        "prov_metadata",
+        "source_terms"
+      ],
+      "shape_family": "nodes_edges_papers_prov (ingest_rsoxs_v3 style; not json2kg output)",
+      "node_count": 17853,
+      "edge_count": 93414,
+      "node_keys": {
+        "aliases": 17851,
+        "corpus_revision": 1,
+        "description": 17853,
+        "entityType": 17853,
+        "graph_id": 17853,
+        "http://www.w3.org/ns/prov#startedAtTime": 1,
+        "id": 17853,
+        "label": 17853,
+        "pages": 17851,
+        "papers": 17851,
+        "path": 1,
+        "slots": 17851,
+        "type": 2
+      },
+      "edge_keys": {
+        "has_evidence": 57712,
+        "object": 93414,
+        "predicate": 93414,
+        "subject": 93414,
+        "type": 35702
+      },
+      "has_top_level_metadata": false,
+      "metadata_keys": [],
+      "has_prov_metadata": true,
+      "codesnippet_nodes": 7,
+      "predicates_distinct": 41,
+      "text_lengths_chars": {
+        "edge.has_evidence": {
+          "count": 0
+        },
+        "node.context_snippets[].text": {
+          "count": 0
+        },
+        "node.description": {
+          "count": 17853,
+          "max": 315,
+          "median": 87,
+          "p95": 137,
+          "ge_200": 23,
+          "ge_500": 0,
+          "ge_1000": 0,
+          "ge_2000": 0
+        },
+        "node.abstract_text": {
+          "count": 0
+        },
+        "node.code_snippet": {
+          "count": 0
+        },
+        "node.domain_features[].feature_source_text": {
+          "count": 0
+        }
+      },
+      "edge_has_evidence_multi_joined": 0,
+      "edge_has_evidence_non_null": 0,
+      "context_text_distinct_values": 0,
+      "context_text_distinct_total_chars": 0,
+      "context_text_max_distinct_chars_for_one_source_paper": 0,
+      "description_ge_500_by_category": {},
+      "distinct_abstract_texts": 0,
+      "distinct_source_papers": 246,
+      "source_paper_values_with_slash": 246,
+      "strings_matching_local_path_pattern": 0,
+      "strings_matching_secret_pattern": 0,
+      "pattern_hits_by_field": {},
+      "strings_with_http_url": 35703,
+      "tracked_at_baseline": false
+    }
+  ],
+  "reviewer_findings": [
+    "OBSERVED: 47 tracked paths = 45 *.json + 1 *.json.bak + 1 view_kg.html; 158,641,676 bytes total.",
+    "OBSERVED: shape families: 38 legacy core-10 things/associations (app/modules/legacy/json2kg.py node layout), 2 current json2kg publication-aware (matkg_with_code.json, matkg_xray_papers_cborg_chat.json), 1 pre-publications variant (.bak), 5 empty placeholders (identical 40-byte blob 2c697ea), 1 HTML viewer.",
+    "OBSERVED: 0 of 47 carry prov_metadata or a top-level metadata object; none has an adjacent manifest; no file records its own extraction/schema/corpus identity.",
+    "OBSERVED: edge has_evidence is null on every edge of every tracked file (0 non-null). Evidence text lives in node.context_snippets[].text instead.",
+    "OBSERVED: node.context_snippets[].text exists in 38 non-empty literature files; 645 values >=500 chars, 90 values >=1000 chars, max 1890 chars; 17,922,311 distinct context chars across tracked files; up to 34,127 distinct context chars attributable to ONE source paper within one file (matkg_qwen3_235b_257papers.json).",
+    "OBSERVED in code: context_snippets text is verbatim page text (app/modules/extract_terms.py:845-859 takes the first context_length=50 tokens of the matching sentence, or of the page when no sentence matches). INFERENCE: all measured context text is verbatim source text; long values are sentences without sentence breaks, and many short values per paper accumulate.",
+    "OBSERVED: abstract_text is null everywhere; description max 530 chars (1 value >=500); code_snippet max 859 chars (GitHub-sourced snippets with repo/license provenance in 3 files).",
+    "OBSERVED: 0 tracked files match local-path or secret-like regexes; source_papers values are bare filenames (no slashes).",
+    "UNTRACKED (gitignored by .gitignore:182, present in working tree only): matkg_rsoxs_v1-3 and matkg_bl1101_v1-9, including both defaults named in app/modules/f2w_agent/multi_kg.py:13-16. A clean checkout/CI image therefore does not contain the default graphs.",
+    "UNTRACKED: matkg_rsoxs_v3.json is a different payload family (nodes/edges, label/entityType/papers/slots, prov_metadata) written by scripts/ingest_rsoxs_v3.py:447-463, not by json2kg; readers accept it via api.py:1341-1342 things|nodes fallback.",
+    "UNTRACKED: bl1101_v1-v9 code_snippet fields each contain 1 api_key literal (classified placeholder-like, not a credential; value not recorded) and 2 /tmp/ path strings; 9 DocumentChunk descriptions >=500 chars in v7-v9 (ops-document text). These would need review before any commit.",
+    "OBSERVED: metadata.graph_snapshot.sha256 embedded by promote_rsoxs_snapshot (app/modules/tiled_sim.py:982-996) never equals the final file hash (False for rsoxs_v2 and every bl1101 snapshot that carries it). The sidecar storage/fixtures/rsoxs_snapshot_promote.json records 7608e224... while the working-tree matkg_rsoxs_v2.json hashes to 2e5b6d64.... INFERENCE: the digest is taken from the tmp file before graph_snapshot is inserted, so the in-file hash is self-referentially stale by construction."
+  ],
+  "owner_decisions": [
+    "O-D1 (2026-10-12, docs/adr/content-disclosure.md:136-137): KG JSON in storage/kg, including verbatim context snippets, stays in the Git repo and the Docker image. This is an owner exception to D19 for stored KG artifacts only. The snippet-length and volume figures in this inventory are INFORMATIONAL and are not a commit-ready blocker. Raw PDFs, full parsed paper bodies, crops, credentials, local paths and operational databases remain forbidden. Serving to users (routes/SSE/traces/exports) still goes through the T21A projection.",
+    "E3 (2026-10-09): storage/ may be baked into images. The Tiled catalog DB is excluded except in a :local image. E4: storage/source_index is excluded."
+  ]
+}

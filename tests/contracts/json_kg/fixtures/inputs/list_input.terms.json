@@ -1,0 +1,4 @@
+[
+  {"term": "Synth List A", "relations": [{"relation": "TEST", "related_term": "Synth List B"}]},
+  {"name": "Synth List B", "definition": "Defined after its stub was created.", "category": "Material"}
+]

@@ -1,0 +1,170 @@
+{
+  "metadata": {
+    "id_prefix": "matkg",
+    "kg": "synthetic_contract",
+    "schema_version": "contract-fixture-1",
+    "note": "Synthetic T23A fixture. No real paper text."
+  },
+  "terms": [
+    {
+      "term": "Synth Polymer A",
+      "category": "ConjugatedPolymer",
+      "definition": "Synthetic placeholder polymer.",
+      "pages": [2],
+      "source_papers": ["paper_alpha.pdf"],
+      "context_snippets": [
+        {"text": "Synthetic placeholder sentence one.", "source_paper": "paper_alpha.pdf", "page": 2}
+      ],
+      "formula": "C4H4S",
+      "formula_validation": {"status": "ok", "canonical": "C4H4S"},
+      "properties": [{"property": "bandgap", "value": 1.9, "unit": "eV"}],
+      "importance": "high",
+      "confidence": 0.9,
+      "evidence_ref": {"store": "private", "sha256": "0000000000000000000000000000000000000000000000000000000000000001"},
+      "paper_title": "Synthetic Title Alpha",
+      "publication_year": 2001,
+      "doi": "10.0000/synthetic.alpha",
+      "authors": "Author One",
+      "paper_authors": ["ignored input-only field"],
+      "relations": [
+        {"relation": "has_application", "related_term": "Synth Device", "evidence": ["ev one", "ev two"]},
+        {"relation": "has_application", "related_term": "Synth Device", "evidence": ["duplicate edge is dropped"]},
+        {"relation": "measured_by", "related_id": "matkg:Synth_Technique", "related_term": "ignored when related_id set", "evidence": "scalar ev", "raw_predicate": "MeasuredBy"},
+        {"related_term": "Synth Target Two"},
+        {"relation": "skipped_no_target", "related_term": ""},
+        {"relation": "uses_raw_relation", "related_term": "Synth Device", "raw_relation": "UsesRawRelation"}
+      ]
+    },
+    {
+      "term": "Synth Polymer A",
+      "category": "Unknown",
+      "definition": "Second definition does not override the first.",
+      "pages": [9],
+      "source_papers": ["paper_beta.pdf", "paper_alpha.pdf"],
+      "context_snippets": [
+        {"text": "Second-occurrence snippet is not merged.", "source_paper": "paper_beta.pdf", "page": 9}
+      ],
+      "polarization": "linear",
+      "importance": "low"
+    },
+    {
+      "term": "Synth Device",
+      "category": "Device",
+      "definition": "Fills the empty stub description.",
+      "raw_category": "DeviceRaw"
+    },
+    {
+      "id": "matkg:Synth_Technique",
+      "name": "Synth Technique",
+      "category": "XRayScatteringAnalysis",
+      "pages": [2],
+      "source_papers": ["paper_alpha.pdf"]
+    },
+    {
+      "term": "Synth Routine",
+      "category": "CodeSnippet",
+      "pages": [3],
+      "source_papers": ["paper_alpha.pdf"]
+    },
+    {
+      "category": "Material",
+      "definition": "Nameless term becomes UNKNOWN."
+    },
+    {
+      "term": "Polymère β-phase_x",
+      "category": "Material",
+      "definition": "Non-ASCII label; ID keeps only [A-Za-z0-9-].",
+      "pages": 4,
+      "source_papers": "paper_gamma.pdf"
+    },
+    {
+      "term": "Synth Motor",
+      "id_prefix": "beamline",
+      "category": "Motor",
+      "relations": [
+        {"relation": "mounted_on", "related_term": "Synth Stage"},
+        {"relation": "same_prefix_curie", "related_id": "matkg:Synth Polymer A"}
+      ]
+    },
+    {
+      "term": "Synth Multi Paper",
+      "category": "Material",
+      "source_papers": ["paper_beta.pdf", "paper_alpha.pdf"],
+      "paper_title": "Stale scalar title is not smeared",
+      "source_metadata": {
+        "paper_beta.pdf": {"paper_title": "Synthetic Title Beta", "publication_year": 2003, "keywords": ["k1", "k2"]},
+        "paper_alpha.pdf": {"paper_title": "Synthetic Title Alpha", "doi": "10.0000/synthetic.alpha", "unknown_field": "dropped"}
+      }
+    },
+    {
+      "term": "Synth Explicit Pubs",
+      "category": "Material",
+      "publications": [
+        {"source_paper": "paper_zeta.pdf", "paper_title": "Synthetic Title Zeta", "journal": ""},
+        "not-a-dict",
+        {"source_paper": "paper_eta.pdf", "volume": "7", "issue": "2", "pages_range": "1-9"}
+      ]
+    }
+  ],
+  "code_snippets": [
+    {
+      "function_name": "synth_fit",
+      "source_paper": "paper_alpha.pdf",
+      "page": 2,
+      "code_language": "python",
+      "code_description": "Synthetic fitting routine.",
+      "code_domain": "synthetic",
+      "domain_features": [
+        {"feature_name": "q_range", "feature_value": 0.5, "feature_units": "A^-1", "feature_source_text": "synthetic"},
+        {"feature_name": "empty", "feature_value": ""},
+        "not-a-dict"
+      ],
+      "source_type": "github",
+      "repo_url": "https://github.com/example/synthetic",
+      "repo_owner": "example",
+      "repo_name": "synthetic",
+      "repo_default_branch": "main",
+      "repo_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+      "source_file_path": "src/synth.py",
+      "source_file_url": "https://github.com/example/synthetic/blob/0123456/src/synth.py",
+      "source_start_line": 10,
+      "source_end_line": 20,
+      "repository_license": "MIT",
+      "license_warning": null,
+      "source_score": 3.5,
+      "authors": "Snippet Author",
+      "code_snippet": "import math\ndef synth_fit(xs, ys):\n    total = 0.0\n    for x, y in zip(xs, ys):\n        total += (y - math.sin(x)) ** 2\n    values = [total, len(xs)]\n    return values[0] / max(values[1], 1)\n"
+    },
+    {
+      "source_paper": "paper_alpha.pdf",
+      "page": 7,
+      "code_language": "python",
+      "code_snippet": "import os\nresult_values = []\nfor index in range(10):\n    result_values.append(index * 2)\nsummary = {'count': len(result_values), 'total': sum(result_values)}\nprint(summary, os.sep)\n"
+    },
+    {
+      "id": "Synth Curated Snip",
+      "curated": true,
+      "source_paper": "paper_beta.pdf",
+      "page": 0,
+      "code_snippet": "x = 1"
+    },
+    {
+      "function_name": "too_short",
+      "source_paper": "paper_alpha.pdf",
+      "page": 2,
+      "code_snippet": "def too_short():\n    return 1\n"
+    },
+    {
+      "function_name": "unbalanced",
+      "source_paper": "paper_alpha.pdf",
+      "page": 2,
+      "code_snippet": "def unbalanced(x):\n    return (x + 1\n    # filler line for length\n    # filler line for length\n    # filler line for length\n    # filler line for length\n    # filler line for length\n"
+    },
+    {
+      "function_name": "synth_fit",
+      "source_paper": "paper_alpha.pdf",
+      "page": 2,
+      "code_snippet": "import math\ndef synth_fit(xs, ys):\n    total = 0.0\n    for x, y in zip(xs, ys):\n        total += (y - math.sin(x)) ** 2\n    values = [total, len(xs)]\n    return values[0] / max(values[1], 1)\n"
+    }
+  ]
+}

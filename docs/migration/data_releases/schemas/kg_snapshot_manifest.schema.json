@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f2w:schema:kg_snapshot_manifest:1",
+  "title": "F2W KG snapshot manifest (PROPOSED, T23A/T26A)",
+  "description": "Sidecar manifest.json committed next to an immutable graph.json. The graph payload is unchanged json2kg output. The manifest never records the Git commit that contains it, nor its own hash.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version", "artifact_type", "corpus", "snapshot_id", "graph_id",
+    "graph", "parent", "created", "schema", "extraction", "corpus_revision",
+    "inputs", "validation", "disclosure"
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "repo_path": {
+      "description": "Repository-relative POSIX path. No absolute paths, no '..', no backslashes.",
+      "type": "string",
+      "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\\\)[A-Za-z0-9._/-]+$"
+    },
+    "private_ref": {
+      "description": "Opaque protected reference to private material (never a bearer URL or a local filesystem path).",
+      "type": "string",
+      "pattern": "^private:[A-Za-z0-9._:/-]+$"
+    },
+    "ref": {"oneOf": [{"$ref": "#/$defs/repo_path"}, {"$ref": "#/$defs/private_ref"}]}
+  },
+  "properties": {
+    "manifest_version": {"const": "1"},
+    "artifact_type": {"const": "f2w.kg_snapshot"},
+    "corpus": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "snapshot_id": {"type": "string", "pattern": "^v[1-9][0-9]*$"},
+    "graph_id": {
+      "description": "Identity existing readers derive from the compatibility filename (multi_kg.graph_id_for_path), e.g. rsoxs_v4 or bl1101.",
+      "type": "string", "minLength": 1
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "format", "serialization", "node_count", "edge_count"],
+      "properties": {
+        "path": {"const": "graph.json"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size_bytes": {"type": "integer", "minimum": 1},
+        "format": {"enum": ["f2w.json2kg.things_associations.v1"]},
+        "serialization": {"const": "json.dumps(indent=2, ensure_ascii=False); utf-8; no trailing newline"},
+        "node_count": {"type": "integer", "minimum": 0},
+        "edge_count": {"type": "integer", "minimum": 0},
+        "codesnippet_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "compat_paths": {
+      "description": "Flat legacy-reader copies (e.g. storage/kg/matkg_rsoxs_v4.json). Each must be byte-identical to graph.json (same sha256, same Git blob). Never symlinks.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {"path": {"$ref": "#/$defs/repo_path"}, "sha256": {"$ref": "#/$defs/sha256"}}
+      }
+    },
+    "parent": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["snapshot_id", "graph_sha256", "relation"],
+          "properties": {
+            "snapshot_id": {"type": "string"},
+            "graph_sha256": {"$ref": "#/$defs/sha256"},
+            "data_commit": {"$ref": "#/$defs/git_sha", "description": "Commit of the PARENT (already exists; not circular)."},
+            "relation": {"enum": ["rebuild", "edit_reconciliation", "repair", "disclosure_split", "legacy_adoption"]}
+          }
+        }
+      ]
+    },
+    "created": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "tool", "code_commit", "json2kg_sha256"],
+      "properties": {
+        "at": {"type": "string", "format": "date-time"},
+        "tool": {"type": "string"},
+        "code_commit": {"$ref": "#/$defs/git_sha", "description": "Code revision that built the graph (an existing commit)."},
+        "json2kg_sha256": {"$ref": "#/$defs/sha256"},
+        "run_id": {"type": "string"},
+        "profile": {"enum": ["local", "als-dev", "als-prod", "ci"]}
+      }
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "path", "sha256"],
+      "properties": {
+        "name": {"type": "string"},
+        "path": {"$ref": "#/$defs/repo_path"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "version": {"type": "string"},
+        "import_fingerprint": {"$ref": "#/$defs/sha256", "description": "Hash of the schema-plus-mapping used by the importer (T22B)."}
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revisions"],
+      "properties": {
+        "revisions": {
+          "description": "Every contributing extraction run/settings revision. A multi-run corpus lists several; never one invented model.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["extractor", "version"],
+            "properties": {
+              "extractor": {"type": "string"},
+              "version": {"type": "string"},
+              "settings_revision": {"type": "string"},
+              "model": {"type": ["string", "null"]},
+              "run_ids": {"type": "array", "items": {"type": "string"}},
+              "unknown": {"type": "boolean", "description": "true when provenance of a legacy run cannot be recovered"}
+            }
+          }
+        }
+      }
+    },
+    "corpus_revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source_count", "sources_checksum"],
+      "properties": {
+        "id": {"type": "string"},
+        "source_count": {"type": "integer", "minimum": 0},
+        "sources_checksum": {"$ref": "#/$defs/sha256", "description": "sha256 over the sorted newline-joined list of per-source sha256 values."},
+        "source_list_ref": {"$ref": "#/$defs/ref"}
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "sha256", "ref"],
+        "properties": {
+          "role": {"enum": ["terms_snapshot", "code_snippets", "edit_journal", "seed_graph", "mapping_file"]},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "ref": {"$ref": "#/$defs/ref"}
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policy_version": {"type": "string"},
+        "private_refs_checksum": {"$ref": "#/$defs/sha256"},
+        "required_private_assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "sha256"],
+            "properties": {"ref": {"$ref": "#/$defs/private_ref"}, "sha256": {"$ref": "#/$defs/sha256"}}
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "report_sha256"],
+      "properties": {
+        "status": {"enum": ["pass", "fail"]},
+        "report_sha256": {"$ref": "#/$defs/sha256"},
+        "report_ref": {"$ref": "#/$defs/ref"},
+        "suite": {"type": "string"}
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_version", "status", "report_sha256"],
+      "properties": {
+        "check_version": {"type": "string"},
+        "status": {"enum": ["pass", "fail", "owner_waiver"]},
+        "report_sha256": {"$ref": "#/$defs/sha256"},
+        "waiver_ref": {"type": "string"}
+      }
+    },
+    "edit_reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["journal_sha256", "base_snapshot_id", "applied_edit_count"],
+      "properties": {
+        "journal_ref": {"$ref": "#/$defs/ref"},
+        "journal_sha256": {"$ref": "#/$defs/sha256"},
+        "base_snapshot_id": {"type": "string"},
+        "applied_edit_count": {"type": "integer", "minimum": 0},
+        "conflicts_resolved": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "things": [
+    {
+      "id": "matkg:SynthEmptyMeta",
+      "name": "Synth Empty Meta",
+      "category": "Unknown",
+      "raw_category": null,
+      "description": "N/A",
+      "pages": [],
+      "source_papers": [],
+      "context_snippets": [],
+      "formula": "",
+      "formula_validation": {},
+      "properties": [],
+      "publication_year": null,
+      "paper_title": null,
+      "source_metadata": {},
+      "publications": [],
+      "authors": [],
+      "institutions": [],
+      "doi": null,
+      "journal": null,
+      "volume": null,
+      "issue": null,
+      "pages_range": null,
+      "abstract_text": null,
+      "keywords": []
+    }
+  ],
+  "associations": []
+}

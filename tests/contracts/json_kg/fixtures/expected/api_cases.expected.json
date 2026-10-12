@@ -1,0 +1,261 @@
+{
+  "cases": {
+    "strict_snippets_false_accepts_unbalanced": {
+      "things": [
+        {
+          "id": "matkg:snippetloosepaperloosepdfp168f2ae43",
+          "name": "loose snippet",
+          "category": "CodeSnippet",
+          "type": "matkg:CodeSnippet",
+          "description": "",
+          "pages": [
+            1
+          ],
+          "source_papers": [
+            "paper_loose.pdf"
+          ],
+          "context_snippets": [],
+          "formula": "",
+          "formula_validation": {},
+          "properties": [],
+          "publication_year": null,
+          "paper_title": null,
+          "source_metadata": {},
+          "publications": [
+            {
+              "source_paper": "paper_loose.pdf"
+            }
+          ],
+          "authors": [],
+          "paper_authors": [],
+          "doi": null,
+          "function_name": "loose",
+          "code_snippet": "def loose(x):\n    return (x + 1\n    # filler line for length\n    # filler line for length\n    # filler line for length\n    # filler line for length\n    # filler line for length\n",
+          "code_language": null,
+          "code_description": null,
+          "code_domain": null,
+          "domain_features": [],
+          "source_type": null,
+          "repo_url": null,
+          "repo_owner": null,
+          "repo_name": null,
+          "repo_default_branch": null,
+          "repo_commit_sha": null,
+          "source_file_path": null,
+          "source_file_url": null,
+          "source_start_line": null,
+          "source_end_line": null,
+          "repository_license": null,
+          "license_warning": null,
+          "source_score": null
+        },
+        {
+          "id": "matkg:SynthLoose",
+          "name": "Synth Loose",
+          "category": "Unknown",
+          "raw_category": null,
+          "description": "N/A",
+          "pages": [
+            1
+          ],
+          "source_papers": [
+            "paper_loose.pdf"
+          ],
+          "context_snippets": [],
+          "formula": "",
+          "formula_validation": {},
+          "properties": [],
+          "publication_year": null,
+          "paper_title": null,
+          "source_metadata": {},
+          "publications": [
+            {
+              "source_paper": "paper_loose.pdf"
+            }
+          ],
+          "authors": [],
+          "institutions": [],
+          "doi": null,
+          "journal": null,
+          "volume": null,
+          "issue": null,
+          "pages_range": null,
+          "abstract_text": null,
+          "keywords": []
+        }
+      ],
+      "associations": [
+        {
+          "subject": "matkg:SynthLoose",
+          "predicate": "rel:has_code_snippet",
+          "object": "matkg:snippetloosepaperloosepdfp168f2ae43",
+          "has_evidence": null
+        }
+      ]
+    },
+    "default_id_prefix_beamline": {
+      "things": [
+        {
+          "id": "beamline:SynthOpsTerm",
+          "name": "Synth Ops Term",
+          "category": "Unknown",
+          "raw_category": null,
+          "description": "N/A",
+          "pages": [],
+          "source_papers": [],
+          "context_snippets": [],
+          "formula": "",
+          "formula_validation": {},
+          "properties": [],
+          "publication_year": null,
+          "paper_title": null,
+          "source_metadata": {},
+          "publications": [],
+          "authors": [],
+          "institutions": [],
+          "doi": null,
+          "journal": null,
+          "volume": null,
+          "issue": null,
+          "pages_range": null,
+          "abstract_text": null,
+          "keywords": []
+        },
+        {
+          "id": "beamline:SynthOpsTarget",
+          "name": "Synth Ops Target",
+          "category": "Unknown",
+          "raw_category": null,
+          "description": "",
+          "pages": [],
+          "source_papers": [],
+          "context_snippets": [],
+          "formula": "",
+          "formula_validation": {},
+          "properties": [],
+          "publications": []
+        }
+      ],
+      "associations": [
+        {
+          "subject": "beamline:SynthOpsTerm",
+          "predicate": "rel:rel",
+          "object": "beamline:SynthOpsTarget",
+          "has_evidence": null
+        }
+      ]
+    },
+    "no_snippets_argument": {
+      "things": [
+        {
+          "id": "matkg:SynthOnly",
+          "name": "Synth Only",
+          "category": "Unknown",
+          "raw_category": null,
+          "description": "N/A",
+          "pages": [],
+          "source_papers": [],
+          "context_snippets": [],
+          "formula": "",
+          "formula_validation": {},
+          "properties": [],
+          "publication_year": null,
+          "paper_title": null,
+          "source_metadata": {},
+          "publications": [],
+          "authors": [],
+          "institutions": [],
+          "doi": null,
+          "journal": null,
+          "volume": null,
+          "issue": null,
+          "pages_range": null,
+          "abstract_text": null,
+          "keywords": []
+        }
+      ],
+      "associations": []
+    }
+  },
+  "make_id": [
+    [
+      "Bulk Heterojunction OPV",
+      "matkg",
+      "matkg:BulkHeterojunctionOPV"
+    ],
+    [
+      "pAQM-2TV!",
+      "matkg",
+      "matkg:pAQM-2TV"
+    ],
+    [
+      "a_b c",
+      "matkg",
+      "matkg:abc"
+    ],
+    [
+      "matkg:Foo_Bar baz",
+      "matkg",
+      "matkg:Foo-Barbaz"
+    ],
+    [
+      "beamline:M1 X_y",
+      "matkg",
+      "beamline:M1X-y"
+    ],
+    [
+      "matkg:Foo",
+      "beamline",
+      "matkg:Foo"
+    ],
+    [
+      "Polymère β",
+      "matkg",
+      "matkg:Polymre"
+    ],
+    [
+      "α",
+      "matkg",
+      "matkg:"
+    ],
+    [
+      "",
+      "matkg",
+      "matkg:"
+    ],
+    [
+      "A B",
+      "matkg",
+      "matkg:AB"
+    ],
+    [
+      "AB",
+      "matkg",
+      "matkg:AB"
+    ],
+    [
+      "A.B",
+      "matkg",
+      "matkg:AB"
+    ],
+    [
+      "Plain",
+      "custom",
+      "custom:Plain"
+    ],
+    [
+      "tiled:Thing",
+      "matkg",
+      "matkg:tiledThing"
+    ]
+  ],
+  "code_snippet_ids": [
+    "matkg:snippetfpaperxpdfp3573fd25d",
+    "matkg:snippetpaperxpdfp3573fd25d",
+    "matkg:snippetfunknownp3573fd25d",
+    "matkg:snippetfNonep3573fd25d",
+    "matkg:ExplicitSnip1",
+    "beamline:Explicit",
+    "matkg:snippetfppdfp0d41d8cd9"
+  ]
+}

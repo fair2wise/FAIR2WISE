@@ -1,0 +1,40 @@
+{
+  "descriptor_version": "1",
+  "release_id": "synthetic-v1-r1",
+  "repository": "github.com/EXAMPLE/FAIRtoWISE-FORUM-AI",
+  "data_commit": "3333333333333333333333333333333333333333",
+  "corpus": "synthetic",
+  "snapshot_id": "v1",
+  "graph_id": "synthetic_v1",
+  "artifacts": [
+    {"role": "graph", "path": "storage/kg/synthetic/v1/graph.json", "sha256": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510", "git_blob": "2ab4f022f847b653a1bea8667195fedbef356a30", "size_bytes": 14662},
+    {"role": "compat_copy", "path": "storage/kg/matkg_synthetic_v1.json", "sha256": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510", "git_blob": "2ab4f022f847b653a1bea8667195fedbef356a30", "size_bytes": 14662},
+    {"role": "manifest", "path": "storage/kg/synthetic/v1/manifest.json", "sha256": "4444444444444444444444444444444444444444444444444444444444444444", "git_blob": "5555555555555555555555555555555555555555"}
+  ],
+  "compatibility": {
+    "schema_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "importer": {"name": "app.modules.graph.imports.tiled_json", "version": "proposed"},
+    "code_commits": ["222b1e7b130567dbf4a3242697ac2b465794a38d"],
+    "image_digests": []
+  },
+  "disclosure": {"status": "pass", "report_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "check_version": "0-example"},
+  "staging": {
+    "binary_report": {
+      "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "suite": "example",
+      "passed": true,
+      "graph_sha256": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510",
+      "manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "data_commit": "3333333333333333333333333333333333333333"
+    },
+    "receipts": [
+      {"target": {"profile": "als-dev", "tiled_instance": "https://tiled-staging.als.lbl.gov/", "scope": "synthetic"},
+       "receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+       "graph_sha256": "34b9b8c08a32cbda485225210d444d65324c57c2ad6dac3270c4df1b7d126510", "adapter_version": "proposed"}
+    ]
+  },
+  "production": {"approvals": [], "receipts": []},
+  "state": "staging_validated",
+  "supersedes": null,
+  "rollback_to": null
+}

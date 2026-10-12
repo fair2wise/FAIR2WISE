@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "f2w:schema:data_release_descriptor:1",
+  "title": "F2W KG data-release descriptor (PROPOSED, T26A)",
+  "description": "Release record created AFTER the data commit exists. Selects exact Git commit + repository-relative paths + SHA-256 for promotion. It is never stored inside the commit it names; it may be stored in the release system or in a LATER commit. Receipts and approvals are referenced by hash/ref, never embedded with credentials.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "descriptor_version", "release_id", "repository", "data_commit", "corpus",
+    "snapshot_id", "graph_id", "artifacts", "compatibility", "disclosure", "state"
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "repo_path": {"type": "string", "pattern": "^(?!/)(?!.*\\.\\.)(?!.*\\\\)[A-Za-z0-9._/-]+$"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "tiled_instance"],
+      "properties": {
+        "profile": {"enum": ["local", "als-dev", "als-prod", "disposable"]},
+        "tiled_instance": {"type": "string", "description": "Canonical target identity, e.g. https://tiled-staging.als.lbl.gov/"},
+        "scope": {"type": "string", "description": "Owner/corpus scope inside the target"}
+      }
+    },
+    "receipt_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "receipt_sha256", "graph_sha256"],
+      "properties": {
+        "target": {"$ref": "#/$defs/target"},
+        "receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "receipt_ref": {"type": "string"},
+        "graph_sha256": {"$ref": "#/$defs/sha256"},
+        "adapter_version": {"type": "string"},
+        "completed_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "approval_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "approval_sha256", "approved_by_kind"],
+      "properties": {
+        "target": {"$ref": "#/$defs/target"},
+        "approval_sha256": {"$ref": "#/$defs/sha256"},
+        "approved_by_kind": {"enum": ["local-operator", "tiled-admin"]},
+        "subject": {"type": "string", "description": "Verified subject for ALS approvals; 'local-operator' for :local"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "expected_base_revision": {"type": ["string", "null"]}
+      }
+    }
+  },
+  "properties": {
+    "descriptor_version": {"const": "1"},
+    "release_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$"},
+    "repository": {"type": "string", "description": "Canonical repository identity, e.g. github.com/<org>/<repo>"},
+    "data_commit": {"$ref": "#/$defs/git_sha"},
+    "corpus": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "snapshot_id": {"type": "string"},
+    "graph_id": {"type": "string"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256", "git_blob"],
+        "properties": {
+          "role": {"enum": ["graph", "manifest", "validation", "compat_copy", "legacy_flat_graph"]},
+          "path": {"$ref": "#/$defs/repo_path"},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "git_blob": {"$ref": "#/$defs/git_sha", "description": "Blob id from `git ls-tree <data_commit> <path>`"},
+          "size_bytes": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_sha256", "importer"],
+      "properties": {
+        "schema_sha256": {"$ref": "#/$defs/sha256"},
+        "import_fingerprint": {"$ref": "#/$defs/sha256"},
+        "importer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version"],
+          "properties": {"name": {"type": "string"}, "version": {"type": "string"}}
+        },
+        "code_commits": {"type": "array", "items": {"$ref": "#/$defs/git_sha"}},
+        "image_digests": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "description": "Images validated with this data. Recorded for audit; image identity never selects data."
+        }
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "report_sha256", "check_version"],
+      "properties": {
+        "status": {"enum": ["pass", "fail", "owner_waiver"]},
+        "report_sha256": {"$ref": "#/$defs/sha256"},
+        "check_version": {"type": "string"},
+        "waiver_ref": {"type": "string"}
+      }
+    },
+    "staging": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binary_report"],
+      "properties": {
+        "binary_report": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha256", "suite", "passed", "graph_sha256", "manifest_sha256", "data_commit"],
+          "properties": {
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "ref": {"type": "string"},
+            "suite": {"type": "string"},
+            "passed": {"type": "boolean"},
+            "graph_sha256": {"$ref": "#/$defs/sha256"},
+            "manifest_sha256": {"$ref": "#/$defs/sha256"},
+            "data_commit": {"$ref": "#/$defs/git_sha"},
+            "image_digest": {"type": "string"}
+          }
+        },
+        "receipts": {"type": "array", "items": {"$ref": "#/$defs/receipt_ref"}}
+      }
+    },
+    "production": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "approvals": {"type": "array", "items": {"$ref": "#/$defs/approval_ref"}},
+        "receipts": {"type": "array", "items": {"$ref": "#/$defs/receipt_ref"}}
+      }
+    },
+    "state": {
+      "enum": ["candidate", "staging_validated", "production_approved", "production_imported", "rolled_back", "superseded", "rejected"]
+    },
+    "supersedes": {"type": ["string", "null"], "description": "release_id this release replaces"},
+    "rollback_to": {"type": ["string", "null"], "description": "For a rollback release: the earlier release_id being reactivated"}
+  }
+}
