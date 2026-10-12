@@ -31,7 +31,9 @@ in the Docker image.
 **Updated in.** `docs/adr/content-disclosure.md` (O-D1); T26A release contract
 (relayed to the T23A/T26A worker).
 
-## O-D2: what is tracked in Git (2026-10-12)
+## O-G1: what is tracked in Git (2026-10-12)
+
+(Recorded as "O-D2" in commit 9155d76; renamed because `content-disclosure.md` already uses O-D2 for disclosure budgets.)
 
 **Decision (owner, verbatim intent).** Beamline ops documents are fine to keep
 in this repo. Research papers stay gitignored. All KGs are saved in this repo
