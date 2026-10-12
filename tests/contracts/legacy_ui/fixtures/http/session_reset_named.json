@@ -1,0 +1,24 @@
+{
+  "id": "session_reset_named",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:6658-6660",
+  "request": {
+    "method": "POST",
+    "path": "/session/reset",
+    "json": {
+      "session_id": "contract-session-1"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "reset",
+      "session_memory": "<WORKSPACE>/run/chat_sessions/contract-session-1/session_memory.json",
+      "session_memory_has_context": false,
+      "workflow_state": "<WORKSPACE>/run/chat_sessions/contract-session-1/workflow_state.json",
+      "workflow_phase": "idle"
+    }
+  }
+}

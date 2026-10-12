@@ -1,0 +1,30 @@
+{
+  "id": "telemetry_ui",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:7010-7016",
+  "request": {
+    "method": "POST",
+    "path": "/telemetry/ui",
+    "json": {
+      "events": [
+        {
+          "type": "citation_click",
+          "turn_id": "turn-answered-1",
+          "ts": "2026-01-01T00:00:00Z",
+          "data": {
+            "node_id": "matkg:TermA"
+          }
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "ok",
+      "written": 1
+    }
+  }
+}

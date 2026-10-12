@@ -1,0 +1,12 @@
+event: progress
+data: {"phase": "turn_started", "message": "Turn started", "turn_id": "turn-err-2"}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected retrieve_kg via RetrievalAgent", "turn_id": "turn-err-2", "action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}
+
+event: progress
+data: {"phase": "retrieval_started", "message": "Retrieval agent searching the KG", "turn_id": "turn-err-2", "round": 1}
+
+event: error
+data: {"status": "stream_error", "message": "'list' object has no attribute 'get'", "turn_id": "turn-err-2"}
+

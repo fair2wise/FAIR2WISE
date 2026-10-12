@@ -1,0 +1,142 @@
+{
+  "id": "chat_action_stream_download_failed_retry",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "fake download of candidate 1 fails -> awaiting_download_decision again, index marked unavailable",
+  "request": {
+    "method": "POST",
+    "path": "/chat/action/stream",
+    "json": {
+      "decision": "yes",
+      "kind": "download",
+      "candidate_index": 1,
+      "session_id": "contract-session-4",
+      "client_turn_id": "turn-action-dlfail-1",
+      "parent_turn_id": "turn-chat-ins-2"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "text/event-stream; charset=utf-8",
+    "sse_events": [
+      {
+        "event": "progress",
+        "data": {
+          "phase": "turn_started",
+          "message": "Turn started",
+          "turn_id": "turn-action-dlfail-1"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "orchestrator_decision",
+          "message": "Orchestrator selected download_selected via DownloadAgent",
+          "turn_id": "turn-action-dlfail-1",
+          "action": "download_selected",
+          "agent": "DownloadAgent",
+          "reason": "A matching one-use download approval is present.",
+          "state": "awaiting_download_approval",
+          "classification": null
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "download_started",
+          "message": "Download agent fetching the approved paper",
+          "turn_id": "turn-action-dlfail-1",
+          "round": 1,
+          "candidate_titles": [
+            "Candidate paper two"
+          ]
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "download_result",
+          "message": "Downloaded 0 PDF(s)",
+          "turn_id": "turn-action-dlfail-1",
+          "round": 1,
+          "count": 0,
+          "titles": [],
+          "skipped": 0,
+          "failed": 1
+        }
+      },
+      {
+        "event": "complete",
+        "data": {
+          "status": "awaiting_download_decision",
+          "answer": "The open-access PDF for **Candidate paper two** could not be retrieved. The repository copy may be temporarily unavailable. Try another candidate. Ask me to download another candidate by title, number, DOI, or repository.",
+          "sufficient": false,
+          "node_ids": [],
+          "publications": [],
+          "confidence": 0.05,
+          "rounds": [
+            {
+              "round": 1,
+              "retrieval": {
+                "status": "success",
+                "sufficient": false,
+                "missing_topics": [
+                  "synthetic missing topic"
+                ],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": true,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash"
+              }
+            }
+          ],
+          "graph": {
+            "nodes": [],
+            "edges": [],
+            "source_path": "query:<WORKSPACE>/run/kg.json"
+          },
+          "graph_source_requested": "splash",
+          "graph_source_used": "splash",
+          "workdir": "<WORKSPACE>/run",
+          "pending": {
+            "kind": "download",
+            "papers": [
+              {
+                "title": "Candidate paper one",
+                "doi": "10.0000/contract.cand1",
+                "publication_year": 2023,
+                "abstract": "Synthetic abstract for candidate one.",
+                "score": 0.91,
+                "repository": "openalex",
+                "recommended": true,
+                "index": 0
+              },
+              {
+                "title": "Candidate paper two",
+                "doi": "10.0000/contract.cand2",
+                "publication_year": 2022,
+                "abstract": "Synthetic abstract for candidate two.",
+                "score": 0.4,
+                "repository": "arxiv",
+                "recommended": false,
+                "index": 1,
+                "unavailable": true
+              }
+            ]
+          },
+          "orchestration": {
+            "action": "download_selected",
+            "agent": "DownloadAgent",
+            "reason": "A matching one-use download approval is present.",
+            "state": "awaiting_download_approval"
+          },
+          "turn_id": "turn-action-dlfail-1"
+        }
+      }
+    ],
+    "sse_file": "sse/chat_action_stream_download_failed_retry.sse",
+    "sse_sha256": "fd92119d1b7b74eb5f165c3df7adf473ef9eed7f13ae31c732f7e7f36c93bb21",
+    "sse_bytes": 2381
+  }
+}

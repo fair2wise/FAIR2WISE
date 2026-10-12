@@ -1,0 +1,42 @@
+event: progress
+data: {"phase": "turn_started", "message": "Turn started", "turn_id": "turn-insufficient-1"}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected retrieve_kg via RetrievalAgent", "turn_id": "turn-insufficient-1", "action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}
+
+event: progress
+data: {"phase": "retrieval_started", "message": "Retrieval agent searching the KG", "turn_id": "turn-insufficient-1", "round": 1}
+
+event: progress
+data: {"phase": "retrieval_result", "message": "Retrieved 0 KG node(s); evidence insufficient", "turn_id": "turn-insufficient-1", "round": 1, "selected_count": 0, "direct_evidence_count": 0, "sufficient": false, "missing_topics": ["synthetic missing topic"]}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected search_candidates via DownloadAgent", "turn_id": "turn-insufficient-1", "action": "search_candidates", "agent": "DownloadAgent", "reason": "KG evidence is insufficient; search paper metadata.", "state": "retrieval_insufficient", "classification": null}
+
+event: progress
+data: {"phase": "candidate_search_started", "message": "Literature scout searching OpenAlex abstracts", "turn_id": "turn-insufficient-1", "round": 1, "preflight": 1, "query": "Explain the insufficient synthetic topic", "missing_topics": ["synthetic missing topic"]}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected consult_debate via EvidenceDebateAgent", "turn_id": "turn-insufficient-1", "action": "consult_debate", "agent": "EvidenceDebateAgent", "reason": "Candidate papers need specialist ranking.", "state": "candidates_found", "classification": null}
+
+event: progress
+data: {"phase": "candidate_search_result", "message": "Literature scout found 2 candidate(s)", "turn_id": "turn-insufficient-1", "round": 1, "preflight": 1, "count": 2, "candidate_titles": ["Candidate paper one", "Candidate paper two"], "scores": [0.91, 0.4]}
+
+event: progress
+data: {"phase": "debate_started", "message": "Evidence debate judging candidate value", "turn_id": "turn-insufficient-1", "round": 1, "preflight": 1}
+
+event: progress
+data: {"phase": "debate_result", "message": "Candidate one has the best abstract evidence", "turn_id": "turn-insufficient-1", "round": 1, "preflight": 1, "hypothesis": "Candidate one fills the gap", "objections": ["Candidate two is weaker"], "selected_action": "download_selected", "reason": "Candidate one has the best abstract evidence", "candidate_titles": ["Candidate paper one"], "candidate_indices": [0]}
+
+event: progress
+data: {"phase": "action_selected", "message": "Evidence debate selected download_selected", "turn_id": "turn-insufficient-1", "round": 1, "selected_action": "download_selected", "reason": "Candidate one has the best abstract evidence", "candidate_titles": ["Candidate paper one"]}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected request_download_approval via WorkflowOrchestratorAgent", "turn_id": "turn-insufficient-1", "action": "request_download_approval", "agent": "WorkflowOrchestratorAgent", "reason": "A paper download requires explicit approval.", "state": "awaiting_download_approval", "classification": null}
+
+event: progress
+data: {"phase": "awaiting_download_decision", "message": "Waiting for you to name a candidate paper in chat", "turn_id": "turn-insufficient-1", "round": 1, "candidate_titles": ["Candidate paper one", "Candidate paper two"]}
+
+event: complete
+data: {"status": "awaiting_download_decision", "answer": "I could not answer this query reliably from the retrieved context. Below is a list of papers that might be relevant to the subject.", "sufficient": false, "node_ids": [], "publications": [], "confidence": 0.05, "rounds": [{"round": 1, "retrieval": {"status": "success", "sufficient": false, "missing_topics": ["synthetic missing topic"], "selected": [], "direct_evidence_count": 0, "no_evidence": true, "graph_source_requested": "splash", "graph_source_used": "splash"}, "candidate_search": {"status": "success", "count": 2, "candidates": [{"id": "Wcontract1", "doi": "10.0000/contract.cand1", "title": "Candidate paper one", "abstract": "Synthetic abstract for candidate one.", "publication_year": 2023, "score": 0.91, "repository": "openalex", "pdf_urls": ["https://example.invalid/cand1.pdf"]}, {"id": "Wcontract2", "doi": "10.0000/contract.cand2", "title": "Candidate paper two", "abstract": "Synthetic abstract for candidate two.", "publication_year": 2022, "score": 0.4, "repository": "arxiv", "pdf_urls": ["https://example.invalid/cand2.pdf"]}]}, "debate": {"hypothesis": "Candidate one fills the gap", "objections": ["Candidate two is weaker"], "selected_action": "download_selected", "reason": "Candidate one has the best abstract evidence", "candidate_titles": ["Candidate paper one"], "candidate_indices": [0]}}], "graph": {"nodes": [], "edges": [], "source_path": "query:<WORKSPACE>/run/kg.json"}, "graph_source_requested": "splash", "graph_source_used": "splash", "workdir": "<WORKSPACE>/run", "pending": {"kind": "download", "papers": [{"title": "Candidate paper one", "doi": "10.0000/contract.cand1", "publication_year": 2023, "abstract": "Synthetic abstract for candidate one.", "score": 0.91, "repository": "openalex", "recommended": true, "index": 0}, {"title": "Candidate paper two", "doi": "10.0000/contract.cand2", "publication_year": 2022, "abstract": "Synthetic abstract for candidate two.", "score": 0.4, "repository": "arxiv", "recommended": false, "index": 1}]}, "orchestration": {"action": "request_download_approval", "agent": "WorkflowOrchestratorAgent", "reason": "A paper download requires explicit approval.", "state": "awaiting_download_approval"}, "turn_id": "turn-insufficient-1"}
+

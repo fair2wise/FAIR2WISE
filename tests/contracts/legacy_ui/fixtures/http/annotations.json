@@ -1,0 +1,27 @@
+{
+  "id": "annotations",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:7019-7029",
+  "request": {
+    "method": "POST",
+    "path": "/annotations",
+    "json": {
+      "turn_id": "turn-answered-1",
+      "verdict": "pass",
+      "failure_tags": [],
+      "note": "contract",
+      "annotator": "contract",
+      "ts": "2026-01-01T00:00:00Z"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "ok",
+      "turn_id": "turn-answered-1",
+      "verdict": "pass"
+    }
+  }
+}

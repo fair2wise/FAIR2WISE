@@ -1,0 +1,128 @@
+{
+  "id": "chat_insufficient_to_download",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "non-stream awaiting_download_decision",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "json": {
+      "message": "Explain the insufficient synthetic topic",
+      "session_id": "contract-session-3",
+      "client_turn_id": "turn-chat-ins-1"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "awaiting_download_decision",
+      "answer": "I could not answer this query reliably from the retrieved context. Below is a list of papers that might be relevant to the subject.",
+      "sufficient": false,
+      "node_ids": [],
+      "publications": [],
+      "confidence": 0.05,
+      "rounds": [
+        {
+          "round": 1,
+          "retrieval": {
+            "status": "success",
+            "sufficient": false,
+            "missing_topics": [
+              "synthetic missing topic"
+            ],
+            "selected": [],
+            "direct_evidence_count": 0,
+            "no_evidence": true,
+            "graph_source_requested": "splash",
+            "graph_source_used": "splash"
+          },
+          "candidate_search": {
+            "status": "success",
+            "count": 2,
+            "candidates": [
+              {
+                "id": "Wcontract1",
+                "doi": "10.0000/contract.cand1",
+                "title": "Candidate paper one",
+                "abstract": "Synthetic abstract for candidate one.",
+                "publication_year": 2023,
+                "score": 0.91,
+                "repository": "openalex",
+                "pdf_urls": [
+                  "https://example.invalid/cand1.pdf"
+                ]
+              },
+              {
+                "id": "Wcontract2",
+                "doi": "10.0000/contract.cand2",
+                "title": "Candidate paper two",
+                "abstract": "Synthetic abstract for candidate two.",
+                "publication_year": 2022,
+                "score": 0.4,
+                "repository": "arxiv",
+                "pdf_urls": [
+                  "https://example.invalid/cand2.pdf"
+                ]
+              }
+            ]
+          },
+          "debate": {
+            "hypothesis": "Candidate one fills the gap",
+            "objections": [
+              "Candidate two is weaker"
+            ],
+            "selected_action": "download_selected",
+            "reason": "Candidate one has the best abstract evidence",
+            "candidate_titles": [
+              "Candidate paper one"
+            ],
+            "candidate_indices": [
+              0
+            ]
+          }
+        }
+      ],
+      "graph": {
+        "nodes": [],
+        "edges": [],
+        "source_path": "query:<WORKSPACE>/run/kg.json"
+      },
+      "graph_source_requested": "splash",
+      "graph_source_used": "splash",
+      "workdir": "<WORKSPACE>/run",
+      "pending": {
+        "kind": "download",
+        "papers": [
+          {
+            "title": "Candidate paper one",
+            "doi": "10.0000/contract.cand1",
+            "publication_year": 2023,
+            "abstract": "Synthetic abstract for candidate one.",
+            "score": 0.91,
+            "repository": "openalex",
+            "recommended": true,
+            "index": 0
+          },
+          {
+            "title": "Candidate paper two",
+            "doi": "10.0000/contract.cand2",
+            "publication_year": 2022,
+            "abstract": "Synthetic abstract for candidate two.",
+            "score": 0.4,
+            "repository": "arxiv",
+            "recommended": false,
+            "index": 1
+          }
+        ]
+      },
+      "orchestration": {
+        "action": "request_download_approval",
+        "agent": "WorkflowOrchestratorAgent",
+        "reason": "A paper download requires explicit approval.",
+        "state": "awaiting_download_approval"
+      },
+      "turn_id": "turn-chat-ins-1"
+    }
+  }
+}

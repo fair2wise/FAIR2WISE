@@ -1,0 +1,23 @@
+{
+  "id": "graph_upload_400_invalid",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:3389-3390",
+  "request": {
+    "method": "POST",
+    "path": "/graph/upload",
+    "json": {
+      "filename": "bad.json",
+      "graph": {
+        "nodes": []
+      }
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "detail": "Uploaded graph must be a MatKG JSON with list fields: things and associations"
+    }
+  }
+}

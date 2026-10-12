@@ -1,0 +1,61 @@
+{
+  "id": "settings_get",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:6645-6647",
+  "request": {
+    "method": "GET",
+    "path": "/settings"
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "backend": "cborg",
+      "model": "lbl/cborg-chat",
+      "graph_source": "splash",
+      "workflow_mode": "agentic",
+      "extraction_mode": "targeted",
+      "targeted_max_pages": 6,
+      "json_graph_path": "storage/kg/matkg_contract_v1.json",
+      "json_graph_paths": [
+        "storage/kg/matkg_contract_v1.json"
+      ],
+      "kg_query_max_nodes": 1000,
+      "kg_query_hops": 20,
+      "source_rag": false,
+      "use_live_tiled": false,
+      "tiled_uri": "http://127.0.0.1:8765",
+      "tiled_api_key_set": false,
+      "tiled_status": "disabled",
+      "tiled_error": null,
+      "available_json_graphs": [
+        "storage/kg/matkg_contract_v1.json"
+      ],
+      "available_graphs": [
+        {
+          "path": "storage/kg/matkg_contract_v1.json",
+          "graph_id": "contract_v1",
+          "label": "contract_v1"
+        }
+      ],
+      "selected_graph_ids": [
+        "contract_v1"
+      ],
+      "available_cborg_models": [
+        "lbl/cborg-chat",
+        "gemini-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-pro",
+        "anthropic/claude-opus",
+        "anthropic/claude-sonnet",
+        "gpt",
+        "gpt-chat",
+        "gpt-mini",
+        "nova-micro",
+        "openai/gpt-4o"
+      ],
+      "default_ollama_model": "deepseek-r1:70b"
+    }
+  }
+}

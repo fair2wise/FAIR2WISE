@@ -1,0 +1,20 @@
+{
+  "id": "graph_node_patch_400_json_mode",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "JSON mode is read-only (api.py:2980-2981)",
+  "request": {
+    "method": "PATCH",
+    "path": "/graph/node/matkg:TermA",
+    "json": {
+      "label": "should fail"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "detail": "Editing node properties requires splash graph mode"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+event: progress
+data: {"phase": "turn_started", "message": "Turn started", "turn_id": "turn-err-1"}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected retrieve_kg via RetrievalAgent", "turn_id": "turn-err-1", "action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}
+
+event: error
+data: {"status": "stream_error", "message": "JSON graph mode requires a graph file", "turn_id": "turn-err-1"}
+

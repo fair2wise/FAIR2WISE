@@ -1,0 +1,40 @@
+{
+  "id": "graph_node_patch_422_bad_action",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "LinkedCodeSnippetUpdate _action pattern upsert|unlink",
+  "request": {
+    "method": "PATCH",
+    "path": "/graph/node/matkg:TermA",
+    "json": {
+      "linked_code_snippets": [
+        {
+          "id": "matkg:Code1",
+          "_action": "delete"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 422,
+    "content_type": "application/json",
+    "json": {
+      "detail": [
+        {
+          "type": "string_pattern_mismatch",
+          "loc": [
+            "body",
+            "linked_code_snippets",
+            0,
+            "_action"
+          ],
+          "msg": "String should match pattern '^(upsert|unlink)$'",
+          "input": "delete",
+          "ctx": {
+            "pattern": "^(upsert|unlink)$"
+          }
+        }
+      ]
+    }
+  }
+}

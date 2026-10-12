@@ -1,0 +1,17 @@
+{
+  "id": "session_delete_400_legacy",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "legacy key cannot be deleted (api.py:4248-4250)",
+  "request": {
+    "method": "DELETE",
+    "path": "/session/__legacy__"
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "detail": "Invalid session ID"
+    }
+  }
+}

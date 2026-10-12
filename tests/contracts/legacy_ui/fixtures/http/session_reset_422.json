@@ -1,0 +1,33 @@
+{
+  "id": "session_reset_422",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "SessionResetRequest pattern",
+  "request": {
+    "method": "POST",
+    "path": "/session/reset",
+    "json": {
+      "session_id": "../escape"
+    }
+  },
+  "response": {
+    "status_code": 422,
+    "content_type": "application/json",
+    "json": {
+      "detail": [
+        {
+          "type": "string_pattern_mismatch",
+          "loc": [
+            "body",
+            "session_id"
+          ],
+          "msg": "String should match pattern '^[A-Za-z0-9][A-Za-z0-9_-]*$'",
+          "input": "../escape",
+          "ctx": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        }
+      ]
+    }
+  }
+}

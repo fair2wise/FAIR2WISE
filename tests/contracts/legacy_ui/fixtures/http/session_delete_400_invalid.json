@@ -1,0 +1,17 @@
+{
+  "id": "session_delete_400_invalid",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "no pydantic pattern on the path param; service ValueError -> 400",
+  "request": {
+    "method": "DELETE",
+    "path": "/session/bad.id"
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "detail": "Invalid session ID"
+    }
+  }
+}

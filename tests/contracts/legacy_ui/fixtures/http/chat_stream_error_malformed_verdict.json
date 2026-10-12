@@ -1,0 +1,62 @@
+{
+  "id": "chat_stream_error_malformed_verdict",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "FAULT INJECTION: fake retrieval returns a non-dict verdict; AttributeError escapes _ask_locked after retrieval_started -> SSE error stream_error (api.py:6882-6890)",
+  "request": {
+    "method": "POST",
+    "path": "/chat/stream",
+    "json": {
+      "message": "Please crash the verdict",
+      "session_id": "contract-session-1",
+      "client_turn_id": "turn-err-2"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "text/event-stream; charset=utf-8",
+    "sse_events": [
+      {
+        "event": "progress",
+        "data": {
+          "phase": "turn_started",
+          "message": "Turn started",
+          "turn_id": "turn-err-2"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "orchestrator_decision",
+          "message": "Orchestrator selected retrieve_kg via RetrievalAgent",
+          "turn_id": "turn-err-2",
+          "action": "retrieve_kg",
+          "agent": "RetrievalAgent",
+          "reason": "fake classifier",
+          "state": "idle",
+          "classification": "scientific_or_uncertain"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "retrieval_started",
+          "message": "Retrieval agent searching the KG",
+          "turn_id": "turn-err-2",
+          "round": 1
+        }
+      },
+      {
+        "event": "error",
+        "data": {
+          "status": "stream_error",
+          "message": "'list' object has no attribute 'get'",
+          "turn_id": "turn-err-2"
+        }
+      }
+    ],
+    "sse_file": "sse/chat_stream_error_malformed_verdict.sse",
+    "sse_sha256": "afad18878d8ca2b6de31237ab7716b4f96dde8c813363c212f6cde6e2189a09c",
+    "sse_bytes": 655
+  }
+}

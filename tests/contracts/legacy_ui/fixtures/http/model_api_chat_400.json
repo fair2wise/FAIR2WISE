@@ -1,0 +1,19 @@
+{
+  "id": "model_api_chat_400",
+  "flow": "model_api",
+  "notes": "kg_rag_api.py:251-252",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "json": {
+      "messages": []
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "error": "No messages"
+    }
+  }
+}

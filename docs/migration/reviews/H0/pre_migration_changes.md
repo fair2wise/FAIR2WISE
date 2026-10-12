@@ -26,6 +26,13 @@ changed hashes and shifted lines in these baseline seam files:
 Contract surface checked by hand against `222b1e7`:
 
 - All 19 UI-agent route decorators in `f2w_agent/api.py` are unchanged.
+- **Correction (found by T18A, 2026-10-12):** `ChatRequest` gained an optional
+  `batch_id` field (`api.py:141-146`; 1-80 chars, `^[A-Za-z0-9][A-Za-z0-9_.-]*$`),
+  passed through `ask`/`ask_with_progress` into traces for eval-batch tagging
+  (`scripts/run_eval_batch.py`). The old UI never sends it, so it is an additive
+  schema change, not a behavior regression, but it changes the OpenAPI snapshot.
+  The frozen T18A contract keeps the baseline shape; adopting the field is an
+  H1 decision. This H0 record originally missed it.
 - No function or class was removed from the eight seam modules above.
 - Added symbols: `cborg_http.stream_chunk_text`, `collect_stream_text`,
   `collect_stream_text_async`, `_stream_piece`; new module

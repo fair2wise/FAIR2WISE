@@ -1,0 +1,44 @@
+{
+  "id": "graph_node_get_uploaded",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "json_graph_path query restricted to storage/kg or uploads (api.py:3396-3412)",
+  "request": {
+    "method": "GET",
+    "path": "/graph/node/matkg:U1",
+    "params": {
+      "json_graph_path": "<WORKSPACE>/run/uploads/contract_upload.json"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "id": "matkg:U1",
+      "label": "Uploaded node",
+      "type": "Thing",
+      "description": "",
+      "publications": [],
+      "code_snippet": null,
+      "code_language": null,
+      "function_name": null,
+      "linked_code_snippets": [],
+      "graph_id": "contract_upload",
+      "graph_label": "contract_upload",
+      "formula": null,
+      "source_papers": [],
+      "properties": [],
+      "extra_fields": {},
+      "source_type": null,
+      "repo_url": null,
+      "repo_owner": null,
+      "repo_name": null,
+      "repo_commit_sha": null,
+      "source_file_path": null,
+      "source_file_url": null,
+      "source_start_line": null,
+      "source_end_line": null,
+      "repository_license": null
+    }
+  }
+}

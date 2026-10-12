@@ -1,0 +1,415 @@
+{
+  "cases": [
+    {
+      "id": "health",
+      "route": "GET /health",
+      "status": 200,
+      "terminal_status": "ok"
+    },
+    {
+      "id": "cors_preflight_allowed_origin",
+      "route": "OPTIONS /chat/stream",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "cors_preflight_other_origin",
+      "route": "OPTIONS /chat/stream",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "cors_simple_get_allowed_origin",
+      "route": "GET /settings",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "settings_get",
+      "route": "GET /settings",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_get",
+      "route": "GET /graph",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_nodes_search",
+      "route": "POST /graph/nodes/search",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_nodes_search_422_empty",
+      "route": "POST /graph/nodes/search",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_get",
+      "route": "GET /graph/node/matkg:TermA",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_get_404",
+      "route": "GET /graph/node/matkg:Missing",
+      "status": 404,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_neighborhood_tiled",
+      "route": "GET /graph/neighborhood/beamline:ESAF-contract",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_neighborhood_404",
+      "route": "GET /graph/neighborhood/matkg:TermA",
+      "status": 404,
+      "terminal_status": null
+    },
+    {
+      "id": "publications_search",
+      "route": "POST /publications/search",
+      "status": 200,
+      "terminal_status": "ok"
+    },
+    {
+      "id": "chat_stream_direct_response",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "complete:direct_response"
+    },
+    {
+      "id": "chat_stream_answered",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "complete:answered"
+    },
+    {
+      "id": "chat_stream_insufficient_to_download",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "complete:awaiting_download_decision"
+    },
+    {
+      "id": "chat_action_stream_error_missing_candidate",
+      "route": "POST /chat/action/stream",
+      "status": 200,
+      "terminal_status": "error:stream_error"
+    },
+    {
+      "id": "chat_action_stream_download_yes",
+      "route": "POST /chat/action/stream",
+      "status": 200,
+      "terminal_status": "complete:awaiting_extraction_decision"
+    },
+    {
+      "id": "chat_action_stream_extraction_yes",
+      "route": "POST /chat/action/stream",
+      "status": 200,
+      "terminal_status": "complete:answered"
+    },
+    {
+      "id": "chat_action_no_pending",
+      "route": "POST /chat/action",
+      "status": 200,
+      "terminal_status": "no_pending_action"
+    },
+    {
+      "id": "chat_stream_error_empty_json_selection",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "error:stream_error"
+    },
+    {
+      "id": "chat_stream_error_malformed_verdict",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "error:stream_error"
+    },
+    {
+      "id": "chat_stream_json_override_missing_file_falls_back",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "complete:answered"
+    },
+    {
+      "id": "chat_stream_retrieval_error",
+      "route": "POST /chat/stream",
+      "status": 200,
+      "terminal_status": "error:retrieval_error"
+    },
+    {
+      "id": "chat_answered",
+      "route": "POST /chat",
+      "status": 200,
+      "terminal_status": "answered"
+    },
+    {
+      "id": "chat_insufficient_to_download",
+      "route": "POST /chat",
+      "status": 200,
+      "terminal_status": "awaiting_download_decision"
+    },
+    {
+      "id": "chat_action_decline",
+      "route": "POST /chat/action",
+      "status": 200,
+      "terminal_status": "stopped_by_user"
+    },
+    {
+      "id": "chat_400_empty_json_selection",
+      "route": "POST /chat",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "chat_500_malformed_verdict",
+      "route": "POST /chat",
+      "status": 500,
+      "terminal_status": null
+    },
+    {
+      "id": "chat_insufficient_for_failed_download",
+      "route": "POST /chat",
+      "status": 200,
+      "terminal_status": "awaiting_download_decision"
+    },
+    {
+      "id": "chat_action_stream_download_failed_retry",
+      "route": "POST /chat/action/stream",
+      "status": 200,
+      "terminal_status": "complete:awaiting_download_decision"
+    },
+    {
+      "id": "chat_action_stream_decline",
+      "route": "POST /chat/action/stream",
+      "status": 200,
+      "terminal_status": "complete:stopped_by_user"
+    },
+    {
+      "id": "chat_422_bad_session",
+      "route": "POST /chat",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "chat_stream_422_empty_message",
+      "route": "POST /chat/stream",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_patch_fields_snippets_relationship",
+      "route": "PATCH /graph/node/matkg:TermA",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_patch_unlink_and_remove",
+      "route": "PATCH /graph/node/matkg:TermA",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_patch_400_self_relationship",
+      "route": "PATCH /graph/node/matkg:TermA",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_patch_422_bad_action",
+      "route": "PATCH /graph/node/matkg:TermA",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_upload",
+      "route": "POST /graph/upload",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_upload_400_invalid",
+      "route": "POST /graph/upload",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_get_uploaded",
+      "route": "GET /graph/node/matkg:U1",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "traces_get",
+      "route": "GET /traces/turn-answered-1",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "traces_get_404",
+      "route": "GET /traces/turn-does-not-exist",
+      "status": 404,
+      "terminal_status": null
+    },
+    {
+      "id": "telemetry_ui",
+      "route": "POST /telemetry/ui",
+      "status": 200,
+      "terminal_status": "ok"
+    },
+    {
+      "id": "annotations",
+      "route": "POST /annotations",
+      "status": 200,
+      "terminal_status": "ok"
+    },
+    {
+      "id": "annotations_422_bad_verdict",
+      "route": "POST /annotations",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "session_reset_named",
+      "route": "POST /session/reset",
+      "status": 200,
+      "terminal_status": "reset"
+    },
+    {
+      "id": "session_reset_legacy",
+      "route": "POST /session/reset",
+      "status": 200,
+      "terminal_status": "reset"
+    },
+    {
+      "id": "session_reset_422",
+      "route": "POST /session/reset",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "session_delete",
+      "route": "DELETE /session/contract-session-1",
+      "status": 200,
+      "terminal_status": "deleted"
+    },
+    {
+      "id": "session_delete_400_legacy",
+      "route": "DELETE /session/__legacy__",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "session_delete_400_invalid",
+      "route": "DELETE /session/bad.id",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "settings_put_ollama",
+      "route": "PUT /settings",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "settings_put_422_bad_graph_source",
+      "route": "PUT /settings",
+      "status": 422,
+      "terminal_status": null
+    },
+    {
+      "id": "settings_put_json_mode",
+      "route": "PUT /settings",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_node_patch_400_json_mode",
+      "route": "PATCH /graph/node/matkg:TermA",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "graph_get_json_mode",
+      "route": "GET /graph",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "settings_put_back_to_splash",
+      "route": "PUT /settings",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "model_api_chat",
+      "route": "POST /api/chat",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "model_api_chat_400",
+      "route": "POST /api/chat",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "model_openai_chat_completions",
+      "route": "POST /v1/chat/completions",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "model_openai_chat_completions_400",
+      "route": "POST /v1/chat/completions",
+      "status": 400,
+      "terminal_status": null
+    },
+    {
+      "id": "model_api_tags",
+      "route": "GET /api/tags",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "model_api_version",
+      "route": "GET /api/version",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "model_v1_models",
+      "route": "GET /v1/models",
+      "status": 200,
+      "terminal_status": null
+    },
+    {
+      "id": "model_api_ps",
+      "route": "GET /api/ps",
+      "status": 200,
+      "terminal_status": null
+    }
+  ],
+  "fake_call_counts": {
+    "debate.decide": 3,
+    "download.download_selected": 2,
+    "download.search_candidates": 3,
+    "extractor.extract_targeted": 1,
+    "kg_update.rebuild_kg": 1,
+    "kg_update.splash_reimport": 1,
+    "llm.chat": 13,
+    "retrieval.query": 10,
+    "splash.create_entity": 1,
+    "splash.create_link": 2,
+    "splash.delete_link": 3,
+    "splash.load_graph": 2,
+    "splash.update_entity": 3
+  }
+}

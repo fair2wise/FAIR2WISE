@@ -1,0 +1,33 @@
+{
+  "id": "settings_put_422_bad_graph_source",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "the browser token splash_links is NOT accepted on the wire; graphSourceToApi maps it",
+  "request": {
+    "method": "PUT",
+    "path": "/settings",
+    "json": {
+      "graph_source": "splash_links"
+    }
+  },
+  "response": {
+    "status_code": 422,
+    "content_type": "application/json",
+    "json": {
+      "detail": [
+        {
+          "type": "string_pattern_mismatch",
+          "loc": [
+            "body",
+            "graph_source"
+          ],
+          "msg": "String should match pattern '^(splash|json)$'",
+          "input": "splash_links",
+          "ctx": {
+            "pattern": "^(splash|json)$"
+          }
+        }
+      ]
+    }
+  }
+}

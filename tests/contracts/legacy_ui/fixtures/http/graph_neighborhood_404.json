@@ -1,0 +1,17 @@
+{
+  "id": "graph_neighborhood_404",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:6693-6694 (live Tiled lookup returns no graph)",
+  "request": {
+    "method": "GET",
+    "path": "/graph/neighborhood/matkg:TermA"
+  },
+  "response": {
+    "status_code": 404,
+    "content_type": "application/json",
+    "json": {
+      "detail": "Neighborhood not found: matkg:TermA"
+    }
+  }
+}

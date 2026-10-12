@@ -1,0 +1,33 @@
+{
+  "id": "chat_stream_422_empty_message",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "validation happens before the stream starts",
+  "request": {
+    "method": "POST",
+    "path": "/chat/stream",
+    "json": {
+      "message": ""
+    }
+  },
+  "response": {
+    "status_code": 422,
+    "content_type": "application/json",
+    "json": {
+      "detail": [
+        {
+          "type": "string_too_short",
+          "loc": [
+            "body",
+            "message"
+          ],
+          "msg": "String should have at least 1 character",
+          "input": "",
+          "ctx": {
+            "min_length": 1
+          }
+        }
+      ]
+    }
+  }
+}

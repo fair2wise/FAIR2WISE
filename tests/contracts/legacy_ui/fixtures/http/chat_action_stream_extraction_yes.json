@@ -1,0 +1,515 @@
+{
+  "id": "chat_action_stream_extraction_yes",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "approved targeted extraction -> rebuild -> splash_reimport -> reload -> answered",
+  "request": {
+    "method": "POST",
+    "path": "/chat/action/stream",
+    "json": {
+      "decision": "yes",
+      "kind": "extraction",
+      "session_id": "contract-session-1",
+      "client_turn_id": "turn-action-ex-1",
+      "parent_turn_id": "turn-action-dl-1"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "text/event-stream; charset=utf-8",
+    "sse_events": [
+      {
+        "event": "progress",
+        "data": {
+          "phase": "turn_started",
+          "message": "Turn started",
+          "turn_id": "turn-action-ex-1"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "orchestrator_decision",
+          "message": "Orchestrator selected extract_selected via ExtractorAgent",
+          "turn_id": "turn-action-ex-1",
+          "action": "extract_selected",
+          "agent": "ExtractorAgent",
+          "reason": "A matching one-use extraction approval is present.",
+          "state": "awaiting_extraction_approval",
+          "classification": null
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "extraction_started",
+          "message": "Extractor agent reading targeted pages from approved PDFs",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "pdfs": [
+            "candidate_one.pdf"
+          ],
+          "mode": "targeted",
+          "max_pages": 6
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "extraction_result",
+          "message": "Extracted 2 term(s) from 1 PDF(s)",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "mode": "targeted",
+          "term_count": 2,
+          "processed_files": 1,
+          "processed_pages_total": 2,
+          "processed_pages_with_terms": 1
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "kg_rebuild_started",
+          "message": "KG builder updating session graph",
+          "turn_id": "turn-action-ex-1",
+          "round": 1
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "kg_rebuild_result",
+          "message": "Rebuilt KG: 3 node(s), 2 edge(s)",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "node_count": 3,
+          "edge_count": 2
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "splash_reimport_started",
+          "message": "Splash importer refreshing graph store",
+          "turn_id": "turn-action-ex-1",
+          "round": 1
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "splash_reimport_result",
+          "message": "Splash graph store refreshed",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "status": "success"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "reload_started",
+          "message": "Retrieval agent reloading updated KG",
+          "turn_id": "turn-action-ex-1",
+          "round": 1
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "reload_result",
+          "message": "Reloaded KG with 0 node(s)",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "node_count": 0,
+          "status": "reloaded"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "orchestrator_decision",
+          "message": "Orchestrator selected retrieve_kg via RetrievalAgent",
+          "turn_id": "turn-action-ex-1",
+          "action": "retrieve_kg",
+          "agent": "RetrievalAgent",
+          "reason": "Extraction completed; re-check the original query against the updated KG.",
+          "state": "paper_extracted",
+          "classification": null
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "retrieval_started",
+          "message": "Retrieval agent re-checking the updated KG",
+          "turn_id": "turn-action-ex-1",
+          "round": 1
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "retrieval_result",
+          "message": "Retrieved 2 KG node(s); evidence sufficient",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "selected_count": 2,
+          "sufficient": true,
+          "missing_topics": []
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "graph_update",
+          "message": "Mapping 2 node(s) onto the graph",
+          "turn_id": "turn-action-ex-1",
+          "round": 1,
+          "node_ids": [
+            "matkg:TermA",
+            "matkg:Other"
+          ],
+          "graph": {
+            "nodes": [
+              {
+                "id": "matkg:TermA",
+                "label": "Term A",
+                "type": "Technique",
+                "description": "Synthetic contract node A (resonant scattering).",
+                "publications": [
+                  {
+                    "source_paper": "contract_paper.pdf"
+                  },
+                  {
+                    "source_paper": "contract_paper.pdf",
+                    "publication_year": 2024,
+                    "paper_title": "Synthetic contract paper on resonant scattering",
+                    "authors": [
+                      "Contract Author"
+                    ],
+                    "doi": "10.0000/contract.a",
+                    "keywords": [
+                      "resonant",
+                      "scattering"
+                    ]
+                  }
+                ],
+                "code_snippet": null,
+                "code_language": null,
+                "function_name": null,
+                "linked_code_snippets": [
+                  {
+                    "id": "matkg:Code1",
+                    "label": "gamma snippet",
+                    "function_name": "gamma",
+                    "code_language": "python",
+                    "code_snippet": "def gamma():\n    return 0",
+                    "publications": [],
+                    "source_type": null,
+                    "repo_url": null,
+                    "repo_owner": null,
+                    "repo_name": null,
+                    "repo_commit_sha": null,
+                    "source_file_path": null,
+                    "source_file_url": null,
+                    "source_start_line": null,
+                    "source_end_line": null
+                  }
+                ],
+                "graph_id": "kg",
+                "graph_label": "kg",
+                "formula": null,
+                "source_papers": [
+                  "contract_paper.pdf"
+                ],
+                "properties": [],
+                "extra_fields": {},
+                "source_type": null,
+                "repo_url": null,
+                "repo_owner": null,
+                "repo_name": null,
+                "repo_commit_sha": null,
+                "source_file_path": null,
+                "source_file_url": null,
+                "source_start_line": null,
+                "source_end_line": null,
+                "repository_license": null
+              },
+              {
+                "id": "matkg:Other",
+                "label": "Other node",
+                "type": "Material",
+                "description": "Synthetic contract node B (polymer film).",
+                "publications": [],
+                "code_snippet": null,
+                "code_language": null,
+                "function_name": null,
+                "linked_code_snippets": [],
+                "graph_id": "kg",
+                "graph_label": "kg",
+                "formula": null,
+                "source_papers": [],
+                "properties": [],
+                "extra_fields": {},
+                "source_type": null,
+                "repo_url": null,
+                "repo_owner": null,
+                "repo_name": null,
+                "repo_commit_sha": null,
+                "source_file_path": null,
+                "source_file_url": null,
+                "source_start_line": null,
+                "source_end_line": null,
+                "repository_license": null
+              }
+            ],
+            "edges": [
+              {
+                "source": "matkg:TermA",
+                "target": "matkg:Other",
+                "predicate": "rel:related_to"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "event": "complete",
+        "data": {
+          "status": "answered",
+          "answer": "## Extraction Summary\nExtraction completed: processed 1 paper; inspected 2 pages; 1 page yielded extractable terms; term store now contains 2 unique terms.\n\n## Relevant Extracted Terms\nNo page-grounded terms were found for this paper on its eligible extracted pages.\n\n## Evidence Assessment\n**Sufficient**\n\nSupport for original query: yes.\nWhy: updated retrieval found enough direct, grounded evidence across 2 evidence-bearing KG nodes. The updated knowledge graph now contains enough direct evidence to answer the original query.\n\nSynthetic grounded answer (μ-scale, UTF-8) citing [KG: matkg:TermA].",
+          "sufficient": true,
+          "node_ids": [
+            "matkg:TermA",
+            "matkg:Other"
+          ],
+          "publications": [
+            {
+              "source_paper": "contract_paper.pdf",
+              "publication_year": 2024,
+              "paper_title": "Synthetic contract paper on resonant scattering",
+              "authors": [
+                "Contract Author"
+              ],
+              "doi": "10.0000/contract.a",
+              "keywords": [
+                "resonant",
+                "scattering"
+              ],
+              "supporting_nodes": [
+                {
+                  "id": "matkg:TermA",
+                  "name": "Term A",
+                  "category": "Technique"
+                }
+              ]
+            },
+            {
+              "paper_title": "Candidate paper one",
+              "doi": "10.0000/contract.cand1",
+              "publication_year": 2023,
+              "source_paper": "candidate_one.pdf",
+              "abstract_text": "Synthetic abstract for candidate one."
+            }
+          ],
+          "confidence": 0.83,
+          "rounds": [
+            {
+              "round": 1,
+              "retrieval": {
+                "status": "success",
+                "sufficient": false,
+                "missing_topics": [
+                  "synthetic missing topic"
+                ],
+                "selected": [],
+                "direct_evidence_count": 0,
+                "no_evidence": true,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash"
+              },
+              "pending_pdfs": [
+                "candidate_one.pdf"
+              ],
+              "extraction": {
+                "status": "success",
+                "extraction_mode": "targeted",
+                "unique_terms": 2,
+                "processed_files": 1,
+                "processed_pages_total": 2,
+                "processed_pages_with_terms": 1,
+                "pdf_results": [
+                  {
+                    "filename": "candidate_one.pdf",
+                    "extraction_state": "partial",
+                    "selected_pages": [
+                      1,
+                      2
+                    ],
+                    "processed_pages_total": 2,
+                    "processed_pages_with_terms": 1,
+                    "source_pages_total": 8
+                  }
+                ]
+              },
+              "kg": {
+                "status": "success",
+                "nodes": 3,
+                "edges": 2
+              },
+              "splash": {
+                "status": "success"
+              },
+              "reload": {
+                "status": "reloaded",
+                "graph_source_requested": null,
+                "graph_source_used": null
+              },
+              "retrieval_after": {
+                "status": "success",
+                "sufficient": true,
+                "answer": "Synthetic grounded answer (μ-scale, UTF-8) citing [KG: matkg:TermA].",
+                "selected": [
+                  "matkg:TermA",
+                  "matkg:Other"
+                ],
+                "direct_evidence_count": 2,
+                "no_evidence": false,
+                "graph_source_requested": "splash",
+                "graph_source_used": "splash"
+              },
+              "extraction_report": {
+                "status": "insufficient",
+                "sufficient": false,
+                "answer": "No page-grounded terms were found for this paper on its eligible extracted pages.",
+                "used_pages": [],
+                "missing_topics": [
+                  "extracted terms"
+                ]
+              }
+            }
+          ],
+          "graph": {
+            "nodes": [
+              {
+                "id": "matkg:TermA",
+                "label": "Term A",
+                "type": "Technique",
+                "description": "Synthetic contract node A (resonant scattering).",
+                "publications": [
+                  {
+                    "source_paper": "contract_paper.pdf"
+                  },
+                  {
+                    "source_paper": "contract_paper.pdf",
+                    "publication_year": 2024,
+                    "paper_title": "Synthetic contract paper on resonant scattering",
+                    "authors": [
+                      "Contract Author"
+                    ],
+                    "doi": "10.0000/contract.a",
+                    "keywords": [
+                      "resonant",
+                      "scattering"
+                    ]
+                  }
+                ],
+                "code_snippet": null,
+                "code_language": null,
+                "function_name": null,
+                "linked_code_snippets": [
+                  {
+                    "id": "matkg:Code1",
+                    "label": "gamma snippet",
+                    "function_name": "gamma",
+                    "code_language": "python",
+                    "code_snippet": "def gamma():\n    return 0",
+                    "publications": [],
+                    "source_type": null,
+                    "repo_url": null,
+                    "repo_owner": null,
+                    "repo_name": null,
+                    "repo_commit_sha": null,
+                    "source_file_path": null,
+                    "source_file_url": null,
+                    "source_start_line": null,
+                    "source_end_line": null
+                  }
+                ],
+                "graph_id": "kg",
+                "graph_label": "kg",
+                "formula": null,
+                "source_papers": [
+                  "contract_paper.pdf"
+                ],
+                "properties": [],
+                "extra_fields": {},
+                "source_type": null,
+                "repo_url": null,
+                "repo_owner": null,
+                "repo_name": null,
+                "repo_commit_sha": null,
+                "source_file_path": null,
+                "source_file_url": null,
+                "source_start_line": null,
+                "source_end_line": null,
+                "repository_license": null
+              },
+              {
+                "id": "matkg:Other",
+                "label": "Other node",
+                "type": "Material",
+                "description": "Synthetic contract node B (polymer film).",
+                "publications": [],
+                "code_snippet": null,
+                "code_language": null,
+                "function_name": null,
+                "linked_code_snippets": [],
+                "graph_id": "kg",
+                "graph_label": "kg",
+                "formula": null,
+                "source_papers": [],
+                "properties": [],
+                "extra_fields": {},
+                "source_type": null,
+                "repo_url": null,
+                "repo_owner": null,
+                "repo_name": null,
+                "repo_commit_sha": null,
+                "source_file_path": null,
+                "source_file_url": null,
+                "source_start_line": null,
+                "source_end_line": null,
+                "repository_license": null
+              }
+            ],
+            "edges": [
+              {
+                "source": "matkg:TermA",
+                "target": "matkg:Other",
+                "predicate": "rel:related_to"
+              }
+            ],
+            "source_path": "<WORKSPACE>/run/kg.json"
+          },
+          "graph_source_requested": "splash",
+          "graph_source_used": "splash",
+          "workdir": "<WORKSPACE>/run",
+          "pending": null,
+          "orchestration": {
+            "action": "retrieve_kg",
+            "agent": "RetrievalAgent",
+            "reason": "Extraction completed; re-check the original query against the updated KG.",
+            "state": "answered"
+          },
+          "turn_id": "turn-action-ex-1"
+        }
+      }
+    ],
+    "sse_file": "sse/chat_action_stream_extraction_yes.sse",
+    "sse_sha256": "1c9c030d5631042aaa43c3b700e76452576615451d40e74f89ea26ee5fc7ef59",
+    "sse_bytes": 9781
+  }
+}

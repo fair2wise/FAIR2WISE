@@ -1,0 +1,21 @@
+event: progress
+data: {"phase": "turn_started", "message": "Turn started", "turn_id": "turn-action-dl-1"}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected download_selected via DownloadAgent", "turn_id": "turn-action-dl-1", "action": "download_selected", "agent": "DownloadAgent", "reason": "A matching one-use download approval is present.", "state": "awaiting_download_approval", "classification": null}
+
+event: progress
+data: {"phase": "download_started", "message": "Download agent fetching the approved paper", "turn_id": "turn-action-dl-1", "round": 1, "candidate_titles": ["Candidate paper one"]}
+
+event: progress
+data: {"phase": "download_result", "message": "Downloaded 1 PDF(s): candidate_one.pdf", "turn_id": "turn-action-dl-1", "round": 1, "count": 1, "titles": ["candidate_one.pdf"], "skipped": 0, "failed": 0}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected request_extraction_approval via WorkflowOrchestratorAgent", "turn_id": "turn-action-dl-1", "action": "request_extraction_approval", "agent": "WorkflowOrchestratorAgent", "reason": "PDF extraction requires explicit approval.", "state": "awaiting_extraction_approval", "classification": null}
+
+event: progress
+data: {"phase": "awaiting_extraction_decision", "message": "Paper downloaded - waiting for your approval to run targeted extraction", "turn_id": "turn-action-dl-1", "round": 1}
+
+event: complete
+data: {"status": "awaiting_extraction_decision", "answer": "", "sufficient": false, "node_ids": [], "publications": [], "confidence": 0.05, "rounds": [{"round": 1, "retrieval": {"status": "success", "sufficient": false, "missing_topics": ["synthetic missing topic"], "selected": [], "direct_evidence_count": 0, "no_evidence": true, "graph_source_requested": "splash", "graph_source_used": "splash"}}], "graph": {"nodes": [], "edges": [], "source_path": "query:<WORKSPACE>/run/kg.json"}, "graph_source_requested": "splash", "graph_source_used": "splash", "workdir": "<WORKSPACE>/run", "pending": {"kind": "extraction", "candidate": {"title": "Candidate paper one", "doi": "10.0000/contract.cand1", "publication_year": 2023, "abstract": "Synthetic abstract for candidate one.", "score": 0.91, "repository": "openalex", "recommended": false, "source_paper": "candidate_one.pdf"}}, "orchestration": {"action": "request_extraction_approval", "agent": "WorkflowOrchestratorAgent", "reason": "PDF extraction requires explicit approval.", "state": "awaiting_extraction_approval"}, "turn_id": "turn-action-dl-1"}
+

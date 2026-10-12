@@ -1,0 +1,34 @@
+{
+  "id": "annotations_422_bad_verdict",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "AnnotationRequest verdict pass|fail",
+  "request": {
+    "method": "POST",
+    "path": "/annotations",
+    "json": {
+      "turn_id": "turn-answered-1",
+      "verdict": "maybe"
+    }
+  },
+  "response": {
+    "status_code": 422,
+    "content_type": "application/json",
+    "json": {
+      "detail": [
+        {
+          "type": "string_pattern_mismatch",
+          "loc": [
+            "body",
+            "verdict"
+          ],
+          "msg": "String should match pattern '^(pass|fail)$'",
+          "input": "maybe",
+          "ctx": {
+            "pattern": "^(pass|fail)$"
+          }
+        }
+      ]
+    }
+  }
+}

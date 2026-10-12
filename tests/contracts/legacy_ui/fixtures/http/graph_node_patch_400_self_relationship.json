@@ -1,0 +1,27 @@
+{
+  "id": "graph_node_patch_400_self_relationship",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:3062-3063",
+  "request": {
+    "method": "PATCH",
+    "path": "/graph/node/matkg:TermA",
+    "json": {
+      "relationship_updates": [
+        {
+          "action": "add",
+          "source": "matkg:TermA",
+          "predicate": "rel:x",
+          "target": "matkg:TermA"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "detail": "Self relationships are not supported"
+    }
+  }
+}

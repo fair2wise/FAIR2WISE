@@ -1,0 +1,245 @@
+{
+  "ui_app": [
+    {
+      "path": "/openapi.json",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "openapi"
+    },
+    {
+      "path": "/docs",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "swagger_ui_html"
+    },
+    {
+      "path": "/docs/oauth2-redirect",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "swagger_ui_redirect"
+    },
+    {
+      "path": "/redoc",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "redoc_html"
+    },
+    {
+      "path": "/health",
+      "methods": [
+        "GET"
+      ],
+      "name": "health"
+    },
+    {
+      "path": "/settings",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_settings"
+    },
+    {
+      "path": "/settings",
+      "methods": [
+        "PUT"
+      ],
+      "name": "update_settings"
+    },
+    {
+      "path": "/session/reset",
+      "methods": [
+        "POST"
+      ],
+      "name": "reset_session"
+    },
+    {
+      "path": "/session/{session_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "name": "delete_session"
+    },
+    {
+      "path": "/graph",
+      "methods": [
+        "GET"
+      ],
+      "name": "graph"
+    },
+    {
+      "path": "/graph/nodes/search",
+      "methods": [
+        "POST"
+      ],
+      "name": "search_graph_nodes"
+    },
+    {
+      "path": "/graph/neighborhood/{node_id:path}",
+      "methods": [
+        "GET"
+      ],
+      "name": "graph_neighborhood"
+    },
+    {
+      "path": "/graph/node/{node_id}",
+      "methods": [
+        "GET"
+      ],
+      "name": "graph_node"
+    },
+    {
+      "path": "/graph/node/{node_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "name": "patch_graph_node"
+    },
+    {
+      "path": "/graph/upload",
+      "methods": [
+        "POST"
+      ],
+      "name": "upload_graph"
+    },
+    {
+      "path": "/chat",
+      "methods": [
+        "POST"
+      ],
+      "name": "chat"
+    },
+    {
+      "path": "/chat/action",
+      "methods": [
+        "POST"
+      ],
+      "name": "chat_action"
+    },
+    {
+      "path": "/publications/search",
+      "methods": [
+        "POST"
+      ],
+      "name": "publication_search"
+    },
+    {
+      "path": "/chat/stream",
+      "methods": [
+        "POST"
+      ],
+      "name": "chat_stream"
+    },
+    {
+      "path": "/chat/action/stream",
+      "methods": [
+        "POST"
+      ],
+      "name": "chat_action_stream"
+    },
+    {
+      "path": "/traces/{turn_id}",
+      "methods": [
+        "GET"
+      ],
+      "name": "get_trace"
+    },
+    {
+      "path": "/telemetry/ui",
+      "methods": [
+        "POST"
+      ],
+      "name": "telemetry_ui"
+    },
+    {
+      "path": "/annotations",
+      "methods": [
+        "POST"
+      ],
+      "name": "create_annotation"
+    }
+  ],
+  "model_app": [
+    {
+      "path": "/openapi.json",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "openapi"
+    },
+    {
+      "path": "/docs",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "swagger_ui_html"
+    },
+    {
+      "path": "/docs/oauth2-redirect",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "swagger_ui_redirect"
+    },
+    {
+      "path": "/redoc",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "redoc_html"
+    },
+    {
+      "path": "/api/chat",
+      "methods": [
+        "POST"
+      ],
+      "name": "api_chat"
+    },
+    {
+      "path": "/v1/chat/completions",
+      "methods": [
+        "POST"
+      ],
+      "name": "openai_chat_completions"
+    },
+    {
+      "path": "/api/tags",
+      "methods": [
+        "GET"
+      ],
+      "name": "list_models"
+    },
+    {
+      "path": "/api/version",
+      "methods": [
+        "GET"
+      ],
+      "name": "ollama_version"
+    },
+    {
+      "path": "/v1/models",
+      "methods": [
+        "GET"
+      ],
+      "name": "openai_models"
+    },
+    {
+      "path": "/api/ps",
+      "methods": [
+        "GET"
+      ],
+      "name": "list_processes"
+    }
+  ]
+}

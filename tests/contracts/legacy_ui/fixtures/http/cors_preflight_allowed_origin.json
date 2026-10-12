@@ -1,0 +1,27 @@
+{
+  "id": "cors_preflight_allowed_origin",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "DEFAULT_CORS_ORIGINS api.py:6603-6608, allow_credentials=True api.py:6616-6622",
+  "request": {
+    "method": "OPTIONS",
+    "path": "/chat/stream",
+    "headers": {
+      "Origin": "http://localhost:5173",
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "content-type"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "text/plain; charset=utf-8",
+    "cors_headers": {
+      "access-control-allow-origin": "http://localhost:5173",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-methods": "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT",
+      "access-control-allow-headers": "content-type",
+      "vary": "Origin"
+    },
+    "text": "OK"
+  }
+}

@@ -1,0 +1,12 @@
+event: progress
+data: {"phase": "turn_started", "message": "Turn started", "turn_id": "turn-reterr-1"}
+
+event: progress
+data: {"phase": "orchestrator_decision", "message": "Orchestrator selected retrieve_kg via RetrievalAgent", "turn_id": "turn-reterr-1", "action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}
+
+event: progress
+data: {"phase": "retrieval_started", "message": "Retrieval agent searching the KG", "turn_id": "turn-reterr-1", "round": 1}
+
+event: error
+data: {"status": "retrieval_error", "answer": "Retrieval failed safely: synthetic retrieval failure", "sufficient": false, "node_ids": [], "publications": [], "confidence": 0.35, "rounds": [], "graph": {"nodes": [], "edges": [], "source_path": "query:<WORKSPACE>/run/kg.json"}, "graph_source_requested": null, "graph_source_used": null, "workdir": "<WORKSPACE>/run", "pending": null, "orchestration": {"action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}, "turn_id": "turn-reterr-1"}
+

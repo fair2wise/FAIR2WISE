@@ -1,0 +1,21 @@
+{
+  "id": "model_openai_chat_completions_400",
+  "flow": "model_api",
+  "notes": "kg_rag_api.py:267-268",
+  "request": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "json": {
+      "messages": []
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "error": {
+        "message": "No messages"
+      }
+    }
+  }
+}

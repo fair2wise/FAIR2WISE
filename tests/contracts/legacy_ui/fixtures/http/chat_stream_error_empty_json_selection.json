@@ -1,0 +1,57 @@
+{
+  "id": "chat_stream_error_empty_json_selection",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "per-turn JSON override whose paths normalize to [] -> ValueError('JSON graph mode requires a graph file') (api.py:5061) after orchestrator progress -> SSE error stream_error",
+  "request": {
+    "method": "POST",
+    "path": "/chat/stream",
+    "json": {
+      "message": "What is Term A?",
+      "session_id": "contract-session-1",
+      "client_turn_id": "turn-err-1",
+      "graph_source": "json",
+      "json_graph_paths": [
+        " "
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "text/event-stream; charset=utf-8",
+    "sse_events": [
+      {
+        "event": "progress",
+        "data": {
+          "phase": "turn_started",
+          "message": "Turn started",
+          "turn_id": "turn-err-1"
+        }
+      },
+      {
+        "event": "progress",
+        "data": {
+          "phase": "orchestrator_decision",
+          "message": "Orchestrator selected retrieve_kg via RetrievalAgent",
+          "turn_id": "turn-err-1",
+          "action": "retrieve_kg",
+          "agent": "RetrievalAgent",
+          "reason": "fake classifier",
+          "state": "idle",
+          "classification": "scientific_or_uncertain"
+        }
+      },
+      {
+        "event": "error",
+        "data": {
+          "status": "stream_error",
+          "message": "JSON graph mode requires a graph file",
+          "turn_id": "turn-err-1"
+        }
+      }
+    ],
+    "sse_file": "sse/chat_stream_error_empty_json_selection.sse",
+    "sse_sha256": "27dc404878da2b7b7ccb789b5c0457dd9983222e6885174aa267d90baf941f43",
+    "sse_bytes": 518
+  }
+}

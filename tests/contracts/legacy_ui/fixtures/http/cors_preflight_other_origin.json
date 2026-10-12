@@ -1,0 +1,24 @@
+{
+  "id": "cors_preflight_other_origin",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "origin not in the default list is refused",
+  "request": {
+    "method": "OPTIONS",
+    "path": "/chat/stream",
+    "headers": {
+      "Origin": "http://example.invalid",
+      "Access-Control-Request-Method": "POST"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "text/plain; charset=utf-8",
+    "cors_headers": {
+      "access-control-allow-credentials": "true",
+      "access-control-allow-methods": "DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT",
+      "vary": "Origin"
+    },
+    "text": "Disallowed CORS origin"
+  }
+}

@@ -1,0 +1,2 @@
+*.sse -text
+*.json text eol=lf

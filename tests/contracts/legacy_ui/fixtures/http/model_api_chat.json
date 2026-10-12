@@ -1,0 +1,30 @@
+{
+  "id": "model_api_chat",
+  "flow": "model_api",
+  "notes": "kg_rag_api.py:246-259",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "json": {
+      "model": "kg-rag:latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is Term A?"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "model": "fake-contract-model",
+      "message": {
+        "role": "assistant",
+        "content": "Synthetic KG-RAG answer."
+      },
+      "done": true
+    }
+  }
+}

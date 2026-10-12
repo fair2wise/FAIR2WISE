@@ -1,0 +1,46 @@
+{
+  "id": "chat_action_decline",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "decline -> stopped_by_user",
+  "request": {
+    "method": "POST",
+    "path": "/chat/action",
+    "json": {
+      "decision": "no",
+      "kind": "download",
+      "session_id": "contract-session-3",
+      "client_turn_id": "turn-chat-decline-1",
+      "parent_turn_id": "turn-chat-ins-1"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "stopped_by_user",
+      "answer": "Okay - I will not download a paper. The current knowledge graph does not have enough direct evidence to answer this question.",
+      "sufficient": false,
+      "node_ids": [],
+      "publications": [],
+      "confidence": 0.05,
+      "rounds": [],
+      "graph": {
+        "nodes": [],
+        "edges": [],
+        "source_path": "query:<WORKSPACE>/run/kg.json"
+      },
+      "graph_source_requested": "splash",
+      "graph_source_used": "splash",
+      "workdir": "<WORKSPACE>/run",
+      "pending": null,
+      "orchestration": {
+        "action": "request_download_approval",
+        "agent": "WorkflowOrchestratorAgent",
+        "reason": "A paper download requires explicit approval.",
+        "state": "awaiting_download_approval"
+      },
+      "turn_id": "turn-chat-decline-1"
+    }
+  }
+}

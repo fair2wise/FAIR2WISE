@@ -1,0 +1,51 @@
+{
+  "id": "publications_search",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:6806-6815; real krag.KnowledgeGraph + lexical retrieve_nodes",
+  "request": {
+    "method": "POST",
+    "path": "/publications/search",
+    "json": {
+      "query": "resonant scattering",
+      "max_results": 5,
+      "include_external": false
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "ok",
+      "query": "resonant scattering",
+      "publications": [
+        {
+          "source_paper": "contract_paper.pdf",
+          "publication_year": 2024,
+          "paper_title": "Synthetic contract paper on resonant scattering",
+          "authors": [
+            "Contract Author"
+          ],
+          "doi": "10.0000/contract.a",
+          "keywords": [
+            "resonant",
+            "scattering"
+          ],
+          "supporting_nodes": [
+            {
+              "id": "matkg:TermA",
+              "name": "Term A",
+              "category": "Technique"
+            }
+          ]
+        }
+      ],
+      "matched_node_ids": [
+        "matkg:TermA",
+        "matkg:Other",
+        "matkg:Code1"
+      ],
+      "source": "kg"
+    }
+  }
+}

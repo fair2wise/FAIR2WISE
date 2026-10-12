@@ -1,0 +1,72 @@
+{
+  "id": "settings_put_ollama",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "api.py:6650-6655 / apply_settings 2726-2869",
+  "request": {
+    "method": "PUT",
+    "path": "/settings",
+    "json": {
+      "backend": "ollama",
+      "workflow_mode": "agentic",
+      "extraction_mode": "full",
+      "targeted_max_pages": 4,
+      "kg_query_max_nodes": 250,
+      "kg_query_hops": 3,
+      "source_rag": false,
+      "use_live_tiled": false
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "backend": "ollama",
+      "model": "deepseek-r1:70b",
+      "graph_source": "splash",
+      "workflow_mode": "agentic",
+      "extraction_mode": "full",
+      "targeted_max_pages": 4,
+      "json_graph_path": "storage/kg/matkg_contract_v1.json",
+      "json_graph_paths": [
+        "storage/kg/matkg_contract_v1.json"
+      ],
+      "kg_query_max_nodes": 250,
+      "kg_query_hops": 3,
+      "source_rag": false,
+      "use_live_tiled": false,
+      "tiled_uri": "http://127.0.0.1:8765",
+      "tiled_api_key_set": false,
+      "tiled_status": "disabled",
+      "tiled_error": null,
+      "available_json_graphs": [
+        "storage/kg/matkg_contract_v1.json"
+      ],
+      "available_graphs": [
+        {
+          "path": "storage/kg/matkg_contract_v1.json",
+          "graph_id": "contract_v1",
+          "label": "contract_v1"
+        }
+      ],
+      "selected_graph_ids": [
+        "contract_v1"
+      ],
+      "available_cborg_models": [
+        "deepseek-r1:70b",
+        "lbl/cborg-chat",
+        "gemini-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-pro",
+        "anthropic/claude-opus",
+        "anthropic/claude-sonnet",
+        "gpt",
+        "gpt-chat",
+        "gpt-mini",
+        "nova-micro",
+        "openai/gpt-4o"
+      ],
+      "default_ollama_model": "deepseek-r1:70b"
+    }
+  }
+}

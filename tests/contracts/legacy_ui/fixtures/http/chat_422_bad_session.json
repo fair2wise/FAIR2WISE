@@ -1,0 +1,34 @@
+{
+  "id": "chat_422_bad_session",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "ChatRequest session_id pattern",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "json": {
+      "message": "x",
+      "session_id": "../escape"
+    }
+  },
+  "response": {
+    "status_code": 422,
+    "content_type": "application/json",
+    "json": {
+      "detail": [
+        {
+          "type": "string_pattern_mismatch",
+          "loc": [
+            "body",
+            "session_id"
+          ],
+          "msg": "String should match pattern '^[A-Za-z0-9][A-Za-z0-9_-]*$'",
+          "input": "../escape",
+          "ctx": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          }
+        }
+      ]
+    }
+  }
+}

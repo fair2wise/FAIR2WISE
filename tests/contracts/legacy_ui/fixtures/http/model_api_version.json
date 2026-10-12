@@ -1,0 +1,16 @@
+{
+  "id": "model_api_version",
+  "flow": "model_api",
+  "notes": "kg_rag_api.py:294-296",
+  "request": {
+    "method": "GET",
+    "path": "/api/version"
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "version": "0.1.0"
+    }
+  }
+}

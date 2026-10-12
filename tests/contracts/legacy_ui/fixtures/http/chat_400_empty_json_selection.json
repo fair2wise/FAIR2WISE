@@ -1,0 +1,26 @@
+{
+  "id": "chat_400_empty_json_selection",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "same ValueError as the stream case -> HTTP 400 detail on the non-stream route (api.py:6786-6787)",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "json": {
+      "message": "What is Term A?",
+      "session_id": "contract-session-2",
+      "client_turn_id": "turn-chat-400",
+      "graph_source": "json",
+      "json_graph_paths": [
+        " "
+      ]
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "content_type": "application/json",
+    "json": {
+      "detail": "JSON graph mode requires a graph file"
+    }
+  }
+}

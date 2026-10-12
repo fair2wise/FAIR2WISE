@@ -1,0 +1,20 @@
+{
+  "id": "chat_500_malformed_verdict",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "FAULT INJECTION: non-ValueError exceptions are not mapped on /chat -> HTTP 500 plain text",
+  "request": {
+    "method": "POST",
+    "path": "/chat",
+    "json": {
+      "message": "Please crash the verdict",
+      "session_id": "contract-session-2",
+      "client_turn_id": "turn-chat-500"
+    }
+  },
+  "response": {
+    "status_code": 500,
+    "content_type": "text/plain; charset=utf-8",
+    "text": "Internal Server Error"
+  }
+}

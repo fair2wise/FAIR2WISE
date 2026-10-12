@@ -1,0 +1,111 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "KG-RAG Chat Proxy",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/chat": {
+      "post": {
+        "summary": "Api Chat",
+        "description": "Handle incoming chat request: retrieve KG context, call LLM, return response.",
+        "operationId": "api_chat_api_chat_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "summary": "Openai Chat Completions",
+        "description": "Handle OpenAI-compatible chat completions for Open WebUI.",
+        "operationId": "openai_chat_completions_v1_chat_completions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "summary": "List Models",
+        "description": "Return available model tags for OpenWebUI compatibility.",
+        "operationId": "list_models_api_tags_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "summary": "Ollama Version",
+        "description": "Return a minimal Ollama-compatible version response.",
+        "operationId": "ollama_version_api_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "Openai Models",
+        "description": "Return OpenAI-compatible model list for Open WebUI.",
+        "operationId": "openai_models_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ps": {
+      "get": {
+        "summary": "List Processes",
+        "description": "Return running processes (stub for OpenWebUI compatibility).",
+        "operationId": "list_processes_api_ps_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

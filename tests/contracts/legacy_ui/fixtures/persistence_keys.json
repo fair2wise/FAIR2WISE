@@ -1,0 +1,205 @@
+{
+  "record": "T18A browser persistence inventory (frozen F2W UI)",
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "ui_tree": "75a19b9823bc924a6391311191d3e41a5b4917ff",
+  "method": "grep of ui/src for localStorage, sessionStorage, indexedDB, document.cookie, getItem/setItem/removeItem and 'storage' events (test files excluded), then reading each owner module. Lines are 1-based against the 222b1e7 export. Every key literal below is asserted at its cited line by tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_persistence_key_evidence.",
+  "conventions": {
+    "inferred": "Claims tagged [INFERRED] are reasoned from several locations, not read at one line."
+  },
+  "keys": [
+    {
+      "key": "fair2wise-agent-settings-v1",
+      "storage": "localStorage",
+      "owner": "ui/src/app/components/agentSettings.ts",
+      "declared_at": "ui/src/app/components/agentSettings.ts:58",
+      "read_at": ["ui/src/app/components/agentSettings.ts:175"],
+      "written_at": ["ui/src/app/components/agentSettings.ts:217"],
+      "callers": {
+        "write": [
+          "ui/src/app/App.tsx:169 (boot: overwritten from GET /settings via settingsFromApiResponse; the server is the source of truth on every page load)",
+          "ui/src/app/components/AppSettingsButton.tsx:353 (after a successful PUT /settings)",
+          "ui/src/app/components/AppSettingsButton.tsx:475 (JSON graph View action)"
+        ],
+        "read": [
+          "ui/src/app/components/data/liveAgent.ts:276 (uiSettingsSnapshot -> ChatRequest.ui_settings)",
+          "ui/src/app/components/data/liveAgent.ts:301 (chatRequestBody: source_rag, use_live_tiled)",
+          "ui/src/app/components/GraphMockup.tsx:663 (canEdit = graphSource !== 'json')",
+          "ui/src/app/components/GraphMockup.tsx:1672 (jsonGraphPath for node detail)",
+          "ui/src/app/components/AppSettingsButton.tsx:190-191,223"
+        ]
+      },
+      "value_format": "JSON.stringify(AgentSettings)",
+      "value_schema": {
+        "type_at": "ui/src/app/components/agentSettings.ts:12-30",
+        "fields": {
+          "backend": "'cborg' | 'ollama'; anything else loads as 'cborg' (agentSettings.ts:178)",
+          "model": "string; cborg aliases normalized (agentSettings.ts:93-105,158-164); empty -> backend default",
+          "graphSource": "'splash_links' | 'json' (agentSettings.ts:2); ANY stored value other than 'json', including a missing field, loads as 'splash_links' (agentSettings.ts:190)",
+          "workflowMode": "'deterministic' | 'agentic'; else 'agentic' (agentSettings.ts:191)",
+          "extractionMode": "'full' | 'targeted'; else 'targeted' (agentSettings.ts:166-170)",
+          "targetedMaxPages": "number > 0; else 6 (agentSettings.ts:193-195)",
+          "jsonGraphPath": "string; must be a member of jsonGraphPaths else first path (agentSettings.ts:184-186)",
+          "jsonGraphPaths": "string[]; deduplicated; empty -> [stored path] unless it is the xray demo graph, else DEFAULT_JSON_GRAPH_PATHS (agentSettings.ts:149-156,180-183)",
+          "availableGraphs": "GraphMeta[] {path, graphId, label} (agentSettings.ts:6-10,198); no element validation",
+          "selectedGraphIds": "string[] (agentSettings.ts:199); no element validation",
+          "kgQueryMaxNodes": "number clamped to [10, 1000] (agentSettings.ts:200-202)",
+          "kgQueryHops": "number floored and clamped to [1, 20] (agentSettings.ts:116,122-125,203-205)",
+          "sourceRag": "boolean, strictly === true (agentSettings.ts:206)",
+          "useLiveTiled": "boolean, strictly === true (agentSettings.ts:207)",
+          "tiledUri": "string, trimmed (agentSettings.ts:208)"
+        }
+      },
+      "defaults": {
+        "at": "ui/src/app/components/agentSettings.ts:127-143",
+        "value": {
+          "backend": "cborg",
+          "model": "lbl/cborg-chat",
+          "graphSource": "json",
+          "workflowMode": "agentic",
+          "extractionMode": "targeted",
+          "targetedMaxPages": 6,
+          "jsonGraphPath": "storage/kg/matkg_rsoxs_v1.json",
+          "jsonGraphPaths": ["storage/kg/matkg_rsoxs_v1.json", "storage/kg/matkg_bl1101_v1.json"],
+          "availableGraphs": [],
+          "selectedGraphIds": [],
+          "kgQueryMaxNodes": 1000,
+          "kgQueryHops": 20,
+          "sourceRag": false,
+          "useLiveTiled": false,
+          "tiledUri": ""
+        },
+        "note": "Defaults apply when the key is absent or JSON.parse fails (agentSettings.ts:176,210-212). Absent key -> graphSource 'json'; present key without 'json' -> 'splash_links'. These two defaults differ."
+      },
+      "wire_mapping": {
+        "to_api": "graphSourceToApi: 'json' -> 'json', everything else -> 'splash' (agentSettings.ts:220-222); used in settingsToApiPayload (agentSettings.ts:228-249) for PUT /settings",
+        "from_api": "graphSourceFromApi: 'json' -> 'json', everything else -> 'splash_links' (agentSettings.ts:224-226)",
+        "server_validation": "AgentSettingsUpdate.graph_source pattern ^(splash|json)$ (app/modules/f2w_agent/api.py:414); sending 'splash_links' is a 422 (fixture http/settings_put_422_bad_graph_source.json)",
+        "chat_requests": "chatRequestBody does not send graph_source or json_graph_path(s) (liveAgent.ts:295-311); ui_settings carries graphSource:'splash_links' for trace only"
+      },
+      "migration_rule": "Preserve the key, the field names and the 'splash_links' token. Because App.tsx:169 rewrites the key from GET /settings on every boot, the backend graph_source value ('splash' | 'json') determines what the browser stores; a new backend must keep returning one of those two literals on /settings."
+    },
+    {
+      "key": "fair2wise-available-graphs-cache-v1",
+      "storage": "localStorage",
+      "owner": "ui/src/app/components/agentSettings.ts",
+      "declared_at": "ui/src/app/components/agentSettings.ts:59",
+      "read_at": ["ui/src/app/components/agentSettings.ts:69"],
+      "written_at": ["ui/src/app/components/agentSettings.ts:87"],
+      "callers": {
+        "read": ["ui/src/app/components/AppSettingsButton.tsx:194"],
+        "write": ["ui/src/app/components/AppSettingsButton.tsx:235", "ui/src/app/components/AppSettingsButton.tsx:356"]
+      },
+      "value_format": "JSON.stringify(string[]) of available_json_graphs from GET/PUT /settings",
+      "value_schema": "string[]; on read non-string and blank items are dropped (agentSettings.ts:72-74)",
+      "defaults": {"value": [], "at": "ui/src/app/components/agentSettings.ts:67,70,75-77"},
+      "migration_rule": "Best-effort cache; quota errors ignored (agentSettings.ts:88-90). Paths are storage/kg-relative strings; a backend that changes path spelling invalidates the cache harmlessly."
+    },
+    {
+      "key": "fair2wise.chat.sessions.v2",
+      "storage": "localStorage",
+      "owner": "ui/src/app/components/chatSessions.ts",
+      "declared_at": "ui/src/app/components/chatSessions.ts:42",
+      "read_at": ["ui/src/app/components/chatSessions.ts:196"],
+      "written_at": ["ui/src/app/components/chatSessions.ts:231-234"],
+      "callers": {
+        "read": ["ui/src/app/App.tsx:91"],
+        "write": ["ui/src/app/App.tsx:96 (useEffect on every chatStore change)"]
+      },
+      "value_format": "JSON.stringify(ChatSessionStore) with each session's messages sliced to the last 80",
+      "value_schema": {
+        "ChatSessionStore": "{activeSessionId: string, sessions: ChatSession[]} (chatSessions.ts:37-40)",
+        "ChatSession": "{id: string, title: string, createdAt: number(ms), updatedAt: number(ms), messages: ChatMessage[]} (chatSessions.ts:29-35)",
+        "ChatMessage": "{id, role:'user'|'assistant', content, question?, highlightNodeIds?, retrievedNodeIds?, confidence?, status?, graphSourceUsed?, elapsedSeconds?(integer), publications?, pending?, retrievedGraph?, turnId?, progress?, annotation?} (chatSessions.ts:10-27; normalized at 92-126)",
+        "TurnAnnotationState": "{verdict:'pass'|'fail', failureTags:string[], note:string, saved:boolean} (chatSessions.ts:3-8,136-148)",
+        "embedded_server_payloads": "pending (PendingAction from ChatResponse.pending), publications, retrievedGraph (GraphPayload, kept only when nodes non-empty, chatSessions.ts:70-80), progress (ChatProgressEvent[] SSE progress payloads, chatSessions.ts:128-134), status (ChatResponse.status), turnId (ChatResponse.turn_id)"
+      },
+      "limits": {
+        "MAX_STORED_MESSAGES": "80 (chatSessions.ts:44,155,228)",
+        "title": "first user prompt, whitespace-collapsed, 60 chars with ellipsis (chatSessions.ts:54-58)",
+        "session_id": "crypto.randomUUID() or 'chat-<ms>-<rand8>' fallback (chatSessions.ts:47-52); used as ChatRequest.session_id, which the server validates against ^[A-Za-z0-9][A-Za-z0-9_-]*$ max 64 (api.py:128-133)"
+      },
+      "defaults": {
+        "value": "one fresh session {title:'New chat', messages:[]} active (chatSessions.ts:60-68,181-191)",
+        "on_parse_error": "falls through to the legacy key, then a fresh store (chatSessions.ts:204-221)"
+      },
+      "migration_rule": "Old messages persist server payload fragments (status strings, pending envelopes, progress phases, graph node ids, publications). A new backend must keep those literals and shapes readable, because reloaded sessions re-render them without re-fetching. Session ids are the server's per-session memory keys (POST /session/reset, DELETE /session/{id})."
+    },
+    {
+      "key": "fair2wise.chat.messages.v1",
+      "storage": "localStorage",
+      "owner": "ui/src/app/components/chatSessions.ts",
+      "declared_at": "ui/src/app/components/chatSessions.ts:43",
+      "read_at": ["ui/src/app/components/chatSessions.ts:209"],
+      "removed_at": ["ui/src/app/components/chatSessions.ts:235"],
+      "value_format": "legacy JSON array of ChatMessage",
+      "value_schema": "ChatMessage[] normalized with the same rules as v2 messages (chatSessions.ts:211)",
+      "defaults": {"value": null},
+      "migration_rule": "One-way migration: read only when v2 is absent or unparsable, wrapped into one new session (chatSessions.ts:208-217), deleted on the next successful v2 save (chatSessions.ts:235). Keep this read path; do not write v1."
+    },
+    {
+      "key": "fair2wise-publication-favorites-v1",
+      "storage": "localStorage",
+      "owner": "ui/src/app/components/publicationFavorites.ts",
+      "declared_at": "ui/src/app/components/publicationFavorites.ts:4",
+      "read_at": ["ui/src/app/components/publicationFavorites.ts:25"],
+      "written_at": ["ui/src/app/components/publicationFavorites.ts:44"],
+      "callers": {
+        "read_write": [
+          "ui/src/app/components/PublicationFavoriteButton.tsx:6",
+          "ui/src/app/components/AppBookmarksButton.tsx:16"
+        ]
+      },
+      "value_format": "JSON.stringify(StoredFavorite[]), newest first (unshift, publicationFavorites.ts:77-81)",
+      "value_schema": {
+        "StoredFavorite": "{key: string, savedAt: number(ms), publication: PublicationInfo} (publicationFavorites.ts:7-11); items failing these typeof checks are dropped on read (publicationFavorites.ts:29-36)",
+        "key": "'doi:<lowercased doi>' else 'source-title:<lower source_paper>:<lower paper_title or source_paper>' (publicationFavorites.ts:14-20)",
+        "PublicationInfo": "ui/src/app/components/data/liveAgent.ts:91-106"
+      },
+      "server_alignment": "Same key rule as backend _publication_key (app/modules/f2w_agent/api.py:868-875) except the browser falls back to source_paper when paper_title is empty (publicationFavorites.ts:18) [INFERRED: keys diverge only for publications with no DOI and no title].",
+      "sync": "cross-tab 'storage' event (publicationFavorites.ts:96-100); same-tab CustomEvent 'fair2wise-favorites-changed' (publicationFavorites.ts:5,47-50) - an event name, not a storage key",
+      "defaults": {"value": []},
+      "migration_rule": "Bookmarks hold a full PublicationInfo copy and are never refreshed from the server. Keep DOI/title spelling stable so keys still match publications in new ChatResponse/PublicationSearchResponse payloads."
+    },
+    {
+      "key": "fair2wise.citeFocusNodeId",
+      "storage": "sessionStorage",
+      "owner": "ui/src/app/components/ChatSidebar.tsx",
+      "declared_at": "ui/src/app/components/ChatSidebar.tsx:388",
+      "read_at": ["ui/src/app/components/ChatSidebar.tsx:397"],
+      "written_at": ["ui/src/app/components/ChatSidebar.tsx:405"],
+      "removed_at": ["ui/src/app/components/ChatSidebar.tsx:406"],
+      "callers": {
+        "read": ["ui/src/app/components/ChatSidebar.tsx:671"],
+        "write": [
+          "ui/src/app/components/ChatSidebar.tsx:759 (resolved viewer node id)",
+          "ui/src/app/components/ChatSidebar.tsx:1177 (citation click)"
+        ],
+        "clear": [
+          "ui/src/app/components/ChatSidebar.tsx:734 (session switch)",
+          "ui/src/app/components/ChatSidebar.tsx:900",
+          "ui/src/app/components/ChatSidebar.tsx:1086"
+        ]
+      },
+      "value_format": "raw string (not JSON): a graph node id from a [KG: ...] citation, possibly graph-prefixed or a Tiled identity ref",
+      "defaults": {"value": null},
+      "migration_rule": "Tab-scoped. Holds old node ids across reloads, so node ids (and the Tiled 'beamline:'/'tiled:' prefixes resolved at ChatSidebar.tsx:753-755) must keep resolving after any backend revision."
+    }
+  ],
+  "not_persisted_or_unreachable": [
+    {
+      "item": "cookie sidebar_state",
+      "evidence": "ui/src/app/components/ui/sidebar.tsx:28-29,86",
+      "status": "[INFERRED] unreachable: SidebarProvider (sidebar.tsx:56) is not imported by any other file under ui/src"
+    },
+    {
+      "item": "UI telemetry queue",
+      "evidence": "ui/src/app/components/uiTelemetry.ts:11",
+      "status": "in-memory only; flushed to POST /telemetry/ui with keepalive (uiTelemetry.ts:53-58); nothing stored"
+    },
+    {
+      "item": "IndexedDB / Cache Storage",
+      "evidence": "no occurrence of indexedDB or caches. under ui/src",
+      "status": "not used"
+    }
+  ]
+}

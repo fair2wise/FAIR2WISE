@@ -1,0 +1,6 @@
+event: progress
+data: {"phase": "turn_started", "message": "Turn started", "turn_id": "turn-action-decline-1"}
+
+event: complete
+data: {"status": "stopped_by_user", "answer": "Okay - I will not download a paper. The current knowledge graph does not have enough direct evidence to answer this question.", "sufficient": false, "node_ids": [], "publications": [], "confidence": 0.05, "rounds": [], "graph": {"nodes": [], "edges": [], "source_path": "query:<WORKSPACE>/run/kg.json"}, "graph_source_requested": "splash", "graph_source_used": "splash", "workdir": "<WORKSPACE>/run", "pending": null, "orchestration": {"action": "download_selected", "agent": "DownloadAgent", "reason": "A matching one-use download approval is present.", "state": "awaiting_download_approval"}, "turn_id": "turn-action-decline-1"}
+

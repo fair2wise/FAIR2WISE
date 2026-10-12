@@ -1,0 +1,2497 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FAIR2WISE Agent Pipeline API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "description": "Return process health, runtime settings, and session paths.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings": {
+      "get": {
+        "summary": "Get Settings",
+        "description": "Return the current agent settings.",
+        "operationId": "get_settings_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update Settings",
+        "description": "Apply a settings update and return the new settings.",
+        "operationId": "update_settings_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session/reset": {
+      "post": {
+        "summary": "Reset Session",
+        "description": "Clear the requested chat session.",
+        "operationId": "reset_session_session_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SessionResetRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/session/{session_id}": {
+      "delete": {
+        "summary": "Delete Session",
+        "description": "Delete a named chat session.",
+        "operationId": "delete_session_session__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Session Session  Session Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graph": {
+      "get": {
+        "summary": "Graph",
+        "description": "Return the current graph payload.",
+        "operationId": "graph_graph_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphPayload"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graph/nodes/search": {
+      "post": {
+        "summary": "Search Graph Nodes",
+        "description": "Search graph nodes by text query.",
+        "operationId": "search_graph_nodes_graph_nodes_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphNodeSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphNodeSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graph/neighborhood/{node_id}": {
+      "get": {
+        "summary": "Graph Neighborhood",
+        "description": "Return a Tiled node's neighborhood subgraph.",
+        "operationId": "graph_neighborhood_graph_neighborhood__node_id__get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "hops",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 3,
+              "title": "Hops"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphPayload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graph/node/{node_id}": {
+      "get": {
+        "summary": "Graph Node",
+        "description": "Return one graph node by id from Tiled or a JSON graph file.",
+        "operationId": "graph_node_graph_node__node_id__get",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          },
+          {
+            "name": "json_graph_path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Json Graph Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphNode"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Patch Graph Node",
+        "description": "Patch a splash-mode graph node.",
+        "operationId": "patch_graph_node_graph_node__node_id__patch",
+        "parameters": [
+          {
+            "name": "node_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Node Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphNodeUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphNode"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graph/upload": {
+      "post": {
+        "summary": "Upload Graph",
+        "description": "Save an uploaded MatKG JSON graph.",
+        "operationId": "upload_graph_graph_upload_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "summary": "Chat",
+        "description": "Handle a non-streaming chat request.",
+        "operationId": "chat_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/action": {
+      "post": {
+        "summary": "Chat Action",
+        "description": "Handle a non-streaming pending yes/no action.",
+        "operationId": "chat_action_chat_action_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/publications/search": {
+      "post": {
+        "summary": "Publication Search",
+        "description": "Search publications in the graph and optionally OpenAlex.",
+        "operationId": "publication_search_publications_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicationSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicationSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/stream": {
+      "post": {
+        "summary": "Chat Stream",
+        "description": "Stream chat progress and the final response as SSE.",
+        "operationId": "chat_stream_chat_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chat/action/stream": {
+      "post": {
+        "summary": "Chat Action Stream",
+        "description": "Stream pending-action progress and the final response as SSE.",
+        "operationId": "chat_action_stream_chat_action_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/{turn_id}": {
+      "get": {
+        "summary": "Get Trace",
+        "description": "Return the unclipped detail record for one turn.",
+        "operationId": "get_trace_traces__turn_id__get",
+        "parameters": [
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Turn Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Trace Traces  Turn Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/telemetry/ui": {
+      "post": {
+        "summary": "Telemetry Ui",
+        "description": "Append a batch of UI events. No-op when tracing is disabled.",
+        "operationId": "telemetry_ui_telemetry_ui_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiTelemetryBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Telemetry Ui Telemetry Ui Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotations": {
+      "post": {
+        "summary": "Create Annotation",
+        "description": "Append a human pass/fail label. Multiple labels per turn are allowed.",
+        "operationId": "create_annotation_annotations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Annotation Annotations Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentSettingsResponse": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "graph_source": {
+            "type": "string",
+            "title": "Graph Source"
+          },
+          "workflow_mode": {
+            "type": "string",
+            "title": "Workflow Mode",
+            "default": "agentic"
+          },
+          "extraction_mode": {
+            "type": "string",
+            "title": "Extraction Mode",
+            "default": "targeted"
+          },
+          "targeted_max_pages": {
+            "type": "integer",
+            "title": "Targeted Max Pages",
+            "default": 6
+          },
+          "json_graph_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Graph Path"
+          },
+          "json_graph_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Json Graph Paths"
+          },
+          "kg_query_max_nodes": {
+            "type": "integer",
+            "title": "Kg Query Max Nodes",
+            "default": 1000
+          },
+          "kg_query_hops": {
+            "type": "integer",
+            "title": "Kg Query Hops",
+            "default": 20
+          },
+          "source_rag": {
+            "type": "boolean",
+            "title": "Source Rag",
+            "default": false
+          },
+          "use_live_tiled": {
+            "type": "boolean",
+            "title": "Use Live Tiled",
+            "default": false
+          },
+          "tiled_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiled Uri"
+          },
+          "tiled_api_key_set": {
+            "type": "boolean",
+            "title": "Tiled Api Key Set",
+            "default": false
+          },
+          "tiled_status": {
+            "type": "string",
+            "title": "Tiled Status",
+            "default": "disabled"
+          },
+          "tiled_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiled Error"
+          },
+          "available_json_graphs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Json Graphs"
+          },
+          "available_graphs": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Available Graphs"
+          },
+          "selected_graph_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Selected Graph Ids"
+          },
+          "available_cborg_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Cborg Models"
+          },
+          "default_ollama_model": {
+            "type": "string",
+            "title": "Default Ollama Model",
+            "default": "deepseek-r1:70b"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backend",
+          "model",
+          "graph_source"
+        ],
+        "title": "AgentSettingsResponse",
+        "description": "Current agent backend, model, graph, and workflow settings."
+      },
+      "AgentSettingsUpdate": {
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(cborg|ollama)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "graph_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(splash|json)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Source"
+          },
+          "workflow_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(deterministic|agentic)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Mode"
+          },
+          "extraction_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(full|targeted)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Mode"
+          },
+          "targeted_max_pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targeted Max Pages"
+          },
+          "json_graph_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Graph Path"
+          },
+          "json_graph_paths": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Graph Paths"
+          },
+          "selected_graph_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Graph Ids"
+          },
+          "kg_query_max_nodes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg Query Max Nodes"
+          },
+          "kg_query_hops": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kg Query Hops"
+          },
+          "source_rag": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Rag"
+          },
+          "use_live_tiled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Live Tiled"
+          },
+          "tiled_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiled Uri"
+          }
+        },
+        "type": "object",
+        "title": "AgentSettingsUpdate",
+        "description": "Partial update for runtime agent settings."
+      },
+      "AnnotationRequest": {
+        "properties": {
+          "turn_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+            "title": "Turn Id"
+          },
+          "verdict": {
+            "type": "string",
+            "pattern": "^(pass|fail)$",
+            "title": "Verdict"
+          },
+          "failure_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Tags"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          },
+          "annotator": {
+            "type": "string",
+            "title": "Annotator",
+            "default": ""
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "turn_id",
+          "verdict"
+        ],
+        "title": "AnnotationRequest",
+        "description": "Human pass/fail label for one traced turn."
+      },
+      "ChatActionRequest": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "pattern": "^(yes|no)$",
+            "title": "Decision"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(download|extraction)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "candidate_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Index"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageInput"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "client_turn_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Turn Id"
+          },
+          "parent_turn_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Turn Id"
+          },
+          "ui_settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui Settings"
+          },
+          "graph_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(splash|json)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Source"
+          },
+          "json_graph_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Graph Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ChatActionRequest",
+        "description": "Yes/no decision for a pending download or extraction."
+      },
+      "ChatMessageInput": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "pattern": "^(user|assistant)$",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "ChatMessageInput",
+        "description": "One chat history turn with a user or assistant role."
+      },
+      "ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Message"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageInput"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "client_turn_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Turn Id"
+          },
+          "ui_settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui Settings"
+          },
+          "graph_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(splash|json)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Source"
+          },
+          "json_graph_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Graph Path"
+          },
+          "json_graph_paths": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Json Graph Paths"
+          },
+          "source_rag": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Rag"
+          },
+          "use_live_tiled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Use Live Tiled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest",
+        "description": "Inbound chat request including message, history, session, and graph options."
+      },
+      "ChatResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "sufficient": {
+            "type": "boolean",
+            "title": "Sufficient"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          },
+          "publications": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Publications"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "rounds": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "graph": {
+            "$ref": "#/components/schemas/GraphPayload"
+          },
+          "graph_source_requested": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Source Requested"
+          },
+          "graph_source_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Source Used"
+          },
+          "workdir": {
+            "type": "string",
+            "title": "Workdir"
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending"
+          },
+          "orchestration": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orchestration"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "answer",
+          "sufficient",
+          "node_ids",
+          "confidence",
+          "rounds",
+          "graph",
+          "workdir"
+        ],
+        "title": "ChatResponse",
+        "description": "Agent pipeline reply including answer, graph, and pending state."
+      },
+      "GraphEdge": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "predicate": {
+            "type": "string",
+            "title": "Predicate",
+            "default": "rel:related_to"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "GraphEdge",
+        "description": "A directed edge between two graph nodes."
+      },
+      "GraphNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "publications": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Publications"
+          },
+          "code_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Snippet"
+          },
+          "code_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Language"
+          },
+          "function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Name"
+          },
+          "linked_code_snippets": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedCodeSnippet"
+            },
+            "type": "array",
+            "title": "Linked Code Snippets"
+          },
+          "graph_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Id"
+          },
+          "graph_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Label"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formula"
+          },
+          "source_papers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Papers"
+          },
+          "properties": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "extra_fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Extra Fields"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "repo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Url"
+          },
+          "repo_owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Name"
+          },
+          "repo_commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Commit Sha"
+          },
+          "source_file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File Path"
+          },
+          "source_file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File Url"
+          },
+          "source_start_line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Start Line"
+          },
+          "source_end_line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source End Line"
+          },
+          "repository_license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository License"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "type"
+        ],
+        "title": "GraphNode",
+        "description": "A knowledge-graph node returned to the client."
+      },
+      "GraphNodeSearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "GraphNodeSearchRequest",
+        "description": "Text query and result limit for graph node search."
+      },
+      "GraphNodeSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "retrieval_backend": {
+            "type": "string",
+            "title": "Retrieval Backend"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNodeSearchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "retrieval_backend"
+        ],
+        "title": "GraphNodeSearchResponse",
+        "description": "Node-search results with the retrieval backend used."
+      },
+      "GraphNodeSearchResult": {
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/GraphNode"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node",
+          "score"
+        ],
+        "title": "GraphNodeSearchResult",
+        "description": "One ranked graph-node search hit."
+      },
+      "GraphNodeUpdateRequest": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "code_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Snippet"
+          },
+          "publications": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publications"
+          },
+          "linked_code_snippets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LinkedCodeSnippetUpdate"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked Code Snippets"
+          },
+          "relationship_updates": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraphRelationshipUpdate"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship Updates"
+          }
+        },
+        "type": "object",
+        "title": "GraphNodeUpdateRequest",
+        "description": "Partial patch for a splash-mode graph node."
+      },
+      "GraphPayload": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "source_path": {
+            "type": "string",
+            "title": "Source Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodes",
+          "edges",
+          "source_path"
+        ],
+        "title": "GraphPayload",
+        "description": "Nodes, edges, and source path for a graph view."
+      },
+      "GraphRelationshipUpdate": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "pattern": "^(add|remove)$",
+            "title": "Action"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source"
+          },
+          "predicate": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Predicate"
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Target"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "source",
+          "predicate",
+          "target"
+        ],
+        "title": "GraphRelationshipUpdate",
+        "description": "Add or remove a relationship incident to a node."
+      },
+      "GraphUploadRequest": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "uploaded_graph.json"
+          },
+          "graph": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Graph"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph"
+        ],
+        "title": "GraphUploadRequest",
+        "description": "Uploaded MatKG JSON graph and suggested filename."
+      },
+      "GraphUploadResponse": {
+        "properties": {
+          "graph": {
+            "$ref": "#/components/schemas/GraphPayload"
+          },
+          "graph_path": {
+            "type": "string",
+            "title": "Graph Path"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph",
+          "graph_path",
+          "filename"
+        ],
+        "title": "GraphUploadResponse",
+        "description": "Saved uploaded graph payload and filesystem path."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LinkedCodeSnippet": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": ""
+          },
+          "function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Name"
+          },
+          "code_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Language"
+          },
+          "code_snippet": {
+            "type": "string",
+            "title": "Code Snippet"
+          },
+          "publications": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Publications"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "repo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Url"
+          },
+          "repo_owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Owner"
+          },
+          "repo_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Name"
+          },
+          "repo_commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Commit Sha"
+          },
+          "source_file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File Path"
+          },
+          "source_file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File Url"
+          },
+          "source_start_line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Start Line"
+          },
+          "source_end_line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source End Line"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code_snippet"
+        ],
+        "title": "LinkedCodeSnippet",
+        "description": "A code snippet linked to a knowledge-graph node."
+      },
+      "LinkedCodeSnippetUpdate": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "function_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Function Name"
+          },
+          "code_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Language"
+          },
+          "code_snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Snippet"
+          },
+          "_action": {
+            "type": "string",
+            "pattern": "^(upsert|unlink)$",
+            "title": "Action",
+            "default": "upsert"
+          }
+        },
+        "type": "object",
+        "title": "LinkedCodeSnippetUpdate",
+        "description": "Upsert or unlink a linked code snippet on a node."
+      },
+      "PublicationSearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query"
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "default": 20
+          },
+          "include_external": {
+            "type": "boolean",
+            "title": "Include External",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "PublicationSearchRequest",
+        "description": "Publication search query with optional OpenAlex lookup."
+      },
+      "PublicationSearchResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "publications": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Publications"
+          },
+          "matched_node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Node Ids"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "query",
+          "source"
+        ],
+        "title": "PublicationSearchResponse",
+        "description": "Ranked publications matching a search query."
+      },
+      "SessionResetRequest": {
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "type": "object",
+        "title": "SessionResetRequest",
+        "description": "Optional session id for a session reset."
+      },
+      "SessionResetResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "session_memory": {
+            "type": "string",
+            "title": "Session Memory"
+          },
+          "session_memory_has_context": {
+            "type": "boolean",
+            "title": "Session Memory Has Context"
+          },
+          "workflow_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow State"
+          },
+          "workflow_phase": {
+            "type": "string",
+            "title": "Workflow Phase",
+            "default": "idle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "session_memory",
+          "session_memory_has_context"
+        ],
+        "title": "SessionResetResponse",
+        "description": "Result of clearing a chat session's memory and workflow."
+      },
+      "UiTelemetryBatch": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/UiTelemetryEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "title": "UiTelemetryBatch",
+        "description": "Batch of UI events flushed by the browser."
+      },
+      "UiTelemetryEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Type"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "UiTelemetryEvent",
+        "description": "One browser interaction, never including draft keystrokes."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

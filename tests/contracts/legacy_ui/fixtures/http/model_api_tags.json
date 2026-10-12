@@ -1,0 +1,22 @@
+{
+  "id": "model_api_tags",
+  "flow": "model_api",
+  "notes": "kg_rag_api.py:285-291",
+  "request": {
+    "method": "GET",
+    "path": "/api/tags"
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "models": [
+        {
+          "name": "kg-rag:latest",
+          "model": "kg-rag:latest",
+          "modified_at": "2025-09-17T00:00:00Z"
+        }
+      ]
+    }
+  }
+}

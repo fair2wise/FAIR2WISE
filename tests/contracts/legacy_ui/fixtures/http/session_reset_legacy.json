@@ -1,0 +1,21 @@
+{
+  "id": "session_reset_legacy",
+  "flow": "splash_app",
+  "kg_mode": "splash",
+  "notes": "no body -> __legacy__ session",
+  "request": {
+    "method": "POST",
+    "path": "/session/reset"
+  },
+  "response": {
+    "status_code": 200,
+    "content_type": "application/json",
+    "json": {
+      "status": "reset",
+      "session_memory": "<WORKSPACE>/run/session_memory.json",
+      "session_memory_has_context": false,
+      "workflow_state": "<WORKSPACE>/run/workflow_state.json",
+      "workflow_phase": "idle"
+    }
+  }
+}
