@@ -347,6 +347,20 @@ class QuoteVerifier:
             return QuoteVerification(True, MatchType.EXACT, None, locator, region, tuple(spans))
         return QuoteVerification(True, MatchType.NORMALIZED, NORMALIZATION_PROFILE, locator, region, tuple(spans))
 
+    @staticmethod
+    def _source_spans(indices: Sequence[int], src_words: Sequence[Tuple[int, int, str]]) -> Tuple[Tuple[int, int], ...]:
+        """Merge consecutive source word indices into char intervals (spaces between them included)."""
+        spans: List[Tuple[int, int]] = []
+        prev = None
+        for idx in indices:
+            start, end = src_words[idx][0], src_words[idx][1]
+            if prev is not None and idx == prev + 1:
+                spans[-1] = (spans[-1][0], end)
+            else:
+                spans.append((start, end))
+            prev = idx
+        return tuple(spans)
+
     def find_echoes(self, text: str, sources: Sequence[SourceRef], *, min_chars: int, shingle_words: int,
                     exclude: Sequence[Tuple[int, int]] = ()) -> List[EchoMatch]:
         """Find verbatim runs of any ``sources`` text inside ``text``.
@@ -390,8 +404,8 @@ class QuoteVerifier:
                 if run and (i is None or i != run[-1] + 1):
                     start, end = words[run[0]][0], words[run[-1]][1]
                     if end - start >= min_chars:
-                        spans = tuple(sorted({(src_words[covered[r]][0], src_words[covered[r]][1]) for r in run}))
-                        out.append(EchoMatch(start, end, ref, region, spans))
+                        out.append(EchoMatch(start, end, ref, region,
+                                             self._source_spans(sorted({covered[r] for r in run}), src_words)))
                     run = []
                 if i is not None:
                     run.append(i)
