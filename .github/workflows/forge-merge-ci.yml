@@ -1,0 +1,174 @@
+# Validation for the FORGE-to-F2W migration branch (T01/T18A).
+# Tests only: no deployment, publishing, registry, Pages or secrets.
+# build-app.yml and publish-image.yml keep their main-only triggers unchanged.
+# Plan: docs/migration/ui_contracts/ci_plan.md
+name: forge_merge validation
+
+on:
+  push:
+    branches: [ forge_merge ]
+  pull_request:
+    branches: [ forge_merge ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-merge-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  FROZEN_UI_TREE: 75a19b9823bc924a6391311191d3e41a5b4917ff
+  KG_RAG_RETRIEVAL_BACKEND: lexical
+  KG_RAG_FORCE_CPU: "1"
+  F2W_SOURCE_RAG: "0"
+  F2W_LIVE_TILED: "0"
+
+jobs:
+  guard:
+    name: Isolation and frozen-UI guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with: { fetch-depth: 0 }
+      - name: No .env in the checkout
+        run: test ! -e .env
+      - name: Frozen UI tree unchanged
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'ui-change-approved') }}
+        run: |
+          actual="$(git rev-parse HEAD:ui)"
+          echo "ui tree: $actual"
+          test "$actual" = "$FROZEN_UI_TREE"
+
+  python-contracts:
+    name: Python contract tests
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - name: Install the H0 environment
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements/dev.txt
+          pip check
+      - name: Contract suites (shared contracts, legacy UI, JSON KG)
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            python -m pytest tests/contracts -q -p no:cacheprovider --junitxml=contracts.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with: { name: contracts-junit, path: contracts.xml }
+
+  python-baseline-suite:
+    name: Full pytest suite vs known failures
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements/dev.txt
+      - name: Full suite (failures recorded, not hidden)
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            python -m pytest -q -p no:cacheprovider --junitxml=full.xml || true
+      - name: Compare with the known-failure set
+        run: python scripts/ci/compare_known_failures.py full.xml docs/migration/reviews/H0/known_failures.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with: { name: full-junit, path: full.xml }
+
+  import-closure:
+    name: Syntax check and legacy entrypoints
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements.txt -r requirements/dev.txt
+      - name: Syntax / undefined names vs known pre-existing violations
+        # Two F821 violations exist at baseline 222b1e7 (dead code in api.py, an
+        # annotation in monitored_agent.py). They are tracked, not ignored: any new
+        # or changed violation fails. Line numbers are dropped because they shift.
+        run: |
+          flake8 . --select=E9,F63,F7,F82 --format='%(path)s %(code)s %(text)s' | sort > lint.txt || true
+          diff -u docs/migration/reviews/H0/known_lint.txt lint.txt
+      - name: Legacy entrypoints importable with unchanged signatures
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" PYTHONPATH="$PWD" python - <<'EOF'
+          import inspect
+          from app.modules.f2w_agent import api
+          from app.modules import kg_rag_api
+          sig = str(inspect.signature(api.create_app))
+          assert sig == "(cfg: 'CoordinatorConfig', *, cors_origins: 'Optional[List[str]]' = None) -> 'FastAPI'", sig
+          assert callable(api.run_api)
+          assert str(inspect.signature(kg_rag_api.create_fastapi_app)).startswith("(graph_file: 'str'")
+          print("legacy entrypoints ok")
+          EOF
+
+  frontend:
+    name: Frontend unit tests and build (frozen UI)
+    needs: guard
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ui } }
+    strategy:
+      matrix:
+        include:
+          - name: standalone-dev
+            base: /
+            api: ""
+          - name: fair2wise-prefix
+            base: /fair2wise/
+            api: /fair2wise/api
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: ui/package-lock.json }
+      - run: npm ci
+      - run: npm test
+      - name: vite build (${{ matrix.name }})
+        env:
+          VITE_F2W_AGENT_API_URL: ${{ matrix.api }}
+        run: npx vite build --base "${{ matrix.base }}"
+
+  playwright-mocked:
+    name: Existing Playwright suite (mocked backend)
+    needs: frontend
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ui } }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: ui/package-lock.json }
+      - run: npm ci
+      - run: npx playwright install --with-deps chrome
+      - run: npx playwright test --reporter=line
+        env: { CI: "1" }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: failure()
+        with: { name: playwright-report, path: ui/playwright-report }
+
+  docs-build:
+    name: MkDocs strict build (no publish)
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: pip install -r requirements/dev.txt
+      - run: mkdocs build --strict -f mkdocs/mkdocs.yml
+
+  # Added when their fixtures exist: real-API browser tests against the frozen UI
+  # (T18B, required at H2) and disposable-Tiled publication/edit tests (T20B/T18C).

@@ -1,0 +1,2 @@
+./app/modules/f2w_agent/api.py F821 undefined name 'history'
+./app/modules/term_extractor/monitored_agent.py F821 undefined name 'UserAgent'

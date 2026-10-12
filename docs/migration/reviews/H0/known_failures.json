@@ -1,0 +1,26 @@
+{
+  "record": "Known pre-existing test failures, tracked not skipped (plan section 5.3)",
+  "accepted_at": "H0 (decision.json, 2026-10-09)",
+  "updated": "2026-10-12: the 15 test_bl1101_ingest errors are gone since matkg_bl1101_v7.json is committed (O-D2, 0d3d294)",
+  "environment": "isolated: git archive export, env -i, no .env, requirements.txt + requirements/dev.txt",
+  "known_failures": [
+    {
+      "id": "tests.test_kg_update::test_splash_reimport_refuses_wipe_without_explicit_allow",
+      "kind": "failure",
+      "message_contains": "pixi not found on PATH",
+      "reason": "Checks for pixi on PATH before validating --allow-splash-wipe (precondition ordering)."
+    },
+    {
+      "id": "tests.test_strip_ansi_and_helpers.TestMakeChatClient::test_cborg_backend",
+      "kind": "failure",
+      "message_contains": "Missing credentials",
+      "reason": "Unit test constructs a CBORG client and only passes with an ambient CBORG_API_KEY (test-isolation defect)."
+    },
+    {
+      "id": "tests.test_strip_ansi_and_helpers.TestMakeChatClient::test_cborg_openai_alias",
+      "kind": "failure",
+      "message_contains": "Missing credentials",
+      "reason": "Unit test constructs a CBORG client and only passes with an ambient CBORG_API_KEY (test-isolation defect)."
+    }
+  ]
+}
