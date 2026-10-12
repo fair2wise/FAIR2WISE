@@ -7,7 +7,7 @@ import openai
 import requests
 
 from app.modules.cborg_limiter import sync_slot
-from app.modules.cborg_http import collect_stream_text, openai_http_kwargs
+from app.modules.cborg_http import collect_stream_text, openai_http_kwargs, require_cborg_api_key
 from app.modules.f2w_agent.trace import record_llm_call
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class CBorgChatClient(ChatClient):
         import os
         self.model = model
         self.client = openai.OpenAI(
-            api_key=api_key or os.environ.get("CBORG_API_KEY"),
+            api_key=require_cborg_api_key(api_key),
             base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),
             **openai_http_kwargs(asynchronous=False),
         )

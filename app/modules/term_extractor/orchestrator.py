@@ -13,9 +13,10 @@ import fitz
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
-from app.modules.cborg_http import openai_http_kwargs
+from app.modules.cborg_http import openai_http_kwargs, require_cborg_api_key
 
 from app.modules.cborg_limiter import sync_slot
+from app.modules.llm_admission import shared_admission_enabled
 
 from . import provenance, source_repos
 from .agent import build_graph
@@ -225,6 +226,17 @@ class Orchestrator:
         )
         return build_tools(self._tool_state)
 
+    def _uses_cborg_admission(self) -> bool:
+        """Whether page calls take a CBORG slot.
+
+        Legacy: only backend ``"cborg"``. With shared admission (H1-3) the
+        ``"cborg-openai"`` backend, which also reaches CBORG, joins the cap too.
+        """
+        backend = getattr(self, "backend", "cborg")
+        if backend == "cborg":
+            return True
+        return backend == "cborg-openai" and shared_admission_enabled()
+
     def _build_llm(self) -> ChatOpenAI:
         if self.backend == "ollama":
             logger.debug("Building LLM: backend=ollama url=%s model=%s", self.ollama_url, self.model)
@@ -237,7 +249,7 @@ class Orchestrator:
         logger.debug("Building LLM: backend=cborg base=%s model=%s", self.cborg_base, self.model)
         return ChatOpenAI(
             model=self.model,
-            api_key=self.cborg_api_key,
+            api_key=require_cborg_api_key(self.cborg_api_key),
             base_url=self.cborg_base,
             temperature=self.temperature,
             streaming=True,
@@ -263,7 +275,7 @@ class Orchestrator:
             tool_state.set_page_context(filename, page_num + 1)
         try:
             try:
-                with sync_slot(enabled=getattr(self, "backend", "cborg") == "cborg"):
+                with sync_slot(enabled=self._uses_cborg_admission()):
                     result = self.graph.invoke({"messages": [HumanMessage(content=prompt)]})
             except Exception as e:
                 logger.error("Agent failed on %s page %d: %s", filename, page_num + 1, _short_error(e))

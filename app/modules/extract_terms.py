@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from modules.agents.chebi import ChebiOboLookup
 from modules.agents.chem_checker import ChemicalFormulaValidator
 from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
-from modules.cborg_http import openai_http_kwargs
+from modules.cborg_http import openai_http_kwargs, require_cborg_api_key
 from modules.term_extractor.merge_index import (
     DEFAULT_EMBED_MODEL,
     DEFAULT_MERGE_TOP_K,
@@ -86,13 +86,23 @@ class CBorgChatClient(ChatClient):
         """Initialize with CBORG model, API key, and base URL."""
         self.model = model
         self.client = openai.OpenAI(
-            api_key=api_key or os.environ.get("CBORG_API_KEY"),
+            api_key=require_cborg_api_key(api_key),
             base_url=(base_url or os.environ.get("CBORG_BASE_URL") or "https://api.cborg.lbl.gov").rstrip("/"),
             **openai_http_kwargs(asynchronous=False),
         )
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
         """Send a prompt to CBORG and return the response text."""
+        # Shared admission (H1-3): this client bypassed the CBORG cap before; it joins
+        # it only when F2W_SHARED_ADMISSION is on, so legacy behavior is unchanged.
+        from app.modules.cborg_limiter import sync_slot
+        from app.modules.llm_admission import shared_admission_enabled
+
+        with sync_slot(enabled=shared_admission_enabled()):
+            return self._chat_unadmitted(prompt, temperature=temperature, timeout=timeout)
+
+    def _chat_unadmitted(self, prompt: str, *, temperature: float, timeout: int) -> str:
+        """Issue the streamed request and read it to completion."""
         resp = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],

@@ -11,6 +11,10 @@ async KG-RAG client. The pipeline runs these in separate sequential phases, so
 each gate is sized to the same cap without stacking past it.
 
 Configure the cap with ``CBORG_MAX_CONCURRENCY`` (default 5).
+
+With ``F2W_SHARED_ADMISSION=1`` both gates delegate to one shared
+``llm_admission`` controller instead, so sync and async callers share a single
+cap and honor 429 cooldowns (H1-3). The flag is read per call.
 """
 from __future__ import annotations
 
@@ -19,6 +23,11 @@ import os
 import threading
 from contextlib import asynccontextmanager, contextmanager
 from typing import AsyncIterator, Iterator, Optional
+
+try:
+    from app.modules.llm_admission import get_controller, shared_admission_enabled
+except ImportError:  # pragma: no cover - legacy top-level import style (scripts/)
+    from llm_admission import get_controller, shared_admission_enabled
 
 
 def _read_cap() -> int:
@@ -48,6 +57,10 @@ def sync_slot(enabled: bool = True) -> Iterator[None]:
     if not enabled:
         yield
         return
+    if shared_admission_enabled():
+        with get_controller("cborg").slot():
+            yield
+        return
     _sync_sem.acquire()
     try:
         yield
@@ -73,6 +86,10 @@ async def async_slot(enabled: bool = True) -> AsyncIterator[None]:
     """Hold one async CBORG slot for the duration of the block."""
     if not enabled:
         yield
+        return
+    if shared_admission_enabled():
+        async with get_controller("cborg").aslot():
+            yield
         return
     sem = get_async_semaphore()
     async with sem:

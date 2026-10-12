@@ -147,6 +147,21 @@ async def collect_stream_text_async(chunks: Any) -> str:
     return "".join(parts)
 
 
+def require_cborg_api_key(explicit: str | None = None) -> str:
+    """Return the CBORG API key or raise if none is configured (H1-4).
+
+    The openai SDK falls back to ``OPENAI_API_KEY`` when ``api_key`` is empty,
+    which would send an OpenAI credential to CBORG. Fail closed instead.
+    """
+    key = (explicit or os.environ.get("CBORG_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError(
+            "CBORG_API_KEY is not set; refusing to create a CBORG client "
+            "(the OpenAI SDK would otherwise fall back to OPENAI_API_KEY)."
+        )
+    return key
+
+
 def openai_http_kwargs(*, asynchronous: bool) -> dict[str, Any]:
     """Return OpenAI client kwargs that pin CBORG to IPv4 or IPv6."""
     local_address = _local_address()

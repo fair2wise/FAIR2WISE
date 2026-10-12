@@ -76,9 +76,9 @@ except ImportError:  # pragma: no cover - direct script execution fallback
     from cborg_limiter import async_slot
 
 try:
-    from app.modules.cborg_http import openai_http_kwargs
+    from app.modules.cborg_http import openai_http_kwargs, require_cborg_api_key
 except ImportError:  # pragma: no cover - direct script execution fallback
-    from cborg_http import openai_http_kwargs
+    from cborg_http import openai_http_kwargs, require_cborg_api_key
 
 load_dotenv()
 
@@ -1446,7 +1446,7 @@ class CBorgClient:
         """Initialize with CBORG model, API key, and base URL."""
         self.model = model
         self.client = openai.AsyncOpenAI(
-            api_key=api_key or os.environ.get("CBORG_API_KEY"),
+            api_key=require_cborg_api_key(api_key),
             base_url=(base_url or CBORG_BASE_URL).rstrip("/"),
             **openai_http_kwargs(asynchronous=True),
         )
