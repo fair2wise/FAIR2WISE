@@ -1223,7 +1223,7 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ traces
 
-    def project_trace(self, record: Any, viewer: Viewer) -> Any:
+    def project_trace(self, record: Any, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> Any:
         """Project a trace detail record for ``GET /traces/{turn_id}`` (ADR 4.3).
 
         Prompts, merged context and raw model outputs become SHA-256 digests and
@@ -1253,7 +1253,7 @@ class DisclosureProjector:
             elif key == "llm_calls" and isinstance(value, list):
                 out[key] = [self._project_llm_call(c) for c in value if isinstance(c, Mapping)]
             elif key == "response" and isinstance(value, Mapping):
-                out[key] = self._project_trace_response(value, viewer)
+                out[key] = self._project_trace_response(value, viewer, sources)
             elif key == "errors" and isinstance(value, list):
                 out[key] = [{"code": ErrorCode.INTERNAL.value, "type": str(e.get("type") or ""),
                              "where": self._safe_str(str(e.get("where") or ""), 120)}
@@ -1330,14 +1330,15 @@ class DisclosureProjector:
                                                    "type": str((value or {}).get("type") or "")}
         return out
 
-    def _project_trace_response(self, resp: Mapping[str, Any], viewer: Viewer) -> Dict[str, Any]:
+    def _project_trace_response(self, resp: Mapping[str, Any], viewer: Viewer,
+                                sources: Sequence[SourceRef] = ()) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
         status = str(resp.get("status") or "")
         for key, value in resp.items():
             if key == "answer":
                 text = self._project_error_answer(value, viewer) if status.endswith("_error") and isinstance(
                     value, str) else value
-                out[key] = self.project_text(text, viewer)
+                out[key] = self.project_text(text, viewer, sources=sources)
             elif key == "citations":
                 out[key] = self._scrub(value, depth=1)
             elif key == "publications":
@@ -1403,7 +1404,8 @@ class DisclosureProjector:
         return out
 
     def project_route_response(self, method: str, path: str, status_code: int, body: Any,
-                               viewer: Viewer) -> Any:
+                               viewer: Viewer, *, sources: Sequence[SourceRef] = (),
+                               evidence: Sequence[Tuple[EvidenceRef, Optional[str]]] = ()) -> Any:
         """Dispatch a legacy route response body to its projection.
 
         Args:
@@ -1412,14 +1414,16 @@ class DisclosureProjector:
             status_code: Response status.
             body: Decoded JSON body or response text.
             viewer: Recipient.
+            sources: Source regions retrieved for the turn (chat and model-proxy answers).
+            evidence: Explicit quote evidence for the turn.
         """
         if int(status_code) >= 400:
             return self.project_http_error(status_code, body, viewer)
         p = path.split("?", 1)[0]
         if p in ("/chat", "/chat/action"):
-            return self.project_chat_response(body, viewer)
+            return self.project_chat_response(body, viewer, evidence=evidence, sources=sources)
         if p.startswith("/traces/"):
-            return self.project_trace(body, viewer)
+            return self.project_trace(body, viewer, sources=sources)
         if p == "/settings":
             return self.project_settings(body, viewer)
         if p in ("/health", "/session/reset") or p.startswith("/session/"):
@@ -1444,7 +1448,7 @@ class DisclosureProjector:
             out["publications"] = [self.project_publication(x) for x in body.get("publications") or []]
             return out
         if p in ("/api/chat", "/v1/chat/completions"):
-            return self.project_model_chat(body, viewer)
+            return self.project_model_chat(body, viewer, sources=sources)
         if isinstance(body, (Mapping, list)):
             return self._scrub(body, depth=0)
         return self._safe_str(body) if isinstance(body, str) else body
