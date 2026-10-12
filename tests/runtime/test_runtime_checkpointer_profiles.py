@@ -14,7 +14,13 @@ from app.modules.agent_runtime.checkpointer import (
     scoped_thread_id,
     thread_config,
 )
-from app.modules.agent_runtime.profiles import CURATOR, LITERATURE_READER, CapabilityGroup, get_group, turn_capabilities
+from app.modules.agent_runtime.profiles import (
+    CURATOR,
+    LITERATURE_READER,
+    CapabilityGroup,
+    get_group,
+    turn_capabilities,
+)
 from tests.runtime.runtime_fakes import als_ctx, local_ctx
 
 

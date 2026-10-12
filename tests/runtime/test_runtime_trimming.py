@@ -27,7 +27,8 @@ def result(cid, content, **kw):
 
 
 def test_orphaned_call_repaired_in_place():
-    msgs = [HumanMessage(id="h1", content="q"), call("lit_search", "c1", q="x"), HumanMessage(id="h2", content="q2")]
+    msgs = [HumanMessage(id="h1", content="q"), call("lit_search", "c1", q="x"),
+            HumanMessage(id="h2", content="q2")]
     for_model, replacements = repair_orphaned_tool_calls(msgs)
     fixed = for_model[1]
     assert fixed.id == "ai-c1" and fixed.tool_calls == [] and "Cancelled before it returned" in fixed.content
@@ -46,7 +47,8 @@ def test_orphaned_result_removed():
 
 def test_media_trimmed_only_before_current_turn():
     image = {"type": "image", "base64": "A" * 1000, "mime_type": "image/png"}
-    msgs = [HumanMessage(id="h1", content=[{"type": "text", "text": "see"}, image]), AIMessage(id="a1", content="ok"),
+    msgs = [HumanMessage(id="h1", content=[{"type": "text", "text": "see"}, image]),
+            AIMessage(id="a1", content="ok"),
             HumanMessage(id="h2", content=[{"type": "text", "text": "again"}, image])]
     for_model, replacements = trim_stale_media(msgs)
     assert count_media_blocks(msgs) == 2 and count_media_blocks(for_model) == 1
