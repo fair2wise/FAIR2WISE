@@ -338,3 +338,33 @@ def test_fake_clients_are_deterministic():
     assert sync.calls[1]["trace_label"] == "x"
     fake = FakeAsyncChatClient(['{"sufficient": false}'])
     assert json.loads(asyncio.run(fake.chat([{"role": "user", "content": "q"}]))) == {"sufficient": False}
+
+
+# --- draft.3 additions -----------------------------------------------------------
+
+def test_unauthenticated_maps_to_denied_status():
+    from app.modules.contracts import status_for_code
+    assert status_for_code(ErrorCode.UNAUTHENTICATED) is ToolStatus.DENIED
+    assert status_for_code(ErrorCode.STALE_APPROVAL) is ToolStatus.ERROR
+    assert status_for_code(ErrorCode.BUDGET_EXHAUSTED) is ToolStatus.ERROR
+    assert status_for_code(ErrorCode.UNAVAILABLE) is ToolStatus.UNAVAILABLE
+    ToolResult(tool="t", status=ToolStatus.DENIED, error_code=ErrorCode.UNAUTHENTICATED)
+    with pytest.raises(ValidationError):
+        ToolResult(tool="t", status=ToolStatus.INVALID, error_code=ErrorCode.UNAUTHENTICATED)
+
+
+def test_evidence_carries_normalization_profile_and_citation():
+    loc = SourceLocator(page=2)
+    ref = EvidenceRef(evidence_id="e", work_id="w", source_version="v", locator=loc,
+                      match_type=MatchType.NORMALIZED, quote="q", normalization_profile="ws-hyphen-v1",
+                      citation="[PDF: w.pdf p.2]")
+    assert ref.citation == "[PDF: w.pdf p.2]" and ref.normalization_profile == "ws-hyphen-v1"
+    claimed = EvidenceRef(evidence_id="e", work_id="w", source_version="v", locator=loc,
+                          match_type=MatchType.NORMALIZED, quote="q")
+    assert claimed.normalization_profile is None  # unverified claim; projection will not show it as verbatim
+
+
+def test_source_read_is_not_a_requestable_capability():
+    assert "source.read" not in CAPABILITIES
+    with pytest.raises(ValidationError):
+        local_ctx(capabilities=frozenset({"source.read"}))

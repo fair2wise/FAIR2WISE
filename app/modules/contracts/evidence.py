@@ -76,6 +76,11 @@ class EvidenceRef(BaseModel):
         quote: Bounded excerpt or value as it appears in the source; internal
             until projected through the disclosure policy.
         parser_revision: Parser/extraction revision that produced the locator.
+        normalization_profile: Profile under which a ``NORMALIZED`` quote matched the
+            source (for example ``"ws-hyphen-v1"``), recorded by quote verification. A
+            claimed but unverified normalized quote may omit it; the disclosure
+            projection shows a quote as verbatim only when the profile is recorded.
+        citation: Legacy citation token for display (for example ``"[PDF: x.pdf p.3]"``).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -88,6 +93,8 @@ class EvidenceRef(BaseModel):
     match_type: MatchType = MatchType.NONE
     quote: Optional[str] = None
     parser_revision: Optional[str] = None
+    normalization_profile: Optional[str] = None
+    citation: Optional[str] = None
 
     @model_validator(mode="after")
     def _quote_matches_type(self) -> "EvidenceRef":

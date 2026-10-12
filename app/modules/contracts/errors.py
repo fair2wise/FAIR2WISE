@@ -17,6 +17,7 @@ class ErrorCode(str, Enum):
     Attributes:
         INVALID_INPUT: Arguments failed schema or semantic validation; not retryable.
         DENIED: The request context lacks a required capability or scope.
+        UNAUTHENTICATED: No verified caller (ALS sign-in required); never raised on ``:local``.
         UNAVAILABLE: A dependency (provider, Tiled, parser) is down; retryable.
         UNSUPPORTED_CAPABILITY: The backend cannot perform the operation safely.
         NOT_FOUND: The addressed record does not exist in the authorized scope.
@@ -29,6 +30,7 @@ class ErrorCode(str, Enum):
 
     INVALID_INPUT = "invalid_input"
     DENIED = "denied"
+    UNAUTHENTICATED = "unauthenticated"
     UNAVAILABLE = "unavailable"
     UNSUPPORTED_CAPABILITY = "unsupported_capability"
     NOT_FOUND = "not_found"

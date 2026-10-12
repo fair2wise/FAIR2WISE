@@ -56,7 +56,9 @@ class ChangePlan(BaseModel):
         plan_id: Identifier of this plan.
         snapshot_id: Source snapshot.
         input_sha256: SHA-256 of the snapshot bytes the plan was computed from.
-        target: Target graph instance identifier (for example a Tiled URL + namespace).
+        target: Target graph instance: the normalized Tiled base URL (scheme, host, port,
+            path; no query, credentials or trailing slash), optionally followed by
+            ``#<namespace>``. Any other form fails closed in approval checks.
         corpus_scope: Corpora the plan may affect.
         base_revision: Target revision the plan was computed against.
         creates: Count of entities/links to create.

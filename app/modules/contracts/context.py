@@ -29,6 +29,9 @@ ADMIN_CAPABILITIES = frozenset({
 })
 
 #: Frozen capability vocabulary (docs/migration/authentication/access_contract.md section 6).
+#: Reading private sources (``source.read``) is deliberately *not* a capability: it can
+#: never be placed on a request. It needs a sealed per-request grant from trusted
+#: service code (``app/modules/security/content_access.py``).
 CAPABILITIES = CHAT_CAPABILITIES | ADMIN_CAPABILITIES
 
 

@@ -27,9 +27,9 @@ from .errors import CapabilityError, ContractError, ErrorCode
 from .evidence import EvidenceRef, MatchType, SourceLocator
 from .jobs import JobEvent, JobHandle, JobState, StageOutcome
 from .ports import DocumentStore, GraphCapabilities, GraphPort
-from .tools import CostClass, Effect, ToolResult, ToolSpec, ToolStatus
+from .tools import CostClass, Effect, ToolResult, ToolSpec, ToolStatus, status_for_code
 
-CONTRACT_VERSION = "1.0.0-draft.2"
+CONTRACT_VERSION = "1.0.0-draft.3"
 
 __all__ = [
     "ADMIN_CAPABILITIES",
@@ -64,4 +64,5 @@ __all__ = [
     "ToolResult",
     "ToolSpec",
     "ToolStatus",
+    "status_for_code",
 ]

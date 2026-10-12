@@ -101,10 +101,27 @@ class ToolStatus(str, Enum):
 
 
 _STATUS_ERROR = {
-    ToolStatus.DENIED: ErrorCode.DENIED,
-    ToolStatus.INVALID: ErrorCode.INVALID_INPUT,
-    ToolStatus.UNAVAILABLE: ErrorCode.UNAVAILABLE,
+    ToolStatus.DENIED: frozenset({ErrorCode.DENIED, ErrorCode.UNAUTHENTICATED}),
+    ToolStatus.INVALID: frozenset({ErrorCode.INVALID_INPUT}),
+    ToolStatus.UNAVAILABLE: frozenset({ErrorCode.UNAVAILABLE}),
 }
+
+_CODE_STATUS = {
+    ErrorCode.DENIED: ToolStatus.DENIED,
+    ErrorCode.UNAUTHENTICATED: ToolStatus.DENIED,
+    ErrorCode.INVALID_INPUT: ToolStatus.INVALID,
+    ErrorCode.UNAVAILABLE: ToolStatus.UNAVAILABLE,
+}
+
+
+def status_for_code(code: ErrorCode) -> "ToolStatus":
+    """Return the ToolResult status for a failure code.
+
+    Denied/unauthenticated, invalid input and unavailable have their own statuses;
+    every other failure (not found, conflict, stale approval, budget, cancelled,
+    internal, unsupported capability) is ``ERROR`` with its specific code.
+    """
+    return _CODE_STATUS.get(code, ToolStatus.ERROR)
 
 
 class ToolResult(BaseModel):
@@ -144,8 +161,9 @@ class ToolResult(BaseModel):
         if self.status not in failing and self.error_code is not None:
             raise ValueError(f"status {self.status.value} must not carry error_code")
         expected = _STATUS_ERROR.get(self.status)
-        if expected is not None and self.error_code is not expected:
-            raise ValueError(f"status {self.status.value} requires error_code {expected.value}")
+        if expected is not None and self.error_code not in expected:
+            allowed = ", ".join(sorted(c.value for c in expected))
+            raise ValueError(f"status {self.status.value} requires error_code in {{{allowed}}}")
         if self.status is ToolStatus.EMPTY and self.data:
             raise ValueError("empty results carry no data")
         return self
