@@ -154,3 +154,11 @@ the UI API), O-A2 (role-check max age; default 60 s, capped at 900 s).
 - Remaining T21B conflict for wiring (no owner decision needed): the uploaded
   graph path becomes an opaque `f2w://` id, so `GET /graph/node` must accept
   that id before the projection is wired into routes.
+
+## O-R1: supervisor planner failure (2026-10-13)
+
+**Decision.** "Yes keep the fallback." In `F2W_RUNTIME=langgraph` with
+`F2W_QA_ROUTE=supervisor`, if the planning model errors or does not call the
+QA tool, the turn falls back to the direct `answer_from_knowledge` call; the
+reason is logged and the failed planning call is recorded in the trace. To be
+revisited before the supervisor route becomes the default runtime (H6/H7).
