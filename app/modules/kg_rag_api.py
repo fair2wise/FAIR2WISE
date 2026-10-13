@@ -78,9 +78,9 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-from .project_config import config_value
-from .cborg_limiter import async_slot
-from .cborg_http import openai_http_kwargs, require_cborg_api_key
+from .project_config import config_value  # noqa: E402 - after the optional semantic imports
+from .cborg_limiter import async_slot  # noqa: E402
+from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
 
 if __name__ == "__main__":
     # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):

@@ -21,12 +21,13 @@ def test_checkout_root_is_the_repo_root(monkeypatch):
 def test_schema_defaults_resolve_from_any_working_directory(tmp_path, monkeypatch):
     monkeypatch.delenv(resources.RESOURCE_ROOT_VAR, raising=False)
     monkeypatch.chdir(tmp_path)
-    assert resources.resolve_resource("storage/schema/matkg_schema.yaml") == REPO / "storage/schema/matkg_schema.yaml"
+    rel = "storage/schema/matkg_schema.yaml"
+    assert resources.resolve_resource(rel) == REPO / rel
     local = tmp_path / "storage/schema/matkg_schema.yaml"
     local.parent.mkdir(parents=True)
     local.write_text("id: local\n")
     # An explicit relative path that exists from the CWD keeps its meaning.
-    assert resources.resolve_resource("storage/schema/matkg_schema.yaml") == Path("storage/schema/matkg_schema.yaml")
+    assert resources.resolve_resource(rel) == Path(rel)
     assert resources.resolve_resource(local) == local
 
 

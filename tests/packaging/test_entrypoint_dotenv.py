@@ -131,4 +131,5 @@ def test_documented_launcher_reads_dotenv_before_import_time_configuration(tmp_p
         "workflow_mode": "deterministic", "timeout": 77, "backend": "cborg"}
     assert _launch(tmp_path, F2W_DOTENV=str(env_file), F2W_WORKFLOW_MODE="agentic", KG_RAG_LLM_TIMEOUT="5") == {
         "workflow_mode": "agentic", "timeout": 5, "backend": "cborg"}
-    assert _launch(tmp_path, F2W_DOTENV="none") == {"workflow_mode": "agentic", "timeout": 120, "backend": "ollama"}
+    defaults = {"workflow_mode": "agentic", "timeout": 120, "backend": "ollama"}
+    assert _launch(tmp_path, F2W_DOTENV="none") == defaults
