@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Awaitable, Callable, Dict, FrozenSet, Mapping, Optional, Tuple
 
-from app.modules.contracts import (
+from ..contracts import (
     ApprovalRecord,
     ChangePlan,
     ContractError,

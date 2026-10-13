@@ -10,8 +10,8 @@ from typing import Any, Dict, Iterable, Optional
 
 from academy.agent import Agent, action
 
-from app.modules.f2w_agent.retrieval_agent import _is_ops_layout_question
-from app.modules.f2w_agent.trace import bind_context, note_error, note_precheck
+from .retrieval_agent import _is_ops_layout_question
+from .trace import bind_context, note_error, note_precheck
 
 logger = logging.getLogger(__name__)
 
@@ -298,7 +298,7 @@ class WorkflowOrchestratorAgent(Agent):
 
     def _llm_classify(self, user_turn: str, state: Dict[str, Any]) -> Dict[str, Any]:
         """Ask the chat model to classify a fresh turn; returns parsed JSON."""
-        from app.modules.term_extractor.clients import make_chat_client
+        from ..term_extractor.clients import make_chat_client
 
         client = make_chat_client(
             backend=self._backend,

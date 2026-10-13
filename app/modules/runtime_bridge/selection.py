@@ -43,7 +43,7 @@ def attach_summary_path(pipeline: Any, environ: Optional[Mapping[str, str]] = No
     """
     if runtime_mode(environ) is RuntimeMode.LEGACY:
         return None
-    from app.modules.operations.summary_compat import build_legacy_summary_path
+    from ..operations.summary_compat import build_legacy_summary_path
 
     return build_legacy_summary_path(pipeline, environ)
 

@@ -34,8 +34,8 @@ import re
 import uuid
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from app.modules.contracts import ActorKind, RequestContext
-from app.modules.security.authorization import DeploymentSettings
+from ..contracts import ActorKind, RequestContext
+from ..security.authorization import DeploymentSettings
 
 from .mode import RuntimeConfigError
 from .qa_route import QaRoute, TracedPlanningModel, pipeline_planning_model, qa_route
@@ -118,8 +118,8 @@ def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] =
     Raises:
         RuntimeConfigError: Non-local profile or invalid ``F2W_QA_ROUTE``.
     """
-    from app.modules.agent_runtime.executor import RuntimeLimits
-    from app.modules.application import F2WApplication
+    from ..agent_runtime.executor import RuntimeLimits
+    from ..application import F2WApplication
 
     settings = legacy_deployment_settings(environ)
     route = qa_route(environ)

@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, Optional
 
-from app.modules.contracts import ADMIN_CAPABILITIES, CAPABILITIES, CHAT_CAPABILITIES, RequestContext
+from ..contracts import ADMIN_CAPABILITIES, CAPABILITIES, CHAT_CAPABILITIES, RequestContext
 
 
 @dataclass(frozen=True)

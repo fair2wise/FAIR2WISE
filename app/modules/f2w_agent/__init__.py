@@ -12,17 +12,6 @@ Academy agents coordinate a retrieve -> (download -> extract -> update KG)
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-# Make the repo's existing modules importable in every style they expect
-# (`app.modules.*`, `modules.*`, and top-level `scripts/*`).
-_ROOT = Path(__file__).resolve().parents[3]
-for _p in (_ROOT, _ROOT / "app", _ROOT / "scripts"):
-    sp = str(_p)
-    if sp not in sys.path:
-        sys.path.insert(0, sp)
-
 __all__ = [
     "RetrievalAgent",
     "DownloadAgent",

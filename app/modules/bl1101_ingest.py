@@ -36,7 +36,7 @@ from urllib.request import Request, urlopen
 import yaml
 from lxml import html as lhtml
 
-from app.modules import json2kg
+from . import json2kg
 
 LOGGER = logging.getLogger("ingest_bl1101")
 

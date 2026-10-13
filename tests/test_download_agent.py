@@ -1,16 +1,11 @@
 import asyncio
-import sys
 import json
 from pathlib import Path
 
-
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / "scripts"
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
-
-import download_pdfs
 import pyalex
+
+# Patch the canonical module DownloadAgent uses (scripts/download_pdfs.py is a facade).
+from app.modules.literature import download_pdfs
 
 from app.modules.f2w_agent import download_agent as mod
 from app.modules.f2w_agent.download_agent import DownloadAgent, _search_queries

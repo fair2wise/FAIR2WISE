@@ -23,7 +23,11 @@ DEFAULT_GOLD_LIMIT = 12
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    """Resource root for source indexes (the repo root in a checkout; ``F2W_RESOURCE_ROOT`` when set)."""
+    from ..resources import resource_root
+
+    root = resource_root()
+    return root if root is not None else Path(__file__).resolve().parents[3]
 
 
 def sha256_file(path: Path) -> str:
@@ -181,7 +185,7 @@ def collect_ops_docs(*, root: Optional[Path] = None) -> List[Dict[str, Any]]:
         )
 
     try:
-        from app.modules.bl1101_ingest import REPO_SPECS
+        from ..bl1101_ingest import REPO_SPECS
     except Exception:
         REPO_SPECS = ()
 

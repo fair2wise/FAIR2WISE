@@ -6,7 +6,7 @@ module that uses them.
 """
 from __future__ import annotations
 
-from app.modules import kg_rag_api as krag
+from .. import kg_rag_api as krag
 
 # ---------------------------------------------------------------------------
 # Sufficiency judge — system prompt

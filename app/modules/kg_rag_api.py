@@ -6,6 +6,20 @@ Provides semantic/lexical retrieval over a JSON knowledge graph, LLM chat client
 """
 from __future__ import annotations
 
+if __name__ == "__main__" and not __package__:
+    # Checkout script launch (`python3 app/modules/kg_rag_api.py ...`, documented in
+    # README.md): re-run as the package module `app.modules.kg_rag_api` so its
+    # relative imports resolve under one name. sys.path[0] is the script's own
+    # directory (app/modules); replace it with the repo root instead of adding
+    # app/ or app/modules to sys.path.
+    import runpy as _runpy
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _sys.path[0] = str(_Path(__file__).resolve().parents[2])
+    _runpy.run_module("app.modules.kg_rag_api", run_name="__main__", alter_sys=True)
+    raise SystemExit(0)
+
 import argparse
 import asyncio
 import datetime
@@ -25,7 +39,6 @@ import aiohttp
 import openai
 import requests
 from colorama import Fore, Style, init as colorama_init
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
@@ -40,9 +53,9 @@ import uvicorn
 # ~300 MB combined) when the operator has explicitly selected lexical retrieval.
 # This keeps the process footprint small enough to survive macOS jetsam on
 # memory-constrained hosts (e.g. when a VM or browser fleet is also running).
-# The env var is read *before* load_dotenv() here because the CLI entry point
-# (cli.py) already calls load_dotenv() during its own module load, so the value
-# is available by the time this module is imported.
+# The env var is read *before* this module's own CLI .env load below; the
+# launchers load .env before importing this module, so the value is available
+# by the time this module is imported.
 _SEMANTIC_REQUESTED = os.environ.get("KG_RAG_RETRIEVAL_BACKEND", "").lower() not in ("lexical",)
 
 if _SEMANTIC_REQUESTED:
@@ -65,22 +78,16 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-try:
-    from app.modules.project_config import config_value
-except ImportError:  # pragma: no cover - direct script execution fallback
-    from project_config import config_value
+from .project_config import config_value  # noqa: E402 - after the optional semantic imports
+from .cborg_limiter import async_slot  # noqa: E402
+from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
 
-try:
-    from app.modules.cborg_limiter import async_slot
-except ImportError:  # pragma: no cover - direct script execution fallback
-    from cborg_limiter import async_slot
+if __name__ == "__main__":
+    # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):
+    # load .env before the configuration below is read. Library imports never load .env.
+    from .dotenv_entry import load_entrypoint_dotenv
 
-try:
-    from app.modules.cborg_http import openai_http_kwargs, require_cborg_api_key
-except ImportError:  # pragma: no cover - direct script execution fallback
-    from cborg_http import openai_http_kwargs, require_cborg_api_key
-
-load_dotenv()
+    load_entrypoint_dotenv(__file__)
 
 
 def _load_kg_deps() -> None:
@@ -1453,7 +1460,7 @@ class CBorgClient:
 
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
         """Send messages to CBORG and return the assistant response."""
-        from app.modules.cborg_http import collect_stream_text_async
+        from .cborg_http import collect_stream_text_async
 
         try:
             async with async_slot():
@@ -1595,7 +1602,7 @@ def build_rag_prompt(q: str, ctx: str) -> str:
 
 async def call_llm(cli: ChatClient, messages: Sequence[Dict[str, str]], label: str) -> str:
     """Call the LLM with timeout handling, printing status to stdout."""
-    from app.modules.f2w_agent.trace import record_llm_call
+    from .f2w_agent.trace import record_llm_call
 
     print(
         Fore.YELLOW

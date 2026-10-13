@@ -35,7 +35,7 @@ import re
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
-from app.modules.contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus
+from ..contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus
 
 from .papers import MAX_TERMS_CAP, TOOL_NAME, PaperScope, PaperScopeResolver, PaperSummaryTool, pinned_paper_scope
 
@@ -139,7 +139,7 @@ class LegacySummaryPath:
         if entry is not None and entry.ran:
             return entry.legacy
         if result.status is ToolStatus.INVALID:
-            from app.modules.f2w_agent.paper_evidence_agent import summarize_extracted_terms
+            from ..f2w_agent.paper_evidence_agent import summarize_extracted_terms
 
             self.fallbacks += 1
             logger.warning("%s: arguments outside the tool bounds; ran the legacy function directly (%s)",
@@ -161,14 +161,14 @@ def build_legacy_summary_path(pipeline: Any, environ: Optional[Any] = None) -> L
     Raises:
         RuntimeConfigError: On an ALS profile.
     """
-    from app.modules.agent_runtime.executor import RuntimeLimits, ToolExecutor
-    from app.modules.agent_runtime.policies import InMemoryEventSink
-    from app.modules.llm_admission import ProviderAdmission
-    from app.modules.runtime_bridge.bootstrap import build_read_registry, build_read_skills
-    from app.modules.runtime_bridge.legacy_adapter import legacy_deployment_settings
-    from app.modules.runtime_bridge.qa_tool import LegacyResultLedger
-    from app.modules.runtime_bridge.retrieval import LegacyRetrievalService
-    from app.modules.security.authorization import local_operator_context
+    from ..agent_runtime.executor import RuntimeLimits, ToolExecutor
+    from ..agent_runtime.policies import InMemoryEventSink
+    from ..llm_admission import ProviderAdmission
+    from ..runtime_bridge.bootstrap import build_read_registry, build_read_skills
+    from ..runtime_bridge.legacy_adapter import legacy_deployment_settings
+    from ..runtime_bridge.qa_tool import LegacyResultLedger
+    from ..runtime_bridge.retrieval import LegacyRetrievalService
+    from ..security.authorization import local_operator_context
 
     settings = legacy_deployment_settings(environ)
     tool = PaperSummaryTool(session_paper_resolver(pipeline))

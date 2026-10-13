@@ -8,7 +8,13 @@ Examples:
 
 import sys
 
-from app.modules.f2w_agent.cli import main
+if __name__ == "__main__":
+    # Load .env before the CLI imports coordinator/kg_rag_api, which read configuration at import.
+    from ..dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
+
+from ..f2w_agent.cli import main  # noqa: E402
 
 if __name__ == "__main__":
     sys.exit(main())

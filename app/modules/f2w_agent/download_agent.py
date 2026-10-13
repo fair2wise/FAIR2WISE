@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 MAX_SEARCH_QUERIES = 5
 
-import download_pdfs as _dl
+from ..literature import download_pdfs as _dl
 
 RELIABLE_PDF_HOSTS = _dl.RELIABLE_PDF_HOSTS
 
@@ -499,7 +499,7 @@ class DownloadAgent(Agent):
         """Score candidates by relevance to the query. LLM with lexical fallback."""
         scored = candidates
         try:
-            from app.modules.term_extractor.clients import make_chat_client
+            from ..term_extractor.clients import make_chat_client
 
             cli = make_chat_client(
                 backend=self._backend,
@@ -524,7 +524,7 @@ class DownloadAgent(Agent):
             for i, w in enumerate(candidates):
                 w["_score"] = float(scores.get(str(i), 0.0))
         except Exception as e:
-            from app.modules.f2w_agent.trace import note_error
+            from .trace import note_error
 
             logger.warning("LLM ranking failed (%s); using lexical overlap", e)
             note_error("DownloadAgent._rank_candidates", e)
@@ -598,7 +598,7 @@ class DownloadAgent(Agent):
             return True
 
         try:
-            from app.modules.term_extractor.clients import make_chat_client
+            from ..term_extractor.clients import make_chat_client
 
             cli = make_chat_client(
                 backend=self._backend,
@@ -631,7 +631,7 @@ class DownloadAgent(Agent):
             )
             return False
         except Exception as e:
-            from app.modules.f2w_agent.trace import note_error
+            from .trace import note_error
 
             logger.warning("Semantic PDF validation failed for %s (%s); keeping file", path.name, e)
             note_error("DownloadAgent._validate_downloaded_pdf", e)
@@ -671,7 +671,7 @@ class DownloadAgent(Agent):
         validate_downloads: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Download ranked candidates to ``target_dir`` and append JSONL records."""
-        import download_pdfs as dl  # scripts/download_pdfs.py
+        from ..literature import download_pdfs as dl
 
         validate = self._validate_downloads if validate_downloads is None else validate_downloads
 
@@ -826,7 +826,7 @@ class DownloadAgent(Agent):
         candidate_pool: int = 25,
     ) -> Dict[str, Any]:
         """Search/rank OpenAlex candidates without writing PDFs."""
-        from app.modules.f2w_agent.trace import bind_context
+        from .trace import bind_context
 
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
@@ -854,7 +854,7 @@ class DownloadAgent(Agent):
             prepared.append(
                 self._refresh_candidate_urls(candidate) if refresh_urls else candidate
             )
-        from app.modules.f2w_agent.trace import bind_context
+        from .trace import bind_context
 
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
@@ -879,7 +879,7 @@ class DownloadAgent(Agent):
         candidate_pool: int = 25,
     ) -> Dict[str, Any]:
         """Search OpenAlex, rank by relevance, download top-N PDFs."""
-        from app.modules.f2w_agent.trace import bind_context
+        from .trace import bind_context
 
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(

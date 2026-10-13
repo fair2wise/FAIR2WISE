@@ -13,10 +13,10 @@ import fitz
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
-from app.modules.cborg_http import openai_http_kwargs, require_cborg_api_key
+from ..cborg_http import openai_http_kwargs, require_cborg_api_key
 
-from app.modules.cborg_limiter import sync_slot
-from app.modules.llm_admission import shared_admission_enabled
+from ..cborg_limiter import sync_slot
+from ..llm_admission import shared_admission_enabled
 
 from . import provenance, source_repos
 from .agent import build_graph

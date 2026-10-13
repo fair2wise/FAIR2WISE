@@ -52,8 +52,8 @@ from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.modules.contracts.context import ADMIN_CAPABILITIES, RequestContext
-from app.modules.security.authorization import (
+from ..modules.contracts.context import ADMIN_CAPABILITIES, RequestContext
+from ..modules.security.authorization import (
     DeploymentSettings,
     StartupConfigError,
     chat_action_capabilities,
@@ -62,8 +62,8 @@ from app.modules.security.authorization import (
     require,
     settings_update_plan,
 )
-from app.modules.security.content_access import ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceKind
-from app.modules.security.disclosure import (
+from ..modules.security.content_access import ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceKind
+from ..modules.security.disclosure import (
     DisclosureProjector,
     PathRoots,
     QuoteVerifier,
@@ -71,7 +71,7 @@ from app.modules.security.disclosure import (
     Viewer,
     new_correlation_id,
 )
-from app.modules.security.tiled_identity import TiledIdentityPort
+from ..modules.security.tiled_identity import TiledIdentityPort
 
 from .source_text import TurnSources
 from .auth import (

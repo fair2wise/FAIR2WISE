@@ -27,9 +27,9 @@ from typing import Callable, Dict, List, Optional, Protocol
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.modules.contracts.context import RequestContext
-from app.modules.contracts.errors import ContractError, ErrorCode
-from app.modules.security.authorization import (
+from ..modules.contracts.context import RequestContext
+from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.security.authorization import (
     AGENT_SURFACE,
     TRUST_CLAIM_HEADERS,
     DeploymentSettings,
@@ -40,7 +40,7 @@ from app.modules.security.authorization import (
     resolve_context,
     route_capabilities,
 )
-from app.modules.security.tiled_identity import TiledCredential, TiledIdentityPort
+from ..modules.security.tiled_identity import TiledCredential, TiledIdentityPort
 
 logger = logging.getLogger(__name__)
 

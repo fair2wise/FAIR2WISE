@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Tuple, TypeVar, Union
 
-from app.modules.contracts.changes import ApprovalRecord, ChangePlan, RoleCheckEvidence
-from app.modules.contracts.context import (
+from ..contracts.changes import ApprovalRecord, ChangePlan, RoleCheckEvidence
+from ..contracts.context import (
     ADMIN_CAPABILITIES,
     CAPABILITIES,
     CHAT_CAPABILITIES,
@@ -37,7 +37,7 @@ from app.modules.contracts.context import (
     Principal,
     RequestContext,
 )
-from app.modules.contracts.errors import ContractError, ErrorCode
+from ..contracts.errors import ContractError, ErrorCode
 
 from .tiled_identity import (
     IdentityRejected,

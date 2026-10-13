@@ -15,7 +15,7 @@ from academy.exchange.cloud.login import get_token_storage
 from academy.exchange.cloud.scopes import AcademyExchangeScopes
 from academy.manager import Manager
 
-from app.modules.term_extractor.user_agent import UserAgent
+from ..term_extractor.user_agent import UserAgent
 
 try:
     from academy.logging import init_logging

@@ -23,8 +23,8 @@ from urllib.parse import urlparse
 
 import yaml
 
-from app.modules import json2kg
-from app.modules.bl1101_ingest import (
+from . import json2kg
+from .bl1101_ingest import (
     BEAMLINE_ID,
     KG_DIR,
     NAMESPACE,
@@ -289,7 +289,7 @@ def _load_repo_env() -> None:
 
 def resolve_push_uri(uri: Optional[str] = None) -> str:
     """Local Tiled only (loopback). Never ALS production."""
-    from app.modules.tiled_graph import is_als_production_tiled_host, normalize_tiled_uri
+    from .tiled_graph import is_als_production_tiled_host, normalize_tiled_uri
 
     raw = (uri or os.environ.get("TILED_URI") or TILED_PUSH_DEFAULT_URI).strip()
     parsed = urlparse(raw if "://" in raw else f"http://{raw}")
@@ -517,7 +517,7 @@ def push_fixture_to_tiled(
         raise RuntimeError("TILED_API_KEY is required to write the identity graph.")
 
     if graphql is None:
-        from app.modules.tiled_graph import tiled_graphql
+        from .tiled_graph import tiled_graphql
 
         def _call(query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             """Run a GraphQL query against the resolved local Tiled URI."""

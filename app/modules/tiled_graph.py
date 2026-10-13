@@ -30,7 +30,7 @@ from urllib.parse import urlparse, urlunparse
 
 import requests
 
-from app.modules.f2w_agent.multi_kg import ScoredHit
+from .f2w_agent.multi_kg import ScoredHit
 
 LOGGER = logging.getLogger("tiled_graph")
 

@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import kg_update
 from .coordinator import Coordinator, CoordinatorConfig
-from app.modules import kg_rag_api as krag
+from .. import kg_rag_api as krag
 
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import (
@@ -64,7 +64,7 @@ from .retrieval_agent import (
     _is_numeric_claim,
     _is_ops_layout_question,
 )
-from app.modules.f2w_agent.multi_kg import (
+from .multi_kg import (
     DEFAULT_JSON_GRAPH,
     DEFAULT_JSON_GRAPH_PATHS,
     DEFAULT_KG_QUERY_HOPS,
@@ -82,8 +82,8 @@ from app.modules.f2w_agent.multi_kg import (
     primary_json_graph_path,
     unique_graph_paths,
 )
-from app.modules.hybrid_rag.pipeline import hybrid_rag_enabled
-from app.modules.tiled_graph import (
+from ..hybrid_rag.pipeline import hybrid_rag_enabled
+from ..tiled_graph import (
     CITE_FOCUS_HOPS,
     TILED_GRAPH_ID,
     coerce_local_tiled_uri,
@@ -93,12 +93,12 @@ from app.modules.tiled_graph import (
     resolve_tiled_node_id,
     tiled_neighborhood_ids,
 )
-from app.modules.project_config import config_value, get_config
-from app.modules.runtime_bridge.selection import attach_read_path, attach_summary_path
-from app.api.legacy_ui import build_guard, ui_context, ui_optional_context
-from app.api.source_text import capture_turn, note_paper_evidence, note_retrieval
-from app.modules.contracts.context import RequestContext
-from app.modules.security.authorization import SETTINGS_DEPLOYMENT_FIELDS
+from ..project_config import config_value, get_config
+from ..runtime_bridge.selection import attach_read_path, attach_summary_path
+from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
+from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
+from ..contracts.context import RequestContext
+from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
@@ -4787,7 +4787,7 @@ class AgentPipelineService:
 
     def _chat_completion(self, prompt: str, *, timeout: int) -> str:
         """Call the configured chat backend with temperature 0."""
-        from app.modules.term_extractor.clients import make_chat_client
+        from ..term_extractor.clients import make_chat_client
 
         cli = make_chat_client(
             backend=self.runtime.backend,

@@ -6,9 +6,9 @@ from typing import Optional
 import openai
 import requests
 
-from app.modules.cborg_limiter import sync_slot
-from app.modules.cborg_http import collect_stream_text, openai_http_kwargs, require_cborg_api_key
-from app.modules.f2w_agent.trace import record_llm_call
+from ..cborg_limiter import sync_slot
+from ..cborg_http import collect_stream_text, openai_http_kwargs, require_cborg_api_key
+from ..f2w_agent.trace import record_llm_call
 
 logger = logging.getLogger(__name__)
 

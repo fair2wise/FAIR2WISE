@@ -1,0 +1,108 @@
+# FAIR2WISE packaging (T04; ADR docs/adr/package-and-imports.md, optional-dependencies.md).
+#
+# The physical tree stays app/ (no src-layout move); it installs as the import
+# namespace `f2w` and never as a top-level `app`. Checkout launches keep using
+# `app.modules...`. One process uses one name (guard in app/__init__.py).
+#
+# Locks stay in requirements/*.txt (pip-compile output). The ranges below are
+# copied from requirements/*.in; install with the lock as constraints, e.g.
+#   pip install "fair2wise[full]" -c requirements/runtime.txt
+#
+# Not packaged: app/modules/legacy/ (archived, no __init__.py), app/run_pipeline_cborg.py
+# (checkout-only script), scripts/, storage/, config.yml. Schemas, vocabularies and
+# config.yml resolve from F2W_RESOURCE_ROOT (repo root in a checkout); see
+# app/modules/resources.py.
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fair2wise"
+version = "0.1.0.dev0"
+description = "FAIR2WISE literature knowledge-graph services, SDK and agents"
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+# Tested: CPython 3.12 (requirements/*.txt are compiled for 3.12) on macOS arm64.
+requires-python = ">=3.12"
+dependencies = [
+  # requirements/runtime.in minus the packages split into extras below.
+  "academy-py>=0.5.0",
+  "aiohttp>=3.14.0",
+  "arxiv>=4.0.0",
+  "colorama>=0.4.6",
+  "flask>=3.1.0",
+  "linkml-runtime>=1.11.1",
+  "mp-api>=0.46.1",
+  "numpy>=2.4.6",
+  "obonet>=1.1.1",
+  "openai>=2.40.0",
+  "psutil>=5.9,<8",
+  "pyalex>=0.21",
+  "pymatgen>=2026.5.4",
+  "python-dotenv>=1.2.2",
+  "PyYAML>=6.0.3",
+  "rapidfuzz>=3.14.5",
+  "requests>=2.33.1",
+  "watchdog>=6.0.0",
+]
+
+[project.optional-dependencies]
+# FastAPI surfaces (legacy UI API, kg_rag_api model API, future f2w.api.main).
+api = [
+  "fastapi>=0.136.3",
+  "uvicorn>=0.48.0",
+]
+# LangGraph runtime (F2W_RUNTIME=langgraph) and its OpenAI-compatible model bridge.
+agents = [
+  "langchain-core>=1.4.0",
+  "langchain-openai>=1.3.0",
+  "langgraph>=1.2.0",
+]
+# requirements/semantic.in (no lock: wheels are platform-specific).
+semantic = [
+  "faiss-cpu>=1.14.2",
+  "sentence-transformers>=5.5.1",
+  "torch>=2.12.0",
+]
+# PDF parsing. DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) is replaced by Docling in T05
+# (docs/migration/reviews/H0/license_dependency_audit.md, E2).
+parser = [
+  "PyMuPDF>=1.27.2",
+]
+# Tiled Graph is reached over HTTP with the base dependencies. The `tiled` Python client
+# (lazy import in tiled_graph.py) is not in the lock: Tiled pins pydantic-settings<2.12
+# (ADR optional-dependencies decision 4). Filled by T08/T20B.
+tiled = []
+# Paper-figure kernels arrive with T09.
+figures = []
+# Academy/Globus Compute deployment (requirements/globus.in); not part of [full].
+globus = [
+  "globus-sdk>=4.8,<5",
+  "globus-compute-sdk==4.13.0",
+  "globus-compute-endpoint==4.13.0",
+]
+full = [
+  "fair2wise[api,agents,semantic,parser,tiled,figures]",
+]
+
+[tool.setuptools]
+package-dir = { "f2w" = "app" }
+# Every app/ directory with an __init__.py (tests/packaging checks this list).
+packages = [
+  "f2w",
+  "f2w.api",
+  "f2w.modules",
+  "f2w.modules.agent_runtime",
+  "f2w.modules.agents",
+  "f2w.modules.contracts",
+  "f2w.modules.f2w_agent",
+  "f2w.modules.hybrid_rag",
+  "f2w.modules.launchers",
+  "f2w.modules.literature",
+  "f2w.modules.operations",
+  "f2w.modules.runtime_bridge",
+  "f2w.modules.security",
+  "f2w.modules.term_extractor",
+  "f2w.modules.tools",
+]
+include-package-data = false

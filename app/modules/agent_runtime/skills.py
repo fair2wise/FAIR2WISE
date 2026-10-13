@@ -23,7 +23,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
-from app.modules.contracts import CAPABILITIES, RequestContext
+from ..contracts import CAPABILITIES, RequestContext
 
 from .registry import FORBIDDEN_NAME_PREFIXES, RegisteredTool, ToolRegistry, effective_capabilities
 

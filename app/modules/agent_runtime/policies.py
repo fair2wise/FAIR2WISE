@@ -24,7 +24,7 @@ from typing import Any, List, Mapping, Optional, Protocol, Tuple, Union, runtime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.contracts import (
+from ..contracts import (
     ApprovalRecord,
     ChangePlan,
     Effect,

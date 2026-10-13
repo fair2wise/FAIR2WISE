@@ -46,7 +46,7 @@ class ExtractorAgent(Agent):
 
     def _run(self, pdf_dir: str, terms_json: str, max_workers: Optional[int]) -> Dict[str, Any]:
         """Synchronous full-directory extract into cumulative *terms_json*."""
-        from app.modules.term_extractor import Orchestrator
+        from ..term_extractor import Orchestrator
 
         Path(terms_json).parent.mkdir(parents=True, exist_ok=True)
         orch = Orchestrator(
@@ -73,7 +73,7 @@ class ExtractorAgent(Agent):
         max_workers: Optional[int],
     ) -> Dict[str, Any]:
         """Synchronous query-targeted extract of selected pages in *pdf_dir*."""
-        from app.modules.term_extractor import Orchestrator
+        from ..term_extractor import Orchestrator
 
         Path(terms_json).parent.mkdir(parents=True, exist_ok=True)
         orch = Orchestrator(

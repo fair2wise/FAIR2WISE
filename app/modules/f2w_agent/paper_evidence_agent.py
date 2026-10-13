@@ -303,7 +303,7 @@ class PaperEvidenceAgent(Agent):
 
     def _chat(self, prompt: str) -> str:
         """Send ``prompt`` to the configured chat backend and return the reply text."""
-        from app.modules.term_extractor.clients import make_chat_client
+        from ..term_extractor.clients import make_chat_client
 
         client = make_chat_client(
             backend=self._backend,
@@ -340,7 +340,7 @@ class PaperEvidenceAgent(Agent):
                     for page in eligible
                 }
         except Exception as exc:
-            from app.modules.f2w_agent.trace import note_error
+            from .trace import note_error
 
             logger.warning("Paper evidence read failed: %s", exc)
             note_error("PaperEvidenceAgent._query", exc)
@@ -453,7 +453,7 @@ class PaperEvidenceAgent(Agent):
     async def query(self, question: str, pdf_path: str, manifest_path: str) -> Dict[str, Any]:
         """Run ``_query`` in an executor so the Academy action stays non-blocking."""
         loop = asyncio.get_event_loop()
-        from app.modules.f2w_agent.trace import bind_context
+        from .trace import bind_context
 
         return await loop.run_in_executor(
             None, bind_context(self._query), question, pdf_path, manifest_path

@@ -58,7 +58,7 @@ class RetrievalSettings:
 
 def build_retrieval_agent(settings: RetrievalSettings) -> Any:
     """Construct an existing ``RetrievalAgent`` from ``settings`` (imported lazily)."""
-    from app.modules.f2w_agent.retrieval_agent import RetrievalAgent
+    from ..f2w_agent.retrieval_agent import RetrievalAgent
 
     kwargs: Dict[str, Any] = {
         "graph_files": list(settings.graph_files) or None,
