@@ -35,9 +35,22 @@ Usage::
     if out.get("__interrupt__"):
         out = graph.invoke(Command(resume={tool_call_id: approval_record}), cfg, context=RunContext(ctx))
 
+Pending approvals survive new chat messages (T02B, owner answer H2 Q8 option b). An
+approval request is pinned in ``open_approvals`` (tool, arguments, exact plan, expiry from
+``RuntimeLimits.approval_request_ttl_s``) and the call gets a placeholder ``ToolMessage`` so
+the conversation stays well formed. A new message on the thread discards LangGraph's
+unfinished interrupt task (``pregel/_loop.py`` ``_first``: "discard any unfinished tasks from
+previous checkpoint"); the new turn is answered and, while requests remain open, the graph
+ends in ``await_approval`` again, so ``Command(resume=...)`` keeps working. On resume the
+decision is checked against the pinned plan; ``apply_approvals`` re-resolves the plan (a
+changed plan or an expired request is refused), runs the write once, replaces the
+placeholder in place and closes the request in the same checkpoint write, so a repeated
+resume or a restart over the same saver cannot apply it again.
+
 Resume values: ``{tool_call_id: ApprovalRecord | its JSON dict}``, or a single record when one
-call is pending. Anything else (for example ``"reject"`` or ``{tool_call_id: None}``) rejects
-the pending writes. Two langgraph 1.2.10 pitfalls: ``Command(resume=None)`` fails
+call is pending. Mapped keys decide only those requests; others stay open. A ``None`` or
+non-record value declines; a non-mapping value (for example ``"reject"``) declines every open
+request. Two langgraph 1.2.10 pitfalls: ``Command(resume=None)`` fails
 (``UnboundLocalError`` in ``pregel/_loop.py``), and ``Command(resume={})`` is read as an empty
 interrupt-id map, so the interrupt simply stays pending.
 """
@@ -45,7 +58,7 @@ interrupt-id map, so the interrupt simply stays pending.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
@@ -59,7 +72,7 @@ from app.modules.contracts import ApprovalRecord, ChangePlan, ContractError, Err
 
 from .admission import ensure_admission
 from .checkpointer import owner_key
-from .executor import RuntimeLimits, ToolExecutor, ToolOutcome, TurnLedger
+from .executor import RuntimeLimits, ToolExecutor, ToolOutcome, TurnLedger, _fail, call_key
 from .message_trimming import current_turn_start, is_orphan_repair, prepare_for_model
 from .policies import (
     ApprovalCheck,
@@ -84,6 +97,9 @@ PLACEHOLDER_SYSTEM_PROMPT = (
 )
 
 RUNTIME_STOP_KEY = "f2w_runtime_stop"
+APPROVAL_OUTCOME_KEY = "f2w_approval_outcome"
+APPROVAL_PLACEHOLDER_PREFIX = "f2w_approval_pending:"
+EXPIRED_KEY = "f2w_expired"
 
 #: ``PlanResolver(ctx, tool_name, args) -> ChangePlan | None``: looks up the plan a write would apply.
 PlanResolver = Callable[[RequestContext, str, Mapping[str, Any]], Optional[ChangePlan]]
@@ -134,6 +150,10 @@ def tool_message(call: Mapping[str, Any], outcome: ToolOutcome) -> ToolMessage:
 
 def _stop(code: ErrorCode, text: str) -> AIMessage:
     return AIMessage(content=f"[runtime] Stopped: {text}", response_metadata={RUNTIME_STOP_KEY: code.value})
+
+
+def _refused(record: Mapping[str, Any], code: ErrorCode, message: str) -> ToolOutcome:
+    return ToolOutcome(result=_fail(record["tool"], code, message), key=call_key(record["tool"], record["args"]))
 
 
 def _parse_approval(value: Any) -> Optional[ApprovalRecord]:
@@ -222,7 +242,7 @@ def build_literature_supervisor(
     def prepare_call(state: LiteratureState) -> Tuple[Dict[str, Any], Any, List[BaseMessage], Optional[AIMessage]]:
         rc = run_ctx()
         update = owner_update(state, rc)
-        update.update(pending_approvals=[], approvals={})
+        update.update(approvals={})  # open_approvals deliberately survive the new turn (T02B)
         for_model, repairs = prepare_for_model(state["messages"], budget_chars=limits.stale_tool_result_chars)
         turn = for_model[current_turn_start(for_model):]
         made = sum(1 for m in turn if isinstance(m, AIMessage) and not is_orphan_repair(m))
@@ -268,20 +288,27 @@ def build_literature_supervisor(
     def route_after_supervisor(state: LiteratureState) -> str:
         calls = getattr(state["messages"][-1], "tool_calls", None) or []
         if not calls:
-            return END
+            # T02B: the turn is answered; re-raise any approval still open on this thread.
+            return "await_approval" if state.get("open_approvals") else END
         for call in calls:
             entry = registry.get(call.get("name", ""))
             if entry is not None and needs_approval(entry.spec):
                 return "request_approval"
         return "execute_tools"
 
-    # -- approval -----------------------------------------------------------------
+    # -- approval (T02B: open approvals survive new turns) ---------------------------
+
+    def placeholder_id(tool_call_id: str) -> str:
+        return f"{APPROVAL_PLACEHOLDER_PREFIX}{tool_call_id}"
 
     def request_approval(state: LiteratureState) -> Dict[str, Any]:
         rc = run_ctx()
         owner_update(state, rc)
         ctx, caps, tid = rc.request, effective_capabilities(rc.request, rc.scope), thread_id()
-        pending = []
+        opened: Dict[str, Dict[str, Any]] = {}
+        placeholders: List[BaseMessage] = []
+        now = clock()
+        ttl = limits.approval_request_ttl_s
         for call in getattr(state["messages"][-1], "tool_calls", None) or []:
             entry = registry.get(call.get("name", ""))
             if entry is None or not needs_approval(entry.spec) or not entry.spec.required_capabilities <= caps:
@@ -289,50 +316,170 @@ def build_literature_supervisor(
             plan = resolve_plan(ctx, entry.name, call.get("args"))
             if plan is None:
                 continue  # no plan to approve; the executor denies the write
-            pending.append({"tool_call_id": call.get("id"), "tool": entry.name,
-                            "args_sha256": args_digest(call.get("args")), "plan": plan.model_dump(mode="json")})
+            tcid = call.get("id") or ""
+            expires = now + timedelta(seconds=ttl) if ttl is not None else None
+            opened[tcid] = {"tool_call_id": tcid, "tool": entry.name, "args": dict(call.get("args") or {}),
+                            "args_sha256": args_digest(call.get("args")), "plan": plan.model_dump(mode="json"),
+                            "requested_at": now.isoformat(),
+                            "expires_at": expires.isoformat() if expires is not None else None}
+            # A placeholder result keeps the conversation well formed while the request stays open, so later
+            # turns can call the model; it is replaced in place (same id) by the real outcome.
+            placeholders.append(ToolMessage(
+                id=placeholder_id(tcid), tool_call_id=tcid, name=entry.name, status="success",
+                content=json.dumps({"tool": entry.name, "status": "awaiting_approval", "plan_id": plan.plan_id,
+                                    "plan_sha256": plan.plan_sha256,
+                                    "note": "Not applied. The user has been asked to approve or decline."}),
+                artifact={APPROVAL_PLACEHOLDER_PREFIX: True}))
             try:
-                sink.emit(make_event(AuditKind.APPROVAL_REQUESTED, ctx, at=clock(), spec=entry.spec,
-                                     args=call.get("args"), plan=plan, thread_id=tid, tool_call_id=call.get("id"),
-                                     event_id=f"approval_requested:{tid}:{call.get('id')}"))
+                sink.emit(make_event(AuditKind.APPROVAL_REQUESTED, ctx, at=now, spec=entry.spec,
+                                     args=call.get("args"), plan=plan, thread_id=tid, tool_call_id=tcid,
+                                     event_id=f"approval_requested:{tid}:{tcid}"))
             except Exception:  # noqa: BLE001 - the write itself is refused later if audit stays down
                 pass
-        return {"pending_approvals": pending}
+        return {"open_approvals": opened, "messages": placeholders}
+
+    def unanswered_calls(state: LiteratureState) -> List[Mapping[str, Any]]:
+        answered = {getattr(m, "tool_call_id", None) for m in state["messages"]
+                    if getattr(m, "type", None) == "tool"}
+        calls = getattr(state["messages"][-1], "tool_calls", None) or []
+        if getattr(state["messages"][-1], "type", None) != "ai":
+            last_ai = next((m for m in reversed(state["messages"]) if isinstance(m, AIMessage)), None)
+            calls = getattr(last_ai, "tool_calls", None) or []
+        return [c for c in calls if c.get("id") not in answered]
 
     def route_after_request(state: LiteratureState) -> str:
-        return "await_approval" if state.get("pending_approvals") else "execute_tools"
+        return "execute_tools" if unanswered_calls(state) else "await_approval"
+
+    def is_expired(record: Mapping[str, Any], now: datetime) -> bool:
+        expires = record.get("expires_at")
+        return expires is not None and now >= datetime.fromisoformat(expires)
 
     def await_approval(state: LiteratureState) -> Dict[str, Any]:
-        pending = state.get("pending_approvals") or []
-        shown = ("plan_id", "plan_sha256", "target", "corpus_scope", "base_revision", "creates", "links",
-                 "supersessions")
-        requests = [{"tool_call_id": p["tool_call_id"], "tool": p["tool"], "args_sha256": p["args_sha256"],
-                     **{k: p["plan"].get(k) for k in shown}} for p in pending]
-        payload = {"kind": "approval_required", "requests": requests}
-        decision = interrupt(payload)  # replays from here on resume; nothing above has effects
+        # LangGraph re-runs this node from its start on resume (langgraph.types.interrupt), so nothing
+        # before interrupt() has effects; expired requests are closed here (no interrupt) or after it.
+        open_ = state.get("open_approvals") or {}
+        now = clock()
+        live = {k: v for k, v in open_.items() if not is_expired(v, now)}
+        expired = [k for k in open_ if k not in live]
+        decided: Dict[str, Optional[Dict[str, Any]]] = {}
+        if live:
+            shown = ("plan_id", "plan_sha256", "target", "corpus_scope", "base_revision", "creates", "links",
+                     "supersessions")
+            requests = [{"tool_call_id": p["tool_call_id"], "tool": p["tool"], "args_sha256": p["args_sha256"],
+                         "expires_at": p.get("expires_at"), **{k: p["plan"].get(k) for k in shown}}
+                        for p in live.values()]
+            decision = interrupt({"kind": "approval_required", "requests": requests})
+            rc = run_ctx()
+            owner_update(state, rc)  # another principal cannot decide; the request stays open
+            ctx, tid = rc.request, thread_id()
+            now = clock()
+            if isinstance(decision, (ApprovalRecord, Mapping)) and len(live) == 1 and not (
+                    isinstance(decision, Mapping) and next(iter(live)) in decision):
+                decision = {next(iter(live)): decision}
+            if isinstance(decision, Mapping):
+                targets = [k for k in live if k in decision]
+            else:
+                targets = list(live)  # a non-record value (for example "reject") declines every request
+            supplied = decision if isinstance(decision, Mapping) else {}
+            for key in targets:
+                record = live[key]
+                if is_expired(record, now):
+                    expired.append(key)
+                    continue
+                entry = registry.get(record["tool"])
+                plan = ChangePlan.model_validate(record["plan"])
+                approval = _parse_approval(supplied.get(key))
+                verdict = check(ctx, entry.spec, record["args"], plan=plan, approval=approval, now=now)
+                kind = AuditKind.APPROVAL_GRANTED if verdict.allowed else AuditKind.APPROVAL_REJECTED
+                try:
+                    sink.emit(make_event(kind, ctx, at=now, spec=entry.spec, plan=plan, approval=approval,
+                                         error_code=verdict.error_code, detail=verdict.reason, thread_id=tid,
+                                         tool_call_id=key))
+                except Exception:  # noqa: BLE001 - the executor re-checks and audits the write itself
+                    pass
+                decided[key] = approval.model_dump(mode="json") if approval is not None else None
+        for key in expired:
+            decided[key] = {EXPIRED_KEY: True}
+        return {"approvals": decided}
+
+    def route_after_await(state: LiteratureState) -> str:
+        if state.get("approvals"):
+            return "apply_approvals"
+        return "await_approval" if state.get("open_approvals") else END
+
+    def approval_outcomes(state: LiteratureState):
         rc = run_ctx()
         owner_update(state, rc)
-        ctx, tid = rc.request, thread_id()
-        if isinstance(decision, (ApprovalRecord, Mapping)) and len(pending) == 1 and not (
-                isinstance(decision, Mapping) and pending[0]["tool_call_id"] in decision):
-            decision = {pending[0]["tool_call_id"]: decision}
-        supplied = decision if isinstance(decision, Mapping) else {}
-        approvals: Dict[str, Dict[str, Any]] = {}
-        for p in pending:
-            entry = registry.get(p["tool"])
-            plan = ChangePlan.model_validate(p["plan"])
-            approval = _parse_approval(supplied.get(p["tool_call_id"]))
-            verdict = check(ctx, entry.spec, {}, plan=plan, approval=approval, now=clock())
-            kind = AuditKind.APPROVAL_GRANTED if verdict.allowed else AuditKind.APPROVAL_REJECTED
-            try:
-                sink.emit(make_event(kind, ctx, at=clock(), spec=entry.spec, plan=plan, approval=approval,
-                                     error_code=verdict.error_code, detail=verdict.reason, thread_id=tid,
-                                     tool_call_id=p["tool_call_id"]))
-            except Exception:  # noqa: BLE001 - the executor re-checks and audits the write itself
-                pass
-            if approval is not None:
-                approvals[p["tool_call_id"]] = approval.model_dump(mode="json")
-        return {"approvals": approvals, "pending_approvals": []}
+        open_ = state.get("open_approvals") or {}
+        jobs = []
+        for key, raw in (state.get("approvals") or {}).items():
+            record = open_.get(key)
+            if record is None:
+                continue  # already applied or closed: never applied twice
+            entry = registry.get(record["tool"])
+            pinned = ChangePlan.model_validate(record["plan"])
+            call = {"id": key, "name": record["tool"], "args": record["args"]}
+            if isinstance(raw, Mapping) and raw.get(EXPIRED_KEY):
+                jobs.append((call, None, None, _refused(record, ErrorCode.STALE_APPROVAL,
+                                                        "the approval request expired before a decision")))
+                continue
+            approval = _parse_approval(raw)
+            if approval is None:
+                jobs.append((call, None, None, _refused(record, ErrorCode.DENIED,
+                                                        "the user declined this write")))
+                continue
+            current = resolve_plan(rc.request, record["tool"], record["args"])
+            if entry is None or current is None or current.plan_sha256 != pinned.plan_sha256 \
+                    or current.plan_id != pinned.plan_id:
+                jobs.append((call, None, None, _refused(record, ErrorCode.STALE_APPROVAL,
+                                                        "the plan changed after approval was requested")))
+                continue
+            jobs.append((call, current, approval, None))
+        return rc, jobs, thread_id()
+
+    def finish_apply(state: LiteratureState,
+                     results: List[Tuple[Mapping[str, Any], ToolMessage]]) -> Dict[str, Any]:
+        msgs: List[BaseMessage] = []
+        tail = isinstance(state["messages"][-1], ToolMessage)
+        notes = []
+        for call, message in results:
+            message.id = placeholder_id(call["id"])  # replace the placeholder in place
+            msgs.append(message)
+            body = json.loads(message.content)
+            notes.append(f"{call['name']} (plan {call['args'].get('plan_id', '?')}): {body.get('status')}"
+                         + (f" ({body.get('error_code')})" if body.get("error_code") else ""))
+        if notes and not tail:
+            # The request was made in an earlier turn: report the outcome without another model call.
+            msgs.append(AIMessage(content="[runtime] Approval outcome: " + "; ".join(notes) + ".",
+                                  response_metadata={APPROVAL_OUTCOME_KEY: True}))
+        return {"messages": msgs, "approvals": {},
+                "open_approvals": {call["id"]: None for call, _ in results}}
+
+    def apply_approvals(state: LiteratureState) -> Dict[str, Any]:
+        rc, jobs, tid = approval_outcomes(state)
+        results = []
+        for call, plan, approval, refused in jobs:
+            outcome = refused or executor.execute_call(
+                rc.request, call["name"], call["args"], ledger=TurnLedger(), plan=plan, approval=approval,
+                scope=rc.scope, tool_call_id=call["id"], thread_id=tid)
+            results.append((call, tool_message(call, outcome)))
+        return finish_apply(state, results)
+
+    async def aapply_approvals(state: LiteratureState) -> Dict[str, Any]:
+        rc, jobs, tid = approval_outcomes(state)
+        results = []
+        for call, plan, approval, refused in jobs:
+            outcome = refused or await executor.aexecute_call(
+                rc.request, call["name"], call["args"], ledger=TurnLedger(), plan=plan, approval=approval,
+                scope=rc.scope, tool_call_id=call["id"], thread_id=tid)
+            results.append((call, tool_message(call, outcome)))
+        return finish_apply(state, results)
+
+    def route_after_apply(state: LiteratureState) -> str:
+        last = state["messages"][-1]
+        if isinstance(last, ToolMessage):
+            return "supervisor"  # the request belonged to this turn: let the model report the result
+        return "await_approval" if state.get("open_approvals") else END
 
     # -- tool execution -------------------------------------------------------------
 
@@ -340,16 +487,13 @@ def build_literature_supervisor(
         rc = run_ctx()
         owner_update(state, rc)
         ledger = ledger_from_messages(state["messages"])
-        approvals = state.get("approvals") or {}
-        calls = getattr(state["messages"][-1], "tool_calls", None) or []
         prepared = []
-        for call in calls:
+        for call in unanswered_calls(state):
             entry = registry.get(call.get("name", ""))
-            plan = approval = None
+            plan = None
             if entry is not None and needs_approval(entry.spec):
                 plan = resolve_plan(rc.request, entry.name, call.get("args"))
-                approval = _parse_approval(approvals.get(call.get("id")))
-            prepared.append((call, plan, approval))
+            prepared.append((call, plan, None))  # approved writes run in apply_approvals, never here
         return rc, ledger, prepared, thread_id()
 
     def execute_tools(state: LiteratureState) -> Dict[str, Any]:
@@ -360,7 +504,7 @@ def build_literature_supervisor(
                                             plan=plan, approval=approval, scope=rc.scope,
                                             tool_call_id=call.get("id"), thread_id=tid)
             out.append(tool_message(call, outcome))
-        return {"messages": out, "approvals": {}}
+        return {"messages": out}
 
     async def aexecute_tools(state: LiteratureState) -> Dict[str, Any]:
         rc, ledger, prepared, tid = tool_calls_with_context(state)
@@ -370,19 +514,26 @@ def build_literature_supervisor(
                                                    ledger=ledger, plan=plan, approval=approval, scope=rc.scope,
                                                    tool_call_id=call.get("id"), thread_id=tid)
             out.append(tool_message(call, outcome))
-        return {"messages": out, "approvals": {}}
+        return {"messages": out}
 
     graph = StateGraph(LiteratureState, context_schema=RunContext)
     graph.add_node("supervisor", RunnableLambda(supervisor, afunc=asupervisor, name="supervisor"))
     graph.add_node("request_approval", request_approval)
     graph.add_node("await_approval", await_approval)
+    graph.add_node("apply_approvals", RunnableLambda(apply_approvals, afunc=aapply_approvals,
+                                                     name="apply_approvals"))
     graph.add_node("execute_tools", RunnableLambda(execute_tools, afunc=aexecute_tools, name="execute_tools"))
     graph.add_edge(START, "supervisor")
     graph.add_conditional_edges(
         "supervisor", route_after_supervisor,
-        {"execute_tools": "execute_tools", "request_approval": "request_approval", END: END})
+        {"execute_tools": "execute_tools", "request_approval": "request_approval",
+         "await_approval": "await_approval", END: END})
     graph.add_conditional_edges("request_approval", route_after_request,
                                 {"await_approval": "await_approval", "execute_tools": "execute_tools"})
-    graph.add_edge("await_approval", "execute_tools")
+    graph.add_conditional_edges("await_approval", route_after_await,
+                                {"apply_approvals": "apply_approvals", "await_approval": "await_approval",
+                                 END: END})
+    graph.add_conditional_edges("apply_approvals", route_after_apply,
+                                {"supervisor": "supervisor", "await_approval": "await_approval", END: END})
     graph.add_edge("execute_tools", "supervisor")
     return graph.compile(checkpointer=checkpointer)
