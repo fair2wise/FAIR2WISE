@@ -60,7 +60,7 @@ from app.modules.security.authorization import (
     chat_offers_ingestion,
     health_projection,
     require,
-    settings_update_capabilities,
+    settings_update_plan,
 )
 from app.modules.security.content_access import ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceKind
 from app.modules.security.disclosure import (
@@ -228,6 +228,48 @@ class OwnerRegistry:
         tmp.replace(self._path)
 
 
+class PersonalSettingsStore:
+    """Personal settings per ALS principal (T25D), persisted as JSON under the workdir.
+
+    Keys come from :meth:`LegacyUiGuard.settings_key` (verified issuer and subject); values
+    are the personal runtime fields the principal saved. A principal with no entry uses the
+    deployment defaults.
+
+    Args:
+        path: JSON file to persist to, or ``None`` for memory only.
+    """
+
+    def __init__(self, path: Optional[Path] = None) -> None:
+        self._path = path
+        self._lock = threading.Lock()
+        self._data: Dict[str, Dict[str, Any]] = {}
+        if path is not None and path.exists():
+            try:
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                self._data = {str(k): dict(v) for k, v in (loaded.get("principals") or {}).items()
+                              if isinstance(v, dict)}
+            except (OSError, ValueError, AttributeError) as exc:
+                logger.warning("personal settings store unreadable, starting empty: %s", exc)
+
+    def get(self, key: str) -> Dict[str, Any]:
+        """Return a copy of ``key``'s saved personal fields (empty when never saved)."""
+        with self._lock:
+            return json.loads(json.dumps(self._data.get(key) or {}))
+
+    def update(self, key: str, values: Mapping[str, Any]) -> None:
+        """Merge ``values`` into ``key``'s personal fields and persist."""
+        with self._lock:
+            merged = dict(self._data.get(key) or {})
+            merged.update(json.loads(json.dumps(dict(values))))
+            self._data[key] = merged
+            if self._path is None:
+                return
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"principals": self._data}, indent=1, sort_keys=True), encoding="utf-8")
+            tmp.replace(self._path)
+
+
 # --------------------------------------------------------------------------- dependencies
 
 
@@ -261,7 +303,8 @@ class LegacyUiGuard:
 
     def __init__(self, runtime: AccessRuntime, projector: DisclosureProjector, paths: OpaquePaths,
                  owners: OwnerRegistry, session_key: Callable[[Optional[str]], str],
-                 source_authority: Optional[SourceAccessAuthority] = None) -> None:
+                 source_authority: Optional[SourceAccessAuthority] = None,
+                 personal_settings: Optional[PersonalSettingsStore] = None) -> None:
         self.runtime = runtime
         self.projector = projector
         #: Trusted startup wiring (ADR rule A1): the only issuer of quote-verification grants.
@@ -269,6 +312,8 @@ class LegacyUiGuard:
         self.paths = paths
         self.owners = owners
         self._session_key = session_key
+        #: T25D: personal settings per ALS principal; ``None`` on ``:local`` (server settings).
+        self.personal_settings = personal_settings
 
     # ------------------------------------------------------------------ setup
 
@@ -393,20 +438,40 @@ class LegacyUiGuard:
 
     # ------------------------------------------------------------------ settings
 
+    def settings_key(self, ctx: RequestContext) -> Optional[str]:
+        """T25D: personal-settings key for the caller, or ``None`` for the server's own settings.
+
+        ``None`` on ``:local`` (the single local operator's settings are the server's);
+        on ALS the verified issuer and subject.
+        """
+        if self.is_local:
+            return None
+        issuer = ctx.principal.issuer or self.settings.tiled_target or ""
+        return f"{issuer}|{ctx.principal.subject}"
+
     def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> Tuple[Any, FrozenSet[str]]:
-        """R03: require the capabilities the set fields need; drop ignored fields; decode opaque paths.
+        """R03: check the fields' capabilities; drop ignored fields; decode opaque paths (T25D plan).
+
+        On ALS a non-admin's deployment-wide fields are ignored (warning), not refused, so the
+        frozen UI's Save (which sends every field) succeeds; an admin's re-run the role check.
 
         Returns:
             ``(update to apply, ignored field names)``.
         """
         fields = set(update.model_dump(exclude_none=True))
-        caps, ignored = settings_update_capabilities(fields, local=self.is_local)
-        self.require(request, ctx, *caps)
+        plan = settings_update_plan(fields, local=self.is_local, admin=ctx.has("settings.global"))
+        self.require(request, ctx, *plan.capabilities)
+        ignored = plan.ignored
         changes: Dict[str, Any] = {name: None for name in ignored}
-        if update.json_graph_path is not None:
-            changes["json_graph_path"] = self.paths.decode(update.json_graph_path)
-        if update.json_graph_paths is not None:
-            changes["json_graph_paths"] = self.paths.decode_all(update.json_graph_paths)
+        if not self.is_local and not ctx.has("settings.global") and update.selected_graph_ids:
+            # Paths are hidden from non-admins (project_settings), so the UI echoes placeholders;
+            # their graph selection is by graph id.
+            changes.update(json_graph_path=None, json_graph_paths=None)
+        else:
+            if update.json_graph_path is not None:
+                changes["json_graph_path"] = self.paths.decode(update.json_graph_path)
+            if update.json_graph_paths is not None:
+                changes["json_graph_paths"] = self.paths.decode_all(update.json_graph_paths)
         if ignored:
             logger.info("ignored settings fields not writable on %s: %s", self.settings.profile.value,
                         ", ".join(sorted(ignored)))
@@ -586,9 +651,13 @@ def build_guard(workdir: Any, *, session_key: Callable[[Optional[str]], str],
     paths = OpaquePaths(workdir=workdir, workspace=project_root or Path.cwd())
     projector = projector or DisclosureProjector(roots=paths.roots)
     owners = OwnerRegistry(None if settings.is_local else Path(workdir) / "access" / "owners.json")
-    return LegacyUiGuard(runtime, projector, paths, owners, session_key, source_authority=SourceAccessAuthority())
+    personal = None if settings.is_local else PersonalSettingsStore(
+        Path(workdir) / "access" / "personal_settings.json")
+    return LegacyUiGuard(runtime, projector, paths, owners, session_key, source_authority=SourceAccessAuthority(),
+                         personal_settings=personal)
 
 
 __all__ = ("DEFAULT_WRITER_IDENTITY", "LegacyUiGuard", "NO_INGESTION_ANSWER", "OpaquePaths", "OwnerRegistry",
+           "PersonalSettingsStore",
            "SETTING_WARNING_HEADER", "build_guard", "deployment_settings_from", "ui_context",
            "ui_optional_context")
