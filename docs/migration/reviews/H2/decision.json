@@ -1,0 +1,35 @@
+{
+  "gate": "H2",
+  "status": "approved",
+  "approver": "project owner",
+  "decided_on": "2026-10-13",
+  "basis": "Owner answered Q1-Q9 of review_packet.md section 5.1 after clarification of Q4, Q5 and Q8.",
+  "owner_response_verbatim": {
+    "Q1": "I want to lean towards using the supervisor",
+    "Q2": "Yes",
+    "Q3": "Yes",
+    "Q4": "user settings should be allowed on ALS images. user sessions (i.e. different users, admin or not) should be able to have independent settings",
+    "Q5": "Workflow mode is the one that extracts terms and builds KG and can push to tiled graph? then yes, this should be admin only",
+    "Q6": "yes",
+    "Q7": "sure",
+    "Q8": "let's do b",
+    "Q9": "approve, and ensure the per-user settings and supervisor routing make it into the plan before continuing with code"
+  },
+  "decisions": {
+    "Q1": "Route UI QA turns through the planning supervisor in langgraph mode (task T03B, behind its own setting).",
+    "Q2": "Traces record F2W_RUNTIME; refresh the traces_get fixture for langgraph mode.",
+    "Q3": "Default to the :local profile when F2W_DEPLOYMENT_PROFILE is unset.",
+    "Q4": "Per-user independent settings on ALS (task T25D); deployment-wide fields stay admin-only.",
+    "Q5": "workflow_mode stays admin-only. Clarified to the owner: it is a legacy no-op in the UI API; download, extraction, KG rebuild and Tiled publication are separately admin-only via ingest.acquire, ingest.extract and graph.publish.",
+    "Q6": "ALS role-check cache max age 60 s default, capped at 900 s.",
+    "Q7": "Capability-group names and turn limits approved as provisional.",
+    "Q8": "Option (b): a pending approval stays open while new messages are answered (task T02B).",
+    "Q9": "H2 approved; T25D, T03B and T02B added to the plan (docs/migration/plan_addenda.md A1) and run before further porting."
+  },
+  "unblocked": ["T25D", "T03B", "T02B", "then T04-T11 and T20B per plan_addenda.md"],
+  "not_authorized": [
+    "Any push, pull request, or remote write (F2W or FORGE)",
+    "Changes to main or rsoxs",
+    "Image builds for publication, central Tiled access, or live/paid model evaluation"
+  ]
+}

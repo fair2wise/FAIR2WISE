@@ -2,7 +2,7 @@
 
 Gate: H2
 Approver: project owner
-Status: **awaiting owner decision**
+Status: **approved 2026-10-13** (see decision.json)
 
 H2 asks the owner to approve the unchanged QA and summary path behind the new
 runtime, the private-source boundary, no-login local access and fail-closed
@@ -113,6 +113,6 @@ build, Tiled access, live model evaluation or FORGE change.
 
 ## Owner decision
 
-Decision:
-Limits:
-Date:
+Decision: approved with Q1-Q9 answers (decision.json); T25D, T03B, T02B added to the plan first.
+Limits: no push, publication, central Tiled or live model use.
+Date: 2026-10-13

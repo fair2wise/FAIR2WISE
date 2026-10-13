@@ -1,4 +1,5 @@
 FORGE to F2W: literature-only migration handoff
+Addenda: owner-approved additions (T25D per-user settings, T03B supervisor routing, T02B pending approvals) are in docs/migration/plan_addenda.md and take precedence in ordering.
 Draft v8.0 | 9 October 2026 | Trusted full-access local mode; Tiled-authenticated ALS deployments
 Objective: adopt literature-scoped LangGraph orchestration in F2W; capture the full paper-related capability set from FORGE; preserve F2W's existing LLM paths/classes and QA constraints; make FORGE consume F2W agents and published literature knowledge through Python import and FastAPI. FORGE continues to own experimental analysis/simulation. F2W is the authority for literature KG curation.
 0. Approved scope and remaining implementation gates
