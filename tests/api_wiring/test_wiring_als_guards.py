@@ -151,9 +151,9 @@ def _setup_pending_download(als, who="user", session="s-pend"):
                                                "client_turn_id": f"t-{who}-{session}"})
 
 
+# T25D: a non-admin's PUT /settings of personal fields (graph_source, backend, hops) now succeeds
+# and changes only their own settings (tests/settings/test_personal_settings.py).
 PRIVILEGED = [
-    ("PUT", "/settings", {"json": {"graph_source": "json"}}),
-    ("PUT", "/settings", {"json": {"backend": "ollama", "kg_query_hops": 2}}),
     ("PATCH", "/graph/node/matkg:TermA", {"json": {"description": "user edit"}}),
     ("POST", "/graph/upload", {"json": UPLOAD}),
     ("POST", "/chat/action", {"json": {"decision": "yes", "kind": "download", "candidate_index": 0,
