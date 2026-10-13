@@ -126,7 +126,36 @@ def wrap_retrieval(mp: pytest.MonkeyPatch, obs: Observations) -> None:
 
     base = api_mod.RetrievalAgent
 
+    from types import SimpleNamespace
+
+    from app.modules.f2w_agent.multi_kg import graph_id_for_path
+
     class LiveRetrieval(base):  # type: ignore[misc, valid-type]
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._load_graphs(kwargs.get("graph_files") or [self.graph_file])
+
+        def _load_graphs(self, files) -> None:
+            # Like the real RetrievalAgent: one loaded graph per selected file, keyed by
+            # graph id, so the service can map multi-graph hits back to their files.
+            self._graphs = {}
+            for raw in files:
+                if not raw:
+                    continue
+                path = Path(str(raw))
+                if not path.is_absolute():
+                    path = Path.cwd() / path
+                if path.exists():
+                    self._graphs[graph_id_for_path(str(raw))] = SimpleNamespace(graph_path=str(path))
+
+        async def reload_kg(self, graph_file, graph_source=None, graph_files=None, **kwargs):
+            result = await super().reload_kg(graph_file, graph_source=graph_source, **kwargs)
+            files = list(graph_files) if graph_files is not None else [graph_file]
+            if graph_file and graph_file not in files:
+                files.insert(0, graph_file)
+            self._load_graphs(files)
+            return result
+
         async def query(self, question, *args, **kwargs):
             q = str(question).lower()
             obs.retrieval_calls.append({
@@ -146,6 +175,10 @@ def wrap_retrieval(mp: pytest.MonkeyPatch, obs: Observations) -> None:
                     "answer": ("Term A [KG: matkg:TermA] comes from the first graph and "
                                "Beta film [KG: matkg:Beta] from the second graph."),
                     "selected": ["matkg:TermA", "matkg:Beta"],
+                    "selected_hits": [
+                        {"id": "matkg:TermA", "graph_id": "contract_v1", "score": 1.0},
+                        {"id": "matkg:Beta", "graph_id": "contract_v2", "score": 0.9},
+                    ],
                     "direct_evidence_count": 2,
                     "no_evidence": False,
                     "graph_source_requested": "json",
