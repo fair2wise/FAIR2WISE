@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+
+if __name__ == "__main__" and not __package__:
+    # Checkout script launch (`python3 app/modules/extract_terms.py ...`, documented in
+    # README.md): re-run as the package module `app.modules.extract_terms` so its
+    # relative imports resolve under one name. sys.path[0] is the script's own
+    # directory (app/modules); replace it with the repo root instead of adding
+    # app/ or app/modules to sys.path.
+    import runpy as _runpy
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _sys.path[0] = str(_Path(__file__).resolve().parents[2])
+    _runpy.run_module("app.modules.extract_terms", run_name="__main__", alter_sys=True)
+    raise SystemExit(0)
 from abc import ABC, abstractmethod
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,9 +35,6 @@ import fitz  # this is exactly the same as PyMuPDF
 from linkml_runtime.utils.schemaview import SchemaView
 import openai
 from rapidfuzz import process, fuzz  # still used by SchemaHelper for class/slot matching
-
-# Allow `python3 app/modules/extract_terms.py ...` from repo root.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from .agents.chebi import ChebiOboLookup
 from .agents.chem_checker import ChemicalFormulaValidator

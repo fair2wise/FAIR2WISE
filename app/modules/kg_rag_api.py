@@ -6,6 +6,20 @@ Provides semantic/lexical retrieval over a JSON knowledge graph, LLM chat client
 """
 from __future__ import annotations
 
+if __name__ == "__main__" and not __package__:
+    # Checkout script launch (`python3 app/modules/kg_rag_api.py ...`, documented in
+    # README.md): re-run as the package module `app.modules.kg_rag_api` so its
+    # relative imports resolve under one name. sys.path[0] is the script's own
+    # directory (app/modules); replace it with the repo root instead of adding
+    # app/ or app/modules to sys.path.
+    import runpy as _runpy
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _sys.path[0] = str(_Path(__file__).resolve().parents[2])
+    _runpy.run_module("app.modules.kg_rag_api", run_name="__main__", alter_sys=True)
+    raise SystemExit(0)
+
 import argparse
 import asyncio
 import datetime
@@ -65,20 +79,9 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-try:
-    from .project_config import config_value
-except ImportError:  # pragma: no cover - direct script execution fallback
-    from project_config import config_value
-
-try:
-    from .cborg_limiter import async_slot
-except ImportError:  # pragma: no cover - direct script execution fallback
-    from cborg_limiter import async_slot
-
-try:
-    from .cborg_http import openai_http_kwargs, require_cborg_api_key
-except ImportError:  # pragma: no cover - direct script execution fallback
-    from cborg_http import openai_http_kwargs, require_cborg_api_key
+from .project_config import config_value
+from .cborg_limiter import async_slot
+from .cborg_http import openai_http_kwargs, require_cborg_api_key
 
 load_dotenv()
 
