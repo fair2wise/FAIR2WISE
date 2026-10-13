@@ -21,6 +21,15 @@ startup and every one of its 19 routes calls it:
   :meth:`OpaquePaths.decode` turns ids the UI sends back into paths under those
   two roots only. ``GET /traces/{turn_id}`` uses ``project_trace_for`` (raw for
   ``trace.read_any``: every ``:local`` user and verified ALS admins).
+* **Quotes (H2).** Chat answers and chat stream ``complete``/``error`` events
+  are projected with the turn's retrieved PDF regions
+  (:class:`~app.api.source_text.TurnSources`) and a per-turn
+  :class:`~app.modules.security.disclosure.QuoteVerifier` whose reader runs only
+  under a ``QUOTE_VERIFICATION`` grant from the guard's startup-built
+  :class:`~app.modules.security.content_access.SourceAccessAuthority`, bound to
+  the route's ``RequestContext``. Verified quotes keep their quotation marks;
+  unverified ones become cited statements; more than 40% of one region is
+  clipped (O-D2). A turn without PDF regions is projected as before.
 * **Ownership (ALS only).** Sessions and turns are bound to the verified subject
   in an :class:`OwnerRegistry` persisted under the workdir. On ``:local`` no
   owner is recorded and no identity call is made.
@@ -53,9 +62,18 @@ from app.modules.security.authorization import (
     require,
     settings_update_capabilities,
 )
-from app.modules.security.disclosure import DisclosureProjector, PathRoots, Viewer, new_correlation_id
+from app.modules.security.content_access import ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceKind
+from app.modules.security.disclosure import (
+    DisclosureProjector,
+    PathRoots,
+    QuoteVerifier,
+    SourceRef,
+    Viewer,
+    new_correlation_id,
+)
 from app.modules.security.tiled_identity import TiledIdentityPort
 
+from .source_text import TurnSources
 from .auth import (
     AccessRuntime,
     CredentialStore,
@@ -242,9 +260,12 @@ class LegacyUiGuard:
     """
 
     def __init__(self, runtime: AccessRuntime, projector: DisclosureProjector, paths: OpaquePaths,
-                 owners: OwnerRegistry, session_key: Callable[[Optional[str]], str]) -> None:
+                 owners: OwnerRegistry, session_key: Callable[[Optional[str]], str],
+                 source_authority: Optional[SourceAccessAuthority] = None) -> None:
         self.runtime = runtime
         self.projector = projector
+        #: Trusted startup wiring (ADR rule A1): the only issuer of quote-verification grants.
+        self._source_authority = source_authority or SourceAccessAuthority()
         self.paths = paths
         self.owners = owners
         self._session_key = session_key
@@ -437,22 +458,61 @@ class LegacyUiGuard:
         """Whether a pending card may be kept for ``ctx``."""
         return chat_offers_ingestion(ctx)
 
+    def turn_projector(self, ctx: RequestContext,
+                       sources: Optional[TurnSources]) -> Tuple[DisclosureProjector, List[SourceRef], Any]:
+        """Projector, source regions and grant for one turn's answer.
+
+        Without captured PDF regions this is the app's projector with no sources (the
+        T18B projection). Otherwise a projector sharing the app's budget, ledger, roots
+        and resolver, with a :class:`QuoteVerifier` whose reader runs only through a
+        ``SourceAccessScope`` for a grant bound to ``ctx`` (purpose ``QUOTE_VERIFICATION``,
+        kind ``PARSED_TEXT``, the turn's works). The caller revokes the grant afterwards.
+        """
+        refs = sources.refs() if sources else []
+        if not refs:
+            return self.projector, [], None
+        try:
+            grant = self._source_authority.issue(
+                ctx, purpose=ReadPurpose.QUOTE_VERIFICATION, kinds=(SourceKind.PARSED_TEXT,),
+                work_ids=sorted({r.work_id for r in refs}))
+        except SourceAccessDenied as exc:
+            logger.warning("quote verification grant refused: %s", exc.reason)
+            return self.projector, [], None
+        verifier = QuoteVerifier(sources.reader_for(refs), self._source_authority.scope(ctx, grant))
+        base = self.projector
+        projector = DisclosureProjector(budget=base.budget, verifier=verifier, ledger=base.ledger,
+                                        roots=base.roots, citation_resolver=base.citation_resolver)
+        return projector, refs, grant
+
+    def _with_turn(self, ctx: RequestContext, sources: Optional[TurnSources],
+                   project: Callable[[DisclosureProjector, List[SourceRef]], Any]) -> Any:
+        projector, refs, grant = self.turn_projector(ctx, sources)
+        try:
+            return project(projector, refs)
+        finally:
+            if grant is not None:
+                self._source_authority.revoke(grant)
+
     def project_chat(self, ctx: RequestContext, payload: Dict[str, Any], *, session_id: Optional[str],
-                     turn_id: Optional[str]) -> Dict[str, Any]:
-        """R12/R13 body."""
+                     turn_id: Optional[str], sources: Optional[TurnSources] = None) -> Dict[str, Any]:
+        """R12/R13 body; ``sources`` are the turn's retrieved regions for quote verification."""
         viewer = self.viewer(ctx, session_id=session_id, correlation_id=turn_id)
-        return self.projector.project_chat_response(self.withhold_ingestion(ctx, payload), viewer)
+        body = self.withhold_ingestion(ctx, payload)
+        return self._with_turn(ctx, sources, lambda projector, refs: projector.project_chat_response(
+            body, viewer, sources=refs))
 
     def project_sse(self, ctx: RequestContext, event: str, data: Dict[str, Any], *, session_id: Optional[str],
-                    turn_id: Optional[str]) -> Optional[Dict[str, Any]]:
+                    turn_id: Optional[str], sources: Optional[TurnSources] = None) -> Optional[Dict[str, Any]]:
         """R15/R16 event data; ``None`` drops the event (pending prompts for non-ingesting callers)."""
         viewer = self.viewer(ctx, session_id=session_id, correlation_id=turn_id)
         if event == "progress":
             if not chat_offers_ingestion(ctx) and data.get("phase") in _PENDING_PHASES:
                 return None
-        elif data.get("status") != "stream_error":
+            return self.projector.project_sse_event(event, data, viewer)
+        if data.get("status") != "stream_error":
             data = self.withhold_ingestion(ctx, data)
-        return self.projector.project_sse_event(event, data, viewer)
+        return self._with_turn(ctx, sources, lambda projector, refs: projector.project_sse_event(
+            event, data, viewer, sources=refs))
 
     def stream_error(self, ctx: RequestContext, exc: BaseException, *, turn_id: str) -> str:
         """User-safe ``stream_error`` message (``project_exception``; the turn id is the reference)."""
@@ -526,7 +586,7 @@ def build_guard(workdir: Any, *, session_key: Callable[[Optional[str]], str],
     paths = OpaquePaths(workdir=workdir, workspace=project_root or Path.cwd())
     projector = projector or DisclosureProjector(roots=paths.roots)
     owners = OwnerRegistry(None if settings.is_local else Path(workdir) / "access" / "owners.json")
-    return LegacyUiGuard(runtime, projector, paths, owners, session_key)
+    return LegacyUiGuard(runtime, projector, paths, owners, session_key, source_authority=SourceAccessAuthority())
 
 
 __all__ = ("DEFAULT_WRITER_IDENTITY", "LegacyUiGuard", "NO_INGESTION_ANSWER", "OpaquePaths", "OwnerRegistry",
