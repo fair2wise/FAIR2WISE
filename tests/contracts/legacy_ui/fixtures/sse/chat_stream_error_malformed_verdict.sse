@@ -8,5 +8,5 @@ event: progress
 data: {"phase": "retrieval_started", "message": "Retrieval agent searching the KG", "turn_id": "turn-err-2", "round": 1}
 
 event: error
-data: {"status": "stream_error", "message": "'list' object has no attribute 'get'", "turn_id": "turn-err-2"}
+data: {"status": "stream_error", "message": "Internal error (error: internal; ref: turn-err-2)", "turn_id": "turn-err-2"}
 

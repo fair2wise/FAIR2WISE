@@ -321,14 +321,14 @@
               "retrieval": {
                 "status": "success",
                 "sufficient": false,
-                "missing_topics": [
-                  "synthetic missing topic"
-                ],
-                "selected": [],
                 "direct_evidence_count": 0,
                 "no_evidence": true,
                 "graph_source_requested": "splash",
-                "graph_source_used": "splash"
+                "graph_source_used": "splash",
+                "selected": [],
+                "missing_topics": [
+                  "synthetic missing topic"
+                ]
               },
               "pending_pdfs": [
                 "candidate_one.pdf"
@@ -370,20 +370,18 @@
               "retrieval_after": {
                 "status": "success",
                 "sufficient": true,
-                "answer": "Synthetic grounded answer (μ-scale, UTF-8) citing [KG: matkg:TermA].",
-                "selected": [
-                  "matkg:TermA",
-                  "matkg:Other"
-                ],
                 "direct_evidence_count": 2,
                 "no_evidence": false,
                 "graph_source_requested": "splash",
-                "graph_source_used": "splash"
+                "graph_source_used": "splash",
+                "selected": [
+                  "matkg:TermA",
+                  "matkg:Other"
+                ]
               },
               "extraction_report": {
                 "status": "insufficient",
                 "sufficient": false,
-                "answer": "No page-grounded terms were found for this paper on its eligible extracted pages.",
                 "used_pages": [],
                 "missing_topics": [
                   "extracted terms"
@@ -492,11 +490,11 @@
                 "predicate": "rel:related_to"
               }
             ],
-            "source_path": "<WORKSPACE>/run/kg.json"
+            "source_path": "f2w://workdir/kg.json"
           },
           "graph_source_requested": "splash",
           "graph_source_used": "splash",
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": null,
           "orchestration": {
             "action": "retrieve_kg",
@@ -509,7 +507,7 @@
       }
     ],
     "sse_file": "sse/chat_action_stream_extraction_yes.sse",
-    "sse_sha256": "1c9c030d5631042aaa43c3b700e76452576615451d40e74f89ea26ee5fc7ef59",
-    "sse_bytes": 9781
+    "sse_sha256": "98de872f3d8b7d688e35fc2581ca53783bd6927c7e523f92fb21dd1ade895cc7",
+    "sse_bytes": 9599
   }
 }

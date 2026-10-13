@@ -50,13 +50,13 @@
         "event": "error",
         "data": {
           "status": "stream_error",
-          "message": "'list' object has no attribute 'get'",
+          "message": "Internal error (error: internal; ref: turn-err-2)",
           "turn_id": "turn-err-2"
         }
       }
     ],
     "sse_file": "sse/chat_stream_error_malformed_verdict.sse",
-    "sse_sha256": "afad18878d8ca2b6de31237ab7716b4f96dde8c813363c212f6cde6e2189a09c",
-    "sse_bytes": 655
+    "sse_sha256": "24d051fc91891360bb0f8ce67f465c284873ad0322994d292c87313b7d1cf714",
+    "sse_bytes": 668
   }
 }

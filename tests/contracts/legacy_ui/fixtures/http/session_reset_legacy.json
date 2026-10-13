@@ -12,9 +12,9 @@
     "content_type": "application/json",
     "json": {
       "status": "reset",
-      "session_memory": "<WORKSPACE>/run/session_memory.json",
+      "session_memory": "f2w://workdir/session_memory.json",
       "session_memory_has_context": false,
-      "workflow_state": "<WORKSPACE>/run/workflow_state.json",
+      "workflow_state": "f2w://workdir/workflow_state.json",
       "workflow_phase": "idle"
     }
   }

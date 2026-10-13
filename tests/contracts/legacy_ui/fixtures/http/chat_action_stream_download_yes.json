@@ -104,25 +104,25 @@
               "retrieval": {
                 "status": "success",
                 "sufficient": false,
-                "missing_topics": [
-                  "synthetic missing topic"
-                ],
-                "selected": [],
                 "direct_evidence_count": 0,
                 "no_evidence": true,
                 "graph_source_requested": "splash",
-                "graph_source_used": "splash"
+                "graph_source_used": "splash",
+                "selected": [],
+                "missing_topics": [
+                  "synthetic missing topic"
+                ]
               }
             }
           ],
           "graph": {
             "nodes": [],
             "edges": [],
-            "source_path": "query:<WORKSPACE>/run/kg.json"
+            "source_path": "query:f2w://workdir/kg.json"
           },
           "graph_source_requested": "splash",
           "graph_source_used": "splash",
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": {
             "kind": "extraction",
             "candidate": {
@@ -147,7 +147,7 @@
       }
     ],
     "sse_file": "sse/chat_action_stream_download_yes.sse",
-    "sse_sha256": "309356f581bcc0fdffe21886fd7dc601419e03fcdefa5697ac64edb58fefb7c8",
-    "sse_bytes": 2566
+    "sse_sha256": "bdd48676750c1d4b1cea6dc0ca42f3b8c2d8e74fd45f7c1492c6cefca74613d5",
+    "sse_bytes": 2562
   }
 }

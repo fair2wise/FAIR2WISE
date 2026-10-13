@@ -47,12 +47,7 @@
           "publications": [],
           "confidence": 1.0,
           "rounds": [
-            {
-              "routing": {
-                "requires_agents": false,
-                "reason": "fake classifier"
-              }
-            }
+            {}
           ],
           "graph": {
             "nodes": [
@@ -169,11 +164,11 @@
                 "predicate": "rel:related_to"
               }
             ],
-            "source_path": "<WORKSPACE>/run/kg.json"
+            "source_path": "f2w://workdir/kg.json"
           },
           "graph_source_requested": "splash",
           "graph_source_used": "splash",
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": null,
           "orchestration": {
             "action": "direct_response",
@@ -187,7 +182,7 @@
       }
     ],
     "sse_file": "sse/chat_stream_direct_response.sse",
-    "sse_sha256": "be45be74449485b111b687214edfab97c5ce7885b9a4271133b6b6b34e279f19",
-    "sse_bytes": 3302
+    "sse_sha256": "db8bdf232154b60ad3329bd095376fd2f39d6e7292c96a10f131983155ac4cc8",
+    "sse_bytes": 3232
   }
 }

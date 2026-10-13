@@ -228,15 +228,14 @@
               "retrieval": {
                 "status": "success",
                 "sufficient": true,
-                "answer": "Synthetic grounded answer (μ-scale, UTF-8) citing [KG: matkg:TermA].",
-                "selected": [
-                  "matkg:TermA",
-                  "matkg:Other"
-                ],
                 "direct_evidence_count": 2,
                 "no_evidence": false,
                 "graph_source_requested": "splash",
-                "graph_source_used": "splash"
+                "graph_source_used": "splash",
+                "selected": [
+                  "matkg:TermA",
+                  "matkg:Other"
+                ]
               }
             }
           ],
@@ -341,11 +340,11 @@
                 "predicate": "rel:related_to"
               }
             ],
-            "source_path": "<WORKSPACE>/run/kg.json"
+            "source_path": "f2w://workdir/kg.json"
           },
           "graph_source_requested": "splash",
           "graph_source_used": "splash",
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": null,
           "orchestration": {
             "action": "retrieve_kg",
@@ -359,7 +358,7 @@
       }
     ],
     "sse_file": "sse/chat_stream_answered.sse",
-    "sse_sha256": "e6db7388cb6d7f9489130cf17eb651478dae7f8c44159f4482ed5579a5e9fb74",
-    "sse_bytes": 6133
+    "sse_sha256": "fce70287863eea355c8f46d5c42a52f8e0e582638198a374b183754c4e1a212b",
+    "sse_bytes": 6046
   }
 }

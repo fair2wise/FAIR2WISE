@@ -27,11 +27,11 @@
       "graph": {
         "nodes": [],
         "edges": [],
-        "source_path": "query:<WORKSPACE>/run/kg.json"
+        "source_path": "query:f2w://workdir/kg.json"
       },
       "graph_source_requested": null,
       "graph_source_used": null,
-      "workdir": "<WORKSPACE>/run",
+      "workdir": "f2w://workdir",
       "pending": null,
       "orchestration": {
         "action": "retrieve_kg",
