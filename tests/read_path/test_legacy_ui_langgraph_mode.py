@@ -2,10 +2,13 @@
 
 Same harness, fakes and fixtures as ``tests/contracts/legacy_ui`` (unchanged). Every
 retrieval call must go through the new read path, and every recorded response,
-SSE stream (parsed and raw bytes) must match the baseline fixture. The single
-expected difference is the trace detail's ``env.settings`` snapshot (all ``F2W_*``
-environment variables, trace.py ``settings_snapshot``), which now also records
-``F2W_RUNTIME``.
+SSE stream (parsed and raw bytes) must match the baseline fixture.
+
+Both T03B QA routes are replayed: ``supervisor`` (the default, ``F2W_QA_ROUTE`` unset;
+the harness's ``FakePlanner`` is the planning model) and ``direct``. The only expected
+difference is ``traces_get``, whose langgraph-mode expectation lives in
+``fixtures/runtime/traces_get.langgraph[.direct].json`` (H2 Q2): ``env.settings``
+records ``F2W_RUNTIME``, and on the supervisor route ``llm_calls`` holds the planning call.
 """
 
 from __future__ import annotations
@@ -43,14 +46,20 @@ EXPECTED_READ_PATH_FIXTURES = {
 }
 
 
-@pytest.fixture(scope="module")
-def replay(tmp_path_factory):
+@pytest.fixture(scope="module", params=["supervisor-default", "direct"])
+def replay(request, tmp_path_factory):
     from app.modules.runtime_bridge import legacy_adapter
 
     mp = pytest.MonkeyPatch()
     try:
         ctx = H.install(mp, tmp_path_factory.mktemp("legacy-ui-langgraph") / "ws", REPO_ROOT)
         mp.setenv("F2W_RUNTIME", "langgraph")
+        env = {"F2W_RUNTIME": "langgraph"}
+        if request.param == "direct":
+            mp.setenv("F2W_QA_ROUTE", "direct")
+            env["F2W_QA_ROUTE"] = "direct"
+        else:
+            mp.delenv("F2W_QA_ROUTE", raising=False)
         current = {"fid": None}
         hits: Dict[str, int] = {}
         statuses: Dict[str, List[str]] = {}
@@ -67,7 +76,8 @@ def replay(tmp_path_factory):
             return verdict
 
         mp.setattr(legacy_adapter.LegacyReadPath, "query", counting)
-        results: Dict[str, Any] = {"ctx": ctx, "responses": {}, "raw": {}, "hits": hits, "statuses": statuses}
+        results: Dict[str, Any] = {"ctx": ctx, "responses": {}, "raw": {}, "hits": hits, "statuses": statuses,
+                                   "route": request.param, "env": env}
         apps = []
         for flow in H.flows().values():
             app = H.make_ui_app(ctx, kg_mode=flow["kg_mode"])
@@ -91,19 +101,29 @@ def test_every_retrieval_call_went_through_the_new_read_path(replay):
     assert replay["statuses"]["chat_stream_retrieval_error"] == ["raised"]  # original exception re-raised
 
 
+def test_supervisor_route_plans_every_read_turn_once(replay):
+    planned = replay["ctx"].planner_calls
+    if replay["route"] == "direct":
+        assert planned == []
+        return
+    # One planning call per read turn, the read tool offered, the user's question passed on.
+    assert len(planned) == sum(replay["hits"].values())
+    assert all(call["tools"] == ["answer_from_knowledge"] for call in planned)
+    assert all(call["question"] for call in planned)
+
+
 def _without_runtime_flag(record: Dict[str, Any]) -> Dict[str, Any]:
     record = copy.deepcopy(record)
-    settings = record["json"]["env"]["settings"]
-    assert settings.pop("F2W_RUNTIME") == "langgraph"
+    record["json"]["env"]["settings"].pop("F2W_RUNTIME")
+    record["json"]["env"]["settings"].pop("F2W_QA_ROUTE", None)
+    record["json"]["llm_calls"] = []
     return record
 
 
 @pytest.mark.parametrize("fid", [step[0] for step in UI_STEPS])
 def test_response_matches_frozen_fixture(replay, fid):
-    expected = CASES[fid]["response"]
+    expected = H.expected_response(fid, CASES[fid]["response"], replay["env"])
     actual = replay["responses"][fid]
-    if fid == "traces_get":
-        actual = _without_runtime_flag(actual)
     assert actual["status_code"] == expected["status_code"]
     assert actual["content_type"] == expected["content_type"]
     assert actual.get("cors_headers") == expected.get("cors_headers")
@@ -117,10 +137,13 @@ def test_response_matches_frozen_fixture(replay, fid):
         assert actual.get("text") == expected.get("text")
 
 
-def test_trace_differs_only_by_the_recorded_runtime_flag(replay):
+def test_trace_differs_only_by_the_runtime_flag_and_planning_call(replay):
     actual = replay["responses"]["traces_get"]
-    assert actual != CASES["traces_get"]["response"]
+    assert actual == H.expected_response("traces_get", CASES["traces_get"]["response"], replay["env"])
+    assert actual["json"]["env"]["settings"]["F2W_RUNTIME"] == "langgraph"
     assert _without_runtime_flag(actual) == CASES["traces_get"]["response"]
+    labels = [c["label"] for c in actual["json"]["llm_calls"]]
+    assert labels == ([] if replay["route"] == "direct" else ["supervisor-plan"])
 
 
 def test_ui_openapi_is_unchanged(replay):

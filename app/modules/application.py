@@ -24,7 +24,10 @@ Two call styles reach the same :class:`~app.modules.runtime_bridge.retrieval.Leg
 - :meth:`F2WApplication.answer_from_knowledge`: a direct read call that bypasses
   planning (no supervisor model call);
 - :meth:`F2WApplication.delegate`: a task run by the supervisor, which calls the
-  same ``answer_from_knowledge`` tool.
+  same ``answer_from_knowledge`` tool;
+- :meth:`F2WApplication.answer_via_supervisor` (T03B): one read routed through the
+  supervisor with the tool arguments pinned to the caller's, returning the same
+  ``ReadOutcome`` as the direct call (used by the legacy UI QA route).
 
 Importing this module has no side effects: no environment or file reads, no
 registry, model or agent construction, and no LangGraph, provider or retrieval
@@ -34,6 +37,7 @@ imports (they load when an instance is built or a delegated task runs).
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -42,6 +46,9 @@ from typing import Any, Callable, Dict, FrozenSet, Iterator, List, Mapping, Opti
 
 from app.modules.contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
 from app.modules.security.authorization import DeploymentSettings, local_operator_context, resolve_context
+
+
+logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:
@@ -77,6 +84,22 @@ class DelegatedOutcome:
                 if eid not in out:
                     out.append(eid)
         return out
+
+
+@dataclass(frozen=True)
+class SupervisedRead:
+    """Result of :meth:`F2WApplication.answer_via_supervisor`.
+
+    Attributes:
+        read: The ``ReadOutcome`` of the tool call (``.to_legacy()`` gives the legacy verdict).
+        delegated: The supervisor turn, or ``None`` if the planner raised.
+        fallback: ``None`` when the supervisor's own tool call produced ``read``; otherwise why
+            the direct call was used instead (``"planner_error:<Type>"`` or ``"no_tool_call"``).
+    """
+
+    read: Any
+    delegated: Optional[DelegatedOutcome]
+    fallback: Optional[str] = None
 
 
 class F2WApplication:
@@ -126,6 +149,7 @@ class F2WApplication:
             build_read_registry,
             build_read_skills,
         )
+        from app.modules.runtime_bridge.qa_route import PinnedArgsService
         from app.modules.runtime_bridge.qa_tool import LegacyResultLedger
 
         if not isinstance(settings, DeploymentSettings):
@@ -139,7 +163,8 @@ class F2WApplication:
         self.admission = admission if admission is not None else ProviderAdmission()
         self.event_sink = event_sink if event_sink is not None else InMemoryEventSink()
         self.ledger = LegacyResultLedger(ledger_size)
-        self.registry = build_read_registry(retrieval, self.ledger, name=name)
+        # Pass-through except inside answer_via_supervisor, which pins the caller's arguments.
+        self.registry = build_read_registry(PinnedArgsService(retrieval), self.ledger, name=name)
         self.skills = build_read_skills(self.registry)
         self.executor = ToolExecutor(self.registry, event_sink=self.event_sink, admission=self.admission,
                                      limits=self.limits, clock=clock)
@@ -330,6 +355,70 @@ class F2WApplication:
         return DelegatedOutcome(thread_id=scoped, final_text=text, reads=tuple(reads), tool_results=tuple(results),
                                 interrupted=bool(state.get("__interrupt__")), stopped=stopped)
 
+    async def answer_via_supervisor(
+        self,
+        ctx: RequestContext,
+        question: str,
+        *,
+        history: Optional[Sequence[Mapping[str, str]]] = None,
+        source_rag: Optional[bool] = None,
+        use_live_tiled: Optional[bool] = None,
+        thread_id: Optional[str] = None,
+        keep_thread: bool = False,
+    ) -> SupervisedRead:
+        """Answer ``question`` through the planning supervisor (T03B).
+
+        The supervisor plans the turn and calls ``answer_from_knowledge``; the tool
+        arguments are pinned to this call's (question verbatim, history, flags), so the
+        existing QA path receives exactly what :meth:`answer_from_knowledge` would pass.
+        The first read of the turn is returned. If the planner raises or calls no tool,
+        the direct call answers instead (``fallback`` says why). The one-turn thread is
+        deleted afterwards unless ``keep_thread``.
+        """
+        from app.modules.runtime_bridge.qa_route import pin_args, unpin_args
+
+        self._require_supervisor()
+        args = self._read_args(question, history, source_rag, use_live_tiled)
+        tid = thread_id or f"qa-{uuid.uuid4().hex}"
+        token = pin_args(args)
+        delegated: Optional[DelegatedOutcome] = None
+        fallback: Optional[str] = None
+        try:
+            delegated = await self.delegate(ctx, question, thread_id=tid)
+        except ContractError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - planner/provider failure: the direct call answers
+            fallback = f"planner_error:{type(exc).__name__}"
+            logger.warning("supervisor QA route failed (%s); using the direct call", type(exc).__name__)
+        finally:
+            unpin_args(token)
+            if not keep_thread:
+                self._drop_thread(ctx, tid)
+        read = None
+        if delegated is not None:
+            for extra in delegated.reads[1:]:
+                self.ledger.get(extra.result.provenance_id, pop=True)
+            if delegated.reads:
+                read = delegated.reads[0]
+                self.ledger.get(read.result.provenance_id, pop=True)
+            else:
+                fallback = "no_tool_call"
+                logger.warning("supervisor QA route made no tool call; using the direct call")
+        if read is None:
+            read = await self.answer_from_knowledge(ctx, question, history=history, source_rag=source_rag,
+                                                    use_live_tiled=use_live_tiled)
+        return SupervisedRead(read=read, delegated=delegated, fallback=fallback)
+
+    def _drop_thread(self, ctx: RequestContext, thread_id: str) -> None:
+        scoped = self._config(ctx, thread_id)["configurable"]["thread_id"]
+        try:
+            if self._managed is not None:
+                self._managed.delete_thread(scoped)
+            elif self._saver is not None and hasattr(self._saver, "delete_thread"):
+                self._saver.delete_thread(scoped)
+        except Exception:  # noqa: BLE001 - best-effort cleanup of a finished one-turn thread
+            logger.debug("could not delete QA thread %s", scoped, exc_info=True)
+
     async def thread_messages(self, ctx: RequestContext, thread_id: str) -> List[Any]:
         """Checkpointed messages of ``thread_id`` for ``ctx``'s principal/session."""
         graph = self._require_supervisor()
@@ -337,4 +426,4 @@ class F2WApplication:
         return list((snapshot.values or {}).get("messages") or [])
 
 
-__all__: Tuple[str, ...] = ("DelegatedOutcome", "F2WApplication")
+__all__: Tuple[str, ...] = ("DelegatedOutcome", "F2WApplication", "SupervisedRead")

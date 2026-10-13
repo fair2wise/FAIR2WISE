@@ -127,6 +127,7 @@ class Ctx:
     splash_entities: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     splash_links: List[Dict[str, Any]] = field(default_factory=list)
     calls: Dict[str, int] = field(default_factory=dict)
+    planner_calls: List[Dict[str, Any]] = field(default_factory=list)
 
     def bump(self, name: str) -> None:
         self.calls[name] = self.calls.get(name, 0) + 1
@@ -392,6 +393,64 @@ def _install_splash_fakes(monkeypatch, ctx: Ctx, kg_update) -> None:
     monkeypatch.setattr(kg_update, "splash_reimport", splash_reimport)
 
 
+class FakePlanner:
+    """Deterministic planning model for the T03B supervisor route (F2W_RUNTIME=langgraph).
+
+    Calls ``answer_from_knowledge`` with the user's question, as QA_DELEGATION_PROMPT asks.
+    Kept apart from ``Ctx.calls`` so the recorded fake call counts stay as frozen.
+    """
+
+    model_name = "fake-planner"
+
+    def __init__(self, ctx: "Ctx") -> None:
+        self.ctx = ctx
+        self.tools: List[str] = []
+
+    def bind_tools(self, tools, **kwargs):
+        self.tools = [t["function"]["name"] for t in tools]
+        return self
+
+    def _reply(self, messages):
+        from langchain_core.messages import AIMessage
+
+        question = next((m.content for m in reversed(messages) if getattr(m, "type", "") == "human"), "")
+        self.ctx.planner_calls.append({"tools": list(self.tools), "question": question})
+        n = len(self.ctx.planner_calls)
+        return AIMessage(content="", tool_calls=[{"name": "answer_from_knowledge", "args": {"question": question},
+                                                  "id": f"plan-{n}", "type": "tool_call"}])
+
+    def invoke(self, messages, *args, **kwargs):
+        return self._reply(messages)
+
+    async def ainvoke(self, messages, *args, **kwargs):
+        return self._reply(messages)
+
+
+RUNTIME_FIXTURE_DIR = FIXTURE_DIR / "runtime"
+
+
+def expected_response(fid: str, recorded: Dict[str, Any], environ: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """The expected response of ``fid`` for the runtime mode in ``environ`` (H2 Q2, T03B).
+
+    Default mode: the recorded ``http/<fid>.json`` response. ``F2W_RUNTIME=langgraph``:
+    ``runtime/<fid>.langgraph[.direct].json`` when one exists (only ``traces_get``: the
+    trace's ``env.settings`` records ``F2W_RUNTIME``, and the supervisor route's planning
+    call appears in ``llm_calls``); an explicit ``F2W_QA_ROUTE`` is added to that snapshot.
+    """
+    env = os.environ if environ is None else environ
+    if (env.get("F2W_RUNTIME") or "").strip().lower() != "langgraph":
+        return recorded
+    route = (env.get("F2W_QA_ROUTE") or "").strip()
+    name = f"{fid}.langgraph{'.direct' if route.lower() == 'direct' else ''}.json"
+    path = RUNTIME_FIXTURE_DIR / name
+    if not path.exists():
+        return recorded
+    expected = json.loads(path.read_text(encoding="utf-8"))
+    if route:
+        expected["json"]["env"]["settings"]["F2W_QA_ROUTE"] = route
+    return expected
+
+
 def _fake_tiled_lookup():
     from app.modules.tiled_graph import TiledLookupGraph, TiledLookupResult
 
@@ -459,6 +518,10 @@ def install(monkeypatch, workspace: Path, repo_root: Path) -> Ctx:
     monkeypatch.setattr(trace_mod, "_GIT_SHA", None, raising=False)
     monkeypatch.setattr(trace_mod, "_GIT_SHA_READY", True, raising=False)
     _install_splash_fakes(monkeypatch, ctx, api_mod.kg_update)
+    from app.modules.runtime_bridge import legacy_adapter
+
+    planner = FakePlanner(ctx)
+    monkeypatch.setattr(legacy_adapter, "planning_model_provider", lambda pipeline: (lambda: planner))
     return ctx
 
 

@@ -1,0 +1,235 @@
+"""UI QA route selection for ``F2W_RUNTIME=langgraph`` (task T03B, owner decision H2 Q1).
+
+``F2W_QA_ROUTE`` is read once, when the service starts, and only matters in
+``langgraph`` mode:
+
+- ``supervisor`` (default, also when unset or blank): the legacy orchestrator's
+  ordinary-question read goes through ``F2WApplication.delegate``. The planning
+  supervisor (prompt ``QA_DELEGATION_PROMPT``) makes one model call, chooses
+  ``answer_from_knowledge``, and the tool runs the existing QA path. The UI still
+  gets the exact legacy verdict of that tool call.
+- ``direct``: the T03 behavior, ``F2WApplication.answer_from_knowledge`` with no
+  planning call.
+
+Any other value refuses startup.
+
+Parity rules for the supervisor route:
+
+- The tool arguments are pinned to the UI request (question verbatim, history,
+  ``source_rag``, ``use_live_tiled``) by :class:`PinnedArgsService`, so the model
+  decides *whether* to call the tool, not what the legacy QA path receives.
+- One planning call per turn (``max_model_calls=1``): the tool's verdict is the
+  answer, so the supervisor's relay call would be discarded and is not made.
+- If the planner fails or does not call the tool, the turn falls back to the
+  direct call (logged, and the failed planning call is in the turn trace).
+- Each planning call holds the shared provider admission slot (the
+  supervisor's ``admission.aslot``) and is recorded in the turn trace as
+  ``llm_calls[label="supervisor-plan"]``.
+"""
+
+from __future__ import annotations
+
+import contextvars
+import json
+import os
+import time
+from enum import Enum
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+
+from .mode import RuntimeConfigError
+
+QA_ROUTE_ENV = "F2W_QA_ROUTE"
+PLANNING_LABEL = "supervisor-plan"
+
+
+class QaRoute(str, Enum):
+    """How a langgraph-mode UI QA turn reaches ``answer_from_knowledge``."""
+
+    DIRECT = "direct"
+    SUPERVISOR = "supervisor"
+
+
+DEFAULT_QA_ROUTE = QaRoute.SUPERVISOR
+
+
+def qa_route(environ: Optional[Mapping[str, str]] = None) -> QaRoute:
+    """Return the configured UI QA route.
+
+    Raises:
+        RuntimeConfigError: On any value other than ``direct``/``supervisor``/blank.
+    """
+    env = os.environ if environ is None else environ
+    raw = (env.get(QA_ROUTE_ENV) or "").strip().lower()
+    if not raw:
+        return DEFAULT_QA_ROUTE
+    try:
+        return QaRoute(raw)
+    except ValueError:
+        raise RuntimeConfigError(
+            f"config_rejected: {QA_ROUTE_ENV} must be 'direct' or 'supervisor', got {raw!r}") from None
+
+
+# -- argument pinning -------------------------------------------------------------
+
+_PINNED: contextvars.ContextVar[Optional[Dict[str, Any]]] = contextvars.ContextVar("f2w_qa_pinned", default=None)
+
+
+class PinnedArgsService:
+    """Retrieval-service wrapper that substitutes the pinned UI arguments, if any.
+
+    Outside a pinned turn (the direct route, CLI callers) it passes calls through
+    unchanged. Every other attribute is the wrapped service's.
+    """
+
+    def __init__(self, inner: Any) -> None:
+        self.inner = inner
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.inner, name)
+
+    async def query(self, question: str, *, history: Any = None, source_rag: Any = None,
+                    use_live_tiled: Any = None) -> Any:
+        pinned = _PINNED.get()
+        if pinned is not None:
+            question = pinned["question"]
+            history = pinned.get("history")
+            source_rag = pinned.get("source_rag")
+            use_live_tiled = pinned.get("use_live_tiled")
+        return await self.inner.query(question, history=history, source_rag=source_rag,
+                                      use_live_tiled=use_live_tiled)
+
+
+def pin_args(args: Dict[str, Any]) -> contextvars.Token:
+    """Pin ``args`` for tool calls made in the current context; reset with :func:`unpin_args`."""
+    return _PINNED.set(dict(args))
+
+
+def unpin_args(token: contextvars.Token) -> None:
+    _PINNED.reset(token)
+
+
+# -- traced planning model --------------------------------------------------------
+
+def _role(message: Any) -> str:
+    return {"system": "system", "human": "user", "ai": "assistant", "tool": "tool"}.get(
+        str(getattr(message, "type", "")), str(getattr(message, "type", "")))
+
+
+def _content(message: Any) -> str:
+    content = getattr(message, "content", "")
+    text = content if isinstance(content, str) else json.dumps(content, default=str)
+    calls = getattr(message, "tool_calls", None)
+    if calls:
+        text += json.dumps([{"name": c.get("name"), "args": c.get("args")} for c in calls],
+                           sort_keys=True, default=str)
+    return text
+
+
+def _record(model: Any, messages: Sequence[Any], reply: Any, started: float,
+            error: Optional[BaseException]) -> None:
+    from app.modules.f2w_agent.trace import record_llm_call
+
+    record_llm_call(
+        label=PLANNING_LABEL,
+        model=getattr(model, "model_name", None) or getattr(model, "model", None),
+        messages=[{"role": _role(m), "content": _content(m)} for m in messages],
+        response=None if reply is None else _content(reply),
+        latency_ms=round((time.perf_counter() - started) * 1000.0, 3),
+        error=error,
+    )
+
+
+class _BoundPlanner:
+    def __init__(self, owner: "TracedPlanningModel", tools: List[Any]) -> None:
+        self.owner = owner
+        self.tools = tools
+
+    def _bound(self) -> Any:
+        model = self.owner.current()
+        return model, (model.bind_tools(self.tools) if self.tools else model)
+
+    def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+        model, bound = self._bound()
+        started = time.perf_counter()
+        try:
+            reply = bound.invoke(messages, *args, **kwargs)
+        except Exception as exc:
+            _record(model, messages, None, started, exc)
+            raise
+        _record(model, messages, reply, started, None)
+        return reply
+
+    async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+        model, bound = self._bound()
+        started = time.perf_counter()
+        try:
+            reply = await bound.ainvoke(messages, *args, **kwargs)
+        except Exception as exc:
+            _record(model, messages, None, started, exc)
+            raise
+        _record(model, messages, reply, started, None)
+        return reply
+
+
+class TracedPlanningModel:
+    """Chat model handle for the supervisor that resolves the current model per call and traces it.
+
+    Args:
+        provider: Returns the LangChain chat model to use now (for example the one
+            for the pipeline's current backend/model). Called on every planning call,
+            never at construction, so building this handle needs no credentials.
+    """
+
+    def __init__(self, provider: Callable[[], Any]) -> None:
+        self._provider = provider
+
+    def current(self) -> Any:
+        return self._provider()
+
+    def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> _BoundPlanner:
+        return _BoundPlanner(self, list(tools))
+
+    def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+        return _BoundPlanner(self, []).invoke(messages, *args, **kwargs)
+
+    async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+        return await _BoundPlanner(self, []).ainvoke(messages, *args, **kwargs)
+
+
+def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
+    """Provider of the planning chat model for ``pipeline``'s current backend and model.
+
+    Reuses the existing LangChain builder ``term_extractor.Orchestrator._build_llm``
+    (CBORG with the fail-closed key check, or Ollama). Built lazily on the first
+    planning call and rebuilt when the UI settings change backend or model.
+    """
+    cache: Dict[Any, Any] = {}
+
+    def current() -> Any:
+        runtime = getattr(pipeline, "runtime", None)
+        backend = str(getattr(runtime, "backend", None) or "cborg")
+        active = getattr(pipeline, "_active_model", None)
+        model = active() if callable(active) else str(getattr(runtime, "model", "") or "")
+        key = (backend, model)
+        if key not in cache:
+            from types import SimpleNamespace
+
+            from app.modules.term_extractor.orchestrator import Orchestrator
+
+            cfg = getattr(pipeline, "cfg", None)
+            spec = SimpleNamespace(
+                backend=backend, model=model, temperature=0.0, cborg_api_key=None,
+                cborg_base=os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov"),
+                ollama_url=str(getattr(cfg, "ollama_url", None) or "http://localhost:11434"),
+            )
+            cache.clear()
+            cache[key] = Orchestrator._build_llm(spec)
+        return cache[key]
+
+    return current
+
+
+__all__ = (
+    "DEFAULT_QA_ROUTE", "PLANNING_LABEL", "PinnedArgsService", "QA_ROUTE_ENV", "QaRoute",
+    "TracedPlanningModel", "pin_args", "pipeline_planning_model", "qa_route", "unpin_args",
+)

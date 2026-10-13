@@ -15,11 +15,13 @@ from .mode import RuntimeMode, runtime_mode
 def attach_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> Optional[Any]:
     """Return the langgraph-mode read path for ``pipeline``, or ``None`` in legacy mode.
 
-    Called once from ``AgentPipelineService.__init__``; ``F2W_RUNTIME`` is read here
-    and never per request.
+    Called once from ``AgentPipelineService.__init__``; ``F2W_RUNTIME`` and, in langgraph
+    mode, ``F2W_QA_ROUTE`` (T03B: ``supervisor`` default, or ``direct``) are read here and
+    never per request.
 
     Raises:
-        RuntimeConfigError: Invalid ``F2W_RUNTIME``, or langgraph mode on a non-local profile.
+        RuntimeConfigError: Invalid ``F2W_RUNTIME`` or ``F2W_QA_ROUTE``, or langgraph mode on a
+            non-local profile.
     """
     if runtime_mode(environ) is RuntimeMode.LEGACY:
         return None
