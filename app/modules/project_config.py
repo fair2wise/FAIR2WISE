@@ -15,16 +15,26 @@ from typing import Any, Callable, Iterable
 
 import yaml
 
+from .resources import resource_root
 
+# Checkout root. Installed wheels have no project root; config.yml is found
+# through FAIR2WISE_CONFIG or F2W_RESOURCE_ROOT (see resources.py).
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config.yml"
+
+
+def default_config_path() -> Path | None:
+    """``config.yml`` under the resource root (the repo root in a checkout), or ``None``."""
+    root = resource_root()
+    return root / "config.yml" if root is not None else None
 
 
 @lru_cache(maxsize=1)
 def load_project_config() -> dict[str, Any]:
     """Load root config.yml, returning an empty dict if it is absent."""
-    config_path = Path(os.environ.get("FAIR2WISE_CONFIG", DEFAULT_CONFIG_PATH))
-    if not config_path.exists():
+    explicit = os.environ.get("FAIR2WISE_CONFIG")
+    config_path = Path(explicit) if explicit is not None else default_config_path()
+    if config_path is None or not config_path.exists():
         return {}
     with config_path.open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle) or {}

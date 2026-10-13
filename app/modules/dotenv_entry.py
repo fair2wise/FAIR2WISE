@@ -25,13 +25,10 @@ import os
 from pathlib import Path
 from typing import Optional, Union
 
+from .resources import is_checkout
+
 DOTENV_VAR = "F2W_DOTENV"
 _DISABLED = {"", "0", "none", "off", "false"}
-
-
-def is_checkout() -> bool:
-    """True when this code runs from the ``app/`` source tree rather than an installed ``f2w`` wheel."""
-    return Path(__file__).resolve().parents[1].name == "app"
 
 
 def find_entrypoint_dotenv(anchor: Union[str, Path]) -> Optional[Path]:

@@ -309,9 +309,11 @@ class SchemaHelper:
             schema_path: Path to a LinkML YAML schema.
             fuzzy_cutoff: RapidFuzz score cutoff (0–100) for fuzzy matching.
         """
+        from .resources import resolve_resource
+
         self.schema_path = schema_path
         self.fuzzy_cutoff = fuzzy_cutoff
-        self.schema_view = SchemaView(schema_path)
+        self.schema_view = SchemaView(str(resolve_resource(schema_path)))
         self._load_classes_and_slots()
         self._build_fuzzy_indexes()
 
