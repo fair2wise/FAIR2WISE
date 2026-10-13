@@ -17,7 +17,6 @@ from abc import ABC, abstractmethod
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
-from dotenv import load_dotenv
 import functools
 import json
 import logging
@@ -54,7 +53,11 @@ from .term_extractor.merge_index import (
 # ----------------------------------------
 # LLM Client Setup
 # ----------------------------------------
-load_dotenv()
+if __name__ == "__main__":
+    # CLI entry only: load .env explicitly. Library imports never load .env.
+    from .dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
 
 
 class ChatClient(ABC):

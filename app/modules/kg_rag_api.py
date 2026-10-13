@@ -39,7 +39,6 @@ import aiohttp
 import openai
 import requests
 from colorama import Fore, Style, init as colorama_init
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
@@ -54,9 +53,9 @@ import uvicorn
 # ~300 MB combined) when the operator has explicitly selected lexical retrieval.
 # This keeps the process footprint small enough to survive macOS jetsam on
 # memory-constrained hosts (e.g. when a VM or browser fleet is also running).
-# The env var is read *before* load_dotenv() here because the CLI entry point
-# (cli.py) already calls load_dotenv() during its own module load, so the value
-# is available by the time this module is imported.
+# The env var is read *before* this module's own CLI .env load below; the
+# launchers load .env before importing this module, so the value is available
+# by the time this module is imported.
 _SEMANTIC_REQUESTED = os.environ.get("KG_RAG_RETRIEVAL_BACKEND", "").lower() not in ("lexical",)
 
 if _SEMANTIC_REQUESTED:
@@ -83,7 +82,12 @@ from .project_config import config_value
 from .cborg_limiter import async_slot
 from .cborg_http import openai_http_kwargs, require_cborg_api_key
 
-load_dotenv()
+if __name__ == "__main__":
+    # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):
+    # load .env before the configuration below is read. Library imports never load .env.
+    from .dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
 
 
 def _load_kg_deps() -> None:

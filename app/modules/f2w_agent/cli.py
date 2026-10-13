@@ -13,13 +13,17 @@ import asyncio
 import sys
 from pathlib import Path
 
-# load_dotenv() MUST be called before importing coordinator/retrieval_agent so
-# that KG_RAG_RETRIEVAL_BACKEND (and other env vars) are visible to kg_rag_api
-# at module-load time.  In particular, the lexical-mode import guard in
+# .env MUST be loaded before importing coordinator/retrieval_agent so that
+# KG_RAG_RETRIEVAL_BACKEND (and other env vars) are visible to kg_rag_api at
+# module-load time.  In particular, the lexical-mode import guard in
 # kg_rag_api.py skips loading faiss/torch (~300 MB) only when this env var is
-# already set when that module is first imported.
-from dotenv import load_dotenv
-load_dotenv()
+# already set when that module is first imported.  Only the CLI entry loads it
+# (here for `python -m app.modules.f2w_agent.cli`, or launchers/f2w_agent.py);
+# importing this module as a library does not.
+if __name__ == "__main__":
+    from ..dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
 
 from .coordinator import (
     Coordinator,

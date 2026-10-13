@@ -17,12 +17,15 @@ import pickle
 from academy.exchange.cloud.client import HttpExchangeFactory
 from academy.handle import Handle
 from academy.manager import Manager
-from dotenv import load_dotenv
 from globus_compute_sdk import Executor as GlobusComputeExecutor
 
 from ..term_extractor.academy_agent import TermExtractorAgent
 
-load_dotenv()
+if __name__ == "__main__":
+    # CLI entry only: load .env explicitly. Library imports never load .env.
+    from ..dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
 
 logger = logging.getLogger(__name__)
 
