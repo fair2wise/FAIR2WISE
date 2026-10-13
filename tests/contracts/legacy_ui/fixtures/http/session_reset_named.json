@@ -15,9 +15,9 @@
     "content_type": "application/json",
     "json": {
       "status": "reset",
-      "session_memory": "<WORKSPACE>/run/chat_sessions/contract-session-1/session_memory.json",
+      "session_memory": "f2w://workdir/chat_sessions/contract-session-1/session_memory.json",
       "session_memory_has_context": false,
-      "workflow_state": "<WORKSPACE>/run/chat_sessions/contract-session-1/workflow_state.json",
+      "workflow_state": "f2w://workdir/chat_sessions/contract-session-1/workflow_state.json",
       "workflow_phase": "idle"
     }
   }

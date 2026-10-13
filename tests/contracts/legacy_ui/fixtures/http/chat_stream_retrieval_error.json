@@ -50,7 +50,7 @@
         "event": "error",
         "data": {
           "status": "retrieval_error",
-          "answer": "Retrieval failed safely: synthetic retrieval failure",
+          "answer": "Retrieval failed safely (Internal error (error: internal; ref: turn-reterr-1)).",
           "sufficient": false,
           "node_ids": [],
           "publications": [],
@@ -59,11 +59,11 @@
           "graph": {
             "nodes": [],
             "edges": [],
-            "source_path": "query:<WORKSPACE>/run/kg.json"
+            "source_path": "query:f2w://workdir/kg.json"
           },
           "graph_source_requested": null,
           "graph_source_used": null,
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": null,
           "orchestration": {
             "action": "retrieve_kg",
@@ -77,7 +77,7 @@
       }
     ],
     "sse_file": "sse/chat_stream_retrieval_error.sse",
-    "sse_sha256": "7c424474a080deeabe74e1c0d6d63ec2f2c8f7c6481c28b496a25da6285324f9",
-    "sse_bytes": 1129
+    "sse_sha256": "e3a0ec300532b7a960edf23f0942802f473fa98bb9abc0ed5155e1d21aeecb75",
+    "sse_bytes": 1152
   }
 }

@@ -39,11 +39,11 @@
           "graph": {
             "nodes": [],
             "edges": [],
-            "source_path": "query:<WORKSPACE>/run/kg.json"
+            "source_path": "query:f2w://workdir/kg.json"
           },
           "graph_source_requested": "splash",
           "graph_source_used": "splash",
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": null,
           "orchestration": {
             "action": "download_selected",
@@ -56,7 +56,7 @@
       }
     ],
     "sse_file": "sse/chat_action_stream_decline.sse",
-    "sse_sha256": "eda4b8a19268fee6517f0c1de7ac76c97e55b7ffa2111cfeb5942e65ed1422e2",
-    "sse_bytes": 807
+    "sse_sha256": "587535608db1568eaeb09b4b7659c5c68e3255b807ab7d16acb4372d82805af3",
+    "sse_bytes": 803
   }
 }

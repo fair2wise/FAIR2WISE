@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -94,6 +94,8 @@ from app.modules.tiled_graph import (
 )
 from app.modules.project_config import config_value, get_config
 from app.modules.runtime_bridge.selection import attach_read_path
+from app.api.legacy_ui import build_guard, ui_context, ui_optional_context
+from app.modules.contracts.context import RequestContext
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
@@ -6630,10 +6632,33 @@ DEFAULT_CORS_ORIGINS = [
 ]
 
 
-def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = None) -> FastAPI:
-    """Build the FastAPI app with CORS and agent pipeline routes."""
+def create_app(
+    cfg: CoordinatorConfig,
+    *,
+    cors_origins: Optional[List[str]] = None,
+    deployment: Optional[Any] = None,
+    startup_config: Optional[Dict[str, str]] = None,
+    identity_port: Optional[Any] = None,
+    credential_store: Optional[Any] = None,
+    clock: Optional[Callable[[], Any]] = None,
+) -> FastAPI:
+    """Build the FastAPI app with CORS and agent pipeline routes.
+
+    Access (T18B): ``deployment`` (``DeploymentSettings``) or ``startup_config``
+    (``os.environ`` when ``None``, profile ``local`` when unset) selects the profile
+    once, here. ALS profiles need ``identity_port`` and ``credential_store`` or
+    startup is refused. Every route is guarded per ``ROUTE_POLICIES`` and every
+    response and SSE event is projected (``app/api/legacy_ui.py``).
+    """
     app = FastAPI(title="FAIR2WISE Agent Pipeline API")
+    guard = build_guard(
+        cfg.workdir, session_key=AgentPipelineService._session_key, deployment=deployment,
+        startup_config=startup_config, identity_port=identity_port, credential_store=credential_store,
+        clock=clock,
+    )
     service = AgentPipelineService(cfg)
+    guard.check_service(service)
+    guard.install(app)
 
     app.add_middleware(
         CORSMiddleware,
@@ -6644,9 +6669,9 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
     )
 
     @app.get("/health")
-    async def health() -> Dict[str, Any]:
+    async def health(ctx: Optional[RequestContext] = Depends(ui_optional_context)) -> Dict[str, Any]:
         """Return process health, runtime settings, and session paths."""
-        return {
+        return guard.project_health(ctx, {
             "status": "ok",
             "workdir": str(cfg.workdir),
             "kg_mode": service.runtime.graph_source,
@@ -6661,58 +6686,77 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             "workflow_phase": service.workflow.data.get("phase"),
             "pending_approval": (service.pending or {}).get("kind"),
             "max_rounds": cfg.max_rounds,
-        }
+        })
 
     @app.get("/settings", response_model=AgentSettingsResponse)
-    async def get_settings() -> AgentSettingsResponse:
+    async def get_settings(ctx: RequestContext = Depends(ui_context)) -> AgentSettingsResponse:
         """Return the current agent settings."""
-        return service.settings_response()
+        return guard.project_settings(ctx, _model_to_jsonable(service.settings_response()))
 
     @app.put("/settings", response_model=AgentSettingsResponse)
-    async def update_settings(req: AgentSettingsUpdate) -> AgentSettingsResponse:
+    async def update_settings(
+        req: AgentSettingsUpdate, request: Request, response: Response, ctx: RequestContext = Depends(ui_context),
+    ) -> AgentSettingsResponse:
         """Apply a settings update and return the new settings."""
         try:
-            return await service.apply_settings(req)
+            req, ignored = guard.settings_update(request, ctx, req)
+            response.headers.update(guard.setting_warning_headers(ignored))
+            return guard.project_settings(ctx, _model_to_jsonable(await service.apply_settings(req)))
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/session/reset", response_model=SessionResetResponse)
-    async def reset_session(req: Optional[SessionResetRequest] = None) -> SessionResetResponse:
+    async def reset_session(
+        request: Request, req: Optional[SessionResetRequest] = None, ctx: RequestContext = Depends(ui_context),
+    ) -> SessionResetResponse:
         """Clear the requested chat session."""
-        return await service.reset_session_context(req.session_id if req else None)
+        guard.session_access(request, ctx, req.session_id if req else None, claim=True)
+        return guard.project_paths(_model_to_jsonable(
+            await service.reset_session_context(req.session_id if req else None)))
 
     @app.delete("/session/{session_id}")
-    async def delete_session(session_id: str) -> Dict[str, str]:
+    async def delete_session(
+        session_id: str, request: Request, ctx: RequestContext = Depends(ui_context),
+    ) -> Dict[str, str]:
         """Delete a named chat session."""
         try:
-            return await service.delete_session_context(session_id)
+            guard.session_access(request, ctx, session_id, claim=False)
+            result = await service.delete_session_context(session_id)
+            guard.session_deleted(session_id)
+            return guard.project_paths(result)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/graph", response_model=GraphPayload)
-    async def graph() -> GraphPayload:
+    async def graph(ctx: RequestContext = Depends(ui_context)) -> GraphPayload:
         """Return the current graph payload."""
-        return service.graph_payload()
+        return guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(service.graph_payload()))
 
     @app.post("/graph/nodes/search", response_model=GraphNodeSearchResponse)
-    async def search_graph_nodes(req: GraphNodeSearchRequest) -> GraphNodeSearchResponse:
+    async def search_graph_nodes(
+        req: GraphNodeSearchRequest, ctx: RequestContext = Depends(ui_context),
+    ) -> GraphNodeSearchResponse:
         """Search graph nodes by text query."""
         try:
-            return await service.search_graph_nodes(req.query, req.limit)
+            found = await service.search_graph_nodes(req.query, req.limit)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Node search failed: {exc}") from exc
+            raise HTTPException(status_code=502,
+                                detail=f"Node search failed: {guard.error_detail(ctx, exc)}") from exc
+        return guard.project_route(ctx, "POST", "/graph/nodes/search", _model_to_jsonable(found))
 
     @app.get("/graph/neighborhood/{node_id:path}", response_model=GraphPayload)
-    async def graph_neighborhood(node_id: str, hops: int = CITE_FOCUS_HOPS) -> GraphPayload:
+    async def graph_neighborhood(
+        node_id: str, hops: int = CITE_FOCUS_HOPS, ctx: RequestContext = Depends(ui_context),
+    ) -> GraphPayload:
         """Return a Tiled node's neighborhood subgraph."""
         cleaned = str(node_id or "").strip()
         if not cleaned:
             raise HTTPException(status_code=400, detail="Node id is required")
         payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned)
         if payload.nodes:
-            return payload
+            return guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload))
         raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
 
     def _tiled_graph_node(node_id: str) -> Optional[GraphNode]:
@@ -6738,8 +6782,18 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
     async def graph_node(
         node_id: str,
         json_graph_path: Optional[str] = None,
+        ctx: RequestContext = Depends(ui_context),
     ) -> GraphNode:
         """Return one graph node by id from Tiled or a JSON graph file."""
+        node = await _graph_node(node_id, json_graph_path)
+        return guard.project_route(ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(node))
+
+    async def _graph_node(node_id: str, json_graph_path: Optional[str]) -> GraphNode:
+        """Resolve one node; ``json_graph_path`` may be an opaque ``f2w://`` id (T18B)."""
+        try:
+            json_graph_path = guard.paths.decode(json_graph_path)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         tiled_first = bool(
             str(node_id or "").lower().startswith("tiled:")
             or str(node_id or "").lower().startswith("beamline:")
@@ -6770,36 +6824,52 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         return node
 
     @app.patch("/graph/node/{node_id}", response_model=GraphNode)
-    async def patch_graph_node(node_id: str, req: GraphNodeUpdateRequest) -> GraphNode:
+    async def patch_graph_node(
+        node_id: str, req: GraphNodeUpdateRequest, ctx: RequestContext = Depends(ui_context),
+    ) -> GraphNode:
         """Patch a splash-mode graph node."""
         try:
-            return await service.update_graph_node(node_id, req)
+            node = await service.update_graph_node(node_id, req)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Splash update failed: {exc}") from exc
+            raise HTTPException(status_code=502,
+                                detail=f"Splash update failed: {guard.error_detail(ctx, exc)}") from exc
+        return guard.project_route(ctx, "PATCH", "/graph/node/" + node_id, _model_to_jsonable(node))
 
     @app.post("/graph/upload", response_model=GraphUploadResponse)
-    async def upload_graph(req: GraphUploadRequest) -> GraphUploadResponse:
+    async def upload_graph(
+        req: GraphUploadRequest, ctx: RequestContext = Depends(ui_context),
+    ) -> GraphUploadResponse:
         """Save an uploaded MatKG JSON graph."""
         try:
-            return service.save_uploaded_graph(req.filename, req.graph)
+            saved = service.save_uploaded_graph(req.filename, req.graph)
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise HTTPException(status_code=400, detail=guard.error_detail(ctx, exc)) from exc
+        return guard.project_route(ctx, "POST", "/graph/upload", _model_to_jsonable(saved))
+
+    async def _withhold_pending(ctx: RequestContext, session_id: Optional[str], payload: Dict[str, Any]) -> None:
+        """Drop a download/extraction offer the caller may not act on (AUTH-03)."""
+        if payload.get("pending") and not guard.offers_ingestion(ctx):
+            async with service.lock:
+                service._activate_session(session_id)
+                service._set_pending(None)
 
     @app.post("/chat", response_model=ChatResponse)
-    async def chat(req: ChatRequest) -> ChatResponse:
+    async def chat(req: ChatRequest, request: Request, ctx: RequestContext = Depends(ui_context)) -> ChatResponse:
         """Handle a non-streaming chat request."""
         try:
-            return await service.ask(
+            ctx = guard.chat_entry(request, ctx, req.session_id, req.client_turn_id)
+            guard.claim_turn(ctx, req.client_turn_id)
+            response = await service.ask(
                 req.message,
                 messages=req.messages,
                 session_id=req.session_id,
                 graph_source=req.graph_source,
-                json_graph_path=req.json_graph_path,
-                json_graph_paths=req.json_graph_paths,
+                json_graph_path=guard.paths.decode(req.json_graph_path),
+                json_graph_paths=guard.paths.decode_all(req.json_graph_paths),
                 source_rag=req.source_rag,
                 use_live_tiled=req.use_live_tiled,
                 client_turn_id=req.client_turn_id,
@@ -6808,12 +6878,20 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        guard.claim_turn(ctx, response.turn_id)
+        payload = _model_to_jsonable(response)
+        await _withhold_pending(ctx, req.session_id, payload)
+        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id)
 
     @app.post("/chat/action", response_model=ChatResponse)
-    async def chat_action(req: ChatActionRequest) -> ChatResponse:
+    async def chat_action(
+        req: ChatActionRequest, request: Request, ctx: RequestContext = Depends(ui_context),
+    ) -> ChatResponse:
         """Handle a non-streaming pending yes/no action."""
         try:
-            return await service.act(
+            ctx = guard.chat_action_entry(request, ctx, req.decision, req.kind, req.session_id, req.client_turn_id)
+            guard.claim_turn(ctx, req.client_turn_id)
+            response = await service.act(
                 req.decision,
                 req.kind,
                 candidate_index=req.candidate_index,
@@ -6824,22 +6902,38 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        guard.claim_turn(ctx, response.turn_id)
+        payload = _model_to_jsonable(response)
+        await _withhold_pending(ctx, req.session_id, payload)
+        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id)
 
     @app.post("/publications/search", response_model=PublicationSearchResponse)
-    async def publication_search(req: PublicationSearchRequest) -> PublicationSearchResponse:
+    async def publication_search(
+        req: PublicationSearchRequest, ctx: RequestContext = Depends(ui_context),
+    ) -> PublicationSearchResponse:
         """Search publications in the graph and optionally OpenAlex."""
         try:
-            return await service.search_publications(
+            found = await service.search_publications(
                 req.query,
                 max_results=req.max_results,
                 include_external=req.include_external,
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return guard.project_route(ctx, "POST", "/publications/search", _model_to_jsonable(found))
 
     @app.post("/chat/stream")
-    async def chat_stream(req: ChatRequest) -> StreamingResponse:
+    async def chat_stream(
+        req: ChatRequest, request: Request, ctx: RequestContext = Depends(ui_context),
+    ) -> StreamingResponse:
         """Stream chat progress and the final response as SSE."""
+        try:
+            ctx = guard.chat_entry(request, ctx, req.session_id, req.client_turn_id)
+            req = req.model_copy(update={"json_graph_path": guard.paths.decode(req.json_graph_path),
+                                         "json_graph_paths": guard.paths.decode_all(req.json_graph_paths)})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
         async def events():
             """Yield SSE progress events then the final chat result."""
             collector = open_turn(
@@ -6859,6 +6953,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                 env=service._trace_env(),
             )
             note_progress("turn_started", "Turn started", {"turn_id": collector.turn_id})
+            guard.claim_turn(ctx, collector.turn_id)
             queue: asyncio.Queue[Optional[tuple[str, Dict[str, Any]]]] = asyncio.Queue()
             await queue.put((
                 "progress",
@@ -6899,6 +6994,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                     )
                     payload = _model_to_jsonable(response)
                     payload.setdefault("turn_id", collector.turn_id)
+                    await _withhold_pending(ctx, req.session_id, payload)
                     if response.status.endswith("_error"):
                         await queue.put(("error", payload))
                     else:
@@ -6908,7 +7004,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         "error",
                         {
                             "status": "stream_error",
-                            "message": str(exc),
+                            "message": guard.stream_error(ctx, exc, turn_id=collector.turn_id),
                             "turn_id": collector.turn_id,
                         },
                     ))
@@ -6922,7 +7018,10 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                     if item is None:
                         break
                     event, data = item
-                    yield _sse(event, data)
+                    data = guard.project_sse(ctx, event, data, session_id=req.session_id,
+                                             turn_id=collector.turn_id)
+                    if data is not None:
+                        yield _sse(event, data)
             finally:
                 if not task.done():
                     task.cancel()
@@ -6932,8 +7031,15 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.post("/chat/action/stream")
-    async def chat_action_stream(req: ChatActionRequest) -> StreamingResponse:
+    async def chat_action_stream(
+        req: ChatActionRequest, request: Request, ctx: RequestContext = Depends(ui_context),
+    ) -> StreamingResponse:
         """Stream pending-action progress and the final response as SSE."""
+        try:
+            ctx = guard.chat_action_entry(request, ctx, req.decision, req.kind, req.session_id, req.client_turn_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
         async def events():
             """Yield SSE progress events then the final action result."""
             collector = open_turn(
@@ -6953,6 +7059,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                 env=service._trace_env(),
             )
             note_progress("turn_started", "Turn started", {"turn_id": collector.turn_id})
+            guard.claim_turn(ctx, collector.turn_id)
             queue: asyncio.Queue[Optional[tuple[str, Dict[str, Any]]]] = asyncio.Queue()
             await queue.put((
                 "progress",
@@ -6990,6 +7097,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                     )
                     payload = _model_to_jsonable(response)
                     payload.setdefault("turn_id", collector.turn_id)
+                    await _withhold_pending(ctx, req.session_id, payload)
                     if response.status.endswith("_error"):
                         await queue.put(("error", payload))
                     else:
@@ -6999,7 +7107,7 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                         "error",
                         {
                             "status": "stream_error",
-                            "message": str(exc),
+                            "message": guard.stream_error(ctx, exc, turn_id=collector.turn_id),
                             "turn_id": collector.turn_id,
                         },
                     ))
@@ -7013,7 +7121,10 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
                     if item is None:
                         break
                     event, data = item
-                    yield _sse(event, data)
+                    data = guard.project_sse(ctx, event, data, session_id=req.session_id,
+                                             turn_id=collector.turn_id)
+                    if data is not None:
+                        yield _sse(event, data)
             finally:
                 if not task.done():
                     task.cancel()
@@ -7023,30 +7134,36 @@ def create_app(cfg: CoordinatorConfig, *, cors_origins: Optional[List[str]] = No
         return StreamingResponse(events(), media_type="text/event-stream")
 
     @app.get("/traces/{turn_id}")
-    async def get_trace(turn_id: str) -> Dict[str, Any]:
+    async def get_trace(
+        turn_id: str, request: Request, ctx: RequestContext = Depends(ui_context),
+    ) -> Dict[str, Any]:
         """Return the unclipped detail record for one turn."""
+        # T18B: raw for trace.read_any (every :local user, ALS admins), projected otherwise.
+        ctx = guard.trace_access(request, ctx, turn_id)
         record = load_detail(turn_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Trace not found: {turn_id}")
-        return record
+        return guard.project_trace(ctx, record)
 
     @app.post("/telemetry/ui")
-    async def telemetry_ui(req: UiTelemetryBatch) -> Dict[str, Any]:
+    async def telemetry_ui(req: UiTelemetryBatch, ctx: RequestContext = Depends(ui_context)) -> Dict[str, Any]:
         """Append a batch of UI events. No-op when tracing is disabled."""
         if not tracing_enabled():
             return {"status": "disabled", "written": 0}
-        events = [event.model_dump() for event in req.events]
+        events = guard.telemetry_events(ctx, [event.model_dump() for event in req.events])
         append_ui_events(events)
         return {"status": "ok", "written": len(events)}
 
     @app.post("/annotations")
-    async def create_annotation(req: AnnotationRequest) -> Dict[str, Any]:
+    async def create_annotation(
+        req: AnnotationRequest, request: Request, ctx: RequestContext = Depends(ui_context),
+    ) -> Dict[str, Any]:
         """Append a human pass/fail label. Multiple labels per turn are allowed."""
+        record = guard.annotation(request, ctx, req.model_dump())
         if not tracing_enabled():
             return {"status": "disabled"}
         from datetime import datetime, timezone
 
-        record = req.model_dump()
         if not record.get("ts"):
             record["ts"] = datetime.now(timezone.utc).isoformat()
         append_annotation(record)

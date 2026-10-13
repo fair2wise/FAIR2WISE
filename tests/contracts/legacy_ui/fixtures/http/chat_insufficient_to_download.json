@@ -28,14 +28,14 @@
           "retrieval": {
             "status": "success",
             "sufficient": false,
-            "missing_topics": [
-              "synthetic missing topic"
-            ],
-            "selected": [],
             "direct_evidence_count": 0,
             "no_evidence": true,
             "graph_source_requested": "splash",
-            "graph_source_used": "splash"
+            "graph_source_used": "splash",
+            "selected": [],
+            "missing_topics": [
+              "synthetic missing topic"
+            ]
           },
           "candidate_search": {
             "status": "success",
@@ -45,35 +45,29 @@
                 "id": "Wcontract1",
                 "doi": "10.0000/contract.cand1",
                 "title": "Candidate paper one",
-                "abstract": "Synthetic abstract for candidate one.",
                 "publication_year": 2023,
                 "score": 0.91,
                 "repository": "openalex",
-                "pdf_urls": [
-                  "https://example.invalid/cand1.pdf"
-                ]
+                "abstract": "Synthetic abstract for candidate one."
               },
               {
                 "id": "Wcontract2",
                 "doi": "10.0000/contract.cand2",
                 "title": "Candidate paper two",
-                "abstract": "Synthetic abstract for candidate two.",
                 "publication_year": 2022,
                 "score": 0.4,
                 "repository": "arxiv",
-                "pdf_urls": [
-                  "https://example.invalid/cand2.pdf"
-                ]
+                "abstract": "Synthetic abstract for candidate two."
               }
             ]
           },
           "debate": {
+            "selected_action": "download_selected",
+            "reason": "Candidate one has the best abstract evidence",
             "hypothesis": "Candidate one fills the gap",
             "objections": [
               "Candidate two is weaker"
             ],
-            "selected_action": "download_selected",
-            "reason": "Candidate one has the best abstract evidence",
             "candidate_titles": [
               "Candidate paper one"
             ],
@@ -86,11 +80,11 @@
       "graph": {
         "nodes": [],
         "edges": [],
-        "source_path": "query:<WORKSPACE>/run/kg.json"
+        "source_path": "query:f2w://workdir/kg.json"
       },
       "graph_source_requested": "splash",
       "graph_source_used": "splash",
-      "workdir": "<WORKSPACE>/run",
+      "workdir": "f2w://workdir",
       "pending": {
         "kind": "download",
         "papers": [

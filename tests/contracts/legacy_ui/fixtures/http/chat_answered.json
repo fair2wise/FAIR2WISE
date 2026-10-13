@@ -52,15 +52,14 @@
           "retrieval": {
             "status": "success",
             "sufficient": true,
-            "answer": "Synthetic grounded answer (μ-scale, UTF-8) citing [KG: matkg:TermA].",
-            "selected": [
-              "matkg:TermA",
-              "matkg:Other"
-            ],
             "direct_evidence_count": 2,
             "no_evidence": false,
             "graph_source_requested": "splash",
-            "graph_source_used": "splash"
+            "graph_source_used": "splash",
+            "selected": [
+              "matkg:TermA",
+              "matkg:Other"
+            ]
           }
         }
       ],
@@ -165,11 +164,11 @@
             "predicate": "rel:related_to"
           }
         ],
-        "source_path": "<WORKSPACE>/run/kg.json"
+        "source_path": "f2w://workdir/kg.json"
       },
       "graph_source_requested": "splash",
       "graph_source_used": "splash",
-      "workdir": "<WORKSPACE>/run",
+      "workdir": "f2w://workdir",
       "pending": null,
       "orchestration": {
         "action": "retrieve_kg",

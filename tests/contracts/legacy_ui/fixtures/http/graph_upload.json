@@ -55,9 +55,9 @@
           }
         ],
         "edges": [],
-        "source_path": "<WORKSPACE>/run/uploads/contract_upload.json"
+        "source_path": "f2w://workdir/uploads/contract_upload.json"
       },
-      "graph_path": "<WORKSPACE>/run/uploads/contract_upload.json",
+      "graph_path": "f2w://workdir/uploads/contract_upload.json",
       "filename": "contract_upload.json"
     }
   }

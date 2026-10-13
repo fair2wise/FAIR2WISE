@@ -125,7 +125,7 @@
           "predicate": "rel:related_to"
         }
       ],
-      "source_path": "<WORKSPACE>/storage/kg/matkg_contract_v1.json"
+      "source_path": "f2w://workspace/storage/kg/matkg_contract_v1.json"
     }
   }
 }

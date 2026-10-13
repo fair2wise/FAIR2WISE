@@ -80,25 +80,25 @@
               "retrieval": {
                 "status": "success",
                 "sufficient": false,
-                "missing_topics": [
-                  "synthetic missing topic"
-                ],
-                "selected": [],
                 "direct_evidence_count": 0,
                 "no_evidence": true,
                 "graph_source_requested": "splash",
-                "graph_source_used": "splash"
+                "graph_source_used": "splash",
+                "selected": [],
+                "missing_topics": [
+                  "synthetic missing topic"
+                ]
               }
             }
           ],
           "graph": {
             "nodes": [],
             "edges": [],
-            "source_path": "query:<WORKSPACE>/run/kg.json"
+            "source_path": "query:f2w://workdir/kg.json"
           },
           "graph_source_requested": "splash",
           "graph_source_used": "splash",
-          "workdir": "<WORKSPACE>/run",
+          "workdir": "f2w://workdir",
           "pending": {
             "kind": "download",
             "papers": [
@@ -136,7 +136,7 @@
       }
     ],
     "sse_file": "sse/chat_action_stream_download_failed_retry.sse",
-    "sse_sha256": "fd92119d1b7b74eb5f165c3df7adf473ef9eed7f13ae31c732f7e7f36c93bb21",
-    "sse_bytes": 2381
+    "sse_sha256": "ed35332fd43e8b52f15f5cff9d615b14d83f9bc976ca4e9209c56ee974de6c76",
+    "sse_bytes": 2377
   }
 }

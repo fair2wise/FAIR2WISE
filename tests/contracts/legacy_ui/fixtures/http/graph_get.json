@@ -125,7 +125,7 @@
           "predicate": "rel:related_to"
         }
       ],
-      "source_path": "<WORKSPACE>/run/kg.json"
+      "source_path": "f2w://workdir/kg.json"
     }
   }
 }

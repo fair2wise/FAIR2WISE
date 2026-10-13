@@ -154,8 +154,11 @@ def _log_trust_claims(request: Request) -> None:
         logger.warning("ignored request trust claims: %s", ", ".join(claimed))
 
 
-def _resolve(request: Request, policy: Optional[RoutePolicy]) -> RequestContext:
-    """Resolve the context for ``request`` and check the route's entry capabilities."""
+def _resolve(request: Request, policy: Optional[RoutePolicy], *, fresh: bool = False) -> RequestContext:
+    """Resolve the context for ``request`` and check the route's entry capabilities.
+
+    ``fresh`` forces a new ALS role check (privileged boundary inside a handler).
+    """
     runtime = _runtime(request)
     settings = runtime.settings
     _log_trust_claims(request)
@@ -169,7 +172,7 @@ def _resolve(request: Request, policy: Optional[RoutePolicy]) -> RequestContext:
     ctx = resolve_context(
         settings, credential, request_id=uuid.uuid4().hex, identity_port=runtime.identity_port,
         clock=runtime.clock, role_cache=runtime.role_cache,
-        require_fresh=bool(policy and policy.needs_fresh_role_check),
+        require_fresh=fresh or bool(policy and policy.needs_fresh_role_check),
     )
     if policy is None:
         if not settings.is_local:
@@ -186,6 +189,16 @@ async def request_context(request: Request) -> RequestContext:
         ContractError: ``DENIED`` (403) or ``UNAVAILABLE`` (503).
     """
     return _resolve(request, _policy(request, _runtime(request)))
+
+
+def fresh_request_context(request: Request) -> RequestContext:
+    """Re-resolve the caller with an unconditional ALS role check (section 5.3).
+
+    Handlers call this before a conditional privileged effect whose route entry used
+    the cached role check (for example ``/chat/action decision=yes``). On ``:local``
+    it returns the local-operator context without any identity call.
+    """
+    return _resolve(request, _policy(request, _runtime(request)), fresh=True)
 
 
 async def optional_request_context(request: Request) -> Optional[RequestContext]:

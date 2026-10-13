@@ -8,5 +8,5 @@ event: progress
 data: {"phase": "retrieval_started", "message": "Retrieval agent searching the KG", "turn_id": "turn-reterr-1", "round": 1}
 
 event: error
-data: {"status": "retrieval_error", "answer": "Retrieval failed safely: synthetic retrieval failure", "sufficient": false, "node_ids": [], "publications": [], "confidence": 0.35, "rounds": [], "graph": {"nodes": [], "edges": [], "source_path": "query:<WORKSPACE>/run/kg.json"}, "graph_source_requested": null, "graph_source_used": null, "workdir": "<WORKSPACE>/run", "pending": null, "orchestration": {"action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}, "turn_id": "turn-reterr-1"}
+data: {"status": "retrieval_error", "answer": "Retrieval failed safely (Internal error (error: internal; ref: turn-reterr-1)).", "sufficient": false, "node_ids": [], "publications": [], "confidence": 0.35, "rounds": [], "graph": {"nodes": [], "edges": [], "source_path": "query:f2w://workdir/kg.json"}, "graph_source_requested": null, "graph_source_used": null, "workdir": "f2w://workdir", "pending": null, "orchestration": {"action": "retrieve_kg", "agent": "RetrievalAgent", "reason": "fake classifier", "state": "idle", "classification": "scientific_or_uncertain"}, "turn_id": "turn-reterr-1"}
 
