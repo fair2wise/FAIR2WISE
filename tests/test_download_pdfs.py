@@ -1,13 +1,8 @@
-import sys
 from pathlib import Path
 
+from app.modules.literature import download_pdfs
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / "scripts"
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
-
-import download_pdfs
 
 
 class FakeResponse:
@@ -412,3 +407,12 @@ def test_crossref_tdm_picks_allowlisted_pdf_only():
     )
     assert urls == ["https://www.osti.gov/servlets/purl/1656507"]
     assert sources == ["crossref-tdm"]
+
+
+def test_scripts_facade_reexports_canonical_objects():
+    """scripts/download_pdfs.py holds references to the canonical functions, not copies."""
+    import runpy
+
+    ns = runpy.run_path(str(ROOT / "scripts" / "download_pdfs.py"), run_name="download_pdfs_facade")
+    for name in ("download_pdf", "set_delay_floor", "host_delay", "_host", "RELIABLE_PDF_HOSTS"):
+        assert ns[name] is getattr(download_pdfs, name)

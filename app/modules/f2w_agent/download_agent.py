@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 MAX_SEARCH_QUERIES = 5
 
-import download_pdfs as _dl
+from ..literature import download_pdfs as _dl
 
 RELIABLE_PDF_HOSTS = _dl.RELIABLE_PDF_HOSTS
 
@@ -671,7 +671,7 @@ class DownloadAgent(Agent):
         validate_downloads: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Download ranked candidates to ``target_dir`` and append JSONL records."""
-        import download_pdfs as dl  # scripts/download_pdfs.py
+        from ..literature import download_pdfs as dl
 
         validate = self._validate_downloads if validate_downloads is None else validate_downloads
 
