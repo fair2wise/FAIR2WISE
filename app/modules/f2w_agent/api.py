@@ -10,7 +10,7 @@ import os
 import re
 import shutil
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as dataclass_replace
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
@@ -98,6 +98,7 @@ from app.modules.runtime_bridge.selection import attach_read_path, attach_summar
 from app.api.legacy_ui import build_guard, ui_context, ui_optional_context
 from app.api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from app.modules.contracts.context import RequestContext
+from app.modules.security.authorization import SETTINGS_DEPLOYMENT_FIELDS
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
@@ -517,6 +518,38 @@ class RuntimeSettings:
     source_rag: bool = False
     use_live_tiled: bool = False
     tiled_uri: Optional[str] = None
+
+
+#: T25D: runtime fields kept per ALS principal (deployment-wide ones stay on the server runtime).
+PERSONAL_RUNTIME_FIELDS = (
+    "backend", "model", "graph_source", "json_graph_path", "json_graph_paths",
+    "kg_query_max_nodes", "kg_query_hops", "source_rag", "use_live_tiled",
+)
+#: T25D: which personal runtime fields a PUT /settings field may change.
+_UPDATE_TOUCHES = {
+    "backend": ("backend", "model"),
+    "model": ("model",),
+    "graph_source": ("graph_source", "json_graph_path", "json_graph_paths"),
+    "json_graph_path": ("json_graph_path", "json_graph_paths"),
+    "json_graph_paths": ("json_graph_path", "json_graph_paths"),
+    "selected_graph_ids": ("json_graph_path", "json_graph_paths"),
+    "kg_query_max_nodes": ("kg_query_max_nodes",),
+    "kg_query_hops": ("kg_query_hops",),
+    "source_rag": ("source_rag",),
+    "use_live_tiled": ("use_live_tiled",),
+}
+#: T25D: personal-settings key of the caller for the current request (``None``: server settings).
+_SETTINGS_KEY: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("f2w_settings_key", default=None)
+
+
+@contextlib.contextmanager
+def settings_scope(key: Optional[str]):
+    """Run the enclosed service calls with ``key``'s effective settings (T25D)."""
+    token = _SETTINGS_KEY.set(key)
+    try:
+        yield
+    finally:
+        _SETTINGS_KEY.reset(token)
 
 
 @dataclass
@@ -2540,6 +2573,12 @@ class AgentPipelineService:
             tiled_uri=tiled_cfg.uri,
         )
         self.cfg.model = initial_model
+        # T25D: the server runtime holds the deployment defaults; ``self.runtime`` is the one the
+        # agents were built for (the same object on :local, a principal's copy during their ALS turn).
+        self.deployment_runtime = self.runtime
+        self._runtime_key: Optional[str] = None
+        #: Personal settings per ALS principal (``PersonalSettingsStore``); ``None`` on :local.
+        self.personal_settings: Optional[Any] = None
         self._rebuild_agents()
         if self.runtime.graph_source == "splash":
             self._sync_session_graph_from_splash()
@@ -2738,9 +2777,100 @@ class AgentPipelineService:
                 snap["tiled_error"] = last.get("error")
         return snap
 
-    async def apply_settings(self, update: AgentSettingsUpdate) -> AgentSettingsResponse:
-        """Apply a settings update and rebuild agents when backend or graph changes."""
+    def _effective_runtime(self, key: Optional[str]) -> RuntimeSettings:
+        """T25D: deployment defaults with ``key``'s saved personal fields on top."""
+        if key is None or self.personal_settings is None:
+            return self.deployment_runtime
+        saved = self.personal_settings.get(key)
+        personal = {name: saved[name] for name in PERSONAL_RUNTIME_FIELDS if name in saved}
+        base = dataclass_replace(self.deployment_runtime,
+                                 json_graph_paths=list(self.deployment_runtime.json_graph_paths))
+        return dataclass_replace(base, **personal)
+
+    async def _use_runtime(self, key: Optional[str]) -> None:
+        """T25D: make ``key``'s effective settings the active runtime (call under ``self.lock``).
+
+        A no-op on :local. Agents and the retrieval graphs are rebuilt only when the
+        effective settings differ from the ones they were built for.
+        """
+        target = self._effective_runtime(key)
+        if target is self.runtime:
+            self._runtime_key = key
+            return
+        if key is not None:
+            target = dataclass_replace(target, json_graph_paths=list(target.json_graph_paths))
+        changed = target != self.runtime
+        self.runtime = target
+        self._runtime_key = key
+        if not changed:
+            return
+        self.cfg.model = self.runtime.model
+        self._rebuild_agents()
+        await self._reload_active_graphs()
+
+    async def _reload_active_graphs(self) -> None:
+        """Reload retrieval graphs for the active runtime's graph selection."""
+        if self.runtime.graph_source == "json":
+            files = [str(resolved) for path in self._runtime_json_paths()
+                     if (resolved := self._try_resolve_runtime_json_graph_path(path)) is not None]
+            await self._reload_retrieval(str(self.graph_path()), graph_source="json", graph_files=files)
+        else:
+            path = str(self._session_graph_path())
+            await self._reload_retrieval(path, graph_source="splash", graph_files=[path])
+
+    @contextlib.contextmanager
+    def runtime_view(self, key: Optional[str]):
+        """T25D: read ``key``'s effective settings synchronously, without rebuilding agents.
+
+        For reads outside a turn (settings, graph view); the body must not ``await``.
+        """
+        if key is None or self.personal_settings is None or key == self._runtime_key:
+            yield
+            return
+        saved = self.runtime
+        view = self._effective_runtime(key)
+        self.runtime = dataclass_replace(view, json_graph_paths=list(view.json_graph_paths))
+        try:
+            yield
+        finally:
+            self.runtime = saved
+
+    def settings_response_for(self, key: Optional[str]) -> AgentSettingsResponse:
+        """T25D: the settings payload with ``key``'s effective settings (GET /settings)."""
+        with self.runtime_view(key):
+            return self.settings_response()
+
+    async def apply_settings_for(self, key: Optional[str], update: AgentSettingsUpdate) -> AgentSettingsResponse:
+        """T25D: apply an (already checked) update for ``key``; ``None`` updates the server settings.
+
+        On ALS deployment-wide fields go to the server runtime and personal fields to
+        ``key``'s own copy, which is persisted; other principals are unaffected.
+        """
+        if key is None or self.personal_settings is None:
+            return await self.apply_settings(update)
+        values = update.model_dump(exclude_none=True)
+        deployment = {k: v for k, v in values.items() if k in SETTINGS_DEPLOYMENT_FIELDS}
+        personal = {k: v for k, v in values.items() if k not in SETTINGS_DEPLOYMENT_FIELDS}
         async with self.lock:
+            if deployment:
+                await self._use_runtime(None)
+                await self.apply_settings(AgentSettingsUpdate(**deployment), locked=True)
+            await self._use_runtime(key)
+            if personal:
+                await self.apply_settings(AgentSettingsUpdate(**personal), locked=True)
+                touched = {name for field_name in personal for name in _UPDATE_TOUCHES.get(field_name, ())}
+                self.personal_settings.update(key, {
+                    name: getattr(self.runtime, name) for name in PERSONAL_RUNTIME_FIELDS if name in touched})
+            return self.settings_response()
+
+    async def apply_settings(self, update: AgentSettingsUpdate, *, locked: bool = False) -> AgentSettingsResponse:
+        """Apply a settings update and rebuild agents when backend or graph changes.
+
+        ``locked``: the caller already holds ``self.lock`` and chose the active runtime (T25D).
+        """
+        async with (contextlib.nullcontext() if locked else self.lock):
+            if not locked:
+                await self._use_runtime(None)
             backend_changed = False
             model_changed = False
             graph_changed = False
@@ -3516,14 +3646,17 @@ class AgentPipelineService:
 
     def _trace_env(self) -> Dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""
-        model = self._active_model()
-        retrieval_model = getattr(self.retrieval, "_model", None) or model
-        orchestrator_model = getattr(self.orchestrator, "_model", None) or model
-        paths = list(self.runtime.json_graph_paths or [])
+        key = _SETTINGS_KEY.get()
+        runtime = self.runtime if key == self._runtime_key else self._effective_runtime(key)
+        model = default_runtime_model(runtime.backend, runtime.model)
+        built = runtime is self.runtime  # T25D: agents not yet rebuilt for this caller otherwise
+        retrieval_model = (getattr(self.retrieval, "_model", None) if built else None) or model
+        orchestrator_model = (getattr(self.orchestrator, "_model", None) if built else None) or model
+        paths = list(runtime.json_graph_paths or [])
         enabled = tracing_enabled()
         return {
             "git_sha": git_sha() if enabled else None,
-            "backend": self.runtime.backend,
+            "backend": runtime.backend,
             "models": {
                 "chat": model,
                 "orchestrator": orchestrator_model,
@@ -3683,6 +3816,7 @@ class AgentPipelineService:
         original_question = question.strip()
         async with self.lock:
             self._activate_session(session_id)
+            await self._use_runtime(_SETTINGS_KEY.get())
             self._trace_prechecks(original_question)
             if self.pending:
                 pending_response = await self._handle_pending_message(original_question, emit=None)
@@ -3832,6 +3966,7 @@ class AgentPipelineService:
         original_question = question.strip()
         async with self.lock:
             self._activate_session(session_id)
+            await self._use_runtime(_SETTINGS_KEY.get())
             self._trace_prechecks(original_question)
             if self.pending:
                 pending_response = await self._handle_pending_message(original_question, emit=emit)
@@ -6005,6 +6140,7 @@ class AgentPipelineService:
         """Apply a yes/no pending decision without streaming progress."""
         async with self.lock:
             self._activate_session(session_id)
+            await self._use_runtime(_SETTINGS_KEY.get())
             return await self._act_locked(decision, kind, emit=None, candidate_index=candidate_index)
 
     async def act_with_progress(
@@ -6061,6 +6197,7 @@ class AgentPipelineService:
         """Apply a yes/no pending decision, emitting progress events."""
         async with self.lock:
             self._activate_session(session_id)
+            await self._use_runtime(_SETTINGS_KEY.get())
             return await self._act_locked(decision, kind, emit=emit, candidate_index=candidate_index)
 
     async def _act_locked(
@@ -6671,6 +6808,7 @@ def create_app(
         clock=clock,
     )
     service = AgentPipelineService(cfg)
+    service.personal_settings = guard.personal_settings  # T25D: None on :local
     guard.check_service(service)
     guard.install(app)
 
@@ -6705,17 +6843,23 @@ def create_app(
     @app.get("/settings", response_model=AgentSettingsResponse)
     async def get_settings(ctx: RequestContext = Depends(ui_context)) -> AgentSettingsResponse:
         """Return the current agent settings."""
-        return guard.project_settings(ctx, _model_to_jsonable(service.settings_response()))
+        payload = service.settings_response_for(guard.settings_key(ctx))
+        return guard.project_settings(ctx, _model_to_jsonable(payload))
 
     @app.put("/settings", response_model=AgentSettingsResponse)
     async def update_settings(
         req: AgentSettingsUpdate, request: Request, response: Response, ctx: RequestContext = Depends(ui_context),
     ) -> AgentSettingsResponse:
         """Apply a settings update and return the new settings."""
+        sent = req.model_dump(exclude_none=True)
         try:
             req, ignored = guard.settings_update(request, ctx, req)
+            key = guard.settings_key(ctx)
+            if key is not None:  # T25D: warn only about ignored values that differ from the server's
+                ignored = {name for name in ignored
+                           if sent.get(name) != getattr(service.deployment_runtime, name, None)}
             response.headers.update(guard.setting_warning_headers(ignored))
-            return guard.project_settings(ctx, _model_to_jsonable(await service.apply_settings(req)))
+            return guard.project_settings(ctx, _model_to_jsonable(await service.apply_settings_for(key, req)))
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -6744,7 +6888,9 @@ def create_app(
     @app.get("/graph", response_model=GraphPayload)
     async def graph(ctx: RequestContext = Depends(ui_context)) -> GraphPayload:
         """Return the current graph payload."""
-        return guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(service.graph_payload()))
+        with service.runtime_view(guard.settings_key(ctx)):
+            payload = service.graph_payload()
+        return guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(payload))
 
     @app.post("/graph/nodes/search", response_model=GraphNodeSearchResponse)
     async def search_graph_nodes(
@@ -6799,10 +6945,10 @@ def create_app(
         ctx: RequestContext = Depends(ui_context),
     ) -> GraphNode:
         """Return one graph node by id from Tiled or a JSON graph file."""
-        node = await _graph_node(node_id, json_graph_path)
+        node = await _graph_node(node_id, json_graph_path, guard.settings_key(ctx))
         return guard.project_route(ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(node))
 
-    async def _graph_node(node_id: str, json_graph_path: Optional[str]) -> GraphNode:
+    async def _graph_node(node_id: str, json_graph_path: Optional[str], key: Optional[str]) -> GraphNode:
         """Resolve one node; ``json_graph_path`` may be an opaque ``f2w://`` id (T18B)."""
         try:
             json_graph_path = guard.paths.decode(json_graph_path)
@@ -6816,7 +6962,8 @@ def create_app(
             node = _tiled_graph_node(node_id)
             if node is not None:
                 return node
-        graph_path = service.graph_path()
+        with service.runtime_view(key):
+            graph_path = service.graph_path()
         uploaded = bool(json_graph_path)
         if json_graph_path:
             graph_path = service._resolve_json_graph_path(json_graph_path)
@@ -6877,7 +7024,7 @@ def create_app(
         try:
             ctx = guard.chat_entry(request, ctx, req.session_id, req.client_turn_id)
             guard.claim_turn(ctx, req.client_turn_id)
-            with capture_turn() as sources:
+            with capture_turn() as sources, settings_scope(guard.settings_key(ctx)):
                 response = await service.ask(
                     req.message,
                     messages=req.messages,
@@ -6907,7 +7054,7 @@ def create_app(
         try:
             ctx = guard.chat_action_entry(request, ctx, req.decision, req.kind, req.session_id, req.client_turn_id)
             guard.claim_turn(ctx, req.client_turn_id)
-            with capture_turn() as sources:
+            with capture_turn() as sources, settings_scope(guard.settings_key(ctx)):
                 response = await service.act(
                     req.decision,
                     req.kind,
@@ -6951,9 +7098,11 @@ def create_app(
                                          "json_graph_paths": guard.paths.decode_all(req.json_graph_paths)})
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        settings_key = guard.settings_key(ctx)
 
         async def events():
             """Yield SSE progress events then the final chat result."""
+            _SETTINGS_KEY.set(settings_key)  # T25D: this generator's own context
             collector = open_turn(
                 client_turn_id=req.client_turn_id,
                 session_id=req.session_id,
@@ -7058,9 +7207,11 @@ def create_app(
             ctx = guard.chat_action_entry(request, ctx, req.decision, req.kind, req.session_id, req.client_turn_id)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        settings_key = guard.settings_key(ctx)
 
         async def events():
             """Yield SSE progress events then the final action result."""
+            _SETTINGS_KEY.set(settings_key)  # T25D: this generator's own context
             collector = open_turn(
                 client_turn_id=req.client_turn_id,
                 session_id=req.session_id,
