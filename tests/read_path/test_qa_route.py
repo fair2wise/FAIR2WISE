@@ -34,6 +34,7 @@ def test_route_setting_parses_and_defaults_to_supervisor():
 @pytest.fixture
 def graphs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("F2W_QA_ROUTE", raising=False)
     client = install_fake_inference(monkeypatch, QuestionKeyedClient())
     return client, [write_graph(tmp_path / "kg"),
                     write_graph(tmp_path / "kg", SECOND_KG, name="matkg_fixture_ops_v1.json")]
