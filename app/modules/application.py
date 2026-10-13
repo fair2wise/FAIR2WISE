@@ -64,8 +64,12 @@ class DelegatedOutcome:
         final_text: Content of the last AI message (the supervisor's reply).
         reads: One ``ReadOutcome`` per ``answer_from_knowledge`` call made this turn, in order.
         tool_results: Every tool result of this turn, in order.
-        interrupted: Whether the turn stopped at an approval interrupt.
+        interrupted: Whether the graph returned ``__interrupt__`` (some approval is open).
         stopped: Runtime stop code (budget/deadline), if the runtime stopped the turn.
+        open_approvals: Tool-call ids of approval requests still open on the thread (T02B).
+        blocked: The turn itself is waiting: it requested an approval this turn and has no
+            answer yet. ``interrupted and not blocked`` means "answered, an earlier approval
+            is still open": ``final_text`` and ``reads`` are this turn's answer.
     """
 
     thread_id: str
@@ -74,6 +78,13 @@ class DelegatedOutcome:
     tool_results: Tuple[ToolResult, ...]
     interrupted: bool = False
     stopped: Optional[str] = None
+    open_approvals: Tuple[str, ...] = ()
+    blocked: bool = False
+
+    @property
+    def answered(self) -> bool:
+        """The turn produced a final reply (an older approval may still be open)."""
+        return not self.blocked and self.stopped is None
 
     @property
     def evidence_ids(self) -> List[str]:
@@ -350,10 +361,17 @@ class F2WApplication:
             if result.tool == TOOL_NAME:
                 reads.append(outcome_from_ledger(result, self.ledger, pop=False))
         last_ai = next((m for m in reversed(turn) if isinstance(m, AIMessage)), None)
-        text = last_ai.content if last_ai is not None and isinstance(last_ai.content, str) else ""
         stopped = (last_ai.response_metadata or {}).get(RUNTIME_STOP_KEY) if last_ai is not None else None
+        open_ids = tuple(str(k) for k in (state.get("open_approvals") or {}))
+        turn_calls = {str(c.get("id")) for m in turn if isinstance(m, AIMessage)
+                      for c in (getattr(m, "tool_calls", None) or [])}
+        # Blocked: this turn's last model reply asked for tools and one of them awaits approval.
+        blocked = bool(state.get("__interrupt__")) and last_ai is not None and bool(last_ai.tool_calls) and bool(
+            turn_calls & set(open_ids))
+        text = "" if blocked or last_ai is None or not isinstance(last_ai.content, str) else last_ai.content
         return DelegatedOutcome(thread_id=scoped, final_text=text, reads=tuple(reads), tool_results=tuple(results),
-                                interrupted=bool(state.get("__interrupt__")), stopped=stopped)
+                                interrupted=bool(state.get("__interrupt__")), stopped=stopped,
+                                open_approvals=open_ids, blocked=blocked)
 
     async def answer_via_supervisor(
         self,

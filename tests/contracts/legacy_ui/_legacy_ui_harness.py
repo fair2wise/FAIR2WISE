@@ -429,7 +429,8 @@ class FakePlanner:
 RUNTIME_FIXTURE_DIR = FIXTURE_DIR / "runtime"
 
 
-def expected_response(fid: str, recorded: Dict[str, Any], environ: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+def expected_response(fid: str, recorded: Dict[str, Any],
+                      environ: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
     """The expected response of ``fid`` for the runtime mode in ``environ`` (H2 Q2, T03B).
 
     Default mode: the recorded ``http/<fid>.json`` response. ``F2W_RUNTIME=langgraph``:
