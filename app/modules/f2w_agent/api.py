@@ -38,6 +38,7 @@ from .orchestrator_agent import (
     _paper_reference_followup,
 )
 from .paper_evidence_agent import PaperEvidenceAgent, summarize_extracted_terms
+from .paper_evidence_agent import summarize_extracted_terms as _LEGACY_SUMMARIZE_EXTRACTED_TERMS
 from .trace import (
     append_annotation,
     append_ui_events,
@@ -93,8 +94,9 @@ from app.modules.tiled_graph import (
     tiled_neighborhood_ids,
 )
 from app.modules.project_config import config_value, get_config
-from app.modules.runtime_bridge.selection import attach_read_path
+from app.modules.runtime_bridge.selection import attach_read_path, attach_summary_path
 from app.api.legacy_ui import build_guard, ui_context, ui_optional_context
+from app.api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from app.modules.contracts.context import RequestContext
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
@@ -2543,6 +2545,8 @@ class AgentPipelineService:
             self._sync_session_graph_from_splash()
         # F2W_RUNTIME, read once at startup: None (default "legacy") keeps the path below unchanged.
         self._read_path = attach_read_path(self)
+        # H2: langgraph mode only, the extracted-term summary runs through lit_summarize_extracted_terms.
+        self._summary_path = attach_summary_path(self)
 
     @staticmethod
     def _session_key(session_id: Optional[str]) -> str:
@@ -3495,20 +3499,20 @@ class AgentPipelineService:
         )
         read_path = getattr(self, "_read_path", None)
         if read_path is not None:
-            return await read_path.query(
+            return note_retrieval(self.retrieval, await read_path.query(
                 question, history=history, source_rag=enabled, use_live_tiled=tiled_enabled
-            )
+            ))
         tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
         if callable(tiled_setter):
             tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
         query = self.retrieval.query
         try:
-            return await query(question, history=history, source_rag=enabled)
+            return note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled))
         except TypeError:
             try:
-                return await query(question, history=history)
+                return note_retrieval(self.retrieval, await query(question, history=history))
             except TypeError:
-                return await query(question)
+                return note_retrieval(self.retrieval, await query(question))
 
     def _trace_env(self) -> Dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""
@@ -4074,11 +4078,11 @@ class AgentPipelineService:
         if decision.get("action") != "query_extracted_paper":
             return None
         paper = state.get("active_paper") or {}
-        result = await self.paper_evidence.query(
+        result = note_paper_evidence(paper.get("path"), await self.paper_evidence.query(
             question,
             str(paper.get("path") or ""),
             str(self.coord.extraction_manifest),
-        )
+        ))
         phase = "paper_answered" if result.get("sufficient") else "paper_insufficient"
         self.workflow.update(phase=phase, last_route=decision)
         if self._last_orchestration:
@@ -4112,7 +4116,7 @@ class AgentPipelineService:
         if decision.get("action") != "report_extraction":
             return None
         paper = state.get("active_paper") or {}
-        result = summarize_extracted_terms(
+        result = self._summarize_extracted_terms(
             str(self.coord.session_terms),
             str(self.coord.extraction_manifest),
             str(paper.get("filename") or ""),
@@ -4130,6 +4134,16 @@ class AgentPipelineService:
             self.graph_path(),
             publications_override=[],
         )
+
+    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """``summarize_extracted_terms``, through the T19B Tool adapter in langgraph mode.
+
+        Default mode, or a replaced module-level ``summarize_extracted_terms``: that name, as before.
+        """
+        path = getattr(self, "_summary_path", None)
+        if path is not None and summarize_extracted_terms is _LEGACY_SUMMARIZE_EXTRACTED_TERMS:
+            return path.summarize_extracted_terms(*args, **kwargs)
+        return summarize_extracted_terms(*args, **kwargs)
 
     async def _handle_pending_message(
         self,
@@ -6376,7 +6390,7 @@ class AgentPipelineService:
             if isinstance(node, dict)
             and str(node.get("label") or node.get("name") or "").strip()
         ]
-        term_report = summarize_extracted_terms(
+        term_report = self._summarize_extracted_terms(
             str(self.coord.session_terms),
             str(self.coord.extraction_manifest),
             str(active_paper.get("filename") or ""),
@@ -6863,25 +6877,27 @@ def create_app(
         try:
             ctx = guard.chat_entry(request, ctx, req.session_id, req.client_turn_id)
             guard.claim_turn(ctx, req.client_turn_id)
-            response = await service.ask(
-                req.message,
-                messages=req.messages,
-                session_id=req.session_id,
-                graph_source=req.graph_source,
-                json_graph_path=guard.paths.decode(req.json_graph_path),
-                json_graph_paths=guard.paths.decode_all(req.json_graph_paths),
-                source_rag=req.source_rag,
-                use_live_tiled=req.use_live_tiled,
-                client_turn_id=req.client_turn_id,
-                ui_settings=req.ui_settings,
-                batch_id=req.batch_id,
-            )
+            with capture_turn() as sources:
+                response = await service.ask(
+                    req.message,
+                    messages=req.messages,
+                    session_id=req.session_id,
+                    graph_source=req.graph_source,
+                    json_graph_path=guard.paths.decode(req.json_graph_path),
+                    json_graph_paths=guard.paths.decode_all(req.json_graph_paths),
+                    source_rag=req.source_rag,
+                    use_live_tiled=req.use_live_tiled,
+                    client_turn_id=req.client_turn_id,
+                    ui_settings=req.ui_settings,
+                    batch_id=req.batch_id,
+                )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         guard.claim_turn(ctx, response.turn_id)
         payload = _model_to_jsonable(response)
         await _withhold_pending(ctx, req.session_id, payload)
-        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id)
+        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id,
+                                  sources=sources)
 
     @app.post("/chat/action", response_model=ChatResponse)
     async def chat_action(
@@ -6891,21 +6907,23 @@ def create_app(
         try:
             ctx = guard.chat_action_entry(request, ctx, req.decision, req.kind, req.session_id, req.client_turn_id)
             guard.claim_turn(ctx, req.client_turn_id)
-            response = await service.act(
-                req.decision,
-                req.kind,
-                candidate_index=req.candidate_index,
-                session_id=req.session_id,
-                client_turn_id=req.client_turn_id,
-                parent_turn_id=req.parent_turn_id,
-                ui_settings=req.ui_settings,
-            )
+            with capture_turn() as sources:
+                response = await service.act(
+                    req.decision,
+                    req.kind,
+                    candidate_index=req.candidate_index,
+                    session_id=req.session_id,
+                    client_turn_id=req.client_turn_id,
+                    parent_turn_id=req.parent_turn_id,
+                    ui_settings=req.ui_settings,
+                )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         guard.claim_turn(ctx, response.turn_id)
         payload = _model_to_jsonable(response)
         await _withhold_pending(ctx, req.session_id, payload)
-        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id)
+        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id,
+                                  sources=sources)
 
     @app.post("/publications/search", response_model=PublicationSearchResponse)
     async def publication_search(
@@ -7011,7 +7029,8 @@ def create_app(
                 finally:
                     await queue.put(None)
 
-            task = asyncio.create_task(run())
+            with capture_turn() as sources:  # the run() task inherits this turn's capture
+                task = asyncio.create_task(run())
             try:
                 while True:
                     item = await queue.get()
@@ -7019,7 +7038,7 @@ def create_app(
                         break
                     event, data = item
                     data = guard.project_sse(ctx, event, data, session_id=req.session_id,
-                                             turn_id=collector.turn_id)
+                                             turn_id=collector.turn_id, sources=sources)
                     if data is not None:
                         yield _sse(event, data)
             finally:
@@ -7114,7 +7133,8 @@ def create_app(
                 finally:
                     await queue.put(None)
 
-            task = asyncio.create_task(run())
+            with capture_turn() as sources:  # the run() task inherits this turn's capture
+                task = asyncio.create_task(run())
             try:
                 while True:
                     item = await queue.get()
@@ -7122,7 +7142,7 @@ def create_app(
                         break
                     event, data = item
                     data = guard.project_sse(ctx, event, data, session_id=req.session_id,
-                                             turn_id=collector.turn_id)
+                                             turn_id=collector.turn_id, sources=sources)
                     if data is not None:
                         yield _sse(event, data)
             finally:
