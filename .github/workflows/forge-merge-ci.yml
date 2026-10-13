@@ -110,8 +110,13 @@ jobs:
           import inspect
           from app.modules.f2w_agent import api
           from app.modules import kg_rag_api
-          sig = str(inspect.signature(api.create_app))
-          assert sig == "(cfg: 'CoordinatorConfig', *, cors_origins: 'Optional[List[str]]' = None) -> 'FastAPI'", sig
+          # Backward compatible: old callers create_app(cfg, cors_origins=...) still work;
+          # parameters added since the baseline are keyword-only with defaults.
+          params = list(inspect.signature(api.create_app).parameters.values())
+          assert params[0].name == "cfg" and params[0].kind is params[0].POSITIONAL_OR_KEYWORD, params
+          extra = {p.name: p for p in params[1:]}
+          assert extra["cors_origins"].kind is extra["cors_origins"].KEYWORD_ONLY and extra["cors_origins"].default is None
+          assert all(p.kind is p.KEYWORD_ONLY and p.default is not p.empty for p in extra.values()), params
           assert callable(api.run_api)
           assert str(inspect.signature(kg_rag_api.create_fastapi_app)).startswith("(graph_file: 'str'")
           print("legacy entrypoints ok")
