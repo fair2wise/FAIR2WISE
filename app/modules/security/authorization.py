@@ -562,7 +562,8 @@ ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("R02", _A, "GET", "/settings", "settings.personal",
        note="paths, tiled_uri, tiled_error need settings.global"),
     _p("R03", _A, "PUT", "/settings", "settings.personal",
-       note="settings_update_capabilities(fields, local=...); tiled_uri writable on :local only"),
+       note="settings_update_plan (T25D): personal fields per principal; deployment-wide "
+            "fields need settings.global (ignored for non-admins); tiled_uri writable on :local only"),
     _p("R04", _A, "POST", "/session/reset", "session.own", note="session.any for another principal's session"),
     _p("R05", _A, "DELETE", "/session/{session_id}", "session.own",
        note="session.any for another principal's session"),
@@ -640,7 +641,10 @@ SETTINGS_NOT_WRITABLE = frozenset({"tiled_uri"})
 def settings_update_capabilities(
         fields: Iterable[str], *, local: bool = False
 ) -> Tuple[FrozenSet[str], FrozenSet[str]]:
-    """Return ``(required capabilities, ignored fields)`` for a PUT /settings body.
+    """Return ``(required capabilities, ignored fields)`` to change these fields server-wide.
+
+    The legacy UI's PUT /settings uses :func:`settings_update_plan` since T25D (personal
+    fields per principal on ALS); this function keeps the server-wide rule.
 
     Unknown fields count as global (fail closed). ``tiled_uri`` is ignored on ALS and is
     a global setting on ``:local`` (``local`` must come from startup settings, never
@@ -652,6 +656,58 @@ def settings_update_capabilities(
     if names - ignored - SETTINGS_PERSONAL_FIELDS:
         caps.add("settings.global")
     return frozenset(caps), ignored
+
+
+#: T25D (owner Q4): fields stored per principal on ALS; each turn uses the caller's copy.
+#: Classification and reasons: docs/migration/authentication/settings_fields.md.
+SETTINGS_USER_FIELDS = frozenset({
+    "backend", "model", "provider", "graph_source", "json_graph_path", "json_graph_paths",
+    "selected_graph_ids", "kg_query_max_nodes", "kg_query_hops", "source_rag", "use_live_tiled",
+})
+#: T25D: fields that change the shared service; admin-only on ALS (``settings.global``).
+#: ``tiled_uri`` is also in :data:`SETTINGS_NOT_WRITABLE` (never writable on ALS).
+SETTINGS_DEPLOYMENT_FIELDS = frozenset({"workflow_mode", "extraction_mode", "targeted_max_pages", "tiled_uri"})
+
+
+@dataclass(frozen=True)
+class SettingsUpdatePlan:
+    """How one PUT /settings body is applied on a profile (T25D).
+
+    Attributes:
+        capabilities: Capabilities the caller must hold for the fields that are applied.
+        personal: Fields stored in the caller's personal settings (ALS) or applied (``:local``).
+        deployment: Deployment-wide fields applied to the server runtime.
+        ignored: Fields dropped with a ``setting_not_writable`` warning.
+    """
+
+    capabilities: FrozenSet[str]
+    personal: FrozenSet[str]
+    deployment: FrozenSet[str]
+    ignored: FrozenSet[str]
+
+
+def settings_update_plan(fields: Iterable[str], *, local: bool, admin: bool) -> SettingsUpdatePlan:
+    """Split a PUT /settings body into personal, deployment-wide and ignored fields (T25D).
+
+    On ``:local`` every field applies to the server runtime, as before (the operator's
+    settings are the server's). On ALS, personal fields go to the caller's own copy;
+    deployment-wide and unknown fields (fail closed) need ``settings.global`` and are
+    ignored, not refused, for a non-admin (``admin`` is the caller's current
+    ``settings.global``; the guard re-runs the role check before applying them);
+    ``tiled_uri`` is ignored for everyone.
+    """
+    names = frozenset(fields)
+    if local:
+        caps, _ = settings_update_capabilities(names, local=True)
+        return SettingsUpdatePlan(caps, names, frozenset(), frozenset())
+    personal = names & SETTINGS_USER_FIELDS
+    rest = names - personal
+    ignored = rest & SETTINGS_NOT_WRITABLE
+    deployment = rest - ignored
+    if not admin:
+        ignored, deployment = ignored | deployment, frozenset()
+    caps = {"settings.personal"} | ({"settings.global"} if deployment else set())
+    return SettingsUpdatePlan(frozenset(caps), personal, deployment, ignored)
 
 
 def chat_action_capabilities(decision: str, kind: Optional[str]) -> FrozenSet[str]:
