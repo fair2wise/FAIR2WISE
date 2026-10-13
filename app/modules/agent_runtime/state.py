@@ -14,13 +14,26 @@ the context of the resuming call, not by stored state.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, FrozenSet, List, Optional
+from typing import Any, Dict, FrozenSet, List, Mapping, Optional
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, NotRequired, TypedDict
 
 from app.modules.contracts import ContractError, ErrorCode, RequestContext
+
+
+def merge_open_approvals(
+    left: Optional[Mapping[str, Any]], right: Optional[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """Reducer for ``open_approvals``: merge by tool-call id; a ``None`` value closes that entry (T02B)."""
+    merged = dict(left or {})
+    for key, value in (right or {}).items():
+        if value is None:
+            merged.pop(key, None)
+        else:
+            merged[key] = value
+    return merged
 
 
 class LiteratureState(TypedDict):
@@ -30,14 +43,19 @@ class LiteratureState(TypedDict):
         messages: Conversation with ``add_messages`` semantics (append, or replace by id).
         owner: Opaque owner key of the thread (profile/issuer/subject/session), set on
             first use; a different owner is refused.
-        pending_approvals: Approval requests raised by the current step (plans pinned).
-        approvals: Approval records supplied on resume, keyed by tool-call id.
+        pending_approvals: Unused since T02B (kept so T02 checkpoints still load).
+        open_approvals: Approval requests still awaiting a decision, keyed by tool-call id
+            (T02B). Each pins the tool, arguments and exact plan, and carries an expiry. They
+            survive new turns on the thread until approved, declined or expired.
+        approvals: Decisions taken on resume, keyed by tool-call id (an ``ApprovalRecord``
+            JSON dict, or ``None`` for a decline), consumed by the apply step.
     """
 
     messages: Annotated[List[BaseMessage], add_messages]
     owner: NotRequired[str]
     pending_approvals: NotRequired[List[Dict[str, Any]]]
-    approvals: NotRequired[Dict[str, Dict[str, Any]]]
+    open_approvals: NotRequired[Annotated[Dict[str, Dict[str, Any]], merge_open_approvals]]
+    approvals: NotRequired[Dict[str, Optional[Dict[str, Any]]]]
 
 
 @dataclass(frozen=True)

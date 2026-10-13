@@ -91,6 +91,8 @@ class RuntimeLimits:
         retry_backoff_s: Base backoff; attempt ``n`` waits ``retry_backoff_s * 2**(n-1)``.
         stale_tool_result_chars: Stale tool output kept in model context (message trimming).
         recursion_limit: LangGraph recursion limit suggested to callers.
+        approval_request_ttl_s: How long an approval request stays open (seconds) before
+            it is refused as expired; ``None`` means no runtime expiry (T02B).
     """
 
     max_tool_calls: int = 12
@@ -101,6 +103,7 @@ class RuntimeLimits:
     retry_backoff_s: float = 0.5
     stale_tool_result_chars: int = 120_000
     recursion_limit: int = 64
+    approval_request_ttl_s: Optional[float] = 86_400.0
 
 
 @dataclass

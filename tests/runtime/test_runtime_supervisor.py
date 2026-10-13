@@ -249,16 +249,19 @@ def test_resume_after_restart_with_same_saver_and_thread():
     assert first_rec.calls == [] and len(rec.calls) == 1
 
 
-def test_new_message_while_awaiting_approval_repairs_the_pending_call():
+def test_new_message_while_awaiting_approval_keeps_the_request_open():
+    # T02B (owner Q8 option b) replaces the T02 behavior that repaired (dropped) the pending call.
     graph, model, rec = build([tool_call("kg_apply_plan", {"plan_id": "p1"}, "w1"),
-                               AIMessage(content="ok, not publishing")])
+                               AIMessage(content="here is the answer")])
     ctx = local_ctx()
     cfg = thread_config(ctx, "t1")
     graph.invoke(ask(), cfg, context=RunContext(ctx))
-    out = graph.invoke(ask("never mind"), cfg, context=RunContext(ctx))
-    assert out["messages"][-1].content == "ok, not publishing" and rec.calls == []
+    out = graph.invoke(ask("another question"), cfg, context=RunContext(ctx))
+    assert out["messages"][-1].content == "here is the answer" and rec.calls == []
+    assert out["__interrupt__"][0].value["requests"][0]["tool_call_id"] == "w1"
     sent = model.calls[-1]
-    assert all(not getattr(m, "tool_calls", None) for m in sent)  # no orphaned call reaches the provider
+    answered = {m.tool_call_id for m in sent if isinstance(m, ToolMessage)}
+    assert all(c["id"] in answered for m in sent for c in (getattr(m, "tool_calls", None) or []))
 
 
 # -- isolation -------------------------------------------------------------------------------
