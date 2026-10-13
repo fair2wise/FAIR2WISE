@@ -130,7 +130,8 @@ def test_query_scoped_omitted_note_is_not_read_as_the_total(tmp_path):
     assert (summary.term_count, summary.relevant_term_count, summary.displayed_term_count) == (4, 2, 1)
     assert summary.legacy_omitted_note_count == 1 and summary.omitted_term_count == 3
     assert summary.summary_text.endswith("- 1 additional terms omitted from this compact summary.")
-    assert summary.completeness == "partial" and "2 of 4 matched, capped at max_terms=1" in summary.completeness_reason
+    assert summary.completeness == "partial"
+    assert "2 of 4 matched, capped at max_terms=1" in summary.completeness_reason
     assert any("counts only query-matched records" in w for w in summary.warnings)
 
     nomatch = summarize_paper_terms(_scope(paths), max_terms=6, query="zzqx quokka").summary
