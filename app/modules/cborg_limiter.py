@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import AsyncIterator, Iterator, Optional
 
 try:
-    from app.modules.llm_admission import get_controller, shared_admission_enabled
+    from .llm_admission import get_controller, shared_admission_enabled
 except ImportError:  # pragma: no cover - legacy top-level import style (scripts/)
     from llm_admission import get_controller, shared_admission_enabled
 

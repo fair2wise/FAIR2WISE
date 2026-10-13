@@ -68,7 +68,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import get_runtime
 from langgraph.types import interrupt
 
-from app.modules.contracts import ApprovalRecord, ChangePlan, ContractError, ErrorCode, RequestContext, ToolStatus
+from ..contracts import ApprovalRecord, ChangePlan, ContractError, ErrorCode, RequestContext, ToolStatus
 
 from .admission import ensure_admission
 from .checkpointer import owner_key
@@ -116,7 +116,7 @@ def tool_definition(spec: Any) -> Dict[str, Any]:
 
 def ledger_from_messages(messages: List[BaseMessage]) -> TurnLedger:
     """Rebuild the current turn's ledger from tool-message artifacts (donor ``_already_called`` idea)."""
-    from app.modules.contracts import ToolResult
+    from ..contracts import ToolResult
 
     ledger = TurnLedger()
     for message in messages[current_turn_start(messages):]:

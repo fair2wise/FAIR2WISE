@@ -20,7 +20,7 @@ from academy.manager import Manager
 from dotenv import load_dotenv
 from globus_compute_sdk import Executor as GlobusComputeExecutor
 
-from app.modules.term_extractor.academy_agent import TermExtractorAgent
+from ..term_extractor.academy_agent import TermExtractorAgent
 
 load_dotenv()
 

@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, Tuple
 
-from app.modules.agent_runtime.registry import ToolRegistry, ToolRegistryError
-from app.modules.agent_runtime.skills import Skill, SkillRegistry
-from app.modules.contracts import CostClass, Effect, RequestContext, ToolResult, ToolSpec, ToolStatus
+from ..agent_runtime.registry import ToolRegistry, ToolRegistryError
+from ..agent_runtime.skills import Skill, SkillRegistry
+from ..contracts import CostClass, Effect, RequestContext, ToolResult, ToolSpec, ToolStatus
 
 DEMO_LITERATURE = "demo_literature"
 KNOWN_GROUPS = frozenset({DEMO_LITERATURE})

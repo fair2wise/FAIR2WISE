@@ -26,7 +26,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
-from app.modules.contracts import CAPABILITIES, RequestContext, ToolSpec
+from ..contracts import CAPABILITIES, RequestContext, ToolSpec
 
 #: Domains a literature runtime may register. Experimental FORGE domains are absent.
 LITERATURE_DOMAINS: FrozenSet[str] = frozenset({

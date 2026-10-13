@@ -57,9 +57,9 @@ from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Option
 
 from pydantic import BaseModel, ConfigDict
 
-from app.modules.agent_runtime.executor import is_control_flow
-from app.modules.agent_runtime.skills import Skill
-from app.modules.contracts import (
+from ..agent_runtime.executor import is_control_flow
+from ..agent_runtime.skills import Skill
+from ..contracts import (
     ContractError,
     CostClass,
     Effect,
@@ -72,7 +72,7 @@ from app.modules.contracts import (
     ToolSpec,
     ToolStatus,
 )
-from app.modules.runtime_bridge.qa_tool import CITATION_TOKEN_RE
+from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
 
 TOOL_NAME = "lit_summarize_extracted_terms"
 OPERATION_VERSION = "1.0.0"
@@ -304,7 +304,7 @@ def _completeness(mode: str, total: int, relevant: int, shown: int, max_terms: i
 
 
 def _extraction_state(scope: PaperScope) -> Optional[str]:
-    from app.modules.f2w_agent.paper_evidence_agent import _manifest_entry
+    from ..f2w_agent.paper_evidence_agent import _manifest_entry
 
     try:
         value = _manifest_entry(Path(scope.manifest_path), scope.filename).get("extraction_state")
@@ -360,7 +360,7 @@ def summarize_paper_terms(
     Arguments are passed through unchanged (the defaults equal the wrapped
     function's). Exceptions the wrapped function raises propagate unchanged.
     """
-    from app.modules.f2w_agent.paper_evidence_agent import summarize_extracted_terms
+    from ..f2w_agent.paper_evidence_agent import summarize_extracted_terms
 
     legacy = summarize_extracted_terms(
         scope.terms_path, scope.manifest_path, scope.filename, max_terms=max_terms, query=query,

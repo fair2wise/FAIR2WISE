@@ -15,10 +15,10 @@ from __future__ import annotations
 
 from typing import Any, Tuple
 
-from app.modules.agent_runtime.registry import ToolRegistry
-from app.modules.agent_runtime.skills import Skill, SkillRegistry
-from app.modules.tools.bootstrap import build_registry, build_skill_registry
-from app.modules.operations.papers import SUMMARIZE_LITERATURE_SKILL, TOOL_NAME as SUMMARY_TOOL_NAME
+from ..agent_runtime.registry import ToolRegistry
+from ..agent_runtime.skills import Skill, SkillRegistry
+from ..tools.bootstrap import build_registry, build_skill_registry
+from ..operations.papers import SUMMARIZE_LITERATURE_SKILL, TOOL_NAME as SUMMARY_TOOL_NAME
 
 from .qa_tool import ANSWER_FROM_KNOWLEDGE, TOOL_NAME, LegacyResultLedger, make_answer_tool
 

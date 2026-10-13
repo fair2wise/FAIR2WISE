@@ -44,8 +44,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, FrozenSet, Iterator, List, Mapping, Optional, Sequence, Tuple
 
-from app.modules.contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
-from app.modules.security.authorization import DeploymentSettings, local_operator_context, resolve_context
+from .contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
+from .security.authorization import DeploymentSettings, local_operator_context, resolve_context
 
 
 logger = logging.getLogger(__name__)
@@ -152,16 +152,16 @@ class F2WApplication:
         name: str = "f2w",
         ledger_size: int = 256,
     ) -> None:
-        from app.modules.agent_runtime.executor import RuntimeLimits, ToolExecutor
-        from app.modules.agent_runtime.policies import InMemoryEventSink
-        from app.modules.llm_admission import ProviderAdmission
-        from app.modules.runtime_bridge.bootstrap import (
+        from .agent_runtime.executor import RuntimeLimits, ToolExecutor
+        from .agent_runtime.policies import InMemoryEventSink
+        from .llm_admission import ProviderAdmission
+        from .runtime_bridge.bootstrap import (
             QA_DELEGATION_PROMPT,
             build_read_registry,
             build_read_skills,
         )
-        from app.modules.runtime_bridge.qa_route import PinnedArgsService
-        from app.modules.runtime_bridge.qa_tool import LegacyResultLedger
+        from .runtime_bridge.qa_route import PinnedArgsService
+        from .runtime_bridge.qa_tool import LegacyResultLedger
 
         if not isinstance(settings, DeploymentSettings):
             raise TypeError("settings must be a validated DeploymentSettings")
@@ -186,7 +186,7 @@ class F2WApplication:
         self.supervisor = None
         if chat_model is not None:
             self._saver = self._open_checkpointer(checkpointer)
-            from app.modules.agent_runtime.supervisor import build_literature_supervisor
+            from .agent_runtime.supervisor import build_literature_supervisor
 
             self.supervisor = build_literature_supervisor(
                 registry=self.registry, chat_model=chat_model, checkpointer=self._saver,
@@ -198,7 +198,7 @@ class F2WApplication:
     # -- lifecycle ----------------------------------------------------------------
 
     def _open_checkpointer(self, checkpointer: Any) -> Any:
-        from app.modules.agent_runtime.checkpointer import ManagedCheckpointer
+        from .agent_runtime.checkpointer import ManagedCheckpointer
 
         if checkpointer is None:
             self._owned_checkpointer = self._managed = ManagedCheckpointer()
@@ -278,7 +278,7 @@ class F2WApplication:
         ``ReadOutcome``: ``.result`` is the typed ``ToolResult``; ``.to_legacy()``
         returns the unchanged legacy verdict (or re-raises the original error).
         """
-        from app.modules.runtime_bridge.qa_tool import TOOL_NAME, outcome_from_ledger
+        from .runtime_bridge.qa_tool import TOOL_NAME, outcome_from_ledger
 
         outcome = await self.executor.aexecute_call(
             ctx, TOOL_NAME, self._read_args(question, history, source_rag, use_live_tiled))
@@ -306,7 +306,7 @@ class F2WApplication:
         return self.supervisor
 
     def _config(self, ctx: RequestContext, thread_id: str) -> Dict[str, Any]:
-        from app.modules.agent_runtime.checkpointer import thread_config
+        from .agent_runtime.checkpointer import thread_config
 
         return thread_config(ctx, thread_id, recursion_limit=self.limits.recursion_limit)
 
@@ -331,7 +331,7 @@ class F2WApplication:
         """
         from langchain_core.messages import HumanMessage
 
-        from app.modules.agent_runtime.state import RunContext
+        from .agent_runtime.state import RunContext
 
         graph = self._require_supervisor()
         config = self._config(ctx, thread_id)
@@ -344,9 +344,9 @@ class F2WApplication:
     def _delegated_outcome(self, scoped: str, state: Mapping[str, Any]) -> DelegatedOutcome:
         from langchain_core.messages import AIMessage
 
-        from app.modules.agent_runtime.message_trimming import current_turn_start
-        from app.modules.agent_runtime.supervisor import RUNTIME_STOP_KEY
-        from app.modules.runtime_bridge.qa_tool import TOOL_NAME, outcome_from_ledger
+        from .agent_runtime.message_trimming import current_turn_start
+        from .agent_runtime.supervisor import RUNTIME_STOP_KEY
+        from .runtime_bridge.qa_tool import TOOL_NAME, outcome_from_ledger
 
         messages = list(state.get("messages") or [])
         turn = messages[current_turn_start(messages):]
@@ -393,7 +393,7 @@ class F2WApplication:
         the direct call answers instead (``fallback`` says why). The one-turn thread is
         deleted afterwards unless ``keep_thread``.
         """
-        from app.modules.runtime_bridge.qa_route import pin_args, unpin_args
+        from .runtime_bridge.qa_route import pin_args, unpin_args
 
         self._require_supervisor()
         args = self._read_args(question, history, source_rag, use_live_tiled)

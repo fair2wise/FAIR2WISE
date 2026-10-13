@@ -20,7 +20,7 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import Annotated, NotRequired, TypedDict
 
-from app.modules.contracts import ContractError, ErrorCode, RequestContext
+from ..contracts import ContractError, ErrorCode, RequestContext
 
 
 def merge_open_approvals(

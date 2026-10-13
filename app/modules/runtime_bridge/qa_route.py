@@ -127,7 +127,7 @@ def _content(message: Any) -> str:
 
 def _record(model: Any, messages: Sequence[Any], reply: Any, started: float,
             error: Optional[BaseException]) -> None:
-    from app.modules.f2w_agent.trace import record_llm_call
+    from ..f2w_agent.trace import record_llm_call
 
     record_llm_call(
         label=PLANNING_LABEL,
@@ -214,7 +214,7 @@ def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
         if key not in cache:
             from types import SimpleNamespace
 
-            from app.modules.term_extractor.orchestrator import Orchestrator
+            from ..term_extractor.orchestrator import Orchestrator
 
             cfg = getattr(pipeline, "cfg", None)
             spec = SimpleNamespace(

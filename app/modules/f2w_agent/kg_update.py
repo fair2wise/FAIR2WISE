@@ -103,7 +103,7 @@ def _wipe_splash_via_graphql(splash_uri: str, *, page_size: int = 500) -> int:
 
 def rebuild_kg(terms_json: str, kg_json: str) -> Dict[str, Any]:
     """Convert ``terms_json`` to MatKG ``kg_json`` (keeps provenance + snippets)."""
-    from app.modules.json2kg import convert_terms_to_graph
+    from ..json2kg import convert_terms_to_graph
 
     out = Path(kg_json)
     out.parent.mkdir(parents=True, exist_ok=True)

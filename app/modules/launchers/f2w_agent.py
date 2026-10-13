@@ -8,7 +8,7 @@ Examples:
 
 import sys
 
-from app.modules.f2w_agent.cli import main
+from ..f2w_agent.cli import main
 
 if __name__ == "__main__":
     sys.exit(main())

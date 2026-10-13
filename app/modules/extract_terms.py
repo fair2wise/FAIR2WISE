@@ -25,11 +25,11 @@ from rapidfuzz import process, fuzz  # still used by SchemaHelper for class/slot
 # Allow `python3 app/modules/extract_terms.py ...` from repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from modules.agents.chebi import ChebiOboLookup
-from modules.agents.chem_checker import ChemicalFormulaValidator
-from modules.agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
-from modules.cborg_http import openai_http_kwargs, require_cborg_api_key
-from modules.term_extractor.merge_index import (
+from .agents.chebi import ChebiOboLookup
+from .agents.chem_checker import ChemicalFormulaValidator
+from .agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
+from .cborg_http import openai_http_kwargs, require_cborg_api_key
+from .term_extractor.merge_index import (
     DEFAULT_EMBED_MODEL,
     DEFAULT_MERGE_TOP_K,
     TermMergeIndex,
@@ -95,8 +95,8 @@ class CBorgChatClient(ChatClient):
         """Send a prompt to CBORG and return the response text."""
         # Shared admission (H1-3): this client bypassed the CBORG cap before; it joins
         # it only when F2W_SHARED_ADMISSION is on, so legacy behavior is unchanged.
-        from app.modules.cborg_limiter import sync_slot
-        from app.modules.llm_admission import shared_admission_enabled
+        from .cborg_limiter import sync_slot
+        from .llm_admission import shared_admission_enabled
 
         with sync_slot(enabled=shared_admission_enabled()):
             return self._chat_unadmitted(prompt, temperature=temperature, timeout=timeout)
@@ -110,7 +110,7 @@ class CBorgChatClient(ChatClient):
             timeout=timeout,
             stream=True,
         )
-        from app.modules.cborg_http import collect_stream_text
+        from .cborg_http import collect_stream_text
 
         return collect_stream_text(resp)
 

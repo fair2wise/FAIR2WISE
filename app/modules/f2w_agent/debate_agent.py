@@ -180,7 +180,7 @@ class EvidenceDebateAgent(Agent):
         round_no: int,
     ) -> Dict[str, Any]:
         """Ask the chat model for a JSON action, falling back to heuristics."""
-        from app.modules.term_extractor.clients import make_chat_client
+        from ..term_extractor.clients import make_chat_client
 
         cli = make_chat_client(
             backend=self._backend,
@@ -253,14 +253,14 @@ class EvidenceDebateAgent(Agent):
         candidates = candidates or []
         loop = asyncio.get_event_loop()
         try:
-            from app.modules.f2w_agent.trace import bind_context, note_error
+            from .trace import bind_context, note_error
 
             return await loop.run_in_executor(
                 None,
                 bind_context(lambda: self._llm_decide(question, retrieval_probe, candidates, round_no)),
             )
         except Exception as exc:
-            from app.modules.f2w_agent.trace import note_error
+            from .trace import note_error
 
             logger.warning("Evidence debate LLM failed (%s); using heuristic decision", exc)
             note_error("EvidenceDebateAgent.decide", exc)

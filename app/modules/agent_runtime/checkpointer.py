@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, Literal, Optional
 
-from app.modules.contracts import RequestContext
+from ..contracts import RequestContext
 
 
 @dataclass(frozen=True)

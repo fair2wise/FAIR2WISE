@@ -48,8 +48,8 @@ import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
 
-from app.modules.contracts.evidence import SourceLocator
-from app.modules.security.disclosure import SourceRef
+from ..modules.contracts.evidence import SourceLocator
+from ..modules.security.disclosure import SourceRef
 
 logger = logging.getLogger(__name__)
 

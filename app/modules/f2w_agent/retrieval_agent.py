@@ -18,16 +18,16 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from academy.agent import Agent, action
 
-from app.modules import kg_rag_api as krag
-from app.modules.hybrid_rag.pipeline import HybridSourceRAG, hybrid_rag_enabled
-from app.modules.tiled_graph import (
+from .. import kg_rag_api as krag
+from ..hybrid_rag.pipeline import HybridSourceRAG, hybrid_rag_enabled
+from ..tiled_graph import (
     TILED_GRAPH_ID,
     is_experiment_identity_question,
     load_tiled_config,
     lookup_experiment_identity,
 )
-from app.modules.f2w_agent.materials_project import lookup_materials_project
-from app.modules.f2w_agent.multi_kg import (
+from .materials_project import lookup_materials_project
+from .multi_kg import (
     DEFAULT_KG_QUERY_HOPS,
     DEFAULT_KG_QUERY_MAX_NODES,
     ScoredHit,
@@ -41,12 +41,12 @@ from app.modules.f2w_agent.multi_kg import (
     schema_path_for_graph,
     unique_graph_paths,
 )
-from app.modules.f2w_agent.prompts import (
+from .prompts import (
     JUDGE_SYSTEM,
     LAYOUT_LEEWAY_SYSTEM,
     LEEWAY_SYSTEM,
 )
-from app.modules.f2w_agent.trace import bind_context, note_error, record_retrieval
+from .trace import bind_context, note_error, record_retrieval
 
 logger = logging.getLogger(__name__)
 

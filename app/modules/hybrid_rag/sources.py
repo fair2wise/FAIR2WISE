@@ -181,7 +181,7 @@ def collect_ops_docs(*, root: Optional[Path] = None) -> List[Dict[str, Any]]:
         )
 
     try:
-        from app.modules.bl1101_ingest import REPO_SPECS
+        from ..bl1101_ingest import REPO_SPECS
     except Exception:
         REPO_SPECS = ()
 

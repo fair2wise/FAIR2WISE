@@ -50,8 +50,8 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from app.modules.agent_runtime.executor import is_control_flow
-from app.modules.contracts import (
+from ..agent_runtime.executor import is_control_flow
+from ..contracts import (
     ContractError,
     CostClass,
     Effect,

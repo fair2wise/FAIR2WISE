@@ -66,17 +66,17 @@ else:
     torch = None  # type: ignore[assignment]
 
 try:
-    from app.modules.project_config import config_value
+    from .project_config import config_value
 except ImportError:  # pragma: no cover - direct script execution fallback
     from project_config import config_value
 
 try:
-    from app.modules.cborg_limiter import async_slot
+    from .cborg_limiter import async_slot
 except ImportError:  # pragma: no cover - direct script execution fallback
     from cborg_limiter import async_slot
 
 try:
-    from app.modules.cborg_http import openai_http_kwargs, require_cborg_api_key
+    from .cborg_http import openai_http_kwargs, require_cborg_api_key
 except ImportError:  # pragma: no cover - direct script execution fallback
     from cborg_http import openai_http_kwargs, require_cborg_api_key
 
@@ -1453,7 +1453,7 @@ class CBorgClient:
 
     async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
         """Send messages to CBORG and return the assistant response."""
-        from app.modules.cborg_http import collect_stream_text_async
+        from .cborg_http import collect_stream_text_async
 
         try:
             async with async_slot():
@@ -1595,7 +1595,7 @@ def build_rag_prompt(q: str, ctx: str) -> str:
 
 async def call_llm(cli: ChatClient, messages: Sequence[Dict[str, str]], label: str) -> str:
     """Call the LLM with timeout handling, printing status to stdout."""
-    from app.modules.f2w_agent.trace import record_llm_call
+    from .f2w_agent.trace import record_llm_call
 
     print(
         Fore.YELLOW
