@@ -5,10 +5,10 @@ retrieval service and ledger, gets a fresh frozen ``ToolRegistry``, then
 :func:`build_read_skills` for the matching frozen ``SkillRegistry``. Nothing here
 runs at import, and nothing is shared between instances.
 
-``summarize_extracted_terms`` (paper_evidence_agent.py, B07/QA-44) is not
-wrapped here: it takes server file paths (terms JSON, manifest) and is scoped to
-the session's active extracted paper, so exposing it as a tool needs the T21A
-source-boundary/active-paper state design. It is left for T19B.
+``summarize_extracted_terms`` (paper_evidence_agent.py, B07/QA-44) is wrapped
+by T19B as ``lit_summarize_extracted_terms`` (``app.modules.operations.papers``).
+It is registered only when the caller passes ``paper_summary`` (it needs a
+server-side active-paper resolver), so the default read registry is unchanged.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from typing import Any, Tuple
 from app.modules.agent_runtime.registry import ToolRegistry
 from app.modules.agent_runtime.skills import Skill, SkillRegistry
 from app.modules.tools.bootstrap import build_registry, build_skill_registry
+from app.modules.operations.papers import SUMMARIZE_LITERATURE_SKILL, TOOL_NAME as SUMMARY_TOOL_NAME
 
 from .qa_tool import ANSWER_FROM_KNOWLEDGE, TOOL_NAME, LegacyResultLedger, make_answer_tool
 
@@ -51,18 +52,23 @@ QA_DELEGATION_PROMPT = (
 
 def build_read_registry(
     service: Any, ledger: LegacyResultLedger, *, name: str = "f2w", freeze: bool = True,
+    paper_summary: Any = None,
 ) -> ToolRegistry:
     """Fresh registry holding ``answer_from_knowledge`` bound to ``service`` and ``ledger``.
 
-    The T02 demo tools are not included.
+    The T02 demo tools are not included. ``paper_summary`` (an
+    ``operations.papers.PaperSummaryTool``) opts in the T19B ``lit_summarize_extracted_terms`` tool.
     """
-    return build_registry(None, include=(), extra=[(ANSWER_FROM_KNOWLEDGE, make_answer_tool(service, ledger))],
-                          name=name, freeze=freeze)
+    extra = [(ANSWER_FROM_KNOWLEDGE, make_answer_tool(service, ledger))]
+    if paper_summary is not None:  # T19B: explicit registration; absent unless the caller passes it
+        extra.append(paper_summary.registration())
+    return build_registry(None, include=(), extra=extra, name=name, freeze=freeze)
 
 
 def build_read_skills(registry: ToolRegistry) -> SkillRegistry:
     """Frozen skills over ``registry`` with full tool coverage."""
-    return build_skill_registry(registry, skills=[ANSWER_SKILL], require_coverage=True)
+    skills = [ANSWER_SKILL, *([SUMMARIZE_LITERATURE_SKILL] if SUMMARY_TOOL_NAME in registry else [])]
+    return build_skill_registry(registry, skills=skills, require_coverage=True)
 
 
 __all__: Tuple[str, ...] = ("ANSWER_SKILL", "QA_DELEGATION_PROMPT", "build_read_registry", "build_read_skills")

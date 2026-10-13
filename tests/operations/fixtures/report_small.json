@@ -1,0 +1,46 @@
+{
+  "question": "Summarize the terms you extracted from the paper: Synthetic study of resonant scattering contrast?",
+  "sse_raw": "event: progress\ndata: {\"phase\": \"turn_started\", \"message\": \"Turn started\", \"turn_id\": \"t19b-turn-stream\"}\n\nevent: progress\ndata: {\"phase\": \"orchestrator_decision\", \"message\": \"Orchestrator selected report_extraction via WorkflowOrchestratorAgent\", \"turn_id\": \"t19b-turn-stream\", \"action\": \"report_extraction\", \"agent\": \"WorkflowOrchestratorAgent\", \"reason\": \"The turn asks for terms produced by the active paper extraction.\", \"state\": \"paper_insufficient\", \"classification\": null}\n\nevent: complete\ndata: {\"status\": \"extraction_reported\", \"answer\": \"Extracted 2 page-grounded terms; key terms:\\n- **Resonant contrast** (Concept): Synthetic contrast mechanism. [PDF: synthetic_paper.pdf p.2]\\n- **Detector geometry** (Equipment): Synthetic setup. [PDF: synthetic_paper.pdf p.3]\", \"sufficient\": true, \"node_ids\": [], \"publications\": [], \"confidence\": 0.35, \"rounds\": [{\"extraction_report\": {\"status\": \"success\", \"sufficient\": true, \"answer\": \"Extracted 2 page-grounded terms; key terms:\\n- **Resonant contrast** (Concept): Synthetic contrast mechanism. [PDF: synthetic_paper.pdf p.2]\\n- **Detector geometry** (Equipment): Synthetic setup. [PDF: synthetic_paper.pdf p.3]\", \"used_pages\": [2, 3], \"missing_topics\": [], \"term_count\": 2, \"relevant_term_count\": 2, \"displayed_term_count\": 2, \"relevance_mode\": \"all_terms\"}}], \"graph\": {\"nodes\": [], \"edges\": [], \"source_path\": \"query:<WORKSPACE>/storage/kg/matkg_contract_v1.json\"}, \"graph_source_requested\": null, \"graph_source_used\": null, \"workdir\": \"<WORKSPACE>/run\", \"pending\": null, \"orchestration\": {\"action\": \"report_extraction\", \"agent\": \"WorkflowOrchestratorAgent\", \"reason\": \"The turn asks for terms produced by the active paper extraction.\", \"state\": \"paper_answered\"}, \"turn_id\": \"t19b-turn-stream\"}\n\n",
+  "json": {
+    "status": "extraction_reported",
+    "answer": "Extracted 2 page-grounded terms; key terms:\n- **Resonant contrast** (Concept): Synthetic contrast mechanism. [PDF: synthetic_paper.pdf p.2]\n- **Detector geometry** (Equipment): Synthetic setup. [PDF: synthetic_paper.pdf p.3]",
+    "sufficient": true,
+    "node_ids": [],
+    "publications": [],
+    "confidence": 0.35,
+    "rounds": [
+      {
+        "extraction_report": {
+          "status": "success",
+          "sufficient": true,
+          "answer": "Extracted 2 page-grounded terms; key terms:\n- **Resonant contrast** (Concept): Synthetic contrast mechanism. [PDF: synthetic_paper.pdf p.2]\n- **Detector geometry** (Equipment): Synthetic setup. [PDF: synthetic_paper.pdf p.3]",
+          "used_pages": [
+            2,
+            3
+          ],
+          "missing_topics": [],
+          "term_count": 2,
+          "relevant_term_count": 2,
+          "displayed_term_count": 2,
+          "relevance_mode": "all_terms"
+        }
+      }
+    ],
+    "graph": {
+      "nodes": [],
+      "edges": [],
+      "source_path": "query:<WORKSPACE>/storage/kg/matkg_contract_v1.json"
+    },
+    "graph_source_requested": null,
+    "graph_source_used": null,
+    "workdir": "<WORKSPACE>/run",
+    "pending": null,
+    "orchestration": {
+      "action": "report_extraction",
+      "agent": "WorkflowOrchestratorAgent",
+      "reason": "The turn asks for terms produced by the active paper extraction.",
+      "state": "paper_answered"
+    },
+    "turn_id": "t19b-turn-json"
+  }
+}
