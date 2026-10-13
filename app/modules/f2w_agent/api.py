@@ -38,6 +38,7 @@ from .orchestrator_agent import (
     _paper_reference_followup,
 )
 from .paper_evidence_agent import PaperEvidenceAgent, summarize_extracted_terms
+from .paper_evidence_agent import summarize_extracted_terms as _LEGACY_SUMMARIZE_EXTRACTED_TERMS
 from .trace import (
     append_annotation,
     append_ui_events,
@@ -93,7 +94,7 @@ from app.modules.tiled_graph import (
     tiled_neighborhood_ids,
 )
 from app.modules.project_config import config_value, get_config
-from app.modules.runtime_bridge.selection import attach_read_path
+from app.modules.runtime_bridge.selection import attach_read_path, attach_summary_path
 from app.api.legacy_ui import build_guard, ui_context, ui_optional_context
 from app.api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from app.modules.contracts.context import RequestContext
@@ -2544,6 +2545,8 @@ class AgentPipelineService:
             self._sync_session_graph_from_splash()
         # F2W_RUNTIME, read once at startup: None (default "legacy") keeps the path below unchanged.
         self._read_path = attach_read_path(self)
+        # H2: langgraph mode only, the extracted-term summary runs through lit_summarize_extracted_terms.
+        self._summary_path = attach_summary_path(self)
 
     @staticmethod
     def _session_key(session_id: Optional[str]) -> str:
@@ -4113,7 +4116,7 @@ class AgentPipelineService:
         if decision.get("action") != "report_extraction":
             return None
         paper = state.get("active_paper") or {}
-        result = summarize_extracted_terms(
+        result = self._summarize_extracted_terms(
             str(self.coord.session_terms),
             str(self.coord.extraction_manifest),
             str(paper.get("filename") or ""),
@@ -4131,6 +4134,16 @@ class AgentPipelineService:
             self.graph_path(),
             publications_override=[],
         )
+
+    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """``summarize_extracted_terms``, through the T19B Tool adapter in langgraph mode.
+
+        Default mode, or a replaced module-level ``summarize_extracted_terms``: that name, as before.
+        """
+        path = getattr(self, "_summary_path", None)
+        if path is not None and summarize_extracted_terms is _LEGACY_SUMMARIZE_EXTRACTED_TERMS:
+            return path.summarize_extracted_terms(*args, **kwargs)
+        return summarize_extracted_terms(*args, **kwargs)
 
     async def _handle_pending_message(
         self,
@@ -6377,7 +6390,7 @@ class AgentPipelineService:
             if isinstance(node, dict)
             and str(node.get("label") or node.get("name") or "").strip()
         ]
-        term_report = summarize_extracted_terms(
+        term_report = self._summarize_extracted_terms(
             str(self.coord.session_terms),
             str(self.coord.extraction_manifest),
             str(active_paper.get("filename") or ""),

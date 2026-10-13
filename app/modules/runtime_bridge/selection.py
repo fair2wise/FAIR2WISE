@@ -28,4 +28,22 @@ def attach_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None)
     return build_legacy_read_path(pipeline, environ)
 
 
-__all__ = ("attach_read_path",)
+def attach_summary_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> Optional[Any]:
+    """Return the langgraph-mode ``LegacySummaryPath`` for ``pipeline``, or ``None`` in legacy mode (H2).
+
+    Called once from ``AgentPipelineService.__init__`` beside :func:`attach_read_path`. The
+    adapter's executor registry holds ``lit_summarize_extracted_terms`` (T19B opt-in
+    registration, ``build_read_registry(paper_summary=...)``); the adapter keeps its documented
+    fallback for arguments outside the Tool's bounds.
+
+    Raises:
+        RuntimeConfigError: Invalid ``F2W_RUNTIME``, or langgraph mode on a non-local profile.
+    """
+    if runtime_mode(environ) is RuntimeMode.LEGACY:
+        return None
+    from app.modules.operations.summary_compat import build_legacy_summary_path
+
+    return build_legacy_summary_path(pipeline, environ)
+
+
+__all__ = ("attach_read_path", "attach_summary_path")
