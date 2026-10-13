@@ -114,7 +114,7 @@ def test_four_paths_agree_on_evidence_and_graph_ids(graphs, tmp_path, monkeypatc
 
     # Same retrieval service instance for direct and delegated calls (2 per question).
     tool_fn = app.registry.get("answer_from_knowledge").fn
-    assert tool_fn.service is app.retrieval is service
+    assert tool_fn.service.inner is app.retrieval is service
     assert service.calls == 2 * len(QUESTIONS)
     assert spy.questions == [q for q in QUESTIONS for _ in range(2)]
 

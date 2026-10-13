@@ -105,7 +105,7 @@ def test_frozen_extraction_flow_reaches_the_summary_through_the_tool(frozen_repl
 
 @pytest.mark.parametrize("fid", [step[0] for step in UI_STEPS])
 def test_frozen_fixture_is_byte_identical_with_the_adapter(frozen_replay, fid):
-    expected = CASES[fid]["response"]
+    expected = H.expected_response(fid, CASES[fid]["response"])
     actual = frozen_replay["responses"][fid]
     assert actual["status_code"] == expected["status_code"]
     if "sse_events" in expected:

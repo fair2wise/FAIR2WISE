@@ -231,7 +231,7 @@ def test_fixture_ids_match_flow_definition():
 
 @pytest.mark.parametrize("fid", UI_STEP_IDS + MODEL_STEP_IDS)
 def test_replayed_response_matches_fixture(replay, fid):
-    expected = CASES[fid]["response"]
+    expected = H.expected_response(fid, CASES[fid]["response"])
     actual = replay["responses"][fid]
     assert actual["status_code"] == expected["status_code"]
     assert actual["content_type"] == expected["content_type"]

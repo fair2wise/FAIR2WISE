@@ -1,4 +1,4 @@
-"""Legacy UI/CLI adapter for ``F2W_RUNTIME=langgraph`` (task T03).
+"""Legacy UI/CLI adapter for ``F2W_RUNTIME=langgraph`` (tasks T03, T03B).
 
 In langgraph mode ``AgentPipelineService._query_retrieval`` hands the ordinary
 read/QA call to :class:`LegacyReadPath`, which runs it through an
@@ -9,6 +9,12 @@ read/QA call to :class:`LegacyReadPath`, which runs it through an
 after that call (graph_update, sufficiency branches, downloads, extraction,
 ``ChatResponse``/SSE construction) stays in ``api.py`` unchanged, so routes,
 DTOs, statuses, SSE phases and citation tokens are byte-identical.
+
+Route (T03B, ``F2W_QA_ROUTE``, read once at startup; see :mod:`.qa_route`): by
+default (``supervisor``) the call is planned by the literature supervisor
+(``F2WApplication.answer_via_supervisor``: one planning model call under shared
+admission, traced as ``supervisor-plan``, tool arguments pinned to the UI's);
+``direct`` keeps the T03 direct call. Both return the same ``ReadOutcome``.
 
 The retrieval service reads the pipeline's *current* agent on every call
 (``pipeline.retrieval`` is rebuilt on settings changes) and its current Tiled URI.
@@ -32,6 +38,7 @@ from app.modules.contracts import ActorKind, RequestContext
 from app.modules.security.authorization import DeploymentSettings
 
 from .mode import RuntimeConfigError
+from .qa_route import QaRoute, TracedPlanningModel, pipeline_planning_model, qa_route
 from .retrieval import LegacyRetrievalService
 
 #: Placeholder writer identity for the read-only adapter; never used to write or to
@@ -68,11 +75,17 @@ class LegacyReadPath:
     Args:
         application: The ``F2WApplication`` whose retrieval service wraps the pipeline's agent.
         context_factory: Returns the server-built ``RequestContext`` for one call.
+        route: ``QaRoute``; ``SUPERVISOR`` needs an application built with a chat model.
     """
 
-    def __init__(self, application: Any, *, context_factory: Callable[[], RequestContext]) -> None:
+    def __init__(self, application: Any, *, context_factory: Callable[[], RequestContext],
+                 route: QaRoute = QaRoute.DIRECT) -> None:
+        if route is QaRoute.SUPERVISOR and getattr(application, "supervisor", None) is None:
+            raise ValueError("the supervisor QA route needs an application with a chat model")
         self.application = application
         self._context_factory = context_factory
+        self.route = route
+        self.last_supervised: Any = None
 
     async def query(
         self,
@@ -85,21 +98,43 @@ class LegacyReadPath:
         """Same contract as ``AgentPipelineService._query_retrieval``'s agent call: returns the
         legacy verdict unchanged or raises the original exception."""
         ctx = self._context_factory()
+        if self.route is QaRoute.SUPERVISOR:
+            supervised = await self.application.answer_via_supervisor(
+                ctx, question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled)
+            self.last_supervised = supervised
+            return supervised.read.to_legacy()
         outcome = await self.application.answer_from_knowledge(
             ctx, question, history=history, source_rag=source_rag, use_live_tiled=use_live_tiled)
         return outcome.to_legacy()
 
 
+#: Planning-model provider factory, ``(pipeline) -> (() -> chat model)``. Tests replace it with a fake.
+planning_model_provider: Callable[[Any], Callable[[], Any]] = pipeline_planning_model
+
+
 def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> LegacyReadPath:
-    """Build the langgraph-mode read path for one ``AgentPipelineService`` instance."""
+    """Build the langgraph-mode read path for one ``AgentPipelineService`` instance.
+
+    Raises:
+        RuntimeConfigError: Non-local profile or invalid ``F2W_QA_ROUTE``.
+    """
+    from app.modules.agent_runtime.executor import RuntimeLimits
     from app.modules.application import F2WApplication
 
     settings = legacy_deployment_settings(environ)
+    route = qa_route(environ)
     service = LegacyRetrievalService(
         agent_provider=lambda: pipeline.retrieval,
         tiled_uri_provider=lambda: getattr(getattr(pipeline, "runtime", None), "tiled_uri", None),
     )
-    application = F2WApplication(settings=settings, retrieval=service, name="f2w-legacy-ui")
+    chat_model = None
+    if route is QaRoute.SUPERVISOR:
+        chat_model = TracedPlanningModel(planning_model_provider(pipeline))
+    backend = str(getattr(getattr(pipeline, "runtime", None), "backend", None) or "cborg")
+    # One planning call per turn: the tool verdict is the answer, so no relay call is made.
+    limits = RuntimeLimits(max_retries=0, max_model_calls=1)
+    application = F2WApplication(settings=settings, retrieval=service, chat_model=chat_model, limits=limits,
+                                 provider=backend, name="f2w-legacy-ui")
 
     def context() -> RequestContext:
         key = str(getattr(pipeline, "_active_session_key", "") or "")
@@ -107,7 +142,7 @@ def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] =
         return application.local_context(request_id=uuid.uuid4().hex, session_id=session_id,
                                          actor_kind=ActorKind.INTERACTIVE)
 
-    return LegacyReadPath(application, context_factory=context)
+    return LegacyReadPath(application, context_factory=context, route=route)
 
 
 __all__ = ("DEFAULT_WRITER_IDENTITY", "LegacyReadPath", "build_legacy_read_path", "legacy_deployment_settings")
