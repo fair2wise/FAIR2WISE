@@ -73,8 +73,12 @@ parser = [
 # (lazy import in tiled_graph.py) is not in the lock: Tiled pins pydantic-settings<2.12
 # (ADR optional-dependencies decision 4). Filled by T08/T20B.
 tiled = []
-# Paper-figure kernels arrive with T09.
-figures = []
+# Paper figures (T09): source-text-first extraction reads the PDF text layer with PyMuPDF.
+# OCR (rapidocr/onnxruntime) is an OPTIONAL fallback imported lazily; it is not in the lock and is
+# not a dependency here. numpy is a base dependency.
+figures = [
+  "PyMuPDF>=1.27.2",
+]
 # Academy/Globus Compute deployment (requirements/globus.in); not part of [full].
 globus = [
   "globus-sdk>=4.8,<5",
@@ -109,6 +113,9 @@ packages = [
   "f2w.modules.runtime_bridge",
   "f2w.modules.security",
   "f2w.modules.term_extractor",
+  "f2w.modules.science",
   "f2w.modules.tools",
+  "f2w.modules.vision",
+  "f2w.modules.vision.kernels",
 ]
 include-package-data = false
