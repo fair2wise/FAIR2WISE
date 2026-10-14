@@ -37,6 +37,7 @@ __all__ = [
     "INVERSE_UNIT_TO_NM_INV",
     "LENGTH_UNIT_TO_NM",
     "caption_inverse_unit",
+    "caption_inverse_units",
     "fold_inverse_length",
     "fold_length",
     "iter_lengths",
@@ -198,6 +199,19 @@ def caption_inverse_unit(caption: str) -> str:
     }
     usable = {unit for unit in found if fold_inverse_length(1.0, unit)}
     return usable.pop() if len(usable) == 1 else ""
+
+
+def caption_inverse_units(caption: str) -> frozenset[str]:
+    """Every usable inverse-length unit a caption states, folded (F2W addition, not in the donor).
+
+    :func:`caption_inverse_unit` collapses "none" and "ambiguous" to ``""``; callers that must
+    tell them apart (to surface the ambiguity instead of a silent no-unit) use this set.
+    """
+    found = {
+        normalise_unit(match.group(0).strip("()[] "))
+        for match in _CAPTION_INVERSE_UNIT.finditer(caption or "")
+    }
+    return frozenset(unit for unit in found if fold_inverse_length(1.0, unit))
 
 
 def document_inverse_unit(texts: list[str] | tuple[str, ...]) -> str:
