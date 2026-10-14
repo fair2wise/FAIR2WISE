@@ -95,6 +95,7 @@ packages = [
   "f2w.modules.agent_runtime",
   "f2w.modules.agents",
   "f2w.modules.contracts",
+  "f2w.modules.deployment",
   "f2w.modules.f2w_agent",
   "f2w.modules.hybrid_rag",
   "f2w.modules.launchers",
