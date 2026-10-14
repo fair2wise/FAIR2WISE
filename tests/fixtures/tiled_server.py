@@ -162,8 +162,19 @@ class TiledTestInstance:
         return receipt
 
 
+#: Tag definitions for the ACL variant: ``reader`` may read the F2W literature tag, ``owner``
+#: may read/write it and apply it; ``admin`` (Tiled admin) bypasses tag checks.
+TEST_ACCESS_TAGS: Dict[str, Any] = {
+    "roles": {"facility_user": {"scopes": ["read:metadata", "read:data", "write:metadata", "write:data"]}},
+    "tags": {"f2w_literature": {"users": [{"name": "reader", "scopes": ["read:metadata", "read:data"]},
+                                          {"name": "owner", "role": "facility_user"}]}},
+    "tag_owners": {"f2w_literature": {"users": [{"name": "owner"}]}},
+}
+
+
 def start_tiled_instance(base: Path, *, auth: bool = False, seed: bool = True, port: int = 0,
-                         python: Optional[Path] = None) -> TiledTestInstance:
+                         python: Optional[Path] = None,
+                         access_tags: Optional[Dict[str, Any]] = None) -> TiledTestInstance:
     """Start a disposable server under ``base`` (skips if ``F2W_TILED_PYTHON`` is unset).
 
     Args:
@@ -173,12 +184,19 @@ def start_tiled_instance(base: Path, *, auth: bool = False, seed: bool = True, p
         seed: Load the deterministic seed catalog (:func:`seed_catalog`).
         port: ``0`` for ephemeral; a fixed port only for port-conflict tests.
         python: Override the Tiled interpreter.
+        access_tags: With ``auth=True``, enforce ``TagBasedAccessPolicy`` with these tag
+            definitions (adds an ``owner`` user); see :data:`TEST_ACCESS_TAGS`.
     """
     interpreter = python or tiled_python_or_skip()
     base.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="f2w-tiled-", dir=str(base)))
+    authn = None
+    if auth:
+        authn = AuthnSpec()
+        if access_tags:
+            authn = AuthnSpec(users=("admin", "reader", "owner"), access_tags=access_tags)
     cfg = ManagedTiledConfig(profile="test", data_dir=root, tiled_python=interpreter, port=port,
-                             owner=OWNER_TEST, authn=AuthnSpec() if auth else None)
+                             owner=OWNER_TEST, authn=authn)
     server = lifecycle.start_managed(cfg, ready_timeout=READY_TIMEOUT)
     instance = TiledTestInstance(server=server, base=base)
     _LIVE[server.nonce] = instance
@@ -296,5 +314,11 @@ def tiled_session_instance(tiled_base: Path) -> Iterator[TiledTestInstance]:
 
 @pytest.fixture(scope="session")
 def tiled_auth_instance(tiled_base: Path) -> Iterator[TiledTestInstance]:
-    """One multi-user server (``admin`` with the admin role, ``reader`` without)."""
+    """One multi-user server (``admin`` with the admin role, ``reader`` without); no access policy."""
     yield from _managed(tiled_base, auth=True)
+
+
+@pytest.fixture(scope="session")
+def tiled_acl_instance(tiled_base: Path) -> Iterator[TiledTestInstance]:
+    """Multi-user server with ``TagBasedAccessPolicy`` (:data:`TEST_ACCESS_TAGS`); unseeded."""
+    yield from _managed(tiled_base, auth=True, seed=False, access_tags=TEST_ACCESS_TAGS)

@@ -125,3 +125,16 @@ def test_authn_spec_validation():
     with pytest.raises(tc.TiledConfigError):
         tc.AuthnSpec(users=("a",), admins=("b",))
     assert json.dumps(tc.AuthnSpec().__dict__)  # serializable, no secrets
+
+
+def test_access_tags_render_tag_based_policy(tmp_path):
+    tags = {"tags": {"t": {"users": [{"name": "reader", "scopes": ["read:metadata"]}]}}}
+    cfg = tc.ManagedTiledConfig(profile="test", data_dir=tmp_path, tiled_python=Path("/x"), port=0,
+                                owner=tc.OWNER_TEST, authn=tc.AuthnSpec(access_tags=tags))
+    rendered = tc.render_server_config(cfg, port=1, init_catalog=True)
+    policy = rendered["access_control"]
+    assert policy["access_policy"].endswith(":TagBasedAccessPolicy")
+    assert policy["args"]["tags_db"] == {"uri": f"sqlite:///{tmp_path / 'access_tags.db'}"}
+    plain = tc.ManagedTiledConfig(profile="test", data_dir=tmp_path, tiled_python=Path("/x"), port=0,
+                                  owner=tc.OWNER_TEST, authn=tc.AuthnSpec())
+    assert "access_control" not in tc.render_server_config(plain, port=1, init_catalog=True)

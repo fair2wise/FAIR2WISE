@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fixtures"))
 
 from tiled_server import (  # noqa: E402,F401
+    tiled_acl_instance,
     tiled_auth_instance,
     tiled_base,
     tiled_empty_instance,
