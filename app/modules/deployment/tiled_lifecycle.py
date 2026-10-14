@@ -232,6 +232,8 @@ def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
                 "secret_keys": [generate_api_key()],
             }
             write_private_file(cfg.authn_secrets_file, json.dumps(data))
+        if cfg.authn.access_tags is not None:
+            _compile_access_tags(cfg)
         return
     key_file = cfg.effective_writer_secret_file
     if not key_file.exists():
@@ -240,6 +242,19 @@ def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
         # First provisioning: generate the local writer key inside the data mount.
         write_private_file(key_file, generate_api_key() + "\n")
     read_secret_file(key_file, alphanumeric=True)
+
+
+def _compile_access_tags(cfg: ManagedTiledConfig) -> None:
+    """Compile ``cfg.authn.access_tags`` into the tags DB with the isolated Tiled interpreter."""
+    cfg.run_dir.mkdir(parents=True, exist_ok=True)
+    cfg.access_tags_source.write_text(json.dumps(cfg.authn.access_tags, indent=2), encoding="utf-8")
+    argv = [str(cfg.tiled_python), "-I", str(ENTRY_SCRIPT), "--expected-version", cfg.expected_version,
+            "--instance", "compile-tags", "--compile-tags", str(cfg.access_tags_source),
+            "--tags-db", str(cfg.access_tags_db_path)]
+    out = subprocess.run(argv, capture_output=True, text=True, timeout=120, cwd=str(cfg.run_dir),
+                         env=_child_env(cfg.run_dir))
+    if out.returncode != 0:
+        raise TiledConfigError("Access-tag compilation failed", detail={"stderr": out.stderr[-4000:]})
 
 
 def writer_credential(cfg: ManagedTiledConfig) -> Optional[str]:

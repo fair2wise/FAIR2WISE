@@ -33,7 +33,7 @@ import ipaddress
 import os
 import secrets
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
@@ -106,11 +106,16 @@ class AuthnSpec:
         provider: Tiled provider name.
         users: User names the authenticator accepts.
         admins: Subset of ``users`` granted Tiled's ``admin`` role via ``tiled_admins``.
+        access_tags: Optional tag definitions (``roles``/``tags``/``tag_owners``, the
+            ``AccessTagsCompiler`` format, ``tiled/access_control/access_tags.py:308``).
+            When set, the server enforces ``TagBasedAccessPolicy`` from a tags database
+            compiled at start. Without it, any signed-in user (Tiled role ``user``) can write.
     """
 
     provider: str = "f2wtest"
     users: Tuple[str, ...] = ("admin", "reader")
     admins: Tuple[str, ...] = ("admin",)
+    access_tags: Optional[Dict[str, Any]] = field(default=None, compare=False, hash=False)
 
     def __post_init__(self) -> None:
         missing = [name for name in self.admins if name not in self.users]
@@ -218,6 +223,16 @@ class ManagedTiledConfig:
     def authn_secrets_file(self) -> Path:
         """Passwords and token-signing keys for :attr:`authn` (generated, mode 0600)."""
         return self.secrets_dir / "authn.json"
+
+    @property
+    def access_tags_source(self) -> Path:
+        """Tag definitions written at start (no secrets)."""
+        return self.run_dir / "access_tags.json"
+
+    @property
+    def access_tags_db_path(self) -> Path:
+        """Compiled tags database read by ``TagBasedAccessPolicy``."""
+        return self.data_dir / "access_tags.db"
 
 
 @dataclass(frozen=True)
@@ -498,4 +513,13 @@ def render_server_config(cfg: ManagedTiledConfig, *, port: int, init_catalog: bo
             }
         )
         config["database"] = {"uri": f"sqlite:///{cfg.authn_db_path}", "init_if_not_exists": True}
+        if cfg.authn.access_tags is not None:
+            config["access_control"] = {
+                "access_policy": "tiled.access_control.access_policies:TagBasedAccessPolicy",
+                "args": {
+                    "provider": cfg.authn.provider,
+                    "tags_db": {"uri": f"sqlite:///{cfg.access_tags_db_path}"},
+                    "access_tags_parser": "tiled.access_control.access_tags:AccessTagsParser",
+                },
+            }
     return config

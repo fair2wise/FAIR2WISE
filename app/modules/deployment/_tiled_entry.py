@@ -10,6 +10,9 @@ user can read it with ``ps`` (``tiled/commandline/_serve.py:723-729``). This lau
 reads the key and authentication secrets from files, injects them into the parsed
 configuration, and starts uvicorn without printing them.
 
+``--compile-tags SRC --tags-db DB`` compiles access-tag definitions (JSON) into the SQLite
+database ``TagBasedAccessPolicy`` reads (0.2.18 has no CLI for this), then exits.
+
 Exit codes: 3 = installed tiled is not the expected version; 4 = configuration rejected.
 """
 
@@ -29,11 +32,13 @@ def _read(path):
 def main(argv=None):
     """Validate the version, load configuration and secrets, and serve until terminated."""
     parser = argparse.ArgumentParser(prog="f2w-tiled-entry")
-    parser.add_argument("--config", required=True)
+    parser.add_argument("--config")
     parser.add_argument("--expected-version", required=True)
     parser.add_argument("--instance", required=True, help="ownership nonce (not secret)")
     parser.add_argument("--api-key-file")
     parser.add_argument("--authn-secrets-file")
+    parser.add_argument("--compile-tags")
+    parser.add_argument("--tags-db")
     args = parser.parse_args(argv)
 
     import tiled
@@ -46,6 +51,10 @@ def main(argv=None):
             flush=True,
         )
         return EXIT_UNSUPPORTED_VERSION
+    if args.compile_tags:
+        return _compile_tags(args.compile_tags, args.tags_db)
+    if not args.config:
+        parser.error("--config is required")
 
     from tiled.config import Config
     from tiled.utils import parse
@@ -79,6 +88,21 @@ def main(argv=None):
         flush=True,
     )
     uvicorn.run(web_app, host=host, port=port, log_config=_setup_log_config(None, True))
+    return 0
+
+
+def _compile_tags(source, tags_db):
+    from tiled.access_control.access_tags import AccessTagsCompiler
+    from tiled.access_control.scopes import ALL_SCOPES
+
+    def no_groups(name):
+        raise KeyError(name)
+
+    Path(tags_db).unlink(missing_ok=True)
+    compiler = AccessTagsCompiler(ALL_SCOPES, json.loads(_read(source)), {"uri": str(tags_db)}, no_groups)
+    compiler.load_tag_config()
+    compiler.compile()
+    compiler.connection.close()
     return 0
 
 
