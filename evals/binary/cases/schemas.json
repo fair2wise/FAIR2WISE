@@ -1,0 +1,325 @@
+{
+  "cases": [
+    {
+      "blocked_by": [],
+      "case_id": "SCH-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SCH-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "schemas",
+        "title": "Selected overlay/imports preserved",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Selected overlay/imports preserved",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Selected overlay/imports preserved. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SCH",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "cd68bfd585bcb0af18e42485c4040dd2069892af53da496b07cfafa6291c1fe0",
+        "config_sha256": "0ccf99e68ea28513b48ea5bc257f1abc042b348fde6817a2f8e6732c11c1c734",
+        "model_sha256": null,
+        "oracle_source_sha256": "8c4a3fe0cc753273187d6426e5ba4a0f825c103fd76418167f09db7a44fbdb6e",
+        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+      },
+      "input_fixture_refs": [],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Current overlay/import structure loads and resolves",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/test_xray_schema.py::test_extract_schema_imports_overlay",
+          "tests/test_xray_schema.py::test_imports_matkg_not_a_fork",
+          "tests/test_xray_schema.py::test_xray_extract_schema_loads_with_linkml",
+          "tests/packaging/test_resources.py::test_schema_defaults_resolve_from_any_working_directory",
+          "tests/packaging/test_resources.py::test_schema_helper_loads_default_schema_outside_repo"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Selected overlay/imports preserved through the T22B registry (not merged)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema_extract.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "schemas",
+      "supersedes": null,
+      "title": "Selected overlay/imports preserved"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SCH-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SCH-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "schemas",
+        "title": "PROV reference is not loaded as LinkML",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "PROV reference is not loaded as LinkML",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: PROV reference is not loaded as LinkML. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SCH",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "8d671175392e2792393ff76ebb1a79a0038f8912d4a2d6d9c348e7d24042730c",
+        "config_sha256": "09b01a2121d3bda785e1395107487ebdc0a56e2bb92ea7f3365c02d765f04607",
+        "model_sha256": null,
+        "oracle_source_sha256": "a94cf0f39377df2a876f81e358c6a60174630c8a16d35bbb183059f65d1cdadf",
+        "schema_sha256": "0120f16f4fab7bf7fce763cc13536f2bf23f1946bd0ba37635a41574c278dc61"
+      },
+      "input_fixture_refs": [],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "The PROV vocabulary is a reference block, not loaded as LinkML schema content",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/test_prov.py::TestBl1101SchemaProvVocabulary::test_bl1101_schema_loads_without_prov_vocabulary",
+          "tests/test_prov.py::TestRsoxsSchemaProvVocabulary::test_prov_vocabulary_key_exists",
+          "tests/test_xray_schema.py::test_no_prov_vocabulary_top_level"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": "storage/schema/prov_vocabulary.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "schemas",
+      "supersedes": null,
+      "title": "PROV reference is not loaded as LinkML"
+    },
+    {
+      "blocked_by": [
+        "T22B (schema registry, fingerprint and revision binding)"
+      ],
+      "case_id": "SCH-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SCH-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "schemas",
+        "title": "Schema fingerprint pins result and job",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Schema fingerprint pins result and job",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Schema fingerprint pins result and job. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SCH",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "23241de46b0535b64e53d21d0abbbdd7e60df6d600f3c3ab399e2f1c082fdad5",
+        "config_sha256": "69d323a120ffffcefd4d391181f47cfdd9a25dffd6e8253aac554b1b9e0899d8",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/extraction/extraction_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/extraction/test_validation_stage.py::test_h3_gates_are_closed_and_enforced"
+        ],
+        "uncovered": "Schema fingerprint pinning of results and jobs belongs to the schema registry"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "schemas",
+      "supersedes": null,
+      "title": "Schema fingerprint pins result and job"
+    },
+    {
+      "blocked_by": [
+        "T22B (schema registry, fingerprint and revision binding)",
+        "T10 (durable jobs and curation)"
+      ],
+      "case_id": "SCH-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SCH-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "schemas",
+        "title": "Stale schema plan rejected",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Stale schema plan rejected",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Stale schema plan rejected. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SCH",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "59847a4b87115daa57c414037c044c772a49cd7f247db4fc988e139c8fe137e0",
+        "config_sha256": "39ede4d74bd0ca8f3299609c5cfd86ec249cdcc3084a2df02a76985bb4cc2533",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/test_shared_contracts.py::test_apply_plan_rejects_stale_approval",
+          "tests/canonicalization/test_canon_online.py::test_approval_must_name_the_exact_revision"
+        ],
+        "uncovered": "Stale schema-plan rejection needs the schema revision binding; stale approvals are covered for other plans"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "schemas",
+      "supersedes": null,
+      "title": "Stale schema plan rejected"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SCH-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SCH-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "schemas",
+        "title": "Preserved measurement/technique inheritance; no reclassification",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Preserved measurement/technique inheritance; no reclassification",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Preserved measurement/technique inheritance; no reclassification. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SCH",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "f39518817be08abc02bb2c37a95dd423ff2b18b3668ea588dbc4f1a53ee697aa",
+        "config_sha256": "f8c2f38cb51c7f45cd815edd2b30815a1274851eb290d2428d1ffa27a9d74773",
+        "model_sha256": null,
+        "oracle_source_sha256": "aa55692bcda59da988037b62d55531b83392320aa1db28adf1de74e6772666b5",
+        "schema_sha256": "8269251b1bdaaf92750b58db04013910f596f35519b6cebbcbb036241d51b175"
+      },
+      "input_fixture_refs": [],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Current RSoXS measurement inheritance is not redefined and inherited classes are not merged",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/canonicalization/test_canon_online.py::test_different_classes_never_merge_even_when_one_inherits_the_other",
+          "tests/test_xray_schema.py::test_does_not_redefine_rsoxs_measurement"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Whole-schema inheritance fingerprint before/after migration (T22B)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "schemas",
+      "supersedes": null,
+      "title": "Preserved measurement/technique inheritance; no reclassification"
+    }
+  ],
+  "suite": "schemas"
+}

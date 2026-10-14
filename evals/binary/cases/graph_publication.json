@@ -1,0 +1,661 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "T23B (immutable JSON snapshot service)"
+      ],
+      "case_id": "JSON-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "KG builds as versioned JSON with Tiled unavailable",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "KG builds as versioned JSON with Tiled unavailable",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: KG builds as versioned JSON with Tiled unavailable. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "06afcfbe13379631fd188e5770775309460fa8eaf604f01d4dbfea65be23b095",
+        "config_sha256": "16570fa9fbbac53aad44db389c248b6533098792fd218d6eaa2939a8d7ff075d",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/json_kg/"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/test_json2kg.py::test_main_writes_graph_for_valid_input",
+          "tests/contracts/json_kg/test_json_kg_contract.py::test_repeated_builds_from_fresh_input_are_identical"
+        ],
+        "uncovered": "json2kg builds without Tiled, but the versioned snapshot service does not exist yet"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "KG builds as versioned JSON with Tiled unavailable"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "JSON-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "json2kg field identity and CLI compatibility retained",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "json2kg field identity and CLI compatibility retained",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: json2kg field identity and CLI compatibility retained. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "b0dae6d69a73f68d8ae15847538fb7a9be59e8cd6688a812ca307c3254fbe988",
+        "config_sha256": "e37a14caf623302af32af00b2e19d076ea50ebd4b80d51526d146d96f83e95b4",
+        "model_sha256": null,
+        "oracle_source_sha256": "7c977e51e032bba93aabb6641e5eca60f29be2f2e32c8900b944555e3c58fae5",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/json_kg/"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "json2kg field identity, serialization and CLI behaviour match the frozen baseline",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/contracts/json_kg/test_json_kg_contract.py",
+          "tests/test_json2kg.py",
+          "tests/test_json2kg_extended.py"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "json2kg field identity and CLI compatibility retained"
+    },
+    {
+      "blocked_by": [
+        "T23B (immutable JSON snapshot service)"
+      ],
+      "case_id": "JSON-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Frozen JSON is immutable and hash/manifest agree",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Frozen JSON is immutable and hash/manifest agree",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Frozen JSON is immutable and hash/manifest agree. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "cf9e3d873c6df5576c5f16039806cba403d14ddb3dfc9c8b05145262b4a93650",
+        "config_sha256": "68ea5dd0b94c53fe30f88c261c9e6a1f42bb5a45ee707d238e8f7eb067305cab",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/json_kg/",
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/json_kg/test_json_kg_contract.py::test_example_manifest_binds_exact_fixture_bytes_and_rejects_bad_paths",
+          "tests/contracts/json_kg/test_json_kg_contract.py::test_fixture_files_match_manifest_hashes",
+          "tests/graph/test_graph_json_backend.py::test_manifest_hash_is_checked_and_cache_reloads_explicitly"
+        ],
+        "uncovered": "Immutable version creation is the unbuilt part"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Frozen JSON is immutable and hash/manifest agree"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "JSON-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Import performs zero parser, inference or acquisition calls",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Import performs zero parser, inference or acquisition calls",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Import performs zero parser, inference or acquisition calls. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "b1e3414939577e6c8fd79694e707f797eb9e45d7d71c36001611ed60d5fa7bda",
+        "config_sha256": "a631dc6237043778052b931dd7277b2a9be7901c963622417f0495de495a90ad",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/graph/test_graph_json_backend.py::test_round_trip_preserves_every_node_edge_and_bytes"
+        ],
+        "uncovered": "No importer exists to observe zero parser/inference/acquisition calls"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Import performs zero parser, inference or acquisition calls"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "JSON-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Same-target replay creates no duplicate facts or links",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Same-target replay creates no duplicate facts or links",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Same-target replay creates no duplicate facts or links. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "7da7862d1866ce72c23adb133cb36a7b8c9ca4c157d152881877ae0c3cf6073a",
+        "config_sha256": "6ab0dbd436a073ce6fcd6503642f3743245674a2c2cd928b4f333223a7b0580b",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/graph/test_graph_identity.py::test_edge_ids_follow_triple_identity",
+          "tests/graph/test_graph_identity.py::test_ledger_never_rebinds_and_round_trips"
+        ],
+        "uncovered": "Same-target replay needs the importer"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Same-target replay creates no duplicate facts or links"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)",
+        "T26B (committed artifact validation and export)"
+      ],
+      "case_id": "JSON-06",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-06",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Import receipt cannot skip publication to another target",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Import receipt cannot skip publication to another target",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Import receipt cannot skip publication to another target. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "97140d7bf908d2bfe281fa62e223683fd6badcbe04267099d60cab120823630c",
+        "config_sha256": "7a69e56212b01ab991c6a8060e3e1ce9cc55242156c434a69e4312891666555d",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/security/test_security_workers_approvals.py::test_local_approval_never_authorizes_an_als_target",
+          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod"
+        ],
+        "uncovered": "Import receipts do not exist yet; approval target binding is covered by AUTH-08/LOCAL-10"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Import receipt cannot skip publication to another target"
+    },
+    {
+      "blocked_by": [
+        "T23B (immutable JSON snapshot service)",
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "JSON-07",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-07",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Tampered JSON or mismatched schema/approval is rejected",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Tampered JSON or mismatched schema/approval is rejected",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Tampered JSON or mismatched schema/approval is rejected. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "b695ccce6a3c18b771eacb987ac9023e4f32c0acadcdba53faf8817808700d85",
+        "config_sha256": "9f5b0ae3c732205fe9c69e643d7b9af9beb11b1d2fb0940a9077f8a86f471f7b",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/graph/test_graph_json_backend.py::test_manifest_hash_is_checked_and_cache_reloads_explicitly"
+        ],
+        "uncovered": "Schema/approval mismatch rejection needs snapshot and importer"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Tampered JSON or mismatched schema/approval is rejected"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "JSON-08",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-08",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Imported graph preserves required IDs, edge evidence and code links",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Imported graph preserves required IDs, edge evidence and code links",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Imported graph preserves required IDs, edge evidence and code links. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "444b486e80c911e0269a78b8bd1b6a59bb16adbde464bb12d1626434d35556ed",
+        "config_sha256": "bfab12a5382087c09be77a6365fb217a7fe736179decad8c0c77806adab0ecd9",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/graph/test_graph_json_backend.py::test_round_trip_preserves_every_node_edge_and_bytes",
+          "tests/graph/test_graph_json_backend.py::test_records_are_graph_scoped_and_keep_old_fields",
+          "tests/graph/test_graph_identity.py::test_uri_round_trip"
+        ],
+        "uncovered": "Needs the imported Tiled graph to compare against; the JSON backend side is covered"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Imported graph preserves required IDs, edge evidence and code links"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)",
+        "T10 (durable jobs and curation)"
+      ],
+      "case_id": "JSON-09",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-09",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Interrupted import retains JSON and does not activate partial graph",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Interrupted import retains JSON and does not activate partial graph",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Interrupted import retains JSON and does not activate partial graph. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "41d8977e77bf7df831a9af06c568b73c11f56543bf5a9305f30df12daa697c0f",
+        "config_sha256": "e98310bf4c3ecda826e1374e342503c0dcce1255dea7ca019f4f18aa66f797fe",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Interrupted import and activation of partial graphs need the importer and job journal"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Interrupted import retains JSON and does not activate partial graph"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)",
+        "T10 (durable jobs and curation)",
+        "T23B (immutable JSON snapshot service)"
+      ],
+      "case_id": "JSON-10",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "JSON-10",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "policy_note": "Use owner-D30 admin-only writeback behavior; unresolved policy cannot be counted as a passing case.",
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "graph_publication",
+        "title": "Acknowledged UI edits survive next JSON version and re-import",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Acknowledged UI edits survive next JSON version and re-import",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Acknowledged UI edits survive next JSON version and re-import. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "JSON",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "313e8852de6008eb6d55bb2390b471bd81503f7952cf5728521573bc62c58c6f",
+        "config_sha256": "dd0bb7b85b50a7b5435caf4e325db647f249d293ba356b4d87159fec61850cba",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Acknowledged UI edits surviving the next JSON version needs the journal reconciliation; D30 admin-only writeback applies"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "graph_publication",
+      "supersedes": null,
+      "title": "Acknowledged UI edits survive next JSON version and re-import"
+    }
+  ],
+  "suite": "graph_publication"
+}
