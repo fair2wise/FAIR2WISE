@@ -236,8 +236,8 @@ def validate_graph(
             "predicates_outside_closure": _top(bad_predicates),
         },
         INCOMPLETE_EXTRACTION: {"count": incomplete, "unit": "nodes", "rule": "description is N/A or empty"},
-        UNKNOWN_SOURCE_DATA: {"count": no_source, "unit": "nodes", 
-            "rule": "non-snippet node without source_papers"},
+        UNKNOWN_SOURCE_DATA: {
+            "count": no_source, "unit": "nodes", "rule": "non-snippet node without source_papers"},
     }
     counts = {"nodes": len(nodes), "edges": len(edges), "codesnippet_nodes": snippets}
     return GraphValidationReport(
