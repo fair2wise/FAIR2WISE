@@ -269,25 +269,47 @@ def changes_markdown(cases: List[Dict[str, Any]]) -> str:
         "",
         "## Decisions considered that changed no case",
         "",
+        "- H1 O-A5 (JSON graph reading) is applied to AUTH-02; the per-user default graph selection follow-up and",
+        "  H2 Q4 are applied to AUTH-02/AUTH-03/LLM-01; no separate case asserts them.",
+        "- H2 Q8 / T02B (pending approvals survive new messages): no companion case states the old behaviour, so",
         (
-            "- H1 O-A5 (JSON graph reading) is applied to AUTH-02; the per-user default graph selection follow-up and H2 Q4 are applied to AUTH-02/AUTH-03/LLM-01; no separate case asserts them.",
+            "  none changed. Existing runtime tests cover it; H3 may want a new case (a new required case, not a"
+            " change)."
+        ),
+        "- H2 Q2 (traces record F2W_RUNTIME) and O-D2 uploaded-graph opaque ids: implementation details with",
+        "  existing tests, no case expectation changed.",
+        "- H1 O-P1 (checkout .env lookup, T15 bridge): packaging decisions, outside the 108 cases.",
         (
             "- H1 O-A7 touches DEP-05 only (MkDocs under the prefix); FastAPI docs pages (O-A8) touch AUTH-01 and"
             " DEP-07."
         ),
         "",
+        "## Flags for the owner",
+        "",
         (
-            "## Flags for the owner",
-        "",
-        "- REL-05 reverses the companion wording: O-D1 keeps tracked KG JSON (with verbatim snippets) in the image. REL-04 and REL-05 now",
-        "  forbid only raw PDFs, full parsed bodies, crops, the source-RAG index, credentials, local paths and operational databases.",
-        "- QUOTE-01 drops count limits (O-D2) but adds the 40% single-page/section rule; confirm the 40% figure is the intended oracle.",
-        "- AUTH-02/AUTH-03 absorb the per-user settings decision (H2 Q4); the T25D acceptance wording is the source of the oracle.",
-        "- TIL-07/DEP-02 oracle the interim 0.2.18 pin; they must be re-issued as a new revision when a final 0.2.19 exists (O-T1).",
-        "",
-        "Nothing was dropped or weakened: a reviewer can diff `case_revision`, `companion_expected_rule` and"
-            " `supersedes` in each record."
+            "- REL-05 reverses the companion wording: O-D1 keeps tracked KG JSON (with verbatim snippets) in the"
+            " image."
         ),
+        (
+            "  REL-04 and REL-05 now forbid only raw PDFs, full parsed bodies, crops, the source-RAG index,"
+            " credentials,"
+        ),
+        "  local paths and operational databases.",
+        (
+            "- QUOTE-01 drops count limits (O-D2) but adds the 40% single-page/section rule; confirm 40% is the"
+            " intended oracle."
+        ),
+        (
+            "- AUTH-02/AUTH-03 absorb the per-user settings decision (H2 Q4); the T25D acceptance wording is the"
+            " oracle source."
+        ),
+        (
+            "- TIL-07/DEP-02 oracle the interim 0.2.18 pin; re-issue them as a new revision when a final 0.2.19"
+            " exists (O-T1)."
+        ),
+        "",
+        "Nothing was dropped or weakened: a reviewer can diff `case_revision`, `companion_expected_rule` and",
+        "`supersedes` in each record.",
         "",
     ]
     return "\n".join(lines)
