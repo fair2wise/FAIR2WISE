@@ -113,6 +113,7 @@ packages = [
   "f2w.modules.literature",
   "f2w.modules.operations",
   "f2w.modules.runtime_bridge",
+  "f2w.modules.schema",
   "f2w.modules.security",
   "f2w.modules.term_extractor",
   "f2w.modules.science",
