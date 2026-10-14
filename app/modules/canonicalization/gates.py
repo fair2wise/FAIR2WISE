@@ -92,3 +92,18 @@ def authorize_apply(
     if plan.vocabulary_revision != current_vocabulary_revision:
         raise ApplyRefused("stale_vocabulary", "vocabulary revision changed since the plan was made")
     return change_plan
+
+
+def authorize_vocabulary_change(gate: str, subject_revision: str, approval: Any, *, current_revision: str) -> None:
+    """Gate for vocabulary activation/promotion, which bind to a content revision, not a graph plan.
+
+    ``approval`` is a :class:`~.vocabulary.VocabularyApproval`. Refuses when the gate is closed, no
+    approval exists, the approval names a different revision, or the live revision moved.
+    """
+    require_gate(gate)
+    if approval is None:
+        raise ApplyRefused("approval_missing", "a VocabularyApproval for this exact revision is required")
+    if approval.vocabulary_revision != subject_revision:
+        raise ApplyRefused("approval_mismatch", "approval names a different revision")
+    if subject_revision != current_revision:
+        raise ApplyRefused("stale_vocabulary", "revision changed since it was proposed")
