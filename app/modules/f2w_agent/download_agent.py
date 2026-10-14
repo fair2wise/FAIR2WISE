@@ -366,9 +366,20 @@ class DownloadAgent(Agent):
         mailto: Optional[str] = None,
         download_delay_seconds: Optional[float] = None,
         validate_downloads: Optional[bool] = None,
+        document_store: Any = None,
+        legacy_index: Any = None,
+        store_context: Any = None,
     ) -> None:
-        """Configure OA search, polite delays, and optional PDF semantic validation."""
+        """Configure OA search, polite delays, and optional PDF semantic validation.
+
+        ``document_store``/``legacy_index``/``store_context`` (T05, all optional) also
+        record each accepted PDF in the shared content-addressed literature store at
+        its legacy path. Without them behaviour is unchanged.
+        """
         super().__init__()
+        self._document_store = document_store
+        self._legacy_index = legacy_index
+        self._store_context = store_context
         self._backend = backend or os.environ.get("KG_RAG_BACKEND", "cborg")
         self._model = model
         self._mailto = mailto or os.environ.get("OPENALEX_EMAIL")
@@ -533,6 +544,19 @@ class DownloadAgent(Agent):
                 w["_score"] = _lexical_score(query, text)
         scored = sorted(candidates, key=lambda w: w.get("_score", 0.0), reverse=True)
         return scored
+
+    def _forward_to_store(self, target: Path, dest: Path, work: Dict[str, Any], source_url: str = "") -> None:
+        """Record an accepted PDF in the shared literature store (T05); never changes the result."""
+        if self._legacy_index is None or self._store_context is None:
+            return
+        try:
+            import hashlib
+
+            root_id = "downloads-" + hashlib.sha1(str(target.resolve()).encode()).hexdigest()[:10]
+            self._legacy_index.adopt_download(self._store_context, root_id, target, dest,
+                                              doi=str(work.get("doi") or ""), source_url=source_url)
+        except Exception as exc:  # noqa: BLE001 - the shared store is additive, not a new failure mode
+            logger.warning("Could not record %s in the literature store (%s)", dest.name, type(exc).__name__)
 
     def _sleep_between_downloads(self) -> None:
         """Pause between PDF fetches when ``_download_delay_seconds`` is positive."""
@@ -714,6 +738,7 @@ class DownloadAgent(Agent):
                 if _is_valid_pdf(dest):
                     skipped += 1
                     downloaded.append(str(dest))
+                    self._forward_to_store(target, dest, w)
                     _append_download_record(
                         manifest,
                         _manifest_record(
@@ -744,6 +769,7 @@ class DownloadAgent(Agent):
             if ok and dest.exists() and dest.stat().st_size > 0:
                 if (not validate) or self._validate_downloaded_pdf(query, w, dest):
                     downloaded.append(str(dest))
+                    self._forward_to_store(target, dest, w, attempted_urls[-1] if attempted_urls else "")
                     _append_download_record(
                         manifest,
                         _manifest_record(
