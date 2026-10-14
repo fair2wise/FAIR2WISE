@@ -294,7 +294,7 @@ class FileDocumentStore:
             if existing is not None:
                 # Metadata is immutable. Bytes that arrive for a referenced or lost object are
                 # kept inside the store (this is also how a deleted blob is repaired).
-                if external is None and not target.exists():
+                if external is None and (not target.exists() or sha256_of(target) != hexdigest):
                     target.parent.mkdir(parents=True, exist_ok=True)
                     os.replace(tmp, target)
                     os.chmod(target, 0o444)
