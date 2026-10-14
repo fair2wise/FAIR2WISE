@@ -162,3 +162,13 @@ the UI API), O-A2 (role-check max age; default 60 s, capped at 900 s).
 QA tool, the turn falls back to the direct `answer_from_knowledge` call; the
 reason is logged and the failed planning call is recorded in the trace. To be
 revisited before the supervisor route becomes the default runtime (H6/H7).
+
+## O-P1: T04 follow-ups (2026-10-14)
+
+Owner replied "let's continue" to the T04 recommendations; recorded as
+accepted: (1) the installed CLI reads `.env` only from the current directory;
+(2) the F2W-client-to-LangChain bridge for `create_literature_agent` belongs
+to T15; (3) remaining import-time settings (kg_rag_api, CBORG cap, repo-root
+paths) move to startup in one later cleanup task with parity tests;
+(4) console scripts with T14; (5) the first GitHub CI run is the Linux check.
+Also: at most 2 workers run in parallel.
