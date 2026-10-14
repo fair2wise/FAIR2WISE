@@ -17,7 +17,7 @@ empty success. A shortlist is a retrieval result, not identity.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -125,8 +125,13 @@ class CandidateSearch:
             self._embedding_error = "no encoder configured"
             return
         try:
-            batch = embed_texts_cached([s for _, s in self._rows], self.encoder, model=self.model,
-                                       revision=self.revision, cache=self.cache)
+            batch = embed_texts_cached(
+                [s for _, s in self._rows],
+                self.encoder,
+                model=self.model,
+                revision=self.revision,
+                cache=self.cache,
+            )
         except EmbeddingUnavailable as exc:
             self._embedding_error = str(exc)
             return
@@ -162,7 +167,8 @@ class CandidateSearch:
                 bump(i, 1.0, "exact", surface)
                 continue
             if (mention_acronym or looks_like_an_acronym(surface)) and (
-                    is_acronym_of(mention, surface) or is_acronym_of(surface, mention)):
+                is_acronym_of(mention, surface) or is_acronym_of(surface, mention)
+            ):
                 bump(i, 0.95, "acronym", surface)
                 continue
             ratio = SequenceMatcher(None, key, sk).ratio()
@@ -175,8 +181,9 @@ class CandidateSearch:
         degraded: List[str] = []
         if self._matrix is not None and self.encoder is not None:
             try:
-                q = embed_texts_cached([mention], self.encoder, model=self.model, revision=self.revision,
-                                       cache=self.cache).vectors[0]
+                q = embed_texts_cached(
+                    [mention], self.encoder, model=self.model, revision=self.revision, cache=self.cache
+                ).vectors[0]
                 norm = float(np.linalg.norm(q)) or 1.0
                 sims = self._matrix @ (q / norm)
                 for row in np.argsort(-sims)[: self.max_candidates * 4]:
@@ -192,8 +199,17 @@ class CandidateSearch:
             degraded.append("embedding_unavailable")
 
         ranked = sorted(scores.items(), key=lambda kv: (-kv[1][0], self.entities[kv[0]].entity_id))
-        candidates = [Candidate(self.entities[i].entity_id, self.entities[i].label, self.entities[i].category,
-                                round(s, 4), tuple(sorted(ch)), text) for i, (s, ch, text) in ranked]
+        candidates = [
+            Candidate(
+                self.entities[i].entity_id,
+                self.entities[i].label,
+                self.entities[i].category,
+                round(s, 4),
+                tuple(sorted(ch)),
+                text,
+            )
+            for i, (s, ch, text) in ranked
+        ]
         kept: List[Candidate] = []
         used = estimate_tokens(mention)
         for cand in candidates:
@@ -208,5 +224,4 @@ class CandidateSearch:
             status = "index_unavailable" if failed or not self._rows else "empty"
         else:
             status = "ok"
-        return Shortlist(mention, category or "", status, tuple(kept), dropped > 0, dropped, tuple(degraded),
-                         used)
+        return Shortlist(mention, category or "", status, tuple(kept), dropped > 0, dropped, tuple(degraded), used)

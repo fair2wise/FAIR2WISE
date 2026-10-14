@@ -16,15 +16,15 @@ from .vocabulary import VocabEntry, Vocabulary
 
 #: The controls the plan names. Each must never merge, by any strategy's gate, with any judge.
 NAMED_NEGATIVE_CONTROLS: Tuple[Tuple[str, str], ...] = (
-    ("Princeton Instruments PI-MTE", "CCD area detector"),   # specific instrument vs generic class
-    ("MoTe2", "WTe2"),                                       # distinct chemicals
-    ("Al2O3[0001]", "Al2O3"),                                # specific surface vs generic material
-    ("SEM", "TEM"),                                          # distinct techniques
+    ("Princeton Instruments PI-MTE", "CCD area detector"),  # specific instrument vs generic class
+    ("MoTe2", "WTe2"),  # distinct chemicals
+    ("Al2O3[0001]", "Al2O3"),  # specific surface vs generic material
+    ("SEM", "TEM"),  # distinct techniques
     ("STEM", "TEM"),
     ("USAXS", "SAXS"),
     ("GIWAXS", "GISAXS"),
     ("PC71BM", "PC61BM"),
-    ("gamma-Fe2O3", "alpha-Fe2O3"),                          # polymorphs
+    ("gamma-Fe2O3", "alpha-Fe2O3"),  # polymorphs
 )
 
 
@@ -99,6 +99,15 @@ MENTIONS: Tuple[FixtureMention, ...] = (
 
 def approved_alias_vocabulary() -> Vocabulary:
     """A tiny CANDIDATE vocabulary whose revision a test or the harness may approve explicitly."""
-    return Vocabulary(1, [VocabEntry("t:giwaxs", "grazing incidence wide angle x-ray scattering", "technique",
-                                     aliases=("wide-angle scattering at grazing incidence",))],
-                      source="synthetic-fixture")
+    return Vocabulary(
+        1,
+        [
+            VocabEntry(
+                "t:giwaxs",
+                "grazing incidence wide angle x-ray scattering",
+                "technique",
+                aliases=("wide-angle scattering at grazing incidence",),
+            )
+        ],
+        source="synthetic-fixture",
+    )

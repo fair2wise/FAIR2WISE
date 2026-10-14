@@ -25,7 +25,7 @@ import hashlib
 import json
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -61,9 +61,15 @@ class VocabEntry:
         return [re.compile(p, re.IGNORECASE) for p in self.patterns]
 
     def as_dict(self) -> Dict[str, Any]:
-        return {"slug": self.slug, "display_name": self.display_name, "category": self.category,
-                "aliases": list(self.aliases), "patterns": list(self.patterns), "notes": self.notes,
-                "smiles": self.smiles}
+        return {
+            "slug": self.slug,
+            "display_name": self.display_name,
+            "category": self.category,
+            "aliases": list(self.aliases),
+            "patterns": list(self.patterns),
+            "notes": self.notes,
+            "smiles": self.smiles,
+        }
 
 
 @dataclass(frozen=True)
@@ -91,8 +97,15 @@ class Vocabulary:
         source: Where the content came from (path and file hash for loaded assets).
     """
 
-    def __init__(self, version: int, entries: Iterable[VocabEntry], *, status: str = "candidate",
-                 source: str = "", approval_id: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        version: int,
+        entries: Iterable[VocabEntry],
+        *,
+        status: str = "candidate",
+        source: str = "",
+        approval_id: Optional[str] = None,
+    ) -> None:
         if status not in ("candidate", "approved"):
             raise ValueError(f"unknown vocabulary status {status!r}")
         self.version = version
@@ -119,16 +132,24 @@ class Vocabulary:
                 if other is not None and other.slug != entry.slug:
                     raise ValueError(f"alias {alias!r} claimed by both {other.slug!r} and {entry.slug!r}")
                 self._by_alias[key] = entry
-        self.revision = hashlib.sha256(json.dumps(
-            {"version": version, "entries": sorted((e.as_dict() for e in self.entries), key=lambda d: d["slug"])},
-            sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.revision = hashlib.sha256(
+            json.dumps(
+                {
+                    "version": version,
+                    "entries": sorted((e.as_dict() for e in self.entries), key=lambda d: d["slug"]),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
 
     def approve(self, approval: VocabularyApproval) -> "Vocabulary":
         """Return an approved copy; the approval must name exactly this content revision."""
         if approval.vocabulary_revision != self.revision:
             raise ValueError("approval is for a different vocabulary revision")
-        return Vocabulary(self.version, self.entries, status="approved", source=self.source,
-                          approval_id=approval.approval_id)
+        return Vocabulary(
+            self.version, self.entries, status="approved", source=self.source, approval_id=approval.approval_id
+        )
 
     @property
     def approved(self) -> bool:
@@ -178,12 +199,17 @@ class Vocabulary:
             return None
         hits: Dict[str, Tuple[int, VocabEntry]] = {}
         for entry in self.entries:
-            if (category is not None and entry.category != category) or entry.category in _NO_CONTAINMENT_CATEGORIES:
+            if (
+                category is not None and entry.category != category
+            ) or entry.category in _NO_CONTAINMENT_CATEGORIES:
                 continue
             spans = [m.end() - m.start() for p in entry.compiled_patterns() if (m := p.search(text))]
-            spans += [m.end() - m.start() for alias in entry.aliases
-                      if len(alias) >= _CONTAINMENT_MIN_CHARS
-                      and (m := re.search(_separator_insensitive(alias), text, re.IGNORECASE))]
+            spans += [
+                m.end() - m.start()
+                for alias in entry.aliases
+                if len(alias) >= _CONTAINMENT_MIN_CHARS
+                and (m := re.search(_separator_insensitive(alias), text, re.IGNORECASE))
+            ]
             if spans:
                 hits[entry.slug] = (max(spans), entry)
         if not hits:
@@ -199,10 +225,14 @@ class Vocabulary:
 
 def _entry_from_raw(raw: Dict[str, Any]) -> VocabEntry:
     return VocabEntry(
-        slug=str(raw["slug"]), display_name=str(raw.get("display_name") or raw["slug"]),
-        category=str(raw["category"]), aliases=tuple(str(a) for a in raw.get("aliases") or ()),
-        patterns=tuple(str(p) for p in raw.get("patterns") or ()), notes=str(raw.get("notes") or ""),
-        smiles=str(raw.get("smiles") or ""))
+        slug=str(raw["slug"]),
+        display_name=str(raw.get("display_name") or raw["slug"]),
+        category=str(raw["category"]),
+        aliases=tuple(str(a) for a in raw.get("aliases") or ()),
+        patterns=tuple(str(p) for p in raw.get("patterns") or ()),
+        notes=str(raw.get("notes") or ""),
+        smiles=str(raw.get("smiles") or ""),
+    )
 
 
 def vocabulary_from_mapping(raw: Dict[str, Any], *, source: str = "") -> Vocabulary:
@@ -217,6 +247,7 @@ def load_vocabulary_asset(path: Path) -> Vocabulary:
     import yaml
 
     data = Path(path).read_bytes()
-    vocab = vocabulary_from_mapping(yaml.safe_load(data.decode("utf-8")),
-                                    source=f"{Path(path).name}@sha256:{hashlib.sha256(data).hexdigest()}")
+    vocab = vocabulary_from_mapping(
+        yaml.safe_load(data.decode("utf-8")), source=f"{Path(path).name}@sha256:{hashlib.sha256(data).hexdigest()}"
+    )
     return vocab

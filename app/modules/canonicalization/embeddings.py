@@ -99,7 +99,8 @@ def embed_texts_cached(
     computed: Dict[int, np.ndarray] = {}
     step = max(1, int(batch_size))
     for start in range(0, len(missing), step):
-        idx = missing[start:start + step]
+        stop = start + step
+        idx = missing[start:stop]
         batch = [texts[i] for i in idx]
         try:
             raw = np.asarray(encoder(batch), dtype=np.float32)
@@ -133,7 +134,8 @@ class DeterministicEncoder:
             folded = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()).strip() + " "
             for n in self.ngram:
                 for i in range(len(folded) - n + 1):
-                    h = int.from_bytes(hashlib.blake2b(folded[i:i + n].encode(), digest_size=4).digest(), "big")
+                    j = i + n
+                    h = int.from_bytes(hashlib.blake2b(folded[i:j].encode(), digest_size=4).digest(), "big")
                     out[row, h % self.dim] += 1.0
             norm = float(np.linalg.norm(out[row]))
             if norm:

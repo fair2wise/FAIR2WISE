@@ -52,7 +52,8 @@ def _pick(term: str, labels: Sequence[str], mode: str) -> Optional[str]:
         if fold(label) == fold(term):
             score = 1.0
         elif (looks_like_an_acronym(term) or looks_like_an_acronym(label)) and (
-                is_acronym_of(term, label) or is_acronym_of(label, term)):
+            is_acronym_of(term, label) or is_acronym_of(label, term)
+        ):
             score = 0.95
         elif mode == "permissive":
             score = SequenceMatcher(None, fold(term), fold(label)).ratio()
@@ -97,8 +98,9 @@ def _summarise(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         "false_splits_held_visible": sum(1 for r in rows if r["outcome"] == "false_split_held"),
         "false_split_items": [r["surface"] for r in splits],
         "negative_controls_merged": sum(1 for r in rows if r["kind"] == "negative_control" and r["merged"]),
-        "recall_in_shortlist": (round(sum(1 for r in true_rows if r["true_shown"]) / len(true_rows), 3)
-                                if true_rows else None),
+        "recall_in_shortlist": (
+            round(sum(1 for r in true_rows if r["true_shown"]) / len(true_rows), 3) if true_rows else None
+        ),
         "true_outside_shortlist": [r["surface"] for r in true_rows if not r["true_shown"]],
         "judge_calls": sum(1 for r in rows if r["prompt_tokens"]),
         "prompt_tokens_mean": round(mean(prompts), 1) if prompts else 0,
@@ -123,14 +125,28 @@ def run_baseline(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntit
         prompt = build_merge_prompt(clean_term(m.surface), names)
         reply = (judge(prompt) or "").strip()
         merged = by_label.get(reply) if reply in by_label else None
-        rows.append({"surface": m.surface, "kind": m.kind, "merged": merged is not None, "merged_to": merged,
-                     "prompt_tokens": estimate_tokens(prompt), "true_shown": m.expected is not None,
-                     "outcome": _classify(m, merged, False)})
+        rows.append(
+            {
+                "surface": m.surface,
+                "kind": m.kind,
+                "merged": merged is not None,
+                "merged_to": merged,
+                "prompt_tokens": estimate_tokens(prompt),
+                "true_shown": m.expected is not None,
+                "outcome": _classify(m, merged, False),
+            }
+        )
     return rows
 
 
-def run_shortlist(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntity], judge: Judge, *,
-                  top_k: int, with_index: bool = True) -> List[Dict]:
+def run_shortlist(
+    mentions: Sequence[FixtureMention],
+    ents: Sequence[IndexedEntity],
+    judge: Judge,
+    *,
+    top_k: int,
+    with_index: bool = True,
+) -> List[Dict]:
     """The pre-migration FAISS shortlist (real ``TermMergeIndex``); no index -> ``no_match``, no judge call."""
     names = [clean_term(e.label) for e in ents]
     by_label = {clean_term(e.label): e.entity_id for e in ents}
@@ -145,55 +161,98 @@ def run_shortlist(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEnti
         reply = (judge(prompt) or "").strip() if prompt else "NO_MATCH"
         merged = by_label.get(reply) if reply in candidates else None
         shown = m.expected is not None and any(by_label.get(c) == m.expected for c in candidates)
-        rows.append({"surface": m.surface, "kind": m.kind, "merged": merged is not None, "merged_to": merged,
-                     "prompt_tokens": estimate_tokens(prompt) if prompt else 0, "true_shown": shown,
-                     "outcome": _classify(m, merged, False)})
+        rows.append(
+            {
+                "surface": m.surface,
+                "kind": m.kind,
+                "merged": merged is not None,
+                "merged_to": merged,
+                "prompt_tokens": estimate_tokens(prompt) if prompt else 0,
+                "true_shown": shown,
+                "outcome": _classify(m, merged, False),
+            }
+        )
     return rows
 
 
-def run_candidate_search(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntity], judge: Judge, *,
-                         max_candidates: int, token_budget: int, with_index: bool = True,
-                         use_vocabulary: bool = True) -> List[Dict]:
+def run_candidate_search(
+    mentions: Sequence[FixtureMention],
+    ents: Sequence[IndexedEntity],
+    judge: Judge,
+    *,
+    max_candidates: int,
+    token_budget: int,
+    with_index: bool = True,
+    use_vocabulary: bool = True,
+) -> List[Dict]:
     """This package's online path; the vocabulary is approved in memory for the measurement only."""
-    search = CandidateSearch(ents, encoder=DeterministicEncoder() if with_index else None,
-                             model="deterministic", max_candidates=max_candidates, token_budget=token_budget)
+    search = CandidateSearch(
+        ents,
+        encoder=DeterministicEncoder() if with_index else None,
+        model="deterministic",
+        max_candidates=max_candidates,
+        token_budget=token_budget,
+    )
     vocab = None
     if use_vocabulary:
         candidate = approved_alias_vocabulary()
-        vocab = candidate.approve(VocabularyApproval("measurement-only", candidate.revision, "harness",
-                                                     datetime.now(timezone.utc)))
+        vocab = candidate.approve(
+            VocabularyApproval("measurement-only", candidate.revision, "harness", datetime.now(timezone.utc))
+        )
     rows = []
     for m in mentions:
         res = resolve_mention(SourceMention(m.surface, m.category), vocabulary=vocab, search=search, judge=judge)
         merged = res.entity_id if res.status == ACCEPTED else None
-        shown = m.expected is not None and (res.method in ("approved_alias", "identifier") or (
-            res.shortlist is not None and any(c.entity_id == m.expected for c in res.shortlist.candidates)))
+        shown = m.expected is not None and (
+            res.method in ("approved_alias", "identifier")
+            or (res.shortlist is not None and any(c.entity_id == m.expected for c in res.shortlist.candidates))
+        )
         tokens = res.verdict.prompt_tokens if res.verdict else 0
-        rows.append({"surface": m.surface, "kind": m.kind, "merged": merged is not None, "merged_to": merged,
-                     "prompt_tokens": tokens, "true_shown": shown, "status": res.status, "reason": res.reason,
-                     "method": res.method,
-                     "outcome": _classify(m, merged, res.status == "review")})
+        rows.append(
+            {
+                "surface": m.surface,
+                "kind": m.kind,
+                "merged": merged is not None,
+                "merged_to": merged,
+                "prompt_tokens": tokens,
+                "true_shown": shown,
+                "status": res.status,
+                "reason": res.reason,
+                "method": res.method,
+                "outcome": _classify(m, merged, res.status == "review"),
+            }
+        )
     return rows
 
 
-def run_measurement(*, top_k: int = 5, default_top_k: int = 12, max_candidates: int = 8,
-                    token_budget: int = 400) -> Dict[str, Any]:
+def run_measurement(
+    *, top_k: int = 5, default_top_k: int = 12, max_candidates: int = 8, token_budget: int = 400
+) -> Dict[str, Any]:
     """Run every strategy x judge x index availability and return the machine-readable report."""
     ents = entities()
     report: Dict[str, Any] = {
         "harness_version": HARNESS_VERSION,
-        "fixture": {"entities": len(ents), "mentions": len(MENTIONS),
-                    "true_merges": sum(m.kind == "true_merge" for m in MENTIONS),
-                    "negative_controls": sum(m.kind == "negative_control" for m in MENTIONS),
-                    "novel": sum(m.kind == "novel" for m in MENTIONS)},
-        "parameters": {"faiss_top_k_small": top_k, "faiss_top_k_default": default_top_k,
-                       "max_candidates": max_candidates, "token_budget": token_budget,
-                       "encoder": DeterministicEncoder.name},
-        "caveats": ["Judges are deterministic stand-ins, not language models.",
-                    "The encoder hashes character n-grams; it is not the sentence-transformer model.",
-                    "Baseline prompt is rebuilt with the current build_merge_prompt over all names; the 222b1e7 "
-                    "prompt text itself is not in this repo.",
-                    "The fixture is synthetic; numbers are not corpus estimates. The decision belongs to H3."],
+        "fixture": {
+            "entities": len(ents),
+            "mentions": len(MENTIONS),
+            "true_merges": sum(m.kind == "true_merge" for m in MENTIONS),
+            "negative_controls": sum(m.kind == "negative_control" for m in MENTIONS),
+            "novel": sum(m.kind == "novel" for m in MENTIONS),
+        },
+        "parameters": {
+            "faiss_top_k_small": top_k,
+            "faiss_top_k_default": default_top_k,
+            "max_candidates": max_candidates,
+            "token_budget": token_budget,
+            "encoder": DeterministicEncoder.name,
+        },
+        "caveats": [
+            "Judges are deterministic stand-ins, not language models.",
+            "The encoder hashes character n-grams; it is not the sentence-transformer model.",
+            "Baseline prompt is rebuilt with the current build_merge_prompt over all names; the 222b1e7 "
+            "prompt text itself is not in this repo.",
+            "The fixture is synthetic; numbers are not corpus estimates. The decision belongs to H3.",
+        ],
         "results": {},
     }
     for mode in ("permissive", "conservative"):
@@ -202,15 +261,26 @@ def run_measurement(*, top_k: int = 5, default_top_k: int = 12, max_candidates: 
         block["baseline_full_list"] = _summarise(run_baseline(MENTIONS, ents, judges["legacy"]))
         for k in sorted({top_k, default_top_k}):
             block[f"faiss_shortlist_k{k}"] = _summarise(run_shortlist(MENTIONS, ents, judges["legacy"], top_k=k))
-        block["candidate_search"] = _summarise(run_candidate_search(
-            MENTIONS, ents, judges["modern"], max_candidates=max_candidates, token_budget=token_budget))
+        block["candidate_search"] = _summarise(
+            run_candidate_search(
+                MENTIONS, ents, judges["modern"], max_candidates=max_candidates, token_budget=token_budget
+            )
+        )
         block["no_index"] = {
             "baseline_full_list": block["baseline_full_list"],
-            f"faiss_shortlist_k{default_top_k}": _summarise(run_shortlist(
-                MENTIONS, ents, judges["legacy"], top_k=default_top_k, with_index=False)),
-            "candidate_search_lexical_only": _summarise(run_candidate_search(
-                MENTIONS, ents, judges["modern"], max_candidates=max_candidates, token_budget=token_budget,
-                with_index=False)),
+            f"faiss_shortlist_k{default_top_k}": _summarise(
+                run_shortlist(MENTIONS, ents, judges["legacy"], top_k=default_top_k, with_index=False)
+            ),
+            "candidate_search_lexical_only": _summarise(
+                run_candidate_search(
+                    MENTIONS,
+                    ents,
+                    judges["modern"],
+                    max_candidates=max_candidates,
+                    token_budget=token_budget,
+                    with_index=False,
+                )
+            ),
         }
         report["results"][mode] = block
     return report
@@ -218,12 +288,25 @@ def run_measurement(*, top_k: int = 5, default_top_k: int = 12, max_candidates: 
 
 def render_markdown(report: Dict[str, Any]) -> str:
     """Human-readable report; states what was measured and leaves the decision to H3."""
-    lines = ["# T07 measurement report (decision reserved for H3)", "",
-             f"Harness `{report['harness_version']}`. Fixture: {report['fixture']}.", "",
-             "## Caveats", ""] + [f"- {c}" for c in report["caveats"]]
-    cols = ["correct_merges", "false_merges", "false_splits_no_match", "false_splits_held_visible",
-            "negative_controls_merged", "recall_in_shortlist", "judge_calls", "prompt_tokens_mean",
-            "prompt_tokens_max"]
+    lines = [
+        "# T07 measurement report (decision reserved for H3)",
+        "",
+        f"Harness `{report['harness_version']}`. Fixture: {report['fixture']}.",
+        "",
+        "## Caveats",
+        "",
+    ] + [f"- {c}" for c in report["caveats"]]
+    cols = [
+        "correct_merges",
+        "false_merges",
+        "false_splits_no_match",
+        "false_splits_held_visible",
+        "negative_controls_merged",
+        "recall_in_shortlist",
+        "judge_calls",
+        "prompt_tokens_mean",
+        "prompt_tokens_max",
+    ]
 
     def table(block: Dict[str, Any]) -> List[str]:
         out = ["| strategy | " + " | ".join(cols) + " |", "|---|" + "---|" * len(cols)]
@@ -239,8 +322,10 @@ def render_markdown(report: Dict[str, Any]) -> str:
         for name, s in block.items():
             if name == "no_index":
                 continue
-            lines.append(f"- `{name}` false merges: {s['false_merge_items'] or 'none'}; "
-                         f"true match outside the shortlist: {s['true_outside_shortlist'] or 'none'}")
+            lines.append(
+                f"- `{name}` false merges: {s['false_merge_items'] or 'none'}; "
+                f"true match outside the shortlist: {s['true_outside_shortlist'] or 'none'}"
+            )
     return "\n".join(lines) + "\n"
 
 

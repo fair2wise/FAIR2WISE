@@ -47,9 +47,13 @@ class TermGroup:
     auto_applicable: bool = True
 
     def as_dict(self) -> Dict[str, Any]:
-        return {"category": self.category, "representative": self.representative,
-                "members": list(self.members), "min_similarity": round(self.min_similarity, 4),
-                "auto_applicable": self.auto_applicable}
+        return {
+            "category": self.category,
+            "representative": self.representative,
+            "members": list(self.members),
+            "min_similarity": round(self.min_similarity, 4),
+            "auto_applicable": self.auto_applicable,
+        }
 
 
 def embedding_text(surface: str, snippets: Sequence[Dict[str, str]]) -> str:
@@ -74,12 +78,19 @@ def estimate_matrix_bytes(n: int) -> int:
     return 4 * n * n
 
 
-def estimate_grouping_memory(n: int, dim: int, *, max_matrix_bytes: int = DEFAULT_MAX_MATRIX_BYTES) -> Dict[str, Any]:
+def estimate_grouping_memory(
+    n: int, dim: int, *, max_matrix_bytes: int = DEFAULT_MAX_MATRIX_BYTES
+) -> Dict[str, Any]:
     """Memory estimate a caller can show before running: mode, matrix bytes and vector bytes."""
     matrix = estimate_matrix_bytes(n)
-    return {"terms": n, "dim": dim, "vector_bytes": 4 * n * dim, "matrix_bytes": matrix,
-            "mode": "matrix" if matrix <= max_matrix_bytes else "rowwise",
-            "peak_bytes": 4 * n * dim + (matrix if matrix <= max_matrix_bytes else 4 * n)}
+    return {
+        "terms": n,
+        "dim": dim,
+        "vector_bytes": 4 * n * dim,
+        "matrix_bytes": matrix,
+        "mode": "matrix" if matrix <= max_matrix_bytes else "rowwise",
+        "peak_bytes": 4 * n * dim + (matrix if matrix <= max_matrix_bytes else 4 * n),
+    }
 
 
 def _normalise(vectors: Sequence[Sequence[float]]) -> "np.ndarray":
@@ -132,11 +143,19 @@ def group_terms(
             taken.update(members)
             if len(members) == 1:
                 continue
-            groups.append(TermGroup(
-                category=category, representative=str(terms[seed].get("surface") or ""),
-                members=[str(terms[i].get("surface") or "") for i in members], min_similarity=lowest,
-                auto_applicable=(category in AUTO_GROUPABLE and category not in PROPOSAL_ONLY
-                                 and all(bool(terms[i].get("has_context")) for i in members))))
+            groups.append(
+                TermGroup(
+                    category=category,
+                    representative=str(terms[seed].get("surface") or ""),
+                    members=[str(terms[i].get("surface") or "") for i in members],
+                    min_similarity=lowest,
+                    auto_applicable=(
+                        category in AUTO_GROUPABLE
+                        and category not in PROPOSAL_ONLY
+                        and all(bool(terms[i].get("has_context")) for i in members)
+                    ),
+                )
+            )
     return groups
 
 
@@ -144,7 +163,13 @@ def summarize(groups: Sequence[TermGroup]) -> Dict[str, Any]:
     """Counts a reviewer can act on, split by whether a group may ever be applied."""
     applicable = [g for g in groups if g.auto_applicable]
     proposal = [g for g in groups if not g.auto_applicable]
-    return {"groups": len(groups), "auto_applicable": len(applicable), "proposal_only": len(proposal),
-            "terms_merged_if_applied": sum(len(g.members) - 1 for g in applicable),
-            "terms_in_proposals": sum(len(g.members) for g in proposal),
-            "by_category": {c: sum(1 for g in groups if g.category == c) for c in sorted({g.category for g in groups})}}
+    return {
+        "groups": len(groups),
+        "auto_applicable": len(applicable),
+        "proposal_only": len(proposal),
+        "terms_merged_if_applied": sum(len(g.members) - 1 for g in applicable),
+        "terms_in_proposals": sum(len(g.members) for g in proposal),
+        "by_category": {
+            c: sum(1 for g in groups if g.category == c) for c in sorted({g.category for g in groups})
+        },
+    }

@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup
@@ -103,37 +103,63 @@ class GroupVerdict:
     @property
     def auto_applicable(self) -> bool:
         """Eligible to enter a plan without individual review. Never means "applied"."""
-        return (self.group_auto_applicable and self.same_thing and self.method == "llm"
-                and self.confidence >= AUTO_APPLY_CONFIDENCE and bool(self.aliases))
+        return (
+            self.group_auto_applicable
+            and self.same_thing
+            and self.method == "llm"
+            and self.confidence >= AUTO_APPLY_CONFIDENCE
+            and bool(self.aliases)
+        )
 
     def as_dict(self) -> Dict[str, Any]:
-        return {"category": self.category, "canonical": self.canonical, "aliases": list(self.aliases),
-                "separate": list(self.separate), "held_for_review": [list(x) for x in self.held_for_review],
-                "same_thing": self.same_thing, "confidence": round(self.confidence, 3), "reason": self.reason,
-                "method": self.method, "auto_applicable": self.auto_applicable}
+        return {
+            "category": self.category,
+            "canonical": self.canonical,
+            "aliases": list(self.aliases),
+            "separate": list(self.separate),
+            "held_for_review": [list(x) for x in self.held_for_review],
+            "same_thing": self.same_thing,
+            "confidence": round(self.confidence, 3),
+            "reason": self.reason,
+            "method": self.method,
+            "auto_applicable": self.auto_applicable,
+        }
 
 
 def build_group_prompt(group: TermGroup, contexts: Dict[str, List[str]]) -> str:
     """One bounded prompt for a whole cluster (members and snippets are capped)."""
     members = group.members[:MAX_GROUP_MEMBERS]
-    lines = [f"- {m}: {s[:MAX_SNIPPET_CHARS]}" for m in members for s in (contexts.get(m) or [])[:MAX_SNIPPETS_PER_MEMBER]]
-    return _GROUP_PROMPT.format(category=group.category, members="\n".join(f"- {m}" for m in members),
-                                context="\n".join(lines) or "(none available)")
+    lines = [
+        f"- {m}: {s[:MAX_SNIPPET_CHARS]}"
+        for m in members
+        for s in (contexts.get(m) or [])[:MAX_SNIPPETS_PER_MEMBER]
+    ]
+    return _GROUP_PROMPT.format(
+        category=group.category,
+        members="\n".join(f"- {m}" for m in members),
+        context="\n".join(lines) or "(none available)",
+    )
 
 
 def _keep(group: TermGroup, method: str, reason: str) -> GroupVerdict:
-    return GroupVerdict(group.category, group.representative, method=method, reason=reason,
-                        group_auto_applicable=group.auto_applicable)
+    return GroupVerdict(
+        group.category,
+        group.representative,
+        method=method,
+        reason=reason,
+        group_auto_applicable=group.auto_applicable,
+    )
 
 
 def parse_json_object(raw: Any) -> Optional[Dict[str, Any]]:
     """The first JSON object in ``raw`` (tolerates prose or fences), else ``None``."""
     text = str(raw or "").strip()
     start, end = text.find("{"), text.rfind("}")
+    end_incl = end + 1
     if start == -1 or end <= start:
         return None
     try:
-        value = json.loads(text[start:end + 1])
+        value = json.loads(text[start:end_incl])
     except (ValueError, TypeError):
         return None
     return value if isinstance(value, dict) else None
@@ -151,7 +177,9 @@ def clamp_confidence(value: Any) -> float:
         return 0.0
 
 
-def adjudicate_group(group: TermGroup, contexts: Dict[str, List[str]], *, judge: Optional[Judge] = None) -> GroupVerdict:
+def adjudicate_group(
+    group: TermGroup, contexts: Dict[str, List[str]], *, judge: Optional[Judge] = None
+) -> GroupVerdict:
     """Decide one cluster in one call. Never raises: a judge fault is not a verdict."""
     if judge is None:
         return _keep(group, "no_model", "no model available to adjudicate")
@@ -178,9 +206,18 @@ def adjudicate_group(group: TermGroup, contexts: Dict[str, List[str]], *, judge:
             accepted.append(alias)
         else:
             held.append((alias, verdict.reason))
-    return GroupVerdict(group.category, canonical, accepted, separate, held, bool(payload.get("same_thing")),
-                        clamp_confidence(payload.get("confidence")), str(payload.get("reason") or "")[:400], "llm",
-                        group.auto_applicable)
+    return GroupVerdict(
+        group.category,
+        canonical,
+        accepted,
+        separate,
+        held,
+        bool(payload.get("same_thing")),
+        clamp_confidence(payload.get("confidence")),
+        str(payload.get("reason") or "")[:400],
+        "llm",
+        group.auto_applicable,
+    )
 
 
 _MENTION_PROMPT = """A new term was extracted: "{term}" (category: {category})
@@ -214,8 +251,14 @@ def build_mention_prompt(mention: str, category: str, shortlist: Shortlist) -> s
     return _MENTION_PROMPT.format(term=mention, category=category or "unspecified", menu=shortlist.render())
 
 
-def adjudicate_mention(mention: str, category: str, shortlist: Shortlist, *, judge: Optional[Judge] = None,
-                       min_confidence: float = AUTO_APPLY_CONFIDENCE) -> MentionVerdict:
+def adjudicate_mention(
+    mention: str,
+    category: str,
+    shortlist: Shortlist,
+    *,
+    judge: Optional[Judge] = None,
+    min_confidence: float = AUTO_APPLY_CONFIDENCE,
+) -> MentionVerdict:
     """Ask the judge to choose among shortlist ids; the id must be offered and pass the safety check."""
     if not shortlist.candidates:
         return MentionVerdict("abstain", reason="empty shortlist")
@@ -234,7 +277,9 @@ def adjudicate_mention(mention: str, category: str, shortlist: Shortlist, *, jud
     confidence = clamp_confidence(payload.get("confidence"))
     reason = str(payload.get("reason") or "")[:400]
     if chosen in (None, "", "null"):
-        return MentionVerdict("abstain", confidence=confidence, reason=reason or "model abstained", prompt_tokens=tokens)
+        return MentionVerdict(
+            "abstain", confidence=confidence, reason=reason or "model abstained", prompt_tokens=tokens
+        )
     by_id = {c.entity_id: c for c in shortlist.candidates}
     if str(chosen) not in by_id:
         return MentionVerdict("not_offered", reason=f"{chosen!r} is not on the shortlist", prompt_tokens=tokens)
@@ -243,5 +288,7 @@ def adjudicate_mention(mention: str, category: str, shortlist: Shortlist, *, jud
     if not verdict.allowed:
         return MentionVerdict("refused", cand.entity_id, confidence, f"safety check: {verdict.reason}", tokens)
     if confidence < min_confidence:
-        return MentionVerdict("abstain", cand.entity_id, confidence, f"confidence {confidence:.2f} below floor", tokens)
+        return MentionVerdict(
+            "abstain", cand.entity_id, confidence, f"confidence {confidence:.2f} below floor", tokens
+        )
     return MentionVerdict("match", cand.entity_id, confidence, reason, tokens)

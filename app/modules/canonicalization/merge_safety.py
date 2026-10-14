@@ -55,23 +55,80 @@ MIN_SUBSET_TOKENS = 2
 #: Words that carry no identity of their own. They are exactly what a generic
 #: category and a specific model have in common, so a subset test that counted
 #: them would let a category absorb a model number.
-_STOPWORDS = frozenset({
-    "the", "a", "an", "of", "at", "in", "on", "for", "and", "with", "by",
-    "detector", "system", "setup", "instrument", "apparatus", "chamber",
-})
+_STOPWORDS = frozenset(
+    {
+        "the",
+        "a",
+        "an",
+        "of",
+        "at",
+        "in",
+        "on",
+        "for",
+        "and",
+        "with",
+        "by",
+        "detector",
+        "system",
+        "setup",
+        "instrument",
+        "apparatus",
+        "chamber",
+    }
+)
 
 
 #: Qualifiers that turn one technique into another when added to its name:
 #: geometry, probe, energy range, mode, regime. A form that differs from another
 #: only by ADDING one of these is a variant, not a spelling.
-_MODIFIERS = frozenset({
-    "polarized", "polarised", "polarizing", "resonant", "soft", "hard", "grazing",
-    "incidence", "incident", "ultra", "small", "wide", "angle", "scanning",
-    "transmission", "reflection", "high", "low", "resolution", "situ", "operando",
-    "ex", "time", "resolved", "distorted", "wave", "free", "inelastic", "elastic",
-    "neutron", "electron", "x", "ray", "xray", "magnetic", "anomalous", "coherent",
-    "dynamic", "near", "ambient", "pressure", "cryo", "cryogenic", "non",
-})
+_MODIFIERS = frozenset(
+    {
+        "polarized",
+        "polarised",
+        "polarizing",
+        "resonant",
+        "soft",
+        "hard",
+        "grazing",
+        "incidence",
+        "incident",
+        "ultra",
+        "small",
+        "wide",
+        "angle",
+        "scanning",
+        "transmission",
+        "reflection",
+        "high",
+        "low",
+        "resolution",
+        "situ",
+        "operando",
+        "ex",
+        "time",
+        "resolved",
+        "distorted",
+        "wave",
+        "free",
+        "inelastic",
+        "elastic",
+        "neutron",
+        "electron",
+        "x",
+        "ray",
+        "xray",
+        "magnetic",
+        "anomalous",
+        "coherent",
+        "dynamic",
+        "near",
+        "ambient",
+        "pressure",
+        "cryo",
+        "cryogenic",
+        "non",
+    }
+)
 
 #: Character similarity at which two DIFFERENT words are still one word misspelt
 #: ("Soxhlet"/"Sohxlet" 0.86). Below it the word was swapped ("wide"/"small" 0.0,
@@ -95,7 +152,8 @@ def _substituted_words(canonical: str, alias: str) -> tuple[str, str] | None:
             joined = theirs[i] + theirs[i + 1]
             if joined in mine:
                 mine.remove(joined)
-                del theirs[i : i + 2]
+                pair_end = i + 2
+                del theirs[i:pair_end]
                 break
     if not left_only or not right_only:
         return None
@@ -168,12 +226,29 @@ def _looks_like_an_acronym(text: str) -> bool:
 #: Words an expansion may carry that its acronym leaves out: the trailing class
 #: noun ("Fourier transform infrared SPECTROSCOPY" -> FTIR) and chemistry's
 #: functional-group words ("... butyric ACID methyl ESTER" -> PCBM).
-_ACRONYM_OPTIONAL_WORDS = frozenset({
-    "spectroscopy", "spectrometry", "microscopy", "measurement", "measurements",
-    "analysis", "technique", "techniques", "method", "methods", "imaging",
-    "experiment", "experiments", "acid", "ester", "calculation", "calculations",
-    "simulation", "simulations",
-})
+_ACRONYM_OPTIONAL_WORDS = frozenset(
+    {
+        "spectroscopy",
+        "spectrometry",
+        "microscopy",
+        "measurement",
+        "measurements",
+        "analysis",
+        "technique",
+        "techniques",
+        "method",
+        "methods",
+        "imaging",
+        "experiment",
+        "experiments",
+        "acid",
+        "ester",
+        "calculation",
+        "calculations",
+        "simulation",
+        "simulations",
+    }
+)
 
 
 def _acronym_words(long_form: str) -> list[str]:
@@ -226,10 +301,7 @@ def _is_acronym_of(short: str, long_form: str) -> bool:
         return False
     # Numbers are optional words: "poly(3-hexylthiophene)" spends one on P3HT,
     # "[6,6]-phenyl-..." spends none on PCBM.
-    required = [
-        w not in _ACRONYM_OPTIONAL_WORDS and w not in _STOPWORDS and not w.isdigit()
-        for w in words
-    ]
+    required = [w not in _ACRONYM_OPTIONAL_WORDS and w not in _STOPWORDS and not w.isdigit() for w in words]
     if sum(1 for w in words if w not in _STOPWORDS and not w.isdigit()) < 2:
         # ONE CONTENT WORD IS NOT AN EXPANSION. With letters allowed from inside
         # a word, any word holding the letters in order "expands" any acronym:
@@ -374,8 +446,7 @@ def may_merge(canonical: str, alias: str) -> MergeVerdict:
     if shorter and shorter <= longer and added_modifiers:
         return MergeVerdict(
             False,
-            f"the longer form adds a qualifier that changes the thing named: "
-            f"{added_modifiers}",
+            f"the longer form adds a qualifier that changes the thing named: " f"{added_modifiers}",
         )
 
     similarity = SequenceMatcher(None, left, right).ratio()
@@ -407,9 +478,7 @@ def may_merge(canonical: str, alias: str) -> MergeVerdict:
     # "POLARIZED optical microscopy", "spin coating" inside "spin-coating-FREE
     # technologies" -- was refused above. Category words and vendor names pass.)
     if len(shorter) >= MIN_SUBSET_TOKENS and shorter <= longer:
-        return MergeVerdict(
-            True, f"the shorter form's {len(shorter)} words all appear in the longer"
-        )
+        return MergeVerdict(True, f"the shorter form's {len(shorter)} words all appear in the longer")
     return MergeVerdict(
         False,
         f"character similarity {similarity:.2f} < {MIN_CHAR_SIMILARITY}: these "
