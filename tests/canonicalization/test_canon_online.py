@@ -1,4 +1,5 @@
 """T07 online resolution: approved aliases, negative controls, bounds, retained mentions, no-index."""
+
 from datetime import datetime, timezone
 
 import numpy as np
@@ -7,14 +8,33 @@ import pytest
 from app.modules.canonicalization import gates
 from app.modules.canonicalization.adjudication import ChatJudge, adjudicate_mention, parse_json_object
 from app.modules.canonicalization.candidate_search import (
-    HARD_MAX_CANDIDATES, CandidateSearch, IndexedEntity, estimate_tokens)
+    HARD_MAX_CANDIDATES,
+    CandidateSearch,
+    IndexedEntity,
+    estimate_tokens,
+)
 from app.modules.canonicalization.chemical_identity import chemical_verdict, formula_counts
 from app.modules.canonicalization.embeddings import (
-    DeterministicEncoder, EmbeddingCache, EmbeddingUnavailable, embed_texts_cached)
+    DeterministicEncoder,
+    EmbeddingCache,
+    EmbeddingUnavailable,
+    embed_texts_cached,
+)
 from app.modules.canonicalization.measurement_fixture import (
-    MENTIONS, NAMED_NEGATIVE_CONTROLS, approved_alias_vocabulary, entities)
+    MENTIONS,
+    NAMED_NEGATIVE_CONTROLS,
+    approved_alias_vocabulary,
+    entities,
+)
 from app.modules.canonicalization.merge_safety import check_merge, may_merge
-from app.modules.canonicalization.online import ACCEPTED, REVIEW, UNRESOLVED, MutableBudget, SourceMention, resolve_mention
+from app.modules.canonicalization.online import (
+    ACCEPTED,
+    REVIEW,
+    UNRESOLVED,
+    MutableBudget,
+    SourceMention,
+    resolve_mention,
+)
 from app.modules.canonicalization.vocabulary import VocabularyApproval, entity_slug, load_vocabulary_asset
 from app.modules.extraction.contract import ExtractedMention
 
@@ -36,7 +56,9 @@ def test_spelling_variants_pass(canonical, alias):
 
 
 def test_different_classes_never_merge_even_when_one_inherits_the_other():
-    verdict = check_merge("RSoXS", "RSoXS", canonical_class="ExperimentalTechnique", alias_class="RSoXSMeasurement")
+    verdict = check_merge(
+        "RSoXS", "RSoXS", canonical_class="ExperimentalTechnique", alias_class="RSoXSMeasurement"
+    )
     assert not verdict.allowed and "different schema classes" in verdict.reason
 
 
@@ -65,7 +87,9 @@ def test_approval_must_name_the_exact_revision():
 
 def test_donor_yaml_loads_only_as_candidate(tmp_path):
     f = tmp_path / "vocabulary.yaml"
-    f.write_text("version: 3\nentries:\n  - {slug: rsoxs, display_name: RSoXS, category: technique, aliases: [r-soxs]}\n")
+    f.write_text(
+        "version: 3\nentries:\n  - {slug: rsoxs, display_name: RSoXS, category: technique, aliases: [r-soxs]}\n"
+    )
     vocab = load_vocabulary_asset(f)
     assert vocab.status == "candidate" and "sha256:" in vocab.source
     assert vocab.match("R-SoXS").slug == "rsoxs" and entity_slug("R-SoXS") == "r_soxs"
@@ -73,7 +97,12 @@ def test_donor_yaml_loads_only_as_candidate(tmp_path):
 
 def test_alias_collision_is_an_error(tmp_path):
     f = tmp_path / "v.yaml"
-    f.write_text("entries:\n  - {slug: a, category: technique, aliases: [x y]}\n  - {slug: b, category: technique, aliases: [x-y]}\n")
+    f.write_text(
+        (
+            "entries:\n  - {slug: a, category: technique, aliases: [x y]}\n"
+            "  - {slug: b, category: technique, aliases: [x-y]}\n"
+        )
+    )
     with pytest.raises(ValueError, match="claimed by both"):
         load_vocabulary_asset(f)
 
@@ -92,6 +121,7 @@ def search(**kw):
 
 def judge_picking(entity_id):
     import json
+
     return lambda prompt: json.dumps({"entity_id": entity_id, "confidence": 0.99, "reason": "x"})
 
 
@@ -115,7 +145,9 @@ def test_unresolved_terms_stay_visible_with_reason_and_shortlist():
 def test_adjudication_budget_and_judge_fault_do_not_merge():
     s = search()
     budget = MutableBudget(0)
-    res = resolve_mention(SourceMention("GIWAXS", "technique"), search=s, judge=judge_picking("t:giwaxs"), budget=budget)
+    res = resolve_mention(
+        SourceMention("GIWAXS", "technique"), search=s, judge=judge_picking("t:giwaxs"), budget=budget
+    )
     assert res.status == UNRESOLVED and "budget" in res.reason
 
     def boom(prompt):

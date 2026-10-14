@@ -1,4 +1,5 @@
 """T07 measurement harness: runs offline, reports false merges and false splits separately."""
+
 import json
 
 from app.modules.canonicalization.measurement import render_markdown, run_measurement, write_report
@@ -15,7 +16,9 @@ def test_report_structure_and_invariants(tmp_path):
         assert block["candidate_search"]["negative_controls_merged"] == 0
         assert block["candidate_search"]["false_merges"] == 0
         # prompts are bounded: far below the full-list prompt
-        assert block["candidate_search"]["prompt_tokens_max"] < block["baseline_full_list"]["prompt_tokens_max"] / 4
+        assert (
+            block["candidate_search"]["prompt_tokens_max"] < block["baseline_full_list"]["prompt_tokens_max"] / 4
+        )
     perm = report["results"]["permissive"]
     assert perm["baseline_full_list"]["negative_controls_merged"] > 0  # why the gate exists
     # no-index path: the FAISS path silently resolves nothing; the new path degrades to lexical
