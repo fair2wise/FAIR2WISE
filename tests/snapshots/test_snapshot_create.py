@@ -366,6 +366,9 @@ def test_terms_outside_the_repo_need_an_explicit_reference(storage_kg, terms_fil
 
 
 def test_code_commit_defaults_to_the_checkout_head_without_a_shell(make):
+    # A `git archive` export (as used for clean-room test runs) has no .git to read.
+    if not (Path(__file__).resolve().parents[2] / ".git").exists():
+        pytest.skip("no .git in this tree (exported copy); the default needs a checkout")
     result = make(code_commit=None)
     assert len(result.manifest.created.code_commit) in (40, 64)
 
