@@ -18,7 +18,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Sequence
 
 from ..growth import ObservationLog
 from ..migration import PlanDraft, sha256_json

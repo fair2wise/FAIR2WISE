@@ -22,7 +22,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .gates import authorize_vocabulary_change
 from .merge_safety import check_merge, is_acronym_of
