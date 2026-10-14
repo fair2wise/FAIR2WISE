@@ -146,6 +146,7 @@ def validate_graph(
     selection_source: str = "caller",
     helper: Any = None,
     implementation: str = NORMALIZER_TERM_EXTRACTOR,
+    fingerprint: Optional[str] = None,
 ) -> GraphValidationReport:
     """Report-mode check of one graph payload against ``entry``. The payload is read, never modified.
 
@@ -157,8 +158,9 @@ def validate_graph(
             :class:`SchemaBindingError`; no claim gives ``legacy_unverified`` (a warning).
         selection_source: How ``entry`` was chosen (``caller``, ``default``, ``filename_pattern``...).
         helper: Existing ``SchemaHelper`` to reuse; built from ``entry`` when omitted.
+        fingerprint: Precomputed ``closure_fingerprint(entry)`` (saves one schema load).
     """
-    fingerprint = closure_fingerprint(entry)
+    fingerprint = fingerprint or closure_fingerprint(entry)
     status = check_binding(registry, entry, claimed_fingerprint, actual=fingerprint)
     helper = helper or load_helper(entry, implementation=implementation)
     schema_block = {
