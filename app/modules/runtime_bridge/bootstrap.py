@@ -9,6 +9,9 @@ runs at import, and nothing is shared between instances.
 by T19B as ``lit_summarize_extracted_terms`` (``app.modules.operations.papers``).
 It is registered only when the caller passes ``paper_summary`` (it needs a
 server-side active-paper resolver), so the default read registry is unchanged.
+
+The six T05 ``lit_*`` tools (``app.modules.literature.tools.LiteratureToolset``)
+are registered the same way, only when the caller passes ``literature``.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from typing import Any, Tuple
 from ..agent_runtime.registry import ToolRegistry
 from ..agent_runtime.skills import Skill, SkillRegistry
 from ..tools.bootstrap import build_registry, build_skill_registry
+from ..literature.skill import LITERATURE_RESEARCH_SKILL
 from ..operations.papers import SUMMARIZE_LITERATURE_SKILL, TOOL_NAME as SUMMARY_TOOL_NAME
 
 from .qa_tool import ANSWER_FROM_KNOWLEDGE, TOOL_NAME, LegacyResultLedger, make_answer_tool
@@ -52,7 +56,7 @@ QA_DELEGATION_PROMPT = (
 
 def build_read_registry(
     service: Any, ledger: LegacyResultLedger, *, name: str = "f2w", freeze: bool = True,
-    paper_summary: Any = None,
+    paper_summary: Any = None, literature: Any = None,
 ) -> ToolRegistry:
     """Fresh registry holding ``answer_from_knowledge`` bound to ``service`` and ``ledger``.
 
@@ -62,12 +66,16 @@ def build_read_registry(
     extra = [(ANSWER_FROM_KNOWLEDGE, make_answer_tool(service, ledger))]
     if paper_summary is not None:  # T19B: explicit registration; absent unless the caller passes it
         extra.append(paper_summary.registration())
+    if literature is not None:  # T05: the six lit_* tools; absent unless the caller passes a LiteratureToolset
+        extra.extend(literature.registrations())
     return build_registry(None, include=(), extra=extra, name=name, freeze=freeze)
 
 
 def build_read_skills(registry: ToolRegistry) -> SkillRegistry:
     """Frozen skills over ``registry`` with full tool coverage."""
     skills = [ANSWER_SKILL, *([SUMMARIZE_LITERATURE_SKILL] if SUMMARY_TOOL_NAME in registry else [])]
+    if all(name in registry for name in LITERATURE_RESEARCH_SKILL.tools):
+        skills.append(LITERATURE_RESEARCH_SKILL)
     return build_skill_registry(registry, skills=skills, require_coverage=True)
 
 
