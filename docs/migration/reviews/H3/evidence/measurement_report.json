@@ -1,0 +1,423 @@
+{
+  "caveats": [
+    "Judges are deterministic stand-ins, not language models.",
+    "The encoder hashes character n-grams; it is not the sentence-transformer model.",
+    "Baseline prompt is rebuilt with the current build_merge_prompt over all names; the 222b1e7 prompt text itself is not in this repo.",
+    "The fixture is synthetic; numbers are not corpus estimates. The decision belongs to H3."
+  ],
+  "fixture": {
+    "entities": 133,
+    "mentions": 24,
+    "negative_controls": 9,
+    "novel": 2,
+    "true_merges": 13
+  },
+  "harness_version": "t07-measure-1",
+  "parameters": {
+    "encoder": "deterministic-char-ngram-v1",
+    "faiss_top_k_default": 12,
+    "faiss_top_k_small": 5,
+    "max_candidates": 8,
+    "token_budget": 400
+  },
+  "results": {
+    "conservative": {
+      "baseline_full_list": {
+        "correct_merges": 9,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "Sohxlet extraction",
+          "Pilatus 2M",
+          "charge coupled device area detector",
+          "wide-angle scattering at grazing incidence"
+        ],
+        "false_splits": 4,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 4,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 2013,
+        "prompt_tokens_mean": 1990.7,
+        "recall_in_shortlist": 1.0,
+        "true_outside_shortlist": []
+      },
+      "candidate_search": {
+        "correct_merges": 10,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "Sohxlet extraction",
+          "Pilatus 2M",
+          "charge coupled device area detector"
+        ],
+        "false_splits": 3,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 3,
+        "judge_calls": 18,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 260,
+        "prompt_tokens_mean": 191.6,
+        "recall_in_shortlist": 1.0,
+        "true_outside_shortlist": []
+      },
+      "faiss_shortlist_k12": {
+        "correct_merges": 4,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "Sohxlet extraction",
+          "P3HT",
+          "Pilatus 2M",
+          "charge coupled device area detector",
+          "wide-angle scattering at grazing incidence"
+        ],
+        "false_splits": 9,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 9,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 1154,
+        "prompt_tokens_mean": 1115.6,
+        "recall_in_shortlist": 0.615,
+        "true_outside_shortlist": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "P3HT"
+        ]
+      },
+      "faiss_shortlist_k5": {
+        "correct_merges": 4,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "Sohxlet extraction",
+          "P3HT",
+          "Pilatus 2M",
+          "charge coupled device area detector",
+          "wide-angle scattering at grazing incidence"
+        ],
+        "false_splits": 9,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 9,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 1097,
+        "prompt_tokens_mean": 1063.6,
+        "recall_in_shortlist": 0.615,
+        "true_outside_shortlist": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "P3HT"
+        ]
+      },
+      "no_index": {
+        "baseline_full_list": {
+          "correct_merges": 9,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "Sohxlet extraction",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ],
+          "false_splits": 4,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 4,
+          "judge_calls": 24,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 2013,
+          "prompt_tokens_mean": 1990.7,
+          "recall_in_shortlist": 1.0,
+          "true_outside_shortlist": []
+        },
+        "candidate_search_lexical_only": {
+          "correct_merges": 10,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "Sohxlet extraction",
+            "Pilatus 2M",
+            "charge coupled device area detector"
+          ],
+          "false_splits": 3,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 3,
+          "judge_calls": 16,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 201,
+          "prompt_tokens_mean": 177.3,
+          "recall_in_shortlist": 1.0,
+          "true_outside_shortlist": []
+        },
+        "faiss_shortlist_k12": {
+          "correct_merges": 0,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "GIWAXS",
+            "GI-WAXS",
+            "small angle x-ray scattering",
+            "RSoXS",
+            "TEM",
+            "XRD",
+            "X-ray diffraction",
+            "Sohxlet extraction",
+            "P3HT",
+            "mote2",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ],
+          "false_splits": 13,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 13,
+          "judge_calls": 0,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 0,
+          "prompt_tokens_mean": 0,
+          "recall_in_shortlist": 0.0,
+          "true_outside_shortlist": [
+            "GIWAXS",
+            "GI-WAXS",
+            "small angle x-ray scattering",
+            "RSoXS",
+            "TEM",
+            "XRD",
+            "X-ray diffraction",
+            "Sohxlet extraction",
+            "P3HT",
+            "mote2",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ]
+        }
+      }
+    },
+    "permissive": {
+      "baseline_full_list": {
+        "correct_merges": 12,
+        "false_merge_items": [
+          "wide-angle scattering at grazing incidence",
+          "WTe2",
+          "Al2O3[0001]",
+          "USAXS",
+          "GISAXS",
+          "PC71BM",
+          "gamma-Fe2O3"
+        ],
+        "false_merges": 7,
+        "false_split_items": [],
+        "false_splits": 0,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 0,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 6,
+        "prompt_tokens_max": 2013,
+        "prompt_tokens_mean": 1990.7,
+        "recall_in_shortlist": 1.0,
+        "true_outside_shortlist": []
+      },
+      "candidate_search": {
+        "correct_merges": 12,
+        "false_merge_items": [],
+        "false_merges": 0,
+        "false_split_items": [
+          "charge coupled device area detector"
+        ],
+        "false_splits": 1,
+        "false_splits_held_visible": 1,
+        "false_splits_no_match": 0,
+        "judge_calls": 18,
+        "mentions": 24,
+        "negative_controls_merged": 0,
+        "prompt_tokens_max": 260,
+        "prompt_tokens_mean": 191.6,
+        "recall_in_shortlist": 1.0,
+        "true_outside_shortlist": []
+      },
+      "faiss_shortlist_k12": {
+        "correct_merges": 7,
+        "false_merge_items": [
+          "wide-angle scattering at grazing incidence",
+          "WTe2",
+          "Al2O3[0001]",
+          "USAXS",
+          "GISAXS",
+          "PC71BM",
+          "gamma-Fe2O3"
+        ],
+        "false_merges": 7,
+        "false_split_items": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "P3HT"
+        ],
+        "false_splits": 5,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 5,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 6,
+        "prompt_tokens_max": 1154,
+        "prompt_tokens_mean": 1115.6,
+        "recall_in_shortlist": 0.615,
+        "true_outside_shortlist": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "P3HT"
+        ]
+      },
+      "faiss_shortlist_k5": {
+        "correct_merges": 7,
+        "false_merge_items": [
+          "wide-angle scattering at grazing incidence",
+          "WTe2",
+          "Al2O3[0001]",
+          "USAXS",
+          "GISAXS",
+          "PC71BM",
+          "gamma-Fe2O3"
+        ],
+        "false_merges": 7,
+        "false_split_items": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "P3HT"
+        ],
+        "false_splits": 5,
+        "false_splits_held_visible": 0,
+        "false_splits_no_match": 5,
+        "judge_calls": 24,
+        "mentions": 24,
+        "negative_controls_merged": 6,
+        "prompt_tokens_max": 1097,
+        "prompt_tokens_mean": 1063.6,
+        "recall_in_shortlist": 0.615,
+        "true_outside_shortlist": [
+          "GI-WAXS",
+          "small angle x-ray scattering",
+          "TEM",
+          "XRD",
+          "P3HT"
+        ]
+      },
+      "no_index": {
+        "baseline_full_list": {
+          "correct_merges": 12,
+          "false_merge_items": [
+            "wide-angle scattering at grazing incidence",
+            "WTe2",
+            "Al2O3[0001]",
+            "USAXS",
+            "GISAXS",
+            "PC71BM",
+            "gamma-Fe2O3"
+          ],
+          "false_merges": 7,
+          "false_split_items": [],
+          "false_splits": 0,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 0,
+          "judge_calls": 24,
+          "mentions": 24,
+          "negative_controls_merged": 6,
+          "prompt_tokens_max": 2013,
+          "prompt_tokens_mean": 1990.7,
+          "recall_in_shortlist": 1.0,
+          "true_outside_shortlist": []
+        },
+        "candidate_search_lexical_only": {
+          "correct_merges": 12,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "charge coupled device area detector"
+          ],
+          "false_splits": 1,
+          "false_splits_held_visible": 1,
+          "false_splits_no_match": 0,
+          "judge_calls": 16,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 201,
+          "prompt_tokens_mean": 177.3,
+          "recall_in_shortlist": 1.0,
+          "true_outside_shortlist": []
+        },
+        "faiss_shortlist_k12": {
+          "correct_merges": 0,
+          "false_merge_items": [],
+          "false_merges": 0,
+          "false_split_items": [
+            "GIWAXS",
+            "GI-WAXS",
+            "small angle x-ray scattering",
+            "RSoXS",
+            "TEM",
+            "XRD",
+            "X-ray diffraction",
+            "Sohxlet extraction",
+            "P3HT",
+            "mote2",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ],
+          "false_splits": 13,
+          "false_splits_held_visible": 0,
+          "false_splits_no_match": 13,
+          "judge_calls": 0,
+          "mentions": 24,
+          "negative_controls_merged": 0,
+          "prompt_tokens_max": 0,
+          "prompt_tokens_mean": 0,
+          "recall_in_shortlist": 0.0,
+          "true_outside_shortlist": [
+            "GIWAXS",
+            "GI-WAXS",
+            "small angle x-ray scattering",
+            "RSoXS",
+            "TEM",
+            "XRD",
+            "X-ray diffraction",
+            "Sohxlet extraction",
+            "P3HT",
+            "mote2",
+            "Pilatus 2M",
+            "charge coupled device area detector",
+            "wide-angle scattering at grazing incidence"
+          ]
+        }
+      }
+    }
+  }
+}
