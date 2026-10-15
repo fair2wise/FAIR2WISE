@@ -58,6 +58,77 @@ continues. They run first in the post-H2 phase, ahead of T04-T09.
   changed plan or expired approval is refused; no duplicate effects across
   restart.
 
+## A2 (2026-10-14, owner request): legacy porting and framework consolidation
+
+The owner requested a dedicated stage to systematically bring pre-existing F2W
+code into the new module framework, with originals preserved in
+`app/modules/legacy/` for backward compatibility and reference during the
+transition.
+
+**Design decisions (owner, 2026-10-14):**
+- `app/modules/legacy/` serves both roles simultaneously: frozen originals kept
+  for backward-compat and reference (read-only, no active development), while
+  ported counterparts live in their canonical module locations. The legacy copies
+  stay runnable until the gate that retires them is approved.
+- A piece is retired only after the binary suite has passed against its ported
+  replacement and the owner has approved the retirement at a gate.
+
+### T17B: Audit, port and consolidate pre-framework F2W code
+
+- **Depends on:** H4 (binary suite passed; canonical new-framework modules
+  validated). **Blocks:** H8 (new gate, see below).
+- **Requirement (owner, 2026-10-14):** every piece of application logic that
+  belongs in the framework should live there; originals move to
+  `app/modules/legacy/` and stay runnable until explicitly retired.
+- **Scope:**
+  1. **Audit.** Enumerate all Python files outside `app/modules/` (excluding
+     `tests/`, `evals/`, `scripts/`, `splash_links/`, `AGENT/`) and all
+     files inside `app/modules/` that pre-date the migration framework
+     (identified by baseline inventory B01-B36). Classify each as:
+     - **(a) already ported** — a canonical module covers this; original can
+       move to `legacy/` now.
+     - **(b) needs porting** — logic belongs in the framework but has no
+       canonical home yet; port it before retiring the original.
+     - **(c) operator script** — lives in `scripts/`; promote to a proper
+       CLI entry point via `pyproject.toml` if frequently used, otherwise
+       leave in place.
+     - **(d) retire** — dead code, superseded, or out of scope; remove after
+       owner approval.
+  2. **Port class (b) files.** Implement the canonical module version; add
+     tests proving behavioral parity with the original using the same
+     fixtures as T11 where applicable.
+  3. **Move class (a) originals to `app/modules/legacy/`.** Add a
+     module-level deprecation notice pointing to the canonical location.
+     Keep them importable and runnable; do not change their behavior.
+  4. **Promote class (c) scripts.** Wire frequently-used scripts as
+     `[project.scripts]` entry points in `pyproject.toml`; scripts that
+     are one-off analyses stay as-is.
+  5. **Mark class (d) for retirement.** Record each in the H8 review packet;
+     do not delete until H8 is approved.
+- **Acceptance:**
+  - Audit report committed to `docs/migration/reviews/H8/legacy_audit.md`
+    with one row per classified file.
+  - Every class (b) port passes the T11 binary suite at parity with its
+    original.
+  - `app/modules/legacy/` contains the moved originals with deprecation
+    notices; their existing tests still pass unchanged.
+  - No class (d) file is deleted before H8 approval.
+  - A clean `pip install fair2wise` installs no stray top-level packages;
+    `from f2w.<module>` resolves to the canonical location, not the legacy
+    copy.
+
+### H8: Legacy consolidation gate
+
+- **Evidence required:** legacy audit report; T11 binary suite passing for
+  all class (b) ports; `app/modules/legacy/` inventory with deprecation
+  markers; class (d) retirement list with owner sign-off per item; no
+  regressions in the existing full test suite.
+- **Blocks:** deleting any legacy file, removing any `legacy/` shim, or
+  declaring the framework consolidation complete.
+- **Safe work while waiting:** continued H5/H6/H7 deployment work; T17B
+  audit and porting can run in parallel with the H5-H7 sequence after H4.
+- **Approver:** project owner (same as H0-H7).
+
 ## Order after H2
 
 T25D, T03B and T02B first (they can run in parallel), then the plan's
