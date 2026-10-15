@@ -1,0 +1,280 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)"
+      ],
+      "case_id": "FIG-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "FIG-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "figures",
+        "title": "Correct figure/panel and coordinates",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Correct figure/panel and coordinates",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Correct figure/panel and coordinates. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "FIG",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "015df421c86235ca32c95b2a347166ea639d98b18dc757fff9a22c8709dadbc0",
+        "config_sha256": "4e397b2d6e0efd0099e8e5fb57227461b7561dc8a3159b83550545a6853a4738",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-FIG",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/vision/test_figure_pipeline.py::test_multi_panel_geometry_is_origin_independent",
+          "tests/vision/test_figure_pipeline.py::test_evidence_covers_figure_panels_and_reported_values",
+          "tests/vision/test_figure_pipeline.py::test_unlocated_figure_is_explicit",
+          "tests/vision/test_figure_pipeline.py::test_per_panel_q_ranges_do_not_mix_and_angstrom_is_converted",
+          "tests/vision/test_tools.py::test_each_reading_tool_returns_panel_locators",
+          "tests/vision/test_kernels.py::test_frame_round_trip_and_degenerate",
+          "tests/vision/test_kernels.py::test_label_panels_from_spans_by_position"
+        ],
+        "uncovered": "Correct figure/panel/coordinates on real authorized figures needs owner-labelled gold"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "figures",
+      "supersedes": null,
+      "title": "Correct figure/panel and coordinates"
+    },
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)"
+      ],
+      "case_id": "FIG-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "FIG-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "figures",
+        "title": "Source-supported scale/q-axis/unit",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Source-supported scale/q-axis/unit",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Source-supported scale/q-axis/unit. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "FIG",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "1fbaf748880b4021f82939c6e7186baed715ad2ac3b3703c3bd60a46a7ffe851",
+        "config_sha256": "5961fedfc4c02c11b694aed4564e8e215ba6157404c41f2e22d846a627c16857",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-FIG",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/vision/test_kernels.py::test_q_axis_reads_text_layer_unit_and_converts_angstrom",
+          "tests/vision/test_kernels.py::test_bar_measure_and_scale_reading",
+          "tests/vision/test_kernels.py::test_q_axis_without_unit_is_not_determined",
+          "tests/vision/test_figure_pipeline.py::test_scale_bar_reported_only_where_measured_and_lengths_assigned_by_panel",
+          "tests/vision/test_figure_pipeline.py::test_axis_not_identified_as_q_is_withheld"
+        ],
+        "uncovered": "Source-supported scale/q-axis/unit on real authorized figures needs owner-labelled gold"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "figures",
+      "supersedes": null,
+      "title": "Source-supported scale/q-axis/unit"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "FIG-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "FIG-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "figures",
+        "title": "Ambiguous reading explicitly withheld",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Ambiguous reading explicitly withheld",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Ambiguous reading explicitly withheld. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "FIG",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "100e6c41a0835d4d63a1d2c9172bd6187c6e1b5c9a1941b4c7be1a6e4270d0bc",
+        "config_sha256": "016aa525941b5a5659ea7b3f38e16ba2cf9ffe43d1013643f4de15846c219384",
+        "model_sha256": null,
+        "oracle_source_sha256": "0073c92db52c47ca549bdf76078a1809bf60c535d4f0a891de5303e7486d9313",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Ambiguous scale, unit, panel count, rotation and OCR readings are withheld, never guessed",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/vision/test_kernels.py::test_ambiguous_bars_refused",
+          "tests/vision/test_kernels.py::test_caption_unit_ambiguity_is_withheld",
+          "tests/vision/test_kernels.py::test_q_axis_ocr_unit_never_believed",
+          "tests/vision/test_figure_pipeline.py::test_caption_unit_used_when_panel_states_none_and_ambiguous_units_withheld",
+          "tests/vision/test_figure_pipeline.py::test_panel_count_mismatch_blocks_all_values_and_is_surfaced",
+          "tests/vision/test_figure_pipeline.py::test_rotated_page_withholds_everything",
+          "tests/vision/test_figure_pipeline.py::test_ocr_fallback_spans_are_tagged_and_their_units_never_believed",
+          "tests/vision/test_orientation_tables.py::test_hedged_negated_or_conflicting_statements_are_withheld",
+          "tests/vision/test_orientation_tables.py::test_inference_candidate_never_becomes_a_reported_observation"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Withholding on gold ambiguous figures from real papers (H3 fixtures)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "figures",
+      "supersedes": null,
+      "title": "Ambiguous reading explicitly withheld"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "FIG-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "FIG-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "figures",
+        "title": "Image remains available internally, not publicly",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Image remains available internally, not publicly",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Image remains available internally, not publicly. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "FIG",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "a1205e0807c446b1281f13f016d26e30404052ac6e4fb3adbe2e4dc59abdccf1",
+        "config_sha256": "07e01b794616ba36c5fd847db345a637b1835eb9238f1cd0e6f6bfeb4c0dc293",
+        "model_sha256": null,
+        "oracle_source_sha256": "bc9f551f6a6c5f687460d7b067cda0c4da96f95699a8d2d017d4f22ab92ba02b",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/disclosure/_disclosure_support.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Figure material is readable by trusted internal agents only; results and public routes carry no image bytes, paths or URLs",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/vision/test_figure_pipeline.py::test_results_carry_no_image_bytes_paths_or_urls",
+          "tests/vision/test_tools.py::test_extract_figures_result_locates_figure_and_panels_without_image_material",
+          "tests/vision/test_tools.py::test_access_denied_without_scope_or_authority_and_unknown_inputs",
+          "tests/vision/test_tools.py::test_expired_scope_is_denied",
+          "tests/vision/test_tools.py::test_stored_paper_source_requires_a_stored_verified_pdf",
+          "tests/disclosure/test_disclosure_access.py::test_trusted_internal_read_succeeds_for_every_source_kind",
+          "tests/disclosure/test_disclosure_access.py::test_internal_reads_work_for_every_profile_runtime",
+          "tests/disclosure/test_disclosure_payloads.py::test_no_frozen_legacy_route_is_source_serving"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "figures",
+      "supersedes": null,
+      "title": "Image remains available internally, not publicly"
+    }
+  ],
+  "suite": "figures"
+}

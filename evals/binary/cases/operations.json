@@ -1,0 +1,342 @@
+{
+  "cases": [
+    {
+      "blocked_by": [],
+      "case_id": "OPS-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "OPS-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "operations",
+        "title": "Known complete-population count matches oracle",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Known complete-population count matches oracle",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Known complete-population count matches oracle. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "OPS",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "fa193ce1bde8dd65af196e1ff40d81e02c6da111564c6b1b603dd20f689d4270",
+        "config_sha256": "645209e5fb66365cac93bd7d97cc496a68eed4b7d5ee260699dacc81c65994da",
+        "model_sha256": null,
+        "oracle_source_sha256": "80b27f784202f56014009ded67804b4c5ef7ea4a3e18af2c3052f5b45de8947f",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/operations/fixtures/",
+        "tests/operations/summary_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Population counts of the baseline summary function on synthetic populations",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/operations/test_paper_summary_service.py::test_complete_display_when_everything_is_listed",
+          "tests/operations/test_paper_summary_service.py::test_same_output_as_the_baseline_function",
+          "tests/operations/test_paper_summary_service.py::test_query_scoped_omitted_note_is_not_read_as_the_total"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Known complete-population count on an owner-approved real population (H3 oracle)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "operations",
+      "supersedes": null,
+      "title": "Known complete-population count matches oracle"
+    },
+    {
+      "blocked_by": [
+        "H3 (owner definition of how repeated Work references are deduplicated)",
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "OPS-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "OPS-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "operations",
+        "title": "Repeated Work references deduplicated as approved",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Repeated Work references deduplicated as approved",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Repeated Work references deduplicated as approved. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "OPS",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "daf1bfaee972a27e34cef41cd08b6913cffb44aeb185078a2e4a2273fc594398",
+        "config_sha256": "5b70fcab9d7ecd9cf7394c1d68b2c70c8cb1dd17131cf83dd4c2b6d781093c7d",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/operations/fixtures/",
+        "tests/operations/summary_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/operations/test_paper_summary_service.py::test_duplicate_labels_count_as_separate_records"
+        ],
+        "uncovered": "The approved dedupe/counting definition does not exist yet; the baseline counts duplicate labels as separate records"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "operations",
+      "supersedes": null,
+      "title": "Repeated Work references deduplicated as approved"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "OPS-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "OPS-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "operations",
+        "title": "Incomplete scan not described as exhaustive",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Incomplete scan not described as exhaustive",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Incomplete scan not described as exhaustive. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "OPS",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "038b27dfefc386523ca52eb71884aef8ab60ca72950f5d30b61d99c2dc8ef5bc",
+        "config_sha256": "41d2f049655526b85a95e73652d55ad7c574f3399c4131469e024be8233c8c55",
+        "model_sha256": null,
+        "oracle_source_sha256": "80fa598c65ded82a49caf2e802b1ba859c6ebcbde6ea4bdbb0031069c0fda319",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py",
+        "tests/operations/fixtures/",
+        "tests/operations/summary_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/operations/test_paper_summary_service.py::test_capped_display_is_partial_never_exhaustive",
+          "tests/operations/test_paper_summary_service.py::test_query_scoped_omitted_note_is_not_read_as_the_total",
+          "tests/graph/test_graph_json_backend.py::test_find_entities_flags_partial_results",
+          "tests/graph/test_graph_tiled_server.py::test_partial_scan_is_flagged_not_absent"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "operations",
+      "supersedes": null,
+      "title": "Incomplete scan not described as exhaustive"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "OPS-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "OPS-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "operations",
+        "title": "Display truncation does not change totals",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Display truncation does not change totals",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Display truncation does not change totals. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "OPS",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "382c9c9be75ea3f7aca454b56bf0168cfb089233ad3a3a544f4b4c2c200d26db",
+        "config_sha256": "ebf7bc8d291ab8cd2c882ed4e0488116415f4248c3385f3b80ceb9f0f5f0f1ae",
+        "model_sha256": null,
+        "oracle_source_sha256": "b2e837be7f112ac48d19f6f68ec7675cc495765daecbbf0fd80ad487e05293c7",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/operations/fixtures/",
+        "tests/operations/summary_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Display bounding keeps the same output as the baseline and never reads as the total",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/operations/test_paper_summary_service.py::test_capped_display_is_partial_never_exhaustive",
+          "tests/operations/test_paper_summary_service.py::test_result_is_bounded_with_long_definitions",
+          "tests/operations/test_paper_summary_service.py::test_same_output_as_the_baseline_function",
+          "tests/operations/test_paper_summary_tool.py::test_ok_result_is_typed_bounded_and_cites_eligible_pages"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Totals unchanged under truncation on a gold population (H3 oracle)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "operations",
+      "supersedes": null,
+      "title": "Display truncation does not change totals"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "OPS-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "OPS-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "operations",
+        "title": "Existing deterministic paper-summary citations retained",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Existing deterministic paper-summary citations retained",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Existing deterministic paper-summary citations retained. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "OPS",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "9e9056dc36111dfa7c8f2a69b394cc2cf1524b46324f807985554a27ba7834e0",
+        "config_sha256": "375b9fbb710ecb7ca2c6efcfe6d51787e21aac58ae7e865f89f185bde770fda2",
+        "model_sha256": null,
+        "oracle_source_sha256": "188822ac39c8b89c4b1f353fbaac672d4c4ac8c0e94f0096506c8755cc1bab01",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/operations/fixtures/",
+        "tests/operations/summary_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "The deterministic paper summary keeps the baseline output and its eligible-page citations",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/operations/test_paper_summary_service.py::test_same_output_as_the_baseline_function",
+          "tests/operations/test_paper_summary_service.py::test_page_eligibility_is_the_baseline_rule_including_d10",
+          "tests/operations/test_paper_summary_tool.py::test_ok_result_is_typed_bounded_and_cites_eligible_pages",
+          "tests/operations/test_paper_summary_tool.py::test_spec_is_read_only_free_and_has_no_path_inputs",
+          "tests/operations/test_summary_legacy_ui.py"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "operations",
+      "supersedes": null,
+      "title": "Existing deterministic paper-summary citations retained"
+    }
+  ],
+  "suite": "operations"
+}

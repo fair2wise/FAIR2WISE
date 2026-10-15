@@ -1,0 +1,337 @@
+{
+  "cases": [
+    {
+      "blocked_by": [],
+      "case_id": "LLM-01",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H2 decision Q4 (per-user settings on ALS). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "LLM-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "inference",
+        "title": "Frontend provider/model selection preserved",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Frontend provider/model selection preserved",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Frontend provider/model selection preserved. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: on ALS the provider/model selection is the signed-in user's own personal setting, independent per principal; on :local the operator's settings are the server's.",
+      "expected_rule_source": "owner_decision",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "b940debbd525fe40af785f7894b926a2cdb283a15a256371007f79268c1f8982",
+        "config_sha256": "a00b5d9c3e93c4294566890b84f2264bedaf15173df3a0ddd7fa95dbb70ba0ba",
+        "model_sha256": null,
+        "oracle_source_sha256": "28b53b7624adf24b16208f271450227cafcc76f324b90554d38db613ab6ca4c1",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/read_path/read_path_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Per-principal provider/model settings are what a turn uses; local settings stay server-wide",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/settings/test_personal_settings.py::test_two_principals_keep_independent_settings_and_turns_use_their_own",
+          "tests/settings/test_personal_settings.py::test_local_settings_stay_server_wide",
+          "tests/read_path/test_application.py::test_delegated_run_uses_f2w_prompt_skill_and_admission",
+          "tests/read_path/test_application.py::test_default_admission_is_the_shared_provider_admission"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "End-to-end frontend selection through every runtime path (T14/T18C)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "inference",
+      "supersedes": "LLM-01 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Frontend provider/model selection preserved"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "LLM-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "inference",
+        "title": "No automatic donor or paid fallback",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "No automatic donor or paid fallback",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: No automatic donor or paid fallback. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "ee7e3b4b451695291d253870d4b17a4f8718121d703c892b200612fe2503bf4f",
+        "config_sha256": "b0e94895ff8c41674502499484fd7b4b2f1f8facdb5a8c467304550dc11e790e",
+        "model_sha256": null,
+        "oracle_source_sha256": "c6454161cdf4bc1a9ded089b3afe15afeb2438a47b0310f5efde9f71bbba5d8f",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/extraction/extraction_fakes.py",
+        "tests/read_path/read_path_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "No automatic donor or paid fallback: clients fail closed and runtime modules construct no provider",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/test_llm_admission.py::test_cborg_clients_fail_closed_without_key",
+          "tests/test_llm_admission.py::test_require_cborg_api_key_refuses_openai_fallback",
+          "tests/canonicalization/test_canon_online.py::test_chat_judge_uses_existing_client_signature_and_has_no_default",
+          "tests/extraction/test_forge_strategies.py::test_extraction_package_constructs_no_provider_and_imports_no_donor_code",
+          "tests/read_path/test_application.py::test_delegate_needs_an_injected_chat_model"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "inference",
+      "supersedes": null,
+      "title": "No automatic donor or paid fallback"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "LLM-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "inference",
+        "title": "Combined sync/async/worker quota enforced",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Combined sync/async/worker quota enforced",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Combined sync/async/worker quota enforced. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "0d5cf1274ea9cbfeb321c68ff1a160bd5b6ef7be15b703597e4e0167e3ea868e",
+        "config_sha256": "dd1daf4a4f8c87bccaec85c4c1e1a2480f9abd0d3af4738f592ee8edaf458f0b",
+        "model_sha256": null,
+        "oracle_source_sha256": "3ceba3f5c988aaeda765e5b7127336df2fd49f8ecf11f18e82aaaae3792b0edc",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/runtime/runtime_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Sync and async callers share one provider cap",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/test_llm_admission.py::test_sync_and_async_callers_share_one_cap",
+          "tests/test_llm_admission.py::test_provider_admission_facade_uses_shared_controller",
+          "tests/test_llm_admission.py::test_cborg_limiter_routes_to_shared_controller_when_flag_on",
+          "tests/test_cborg_limiter.py",
+          "tests/runtime/test_runtime_executor.py::test_call_and_cost_budgets"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Background worker/job callers join the same quota (T10)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "inference",
+      "supersedes": null,
+      "title": "Combined sync/async/worker quota enforced"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "LLM-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "inference",
+        "title": "Rate response/backoff/cancel respected",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Rate response/backoff/cancel respected",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Rate response/backoff/cancel respected. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "02030ccf01d384022a81094d831583f0f181ceef5e59f0e93eb8f2ed3c93e6db",
+        "config_sha256": "fe4818deb9fdca334696670bd75cdd1f54737192eeed75d42e40d9ffd758d688",
+        "model_sha256": null,
+        "oracle_source_sha256": "3f6a0a85f0e2e8a87ea60863ca2ab7478561b64e4f140b68313e47197922bbe9",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/runtime/runtime_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Rate-limit cooldown, cancellation and no-retry-on-deterministic-failure behaviour in admission and executor",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/test_llm_admission.py::test_rate_limit_starts_cooldown_for_every_caller",
+          "tests/test_llm_admission.py::test_cancelled_async_waiter_does_not_leak_a_slot",
+          "tests/runtime/test_runtime_executor.py::test_async_cancellation_propagates",
+          "tests/runtime/test_runtime_executor.py::test_transient_failure_retried_then_succeeds",
+          "tests/runtime/test_runtime_executor.py::test_deterministic_failures_not_retried"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Provider backoff on real responses and worker cancel (T10, live provider)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "inference",
+      "supersedes": null,
+      "title": "Rate response/backoff/cancel respected"
+    },
+    {
+      "blocked_by": [
+        "T10 (durable jobs and curation)",
+        "O03 (owner approval of the job-settings rule)"
+      ],
+      "case_id": "LLM-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "inference",
+        "title": "Settings revision for live job matches approved policy",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Settings revision for live job matches approved policy",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Settings revision for live job matches approved policy. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "86c2c20a166fe0c4ae81d20f2d60ba76c0981351fe4f28d47c8747e543baa2ea",
+        "config_sha256": "f7f2425386a2ade235e9962383df18ea3ee40009959cb7c895c27f20b8cd07fe",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Live job settings revisions need durable jobs; the owner settings rule (O03) is pending"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "inference",
+      "supersedes": null,
+      "title": "Settings revision for live job matches approved policy"
+    }
+  ],
+  "suite": "inference"
+}

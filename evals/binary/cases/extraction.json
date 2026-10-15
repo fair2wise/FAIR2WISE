@@ -1,0 +1,349 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)",
+        "T11B (live/fake model execution of approved cases)"
+      ],
+      "case_id": "EXT-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "EXT-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "extraction",
+        "title": "Approved schema and record fields",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Approved schema and record fields",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Approved schema and record fields. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "EXT",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "d0b6a4d4798995d02ea03d4c8201f54307a41f4afd773ef2962271bc35779b75",
+        "config_sha256": "6123b8db932be546a01c2ebff717f99dffc7f4941fd8a483fca513761b40866f",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+      },
+      "input_fixture_refs": [
+        "tests/extraction/extraction_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-EXT",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/extraction/test_legacy_parity.py::test_f2w_specific_fields_survive_normalization",
+          "tests/extraction/test_legacy_parity.py::test_default_strategy_is_the_existing_f2w_extractor",
+          "tests/extraction/test_legacy_parity.py::test_wrapped_output_equals_direct_output_on_the_synthetic_fixture",
+          "tests/extraction/test_forge_strategies.py::test_forge_paper_strategy_returns_the_normalized_contract"
+        ],
+        "uncovered": "semantic judgment needs the H3-approved rubric"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema_extract.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "extraction",
+      "supersedes": null,
+      "title": "Approved schema and record fields"
+    },
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)",
+        "T11B (live/fake model execution of approved cases)"
+      ],
+      "case_id": "EXT-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "EXT-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "extraction",
+        "title": "Reported quantity and normalized unit agree",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Reported quantity and normalized unit agree",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Reported quantity and normalized unit agree. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "EXT",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "ab0d29221be12065d66c5421ae347b326179239e7d8ee2d4e22c3001da63d7f6",
+        "config_sha256": "0098b453de52d6216299ea5c1e0c204aed47b36a9a2e839f66e355321bd70826",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+      },
+      "input_fixture_refs": [
+        "tests/evidence/evidence_fixtures.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-EXT",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/science/test_normalize.py",
+          "tests/evidence/test_evidence.py::test_normalize_quantity_keeps_raw_and_conversion_provenance",
+          "tests/evidence/test_evidence.py::test_units_refuse_rather_than_guess",
+          "tests/evidence/test_evidence.py::test_record_reported_quantities_keeps_uncertainty_confidence_and_raw_units_apart"
+        ],
+        "uncovered": "semantic judgment needs the H3-approved rubric"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema_extract.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "extraction",
+      "supersedes": null,
+      "title": "Reported quantity and normalized unit agree"
+    },
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)",
+        "T11B (live/fake model execution of approved cases)"
+      ],
+      "case_id": "EXT-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "EXT-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "extraction",
+        "title": "Missing values are not fabricated",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Missing values are not fabricated",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Missing values are not fabricated. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "EXT",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "a3047450eb8eda0a620b27eb54d609924ed941d4478248b1d17c7c1427e3d3a5",
+        "config_sha256": "eac1f0cfb7697578552722e60c49c57e13ee9049c9eaec1fa9217e1b0989a848",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+      },
+      "input_fixture_refs": [
+        "tests/evidence/evidence_fixtures.py",
+        "tests/extraction/extraction_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-EXT",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/evidence/test_evidence.py::test_unlocated_and_label_only_evidence_carry_missing_markers_not_invented_spans",
+          "tests/evidence/test_evidence.py::test_a_miss_has_no_offsets",
+          "tests/evidence/test_evidence.py::test_section_page_unknown_is_none_not_zero",
+          "tests/extraction/test_forge_strategies.py::test_structure_unknown_is_none_not_negative",
+          "tests/vision/test_figure_pipeline.py::test_unit_missing_everywhere_is_withheld_not_defaulted"
+        ],
+        "uncovered": "semantic judgment needs the H3-approved rubric"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema_extract.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "extraction",
+      "supersedes": null,
+      "title": "Missing values are not fabricated"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "EXT-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "EXT-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "extraction",
+        "title": "Source Work/version and locator resolve",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Source Work/version and locator resolve",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Source Work/version and locator resolve. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "EXT",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "188dfc932c8263e88f45f450a17f4c19095fa474e1d54ebbadc13415a3c76fd0",
+        "config_sha256": "b15762e55d127628f553865aa95fa67afa87cbdd48c9b60a3cd048a77335dfa6",
+        "model_sha256": null,
+        "oracle_source_sha256": "b66dd1a52ca5568bc04f9b599ba97adef5ff3a77368ca6d71a67ee7d2cac2937",
+        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+      },
+      "input_fixture_refs": [
+        "tests/evidence/evidence_fixtures.py",
+        "tests/extraction/extraction_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Locator and Work/source-version resolution on synthetic fixtures",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/evidence/test_evidence.py::test_build_evidence_ties_a_quote_to_source_version_and_location",
+          "tests/evidence/test_evidence.py::test_exact_quote_has_offsets_into_the_stored_text",
+          "tests/evidence/test_evidence.py::test_a_miss_has_no_offsets",
+          "tests/evidence/test_evidence.py::test_locate_in_any_section_prefers_exact_then_shortest_and_flags_ties",
+          "tests/extraction/test_validation_stage.py::test_every_retained_assertion_traces_to_source_version_and_location",
+          "tests/extraction/test_validation_stage.py::test_document_validation_attaches_evidence_refs_and_withholds_lexical_failures"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Gold Work/locator pairs on authorized real papers (H3 fixtures)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema_extract.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "extraction",
+      "supersedes": null,
+      "title": "Source Work/version and locator resolve"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "EXT-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "EXT-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "extraction",
+        "title": "Incomplete extraction cannot be promoted",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Incomplete extraction cannot be promoted",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Incomplete extraction cannot be promoted. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "EXT",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "150db0ea246fa0689cf1e99c4ef2f8ae92a2296d9c23b85c7be9fcbc7797fa93",
+        "config_sha256": "6f946d315291218b65bf15a251cb811a2a6c3a40f7ca861903e5cde2610a5c8e",
+        "model_sha256": null,
+        "oracle_source_sha256": "ddf933e4fb19eccd9c27e0c58530532bd8cc286fd700f4350a4285b25eb58a97",
+        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+      },
+      "input_fixture_refs": [
+        "tests/extraction/extraction_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Incomplete extraction is reported unknown and is not importable from a staged package",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/extraction/test_legacy_parity.py::test_completeness_is_reported_as_unknown_not_success",
+          "tests/extraction/test_validation_stage.py::test_withheld_cases_never_reach_the_sink",
+          "tests/extraction/test_validation_stage.py::test_h3_gates_are_closed_and_enforced",
+          "tests/literature/test_staging.py::test_incomplete_extraction_is_never_importable"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Promotion/publication refusal end to end (needs T10 curation and T08B import)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": "storage/schema/rsoxs_schema_extract.yaml",
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "extraction",
+      "supersedes": null,
+      "title": "Incomplete extraction cannot be promoted"
+    }
+  ],
+  "suite": "extraction"
+}

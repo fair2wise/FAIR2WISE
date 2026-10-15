@@ -1,0 +1,584 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "T26B (committed artifact validation and export)"
+      ],
+      "case_id": "REL-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-01",
+        "execution_status": "not_run",
+        "expected_rule": "Commit/path/sha256 and staging PASS result identify identical snapshot/manifest; mutation forces new validation.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Committed JSON equals validated graph bytes",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Committed JSON equals validated graph bytes",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Commit/path/sha256 and staging PASS result identify identical snapshot/manifest; mutation forces new validation.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "73bdac5caaac22e15457cbe3d754c012280a832eaad4bb66b2d314f64e541b00",
+        "config_sha256": "478d4b96441dce8e0400838af162ed4ab7cb6721e8dc8fd5779389d56cab9aca",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/json_kg/"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/json_kg/test_json_kg_contract.py::test_fixture_files_match_manifest_hashes"
+        ],
+        "uncovered": "Commit/path/sha256 identity of a validated graph needs the committed-artifact validator"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "Committed JSON equals validated graph bytes"
+    },
+    {
+      "blocked_by": [
+        "T26B (committed artifact validation and export)",
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "REL-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-02",
+        "execution_status": "not_run",
+        "expected_rule": "Transfer/export/import approved Git JSON without parser/model/acquisition/canonicalization calls.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Production promotion invokes zero extraction or inference",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Production promotion invokes zero extraction or inference",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Transfer/export/import approved Git JSON without parser/model/acquisition/canonicalization calls.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "361e57e5b6f8530e3b3fa191047dff763cda621735bfd62d16387880c9fbbb42",
+        "config_sha256": "305dcaf7f1a837358bb625c55dcaf297cdf5abd392da320fa8afd659e02c95b8",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Production promotion without inference needs the promotion path and importer"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "Production promotion invokes zero extraction or inference"
+    },
+    {
+      "blocked_by": [
+        "T26B (committed artifact validation and export)",
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "REL-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-03",
+        "execution_status": "not_run",
+        "expected_rule": "Staging receipt/approval cannot substitute for target-scoped production admin plan.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Production import has independent authorization and receipt",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Production import has independent authorization and receipt",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Staging receipt/approval cannot substitute for target-scoped production admin plan.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "997b51cb90a8ef083a63772ad4c78e1f6c8f0c9feae85ae3b3556eca2017abb5",
+        "config_sha256": "5c71dcc18c1485b84b6a356e29089a2ac99fecb0d529a01a389602a17de0f3c7",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod"
+        ],
+        "uncovered": "Target-scoped import plan and receipt are not built"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "Production import has independent authorization and receipt"
+    },
+    {
+      "blocked_by": [
+        "T26B (committed artifact validation and export)"
+      ],
+      "case_id": "REL-04",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D1 (verbatim snippets in stored KG JSON, 2026-10-12); H1 owner_decisions O-G1 (what is tracked in Git, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "REL-04",
+        "execution_status": "not_run",
+        "expected_rule": "Check tracked graph/manifests without exposing full papers, crops, raw source bodies or credentials.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Git commit candidates exclude private source and secrets",
+        "verdict": null
+      },
+      "companion_expected_rule": "Check tracked graph/manifests without exposing full papers, crops, raw source bodies or credentials.",
+      "companion_title": "Git commit candidates exclude private source and secrets",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Check tracked graph/manifests without exposing full papers, crops, raw source bodies or credentials. Owner decision update: stored KG JSON may contain verbatim context snippets and is tracked in Git; research papers, raw PDFs, full parsed bodies, figure crops, the source-RAG index, credentials, local paths and operational databases must not be tracked.",
+      "expected_rule_source": "owner_decision",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "3c9ce1f0507f61a687ae995baa50362b3374dafdbe2fc406500dce85816ace02",
+        "config_sha256": "178290419abf0e39c989b0786e0648f400573e1460d40274d8c5695a8155e764",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/json_kg/"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/json_kg/test_json_kg_contract.py::test_fixture_inputs_carry_no_local_paths"
+        ],
+        "uncovered": "The tracked-artifact disclosure check does not exist yet"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": "REL-04 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Git commit candidates exclude private source and secrets"
+    },
+    {
+      "blocked_by": [
+        "T24B (build shared runtime and the three image finals)",
+        "T24D (GitHub Actions build/publication and protected tags)"
+      ],
+      "case_id": "REL-05",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D1 (verbatim snippets in stored KG JSON, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "REL-05",
+        "execution_status": "not_run",
+        "expected_rule": "All three variants exclude Git-tracked corpus data from build context/final and intermediate layers.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Tracked graph snapshots remain outside image layers",
+        "verdict": null
+      },
+      "companion_expected_rule": "All three variants exclude Git-tracked corpus data from build context/final and intermediate layers.",
+      "companion_title": "Tracked graph snapshots remain outside image layers",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "All three variants exclude Git-tracked corpus data from build context/final and intermediate layers. Owner decision update: tracked KG JSON (storage/kg, storage/terminology) is kept in the Docker image; raw PDFs, full parsed paper bodies, figure crops, the source-RAG index (storage/source_index), credentials, local paths and operational databases remain excluded from build context and all layers.",
+      "expected_rule_source": "owner_decision",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "47c5a94c6852872dad3a84e986af74480d02d2e7a2f4e1d0fd7639479eeab254",
+        "config_sha256": "baceb7e25d4c85c2b25b314592ecf040b096eb8c8e2b82cb71a89a3368105f67",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Build-context and layer inspection needs the image build"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": "REL-05 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Tracked graph snapshots remain outside image layers"
+    },
+    {
+      "blocked_by": [
+        "T26B (committed artifact validation and export)"
+      ],
+      "case_id": "REL-06",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-06",
+        "execution_status": "not_run",
+        "expected_rule": "Missing private asset yields explicit blocked/degraded capability rather than model calls or source commit.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Private evidence dependencies are checked without hidden rebuild",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Private evidence dependencies are checked without hidden rebuild",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Missing private asset yields explicit blocked/degraded capability rather than model calls or source commit.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "14ed626e7102565e41401c0cfa9e67671ea1e10e5417b400552625e9b091360c",
+        "config_sha256": "d9dce071bded394088dfbd19f9af83bc08feb9fbc7e1926be4a33179ac3f4f19",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Private-asset dependency checks belong to the promotion validator"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "Private evidence dependencies are checked without hidden rebuild"
+    },
+    {
+      "blocked_by": [
+        "T10 (durable jobs and curation)",
+        "T26B (committed artifact validation and export)",
+        "T23B (immutable JSON snapshot service)"
+      ],
+      "case_id": "REL-07",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-07",
+        "execution_status": "not_run",
+        "expected_rule": "Reconcile journal into new JSON, preserve previous version; older import cannot erase acknowledged edits.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Admin edits produce a new committed promotion version",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Admin edits produce a new committed promotion version",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Reconcile journal into new JSON, preserve previous version; older import cannot erase acknowledged edits.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "05dce16362426ba4a5b0e1387937a70df3bbb63f765e7b01be55b16aaf5cb51d",
+        "config_sha256": "b732087dc9bffa83827807abbbed55ecbee457be944848a7bd8f0ce483bb2291",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Journal reconciliation into a new committed JSON version is not built"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "Admin edits produce a new committed promotion version"
+    },
+    {
+      "blocked_by": [
+        "T26C (exact Git snapshot promotion and rollback rehearsal)"
+      ],
+      "case_id": "REL-08",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-08",
+        "execution_status": "not_run",
+        "expected_rule": "Select an earlier immutable data commit/hash with target approval, no history rewrite or automatic image coupling.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "Data rollback and code rollback are independent",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Data rollback and code rollback are independent",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "Select an earlier immutable data commit/hash with target approval, no history rewrite or automatic image coupling.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "3dc4368a03879831582d1f039bc144f110bd3c3635a3e7770781ab463264c9aa",
+        "config_sha256": "62bf6614d9ac79f8ecd353fcd56a9db58ae7a8f238959cc0144527a155b733a7",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Data rollback rehearsal"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "Data rollback and code rollback are independent"
+    },
+    {
+      "blocked_by": [
+        "T15 (FORGE imports F2W agents)"
+      ],
+      "case_id": "REL-09",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "REL-09",
+        "execution_status": "not_run",
+        "expected_rule": "A tested patch is not reported merged; owner/Alex select target and authorize remote integration.",
+        "expected_rule_status": "draft_requires_owner_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "git_promotion",
+        "title": "FORGE merge status is independently recorded",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "FORGE merge status is independently recorded",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "A tested patch is not reported merged; owner/Alex select target and authorize remote integration.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "REL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "d57e3bb2f9541425f53d027b4e349ff52d1113e4dca4a7a9450d7836c9b3a7ad",
+        "config_sha256": "81e13250618b65d06eb32777c04ebdbf5df4d3f7b3b3c736c98e1127090ebf3e",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "FORGE merge status is recorded by the integration task and the owner with Alex"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "git_promotion",
+      "supersedes": null,
+      "title": "FORGE merge status is independently recorded"
+    }
+  ],
+  "suite": "git_promotion"
+}

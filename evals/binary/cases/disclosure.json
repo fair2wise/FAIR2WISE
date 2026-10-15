@@ -1,0 +1,496 @@
+{
+  "cases": [
+    {
+      "blocked_by": [],
+      "case_id": "QUOTE-01",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D2 (relevance-only quotes, 40% region rule, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "QUOTE-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "Relevant exact quotation and source citation remain visible",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Relevant exact quotation and source citation remain visible",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Relevant exact quotation and source citation remain visible. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: no per-quote, per-answer, per-session or per-user count limits as long as quotes are relevant and verify against sources retrieved and cited for the turn; one response may not reproduce more than 40% of any single page/section verbatim (quotes plus echoed runs).",
+      "expected_rule_source": "owner_decision",
+      "family": "QUOTE",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "641ad8abbe1c37c653cfb4deeb7d13f42a42f0a9ca4604f003ac0ac82b463abf",
+        "config_sha256": "61f9f3b3d8907f44ab0e6020deea8452eb065556e9ab4d73080b6a4431f165d7",
+        "model_sha256": null,
+        "oracle_source_sha256": "adb6968fb9e65a3aacd0ad58ccbdffb8774dd529eebc0e1504c8fd6a70581402",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/disclosure/_disclosure_support.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Relevant exact quotations with their citation stay visible with no count limits; a page dump is clipped",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_quotes.py::test_relevant_exact_quote_survives_byte_identical_with_citation",
+          "tests/disclosure/test_disclosure_quotes.py::test_long_relevant_quote_is_shown_in_full_by_default",
+          "tests/disclosure/test_disclosure_quotes.py::test_many_relevant_quotes_from_different_pages_are_all_kept_by_default",
+          "tests/disclosure/test_disclosure_quotes.py::test_full_page_echo_is_clipped",
+          "tests/disclosure/test_disclosure_quotes.py::test_structured_quote_carries_locator_and_citation",
+          "tests/disclosure/test_disclosure_quotes.py::test_same_projection_for_every_role",
+          "tests/api_wiring/test_wiring_quotes.py::test_als_user_gets_verified_quotes",
+          "tests/api_wiring/test_wiring_quotes.py::test_verbatim_quote_of_a_retrieved_chunk_keeps_its_quotes",
+          "tests/api_wiring/test_wiring_quotes.py::test_answer_echoing_most_of_a_region_is_clipped"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": "QUOTE-01 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Relevant exact quotation and source citation remain visible"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "QUOTE-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "QUOTE-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "Paraphrase or changed-source text is not labeled as an exact quote",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Paraphrase or changed-source text is not labeled as an exact quote",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Paraphrase or changed-source text is not labeled as an exact quote. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "QUOTE",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "7e643f47da48ae5667a1d9638d9462f0ce767cc871b2f12002921e13d566baaf",
+        "config_sha256": "6d605f3c8234508562be3456b508347081a1430b2ebeea669df9e1b42f9763a4",
+        "model_sha256": null,
+        "oracle_source_sha256": "cd9d76033772030239502bef15fbd2ea9e59ae1fad2a40561f832b4ad09e437b",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/disclosure/_disclosure_support.py",
+        "tests/evidence/evidence_fixtures.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "A paraphrase or changed-source text is never labelled an exact quote",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_quotes.py::test_paraphrase_is_never_verbatim_even_when_text_matches",
+          "tests/disclosure/test_disclosure_quotes.py::test_unverifiable_quote_is_downgraded_to_cited_statement",
+          "tests/disclosure/test_disclosure_quotes.py::test_structured_exact_claim_failing_check_is_not_verbatim",
+          "tests/disclosure/test_disclosure_quotes.py::test_normalized_match_is_verbatim_only_under_recorded_profile",
+          "tests/api_wiring/test_wiring_quotes.py::test_paraphrased_quote_is_downgraded_to_a_cited_statement",
+          "tests/evidence/test_evidence.py::test_normalization_profile_is_not_the_disclosure_verbatim_profile"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": null,
+      "title": "Paraphrase or changed-source text is not labeled as an exact quote"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SEC-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SEC-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "Public PDF/fulltext/crop endpoints denied",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Public PDF/fulltext/crop endpoints denied",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Public PDF/fulltext/crop endpoints denied. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SEC",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "660f4ec542fb129a6548f84f6435f4e4d8ebbf3388c2c6b2ae37aeb0d5260c8a",
+        "config_sha256": "b09b2ba1faf1923f520def746bcfa755915b8bd6c41da068981d7dd081e38a61",
+        "model_sha256": null,
+        "oracle_source_sha256": "0863c79d20e60b398404df3cda0781becc7cb8e8148bc0cb9812838250316093",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/disclosure/_disclosure_support.py",
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "No public route serves source PDFs, full text or crops; guessed source URLs are denied",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_payloads.py::test_no_frozen_legacy_route_is_source_serving",
+          "tests/disclosure/test_disclosure_payloads.py::test_guessed_source_urls_are_denied",
+          "tests/disclosure/test_disclosure_access.py::test_caller_flags_never_grant_source_read",
+          "tests/disclosure/test_disclosure_access.py::test_full_access_profiles_hold_no_user_surface_source_access",
+          "tests/security/test_security_guards_routes.py::test_route_policy_matches_contract_section_7"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": null,
+      "title": "Public PDF/fulltext/crop endpoints denied"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SEC-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SEC-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "Trusted internal agent reads succeed",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Trusted internal agent reads succeed",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Trusted internal agent reads succeed. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SEC",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "9b797703cd45bdaf488dc099994a85f88840f0f7b92d94cf5fbb8a17cbdc5192",
+        "config_sha256": "ec66aa7954a2a1c01ef40f49b043724a9b14552ba3ce5f5b392dd2093ac49ddf",
+        "model_sha256": null,
+        "oracle_source_sha256": "f9b4857a23f48e401637a7092cf8658e839e595c9d814763bf17d44ec1a799fe",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/disclosure/_disclosure_support.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Trusted internal agent reads of every source kind succeed inside their granted scope",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_access.py::test_trusted_internal_read_succeeds_for_every_source_kind",
+          "tests/disclosure/test_disclosure_access.py::test_internal_reads_work_for_every_profile_runtime",
+          "tests/disclosure/test_disclosure_access.py::test_grant_expiry_and_revocation",
+          "tests/disclosure/test_disclosure_access.py::test_scope_limits_kind_corpus_and_work"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": null,
+      "title": "Trusted internal agent reads succeed"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SEC-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SEC-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "Caller flag cannot confer agent authority",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Caller flag cannot confer agent authority",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Caller flag cannot confer agent authority. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SEC",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "d194028dfa559b91c525308868494214c439aefebb47776efcd712206bd92515",
+        "config_sha256": "edcf86b3aea745a69accac5c48ced179c32c733a935ee97fd7758ff9441ba609",
+        "model_sha256": null,
+        "oracle_source_sha256": "fe7942bc7a934284afddcf7f61b38e4fb7906d4f413691fbd8e8411884467072",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/disclosure/_disclosure_support.py",
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "A caller-supplied flag, claim or request-shaped context cannot confer source-read authority",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_access.py::test_caller_flags_never_grant_source_read",
+          "tests/disclosure/test_disclosure_access.py::test_forged_or_tampered_grants_fail_the_seal",
+          "tests/disclosure/test_disclosure_access.py::test_request_shaped_context_cannot_obtain_a_grant",
+          "tests/disclosure/test_disclosure_access.py::test_viewer_comes_only_from_server_context",
+          "tests/disclosure/test_disclosure_access.py::test_source_read_is_not_a_request_capability",
+          "tests/security/test_security_fastapi.py::test_forged_trust_claims_never_elevate",
+          "tests/contracts/test_shared_contracts.py::test_source_read_is_not_a_requestable_capability"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": null,
+      "title": "Caller flag cannot confer agent authority"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SEC-04",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D2/T21B follow-up: admin raw traces (2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "SEC-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "SSE/traces/errors do not leak source bodies",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "SSE/traces/errors do not leak source bodies",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: SSE/traces/errors do not leak source bodies. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: admins (verified ALS admins and every :local user) receive the raw trace from GET /traces/{turn_id}; other users receive the projected summary.",
+      "expected_rule_source": "owner_decision",
+      "family": "SEC",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "d8a936b90680e5c4e01fcb580f72edd4b159ee03e9ad797d035fe096379a8969",
+        "config_sha256": "99b10f15e7b3641fcad77cead4368b62ec5c64d9749aa50f9e1d5ff55b4eb9c7",
+        "model_sha256": null,
+        "oracle_source_sha256": "881d26822725d263ad9e0dae949ff34125aa28697fd4ffb89968d36f5bbef6f0",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/disclosure/_disclosure_support.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "SSE events, traces and errors carry no source bodies to ordinary users; admins/local operators see the raw trace as decided",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_payloads.py::test_progress_events_drop_private_data_and_keep_graph_shape",
+          "tests/disclosure/test_disclosure_payloads.py::test_sse_complete_and_error_events_are_projected",
+          "tests/disclosure/test_disclosure_payloads.py::test_trace_projection_has_no_prompt_or_page_text",
+          "tests/disclosure/test_disclosure_payloads.py::test_error_messages_are_typed_or_path_free",
+          "tests/disclosure/test_disclosure_payloads.py::test_project_exception_never_returns_raw_str_exc",
+          "tests/disclosure/test_disclosure_payloads.py::test_trace_route_gives_admins_and_local_raw_and_others_the_summary",
+          "tests/api_wiring/test_wiring_als_guards.py::test_user_trace_is_projected_and_admin_trace_is_raw",
+          "tests/api_wiring/test_wiring_startup.py::test_local_trace_is_raw_and_annotator_is_the_local_operator"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": "SEC-04 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "SSE/traces/errors do not leak source bodies"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "SEC-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "SEC-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "disclosure",
+        "title": "Graph/report exports and artifact URLs cannot bypass policy",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Graph/report exports and artifact URLs cannot bypass policy",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Graph/report exports and artifact URLs cannot bypass policy. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "SEC",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "80a7b3539906718344c0d82316910848f4bc3fadb0577d7d76550e9f75cf4825",
+        "config_sha256": "61ec74a20ed363c446149982a3b39f18d17ba86e13f5db91b65a1abaa6fab95c",
+        "model_sha256": null,
+        "oracle_source_sha256": "48d8f40de827e8f9fae2795bd1acfbaff53933ff419812ba6861cd479d81f2a1",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/disclosure/_disclosure_support.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Graph payloads/exports strip private evidence and artifact URLs; reconstruction is capped per actor",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/disclosure/test_disclosure_payloads.py::test_graph_export_keeps_facts_and_moves_snippets_to_private_evidence",
+          "tests/disclosure/test_disclosure_payloads.py::test_graph_node_private_properties_and_artifact_urls_removed",
+          "tests/disclosure/test_disclosure_payloads.py::test_graph_payload_and_neighborhood_strip_edge_evidence",
+          "tests/disclosure/test_disclosure_payloads.py::test_guessed_source_urls_are_denied",
+          "tests/disclosure/test_disclosure_payloads.py::test_settings_and_health_paths_become_opaque",
+          "tests/disclosure/test_disclosure_reconstruction.py",
+          "tests/api_wiring/test_wiring_opaque_paths.py::test_opaque_ids_resolve_only_inside_allowed_roots"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Report/export artifacts produced by later tasks (T19D/T26B)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "disclosure",
+      "supersedes": null,
+      "title": "Graph/report exports and artifact URLs cannot bypass policy"
+    }
+  ],
+  "suite": "disclosure"
+}

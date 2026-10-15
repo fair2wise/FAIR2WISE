@@ -1,0 +1,1933 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "T24B (build shared runtime and the three image finals)",
+        "T24D (GitHub Actions build/publication and protected tags)"
+      ],
+      "case_id": "DEP-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-01",
+        "execution_status": "not_run",
+        "expected_rule": "same reviewed source and dependency fingerprints",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "All three image variants contain the supported UI/backend/agents/worker",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "All three image variants contain the supported UI/backend/agents/worker",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "same reviewed source and dependency fingerprints",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "ab1fcc165f2eb5428492a7cd38b13038d0e00326cda12d847de9e07c42a63be3",
+        "config_sha256": "ce9c7fa3faacb4cad60a476fc9dc853aeb3d0fa46e8abba7542b11460a2463f6",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "No image variants are built yet"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "All three image variants contain the supported UI/backend/agents/worker"
+    },
+    {
+      "blocked_by": [
+        "T24B (build shared runtime and the three image finals)"
+      ],
+      "case_id": "DEP-02",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-T1 (Tiled 0.2.18 interim pin, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "DEP-02",
+        "execution_status": "not_run",
+        "expected_rule": "no sidecar requirement; persistent local state",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Local image provisions supervised Tiled 0.2.19",
+        "verdict": null
+      },
+      "companion_expected_rule": "no sidecar requirement; persistent local state",
+      "companion_title": "Local image provisions supervised Tiled 0.2.19",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "no sidecar requirement; persistent local state Owner decision update: the interim pin is tiled==0.2.18 (wheel sha256 416079d4...fa06, sdist sha256 2f394326...1e27) in place of 0.2.19 until a final 0.2.19 exists; the managed server runs in its own environment.",
+      "expected_rule_source": "owner_decision",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "859e95dc016321393117c6e5b1f11bd9a51bc710287726491f8e088b2c11eeb4",
+        "config_sha256": "b4c1b4fdbdaaa3e5969f96d676b77d953cf9f733e476114ed00da97648a8c6ea",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/tiled/test_tiled_deploy_config.py::test_local_profile_is_managed_on_loopback_8765",
+          "tests/tiled/test_tiled_deploy_config.py::test_pin_is_exactly_0218",
+          "tests/tiled/test_tiled_server_lifecycle.py::test_launch_health_and_capabilities"
+        ],
+        "uncovered": "The :local image does not exist; the supervised-Tiled lifecycle logic is covered by the T20B tests"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "deployment",
+      "supersedes": "DEP-02 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Local image provisions supervised Tiled (interim pin 0.2.18)"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "DEP-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-03",
+        "execution_status": "not_run",
+        "expected_rule": "no fallback server on central outage",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "ALS images never run or provision a managed Tiled server",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "ALS images never run or provision a managed Tiled server",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "no fallback server on central outage",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "124f0188a23e26ceca6da43b9d36a8be0d0b872bf8a1f4588ba87eff0d13dab4",
+        "config_sha256": "4c02d3fd1b6a1a8b1f3c87006235bd38454f83487ebc92257c7e2e300c2d474b",
+        "model_sha256": null,
+        "oracle_source_sha256": "b997af3e3d88b5a7e0583841600a23de7ea6fccc7a1922f97e35c516b582f173",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "ALS profiles are external-only with no managed or fallback server in code",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_deploy_config.py::test_als_profiles_are_external_with_fixed_url",
+          "tests/tiled/test_tiled_deploy_config.py::test_als_profile_rejects_other_url_and_managed_mode",
+          "tests/tiled/test_tiled_deploy_checks.py::test_external_mode_does_not_import_lifecycle",
+          "tests/tiled/test_tiled_server_lifecycle.py::test_external_outage_never_starts_a_server",
+          "tests/tiled/test_tiled_server_cli.py::test_cli_rejects_lifecycle_on_external_profile",
+          "tests/graph/test_graph_tiled_client.py::test_als_hosts_are_never_rewritten_to_localhost"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Inspection of the built :als-dev/:als-prod images (T24B)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "ALS images never run or provision a managed Tiled server"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "DEP-04",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D2/T21B follow-up: Tiled URL editable on :local only (2026-10-12); H2 decision Q3 (default :local profile). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "DEP-04",
+        "execution_status": "not_run",
+        "expected_rule": "reject unapproved environment/target mismatch",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Staging and production default to their exact assigned endpoints",
+        "verdict": null
+      },
+      "companion_expected_rule": "reject unapproved environment/target mismatch",
+      "companion_title": "Staging and production default to their exact assigned endpoints",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "reject unapproved environment/target mismatch Owner decision update: the Tiled URL is never writable at runtime on ALS (editable on :local only) and an unset F2W_DEPLOYMENT_PROFILE selects :local.",
+      "expected_rule_source": "owner_decision",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "6536cfd86e6b60a89131a94603c4b9bbb0dd19e2050e7ca62975706b6f41a7f3",
+        "config_sha256": "4128af66df735e323199e2940b9032553d404d772914c18983d8707fe60ecfa4",
+        "model_sha256": null,
+        "oracle_source_sha256": "a5111e5a23d61e95853c11f298897820b0cd094777eba4d1727324fafe3e0c08",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "ALS targets are fixed per profile and never runtime-writable; local defaults and edits behave as decided",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_deploy_config.py::test_als_profiles_are_external_with_fixed_url",
+          "tests/tiled/test_tiled_deploy_config.py::test_als_profile_rejects_other_url_and_managed_mode",
+          "tests/security/test_security_settings_resolver.py::test_als_target_is_fixed_per_profile",
+          "tests/security/test_security_settings_resolver.py::test_unknown_or_empty_profile_refuses_startup",
+          "tests/api_wiring/test_wiring_startup.py::test_als_refuses_an_identity_port_for_another_tiled",
+          "tests/api_wiring/test_wiring_startup.py::test_profile_defaults_to_local_when_unset",
+          "tests/api_wiring/test_wiring_startup.py::test_local_tiled_uri_stays_editable",
+          "tests/api_wiring/test_wiring_als_guards.py::test_tiled_uri_is_not_writable_on_als",
+          "tests/security/test_security_guards_routes.py::test_tiled_uri_editable_on_local_only"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Image environment defaults in the built variants (T24B/T24E)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "deployment",
+      "supersedes": "DEP-04 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Staging and production default to their exact assigned endpoints"
+    },
+    {
+      "blocked_by": [
+        "T24C (prefix-correct gateway and existing UI/API deployment)",
+        "T24B (build shared runtime and the three image finals)"
+      ],
+      "case_id": "DEP-05",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-A7 (MkDocs under the prefix, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "DEP-05",
+        "execution_status": "not_run",
+        "expected_rule": "no compiled localhost API, lost path or SPA fallback for missing assets",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Every UI asset and deep link is served beneath /fair2wise",
+        "verdict": null
+      },
+      "companion_expected_rule": "no compiled localhost API, lost path or SPA fallback for missing assets",
+      "companion_title": "Every UI asset and deep link is served beneath /fair2wise",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "no compiled localhost API, lost path or SPA fallback for missing assets Owner decision update: the MkDocs site is built into every image (:local, :als-dev, :als-prod) and is served beneath /fair2wise.",
+      "expected_rule_source": "owner_decision",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "a6c0570f940138352ffb3ebb31067a7b0d5aebbda952c9f2800ada97171d0bbe",
+        "config_sha256": "6555427add609594636d65cbe04817a7c56f6e0eec8896394456a65ce3ca985f",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Prefix serving of UI assets, deep links and the MkDocs site needs the gateway and images"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "deployment",
+      "supersedes": "DEP-05 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Every UI asset and deep link is served beneath /fair2wise"
+    },
+    {
+      "blocked_by": [
+        "T24C (prefix-correct gateway and existing UI/API deployment)"
+      ],
+      "case_id": "DEP-06",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-06",
+        "execution_status": "not_run",
+        "expected_rule": "settings/chat/graph/session schemas and response statuses unchanged",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Legacy API suffixes work behind one prefix-stripping boundary",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Legacy API suffixes work behind one prefix-stripping boundary",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "settings/chat/graph/session schemas and response statuses unchanged",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "c18a6494ab57072bacba3cfaa036358e6bd10e3797bf74a7b4f97b57a50938b7",
+        "config_sha256": "00f994f504a448d49cee833b79a79932ffb9e90b241bef56989fad20f6123c99",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/legacy_ui/"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_route_set_is_the_frozen_19",
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_model_route_set_is_the_frozen_6",
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_openapi_matches_baseline"
+        ],
+        "uncovered": "Behind-prefix equivalence needs the gateway; unprefixed schema/status equivalence is covered by the frozen contract tests"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Legacy API suffixes work behind one prefix-stripping boundary"
+    },
+    {
+      "blocked_by": [
+        "T24C (prefix-correct gateway and existing UI/API deployment)"
+      ],
+      "case_id": "DEP-07",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-A8 (FastAPI docs public, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "DEP-07",
+        "execution_status": "not_run",
+        "expected_rule": "no duplicate root_path or UI API/model API collision",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "OpenAPI redirects and model-compatible routes have correct prefixes",
+        "verdict": null
+      },
+      "companion_expected_rule": "no duplicate root_path or UI API/model API collision",
+      "companion_title": "OpenAPI redirects and model-compatible routes have correct prefixes",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "no duplicate root_path or UI API/model API collision Owner decision update: /docs, /docs/oauth2-redirect, /redoc and /openapi.json are public on ALS as well as local and must carry the correct prefix.",
+      "expected_rule_source": "owner_decision",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "915a5289450b1709039e4a5970b15c4f23a9648b132c6c7cded002b11a18ccf0",
+        "config_sha256": "48136d79713df32ea203e0f44f243772659797c3cb88999c3d5b1d41f15a1742",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/contracts/legacy_ui/"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_model_openapi_matches_baseline",
+          "tests/api_wiring/test_wiring_als_guards.py::test_api_docs_stay_public_on_als"
+        ],
+        "uncovered": "Prefix correctness of /docs, /redoc and /openapi.json needs the gateway"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "deployment",
+      "supersedes": "DEP-07 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "OpenAPI redirects and model-compatible routes have correct prefixes"
+    },
+    {
+      "blocked_by": [
+        "T24C (prefix-correct gateway and existing UI/API deployment)",
+        "T24E (three-profile container, Ansible and restore integration)"
+      ],
+      "case_id": "DEP-08",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-08",
+        "execution_status": "not_run",
+        "expected_rule": "first progress and one terminal event; cancellation/errors preserved",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "SSE works through container and edge proxy",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "SSE works through container and edge proxy",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "first progress and one terminal event; cancellation/errors preserved",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "0c53f5480d895f77c048a72f291eeafc83dd779ed108870e770abe9c6261ff4a",
+        "config_sha256": "0b28ea6c8a418d85916ec1155a481e7fbfa5751c4f5d515ff882e86194e002be",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/legacy_ui/"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_framing_and_event_order",
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_survives_client_fragmentation"
+        ],
+        "uncovered": "SSE through a container and edge proxy needs the deployed stack"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "SSE works through container and edge proxy"
+    },
+    {
+      "blocked_by": [
+        "T24B (build shared runtime and the three image finals)",
+        "T24D (GitHub Actions build/publication and protected tags)"
+      ],
+      "case_id": "DEP-09",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-09",
+        "execution_status": "not_run",
+        "expected_rule": "inspect intermediate layers, not just final image filesystem",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "No private papers or secrets occur in any image layer/build cache",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "No private papers or secrets occur in any image layer/build cache",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "inspect intermediate layers, not just final image filesystem",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "5d40c93281988b9351f643145eec16dd5cbc6c9b0a2315f8f96e25c79e4941d1",
+        "config_sha256": "88e0e13a48646499a4c4e867a9ea599a0197edd798116e9e89f8ece98759e866",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Layer and build-cache inspection needs built images"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "No private papers or secrets occur in any image layer/build cache"
+    },
+    {
+      "blocked_by": [
+        "T24E (three-profile container, Ansible and restore integration)"
+      ],
+      "case_id": "DEP-10",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-10",
+        "execution_status": "not_run",
+        "expected_rule": "source/crops/state do not fall back to ephemeral image directories",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Private mounts remain unserved and survive restart/recreate",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Private mounts remain unserved and survive restart/recreate",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "source/crops/state do not fall back to ephemeral image directories",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "228dfe336a60e8686969a02499c5d0288838b11fb51762865f7ad67e36b83606",
+        "config_sha256": "51a3438fb77cc73e512d916e66b9c15e17b6bf23c520c07e8fd5256ee2306c36",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Mount and restart behaviour needs the three-profile container integration"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Private mounts remain unserved and survive restart/recreate"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "DEP-11",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-11",
+        "execution_status": "not_run",
+        "expected_rule": "browser/model cannot choose arbitrary URL/namespace or mutate FORGE sentinels",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Admin importer enforces reviewed target and literature scope",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Admin importer enforces reviewed target and literature scope",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "browser/model cannot choose arbitrary URL/namespace or mutate FORGE sentinels",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "2da924683075cd7a293fadf07b5bd25e346ef0c73d70410385be6afbd7a5064e",
+        "config_sha256": "e6f71d1967ad68035cb479f337850bfc180c4146c4da62ba1a3a4d0122583646",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/security/test_security_workers_approvals.py::test_als_approval_refused_for_non_admin_downgrade_worker_or_wrong_target",
+          "tests/security/test_security_workers_approvals.py::test_worker_context_cannot_move_between_deployments"
+        ],
+        "uncovered": "The admin importer does not exist; the worker target/scope guard is covered"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Admin importer enforces reviewed target and literature scope"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "DEP-12",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-12",
+        "execution_status": "not_run",
+        "expected_rule": "Local audit identifies local-operator without invented authenticated human identity; ALS uses verified subjects. executed_as is separate configured admin in both modes; no tokens leak.",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Audit distinguishes requester approver and executing admin",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Audit distinguishes requester approver and executing admin",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "Local audit identifies local-operator without invented authenticated human identity; ALS uses verified subjects. executed_as is separate configured admin in both modes; no tokens leak.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "1c0a08189eeaf6ecc55eaf1fd5f36c03f6859f16e9ccf32ef9f4190bda731e6a",
+        "config_sha256": "c88277373620b2b2bc08d585cf63598ef28c0e8a532fdf02b6b4c9de61c27721",
+        "model_sha256": null,
+        "oracle_source_sha256": "d9fc28d1d3ea25644fbcd7f03a205d5da3f3d1a9b882dce6cd8cd2d8c9383b83",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/api_wiring/_wiring_support.py",
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Requester, approver and executing writer are distinct in approvals and telemetry; local audit says local-operator",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/security/test_security_workers_approvals.py::test_als_admin_approval_has_fresh_role_check_and_separate_writer",
+          "tests/security/test_security_workers_approvals.py::test_local_approval_is_local_operator_with_writer_and_no_identity",
+          "tests/security/test_security_workers_approvals.py::test_worker_context_records_actor_and_run",
+          "tests/contracts/test_shared_contracts.py::test_local_approval_requester_is_local_operator",
+          "tests/contracts/test_shared_contracts.py::test_als_approval_requires_verified_admin_evidence",
+          "tests/api_wiring/test_wiring_als_guards.py::test_telemetry_actor_comes_from_the_context"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Audit of an importer run and token-leak scan of its logs (T08B)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Audit distinguishes requester approver and executing admin"
+    },
+    {
+      "blocked_by": [
+        "T23B (immutable JSON snapshot service)",
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "DEP-13",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-13",
+        "execution_status": "not_run",
+        "expected_rule": "build/pull/start never automatically publishes a corpus",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "JSON creation succeeds without Tiled and import is inference-free",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "JSON creation succeeds without Tiled and import is inference-free",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "build/pull/start never automatically publishes a corpus",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "1945fb4ba7766f18b25c1a29126756c7e133419fc04a804eb71ceaf6f9cf65a7",
+        "config_sha256": "b5bfb06cf2bf07f308d014d5e85e7d9fb1336d29aab046c3eff8f757a9b0561c",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Needs JSON creation without Tiled (snapshot service) and an inference-free importer"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "JSON creation succeeds without Tiled and import is inference-free"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "DEP-14",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-14",
+        "execution_status": "not_run",
+        "expected_rule": "same JSON hash requires target-specific plan and receipt",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Import receipts cannot cross local staging production targets",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Import receipts cannot cross local staging production targets",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "same JSON hash requires target-specific plan and receipt",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "a6256179d943493b6f6fa66ba861881503697079c4aeccba49c552b06d9e97d6",
+        "config_sha256": "5115b55653dc219c67a581cc55366fefaa6e07a2a6267be6eca470af4b23a9d7",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/security/test_security_workers_approvals.py::test_local_approval_never_authorizes_an_als_target",
+          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod"
+        ],
+        "uncovered": "Import receipts do not exist yet"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Import receipts cannot cross local staging production targets"
+    },
+    {
+      "blocked_by": [
+        "T24D (GitHub Actions build/publication and protected tags)"
+      ],
+      "case_id": "DEP-15",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-15",
+        "execution_status": "not_run",
+        "expected_rule": "PRs cannot publish tags or access runtime keys",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "CI publication is trusted and prod promotion follows approved policy",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "CI publication is trusted and prod promotion follows approved policy",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "PRs cannot publish tags or access runtime keys",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "f9ae11fefe848f79cabe6a41c6b736c56f79a0559e170fd6727e374e1bc9d0de",
+        "config_sha256": "11351c9aa1c86c25c166a80e0b6e6f74b54d90e751c9ba9555326aad02ce0653",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "No CI publication workflow is under test"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "CI publication is trusted and prod promotion follows approved policy"
+    },
+    {
+      "blocked_by": [
+        "T24E (three-profile container, Ansible and restore integration)"
+      ],
+      "case_id": "DEP-16",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-16",
+        "execution_status": "not_run",
+        "expected_rule": "prefix-preserving edge, runtime mounts/secrets, no central reset",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Ansible deploys tested digest without image FQDN dependencies",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Ansible deploys tested digest without image FQDN dependencies",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "prefix-preserving edge, runtime mounts/secrets, no central reset",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "71e27cf86ebad0d64baff659b525d96de21c73c6d826269928f0d81760a04830",
+        "config_sha256": "766d52945769b9f22667ca7b60d89f4058564c87039fc21f6c1b4675766ab3d7",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Ansible rollout and edge proxy are not built"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Ansible deploys tested digest without image FQDN dependencies"
+    },
+    {
+      "blocked_by": [
+        "T24E (three-profile container, Ansible and restore integration)"
+      ],
+      "case_id": "DEP-17",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-17",
+        "execution_status": "not_run",
+        "expected_rule": "JSON/receipts/jobs/artifacts/local Tiled recover; central backup ownership documented",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Mounted-state consistent backup restores on a new disposable instance",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Mounted-state consistent backup restores on a new disposable instance",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "JSON/receipts/jobs/artifacts/local Tiled recover; central backup ownership documented",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "9fcd3d77e4cf6e3dde441af3cdcd6449341a918dcf29fa11dd1c8c0690832ecc",
+        "config_sha256": "9fa64f2e135dca8ac7af14e78c2d33113d6af47dc87629a45ae963f0b3448d6c",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Backup/restore of mounted state needs the container integration"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Mounted-state consistent backup restores on a new disposable instance"
+    },
+    {
+      "blocked_by": [
+        "T10 (durable jobs and curation)",
+        "T24E (three-profile container, Ansible and restore integration)"
+      ],
+      "case_id": "DEP-18",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-18",
+        "execution_status": "not_run",
+        "expected_rule": "no idle successful container concealing dead API/worker/Tiled",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Process death termination and job drain preserve durable work",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Process death termination and job drain preserve durable work",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "no idle successful container concealing dead API/worker/Tiled",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "2655928c2546d3a23856b1fdb4aa3c92d8f5f0b1cc6768e656edc9096b9a1346",
+        "config_sha256": "3d67df90950d16be768c34ea24a3e35ec8e85d2c2e7ac22153c1188b0502277d",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/tiled/test_tiled_server_lifecycle.py::test_recovery_after_killed_server"
+        ],
+        "uncovered": "Container health and job drain need the images and the job runner"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Process death termination and job drain preserve durable work"
+    },
+    {
+      "blocked_by": [
+        "T25C (no-login local workflows and real ALS Tiled role enforcement)",
+        "T18C (full frozen-frontend parity on actual Tiled)",
+        "T14 (FastAPI plus CLI/UI compatibility and job UX)"
+      ],
+      "case_id": "DEP-19",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-19",
+        "execution_status": "not_run",
+        "expected_rule": "D34: local full functionality without sign-in. D30: ALS Tiled-admin editing and non-admin denial. No fake Save, lost edit, hidden publication or local-to-ALS access bypass.",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Profile-specific access preserves truthful old-UI behavior",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Profile-specific access preserves truthful old-UI behavior",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "D34: local full functionality without sign-in. D30: ALS Tiled-admin editing and non-admin denial. No fake Save, lost edit, hidden publication or local-to-ALS access bypass.",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "48529c678b2a69461740f9983c281e599f97d30a2e164fdf9635e0c80c556b9e",
+        "config_sha256": "d2ae4fc50a869d10d6ba1cab836d4703cae5ce59df4e455eb58ef34a4ff86bfe",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/security/test_security_fastapi.py::test_local_every_exposed_inventoried_route_works_without_sign_in",
+          "tests/security/test_security_fastapi.py::test_als_user_is_chat_only_and_denied_before_effects"
+        ],
+        "uncovered": "Truthful old-UI behaviour (Save, edits) needs the frozen UI on real Tiled; API-level access is covered by AUTH/LOCAL"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Profile-specific access preserves truthful old-UI behavior"
+    },
+    {
+      "blocked_by": [
+        "T24E (three-profile container, Ansible and restore integration)"
+      ],
+      "case_id": "DEP-20",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-20",
+        "execution_status": "not_run",
+        "expected_rule": "no forced model/default paid escalation; unsupported local network/inference explicit",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Configured model and limits survive deployment profile changes",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Configured model and limits survive deployment profile changes",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "no forced model/default paid escalation; unsupported local network/inference explicit",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "83e37c7949aaaf79f979d27d7150a6969915c316418cbf1d0a02b83dd8f82261",
+        "config_sha256": "db21ccb0f1c6ef057633c328722f2567bfaf16174151a4198afb050aceb5406b",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/settings/test_personal_settings.py::test_personal_settings_persist_across_restart"
+        ],
+        "uncovered": "Profile-change persistence needs the deployment integration"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Configured model and limits survive deployment profile changes"
+    },
+    {
+      "blocked_by": [
+        "T24E (three-profile container, Ansible and restore integration)",
+        "T13 (publication and rollback rehearsal)"
+      ],
+      "case_id": "DEP-21",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-21",
+        "execution_status": "not_run",
+        "expected_rule": "old digest/state compatibility and snapshot reactivation are separately validated",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Image and data rollback remain independent",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Image and data rollback remain independent",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "old digest/state compatibility and snapshot reactivation are separately validated",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "9825a325ae78d36dddcc0aa6ce4c061c2fbee9a57b01c3ddf11c46c049de5927",
+        "config_sha256": "4b33b7ed62586e99afb56e6d0c0221938feedfbc4c6d587aba747bf8342e4faf",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Independent image and data rollback needs rehearsal"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Image and data rollback remain independent"
+    },
+    {
+      "blocked_by": [
+        "T24C (prefix-correct gateway and existing UI/API deployment)"
+      ],
+      "case_id": "DEP-22",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "DEP-22",
+        "execution_status": "not_run",
+        "expected_rule": "no attempt to fix immutable Vite build solely with runtime ENV",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Base-path build/runtime mismatch is diagnosed",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Base-path build/runtime mismatch is diagnosed",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "no attempt to fix immutable Vite build solely with runtime ENV",
+      "expected_rule_source": "companion_expected_rule",
+      "family": "DEP",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "fc6ae4353fb9d10c438d3cd746fdcbb26bb51e15a72c7c46c1398b59b05d5497",
+        "config_sha256": "a20214e6c3bc8d10b9d3a10fee990d66e5a8649daaf33e2780df8befc360fab4",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Build/runtime base-path diagnosis needs the frontend build in the images"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Base-path build/runtime mismatch is diagnosed"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "TIL-01",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "TIL-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Managed lifecycle preserves normal-stop data",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Managed lifecycle preserves normal-stop data",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Managed lifecycle preserves normal-stop data. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "e82063db40f2892f78f0c726eb074a1980a56cb638b1e6d0060e38943beafb47",
+        "config_sha256": "8a88638b28e0af9bff9a3a79b0e1067a55fb2d08dab454244412b0ecbfb61c04",
+        "model_sha256": null,
+        "oracle_source_sha256": "70dcfbde6802c7deaefb32c3d877c51e313ecf60ccbc854e5527a68128251722",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Managed Tiled stop/restart preserves catalog data and never signals an unowned process",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_server_lifecycle.py::test_stop_retains_data_and_restart_reads_it_back",
+          "tests/tiled/test_tiled_server_lifecycle.py::test_recovery_after_killed_server",
+          "tests/tiled/test_tiled_server_lifecycle.py::test_launch_health_and_capabilities",
+          "tests/tiled/test_tiled_server_cli.py::test_cli_start_check_stop_keeps_data",
+          "tests/tiled/test_tiled_deploy_checks.py::test_stop_never_signals_an_unowned_pid",
+          "tests/tiled/test_tiled_deploy_checks.py::test_status_reports_stale_manifest"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Managed lifecycle preserves normal-stop data"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "TIL-02",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-T1 (Tiled 0.2.18 interim pin, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "TIL-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "External mode never provisions/stops server",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "External mode never provisions/stops server",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: External mode never provisions/stops server. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: external-mode checks must verify the central server's version and capabilities and fail clearly on mismatch (central servers are reported to run 0.2.19; the local interim pin is 0.2.18).",
+      "expected_rule_source": "owner_decision",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "6433e81deefe800d90f73fbf0ebe094708ec9c314cd7ca05d3bd921a8c6b4da1",
+        "config_sha256": "b5bafb86686c70dc186a0943ed8e5b3134fb9ff2968b0424f6bbed2671e73c7c",
+        "model_sha256": null,
+        "oracle_source_sha256": "da3540fbb1242704fafec8843f3a0b78e4e9f0c2ef2b3d53da027a9b9eaa286b",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "External mode never provisions or stops a server, and fails clearly on version mismatch or outage",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_deploy_checks.py::test_external_mode_does_not_import_lifecycle",
+          "tests/tiled/test_tiled_deploy_checks.py::test_connect_external_reads_secret_file_and_never_manages",
+          "tests/tiled/test_tiled_deploy_checks.py::test_probe_environment_rejects_wrong_version_and_app_env",
+          "tests/tiled/test_tiled_deploy_checks.py::test_unsupported_version_is_a_clear_error",
+          "tests/tiled/test_tiled_deploy_checks.py::test_outage_and_5xx_are_target_unavailable",
+          "tests/tiled/test_tiled_server_lifecycle.py::test_external_outage_never_starts_a_server",
+          "tests/tiled/test_tiled_server_lifecycle.py::test_external_connect_to_fixture_without_lifecycle",
+          "tests/tiled/test_tiled_server_cli.py::test_cli_rejects_lifecycle_on_external_profile"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "deployment",
+      "supersedes": "TIL-02 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "External mode never provisions/stops server"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "TIL-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "TIL-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Server reader/owner ACLs plus independent admin-backed application scope guard",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Server reader/owner ACLs plus independent admin-backed application scope guard",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Server reader/owner ACLs plus independent admin-backed application scope guard. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "227bdf2d987da49d786f7496ac5f577d895fbd46b4956b873576e96b9e8d108a",
+        "config_sha256": "40e0921df84f9398b5032dc05f11754aed6bdc62e07474a369689362e3f16a28",
+        "model_sha256": null,
+        "oracle_source_sha256": "640e77182f3b44d361cdfe8779181d717706c39db7f3853ae20e76c2e2081ac2",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py",
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Server reader/owner ACL behaviour on the disposable server and the admin-principal parsing of the application guard",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_capabilities_0218.py::test_acl_variant_tag_policy_scopes_graph_reads_and_writes",
+          "tests/tiled/test_tiled_capabilities_0218.py::test_auth_variant_admin_and_reader_principals",
+          "tests/security/test_security_tiled_adapter.py",
+          "tests/graph/test_graph_tiled_server.py::test_scoping_and_forge_sentinel_isolation",
+          "tests/security/test_security_guards_routes.py::test_tiled_uri_editable_on_local_only"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Application scope guard on write paths (T08B writes are not merged)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Server reader/owner ACLs plus independent admin-backed application scope guard"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "TIL-04",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "TIL-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Owner A writes A, cannot write B",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Owner A writes A, cannot write B",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Owner A writes A, cannot write B. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "f408b7514b0956d0f4fada1d5128db7a021c929043e9db89ab4b10b8861e94f3",
+        "config_sha256": "963a6ce655b5ade6ae0e912606a248a33f1cbd52869fc3e09f0825934ad75515",
+        "model_sha256": null,
+        "oracle_source_sha256": "1b2514c773f5cf70cda05a488fa85ed48a51c1717a96e3a31781d2a16677ddf4",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Server-side tag policy: a principal writes only its own tagged graph on the disposable 0.2.18 server",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_capabilities_0218.py::test_acl_variant_tag_policy_scopes_graph_reads_and_writes",
+          "tests/tiled/test_tiled_capabilities_0218.py::test_auth_variant_reader_can_write_without_access_policy"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Application-level owner write path (T08B)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Owner A writes A, cannot write B"
+    },
+    {
+      "blocked_by": [
+        "T08B (Tiled importer over saved JSON, receipts, writes)",
+        "T14 (FastAPI plus CLI/UI compatibility and job UX)"
+      ],
+      "case_id": "TIL-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "TIL-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "policy_note": "Use owner-D30 admin-only writeback behavior; unresolved policy cannot be counted as a passing case.",
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "UI node/relationship/snippet edits read back",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "UI node/relationship/snippet edits read back",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: UI node/relationship/snippet edits read back. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "2887e467c883f9405a50a8d75002b4c66e5990cf50c3fbcb151ee2df1c8f7203",
+        "config_sha256": "1ca5e6fda05f22a4dcf7cc49308dfe9f6c9293d9347b9321d41bc45ab84db0a4",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/test_f2w_api.py::test_patch_graph_node_updates_label_description_pubs_and_snippets",
+          "tests/test_f2w_api.py::test_relationship_updates_are_directed_idempotent_and_persisted"
+        ],
+        "uncovered": "UI edits are read back through the legacy backend only; the Tiled write adapter and admin-only write path (D30) are not merged"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "UI node/relationship/snippet edits read back"
+    },
+    {
+      "blocked_by": [
+        "T13 (publication and rollback rehearsal)",
+        "T08B (Tiled importer over saved JSON, receipts, writes)"
+      ],
+      "case_id": "TIL-06",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "TIL-06",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Rollback preserves FORGE-owned records",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Rollback preserves FORGE-owned records",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Rollback preserves FORGE-owned records. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "8094b5cdbd2c733c788e79a9e45c6958e8f23bca2bad238b457cc3f04a2dc370",
+        "config_sha256": "53c07e56091a9680d133ae9313eb5f3d6f532d9bd7118e41cce9f5d005e25bc5",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/graph/test_graph_tiled_server.py::test_scoping_and_forge_sentinel_isolation",
+          "tests/graph/test_graph_identity.py::test_ownership_requires_owner_uri_and_properties_to_agree"
+        ],
+        "uncovered": "Rollback of an F2W import needs the import/ownership ledger writes (T08B) and the rehearsal (T13)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "deployment",
+      "supersedes": null,
+      "title": "Rollback preserves FORGE-owned records"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "TIL-07",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-T1 (Tiled 0.2.18 interim pin, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "TIL-07",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "deployment",
+        "title": "Exact owner-selected Tiled 0.2.19 artifact and capability contract recorded",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Exact owner-selected Tiled 0.2.19 artifact and capability contract recorded",
+      "coverage": "full",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Exact owner-selected Tiled 0.2.19 artifact and capability contract recorded. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: the owner-selected artifact for now is tiled==0.2.18 (wheel sha256 416079d4...fa06, sdist sha256 2f394326...1e27); the 0.2.19rc2 capability description is re-checked against 0.2.18; changing the pin invalidates H1.",
+      "expected_rule_source": "owner_decision",
+      "family": "TIL",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "cfeace47d2ff566334c2ed558ffbd2158cf59a672e74f64d4f2160b0f394d21d",
+        "config_sha256": "6fd1bb04b5701922d8c8cc9bd7df28bd7f1ca36ec9983047ebcdd8ef23c5abac",
+        "model_sha256": null,
+        "oracle_source_sha256": "a704beba6c2a7af8153b7acb6b2575a7b922517c62acd1b52be5d64998ac343d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "The exact interim pin (0.2.18, wheel/sdist hashes) and the capability contract observed on it are recorded and enforced",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/tiled/test_tiled_deploy_config.py::test_pin_is_exactly_0218",
+          "tests/tiled/test_tiled_deploy_config.py::test_version_override_must_match_pin",
+          "tests/tiled/test_tiled_deploy_checks.py::test_probe_environment_rejects_wrong_version_and_app_env",
+          "tests/tiled/test_tiled_capabilities_0218.py"
+        ],
+        "supporting_selectors": [],
+        "uncovered": ""
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "deployment",
+      "supersedes": "TIL-07 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Exact owner-selected Tiled artifact (interim 0.2.18) and capability contract recorded"
+    }
+  ],
+  "suite": "deployment"
+}

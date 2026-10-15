@@ -1,0 +1,360 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)",
+        "T11B (live/fake model execution of approved cases)"
+      ],
+      "case_id": "QA-01",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H2 decision Q1 (planning supervisor for UI QA turns). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "QA-01",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "chat",
+        "title": "Existing F2W evidence/citation contract",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Existing F2W evidence/citation contract",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Existing F2W evidence/citation contract. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: with the planning supervisor route (F2W_RUNTIME=langgraph) the evidence IDs, graph IDs, citations and statuses must equal those of the direct call on the same fixtures.",
+      "expected_rule_source": "owner_decision",
+      "family": "QA",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "5f4596f553cdded019317275ff39eb3d46a2f4ad5edf2d3e729931b49fe2d15c",
+        "config_sha256": "0d0d1db84f13728b69a8cd1d4b417869d0a8b22e44df474d1c50dd6d4095ec26",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/read_path/read_path_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-QA",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/read_path/test_read_path_parity.py",
+          "tests/test_paper_evidence_agent.py::test_invalid_claim_citations_get_one_repair_pass",
+          "tests/test_paper_evidence_agent.py::test_out_of_bounds_or_missing_citations_fail_closed",
+          "tests/test_rag_system_prompt.py"
+        ],
+        "uncovered": "Whether each answer's claims are supported by its cited evidence is semantic"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "chat",
+      "supersedes": "QA-01 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Existing F2W evidence/citation contract"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "QA-02",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "QA-02",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "chat",
+        "title": "Active-paper context stays within eligible sources",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Active-paper context stays within eligible sources",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Active-paper context stays within eligible sources. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "QA",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "e445acf41b02111d80c058304a31c0122751d119440d98b443fe38f6e4c9e030",
+        "config_sha256": "dc030cac0656dc27798d97fcf8f829c0c42dc67962b6a47fa894c78d5fb75836",
+        "model_sha256": null,
+        "oracle_source_sha256": "ba1808d6657407fd8cba17b90057aadc62bc6ccdf3713b5e4632dbb6d200bbe0",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/graph/graph_samples.py",
+        "tests/operations/fixtures/",
+        "tests/operations/summary_fakes.py",
+        "tests/read_path/read_path_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "Active-paper and graph scope bind retrieval and tool reads to eligible sources",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/operations/test_paper_summary_tool.py::test_no_active_paper_is_not_found_not_empty",
+          "tests/operations/test_paper_summary_tool.py::test_pinned_scope_wins_and_reaches_the_async_worker_thread",
+          "tests/test_paper_evidence_agent.py::test_targeted_query_reads_only_manifest_selected_pages",
+          "tests/test_paper_evidence_agent.py::test_full_query_sends_at_most_eight_ranked_pages",
+          "tests/read_path/test_read_tool.py::test_selected_without_hits_uses_the_single_loaded_graph",
+          "tests/graph/test_graph_json_backend.py::test_scope_blocks_other_corpora"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Chat answers on gold questions staying within the cited active paper (needs rubric)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "chat",
+      "supersedes": null,
+      "title": "Active-paper context stays within eligible sources"
+    },
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)",
+        "T11B (live/fake model execution of approved cases)"
+      ],
+      "case_id": "QA-03",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "QA-03",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "chat",
+        "title": "Numerical claims have required evidence",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Numerical claims have required evidence",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Numerical claims have required evidence. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "QA",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "ba9de92b55a38f20daa22b70a91faea7f22197b488d5572afcc8f6372d1035cd",
+        "config_sha256": "1a41c026ff678cacbe0e11c64a2fcce3be78b886414567a4047540e4aed9327e",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/evidence/evidence_fixtures.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-QA",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/evals/test_route_regex.py",
+          "tests/test_retrieval_agent.py::test_numeric_claim_re_does_not_match_beamline",
+          "tests/test_retrieval_agent.py::test_judge_system_distinguishes_conceptual_from_numeric",
+          "tests/evidence/test_evidence.py::test_source_support_checks_qualifiers_inside_the_quote",
+          "tests/evidence/test_evidence.py::test_source_support_rejects_a_quote_absent_from_the_source"
+        ],
+        "uncovered": "Whether a numeric claim is entailed by its evidence is semantic; lexical support is only a screen"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "chat",
+      "supersedes": null,
+      "title": "Numerical claims have required evidence"
+    },
+    {
+      "blocked_by": [
+        "H3 (owner-approved gold fixtures and source truth)",
+        "T11B (live/fake model execution of approved cases)"
+      ],
+      "case_id": "QA-04",
+      "case_revision": 2,
+      "change_reason": "Recorded owner decision(s): H1 owner_decisions O-R1 (supervisor planner fallback, 2026-10-13); H2 decision Q1 (planning supervisor for UI QA turns). Listed in docs/migration/reviews/H3/case_changes.md.",
+      "companion": {
+        "case_id": "QA-04",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "chat",
+        "title": "Existing conceptual leeway and fallback preserved",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Existing conceptual leeway and fallback preserved",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Existing conceptual leeway and fallback preserved. The companion records no separate rule text; H3 supplies the explicit rule. Owner decision update: if the supervisor planning model errors or does not call the QA tool, the turn falls back to the direct answer_from_knowledge call with the reason logged and the failed planning call in the trace (O-R1).",
+      "expected_rule_source": "owner_decision",
+      "family": "QA",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "a6fba56c478cfa00468b9b491af4a7f785139280b072ad1842f28791d40cf5e0",
+        "config_sha256": "a8f402cde240c9c12cb49b25960a7d5689cd76d6bd0d4cfc8d63dd8920950410",
+        "model_sha256": null,
+        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/read_path/read_path_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": "RUB-QA",
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/test_retrieval_agent.py::test_query_conceptual_insufficient_judge_uses_leeway",
+          "tests/test_retrieval_agent.py::test_is_conceptual_question_examples",
+          "tests/test_retrieval_agent.py::test_query_conceptual_on_topic_nodes_still_call_judge",
+          "tests/read_path/test_read_path_parity.py::test_leeway_path_is_preserved",
+          "tests/read_path/test_qa_route.py::test_planner_failure_or_no_tool_call_falls_back_to_the_direct_call",
+          "tests/test_f2w_api.py::test_json_insufficient_graph_offers_download_cta",
+          "tests/test_f2w_api.py::test_json_off_topic_dogs_offers_ingest_not_topic_refusal"
+        ],
+        "uncovered": "semantic judgment needs the H3-approved rubric"
+      },
+      "oracle_type": "deterministic_plus_rubric",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "needs_h3_rubric",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H1/owner_decisions.md",
+        "docs/migration/reviews/H2/decision.json"
+      ],
+      "suite": "chat",
+      "supersedes": "QA-04 revision 1 (companion v8.0 binary_case_inventory.json)",
+      "title": "Existing conceptual leeway and fallback preserved"
+    },
+    {
+      "blocked_by": [],
+      "case_id": "QA-05",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "QA-05",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "chat",
+        "title": "Weak retrieval does not grant ingestion/publication authority",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Weak retrieval does not grant ingestion/publication authority",
+      "coverage": "partial",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Weak retrieval does not grant ingestion/publication authority. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "QA",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "7674715038c6e14af31001577a7b33da4ce5092f0a01c593872bf12fd69b0ad9",
+        "config_sha256": "0cc7d80bef8e5eefe329f53707036c683dff610d858e869c510cf96bc974f7ac",
+        "model_sha256": null,
+        "oracle_source_sha256": "a8a13d225db7fccdf16b7b228af787d3c32b174b242b6c6e65e53150291e55e9",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/contracts/legacy_ui/",
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
+      "oracle": {
+        "covers": "A weak or empty retrieval only offers ingestion; effects need an explicit approval and, on ALS, an admin",
+        "kind": "pytest_nodes",
+        "rubric_ref": null,
+        "selectors": [
+          "tests/test_f2w_api.py::test_agentic_path_prompts_before_download_and_respects_decline",
+          "tests/test_f2w_api.py::test_agentic_path_downloads_only_approved_candidate_then_answers",
+          "tests/test_f2w_api.py::test_json_insufficient_graph_offers_download_cta",
+          "tests/test_f2w_api.py::test_json_insufficient_opv_offers_ingest_not_leeway",
+          "tests/security/test_security_guards_routes.py::test_user_chat_action_yes_denied_before_job_creation",
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_side_effects_only_after_approval"
+        ],
+        "supporting_selectors": [],
+        "uncovered": "Publication half of the rule (covered by AUTH-04/JSON-06 once T08B exists)"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "executable",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "chat",
+      "supersedes": null,
+      "title": "Weak retrieval does not grant ingestion/publication authority"
+    }
+  ],
+  "suite": "chat"
+}

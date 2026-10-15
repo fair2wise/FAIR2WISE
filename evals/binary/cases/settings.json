@@ -1,0 +1,194 @@
+{
+  "cases": [
+    {
+      "blocked_by": [
+        "T10 (durable jobs and curation)",
+        "O03 (owner approval of the job-settings rule)"
+      ],
+      "case_id": "LLM-06",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-06",
+        "execution_status": "not_run",
+        "expected_rule_status": "pending_O03_then_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "settings",
+        "title": "Submitted resolved model remains fixed when frontend changes",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Submitted resolved model remains fixed when frontend changes",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Submitted resolved model remains fixed when frontend changes. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "448aa2d8c2ec56c6407b71a82537e93d47dcd5a1ae824ba3a9c36eae13e7ffa9",
+        "config_sha256": "2772989afa36a631fef425bee66f8642ab5fa78b716b1eed361ac330d794fedd",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Draft expectation pending O03; needs durable jobs with a resolved-model snapshot"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "settings",
+      "supersedes": null,
+      "title": "Submitted resolved model remains fixed when frontend changes"
+    },
+    {
+      "blocked_by": [
+        "T10 (durable jobs and curation)",
+        "O03 (owner approval of the job-settings rule)"
+      ],
+      "case_id": "LLM-07",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-07",
+        "execution_status": "not_run",
+        "expected_rule_status": "pending_O03_then_case_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "settings",
+        "title": "Changed-model resume is explicitly revised; defaults cannot silently drift",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Changed-model resume is explicitly revised; defaults cannot silently drift",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Changed-model resume is explicitly revised; defaults cannot silently drift. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "86d75914385e2f9a0e22eb4423716b45007b85ce6a6f7df133e6b4a7cd4588a4",
+        "config_sha256": "0ac5b58bcb37f19dbdb5259ad7fbc7c1cf12ded544836995c3d7a7654c2fa361",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [],
+        "uncovered": "Draft expectation pending O03; changed-model resume needs durable jobs"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "settings",
+      "supersedes": null,
+      "title": "Changed-model resume is explicitly revised; defaults cannot silently drift"
+    },
+    {
+      "blocked_by": [
+        "T10 (durable jobs and curation)"
+      ],
+      "case_id": "LLM-08",
+      "case_revision": 1,
+      "change_reason": null,
+      "companion": {
+        "case_id": "LLM-08",
+        "execution_status": "not_run",
+        "expected_rule_status": "draft_requires_owner_approval",
+        "owner_approval_ref": null,
+        "required_proposal": true,
+        "source_fixture": null,
+        "status": "proposed_case_not_implemented",
+        "suite": "settings",
+        "title": "Rate-limit tightening and access revocation remain live",
+        "verdict": null
+      },
+      "companion_expected_rule": null,
+      "companion_title": "Rate-limit tightening and access revocation remain live",
+      "coverage": "none",
+      "deployment_profiles": [],
+      "expected_rule": "As titled in the companion inventory: Rate-limit tightening and access revocation remain live. The companion records no separate rule text; H3 supplies the explicit rule.",
+      "expected_rule_source": "companion_title",
+      "family": "LLM",
+      "forbidden_outcomes": [],
+      "hashes": {
+        "case_sha256": "ab450a656f2eccd6498fb7576c1b6adc395101b16a7753659980172d9a88a536",
+        "config_sha256": "82667aa58ded009123279801ab08a2d3a83cb99a06361aa72ac2b1fa59ab9560",
+        "model_sha256": null,
+        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "schema_sha256": null
+      },
+      "input_fixture_refs": [
+        "tests/security/security_fakes.py"
+      ],
+      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "oracle": {
+        "covers": "",
+        "kind": null,
+        "rubric_ref": null,
+        "selectors": [],
+        "supporting_selectors": [
+          "tests/security/test_security_workers_approvals.py::test_als_worker_stops_on_downgrade_expiry_revocation"
+        ],
+        "uncovered": "Live rate-limit tightening for running jobs needs the job runner; revocation of ALS workers is covered by AUTH-07"
+      },
+      "oracle_type": "deterministic_assertion",
+      "owner_approval": {
+        "approved_by": null,
+        "ref": null,
+        "status": "proposed"
+      },
+      "readiness": "blocked",
+      "required": true,
+      "schema_ref": null,
+      "source_refs": [
+        "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
+        "docs/migration/companion/binary_case_inventory.json"
+      ],
+      "suite": "settings",
+      "supersedes": null,
+      "title": "Rate-limit tightening and access revocation remain live"
+    }
+  ],
+  "suite": "settings"
+}
