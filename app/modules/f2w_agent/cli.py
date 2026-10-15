@@ -142,6 +142,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Allowed CORS origin; repeat for multiple origins",
     )
+    api.add_argument(
+        "--jobs-api",
+        action="store_true",
+        help="Serve app.api.main.create_api_app: the same UI routes plus the /v1 jobs, review and "
+             "publication API",
+    )
     a = sub.add_parser("ask", help="Ask one question")
     a.add_argument("question")
     sub.add_parser("chat", help="Interactive chat loop")
@@ -176,7 +182,10 @@ def main(argv=None) -> int:
         if args.command == "ask":
             asyncio.run(Coordinator(cfg).run([args.question]))
         elif args.command == "api":
-            from .api import run_api
+            if getattr(args, "jobs_api", False):
+                from ...api.main import run_api
+            else:
+                from .api import run_api
 
             run_api(cfg, host=args.host, port=args.port, cors_origins=args.cors_origin)
         elif args.command == "chat":

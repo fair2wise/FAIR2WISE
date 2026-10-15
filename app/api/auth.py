@@ -9,6 +9,13 @@
   entry capabilities before the handler runs.
 * :func:`optional_request_context` is for public routes (``GET /health``): it yields
   ``None`` for a signed-out ALS caller instead of 401.
+* :meth:`AccessRuntime.notify_scope_change` tells registered listeners (T14 wires
+  ``JobService.notify_scope_change``) that a caller's credential or role changed: an ALS
+  sign-out or a verified admin who is no longer admin. Dependent approvals are then
+  invalidated; nothing falls back to a server credential.
+
+Route policies come from ``ROUTE_CAPABILITIES`` and, for the T14 ``/v1`` routes,
+:data:`app.api.policies.API_ROUTE_CAPABILITIES` (:func:`lookup_policy`).
 
 On ``:local`` no cookie, header or token is read and the response is never a sign-in
 prompt. On ALS the only credential source is the server-side session store keyed by the
@@ -22,7 +29,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Optional, Protocol
+from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -41,6 +48,7 @@ from ..modules.security.authorization import (
     route_capabilities,
 )
 from ..modules.security.tiled_identity import TiledCredential, TiledIdentityPort
+from .policies import API_SURFACE, api_route_policy
 
 logger = logging.getLogger(__name__)
 
@@ -93,10 +101,40 @@ class AccessRuntime:
     surface: str = AGENT_SURFACE
     clock: Callable[[], datetime] = _utcnow
     role_cache: Optional[RoleCheckCache] = field(default=None)
+    #: Called with ``{"subject", "reason"}`` when an ALS caller signs out or loses admin (T14).
+    scope_listeners: List[Callable[[Mapping[str, Any]], None]] = field(default_factory=list)
+    #: Last verified admin flag per ALS subject (bounded), to detect a role downgrade.
+    _admin_seen: Dict[str, bool] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.role_cache is None:
             self.role_cache = RoleCheckCache(self.settings.role_check_max_age)
+
+    def on_scope_change(self, listener: Callable[[Mapping[str, Any]], None]) -> None:
+        """Register ``listener`` for credential/role changes (``JobService.notify_scope_change``)."""
+        self.scope_listeners.append(listener)
+
+    def notify_scope_change(self, change: Mapping[str, Any]) -> None:
+        """Run every listener; a failing listener is logged and does not stop the others."""
+        for listener in list(self.scope_listeners):
+            try:
+                listener(dict(change))
+            except Exception:  # noqa: BLE001 - one listener must not hide the change from the rest
+                logger.exception("scope-change listener failed")
+
+    def observe(self, ctx: RequestContext) -> None:
+        """Record a verified ALS caller's admin flag; notify listeners when it was dropped."""
+        if self.settings.is_local:
+            return
+        subject = ctx.principal.subject
+        now_admin = bool(ctx.principal.is_admin)
+        was_admin = self._admin_seen.get(subject)
+        if len(self._admin_seen) >= 10_000 and subject not in self._admin_seen:
+            self._admin_seen.pop(next(iter(self._admin_seen)))
+        self._admin_seen[subject] = now_admin
+        if was_admin and not now_admin:
+            logger.warning("verified admin role dropped for a subject; notifying scope listeners")
+            self.notify_scope_change({"subject": subject, "reason": "role_downgraded"})
 
 
 def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
@@ -120,15 +158,31 @@ def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
     return app
 
 
+def lookup_policy(method: str, path: str, surface: str) -> Optional[RoutePolicy]:
+    """Return the declared policy of a route on ``surface``, or ``None`` (default-deny on ALS).
+
+    The T14 ``/v1`` routes are declared once for the app factory (``API_SURFACE``); they
+    are served by the legacy UI surface it extends, so both surfaces resolve them.
+    """
+    policy = route_capabilities(method, path, surface)
+    if policy is None and surface in (AGENT_SURFACE, API_SURFACE):
+        policy = api_route_policy(method, path)
+    return policy
+
+
 def undeclared_routes(app: FastAPI, surface: Optional[str] = None) -> List[str]:
-    """Return ``"METHOD path"`` for app routes missing from ``ROUTE_CAPABILITIES`` (DEP-19)."""
+    """Return ``"METHOD path"`` for app routes without a declared policy (DEP-19)."""
     surface = surface or app.state.f2w_access.surface
     missing = []
     for route in app.routes:
+        if not isinstance(getattr(route, "path", None), str):
+            # A mount or lazily included router hides its routes from this check: fail closed.
+            missing.append(f"UNINSPECTABLE {type(route).__name__}")
+            continue
         for method in sorted(getattr(route, "methods", None) or ()):
             if method in {"HEAD", "OPTIONS"}:
                 continue
-            if route_capabilities(method, route.path, surface) is None:
+            if lookup_policy(method, route.path, surface) is None:
                 missing.append(f"{method} {route.path}")
     return missing
 
@@ -147,7 +201,7 @@ def _policy(request: Request, runtime: AccessRuntime) -> Optional[RoutePolicy]:
     path = getattr(route, "path", None)
     if path is None:
         return None
-    return route_capabilities(request.method, path, runtime.surface)
+    return lookup_policy(request.method, path, runtime.surface)
 
 
 def _log_trust_claims(request: Request) -> None:
@@ -177,6 +231,7 @@ def _resolve(request: Request, policy: Optional[RoutePolicy], *, fresh: bool = F
         clock=runtime.clock, role_cache=runtime.role_cache,
         require_fresh=fresh or bool(policy and policy.needs_fresh_role_check),
     )
+    runtime.observe(ctx)
     if policy is None:
         if not settings.is_local:
             raise ContractError(ErrorCode.DENIED, "route has no declared access policy")
@@ -202,6 +257,41 @@ def fresh_request_context(request: Request) -> RequestContext:
     it returns the local-operator context without any identity call.
     """
     return _resolve(request, _policy(request, _runtime(request)), fresh=True)
+
+
+def session_credential(request: Request) -> Optional[TiledCredential]:
+    """Return the ALS caller's own credential from the server-side session store (never sent out).
+
+    ``create_approval`` re-verifies the approver with it (fresh whoami with the approver's
+    credential, never the writer's). ``None`` on ``:local`` and for a signed-out caller.
+    """
+    runtime = _runtime(request)
+    if runtime.settings.is_local or runtime.credential_store is None:
+        return None
+    token = request.cookies.get(SESSION_COOKIE)
+    return runtime.credential_store.get(token) if token else None
+
+
+def current_subject(request: Request) -> Optional[str]:
+    """Return the verified ALS subject of the request's session, or ``None`` (best effort).
+
+    Used by sign-out to name the subject whose approvals depend on the session. Uses the
+    bounded-age role cache; any failure (signed out, outage) yields ``None``.
+    """
+    runtime = getattr(request.app.state, "f2w_access", None)
+    if not isinstance(runtime, AccessRuntime) or runtime.settings.is_local:
+        return None
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token or runtime.credential_store is None:
+        return None
+    try:
+        credential = runtime.credential_store.get(token)
+        ctx = resolve_context(runtime.settings, credential, request_id=uuid.uuid4().hex,
+                              identity_port=runtime.identity_port, clock=runtime.clock,
+                              role_cache=runtime.role_cache)
+    except (Unauthenticated, ContractError):
+        return None
+    return ctx.principal.subject
 
 
 async def optional_request_context(request: Request) -> Optional[RequestContext]:
@@ -236,7 +326,8 @@ async def _contract_error_handler(request: Request, exc: Exception) -> JSONRespo
     code = exc.code if isinstance(exc, ContractError) else ErrorCode.INTERNAL
     retryable = getattr(exc, "retryable", False)
     status = _STATUS.get(code, 500)
-    message = str(exc) if status < 500 or code is ErrorCode.UNAVAILABLE else "internal error"
+    shown = status < 500 or code in (ErrorCode.UNAVAILABLE, ErrorCode.UNSUPPORTED_CAPABILITY)
+    message = str(exc) if shown else "internal error"
     headers = {"Retry-After": "5"} if code is ErrorCode.UNAVAILABLE else None
     return JSONResponse({"code": code.value, "message": message, "retryable": retryable},
                         status_code=status, headers=headers)

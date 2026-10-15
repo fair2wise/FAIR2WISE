@@ -22,6 +22,19 @@ profile's own Tiled:
   still accepted by Tiled until it expires (D-T6), but F2W no longer holds it.
 * **No proxy.** Only these three handlers talk to Tiled's auth router; nothing else is
   forwarded.
+* **Cross-site requests (T14).** ``POST /auth/sign-in`` and ``POST /auth/sign-out`` refuse a
+  cross-site browser request before any effect (:func:`app.api.origin_gate.check_browser_origin`:
+  ``Sec-Fetch-Site: cross-site`` or an ``Origin`` that is neither the request's own host nor
+  in ``allowed_origins``). Together with the ``SameSite=Strict`` cookie this blocks login
+  CSRF and forced sign-out from other sites, including sibling ``*.lbl.gov`` hosts that
+  ``SameSite`` treats as same-site. A session-bound CSRF token (access contract section 9)
+  needs a sign-in page that sends it; the frozen UI has none, so it waits for the gateway
+  sign-in UI (T24C). See docs/migration/api/README.md section 5.
+* **Scope change (T14).** Sign-out tells the app's access runtime which verified subject
+  signed out, so dependent publication approvals are invalidated
+  (``JobService.notify_scope_change``).
+* **Restart signs everyone out.** Sessions are in memory (one process); a persistent or
+  shared store is a deployment item (T24).
 
 The store binds to exactly one Tiled target and is the ``credential_store`` that
 :func:`app.api.auth.request_context` reads. Roles are never decided here: every request
@@ -36,7 +49,7 @@ import secrets
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -50,7 +63,8 @@ from ..modules.security.tiled_identity import (
     TiledWhoamiAdapter,
     normalize_tiled_target,
 )
-from .auth import SESSION_COOKIE
+from .auth import SESSION_COOKIE, AccessRuntime, current_subject
+from .origin_gate import check_browser_origin
 
 logger = logging.getLogger(__name__)
 
@@ -274,8 +288,12 @@ class SignInRequest(BaseModel):
     password: str = Field(min_length=1, max_length=4096, repr=False)
 
 
-def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: DeploymentSettings) -> FastAPI:
+def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: DeploymentSettings, *,
+                           allowed_origins: Iterable[str] = ()) -> FastAPI:
     """Mount ``GET /auth/providers``, ``POST /auth/sign-in`` and ``POST /auth/sign-out`` (ALS only).
+
+    ``allowed_origins`` are browser origins accepted besides the request's own host (ALS is
+    same-origin under ``/fair2wise``, so the default accepts only the gateway's own origin).
 
     Raises:
         StartupConfigError: On ``:local`` (no local login, D34) or when ``store`` is bound
@@ -285,6 +303,8 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
         raise StartupConfigError("config_rejected: there is no sign-in on the local profile")
     if store.tiled_target != settings.tiled_target:
         raise StartupConfigError(f"config_rejected: session store is not bound to {settings.tiled_target}")
+
+    origins = tuple(allowed_origins)
 
     def _set_cookie(response: JSONResponse, token: str) -> None:
         response.set_cookie(SESSION_COOKIE, token, httponly=True, secure=store.cookie_secure, samesite="strict",
@@ -298,6 +318,9 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
     @app.post("/auth/sign-in")
     async def auth_sign_in(body: SignInRequest, request: Request) -> JSONResponse:
         """Sign in through the profile Tiled; set the opaque session cookie."""
+        refused = check_browser_origin(request, allowed_origins=origins)
+        if refused is not None:
+            return refused
         previous = request.cookies.get(SESSION_COOKIE)
         if previous:
             store.sign_out(previous)  # never reuse an id across sign-ins (fixation)
@@ -311,8 +334,15 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
 
     @app.post("/auth/sign-out")
     async def auth_sign_out(request: Request) -> JSONResponse:
-        """Drop the F2W session and revoke the Tiled session."""
-        store.sign_out(request.cookies.get(SESSION_COOKIE) or "")
+        """Drop the F2W session and revoke the Tiled session; invalidate dependent approvals."""
+        refused = check_browser_origin(request, allowed_origins=origins)
+        if refused is not None:
+            return refused
+        subject = current_subject(request)
+        had_session = store.sign_out(request.cookies.get(SESSION_COOKIE) or "")
+        runtime = getattr(request.app.state, "f2w_access", None)
+        if had_session and subject and isinstance(runtime, AccessRuntime):
+            runtime.notify_scope_change({"subject": subject, "reason": "signed_out"})
         response = JSONResponse({"status": "signed_out"})
         response.delete_cookie(SESSION_COOKIE, path=store.cookie_path, secure=store.cookie_secure,
                                httponly=True, samesite="strict")
