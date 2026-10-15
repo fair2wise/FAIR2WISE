@@ -8,7 +8,22 @@ def test_dockerfile_does_not_bake_secrets():
     assert "COPY .env" not in text
     assert "ARG CBORG_API_KEY" not in text
     assert "ENV CBORG_API_KEY" not in text
-    assert "VITE_F2W_AGENT_API_URL=http://127.0.0.1:8090" in text
+    # T24C/D26: the UI image is built for /fair2wise with a same-origin API, never a
+    # compiled localhost browser endpoint.
+    assert "VITE_F2W_AGENT_API_URL=http://127.0.0.1:8090" not in text
+    assert "ENV F2W_PUBLIC_PREFIX=/fair2wise" in text
+    assert "COPY docker/nginx.conf /etc/nginx/templates/default.conf.template" in text
+    assert "/usr/share/nginx/html/fair2wise/docs" in text
+
+
+def test_compose_ui_uses_the_prefixed_gateway():
+    for name in ("compose.yaml", "compose.splash.yaml"):
+        text = (ROOT / name).read_text()
+        assert "F2W_API_UPSTREAM: agent:8090" in text, name
+        assert "F2W_PUBLIC_PREFIX: /fair2wise" in text, name
+        assert "VITE_F2W_AGENT_API_URL" not in text, name
+    # The hot-reload developer stack keeps the unprefixed separate-server setting.
+    assert "VITE_F2W_AGENT_API_URL: http://127.0.0.1:8090" in (ROOT / "docker-compose.yml").read_text()
 
 
 def test_compose_product_stack_is_agent_and_ui():

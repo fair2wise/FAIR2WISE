@@ -12,3 +12,10 @@ services:
     environment:
       F2W_AGENT_HOST: 0.0.0.0
       F2W_AGENT_PORT: "8090"
+
+  frontend:
+    # The agent is on the host network, so the gateway reaches it through the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      F2W_API_UPSTREAM: host.docker.internal:8090

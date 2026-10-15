@@ -499,3 +499,38 @@ def test_auth09_no_tiled_auth_or_admin_proxy_through_the_gateway(als_prefixed):
         assert resp.status_code in (401, 404) or ui_fallback, path
         assert "library_version" not in resp.text and "access-" not in resp.text, path
     assert tiled.paths == before  # nothing was forwarded to Tiled
+
+
+# ------------------------------------------------------------------ image packaging
+
+
+def test_official_image_envsubst_touches_only_the_upstream_placeholder():
+    """The nginx image substitutes ``$F2W_*`` / ``${F2W_*}`` (NGINX_ENVSUBST_FILTER=^F2W_) only."""
+    template = CONF.read_text(encoding="utf-8")
+    assert set(re.findall(r"\$\{?F2W_[A-Za-z0-9_]*\}?", template)) == {"${F2W_API_UPSTREAM}"}
+    dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
+    assert "NGINX_ENVSUBST_FILTER=^F2W_" in dockerfile and "F2W_API_UPSTREAM=127.0.0.1:8090" in dockerfile
+
+
+@pytest.mark.skipif(not __import__("os").environ.get("GATEWAY_IMAGE_ROOT"),
+                    reason="set GATEWAY_IMAGE_ROOT to a built <root>/fair2wise (UI dist + MkDocs site)")
+def test_built_ui_and_docs_through_the_gateway(harness):
+    """Optional: a real ``F2W_PUBLIC_PREFIX=/fair2wise`` Vite build and MkDocs site in the image layout."""
+    import os
+
+    root = Path(os.environ["GATEWAY_IMAGE_ROOT"])
+    gw.check_build_agreement(gw.read_build_manifest(root / "fair2wise" / gw.BUILD_MANIFEST_NAME), LAYOUT)
+    client = _prefixed_client(H.make_ui_app(harness), root, base_url="https://f2w.example")
+    page = client.get("/fair2wise/").text
+    refs = re.findall(r'(?:src|href)="(/[^"]+)"', page)
+    assert refs and all(r.startswith("/fair2wise/") for r in refs)
+    for ref in refs:
+        assert client.get(ref).status_code == 200, ref
+    docs = client.get("/fair2wise/docs/")
+    assert docs.status_code == 200 and "FAIR2WISE" in docs.text
+    sub = client.get("/fair2wise/docs/agent-api", follow_redirects=False)
+    assert sub.status_code == 301 and sub.headers["location"] == "/fair2wise/docs/agent-api/"
+    page = client.get("/fair2wise/docs/agent-api/").text
+    for rel in re.findall(r'href="(\.\./[^"#]+)"', page)[:20]:
+        target = httpx.URL("https://f2w.example/fair2wise/docs/agent-api/").join(rel)
+        assert target.path.startswith("/fair2wise/docs/") and client.get(target.path).status_code == 200, rel
