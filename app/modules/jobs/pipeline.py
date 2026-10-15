@@ -62,6 +62,10 @@ class JobStopped(Exception):
     """A stop or cancel was requested; the job ends ``cancelled`` at this boundary."""
 
 
+class JobInterrupted(Exception):
+    """The owning worker is shutting down; the job goes back to ``queued`` for the next owner."""
+
+
 class QuarantineStage(Exception):
     """The stage's output must not be used; stage -> ``quarantined`` with a reason."""
 
@@ -177,6 +181,7 @@ class StageContext:
         authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None,
         admission: Any = None,
         extra: Optional[Mapping[str, Any]] = None,
+        interrupt: Optional[Any] = None,
     ) -> None:
         self.store = store
         self.lease = lease
@@ -188,10 +193,19 @@ class StageContext:
         self.admission = admission
         self.extra: Mapping[str, Any] = dict(extra or {})
         self._authority = authority
+        self._interrupt = interrupt
+
+    def provider_slot(self, provider: str) -> Any:
+        """Shared-admission slot for ``provider`` (the quota chat, workers and evaluations all share)."""
+        if self.admission is None:
+            raise RuntimeError("no admission configured for this job kind")
+        return self.admission.slot(provider)
 
     def guard(self) -> None:
-        """Raise before an effect when ownership was lost or a stop was requested."""
+        """Raise before an effect when ownership was lost, shutdown began, or a stop was requested."""
         self.store.check_lease(self.lease)
+        if self._interrupt is not None and self._interrupt.is_set():
+            raise JobInterrupted("worker shutting down")
         if self.store.stop_requested(self.job.job_id):
             raise JobStopped("stop requested")
 
@@ -255,7 +269,9 @@ class PipelineRunner:
         admission: Any = None,
         extra: Optional[Mapping[str, Any]] = None,
         on_denied: Optional[Callable[[JobRecord, str], None]] = None,
+        interrupt: Optional[Any] = None,
     ) -> None:
+        self._interrupt = interrupt
         self.store = store
         self.pipeline = pipeline
         self._authority = authority
@@ -277,9 +293,11 @@ class PipelineRunner:
             self._invalidate_incompatible(lease, job, keys, stored)
             for position, spec in enumerate(self.pipeline.specs):
                 stage_name = spec.name
+                self.store.check_lease(lease)
+                if self._interrupt is not None and self._interrupt.is_set():
+                    raise JobInterrupted("worker shutting down")
                 if self.store.stop_requested(job_id):
                     raise JobStopped("stop requested")
-                self.store.check_lease(lease)
                 row = self.store.stage(job_id, spec.name)
                 if (
                     row is not None
@@ -313,6 +331,9 @@ class PipelineRunner:
             raise
         except _Ended as ended:
             return ended.state
+        except JobInterrupted as exc:
+            self.store.set_state(lease, job_id, JobState.QUEUED, stage=stage_name, reason=str(exc))
+            return JobState.QUEUED
         except JobStopped as exc:
             self.store.set_state(
                 lease,
@@ -364,6 +385,7 @@ class PipelineRunner:
             authority=self._authority,
             admission=self._admission,
             extra=self._extra,
+            interrupt=self._interrupt,
         )
         try:
             if spec.required_capability:
@@ -390,7 +412,7 @@ class PipelineRunner:
                 progress=result.progress,
                 result=dict(result.data),
             )
-        except (StagePause, JobStopped, LeaseLost):
+        except (StagePause, JobStopped, JobInterrupted, LeaseLost):
             raise
         except _IncompleteCoverage as exc:
             self.store.mark_stage(
@@ -513,6 +535,7 @@ class _Ended(Exception):
 
 __all__ = (
     "AwaitReview",
+    "JobInterrupted",
     "JobStopped",
     "PauseBudget",
     "PauseProvider",

@@ -9,12 +9,14 @@ context is never accepted from a request body.
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobEvent, JobHandle, JobState
+from ..llm_admission import ProviderAdmission
 from .keys import OperationInputs
 from .pipeline import Pipeline, PipelineRunner
 from .store import JobRecord, JobStore, LeaseLost
@@ -48,9 +50,22 @@ class JobService:
         owner: Identity recorded as the lease owner of this process (for example ``worker-<pid>``).
     """
 
-    def __init__(self, store: JobStore, *, owner: str = "worker") -> None:
+    def __init__(
+        self,
+        store: JobStore,
+        *,
+        owner: str = "worker",
+        admission: Any = None,
+        heartbeat_interval: Optional[float] = None,
+    ) -> None:
         self.store = store
         self.owner = owner
+        #: Shared provider admission (the same controllers chat, workers and evaluations use).
+        self.admission = admission if admission is not None else ProviderAdmission()
+        #: Seconds between lease renewals while a job runs (``None``: renew only through progress calls).
+        self.heartbeat_interval = heartbeat_interval
+        #: Set at shutdown: running jobs return to ``queued`` at their next boundary.
+        self.interrupt = threading.Event()
         self._kinds: Dict[str, RegisteredKind] = {}
         self._scope_hooks: List[Callable[[Mapping[str, Any]], None]] = []
 
@@ -75,9 +90,10 @@ class JobService:
             self.store,
             pipeline,
             authority=authority,
-            admission=admission,
+            admission=admission if admission is not None else self.admission,
             extra=extra,
             on_denied=on_denied or self._default_denied,
+            interrupt=self.interrupt,
         )
         entry = RegisteredKind(kind, pipeline, cap, runner)
         self._kinds[kind] = entry
@@ -218,17 +234,40 @@ class JobService:
             return None
         lease, job = claimed
         entry = self.kind(job.kind)
+        beat = self._start_heartbeat(lease)
         try:
             state: Optional[JobState] = entry.runner.run(lease, job)
         except LeaseLost:
+            beat.set()
             self.store.release_lease(lease)
             return job.job_id, None
         except Exception:
+            beat.set()
             self.store.release_lease(lease)
             raise
         # A BaseException (a crash, a killed thread) skips this on purpose: the lease is left to expire.
+        beat.set()
         self.store.release_lease(lease)
         return job.job_id, state
+
+    def _start_heartbeat(self, lease: Any) -> threading.Event:
+        """Renew ``lease`` periodically while the job runs; returns the event that stops the renewals."""
+        done = threading.Event()
+        interval = self.heartbeat_interval
+        if not interval:
+            return done
+
+        def beat() -> None:
+            while not done.wait(interval):
+                try:
+                    self.store.renew_lease(lease)
+                except (
+                    Exception
+                ):  # noqa: BLE001 - a lost lease ends the heartbeat; the runner sees LeaseLost itself
+                    return
+
+        threading.Thread(target=beat, name=f"heartbeat-{lease.resource}", daemon=True).start()
+        return done
 
 
 __all__ = ("DEFAULT_KIND_CAPABILITIES", "JobService", "RegisteredKind")
