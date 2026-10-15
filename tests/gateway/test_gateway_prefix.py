@@ -215,7 +215,8 @@ def test_not_found_never_becomes_html(model, uri):
 
 def test_index_is_not_cached_and_assets_are_immutable(model):
     assert route(model, "/fair2wise/").headers["Cache-Control"] == "no-cache"
-    assert route(model, "/fair2wise/assets/index-abc123.js").headers["Cache-Control"] == "public, immutable"
+    assert route(model, "/fair2wise/assets/index-abc123.js").headers["Cache-Control"] == \
+        "public, max-age=31536000, immutable"
 
 
 @pytest.mark.parametrize("uri", ["/healthz", "/fair2wise/healthz"])
