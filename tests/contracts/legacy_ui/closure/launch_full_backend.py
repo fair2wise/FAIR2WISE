@@ -269,13 +269,19 @@ class FullObservations(T18B.Observations):
                                                          sort_keys=True).encode()).hexdigest()}
 
     def flush(self) -> None:
-        super().flush()
-        data = json.loads(self.path.read_text(encoding="utf-8"))
-        data.update({
+        # One atomic write of the whole record (the specs read it concurrently).
+        data = {
+            "fake_calls": dict(sorted(self.ctx.calls.items())),
+            "retrieval_calls": self.retrieval_calls,
+            "faults": self.faults,
+            "requests": self.requests,
+            "graph_sha256": self.graph_hashes(),
+            "splash_entities": len(self.ctx.splash_entities),
+            "splash_links": len(self.ctx.splash_links),
             "tiled": self.tiled_counts(), "tiled_lookups": self.tiled_lookups,
             "splash_mode": self.splash.mode() if self.splash else None,
             "secret_hits": self.secret_hits,
-        })
+        }
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(self.path)
