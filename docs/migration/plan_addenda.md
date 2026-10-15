@@ -129,6 +129,54 @@ transition.
   audit and porting can run in parallel with the H5-H7 sequence after H4.
 - **Approver:** project owner (same as H0-H7).
 
+## A3 (2026-10-14, owner request): code quality closure before cutover
+
+At the very end of the migration — after H6 and before H7 — a dedicated pass
+ensures the codebase is production-ready in terms of documentation, typing and
+test coverage. Nothing in this addendum authorizes new features, scientific
+changes or schema modifications.
+
+### T27: Docstring, typing and test-coverage closure
+
+- **Depends on:** H6. **Blocks:** H7.
+- **Scope:**
+  1. **Docstrings.** Every public symbol in `app/` (`public.py`, `api/`,
+     `modules/`) that lacks a docstring gets one. The bar is the WHY and the
+     contract (preconditions, return shape, exceptions raised), not a prose
+     repetition of the function name. Internal helpers that are only called
+     from one place are exempt; anything that appears in a public or
+     cross-module import is not.
+  2. **Type annotations.** All function signatures in `app/` carry complete
+     annotations (parameters and return types). `Any` is allowed only where
+     the type genuinely cannot be narrowed (e.g. LangChain message payloads);
+     each surviving `Any` gets a short inline comment explaining why. Run
+     `mypy --strict` (or the project's configured checker) and fix or
+     explicitly ignore every reported error.
+  3. **Sniff test.** Do a full read-through of every module touched during
+     the migration. Flag anything that smells wrong: dead branches, TODOs
+     that were never resolved, commented-out code, magic literals, functions
+     that are too long to reason about, and any place where the implementation
+     diverges from what its docstring claims. Each flag is either fixed inline
+     or recorded in the H7 review packet with a disposition (fix, defer with
+     owner approval, or intentional).
+  4. **Test coverage.** Run the full test suite with coverage measurement.
+     Any module in `app/` with line coverage below 80% that is not already
+     covered by the T11 binary suite gets additional unit or integration tests.
+     Tests must exercise real behavior — not trivial pass-throughs — and must
+     not duplicate assertions already in the binary suite. Exclude generated
+     files, migration scripts and `app/modules/legacy/`.
+- **Acceptance:**
+  - `mypy` (or the configured checker) passes with no unresolved errors on
+    `app/`.
+  - Coverage report committed to `docs/migration/reviews/H7/coverage.txt`;
+    no in-scope module below 80% line coverage.
+  - Sniff-test findings committed to
+    `docs/migration/reviews/H7/sniff_findings.md` with a disposition for
+    every item.
+  - All public symbols in `app/` have docstrings; every function signature
+    has complete type annotations.
+  - Full test suite green; no new skips introduced to reach the threshold.
+
 ## Order after H2
 
 T25D, T03B and T02B first (they can run in parallel), then the plan's
