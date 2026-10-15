@@ -1,0 +1,183 @@
+{
+  "schema": "f2w.image.profile/v1",
+  "profile": "local",
+  "image_tag": "local",
+  "docker_target": "local",
+  "authorization_mode": "local_trusted",
+  "tiled_mode": "managed",
+  "tiled_url": null,
+  "bundles_tiled_server": true,
+  "cwd": "/app",
+  "locked_env": {
+    "F2W_DEPLOYMENT_PROFILE": "local",
+    "F2W_AUTHORIZATION_MODE": "local_trusted",
+    "F2W_TILED_MODE": "managed",
+    "F2W_PUBLIC_PREFIX": "/fair2wise",
+    "F2W_API_UPSTREAM": "127.0.0.1:8090",
+    "F2W_RESOURCE_ROOT": "/app",
+    "PYTHONPATH": "/app",
+    "F2W_TILED_DATA_DIR": "/var/lib/fair2wise/tiled",
+    "F2W_TILED_PYTHON": "/opt/tiled/venv/bin/python",
+    "F2W_TILED_PORT": "8765"
+  },
+  "forbidden_env": [
+    "F2W_TILED_URL",
+    "F2W_TILED_WRITER_SECRET",
+    "F2W_TILED_API_KEY",
+    "F2W_TILED_WRITER_KEY"
+  ],
+  "stripped_env": [
+    "TILED_URI",
+    "TILED_API_KEY",
+    "TILED_API_KEY_SCHEME",
+    "TILED_CATALOG_URI",
+    "TILED_GRAPH_ENABLED",
+    "TILED_SINGLE_USER_API_KEY",
+    "F2W_LIVE_TILED"
+  ],
+  "env": {
+    "F2W_BACKEND": "cborg",
+    "F2W_MODEL": "lbl/cborg-chat",
+    "F2W_GRAPH": "storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json",
+    "F2W_SCHEMA": "storage/schema/rsoxs_schema.yaml",
+    "F2W_WORKDIR": "/var/lib/fair2wise/state/session",
+    "F2W_JOB_DB": "/var/lib/fair2wise/state/session/operations/jobs.sqlite3",
+    "F2W_WORKER_FACTORY": "app.modules.workers.factories:idle_service",
+    "F2W_WORKER_CONCURRENCY": "2",
+    "F2W_TRACE_ENABLED": "1",
+    "F2W_TRACE_DIR": "/var/lib/fair2wise/state/traces",
+    "F2W_SUPERVISOR_STATUS": "/run/fair2wise/supervisor.json",
+    "KG_RAG_GRAPH_SOURCE": "json",
+    "KG_RAG_RETRIEVAL_BACKEND": "lexical",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1"
+  },
+  "required_mounts": [
+    {
+      "path": "/var/lib/fair2wise/state",
+      "writable": true,
+      "purpose": "jobs, sessions, approvals, audit and traces (single writer)"
+    },
+    {
+      "path": "/var/lib/fair2wise/tiled",
+      "writable": true,
+      "purpose": "managed Tiled catalog, writable storage and generated writer key"
+    }
+  ],
+  "gateway": {
+    "build_manifest": "/usr/share/nginx/html/fair2wise/f2w-build.json",
+    "template": "/etc/fair2wise/nginx/gateway.conf.template",
+    "rendered": "/run/fair2wise/nginx/conf.d/default.conf",
+    "runtime_dirs": [
+      "/run/fair2wise/nginx/tmp/client_body",
+      "/run/fair2wise/nginx/tmp/proxy",
+      "/run/fair2wise/nginx/tmp/fastcgi",
+      "/run/fair2wise/nginx/tmp/uwsgi",
+      "/run/fair2wise/nginx/tmp/scgi"
+    ]
+  },
+  "preflight": [
+    [
+      "@python",
+      "/opt/fair2wise/entrypoint/preflight.py",
+      "--profile-file",
+      "${F2W_PROFILE_FILE}"
+    ],
+    [
+      "nginx",
+      "-t",
+      "-q",
+      "-c",
+      "/opt/fair2wise/entrypoint/nginx-main.conf"
+    ]
+  ],
+  "services": [
+    {
+      "name": "tiled",
+      "argv": [
+        "@python",
+        "/opt/fair2wise/entrypoint/tiled_service.py"
+      ],
+      "required": false,
+      "health": {
+        "http": "http://127.0.0.1:${F2W_TILED_PORT}/healthz",
+        "timeout": 150,
+        "interval": 1.0
+      },
+      "restart": {
+        "max": 3,
+        "backoff": 5
+      },
+      "no_restart_exit_codes": [
+        78
+      ],
+      "stop_timeout": 25
+    },
+    {
+      "name": "api",
+      "argv": [
+        "@python",
+        "/opt/fair2wise/entrypoint/api_service.py",
+        "--backend",
+        "${F2W_BACKEND}",
+        "--model",
+        "${F2W_MODEL}",
+        "--kg-mode",
+        "json",
+        "--graph",
+        "${F2W_GRAPH}",
+        "--schema",
+        "${F2W_SCHEMA}",
+        "--workdir",
+        "${F2W_WORKDIR}",
+        "api",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8090"
+      ],
+      "required": true,
+      "health": {
+        "http": "http://127.0.0.1:8090/health",
+        "timeout": 240,
+        "interval": 1.0
+      },
+      "stop_timeout": 20
+    },
+    {
+      "name": "worker",
+      "argv": [
+        "@python",
+        "-m",
+        "app.modules.workers",
+        "--db",
+        "${F2W_JOB_DB}",
+        "--factory",
+        "${F2W_WORKER_FACTORY}",
+        "--concurrency",
+        "${F2W_WORKER_CONCURRENCY}"
+      ],
+      "required": true,
+      "health": {
+        "alive_for": 3,
+        "timeout": 30
+      },
+      "stop_timeout": 45
+    },
+    {
+      "name": "gateway",
+      "argv": [
+        "nginx",
+        "-c",
+        "/opt/fair2wise/entrypoint/nginx-main.conf"
+      ],
+      "required": true,
+      "health": {
+        "http": "http://127.0.0.1:80/fair2wise/healthz",
+        "timeout": 30
+      },
+      "stop_signal": "SIGQUIT",
+      "stop_timeout": 15
+    }
+  ]
+}
