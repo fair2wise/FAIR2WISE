@@ -7349,7 +7349,16 @@ def create_app(
 
 
 def run_api(cfg: CoordinatorConfig, *, host: str, port: int, cors_origins: Optional[List[str]] = None) -> None:
-    """Start the uvicorn server for the agent pipeline API."""
+    """Start the uvicorn server for the agent pipeline API.
+
+    Behind the ``/fair2wise`` gateway (T24C) the trusted startup setting
+    ``F2W_PUBLIC_PREFIX=/fair2wise`` gives the app ``root_path=/fair2wise/api``; routes stay
+    rooted and the gateway is the only component that strips the prefix. Unset: no
+    ``root_path``, as before.
+    """
     import uvicorn
 
-    uvicorn.run(create_app(cfg, cors_origins=cors_origins), host=host, port=port)
+    from ..deployment.gateway import layout_from_env, uvicorn_options
+
+    options = uvicorn_options(layout_from_env(os.environ))
+    uvicorn.run(create_app(cfg, cors_origins=cors_origins), host=host, port=port, **options)
