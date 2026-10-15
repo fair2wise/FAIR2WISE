@@ -5,7 +5,7 @@ The fixture seed includes a FORGE-owned sentinel ESAF and unmarked ``f2w:test/..
 records; neither may ever appear in a literature scope.
 """
 import pytest
-from conftest import make_als_ctx, make_ctx
+from graph_contexts import make_als_ctx, make_ctx
 from graph_samples import nodes_payload, seed_graph, things_payload
 from tiled_server import start_tiled_instance, tiled_python
 

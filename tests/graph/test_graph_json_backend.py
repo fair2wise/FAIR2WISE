@@ -3,7 +3,7 @@ import json
 import shutil
 
 import pytest
-from conftest import make_als_ctx, make_ctx
+from graph_contexts import make_als_ctx, make_ctx
 from graph_samples import JSON_KG_EXPECTED, nodes_payload, things_payload, write
 
 from app.modules import kg_rag_api
