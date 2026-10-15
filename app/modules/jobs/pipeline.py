@@ -112,6 +112,8 @@ class StageSpec:
         params_keys: Parameter names that matter (empty: all parameters, when ``params`` is relevant).
         verify: Returns ``None`` when the outputs check out, else a reason; run before completion is recorded.
         required_capability: Capability re-checked before the stage runs (workers re-authorize).
+        always_run: Never reuse a completed record: the stage re-checks on every run (for example revalidation
+            of an approval just before an import resumes).
     """
 
     name: str
@@ -122,6 +124,7 @@ class StageSpec:
     params_keys: Tuple[str, ...] = ()
     verify: Optional[StageVerify] = None
     required_capability: Optional[str] = None
+    always_run: bool = False
 
 
 class Pipeline:
@@ -300,7 +303,8 @@ class PipelineRunner:
                     raise JobStopped("stop requested")
                 row = self.store.stage(job_id, spec.name)
                 if (
-                    row is not None
+                    not spec.always_run
+                    and row is not None
                     and row.op_key == keys[spec.name]
                     and row.status in (StageOutcome.COMPLETED, StageOutcome.SKIPPED_COMPATIBLE)
                 ):
@@ -387,14 +391,10 @@ class PipelineRunner:
             extra=self._extra,
             interrupt=self._interrupt,
         )
+        self.store.begin_stage(lease, job_id, spec.name, position, key)
         try:
             if spec.required_capability:
                 ctx.require(spec.required_capability)
-        except ContractError as exc:
-            self._deny(lease, job, spec, exc)
-            raise _Ended(JobState.FAILED) from exc
-        self.store.begin_stage(lease, job_id, spec.name, position, key)
-        try:
             result = spec.run(ctx)
             if result.incomplete:
                 raise _IncompleteCoverage(result.incomplete)
