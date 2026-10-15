@@ -114,6 +114,9 @@ def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
     app.add_exception_handler(ContractError, _contract_error_handler)
     if runtime.settings.exposure_warning:
         logger.warning("F2W local network exposure: %s", runtime.settings.exposure_warning)
+    if runtime.settings.disposable_target:
+        logger.warning("F2W %s is bound to a disposable test Tiled at %s (test fixture override)",
+                       runtime.settings.profile.value, runtime.settings.tiled_target)
     return app
 
 

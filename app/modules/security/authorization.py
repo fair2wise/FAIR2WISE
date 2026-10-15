@@ -116,6 +116,9 @@ class DeploymentSettings:
     local_bind: str = "loopback"
     role_check_max_age: timedelta = DEFAULT_ROLE_CHECK_MAX_AGE
     corpus_scope: FrozenSet[str] = field(default_factory=frozenset)
+    #: ``True`` only for settings built by :meth:`for_disposable_test_target` (T25C). Not an
+    #: ``__init__`` argument, so no constructor call, ``from_mapping`` value or ``replace`` can set it.
+    disposable_target: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         set_ = functools.partial(object.__setattr__, self)
@@ -198,6 +201,43 @@ class DeploymentSettings:
             role_check_max_age=age,
             corpus_scope=corpora,
         )
+
+    @classmethod
+    def for_disposable_test_target(cls, profile: Union[DeploymentProfile, str], *, tiled_target: str,
+                                   writer_identity: str, **kwargs: Any) -> "DeploymentSettings":
+        """Test-only ALS settings bound to an application-owned disposable Tiled (T25C).
+
+        Every ALS rule runs unchanged (profile, mode, identity, approvals, route policy);
+        only ``tiled_target`` is replaced by a loopback fixture server instead of the
+        profile's fixed URL. This is a Python-only entry point for test fixtures:
+        :meth:`from_mapping` (the startup environment), ``F2W_*`` values and requests
+        cannot reach it, and ``dataclasses.replace`` drops the override (the copy is
+        re-validated and refused).
+
+        Args:
+            profile: ``als-dev`` or ``als-prod``.
+            tiled_target: ``http://127.0.0.1:<port>`` of a disposable fixture server.
+            writer_identity: Configured technical writer principal.
+            **kwargs: Other :class:`DeploymentSettings` fields.
+
+        Raises:
+            StartupConfigError: Not an ALS profile, or the target is not an explicit
+                loopback ``127.0.0.1`` port.
+        """
+        settings = cls(profile=profile, writer_identity=writer_identity, **kwargs)
+        if settings.is_local:
+            raise StartupConfigError("config_rejected: the disposable target override is for ALS profiles only")
+        try:
+            target = normalize_tiled_target(tiled_target)
+        except ValueError as exc:
+            raise StartupConfigError(f"config_rejected: {exc}") from None
+        parts = target.split("://", 1)[1].split("/", 1)[0]
+        host, _, port = parts.partition(":")
+        if not target.startswith("http://") or host != LOOPBACK_HOST or not port.isdigit():
+            raise StartupConfigError("config_rejected: a disposable target must be http://127.0.0.1:<port>")
+        object.__setattr__(settings, "tiled_target", target)
+        object.__setattr__(settings, "disposable_target", True)
+        return settings
 
     @property
     def is_local(self) -> bool:
@@ -625,10 +665,27 @@ FRAMEWORK_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
 }
 
 
+#: ALS sign-in/sign-out handlers (access_contract.md section 7 "new" row; ``app/api/sessions.py``,
+#: T25C). Mounted on ALS only; there is no local login (D34).
+SESSION_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
+    _p("S01", _A, "GET", "/auth/providers", "auth.session", public=True, on_local=False,
+       note="sign-in options generated from the profile Tiled's advertised providers"),
+    _p("S02", _A, "POST", "/auth/sign-in", "auth.session", public=True, on_local=False,
+       note="forwards to the profile Tiled's own provider; tokens stay server-side"),
+    _p("S03", _A, "POST", "/auth/sign-out", "auth.session", public=True, on_local=False,
+       note="drops the F2W session and revokes the Tiled session"),
+)
+
+SESSION_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
+    (p.surface, p.method, p.path): p for p in SESSION_ROUTE_POLICIES
+}
+
+
 def route_capabilities(method: str, path: str, surface: str = AGENT_SURFACE) -> Optional[RoutePolicy]:
     """Return the policy for a route, or ``None`` (default-deny on ALS)."""
     key = (surface, method.upper(), path)
-    return ROUTE_CAPABILITIES.get(key) or FRAMEWORK_ROUTE_CAPABILITIES.get(key)
+    return ROUTE_CAPABILITIES.get(key) or FRAMEWORK_ROUTE_CAPABILITIES.get(key) \
+        or SESSION_ROUTE_CAPABILITIES.get(key)
 
 
 #: PUT /settings fields a non-admin may change for their own session (LLM-01).

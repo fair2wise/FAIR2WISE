@@ -96,6 +96,7 @@ from ..tiled_graph import (
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
 from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
+from ...api.sessions import TiledSessionStore, install_session_routes
 from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ..contracts.context import RequestContext
 from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS
@@ -6798,8 +6799,10 @@ def create_app(
     Access (T18B): ``deployment`` (``DeploymentSettings``) or ``startup_config``
     (``os.environ`` when ``None``, profile ``local`` when unset) selects the profile
     once, here. ALS profiles need ``identity_port`` and ``credential_store`` or
-    startup is refused. Every route is guarded per ``ROUTE_POLICIES`` and every
-    response and SSE event is projected (``app/api/legacy_ui.py``).
+    startup is refused. A ``TiledSessionStore`` credential store also mounts the ALS
+    sign-in/sign-out handlers (T25C, ``app/api/sessions.py``). Every route is guarded
+    per ``ROUTE_POLICIES`` and every response and SSE event is projected
+    (``app/api/legacy_ui.py``).
     """
     app = FastAPI(title="FAIR2WISE Agent Pipeline API")
     guard = build_guard(
@@ -6811,6 +6814,8 @@ def create_app(
     service.personal_settings = guard.personal_settings  # T25D: None on :local
     guard.check_service(service)
     guard.install(app)
+    if not guard.is_local and isinstance(credential_store, TiledSessionStore):
+        install_session_routes(app, credential_store, guard.settings)  # T25C: ALS sign-in/sign-out
 
     app.add_middleware(
         CORSMiddleware,

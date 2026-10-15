@@ -21,8 +21,15 @@ wheel (sha256 ``416079d4...7fa06``; owner decision O-T1). No server was contacte
 * ``tiled/authn_database/core.py:51`` and ``tiled/server/app.py:723``: the admin role
   is named ``"admin"``; ``authentication.tiled_admins`` grants it at server start.
 
-Still to confirm in T25C (against a disposable authenticated Tiled, and on the
-central servers' build; D-T1..D-T9): see ``TODO(T25C)`` notes below.
+Confirmed in T25C against application-owned disposable 0.2.18 servers
+(``tests/security_live``): the admin gets roles ``["user", "admin"]`` and a plain user
+``["user"]``; whoami without a credential is 200 ``null``; an expired access token is
+401 ``"Access token has expired. Refresh token."``; a malformed, foreign-signed (another
+server's) or unknown token is 401 ``"Could not validate credentials"``; a revoked or
+unknown API key is 401 ``"Invalid API key"`` (0.2.18 does not tell revoked from
+unknown); a service principal's API key resolves to ``type: "service"``; deleting the
+admin role row is visible at the next whoami. Still open for the central servers'
+build (D33): see the notes on :class:`TiledWhoamiAdapter`.
 
 Importing this module has no side effects and does not import ``httpx`` or ``tiled``.
 """
@@ -40,6 +47,10 @@ TILED_ADMIN_ROLE = "admin"
 
 #: Path of the whoami endpoint under the Tiled base URL (0.2.18 router.py:279).
 WHOAMI_PATH = "/api/v1/auth/whoami"
+#: Server description (``library_version``, ``authentication``), 0.2.18 router.py:285.
+ABOUT_PATH = "/api/v1/"
+#: ``Authorization`` schemes 0.2.18 accepts for a principal (authentication.py:180-200, 668).
+CREDENTIAL_SCHEMES = ("Bearer", "Apikey")
 
 
 def normalize_tiled_target(url: str) -> str:
@@ -80,11 +91,18 @@ class TiledCredential:
         tiled_target: Normalized Tiled base URL that issued the token. ``None`` only
             when the caller already bound the credential to this deployment.
         expires_at: Access-token expiry, if known to the session store.
+        scheme: ``Bearer`` (browser session access token) or ``Apikey`` (a per-principal
+            Tiled API key, D-T8).
     """
 
     access_token: str = field(repr=False)
     tiled_target: Optional[str] = None
     expires_at: Optional[datetime] = None
+    scheme: str = "Bearer"
+
+    def __post_init__(self) -> None:
+        if self.scheme not in CREDENTIAL_SCHEMES:
+            raise ValueError(f"unsupported Tiled credential scheme {self.scheme!r}")
 
     def fingerprint(self) -> str:
         """Return a non-reversible cache key for this credential."""
@@ -217,31 +235,58 @@ def identity_from_whoami(payload: Any, *, issuer: str, now: datetime,
 
 
 class TiledWhoamiAdapter:
-    """``TiledIdentityPort`` over HTTP ``GET {tiled}/api/v1/auth/whoami`` (tiled 0.2.18 shape).
+    """``TiledIdentityPort`` over HTTP ``GET {tiled}/api/v1/auth/whoami`` (tiled 0.2.18).
 
     Args:
         tiled_target: Base URL of the profile's Tiled.
         http_client: An ``httpx.Client``-like object (``get(url, headers=..., timeout=...)``).
-            Injected so tests use ``httpx.MockTransport`` and never reach a server.
+            Production passes a real client; unit tests use ``httpx.MockTransport``.
         timeout: Per-call timeout in seconds.
 
-    TODO(T25C): confirm against a disposable authenticated tiled 0.2.18 and the central
-    servers' build (reported 0.2.19, D33):
-      * D-T3: ``uuid`` is stable across sign-ins for both password and external (OIDC)
-        providers (0.2.18 resolves OIDC tokens to a DB principal, authentication.py:718-728).
-      * D-T4: central ``tiled_admins`` map to a role named ``admin`` in ``whoami.roles``.
-      * D-T5/D-T6: access-token lifetime (0.2.18 default 15 min, server/settings.py:34);
-        0.2.18 decodes Tiled-minted JWTs without a session lookup, so a revoked session's
-        access token stays valid until it expires. That bounds F2W_ROLE_CHECK_MAX_AGE.
-      * D-T8: per-user API keys (``Authorization: Apikey``) for non-browser clients; this
-        adapter only sends ``Authorization: Bearer``.
-      * Whether ``about.library_version`` should be attached (C1) per check.
+    Behaviour (verified against disposable 0.2.18 servers, T25C):
+
+    * The credential is sent with its own scheme (``Bearer`` or ``Apikey``), only to
+      ``tiled_target``; a credential bound to another server is refused before any call.
+    * 401 maps to ``IdentityRejected``: ``expired`` (access token past ``exp``),
+      ``revoked`` (principal deleted), otherwise ``invalid`` (unknown, malformed,
+      signed by another server, revoked API key).
+    * Anything else that is not 200 JSON, a transport error or a timeout is
+      ``IdentityUnavailable``. That includes 404, which a single-user API key server
+      returns because it has no auth routes.
+    * ``library_version`` is read once from ``/api/v1/`` and attached to every identity
+      (role-check evidence, C1). Failing to read it is not an identity failure.
+
+    Gaps that remain for the central 0.2.19 servers (D33), not testable on 0.2.18 fixtures:
+
+    * D-T3/D-T7: external (OIDC) providers. 0.2.18 maps them to a database principal
+      (authentication.py:718-728), so ``uuid`` should stay stable, but no OIDC flow was run.
+    * D-T6: 0.2.18 decodes its access tokens without a session lookup. A revoked session's
+      access token passes whoami until it expires (default 15 min). F2W's sign-out drops
+      the server-side session at once, and the refresh fails afterwards.
+    * Role edits: 0.2.18 has no role-change API. A role removed in the authn database
+      shows at the next whoami, but the access token's ``scp`` claim keeps the old
+      scopes for Tiled's own checks until it expires.
     """
 
     def __init__(self, tiled_target: str, http_client: Any, *, timeout: float = 5.0) -> None:
         self.tiled_target = normalize_tiled_target(tiled_target)
         self._client = http_client
         self._timeout = timeout
+        self._library_version: Optional[str] = None
+
+    def library_version(self) -> Optional[str]:
+        """Return the server's ``library_version`` (read once), or ``None`` if it cannot be read."""
+        if self._library_version is None:
+            try:
+                response = self._client.get(self.tiled_target + ABOUT_PATH, headers={"Accept": "application/json"},
+                                            timeout=self._timeout)
+                body = response.json() if response.status_code == 200 else None
+            except Exception:  # best effort: the version is evidence, not authority
+                return None
+            version = body.get("library_version") if isinstance(body, Mapping) else None
+            if isinstance(version, str) and version:
+                self._library_version = version
+        return self._library_version
 
     def whoami(self, credential: TiledCredential, *, now: datetime) -> VerifiedIdentity:
         """Ask the profile's Tiled who ``credential`` belongs to (see the port)."""
@@ -249,7 +294,8 @@ class TiledWhoamiAdapter:
             raise IdentityRejected("missing")
         if credential.tiled_target and normalize_tiled_target(credential.tiled_target) != self.tiled_target:
             raise IdentityRejected("wrong_issuer")
-        headers = {"Authorization": f"Bearer {credential.access_token}", "Accept": "application/json"}
+        headers = {"Authorization": f"{credential.scheme} {credential.access_token}",
+                   "Accept": "application/json"}
         try:
             response = self._client.get(self.tiled_target + WHOAMI_PATH, headers=headers, timeout=self._timeout)
         except Exception as exc:  # transport error or timeout: never fall back
@@ -269,7 +315,8 @@ class TiledWhoamiAdapter:
         except ValueError:
             raise IdentityUnavailable("whoami body is not JSON") from None
         return identity_from_whoami(payload, issuer=self.tiled_target, now=now,
-                                    credential_expires_at=credential.expires_at)
+                                    credential_expires_at=credential.expires_at,
+                                    tiled_library_version=self.library_version())
 
 
 def _detail(response: Any) -> str:
