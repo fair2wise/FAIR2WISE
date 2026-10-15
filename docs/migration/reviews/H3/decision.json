@@ -1,0 +1,27 @@
+{
+  "gate": "H3",
+  "status": "pending_owner_clarification",
+  "approver": "project owner",
+  "answered_on": "2026-10-15",
+  "basis": "Owner reply to review_packet.md section 3. Not yet an approval: F5 asked for clarification, and B4/B7 need owner-supplied names (Work families, labeler, judge model).",
+  "owner_response_verbatim": {
+    "general": "I agree with most recommendations.",
+    "B": "For H3 review. B should be non-blocking for the application to work, but be used separately for validation.",
+    "S": "all license mentions should be LBNL BSD-style",
+    "F": "elaborate what you mean by candidates vs schema classes"
+  },
+  "recorded_interpretation": {
+    "B": "The binary suite and its gate verdict are a separate validation tool and gate evidence; no application path (startup, chat, extraction, settings) may read or wait on a binary verdict, and the case run is not a required CI check. Today no file under app/, scripts/ or .github/ references evals/binary; only the suite's own unit tests run in the default pytest.",
+    "S4": "Replace `license: MIT` in every schema file with the LBNL BSD-style licence. This changes schema file fingerprints, recorded as an owner-directed change."
+  },
+  "open_items": {
+    "F5": "Clarification requested; answer given in chat 2026-10-15, awaiting owner choice.",
+    "B4": "Owner to name the pilot Work families and a labeler.",
+    "B7": "Owner to choose the CBORG judge model."
+  },
+  "not_authorized": [
+    "Any push, pull request, or remote write (F2W or FORGE)",
+    "Changes to main or rsoxs",
+    "Image builds for publication, central Tiled access, or live/paid model evaluation"
+  ]
+}
