@@ -73,14 +73,16 @@ function ensureMkdocsSite(uiDir: string) {
   return siteDir
 }
 
-function docsMiddleware(siteDir: string): Connect.NextHandleFunction {
+function docsMiddleware(siteDir: string, base = '/'): Connect.NextHandleFunction {
   const root = path.resolve(siteDir)
+  // Same path as the gateway: /docs unprefixed, <base>docs (e.g. /fair2wise/docs) with a Vite base.
+  const mount = `${base.replace(/\/?$/, '/')}docs`
   return (req, res, next) => {
     const raw = req.url || ''
-    if (!raw.startsWith('/docs')) return next()
+    if (!raw.startsWith(mount)) return next()
 
     const url = new URL(raw, 'http://127.0.0.1')
-    let rel = decodeURIComponent(url.pathname.slice('/docs'.length) || '/')
+    let rel = decodeURIComponent(url.pathname.slice(mount.length) || '/')
     if (!rel.startsWith('/')) rel = `/${rel}`
     if (rel === '/') rel = '/index.html'
     if (rel.endsWith('/')) rel += 'index.html'
@@ -114,11 +116,11 @@ export function serveMkdocs(uiDir: string): Plugin {
     name: 'serve-mkdocs',
     configureServer(server: ViteDevServer) {
       const siteDir = ensureMkdocsSite(uiDir)
-      server.middlewares.use(docsMiddleware(siteDir))
+      server.middlewares.use(docsMiddleware(siteDir, server.config.base))
     },
     configurePreviewServer(server: PreviewServer) {
       const siteDir = ensureMkdocsSite(uiDir)
-      server.middlewares.use(docsMiddleware(siteDir))
+      server.middlewares.use(docsMiddleware(siteDir, server.config.base))
     },
   }
 }

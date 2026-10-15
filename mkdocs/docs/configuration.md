@@ -114,7 +114,9 @@ dispatcher. Results report whether the active backend is `semantic` or
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `VITE_F2W_AGENT_API_URL` | `http://127.0.0.1:8090` | Browser-visible agent API |
+| `VITE_F2W_AGENT_API_URL` | `http://127.0.0.1:8090` | Browser-visible agent API (unprefixed builds) |
+| `F2W_PUBLIC_PREFIX` | unset | `/fair2wise` in images: Vite base/API/docs at build time, API `root_path=/fair2wise/api` at run time |
+| `F2W_API_UPSTREAM` | `127.0.0.1:8090` | Gateway's private API `host:port` (`agent:8090` in Compose) |
 | `F2W_AGENT_HOST` / `F2W_AGENT_PORT` | `127.0.0.1` / `8090` | Agent bind address |
 | `F2W_UI_HOST` / `F2W_UI_PORT` | `127.0.0.1` / `5175` | Vite/UI bind; **never 5174** (SSH). 5173 is CORS-allowed |
 | `FAIR2WISE_UI_DIR` | repository `ui/` | Alternate UI workspace |

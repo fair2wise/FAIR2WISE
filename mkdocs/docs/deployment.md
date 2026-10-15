@@ -130,23 +130,24 @@ The first start is intentionally slower than later starts. Expect these phases:
    copies it into the new `splash-data` volume.
 3. Splash starts and passes its health check.
 4. The agent starts, reads the graph from private Splash, and passes `/health`.
-5. Nginx starts the frontend and its same-origin `/api` proxy.
+5. Nginx starts the `/fair2wise` gateway: UI, MkDocs and the same-origin
+   `/fair2wise/api` proxy.
 
 No separate `pip install`, `npm install`, or graph import is required. A
 successful terminal state shows `splash-db-init` exited with code 0 and the
-three long-running services healthy. Open `http://127.0.0.1:5173`.
+three long-running services healthy. Open `http://127.0.0.1:5173/fair2wise/`.
 
 In another terminal, verify the public entry point:
 
 ```bash
 docker compose ps
 curl -fsS http://127.0.0.1:5173/healthz
-curl -fsS http://127.0.0.1:5173/api/health | python3 -m json.tool
+curl -fsS http://127.0.0.1:5173/fair2wise/api/health | python3 -m json.tool
 ```
 
 The frontend is the only published service. Splash `8081` and agent `8090`
 remain private, but the agent API is deliberately reachable through
-`http://127.0.0.1:5173/api/`.
+`http://127.0.0.1:5173/fair2wise/api/`.
 
 ## Persistent state
 
@@ -187,7 +188,7 @@ git pull --ff-only
 docker compose build --pull
 docker compose up -d
 docker compose ps
-curl -fsS http://127.0.0.1:5173/api/health | python3 -m json.tool
+curl -fsS http://127.0.0.1:5173/fair2wise/api/health | python3 -m json.tool
 ```
 
 Review `docker compose logs --tail=200 splash agent frontend` before declaring
@@ -222,7 +223,7 @@ docker compose up -d
 ```
 
 The existing seed marker causes subsequent starts to retain the restored file.
-Verify `/api/health` and inspect a known node after restoration. Agent-run
+Verify `/fair2wise/api/health` and inspect a known node after restoration. Agent-run
 restoration is usually unnecessary; if workflow continuity matters, restore
 the matching `runs` backup before accepting new sessions. Restoring runs is
 destructive because it replaces all newer session state:

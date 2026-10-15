@@ -16,8 +16,11 @@ name: fair2wise
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Ports (loopback only):
-#   UI    127.0.0.1:5175  (never 5174 — that port is SSH)
-#   Agent 127.0.0.1:8090  (browser uses VITE_F2W_AGENT_API_URL)
+#   UI    http://127.0.0.1:5175/fair2wise/  (never 5174 — that port is SSH)
+#         The gateway (docker/nginx.conf) serves the UI, MkDocs at /fair2wise/docs/
+#         and the same-origin API at /fair2wise/api (stripped once, to agent:8090).
+#         http://127.0.0.1:5175/ redirects to /fair2wise/.
+#   Agent 127.0.0.1:8090  direct developer access to the rooted API routes
 #
 # Darwin / Docker Desktop: IPv6 egress to api.cborg.lbl.gov is unreliable
 # because the Mac host GUA is not the Linux VM's source address. On macOS
@@ -40,6 +43,8 @@ services:
       CBORG_IPV6_BIND: ""
       F2W_AGENT_HOST: 0.0.0.0
       F2W_AGENT_PORT: "8090"
+      # Behind the /fair2wise gateway: root_path=/fair2wise/api (routes stay rooted).
+      F2W_PUBLIC_PREFIX: /fair2wise
       F2W_BACKEND: cborg
       F2W_MODEL: lbl/cborg-chat
       F2W_KG_MODE: json
@@ -77,9 +82,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: frontend
-      args:
-        # Browser origin, not an in-container hostname. Map host 8090.
-        VITE_F2W_AGENT_API_URL: http://127.0.0.1:8090
+    environment:
+      # Private API upstream of the gateway (127.0.0.1:8090 inside a combined image).
+      F2W_API_UPSTREAM: agent:8090
     ports:
       - "127.0.0.1:${F2W_UI_PORT:-5175}:80"
     depends_on:

@@ -6,23 +6,42 @@ WORKDIR /build/ui
 COPY ui/package.json ui/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY ui/ ./
-# Browser-visible API URL only. Do not pass LLM credentials as build args.
-ARG VITE_F2W_AGENT_API_URL=http://127.0.0.1:8090
-ENV VITE_F2W_AGENT_API_URL=${VITE_F2W_AGENT_API_URL}
-RUN npm run build
+# T24C/D26: every image serves under /fair2wise. ui/vite.config.ts derives base
+# /fair2wise/, the same-origin API /fair2wise/api and docs /fair2wise/docs/ from
+# this one setting and refuses any other browser API URL (no compiled host or
+# localhost endpoint). Do not pass LLM credentials as build args.
+ENV F2W_PUBLIC_PREFIX=/fair2wise
+RUN npm run build && grep -q '"public_prefix": "/fair2wise"' dist/f2w-build.json
+
+
+# MkDocs site served by the gateway at /fair2wise/docs/ (owner decision O-A7).
+FROM python:3.12-slim AS docs-build
+
+WORKDIR /build
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install mkdocs==1.6.1 mkdocs-material==9.7.7
+COPY mkdocs/ ./mkdocs/
+COPY app/modules/deployment/gateway.py ./gateway.py
+RUN python gateway.py mkdocs-config --source mkdocs/mkdocs.yml --out mkdocs/.mkdocs.image.yml && \
+    mkdocs build --strict -f mkdocs/.mkdocs.image.yml -d /build/site
 
 
 FROM nginx:1.27-alpine AS frontend
 
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=frontend-build /build/ui/dist /usr/share/nginx/html
+# docker/nginx.conf is the /fair2wise gateway template; the image entrypoint fills
+# only F2W_* placeholders (the private API host:port) into conf.d/default.conf.
+ENV F2W_API_UPSTREAM=127.0.0.1:8090 \
+    NGINX_ENVSUBST_FILTER=^F2W_
+COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
+COPY --from=frontend-build /build/ui/dist /usr/share/nginx/html/fair2wise
+COPY --from=docs-build /build/site /usr/share/nginx/html/fair2wise/docs
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=12 \
     CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1
 
 LABEL Name="fair2wise-frontend" \
       Version="2.0" \
-      Description="FAIR2WISE web frontend and private agent API gateway"
+      Description="FAIR2WISE web frontend and /fair2wise agent API gateway"
 
 
 FROM ghcr.io/prefix-dev/pixi:0.70.2 AS pixi

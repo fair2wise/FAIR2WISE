@@ -1,6 +1,6 @@
 name: fair2wise-splash
 
-# Optional Splash-backed stack (database + agent + Nginx /api gateway).
+# Optional Splash-backed stack (database + agent + Nginx /fair2wise gateway).
 # Product path is compose.yaml (agent + UI, JSON KG). Start this with:
 #   docker compose -f compose.splash.yaml up
 #
@@ -59,6 +59,7 @@ services:
       CBORG_IPV6_BIND: ""
       F2W_AGENT_HOST: 0.0.0.0
       F2W_AGENT_PORT: 8090
+      F2W_PUBLIC_PREFIX: /fair2wise
       F2W_KG_MODE: splash
       F2W_GRAPH: storage/kg/matkg_with_code.json
       F2W_WORKDIR: /app/runs/ui_session_splash
@@ -87,8 +88,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: frontend
-      args:
-        VITE_F2W_AGENT_API_URL: /api
+    environment:
+      # UI at /fair2wise/, API at /fair2wise/api (docker/nginx.conf).
+      F2W_API_UPSTREAM: agent:8090
     ports:
       - "127.0.0.1:${F2W_UI_PORT:-5173}:80"
     depends_on:

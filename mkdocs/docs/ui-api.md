@@ -14,8 +14,12 @@ slash.
 | Deployment | Value | Browser behavior |
 |---|---|---|
 | Local Vite | unset | Defaults to `http://127.0.0.1:8090` |
-| Docker Compose | `/api` | Same-origin calls go through Nginx to private `agent:8090` |
-| Custom build | absolute URL or path | Uses exactly the build-time value |
+| Images and Docker Compose | `/fair2wise/api` (from `F2W_PUBLIC_PREFIX=/fair2wise`) | Same-origin calls go through the gateway to the private API |
+| Custom unprefixed build | absolute URL or path | Uses exactly the build-time value |
+
+Prefixed builds set `F2W_PUBLIC_PREFIX` only; `ui/vite.config.ts` derives the
+Vite base `/fair2wise/`, the API `/fair2wise/api` and the docs URL
+`/fair2wise/docs/`, and refuses a different `VITE_F2W_AGENT_API_URL`.
 
 Vite variables are compiled into browser assets. Changing the variable after
 `npm run build` does not rewrite an existing bundle. Never place secrets in a
@@ -212,9 +216,14 @@ The frontend sends no CBORG or external-service authorization header. The
 agent reads those credentials from its environment and makes upstream calls on
 the server side.
 
-## Compose proxy behavior
+## Gateway behavior
 
-Nginx handles `/api/` with buffering and caching disabled and 900-second read
-and send timeouts, which permits long SSE workflows. `proxy_pass` removes the
-`/api/` prefix before forwarding to `agent:8090`. All other paths use SPA
-fallback to `index.html`.
+The gateway (`docker/nginx.conf`) is the only component that removes the
+prefix. It forwards `/fair2wise/api/<path>?<query>` as the raw `/<path>?<query>`
+to the private API, with buffering, caching and gzip disabled and 900-second
+read and send timeouts, which permits long SSE workflows. The API keeps its
+rooted routes and runs with ASGI `root_path=/fair2wise/api`, so FastAPI docs
+(`/fair2wise/api/docs`), `openapi.json` and redirects carry the prefix.
+`/fair2wise/` deep links fall back to `index.html`; missing assets, the API
+root and anything outside `/fair2wise` return 404. MkDocs is served at
+`/fair2wise/docs/`.
