@@ -1,0 +1,271 @@
+<testsuites name="binary-evaluation" tests="108" failures="0" errors="0" skipped="64">
+  <properties>
+    <property name="gate_status" value="NOT_PASS" />
+    <property name="manifest_sha256" value="66c64efaea2cfccb3174340b26d4e357dec4c5d4a35eaf229f6033a7f5254e32" />
+    <property name="runner_revision" value="t11a-runner-1" />
+  </properties>
+  <testsuite name="AUTH" tests="11" failures="0" errors="0" skipped="1">
+    <testcase classname="binary.AUTH" name="AUTH-01" />
+    <testcase classname="binary.AUTH" name="AUTH-02" />
+    <testcase classname="binary.AUTH" name="AUTH-03" />
+    <testcase classname="binary.AUTH" name="AUTH-04" />
+    <testcase classname="binary.AUTH" name="AUTH-05" />
+    <testcase classname="binary.AUTH" name="AUTH-06" />
+    <testcase classname="binary.AUTH" name="AUTH-07" />
+    <testcase classname="binary.AUTH" name="AUTH-08" />
+    <testcase classname="binary.AUTH" name="AUTH-09">
+      <skipped message="blocked: blocked until: T24C (prefix-correct gateway and existing UI/API deployment); T25C (no-login local workflows and real ALS Tiled role enforcement)" />
+    </testcase>
+    <testcase classname="binary.AUTH" name="AUTH-10" />
+    <testcase classname="binary.AUTH" name="AUTH-11" />
+  </testsuite>
+  <testsuite name="DEP" tests="22" failures="0" errors="0" skipped="20">
+    <testcase classname="binary.DEP" name="DEP-01">
+      <skipped message="blocked: blocked until: T24B (build shared runtime and the three image finals); T24D (GitHub Actions build/publication and protected tags)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-02">
+      <skipped message="blocked: blocked until: T24B (build shared runtime and the three image finals)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-03">
+      <skipped message="skipped: 1 oracle test(s) skipped, 6 passed: tests/tiled/test_tiled_server_lifecycle.py::test_external_outage_never_starts_a_server: F2W_TILED_PYTHON is not set (needs tiled 0.2.18)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-04" />
+    <testcase classname="binary.DEP" name="DEP-05">
+      <skipped message="blocked: blocked until: T24C (prefix-correct gateway and existing UI/API deployment); T24B (build shared runtime and the three image finals)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-06">
+      <skipped message="blocked: blocked until: T24C (prefix-correct gateway and existing UI/API deployment)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-07">
+      <skipped message="blocked: blocked until: T24C (prefix-correct gateway and existing UI/API deployment)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-08">
+      <skipped message="blocked: blocked until: T24C (prefix-correct gateway and existing UI/API deployment); T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-09">
+      <skipped message="blocked: blocked until: T24B (build shared runtime and the three image finals); T24D (GitHub Actions build/publication and protected tags)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-10">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-11">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-12" />
+    <testcase classname="binary.DEP" name="DEP-13">
+      <skipped message="blocked: blocked until: T23B (immutable JSON snapshot service); T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-14">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-15">
+      <skipped message="blocked: blocked until: T24D (GitHub Actions build/publication and protected tags)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-16">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-17">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-18">
+      <skipped message="blocked: blocked until: T10 (durable jobs and curation); T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-19">
+      <skipped message="blocked: blocked until: T25C (no-login local workflows and real ALS Tiled role enforcement); T18C (full frozen-frontend parity on actual Tiled); T14 (FastAPI plus CLI/UI compatibility and job UX)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-20">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-21">
+      <skipped message="blocked: blocked until: T24E (three-profile container, Ansible and restore integration); T13 (publication and rollback rehearsal)" />
+    </testcase>
+    <testcase classname="binary.DEP" name="DEP-22">
+      <skipped message="blocked: blocked until: T24C (prefix-correct gateway and existing UI/API deployment)" />
+    </testcase>
+  </testsuite>
+  <testsuite name="EXT" tests="5" failures="0" errors="0" skipped="3">
+    <testcase classname="binary.EXT" name="EXT-01">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-02">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-03">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.EXT" name="EXT-04" />
+    <testcase classname="binary.EXT" name="EXT-05" />
+  </testsuite>
+  <testsuite name="FIG" tests="4" failures="0" errors="0" skipped="2">
+    <testcase classname="binary.FIG" name="FIG-01">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.FIG" name="FIG-02">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.FIG" name="FIG-03" />
+    <testcase classname="binary.FIG" name="FIG-04" />
+  </testsuite>
+  <testsuite name="JSON" tests="10" failures="0" errors="0" skipped="9">
+    <testcase classname="binary.JSON" name="JSON-01">
+      <skipped message="blocked: blocked until: T23B (immutable JSON snapshot service)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-02" />
+    <testcase classname="binary.JSON" name="JSON-03">
+      <skipped message="blocked: blocked until: T23B (immutable JSON snapshot service)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-04">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-05">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-06">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes); T26B (committed artifact validation and export)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-07">
+      <skipped message="blocked: blocked until: T23B (immutable JSON snapshot service); T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-08">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-09">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes); T10 (durable jobs and curation)" />
+    </testcase>
+    <testcase classname="binary.JSON" name="JSON-10">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes); T10 (durable jobs and curation); T23B (immutable JSON snapshot service)" />
+    </testcase>
+  </testsuite>
+  <testsuite name="LLM" tests="8" failures="0" errors="0" skipped="4">
+    <testcase classname="binary.LLM" name="LLM-01" />
+    <testcase classname="binary.LLM" name="LLM-02" />
+    <testcase classname="binary.LLM" name="LLM-03" />
+    <testcase classname="binary.LLM" name="LLM-04" />
+    <testcase classname="binary.LLM" name="LLM-05">
+      <skipped message="blocked: blocked until: T10 (durable jobs and curation); O03 (owner approval of the job-settings rule)" />
+    </testcase>
+    <testcase classname="binary.LLM" name="LLM-06">
+      <skipped message="blocked: blocked until: T10 (durable jobs and curation); O03 (owner approval of the job-settings rule)" />
+    </testcase>
+    <testcase classname="binary.LLM" name="LLM-07">
+      <skipped message="blocked: blocked until: T10 (durable jobs and curation); O03 (owner approval of the job-settings rule)" />
+    </testcase>
+    <testcase classname="binary.LLM" name="LLM-08">
+      <skipped message="blocked: blocked until: T10 (durable jobs and curation)" />
+    </testcase>
+  </testsuite>
+  <testsuite name="LOCAL" tests="10" failures="0" errors="0" skipped="2">
+    <testcase classname="binary.LOCAL" name="LOCAL-01" />
+    <testcase classname="binary.LOCAL" name="LOCAL-02">
+      <skipped message="blocked: blocked until: T25C (no-login local workflows and real ALS Tiled role enforcement); T08B (Tiled importer over saved JSON, receipts, writes); T10 (durable jobs and curation)" />
+    </testcase>
+    <testcase classname="binary.LOCAL" name="LOCAL-03" />
+    <testcase classname="binary.LOCAL" name="LOCAL-04" />
+    <testcase classname="binary.LOCAL" name="LOCAL-05" />
+    <testcase classname="binary.LOCAL" name="LOCAL-06">
+      <skipped message="skipped: 1 oracle test(s) skipped, 20 passed: tests/graph/test_graph_tiled_server.py::test_wrong_credential_is_denied_and_stopped_server_is_unavailable: F2W_TILED_PYTHON is not set (needs tiled 0.2.18)" />
+    </testcase>
+    <testcase classname="binary.LOCAL" name="LOCAL-07" />
+    <testcase classname="binary.LOCAL" name="LOCAL-08" />
+    <testcase classname="binary.LOCAL" name="LOCAL-09" />
+    <testcase classname="binary.LOCAL" name="LOCAL-10" />
+  </testsuite>
+  <testsuite name="OPS" tests="5" failures="0" errors="0" skipped="2">
+    <testcase classname="binary.OPS" name="OPS-01" />
+    <testcase classname="binary.OPS" name="OPS-02">
+      <skipped message="blocked: blocked until: H3 (owner definition of how repeated Work references are deduplicated); T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.OPS" name="OPS-03">
+      <skipped message="skipped: 1 oracle test(s) skipped, 3 passed: tests/graph/test_graph_tiled_server.py::test_partial_scan_is_flagged_not_absent: F2W_TILED_PYTHON is not set (needs tiled 0.2.18)" />
+    </testcase>
+    <testcase classname="binary.OPS" name="OPS-04" />
+    <testcase classname="binary.OPS" name="OPS-05" />
+  </testsuite>
+  <testsuite name="QA" tests="5" failures="0" errors="0" skipped="3">
+    <testcase classname="binary.QA" name="QA-01">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-02" />
+    <testcase classname="binary.QA" name="QA-03">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-04">
+      <skipped message="blocked: rubric is a draft; owner approval at H3 is required" />
+    </testcase>
+    <testcase classname="binary.QA" name="QA-05" />
+  </testsuite>
+  <testsuite name="QUOTE" tests="2" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.QUOTE" name="QUOTE-01" />
+    <testcase classname="binary.QUOTE" name="QUOTE-02" />
+  </testsuite>
+  <testsuite name="REL" tests="9" failures="0" errors="0" skipped="9">
+    <testcase classname="binary.REL" name="REL-01">
+      <skipped message="blocked: blocked until: T26B (committed artifact validation and export)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-02">
+      <skipped message="blocked: blocked until: T26B (committed artifact validation and export); T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-03">
+      <skipped message="blocked: blocked until: T26B (committed artifact validation and export); T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-04">
+      <skipped message="blocked: blocked until: T26B (committed artifact validation and export)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-05">
+      <skipped message="blocked: blocked until: T24B (build shared runtime and the three image finals); T24D (GitHub Actions build/publication and protected tags)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-06">
+      <skipped message="blocked: blocked until: T26B (committed artifact validation and export)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-07">
+      <skipped message="blocked: blocked until: T10 (durable jobs and curation); T26B (committed artifact validation and export); T23B (immutable JSON snapshot service)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-08">
+      <skipped message="blocked: blocked until: T26C (exact Git snapshot promotion and rollback rehearsal)" />
+    </testcase>
+    <testcase classname="binary.REL" name="REL-09">
+      <skipped message="blocked: blocked until: T15 (FORGE imports F2W agents)" />
+    </testcase>
+  </testsuite>
+  <testsuite name="SCH" tests="5" failures="0" errors="0" skipped="2">
+    <testcase classname="binary.SCH" name="SCH-01" />
+    <testcase classname="binary.SCH" name="SCH-02" />
+    <testcase classname="binary.SCH" name="SCH-03">
+      <skipped message="blocked: blocked until: T22B (schema registry, fingerprint and revision binding)" />
+    </testcase>
+    <testcase classname="binary.SCH" name="SCH-04">
+      <skipped message="blocked: blocked until: T22B (schema registry, fingerprint and revision binding); T10 (durable jobs and curation)" />
+    </testcase>
+    <testcase classname="binary.SCH" name="SCH-05" />
+  </testsuite>
+  <testsuite name="SEC" tests="5" failures="0" errors="0" skipped="0">
+    <testcase classname="binary.SEC" name="SEC-01" />
+    <testcase classname="binary.SEC" name="SEC-02" />
+    <testcase classname="binary.SEC" name="SEC-03" />
+    <testcase classname="binary.SEC" name="SEC-04" />
+    <testcase classname="binary.SEC" name="SEC-05" />
+  </testsuite>
+  <testsuite name="TIL" tests="7" failures="0" errors="0" skipped="7">
+    <testcase classname="binary.TIL" name="TIL-01">
+      <skipped message="skipped: 4 oracle test(s) skipped, 2 passed: tests/tiled/test_tiled_server_lifecycle.py::test_stop_retains_data_and_restart_reads_it_back: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_server_lifecycle.py::test_recovery_after_killed_server: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_server_lifecycle.py::test_launch_health_and_capabilities: F2W_TIL..." />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-02">
+      <skipped message="skipped: 2 oracle test(s) skipped, 6 passed: tests/tiled/test_tiled_server_lifecycle.py::test_external_outage_never_starts_a_server: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_server_lifecycle.py::test_external_connect_to_fixture_without_lifecycle: F2W_TILED_PYTHON is not set (needs tiled 0.2.18)" />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-03">
+      <skipped message="skipped: 3 oracle test(s) skipped, 16 passed: tests/tiled/test_tiled_capabilities_0218.py::test_acl_variant_tag_policy_scopes_graph_reads_and_writes: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_capabilities_0218.py::test_auth_variant_admin_and_reader_principals: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/graph/test_graph_tiled_server.py::test_scoping_and_forge_s..." />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-04">
+      <skipped message="skipped: 2 oracle test(s) skipped, 0 passed: tests/tiled/test_tiled_capabilities_0218.py::test_acl_variant_tag_policy_scopes_graph_reads_and_writes: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_capabilities_0218.py::test_auth_variant_reader_can_write_without_access_policy: F2W_TILED_PYTHON is not set (needs tiled 0.2.18)" />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-05">
+      <skipped message="blocked: blocked until: T08B (Tiled importer over saved JSON, receipts, writes); T14 (FastAPI plus CLI/UI compatibility and job UX)" />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-06">
+      <skipped message="blocked: blocked until: T13 (publication and rollback rehearsal); T08B (Tiled importer over saved JSON, receipts, writes)" />
+    </testcase>
+    <testcase classname="binary.TIL" name="TIL-07">
+      <skipped message="skipped: 11 oracle test(s) skipped, 3 passed: tests/tiled/test_tiled_capabilities_0218.py::test_access_blobs_not_access_tags_and_node_id_not_is_node_bound: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_capabilities_0218.py::test_acl_variant_tag_policy_scopes_graph_reads_and_writes: F2W_TILED_PYTHON is not set (needs tiled 0.2.18); tests/tiled/test_tiled_capabilities_0218.py::t..." />
+    </testcase>
+  </testsuite>
+</testsuites>
