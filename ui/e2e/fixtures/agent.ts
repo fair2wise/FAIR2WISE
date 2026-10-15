@@ -1,6 +1,11 @@
 import type { Page, Route } from '@playwright/test';
 
 export const AGENT_ORIGIN = 'http://127.0.0.1:8090';
+/**
+ * Same-origin API base of a prefixed build (T24C), e.g. /fair2wise/api; set by
+ * playwright.prefix.config.ts. Unset: the default separate-server origin above.
+ */
+export const PREFIXED_API_BASE = (process.env.F2W_E2E_API_BASE || '').replace(/\/$/, '');
 
 export const RSOXS_PATH = 'storage/kg/matkg_rsoxs_v3.json';
 export const OPS_PATH = 'storage/kg/matkg_bl1101_v9.json';
@@ -198,7 +203,9 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    const path = url.pathname;
+    const path = PREFIXED_API_BASE && url.pathname.startsWith(`${PREFIXED_API_BASE}/`)
+      ? url.pathname.slice(PREFIXED_API_BASE.length)
+      : url.pathname;
 
     if (path === '/settings' && method === 'GET') {
       if (options.failSettings) {
@@ -322,6 +329,10 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
     await route.fulfill({ status: 404, body: 'not mocked' });
   };
 
+  if (PREFIXED_API_BASE) {
+    await page.route(url => url.pathname.startsWith(`${PREFIXED_API_BASE}/`), handle);
+    return;
+  }
   await page.route(`${AGENT_ORIGIN}/**`, handle);
   await page.route('http://localhost:8090/**', handle);
 }

@@ -40,6 +40,8 @@ import {
 import { installUiTelemetry, recordUiEvent } from './components/uiTelemetry';
 
 const queryClient = new QueryClient();
+/** Vite base without its trailing slash ("/" unprefixed, "/fair2wise" behind the gateway; T24C). */
+const ROUTER_BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 const EMPTY_QUERY: ExampleQuery = {
   id: 'idle',
   question: '',
@@ -206,7 +208,7 @@ export default function App() {
   const headerLogoIcon = (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">
       <img
-        src="/wise_owl.svg"
+        src={`${import.meta.env.BASE_URL}wise_owl.svg`}
         alt="FAIR2WISE"
         className="h-full w-auto max-w-full object-contain"
       />
@@ -214,7 +216,7 @@ export default function App() {
   );
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={ROUTER_BASENAME}>
       <QueryClientProvider client={queryClient}>
         <FinchConfigProvider config={{}}>
           <div className="grid h-screen w-screen grid-cols-[6rem_1fr] grid-rows-[auto_1fr]">
