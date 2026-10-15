@@ -7,14 +7,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fixtures"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from import_fakes import FakeClock, MemoryTiled, snapshot_with_graph  # noqa: E402
+from import_fakes import CountingClient, FakeClock, MemoryTiled  # noqa: E402
 from tiled_server import start_tiled_instance, tiled_base, tiled_python  # noqa: E402,F401
 
-from app.modules.graph.backends.tiled_mutations import TiledMutationClient  # noqa: E402
 from app.modules.graph.imports import tiled_json as tj  # noqa: E402
 from app.modules.graph.snapshot import SnapshotRequest, create_snapshot  # noqa: E402
 from app.modules.schema.registry import SchemaRegistry  # noqa: E402
-from app.modules.security.authorization import DeploymentSettings, create_approval, local_operator_context  # noqa: E402
+from app.modules.security.authorization import (  # noqa: E402
+    DeploymentSettings,
+    create_approval,
+    local_operator_context,
+)
 from tests.snapshots.snapshot_fakes import COMMIT, INPUTS  # noqa: E402
 
 
@@ -55,7 +58,8 @@ class Env:
     """Everything an import test needs against one backend."""
 
     def __init__(self, client, url, tmp_path, clock, fingerprints, instance=None):
-        self.client, self.url, self.clock, self.fingerprints, self.instance = client, url, clock, fingerprints, instance
+        self.client, self.url, self.clock = client, url, clock
+        self.fingerprints, self.instance = fingerprints, instance
         self.settings = DeploymentSettings(profile="local", writer_identity="f2w-writer", tiled_target=url)
         self.ctx = local_operator_context(self.settings, request_id="t08b")
         self.state_dir = tmp_path / "state"
@@ -84,20 +88,8 @@ class Env:
             self.client.add_forge_sentinel()
 
 
-class CountingClient(TiledMutationClient):
-    """Real client that records every mutation it sends."""
-
-    def __init__(self, *a, **kw):
-        super().__init__(*a, **kw)
-        self.writes = []
-
-    def mutate(self, document, variables):
-        self.writes.append(document.split("{", 1)[1].split("(", 1)[0].strip())
-        return super().mutate(document, variables)
-
-
 @pytest.fixture(params=["memory", "server"])
-def env(request, tmp_path, clock, fingerprints, tiled_base):
+def env(request, tmp_path, clock, fingerprints, tiled_base):  # noqa: F811
     if request.param == "memory":
         client = MemoryTiled()
         client.add_forge_sentinel()

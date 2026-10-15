@@ -108,6 +108,7 @@ packages = [
   "f2w.modules.f2w_agent",
   "f2w.modules.graph",
   "f2w.modules.graph.backends",
+  "f2w.modules.graph.imports",
   "f2w.modules.hybrid_rag",
   "f2w.modules.launchers",
   "f2w.modules.literature",

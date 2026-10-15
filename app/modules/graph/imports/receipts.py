@@ -86,6 +86,8 @@ class ReceiptStore:
 
     def write(self, artifact: ReceiptArtifact) -> Path:
         """Write atomically; an existing receipt with different content is never replaced."""
+        if not verify_artifact(artifact):
+            raise ContractError(ErrorCode.INVALID_INPUT, "receipt hash does not match its content")
         self.root.mkdir(parents=True, exist_ok=True)
         path = self._path(artifact.receipt.receipt_id)
         text = artifact.model_dump_json(indent=2)

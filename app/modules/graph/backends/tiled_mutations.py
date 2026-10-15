@@ -17,7 +17,7 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/kg/mutations.py (BSD-3
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping
 
 import requests
 
@@ -79,16 +79,18 @@ class TiledMutationClient(TiledGraphClient):
     # -- complete reads -------------------------------------------------------------------
     def _scan(self, document: str, key: str, page_size: int, max_rows: int) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
+        seen: set = set()
         while True:
             limit = min(page_size, max_rows - len(rows))
             if limit <= 0:
                 raise TruncatedGraphRead(f"tiled.{key} scan", max_rows)
             page = self.query(document, {"l": limit, "o": len(rows)}).get(key) or []
+            if any(r["id"] in seen for r in page):
+                raise ContractError(ErrorCode.CONFLICT, f"the {key} listing changed while it was read")
+            seen.update(r["id"] for r in page)
             rows.extend(page)
             if len(page) < limit:
                 break
-        if len({r["id"] for r in rows}) != len(rows):
-            raise ContractError(ErrorCode.CONFLICT, f"the {key} listing changed while it was read")
         return rows
 
     def scan_entities(self, *, page_size: int = 500, max_rows: int = 200_000) -> List[Dict[str, Any]]:
@@ -120,11 +122,11 @@ class TiledMutationClient(TiledGraphClient):
                        access_blob: Mapping[str, Any]) -> None:
         """``updateEntity`` of ``uri`` only, always with ``accessBlob`` (0.2.18 defect); owned rows only."""
         if not _owned_by(row, graph_id):
-            raise ContractError(ErrorCode.DENIED, "refusing to modify a record the F2W literature graph does not own")
+            raise ContractError(ErrorCode.DENIED, "refusing to modify a record F2W literature does not own")
         self.mutate(_UPDATE_ENTITY, {"id": row["id"], "i": {"uri": uri, "accessBlob": dict(access_blob)}})
 
     def delete_link(self, row: Mapping[str, Any], graph_id: str) -> None:
         """``deleteLink`` for an owned link only."""
         if not _owned_by(row, graph_id):
-            raise ContractError(ErrorCode.DENIED, "refusing to delete a record the F2W literature graph does not own")
+            raise ContractError(ErrorCode.DENIED, "refusing to delete a record F2W literature does not own")
         self.mutate(_DELETE_LINK, {"id": row["id"]})

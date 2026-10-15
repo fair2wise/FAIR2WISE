@@ -118,3 +118,15 @@ class MemoryTiled(TiledMutationClient):
         lid = str(uuid.uuid4())
         self.links[lid] = {"id": lid, "subjectId": a, "objectId": b, "predicate": "forge:has", "properties": None,
                            "accessBlob": None}
+
+
+class CountingClient(TiledMutationClient):
+    """Real client that records every mutation it sends."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.writes = []
+
+    def mutate(self, document, variables):
+        self.writes.append(document.split("{", 1)[1].split("(", 1)[0].strip())
+        return super().mutate(document, variables)

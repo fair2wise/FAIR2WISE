@@ -148,11 +148,13 @@ def load_source(source: Source, *, supported_schema_fingerprints: Collection[str
         raise ContractError(ErrorCode.INVALID_INPUT, "graph bytes do not match the manifest")
     fp = manifest.schema_block.import_fingerprint
     if not fp or fp not in supported_schema_fingerprints:
-        raise ContractError(ErrorCode.INVALID_INPUT, "manifest schema import_fingerprint is not in the supported set")
+        raise ContractError(ErrorCode.INVALID_INPUT,
+                            "manifest schema import_fingerprint is not in the supported set")
     if manifest.validation.status != "pass":
         raise ContractError(ErrorCode.INVALID_INPUT, "the snapshot's validation did not pass")
     if manifest.disclosure.status not in ("pass", "owner_waiver"):
-        raise ContractError(ErrorCode.INVALID_INPUT, f"disclosure status {manifest.disclosure.status!r} blocks import")
+        raise ContractError(ErrorCode.INVALID_INPUT,
+                            f"disclosure status {manifest.disclosure.status!r} blocks import")
     try:
         data = json.loads(graph_bytes.decode("utf-8"))
         raw_nodes = data.get("things") or data.get("nodes") or []
@@ -264,7 +266,8 @@ class Op:
                 "retire_link": "links", "retire_node": "retire"}[self.kind]
 
 
-def compute_ops(src: SourceSnapshot, st: TargetState, tag: Optional[str] = None) -> Tuple[List[Op], Dict[str, int]]:
+def compute_ops(src: SourceSnapshot, st: TargetState,
+                tag: Optional[str] = None) -> Tuple[List[Op], Dict[str, int]]:
     """Diff the snapshot against the scanned target. ``tag`` (a plan tag) recognizes in-flight revisions."""
     ops: List[Op] = []
     counts = {"unchanged_entities": 0, "unchanged_links": 0}
@@ -463,7 +466,8 @@ class ImportOutcome:
 
 
 def _slug(text: str) -> str:
-    return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")[:40] + "-" + hashlib.sha256(text.encode()).hexdigest()[:10]
+    head = re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")[:40]
+    return head + "-" + hashlib.sha256(text.encode()).hexdigest()[:10]
 
 
 def verify_projection(src: SourceSnapshot, st: TargetState, foreign_before: Mapping[str, str]) -> List[str]:
@@ -550,14 +554,17 @@ def apply_import(ctx: RequestContext, plan: ImportPlan, approval: Optional[Appro
     try:
         outcome = _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock, fault, existing)
     except Exception as exc:  # a crash (BaseException) deliberately leaves the lease to expire
-        journal.append("run_failed", error=type(exc).__name__, code=getattr(getattr(exc, "code", None), "value", None))
+        if journal.started():
+            journal.append("run_failed", error=type(exc).__name__,
+                           code=getattr(getattr(exc, "code", None), "value", None))
         lease.release()
         raise
     lease.release()
     return outcome
 
 
-def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock, fault, existing) -> ImportOutcome:
+def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock, fault,
+         existing) -> ImportOutcome:
     change, detail = plan.change, plan.detail
     graph_id, access = detail["graph_id"], detail["access_blob"]
     resumed = journal.started()
@@ -620,8 +627,8 @@ def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock
         edge = dict(src.edges)[op.key]
         spec = lw.link_spec(graph_id, op.key, edge)
         oid = step("links", i, op)
-        lid = client.create_link(subject_id=ids[spec.subject], predicate=spec.predicate, object_id=ids[spec.object],
-                                 properties=spec.properties, access_blob=access)
+        lid = client.create_link(subject_id=ids[spec.subject], predicate=spec.predicate,
+                                 object_id=ids[spec.object], properties=spec.properties, access_blob=access)
         fault("links_effect", i)
         finish(oid, op, tiled_id=lid)
     for i, op in enumerate(o for o in by_stage["links"] if o.kind == "retire_link"):
@@ -631,7 +638,8 @@ def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock
     fault("after_links", 0)
     for i, op in enumerate(by_stage["retire"]):
         oid = step("retire", i, op)
-        client.set_entity_uri(state.rows[op.old_id], graph_id, lw.state_uri(graph_id, op.key, lw.RETIRED, tag), access)
+        client.set_entity_uri(state.rows[op.old_id], graph_id,
+                              lw.state_uri(graph_id, op.key, lw.RETIRED, tag), access)
         finish(oid, op)
     fault("before_verify", 0)
 
@@ -665,10 +673,12 @@ def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock
         id_mapping_sha256=ledger.sha256(), outcomes=counts, verified=True, completed_at=now)
     extras = ReceiptExtras(
         manifest_sha256=src.manifest_sha256, snapshot_id=src.manifest.snapshot_id, graph_id=graph_id,
-        corpus_scope=list(change.corpus_scope), requested_by=approval.requested_by, approved_by=approval.approved_by,
+        corpus_scope=list(change.corpus_scope), requested_by=approval.requested_by,
+        approved_by=approval.approved_by,
         profile=approval.profile.value, authorization_mode=approval.mode.value, base_revision=change.base_revision,
         resulting_revision=final.revision, data_commit=src.data_commit,
-        operation_counts={"entities": change.creates, "links": change.links, "supersessions": change.supersessions},
+        operation_counts={"entities": change.creates, "links": change.links,
+                          "supersessions": change.supersessions},
         dangling_unimported=len(detail["dangling"]))
     artifact = make_artifact(receipt, extras)
     path = store.write(artifact)

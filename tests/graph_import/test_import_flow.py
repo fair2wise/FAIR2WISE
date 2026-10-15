@@ -143,7 +143,8 @@ def test_changed_snapshot_uses_create_new_revision_and_retires_old(env, snap, tm
     assert by_id[old_id]["uri"].split("/")[2] == "retired"             # old revision kept, not deleted
     assert by_id[old_id]["properties"]["description"] != "revised description"
     live = [e for e in ents if ida.parse_entity_uri(e["uri"])]
-    assert len([e for e in live if e["properties"].get("f2w_graph_id") == plan2.detail["graph_id"]]) == len(g["things"])
+    mine = [e for e in live if e["properties"].get("f2w_graph_id") == plan2.detail["graph_id"]]
+    assert len(mine) == len(g["things"])
     assert env.plan(v2).is_noop
 
 
