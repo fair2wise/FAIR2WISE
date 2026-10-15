@@ -75,17 +75,23 @@ measuring load behavior.
 
 The root `Dockerfile` uses two frontend stages:
 
-1. `frontend-build` starts from Node 20, runs `npm ci`, sets the build-time API
-   base, and runs `npm run build`.
-2. `frontend` starts from Nginx Alpine and copies `ui/dist` into the web root.
+1. `frontend-build` starts from Node 20, runs `npm ci`, sets
+   `F2W_PUBLIC_PREFIX=/fair2wise`, and runs `npm run build`.
+2. `docs-build` builds the MkDocs site.
+3. `frontend` starts from Nginx Alpine, installs `docker/nginx.conf` as a
+   template and copies the UI to `/fair2wise/` and MkDocs to `/fair2wise/docs/`.
 
-Compose builds with `VITE_F2W_AGENT_API_URL=/api`. Nginx:
+The gateway:
 
-- serves the SPA and falls back to `index.html`;
-- exposes `/healthz`;
-- proxies `/api/` to the private agent service;
+- serves the SPA under `/fair2wise/` and falls back to `index.html` there only;
+- exposes `/healthz` and `/fair2wise/healthz`;
+- strips `/fair2wise/api` once and proxies to the private API
+  (`F2W_API_UPSTREAM`, `agent:8090` in Compose);
 - disables buffering/caching for streaming; and
 - permits 900-second agent requests.
+
+To check a prefixed build with the unchanged Playwright suite:
+`F2W_UI_PORT=<free port> npm run e2e:prefix`.
 
 Only the frontend binds a host port:
 
@@ -218,7 +224,7 @@ the suite for pure helpers (`kgCitations`, `chatSessions`, `agentSettings`).
 | Vite executable missing | Run `cd ui && npm ci` |
 | `Failed to fetch` | Check the compiled API base and agent port |
 | CORS error | Use port 5173 or update the backend origin allow-list |
-| `/api` works locally but not in a custom image | Confirm the Nginx proxy and build arg |
+| `/fair2wise/api` works locally but not in a custom image | Confirm `F2W_PUBLIC_PREFIX` at build time, `F2W_API_UPSTREAM` and the API's `F2W_PUBLIC_PREFIX` |
 | Stream appears buffered | Confirm requests pass through the supplied Nginx config with buffering off |
 | Settings 404 | Restart the backend from current source |
 | Graph edit 400 | Confirm Splash mode, valid endpoints, and predicate format |
