@@ -177,6 +177,39 @@ changes or schema modifications.
     has complete type annotations.
   - Full test suite green; no new skips introduced to reach the threshold.
 
+## A4 (2026-10-15, H3 decision F5/F6/S4): samples, measurements and instruments as schema classes
+
+At H3 the owner rejected candidate-only Sample/Measurement records: "it is
+imperative to capture samples, measurements, and techniques". This overrides
+the D20 rule that kept the measurement/technique split out of scope, in the
+additive form the owner chose.
+
+### T22C: Versioned additive schema change
+
+- **Depends on:** H3 (with this decision), T22B. **Blocks:** applying F5/F6
+  mappings in the T06 validation stage, T12 pilot extraction of samples and
+  measurements.
+- **Scope:**
+  1. New LinkML classes, added to `matkg_schema.yaml` and `rsoxs_schema.yaml`
+     (and the xray schema if it shares the terms) under a new schema version:
+     - `Sample`: one paper-local physical specimen (label, composition, phase,
+       processing state, preparation); links to the `Material` it is made of.
+     - `Measurement`: one run reported in a paper; links to its technique
+       (`ExperimentalTechnique`, including `RSoXSMeasurement`), its `Sample`(s),
+       its `Instrument`, typed conditions, and the quantities it produced.
+     - `Instrument`: a beamline, endstation or detector, shared across papers
+       through canonicalization.
+  2. `RSoXSMeasurement is_a ExperimentalTechnique` keeps its technique meaning;
+     its description says so. No existing class, slot or node changes meaning.
+  3. Licence line in every schema file set to the LBNL BSD-style licence (S4).
+  4. Schema registry (T22B): new fingerprints and version, old version kept
+     loadable; extraction mapping F5/F6 rows point at the new classes.
+- **Acceptance:** all 12 tracked KGs validate unchanged under the new version;
+  the extractor's Sample/Measurement/Instrument records map onto the new
+  classes with located-quote evidence; graph JSON and Tiled backends round-trip
+  the new node types; owner reviews the schema diff before it is used to build
+  or publish any graph.
+
 ## Order after H2
 
 T25D, T03B and T02B first (they can run in parallel), then the plan's

@@ -8,14 +8,19 @@
     "general": "I agree with most recommendations.",
     "B": "For H3 review. B should be non-blocking for the application to work, but be used separately for validation.",
     "S": "all license mentions should be LBNL BSD-style",
-    "F": "elaborate what you mean by candidates vs schema classes"
+    "F": "elaborate what you mean by candidates vs schema classes",
+    "F5": "it is imperative to capture samples, measurements, and techniques: SampleRecord: a physical sample in one paper, such as \"film annealed at 150 °C\". F2W graphs hold materials, not samples. MeasurementRecord: one measurement in a paper (technique, instrument, conditions). F2W's only related class is RSoXSMeasurement is_a ExperimentalTechnique, which means a technique, not a single run.",
+    "F5_design": {
+      "RSoXSMeasurement relation": "Additive (Recommended)",
+      "Instrument class": "Yes, add Instrument (Recommended)"
+    }
   },
   "recorded_interpretation": {
     "B": "The binary suite and its gate verdict are a separate validation tool and gate evidence; no application path (startup, chat, extraction, settings) may read or wait on a binary verdict, and the case run is not a required CI check. Today no file under app/, scripts/ or .github/ references evals/binary; only the suite's own unit tests run in the default pytest.",
     "S4": "Replace `license: MIT` in every schema file with the LBNL BSD-style licence. This changes schema file fingerprints, recorded as an owner-directed change."
   },
   "open_items": {
-    "F5": "Clarification requested; answer given in chat 2026-10-15, awaiting owner choice.",
+    "F5": "Resolved 2026-10-15: additive versioned schema change (task T22C, plan_addenda.md A4): new Sample, Measurement and Instrument classes; RSoXSMeasurement keeps its technique meaning; existing graphs stay valid.",
     "B4": "Owner to name the pilot Work families and a labeler.",
     "B7": "Owner to choose the CBORG judge model."
   },
