@@ -428,7 +428,7 @@ def test_audit_unavailable_blocks_review_decision(store, tmp_path, clock):
     assert store.get_case(c["id"], ["rsoxs"])["state"] == "needs_review"
 
 
-# --- adapter over existing F2W chat clients -----------------------------------------------------------------------
+# --- adapter over existing F2W chat clients ---
 
 
 class FakeChatClient:

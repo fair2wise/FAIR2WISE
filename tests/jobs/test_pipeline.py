@@ -400,7 +400,7 @@ def test_corrupt_stored_asset_is_quarantined_not_trusted(tmp_path):
     assert store.stage(h.job_id, "acquire").status is StageOutcome.QUARANTINED
 
 
-# --- effects with stable IDs ---------------------------------------------------------------------------------
+# --- effects with stable IDs ---
 
 
 def test_effects_with_stable_ids_are_not_repeated_after_crash(tmp_path):
