@@ -1,0 +1,273 @@
+"""Application service layer for jobs (plan 4.2: FastAPI starts and observes, workers call this).
+
+The API/CLI (T14) call :class:`JobService` to submit, observe, cancel and resume jobs; the
+worker executor calls :meth:`JobService.work_one` directly, never a recursive HTTP call. No
+route is built here. Every operation takes the server-built :class:`RequestContext`; the
+context is never accepted from a request body.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+
+from ..contracts.context import LOCAL_OPERATOR, RequestContext
+from ..contracts.errors import ContractError, ErrorCode
+from ..contracts.jobs import JobEvent, JobHandle, JobState
+from ..llm_admission import ProviderAdmission
+from .keys import OperationInputs
+from .pipeline import Pipeline, PipelineRunner
+from .store import JobRecord, JobStore, LeaseLost
+
+logger = logging.getLogger(__name__)
+
+#: Stable kind names and the capability that submits them.
+DEFAULT_KIND_CAPABILITIES: Mapping[str, str] = {
+    "ingest": "ingest.extract",
+    "build_snapshot": "json.build",
+    "publish": "graph.publish",
+    "curation": "curation.approve",
+}
+
+
+@dataclass(frozen=True)
+class RegisteredKind:
+    """A job kind: its pipeline, the capability to submit it and its runner."""
+
+    kind: str
+    pipeline: Pipeline
+    capability: str
+    runner: PipelineRunner
+
+
+class JobService:
+    """Submit, observe and drive jobs.
+
+    Args:
+        store: The durable job store.
+        owner: Identity recorded as the lease owner of this process (for example ``worker-<pid>``).
+    """
+
+    def __init__(
+        self,
+        store: JobStore,
+        *,
+        owner: str = "worker",
+        admission: Any = None,
+        heartbeat_interval: Optional[float] = None,
+    ) -> None:
+        self.store = store
+        self.owner = owner
+        #: Shared provider admission (the same controllers chat, workers and evaluations use).
+        self.admission = admission if admission is not None else ProviderAdmission()
+        #: Seconds between lease renewals while a job runs (``None``: renew only through progress calls).
+        self.heartbeat_interval = heartbeat_interval
+        #: Set at shutdown: running jobs return to ``queued`` at their next boundary.
+        self.interrupt = threading.Event()
+        self._kinds: Dict[str, RegisteredKind] = {}
+        self._scope_hooks: List[Callable[[Mapping[str, Any]], None]] = []
+
+    # --- registration -----------------------------------------------------------------
+
+    def register(
+        self,
+        kind: str,
+        pipeline: Pipeline,
+        *,
+        capability: Optional[str] = None,
+        authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None,
+        admission: Any = None,
+        extra: Optional[Mapping[str, Any]] = None,
+        on_denied: Optional[Callable[[JobRecord, str], None]] = None,
+    ) -> RegisteredKind:
+        """Declare a job kind. ``authority`` re-authorizes the initiating subject before every stage."""
+        cap = capability or DEFAULT_KIND_CAPABILITIES.get(kind)
+        if cap is None:
+            raise ValueError(f"no capability known for job kind {kind!r}")
+        runner = PipelineRunner(
+            self.store,
+            pipeline,
+            authority=authority,
+            admission=admission if admission is not None else self.admission,
+            extra=extra,
+            on_denied=on_denied or self._default_denied,
+            interrupt=self.interrupt,
+        )
+        entry = RegisteredKind(kind, pipeline, cap, runner)
+        self._kinds[kind] = entry
+        return entry
+
+    def kind(self, name: str) -> RegisteredKind:
+        """A registered kind, or ``INVALID_INPUT``."""
+        try:
+            return self._kinds[name]
+        except KeyError:
+            raise ContractError(ErrorCode.INVALID_INPUT, f"unknown job kind {name!r}") from None
+
+    def _default_denied(self, job: JobRecord, reason: str) -> None:
+        self.notify_scope_change(
+            {
+                "job_id": job.job_id,
+                "subject": job.created_by,
+                "corpus_scope": list(job.inputs.corpus_scope),
+                "reason": reason,
+            }
+        )
+
+    def on_scope_change(self, hook: Callable[[Mapping[str, Any]], None]) -> None:
+        """Register a hook (approval invalidation, cache flush) run when scope/credentials change."""
+        self._scope_hooks.append(hook)
+
+    def notify_scope_change(self, change: Mapping[str, Any]) -> None:
+        """Scope changed or a credential was revoked: run every hook (no fallback to a server credential)."""
+        for hook in self._scope_hooks:
+            hook(change)
+
+    # --- authorization ----------------------------------------------------------------
+
+    @staticmethod
+    def _check_scope(ctx: RequestContext, corpora: Sequence[str]) -> None:
+        if ctx.principal.subject == LOCAL_OPERATOR and ctx.mode.value == "local_trusted":
+            return
+        if not set(corpora) <= set(ctx.corpus_scope):
+            raise ContractError(ErrorCode.DENIED, "corpus is outside the caller's scope")
+
+    def _visible(self, ctx: RequestContext, job: JobRecord) -> None:
+        if ctx.has("jobs.admin"):
+            return
+        local = ctx.mode.value == "local_trusted"
+        if ctx.principal.subject == job.created_by and (
+            local or set(job.inputs.corpus_scope) <= set(ctx.corpus_scope)
+        ):
+            return
+        raise ContractError(ErrorCode.NOT_FOUND, "no such job")
+
+    # --- API-facing operations ---------------------------------------------------------
+
+    def submit(
+        self, ctx: RequestContext, kind: str, inputs: OperationInputs, *, settings_revision: Optional[str] = None
+    ) -> JobHandle:
+        """Register a job (idempotent for identical kind and inputs). Does not run it."""
+        entry = self.kind(kind)
+        if not ctx.has(entry.capability):
+            raise ContractError(ErrorCode.DENIED, f"{entry.capability} is required to submit {kind} jobs")
+        self._check_scope(ctx, inputs.corpus_scope)
+        return self.store.submit(
+            kind, inputs, created_by=ctx.principal.subject, settings_revision=settings_revision
+        ).handle()
+
+    def get(self, ctx: RequestContext, job_id: str) -> JobHandle:
+        """The job handle (current state)."""
+        job = self.store.get(job_id)
+        self._visible(ctx, job)
+        return job.handle()
+
+    def events(self, ctx: RequestContext, job_id: str, *, after: int = -1) -> List[JobEvent]:
+        """Durable events after sequence ``after`` (for polling and SSE)."""
+        self._visible(ctx, self.store.get(job_id))
+        return self.store.events(job_id, after=after)
+
+    def progress(self, ctx: RequestContext, job_id: str) -> Dict[str, Any]:
+        """Per-phase progress (parsing, extraction, validation, review, import)."""
+        from .telemetry import job_progress
+
+        job = self.store.get(job_id)
+        self._visible(ctx, job)
+        return job_progress(self.store, self.kind(job.kind).pipeline, job_id)
+
+    def cancel(self, ctx: RequestContext, job_id: str) -> JobHandle:
+        """Cancel: immediate when nobody runs it, otherwise a stop request honored at the next boundary."""
+        job = self.store.get(job_id)
+        self._visible(ctx, job)
+        if job.state in (JobState.SUCCEEDED, JobState.CANCELLED):
+            return job.handle()
+        if self.store.lease_holder(self.store.job_resource(job_id)) is not None:
+            self.store.request_stop(job_id, actor=ctx.principal.subject)
+            return self.store.get(job_id).handle()
+        if job.state is JobState.RUNNING:  # owner died: no live lease, so nobody can honor a stop
+            lease = self.store.acquire_lease(self.store.job_resource(job_id), f"cancel:{ctx.principal.subject}")
+            if lease is None:
+                raise ContractError(ErrorCode.CONFLICT, "job is owned by a running worker", retryable=True)
+            try:
+                return self.store.set_state(
+                    lease,
+                    job_id,
+                    JobState.CANCELLED,
+                    reason="cancelled by operator",
+                    error_code=ErrorCode.CANCELLED,
+                ).handle()
+            finally:
+                self.store.release_lease(lease)
+        return self.store.transition_without_lease(
+            job_id, JobState.CANCELLED, reason="cancelled by operator", actor=ctx.principal.subject
+        ).handle()
+
+    def resume(self, ctx: RequestContext, job_id: str, *, expected_revision: Optional[int] = None) -> JobHandle:
+        """Re-queue a paused, review-resolved or failed job; only compatible completed stages are reused."""
+        job = self.store.get(job_id)
+        self._visible(ctx, job)
+        entry = self.kind(job.kind)
+        if not ctx.has(entry.capability) and not ctx.has("jobs.admin"):
+            raise ContractError(ErrorCode.DENIED, "not allowed to resume this job")
+        return self.store.transition_without_lease(
+            job_id,
+            JobState.QUEUED,
+            reason="resume",
+            actor=ctx.principal.subject,
+            expected_revision=expected_revision,
+        ).handle()
+
+    # --- worker-facing ----------------------------------------------------------------
+
+    def work_one(
+        self, owner: Optional[str] = None, *, kinds: Optional[Sequence[str]] = None
+    ) -> Optional[Tuple[str, Optional[JobState]]]:
+        """Claim and run one job. Returns ``(job_id, state)``, or ``None`` when nothing is runnable.
+
+        ``state`` is ``None`` when the owner lost its lease mid-run (a newer owner took over);
+        this worker then stops without applying anything further.
+        """
+        claimed = self.store.claim_next(owner or self.owner, kinds=kinds or tuple(self._kinds))
+        if claimed is None:
+            return None
+        lease, job = claimed
+        entry = self.kind(job.kind)
+        beat = self._start_heartbeat(lease)
+        try:
+            state: Optional[JobState] = entry.runner.run(lease, job)
+        except LeaseLost:
+            beat.set()
+            self.store.release_lease(lease)
+            return job.job_id, None
+        except Exception:
+            beat.set()
+            self.store.release_lease(lease)
+            raise
+        # A BaseException (a crash, a killed thread) skips this on purpose: the lease is left to expire.
+        beat.set()
+        self.store.release_lease(lease)
+        return job.job_id, state
+
+    def _start_heartbeat(self, lease: Any) -> threading.Event:
+        """Renew ``lease`` periodically while the job runs; returns the event that stops the renewals."""
+        done = threading.Event()
+        interval = self.heartbeat_interval
+        if not interval:
+            return done
+
+        def beat() -> None:
+            while not done.wait(interval):
+                try:
+                    self.store.renew_lease(lease)
+                except (
+                    Exception
+                ):  # noqa: BLE001 - a lost lease ends the heartbeat; the runner sees LeaseLost itself
+                    return
+
+        threading.Thread(target=beat, name=f"heartbeat-{lease.resource}", daemon=True).start()
+        return done
+
+
+__all__ = ("DEFAULT_KIND_CAPABILITIES", "JobService", "RegisteredKind")
