@@ -194,3 +194,14 @@ class _null_slot:
 
     def __exit__(self, *a):
         return False
+
+
+def test_no_application_path_imports_or_names_the_binary_suite():
+    """H3 B: the app stores the judge id only; it never reads or waits on a binary verdict."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    offenders = [str(p.relative_to(root)) for base in ("app", "scripts", "docker", ".github")
+                 for p in (root / base).rglob("*") if p.is_file() and p.suffix in (".py", ".yml", ".yaml", ".sh")
+                 and ("evals.binary" in p.read_text(errors="ignore") or "evals/binary" in p.read_text(errors="ignore"))]
+    assert offenders == []

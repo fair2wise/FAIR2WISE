@@ -20,7 +20,7 @@ an admin's validation run. So it is one value per deployment, admin-only on ALS,
 ``extraction_mode`` (docs/migration/authentication/settings_fields.md).
 
 **No application path reads a verdict (H3 B).** The application only stores the chosen id.
-The validation runner (``evals/binary``, outside ``app/``) reads it; nothing in ``app/``
+The validation runner (the binary evaluation suite, outside ``app/``) reads it; nothing in ``app/``
 imports the evaluation suite or waits on a binary result.
 """
 

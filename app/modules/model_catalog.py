@@ -13,7 +13,7 @@ The API key is read only through :func:`app.modules.cborg_http.require_cborg_api
 a listing, an error message or a log line.
 
 Used by the validation judge-model picker (``/v1/validation/judge-model``) and the pilot
-labelling tool (``python -m evals.binary.label --list-models``). Importing this module has
+labelling tool of the binary evaluation suite (``--list-models``). Importing this module has
 no side effects.
 """
 
