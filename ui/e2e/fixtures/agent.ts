@@ -191,6 +191,10 @@ export interface MockAgentOptions {
   failChat?: 'network' | 500;
   failSettings?: boolean;
   publications?: Array<Record<string, unknown>>;
+  /** O-U2 judge picker: live model ids the server lists, or 'forbidden' (ALS non-admin). Unset: route absent. */
+  judgeModels?: string[] | 'forbidden';
+  /** Captures PUT /v1/validation/judge-model bodies. */
+  judgePuts?: Array<Record<string, unknown>>;
 }
 
 export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
@@ -198,6 +202,7 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
   const graph = options.graph ?? CATALOG_GRAPH;
   const chatQueue = [...(options.chatQueue ?? [citationChatResponse()])];
   const publications = options.publications ?? [PAPER_PUB];
+  const judge: { judge_model: string | null; updated_by: string | null } = { judge_model: null, updated_by: null };
 
   const handle = async (route: Route) => {
     const request = route.request();
@@ -220,6 +225,29 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
       const body = request.postDataJSON() as Record<string, unknown>;
       Object.assign(settings, body);
       await route.fulfill(json(settings));
+      return;
+    }
+
+    if (path === '/v1/validation/judge-model' && options.judgeModels !== undefined) {
+      if (options.judgeModels === 'forbidden') {
+        await route.fulfill(json({ code: 'denied', message: 'missing capability: settings.global' }, 403));
+        return;
+      }
+      const models = options.judgeModels;
+      if (method === 'PUT') {
+        const body = request.postDataJSON() as { judge_model?: string | null };
+        options.judgePuts?.push(body);
+        if (body.judge_model && !models.includes(body.judge_model)) {
+          await route.fulfill(json({ code: 'invalid_input', message: 'judge model is not in the list' }, 422));
+          return;
+        }
+        judge.judge_model = body.judge_model ?? null;
+        judge.updated_by = 'local-operator';
+      }
+      await route.fulfill(json({ ...judge, available_models: models, models_source: 'live',
+        models_listed_at: '2026-10-16T00:00:00Z', models_error: null, backend: 'cborg', scope: 'deployment',
+        judge_model_available: judge.judge_model ? models.includes(judge.judge_model) : null,
+        updated_at: judge.judge_model ? '2026-10-16T00:00:00Z' : null }));
       return;
     }
 

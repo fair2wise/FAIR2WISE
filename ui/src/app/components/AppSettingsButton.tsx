@@ -839,6 +839,8 @@ export function AppSettingsButton({
               </label>
             </div>
 
+            <JudgeModelSetting open={open} disabled={saving} />
+
             {error && (
               <AppErrorMessage title={errorTitle} className="text-xs">
                 {error}
@@ -872,3 +874,7 @@ export function AppSettingsButton({
     </>
   );
 }
+
+// O-U2 judge-model picker. Imported last so the frozen-contract line references above stay
+// unchanged (tests/contracts/legacy_ui pins line numbers in this file); ES imports are hoisted.
+import { JudgeModelSetting } from './JudgeModelSetting';
