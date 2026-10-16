@@ -31,3 +31,16 @@ splash_links/links.sqlite
 # Source-RAG indexes hold paper-text chunks; mount them at runtime and point
 # HYBRID_RAG_LITERATURE_INDEX / HYBRID_RAG_OPS_INDEX at them (H0 escalation E4).
 storage/source_index
+# T24B backstops. The Dockerfile copies an allowlist; these keep private or runtime data
+# out of the build context even if a COPY line is widened by mistake.
+**/.env
+**/*.pdf
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/*.db-*
+**/source_index
+storage/artifacts
+storage/parsed
+storage/crops
+storage/state
