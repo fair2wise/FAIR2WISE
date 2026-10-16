@@ -4,7 +4,7 @@
  */
 import { expect, test } from '@playwright/test';
 import {
-  askQuestion, effectSnapshot, fullObservations, fullRun, fullShot, noSecretLeak, openApp, openSettings,
+  api, askQuestion, effectSnapshot, fullObservations, fullRun, fullShot, noSecretLeak, openApp, openSettings,
   parseSse, recordApi, resetFull, waitForAnswer,
 } from './full';
 
@@ -70,15 +70,13 @@ test.describe('UI27 live Tiled on a disposable server', () => {
     await chip.hover();
     await expect(page.getByRole('tooltip')).toContainText('ESAF');
     await expect(page.getByText('3 nodes')).toBeVisible();
-    const neighborhood = page.waitForResponse(r => r.url().includes('/graph/neighborhood/'), { timeout: 15_000 })
-      .catch(() => null);
     await chip.click();
-    const nb = await neighborhood;
-    if (nb) {
-      expect(nb.status()).toBe(200);
-      const payload = await nb.json();
-      expect(payload.nodes.map((n: any) => n.id)).toEqual(expect.arrayContaining([tiledSeed.esaf]));
-    }
+    // The cite focus is served from the turn's graph (no request); the neighbourhood route the
+    // viewer uses for Tiled ids pages the disposable server directly.
+    const nb = await api(`/graph/neighborhood/${encodeURIComponent(tiledSeed.esaf)}?hops=2`);
+    expect(nb.status).toBe(200);
+    expect(nb.body.source_path).toBe('tiled://graphql');
+    expect(nb.body.nodes.map((n: any) => n.id)).toEqual(expect.arrayContaining([tiledSeed.esaf, ...tiledSeed.samples]));
     await expect(page.locator(`[data-cite-focus-id="${tiledSeed.esaf}"]`)).toBeVisible();
     await fullShot(page, 'tiled-identity');
     // Read-only: no Tiled write, no graph write, no edit/action request.
