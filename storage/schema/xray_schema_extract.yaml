@@ -5,7 +5,9 @@ description: >
   Thin extract-time overlay. Imports storage/schema/xray_schema.yaml so the
   term extractor sees the same classes and slots as the viewer schema.
   Extract-safe: no extra top-level keys (do not add prov_vocabulary).
-license: MIT
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
 version: xray_v1
 
 prefixes:

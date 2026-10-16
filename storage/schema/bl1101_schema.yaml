@@ -9,7 +9,9 @@ description: >
   Measurement, Detector, Polarization, PhotonEnergy, AbsorptionEdge,
   ScatteringGeometry, Software, Sample) are shared names with the science
   KG; ops records stay distinct by namespace.
-license: MIT
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
 version: bl1101_v2
 
 prefixes:

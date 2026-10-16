@@ -1,7 +1,9 @@
 id: https://w3id.org/matkg
 name: matkg
 description: Materials Knowledge Graph Schema
-license: MIT
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
 version: 0.2.0
 
 prefixes:

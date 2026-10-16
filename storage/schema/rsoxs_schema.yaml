@@ -5,7 +5,9 @@ description: >
   Thin rsoxs_v1 overlay on storage/schema/matkg_schema.yaml.
   Adds RSoXSMeasurement plus resonant-scattering slots used by term extraction.
   Do not merge this graph with the x-ray demo KG.
-license: MIT
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
 version: rsoxs_v1
 
 prefixes:

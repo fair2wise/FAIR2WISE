@@ -8,13 +8,24 @@ rsoxs_v1`` and are told apart only by their bytes (T22A F1).
 Fingerprint definition (:func:`closure_fingerprint` in :mod:`.loading`): SHA-256 over the canonical JSON of
 ``{registry_version, linkml_runtime, files: [[filename, sha256(bytes)], ...sorted]}`` for the resolved
 import closure of the asset. Paths, the working directory and timestamps are not part of it.
+
+Schema sets (T22C). The files directly in ``storage/schema`` are the base set: the version every default
+build, extraction and publish path uses. A later version of some of those files lives in its own
+subdirectory (``storage/schema/v0.3.0/``) with the same file names, so ``imports: [matkg_schema]`` resolves
+to the sibling of the same version. Its entries are registered as ``<stem>@<set version>`` and carry the
+set's review status; a set pending owner review is never chosen by default and is selectable only on
+explicit request (:meth:`SchemaRegistry.select` with ``allow_pending_review=True``).
+
+Licence line (H3 S4). Every base LinkML asset declared ``license: MIT`` until T22C replaced that one line
+with :data:`LICENCE_BLOCK`. :func:`pre_s4_bytes` reconstructs the earlier bytes exactly, so an artifact
+bound to a pre-S4 fingerprint is still recognised (``closure_fingerprint(entry, pre_s4=True)``).
 """
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterator, List, Mapping, Optional, Tuple
+from typing import Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 import yaml
 
@@ -68,6 +79,61 @@ DEFAULT_SCHEMA_ID = "matkg_schema"
 
 NORMALIZER_TERM_EXTRACTOR = "term_extractor.schema.SchemaHelper"
 NORMALIZER_LEGACY = "extract_terms.SchemaHelper"
+
+# Review status of a schema set. The base set is what every default path uses today.
+REVIEW_IN_USE = "in_use"
+REVIEW_PENDING = "pending_owner_review"
+
+#: The one line every base LinkML asset carried before H3 S4 (T22C).
+PRE_S4_LICENCE_LINE = b"license: MIT\n"
+#: What replaced it (LICENSE.txt: LBNL BSD-style, SPDX ``BSD-3-Clause-LBNL``).
+LICENCE_ID = "BSD-3-Clause-LBNL"
+LICENCE_BLOCK = (
+    b"# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the\n"
+    b"# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.\n"
+    b"license: BSD-3-Clause-LBNL\n"
+)
+
+
+def pre_s4_bytes(data: bytes) -> Optional[bytes]:
+    """The bytes ``data`` had before the S4 licence change, or ``None`` if it never had that line.
+
+    Exactly one :data:`LICENCE_BLOCK` must be present; it is replaced by :data:`PRE_S4_LICENCE_LINE`.
+    """
+    if data.count(LICENCE_BLOCK) != 1 or PRE_S4_LICENCE_LINE in data:
+        return None
+    return data.replace(LICENCE_BLOCK, PRE_S4_LICENCE_LINE)
+
+
+@dataclass(frozen=True)
+class SchemaSet:
+    """A later version of some base assets, kept in its own subdirectory (T22C).
+
+    Attributes:
+        version: Set version label (``0.3.0``); entry ids are ``<stem>@<version>``.
+        directory: Subdirectory of the schema directory holding the set's files.
+        members: File stems in the set; each imports its siblings by the base name.
+        review_status: :data:`REVIEW_PENDING` until the owner approves the diff in ``review_doc``.
+        review_doc: Plain-language diff the owner reviews.
+    """
+
+    version: str
+    directory: str
+    members: Tuple[str, ...]
+    review_status: str
+    review_doc: str
+
+    def entry_id(self, stem: str) -> str:
+        """Registry id of ``stem`` in this set."""
+        return f"{stem}@{self.version}"
+
+
+#: T22C (H3 F2/F3/F5/F6/F7): Sample, MeasurementRun, Instrument and the evidence slots. Additive; pending the
+#: owner's review of the schema diff. bl1101 and xray stay on the base set (see the review doc).
+SCHEMA_SETS: Tuple[SchemaSet, ...] = (
+    SchemaSet(version="0.3.0", directory="v0.3.0", members=("matkg_schema", "rsoxs_schema"),
+              review_status=REVIEW_PENDING, review_doc="docs/migration/reviews/H3/schema_diff_T22C.md"),
+)
 
 
 @dataclass(frozen=True)
@@ -154,6 +220,10 @@ class SchemaEntry:
         size_bytes: File size.
         selectable_for: ``extraction`` / ``graph-view``; empty means not selectable.
         known_issues: Recorded defects, never repaired here.
+        schema_set: ``None`` for the base set, else the :class:`SchemaSet` version.
+        review_status: :data:`REVIEW_IN_USE` or :data:`REVIEW_PENDING`.
+        base_id: Base entry this one is a later version of (``None`` for base entries).
+        pre_s4_sha256: Hash of the bytes before the S4 licence change; ``None`` if the file never had it.
     """
 
     schema_id: str
@@ -169,6 +239,15 @@ class SchemaEntry:
     size_bytes: int
     selectable_for: Tuple[str, ...] = ()
     known_issues: Tuple[str, ...] = ()
+    schema_set: Optional[str] = None
+    review_status: str = REVIEW_IN_USE
+    base_id: Optional[str] = None
+    pre_s4_sha256: Optional[str] = None
+
+    @property
+    def pending_review(self) -> bool:
+        """True while the owner has not approved this entry's schema set."""
+        return self.review_status == REVIEW_PENDING
 
     @property
     def is_linkml(self) -> bool:
@@ -201,7 +280,7 @@ def _classify(stem: str, doc: Mapping) -> str:
     return CLASS_UNCLASSIFIED
 
 
-def _entry_from_file(path: Path) -> SchemaEntry:
+def _entry_from_file(path: Path, schema_set: Optional[SchemaSet] = None) -> SchemaEntry:
     data = path.read_bytes()
     doc = yaml.safe_load(data.decode("utf-8"))
     doc = doc if isinstance(doc, dict) else {}
@@ -210,8 +289,10 @@ def _entry_from_file(path: Path) -> SchemaEntry:
     linkml = classification in LINKML_CLASSES
     selectable: Tuple[str, ...] = () if stem in KNOWN_BROKEN else _SELECTABLE.get(stem, ())
     version = doc.get("version") if linkml else None
+    before = pre_s4_bytes(data)
+    rel = f"{SCHEMA_REL_DIR}/{schema_set.directory}/{path.name}" if schema_set else f"{SCHEMA_REL_DIR}/{path.name}"
     return SchemaEntry(
-        schema_id=stem, file=path.name, path=f"{SCHEMA_REL_DIR}/{path.name}", abs_path=path,
+        schema_id=schema_set.entry_id(stem) if schema_set else stem, file=path.name, path=rel, abs_path=path,
         classification=classification,
         version=str(version) if version is not None else None,
         linkml_name=str(doc["name"]) if linkml and "name" in doc else None,
@@ -219,7 +300,26 @@ def _entry_from_file(path: Path) -> SchemaEntry:
         declared_imports=tuple(str(i) for i in (doc.get("imports") or [])) if linkml else (),
         sha256=sha256_bytes(data), size_bytes=len(data), selectable_for=selectable,
         known_issues=KNOWN_ISSUES.get(stem, ()),
+        schema_set=schema_set.version if schema_set else None,
+        review_status=schema_set.review_status if schema_set else REVIEW_IN_USE,
+        base_id=stem if schema_set else None,
+        pre_s4_sha256=sha256_bytes(before) if before is not None and schema_set is None else None,
     )
+
+
+def _set_entries(base: Path, sets: Sequence[SchemaSet]) -> Dict[str, SchemaEntry]:
+    out: Dict[str, SchemaEntry] = {}
+    for schema_set in sets:
+        directory = base / schema_set.directory
+        if not directory.is_dir():
+            continue
+        for stem in schema_set.members:
+            path = directory / f"{stem}.yaml"
+            if not path.is_file():
+                raise RegistryError(f"schema set {schema_set.version} lacks {schema_set.directory}/{path.name}")
+            entry = _entry_from_file(path, schema_set)
+            out[entry.schema_id] = entry
+    return out
 
 
 @dataclass
@@ -242,7 +342,16 @@ class SchemaRegistry:
         base = Path(schema_dir) if schema_dir is not None else resolve_resource(SCHEMA_REL_DIR)
         base = base.resolve()
         entries = {p.stem: _entry_from_file(p) for p in sorted(base.glob("*.yaml"))}
+        entries.update(_set_entries(base, SCHEMA_SETS))
         return cls(schema_dir=base, entries=entries)
+
+    def base_entries(self) -> List[SchemaEntry]:
+        """Entries of the base set (what every default path uses)."""
+        return [e for e in self if e.schema_set is None]
+
+    def set_entries(self, version: str) -> List[SchemaEntry]:
+        """Entries of one schema set, in member order."""
+        return [e for e in self if e.schema_set == version]
 
     def __iter__(self) -> Iterator[SchemaEntry]:
         return iter(self.entries.values())
@@ -263,6 +372,15 @@ class SchemaRegistry:
         text = str(path_or_id or "").replace("\\", "/").strip()
         if not text:
             return None
+        if "/" in text:
+            for versioned in (e for e in self if e.schema_set is not None):
+                candidate = Path(text)
+                if text.endswith(versioned.path) or candidate.resolve() == versioned.abs_path.resolve():
+                    if candidate.is_file() and sha256_bytes(candidate.read_bytes()) != versioned.sha256:
+                        return None
+                    return versioned
+        elif "@" in text:
+            return self.entries.get(text[:-5] if text.endswith(".yaml") else text)
         name = text.rsplit("/", 1)[-1]
         entry = self.entries.get(name[:-5] if name.endswith(".yaml") else name)
         if entry is None:
@@ -283,9 +401,19 @@ class SchemaRegistry:
         path = schema_path_for_graph(graph_path)
         return self.resolve(path) if path else None
 
-    def select(self, schema_id: str, purpose: str = "extraction") -> SchemaEntry:
-        """Entry that may be used for ``purpose``; known-broken or unsuitable assets raise a clear error."""
+    def select(self, schema_id: str, purpose: str = "extraction", *, allow_pending_review: bool = False) -> SchemaEntry:
+        """Entry that may be used for ``purpose``; known-broken or unsuitable assets raise a clear error.
+
+        An entry whose schema set is pending owner review (T22C) is refused unless the caller passes
+        ``allow_pending_review=True``: no default path selects it.
+        """
         entry = self.get(schema_id)
+        if entry.pending_review and not allow_pending_review:
+            raise RegistryError(
+                f"{entry.path} belongs to schema set {entry.schema_set}, which is pending owner review "
+                f"({SCHEMA_SET_DOCS.get(entry.schema_set, 'review doc')}); select it explicitly with "
+                "allow_pending_review=True"
+            )
         if entry.known_broken:
             raise RegistryError(
                 f"{entry.path} is registered as known-broken and not selectable: {entry.known_issues[0]}"
@@ -300,10 +428,16 @@ class SchemaRegistry:
         """Entries whose file bytes hash to ``content_fingerprint``."""
         return [e for e in self if e.sha256 == content_fingerprint]
 
-    def id_collisions(self) -> Dict[str, List[str]]:
-        """LinkML ``name`` values declared by more than one asset (F1), mapped to the schema ids."""
+    def id_collisions(self, schema_set: Optional[str] = None) -> Dict[str, List[str]]:
+        """LinkML ``name`` values declared by more than one asset of one schema set (F1).
+
+        A later version of a schema in another set shares its name on purpose and is not a collision.
+        """
         seen: Dict[str, List[str]] = {}
         for entry in self:
-            if entry.linkml_name:
+            if entry.linkml_name and entry.schema_set == schema_set:
                 seen.setdefault(entry.linkml_name, []).append(entry.schema_id)
         return {k: v for k, v in seen.items() if len(v) > 1}
+
+
+SCHEMA_SET_DOCS: Dict[str, str] = {s.version: s.review_doc for s in SCHEMA_SETS}

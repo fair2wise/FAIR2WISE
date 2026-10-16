@@ -9,7 +9,9 @@ description: >
   those principles. Do not merge this graph with matkg_rsoxs_v* or
   matkg_bl1101_v*. Do not reintroduce sample/device classes or beamline
   hardware inventory.
-license: MIT
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
 version: xray_v1
 
 prefixes:

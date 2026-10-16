@@ -19,6 +19,8 @@ from app.modules.schema.registry import (
     CLASS_BASE,
     CLASS_OVERLAY,
     CLASS_OVERLAY_EXTRACT,
+    LICENCE_BLOCK,
+    PRE_S4_LICENCE_LINE,
     RegistryError,
     SchemaRegistry,
 )
@@ -28,12 +30,19 @@ INVENTORY = json.loads((REPO / "docs/migration/schema_inventory.json").read_text
 
 
 def test_every_inventoried_yaml_asset_is_registered_in_place_with_unchanged_bytes(registry):
+    """Base set = the T22A inventory. LinkML assets differ from it only by the H3 S4 licence line (T22C)."""
     inventoried = {a["file"]: a for a in INVENTORY["assets"] if a["file"].endswith(".yaml")}
-    assert {e.path for e in registry} == set(inventoried)
-    for entry in registry:
+    assert {e.path for e in registry.base_entries()} == set(inventoried)
+    grown = len(LICENCE_BLOCK) - len(PRE_S4_LICENCE_LINE)
+    for entry in registry.base_entries():
         asset = inventoried[entry.path]
-        assert entry.sha256 == asset["sha256"], f"{entry.path} differs from the T22A inventory"
-        assert entry.size_bytes == asset["bytes"]
+        if entry.is_linkml:
+            assert entry.sha256 != asset["sha256"]
+            assert entry.pre_s4_sha256 == asset["sha256"], f"{entry.path} differs beyond the S4 licence line"
+            assert entry.size_bytes == asset["bytes"] + grown
+        else:
+            assert entry.sha256 == asset["sha256"], f"{entry.path} differs from the T22A inventory"
+            assert entry.size_bytes == asset["bytes"] and entry.pre_s4_sha256 is None
         assert entry.abs_path.parent == REPO / "storage" / "schema"  # discovered, never moved
 
 
@@ -135,12 +144,14 @@ def test_resolution_and_fingerprint_do_not_depend_on_the_working_directory(regis
 
 
 def test_discovery_does_not_write_into_the_schema_directory(tmp_path):
-    before = {p.name: (p.stat().st_mtime_ns, p.read_bytes()) for p in (REPO / "storage/schema").glob("*")}
+    before = {str(p): (p.stat().st_mtime_ns, p.read_bytes()) for p in (REPO / "storage/schema").rglob("*")
+              if p.is_file()}
     reg = SchemaRegistry.discover()
     for entry in reg:
         if entry.is_linkml and not entry.known_broken:
             closure_fingerprint(entry)
-    after = {p.name: (p.stat().st_mtime_ns, p.read_bytes()) for p in (REPO / "storage/schema").glob("*")}
+    after = {str(p): (p.stat().st_mtime_ns, p.read_bytes()) for p in (REPO / "storage/schema").rglob("*")
+             if p.is_file()}
     assert before == after
 
 
