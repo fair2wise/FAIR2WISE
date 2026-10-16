@@ -8,7 +8,7 @@
 # itself is hash-checked in the Dockerfile against PINNED_TILED_WHEEL_SHA256
 # (app/modules/deployment/tiled_config.py). These pins are versions only: a fully
 # hash-pinned Linux lock (--require-hashes) still has to be generated with network access,
-# see the T24B notes in docs/migration/deployment/images.md.
+# see docker/profiles/README.md.
 adbc-driver-manager==1.12.0
 adbc-driver-postgresql==1.12.0
 adbc-driver-sqlite==1.12.0

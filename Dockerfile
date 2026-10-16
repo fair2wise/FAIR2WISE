@@ -60,7 +60,7 @@ LABEL Name="fair2wise-frontend" \
 # layer: papers/PDFs, parsed bodies, figure crops, storage/source_index, credentials or
 # dotenv files, runs/logs, job/session databases, Tiled catalogs. Tracked KG JSON
 # (storage/kg, storage/terminology) stays in the image (owner O-D1, H0 E3). Durable state is
-# mounted at runtime and checked by preflight (docs/migration/deployment/images.md).
+# mounted at runtime and checked by preflight (docker/profiles/README.md).
 # ---------------------------------------------------------------------------------------
 
 FROM ${PYTHON_IMAGE} AS tiled-server-build
