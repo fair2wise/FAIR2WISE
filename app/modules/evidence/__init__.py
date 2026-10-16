@@ -4,7 +4,8 @@ Quote location (E-03), lexical source support (E-04), paper-reported units (E-05
 and candidate evidence/quantity persistence over parsed source versions (E-09).
 
 Everything here produces *candidates*. Nothing writes to a scientific graph,
-merges entities or publishes; those wait for owner approval at H3 and later gates.
+merges entities or publishes. Evidence-source tags (H3 F2) are decided by the
+T06B validation stage (:mod:`app.modules.extraction.record_validation`).
 Importing this package has no side effects.
 """
 

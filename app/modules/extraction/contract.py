@@ -5,7 +5,7 @@ A strategy reads one :class:`ExtractionSource` and returns one
 what the strategy says the source contains, not validated science. Validation
 (:mod:`app.modules.extraction.record_validation`) and evidence location
 (:mod:`app.modules.evidence`) run afterwards, and nothing here maps onto new F2W
-schema slots, merges entities or publishes (STOP H3).
+schema slots, merges entities or publishes (see ``H3_GATES``).
 
 Two rules keep the contract lossless:
 

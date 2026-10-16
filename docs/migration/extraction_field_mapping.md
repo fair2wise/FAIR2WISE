@@ -4,9 +4,13 @@ Status: **H3 decided (docs/migration/reviews/H3/decision.json).** Rows marked
 `approved H3` point at classes and slots of schema set 0.3.0
 (`storage/schema/v0.3.0/`, T22C). That set is additive and still **pending the
 owner's review of `docs/migration/reviews/H3/schema_diff_T22C.md`**: no default
-build, extraction or publish path uses it, and the T06 validation stage does not
-apply these mappings yet (`app.modules.extraction.H3_GATES` stays closed; the
-schema-side adapter is `app/modules/schema/experiment_mapping.py`).
+build, extraction or publish path uses it. T06B (2026-10-16) opened the H3 gates
+`apply_validation_mappings` and `new_schema_slots` in `app.modules.extraction.H3_GATES`:
+the validation stage now applies F1/F2/F4/F8 (section 7), and maps onto 0.3.0 only when
+a caller selects the set explicitly and acknowledges its pending review
+(`run_validation_stage(..., schema_set="0.3.0", allow_pending_review=True)`, via the
+schema-side adapter `app/modules/schema/experiment_mapping.py`). `canonical_merge`
+stays closed until the C4 real-model rerun and `publish` until H5.
 `RSoXSMeasurement is_a ExperimentalTechnique` is preserved and keeps meaning a
 technique; one run is the new `MeasurementRun` (F5 overrides the D20 rule that kept
 measurement instances out of scope, in the additive form the owner chose).
@@ -107,7 +111,7 @@ schema slot, class, or hard validation gate that needs owner approval.
 
 H3 decided (F8): gates 1 (quote located; number and unit in the quote) and 3 are hard
 gates on graph writes. Gates 2 and 4 become tags instead (`cited`, `assumed`), and
-every value is captured with its `evidence_source_tag` (F2).
+every value is captured with its `evidence_source_tag` (F2). Implemented in T06B (section 7).
 
 ## 6. Owner questions for H3 (answered 2026-10-16, decision.json; kept for the record)
 
@@ -118,3 +122,34 @@ every value is captured with its `evidence_source_tag` (F2).
 - Approve the taxon → class table in section 4, including where `instrument` goes.
 - Approve graph predicates for quote→section and value→evidence links.
 - Decide which of the gates in section 5 become hard gates on graph writes.
+
+## 7. T06B implementation (H3 F1/F2/F4/F8)
+
+Code: `app/modules/extraction/record_validation.py` (`RULES`, `assess_value`, `run_validation_stage`),
+`field_mapping.py` (F1 table, F4 fill), `schema_selection.py` (explicit 0.3.0), `stage_artifact.py`
+(persistence). Rule version `h3-f2f8.1`; tests in `tests/extraction/test_t06b_rules.py` (one named control per rule).
+
+| Rule | Kind | Effect | Named controls |
+|---|---|---|---|
+| F8.1 quote located | gate | withhold: `missing_quote`, `evidence_quote_not_found`, `evidence_quote_ambiguous` | invented-quote, no-quote |
+| F8.2 number and unit in quote | gate | withhold: `value_unit_not_supported`, `missing_unit`, `invalid_value` | number-not-in-quote, unit-not-in-quote, assumed-number-not-in-quote, not-derivable-d |
+| F8.3 unit consistent with quantity | gate | withhold: `unit_dimension_mismatch` (donor names, `peak_q`/`peak_d_spacing`, instrument settings) | q-in-length-unit, d-spacing-in-reciprocal-unit |
+| F2.0 value present | gate | withhold: `observation_has_no_value` | repeated/qualitative cases in `test_validation_stage.py` |
+| E-02 references resolve | gate | withhold: unknown sample/measurement | donor tests |
+| F8.4 attributing sentence | tag | reported (or derived) -> `cited` | attributing-previous-reports, attributing-et-al, cited-never-upgraded |
+| F8.5 assumed instrument value | tag | -> `assumed` when proposed assumed or the sentence states an assumption; never shown as a measurement | assumed-detector-distance, assumption-cue-retags-reported, reported-photon-energy (stays reported) |
+| F2.3 derived | tag | value = 2*pi/x for a printed x (d from q, q from d, 1 % tolerance) -> `derived`, derivation recorded | derived-d-from-q |
+
+Tags only move away from `reported`. Withheld records keep their tag. Each quantity record carries
+`evidence_source`, `proposed_evidence_source`, `tag_reasons`, `derivation`, `paper_measurement`
+(true only for `reported`) and `presented_as`.
+
+F1 per-row table (`QUANTITY_FIELD_MAP`): every donor quantity name, `peak_q`, `peak_d_spacing` and the
+instrument settings maps to 0.3.0 `QuantityValue` with the name kept as `quantity_label`. On the current
+schema only the F4 peak slots are filled; `beam_energy`/`photon_energy` name the existing
+`RSoXSMeasurement.photon_energy_eV` slot but do not fill it (it sits on a technique, not a run).
+The rows are for the owner's per-row review.
+
+F4: `ExperimentalTechnique.peak_positions` (`q = <value> <unit>`), `d_spacing` and `peak_assignments`
+(the peak label) are filled from accepted `reported` peaks only, as a candidate for the work's technique
+nodes; attaching them to a node waits for canonical resolution (C4) and publication (H5).
