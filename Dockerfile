@@ -54,7 +54,8 @@ LABEL Name="fair2wise-frontend" \
 #   runtime-base        app + UI bundle + MkDocs + gateway + supervisor, no profile baked
 #   local               runtime-base + /opt/tiled/venv + docker/profiles/local.json
 #   als-dev / als-prod  runtime-base + their profile; no Tiled server (central Tiled)
-#   agent               legacy developer/compose API-only target (start_agent_backend.sh)
+#   agent               legacy developer/compose API-only target (start_agent_backend.sh),
+#                       the only target with Splash/pixi (until its retirement gate)
 #
 # Image content is an allowlist of COPY lines; .dockerignore is only a backstop. Never in a
 # layer: papers/PDFs, parsed bodies, figure crops, storage/source_index, credentials or
@@ -215,15 +216,29 @@ LABEL org.opencontainers.image.title="fair2wise" \
       f2w.tiled_version="0.2.18"
 
 
-# Legacy developer target for compose.yaml (agent API only, no supervisor, no gateway).
-# It keeps the previous root user and /app/runs paths so existing compose volumes work.
-# Splash/pixi are no longer installed (Splash is retired, TILED_DEPLOYMENT_SPEC.md s.6).
+# Splash/pixi for the legacy editable mode (compose.splash.yaml, F2W_KG_MODE=splash). Used
+# only by the agent target below; never by runtime-base, local, als-dev or als-prod.
+FROM ghcr.io/prefix-dev/pixi:0.70.2 AS pixi
+
+
+# Legacy developer target for compose.yaml / compose.splash.yaml (agent API only, no
+# supervisor, no gateway). It keeps the previous root user and /app/runs paths so existing
+# compose volumes work. Splash stays in this legacy agent target until its approved
+# retirement gate (T16B at H7, or H8); the Tiled-backed edit path is not built yet (T18C F1).
 FROM runtime-base AS agent
 
 USER root
 ENV PYSTOW_HOME=/app/.cache/pystow \
+    SPLASH_LINKS_REPO=/app/splash_links \
     F2W_AGENT_HOST=0.0.0.0 \
     F2W_AGENT_PORT=8090
+
+COPY --from=pixi /usr/local/bin/pixi /usr/local/bin/pixi
+
+COPY splash_links ./splash_links
+RUN --mount=type=cache,target=/root/.cache/rattler \
+    pixi install --manifest-path splash_links/pixi.toml --locked
+
 RUN mkdir -p /app/.cache/pystow /app/runs && \
     chmod +x scripts/start_agent_backend.sh
 

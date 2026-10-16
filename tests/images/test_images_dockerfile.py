@@ -29,7 +29,6 @@ def test_stage_layout():
     expected = ("frontend-build", "docs-build", "frontend", "tiled-server-build", "runtime-base", *FINALS, "agent")
     for name in expected:
         assert name in names, name
-    assert "pixi" not in names  # Splash/pixi retired
     for name in (*FINALS, "agent"):
         assert DF.stage(name).base == "runtime-base", name
     assert DF.stage("runtime-base").base == "${PYTHON_IMAGE}"
@@ -166,3 +165,18 @@ def test_agent_target_stays_compatible_with_compose():
     assert "tiled-server-build" not in DF.copied_from_stages("agent")
     compose = (REPO / "compose.yaml").read_text(encoding="utf-8")
     assert "target: agent" in compose and "target: frontend" in compose
+
+
+def test_splash_stays_only_in_the_legacy_agent_target():
+    """Splash retirement waits for its gate (T16B/H7 or H8): agent keeps it, the new images do not."""
+    agent = DF.stage("agent")
+    assert DF.stage("pixi").base == "ghcr.io/prefix-dev/pixi:0.70.2"
+    assert ("pixi", ["/usr/local/bin/pixi"], "/usr/local/bin/pixi") in agent.copies()
+    assert (None, ["splash_links"], "./splash_links") in agent.copies()
+    assert agent.env()["SPLASH_LINKS_REPO"] == "/app/splash_links"
+    assert any("pixi install --manifest-path splash_links/pixi.toml --locked" in i.args for i in agent.of("RUN"))
+    for name in ("runtime-base", *FINALS):
+        assert "pixi" not in DF.copied_from_stages(name), name
+        assert not any(p.startswith("splash_links") for p in DF.context_sources(name)), name
+        assert "SPLASH_LINKS_REPO" not in DF.effective_env(name), name
+        assert not any("pixi" in i.args for s in DF.lineage(name) for i in s.of("RUN")), name

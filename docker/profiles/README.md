@@ -12,7 +12,7 @@ Status: candidate for H4. Built and run only by the owner; nothing here has been
 | `local` | `runtime-base` | + `/opt/tiled/venv`, `profiles/local.json`, `/var/lib/fair2wise/tiled` mount point |
 | `als-dev` | `runtime-base` | + `profiles/als-dev.json` (`https://tiled-staging.als.lbl.gov`) |
 | `als-prod` | `runtime-base` | + `profiles/als-prod.json` (`https://tiled.als.lbl.gov`) |
-| `agent` | `runtime-base` | legacy compose API-only target (`scripts/start_agent_backend.sh`, root, no supervisor) |
+| `agent` | `runtime-base` | legacy compose API-only target (`scripts/start_agent_backend.sh`, root, no supervisor) plus Splash/pixi (`splash_links`, `pixi install --locked`) for `compose.splash.yaml`; Splash stays here until its approved retirement gate (T16B/H7 or H8) and is never in the three images |
 
 Not in any layer: `papers/`, PDFs, parsed bodies, crops, `storage/source_index`, Tiled catalogs,
 job/session databases, `.env` files, `runs/`, `logs/`, `.cache/`, tests, evals, docs sources.
