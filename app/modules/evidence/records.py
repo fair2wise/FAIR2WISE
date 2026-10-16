@@ -33,16 +33,69 @@ from ..contracts.evidence import EvidenceRef
 from .units import NormalizedQuantity
 
 #: Record format version of :class:`EvidenceRecord` / :class:`QuantityRecord`.
-RECORD_VERSION = 1
+#: 2 (T06B): quantity records carry the proposed tag, the tag reasons and any derivation.
+RECORD_VERSION = 2
 
 
 class EvidenceSource(str, Enum):
-    """How the source relates to a value: its own result, a citation, a derivation, an assumption."""
+    """How the source relates to a value: its own result, a citation, a derivation, an assumption.
+
+    H3 F2: every value is captured with one of these tags and none is withheld
+    for its tag. Only ``reported`` is the paper's own measurement; a ``cited`` or
+    ``assumed`` value is never presented as one (:attr:`presented_as`).
+    """
 
     REPORTED = "reported"
     CITED = "cited"
     DERIVED = "derived"
     ASSUMED = "assumed"
+
+    @property
+    def is_paper_measurement(self) -> bool:
+        """Whether the value may be shown as the paper's own measurement (``reported`` only)."""
+        return self is EvidenceSource.REPORTED
+
+    @property
+    def presented_as(self) -> str:
+        """Fixed display marker for the tag; consumers show this, not "measured", for non-reported values."""
+        return _PRESENTED_AS[self]
+
+
+_PRESENTED_AS = {
+    EvidenceSource.REPORTED: "reported by this paper",
+    EvidenceSource.CITED: "cited from other work, not this paper's measurement",
+    EvidenceSource.DERIVED: "derived from values this paper reports",
+    EvidenceSource.ASSUMED: "assumed, not measured",
+}
+
+
+@dataclass(frozen=True)
+class TagDecision:
+    """The evidence-source tag a value ends up with, and why (H3 F2/F8).
+
+    Attributes:
+        proposed: Tag the strategy proposed.
+        tag: Tag after the validation rules. Rules only move a tag *away* from
+            ``reported``; nothing is ever upgraded to ``reported``.
+        reasons: Rule ids that changed or confirmed the tag.
+        derivation: Provenance when the value was recognised as derived (``d = 2*pi/q``).
+    """
+
+    proposed: EvidenceSource
+    tag: EvidenceSource
+    reasons: Tuple[str, ...] = ()
+    derivation: Optional[Dict[str, Any]] = None
+
+    @property
+    def retagged(self) -> bool:
+        """Whether the rules changed the proposed tag."""
+        return self.tag is not self.proposed
+
+    def to_dict(self) -> Dict[str, Any]:
+        """JSON-ready form."""
+        return {"proposed": self.proposed.value, "tag": self.tag.value, "reasons": list(self.reasons),
+                "derivation": dict(self.derivation) if self.derivation else None,
+                "paper_measurement": self.tag.is_paper_measurement, "presented_as": self.tag.presented_as}
 
 
 class UncertaintyKind(str, Enum):
@@ -178,6 +231,9 @@ class QuantityRecord:
         extraction_confidence: Extraction confidence; never mixed with ``uncertainty``.
         evidence_ids: Evidence records supporting this value.
         missing: Explicit absence markers.
+        proposed_evidence_source: Tag the strategy proposed, when validation changed it.
+        tag_reasons: Validation rules behind ``evidence_source`` (T06B).
+        derivation: How a ``derived`` value follows from printed values, if recognised.
     """
 
     quantity_id: str
@@ -192,6 +248,9 @@ class QuantityRecord:
     processing_state: str = ""
     qualitative_value: str = ""
     missing: Tuple[MissingData, ...] = ()
+    proposed_evidence_source: Optional[EvidenceSource] = None
+    tag_reasons: Tuple[str, ...] = ()
+    derivation: Optional[Dict[str, Any]] = None
     status: str = "candidate"
     record_version: int = RECORD_VERSION
 
@@ -207,10 +266,15 @@ class QuantityRecord:
             "evidence_ids": list(self.evidence_ids), "sample_id": self.sample_id,
             "processing_state": self.processing_state, "qualitative_value": self.qualitative_value,
             "missing": [m.value for m in self.missing],
+            "proposed_evidence_source": (self.proposed_evidence_source or self.evidence_source).value,
+            "tag_reasons": list(self.tag_reasons),
+            "derivation": dict(self.derivation) if self.derivation else None,
+            "paper_measurement": self.evidence_source.is_paper_measurement,
+            "presented_as": self.evidence_source.presented_as,
         }
 
 
 __all__ = [
     "RECORD_VERSION", "EvidenceRecord", "EvidenceSource", "MeasuredUncertainty", "MissingData",
-    "QuantityRecord", "ReportedQuantity", "UncertaintyKind",
+    "QuantityRecord", "ReportedQuantity", "TagDecision", "UncertaintyKind",
 ]

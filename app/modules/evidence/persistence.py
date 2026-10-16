@@ -41,7 +41,7 @@ from ..contracts.evidence import EvidenceRef, MatchType, SourceLocator
 from ..literature.parsed_document import SECTION_TEXT_MAX_CHARS, ParsedDocument, ParsedSection
 from .quote_location import NORMALIZATION_PROFILE, QuoteLocation, count_occurrences, locate_quote
 from .records import (
-    EvidenceRecord, MissingData, QuantityRecord, ReportedQuantity,
+    EvidenceRecord, MissingData, QuantityRecord, ReportedQuantity, TagDecision,
 )
 from .units import dimension_mismatch, normalize_quantity
 
@@ -342,18 +342,27 @@ def record_reported_quantities(
     pub_path: str,
     strategy: str = "",
     prompt_version: str = "",
+    tags: Optional[Sequence[Optional[TagDecision]]] = None,
 ) -> int:
     """Record what the paper reported, as candidates, with evidence attached.
 
     A quantity whose unit contradicts its own dimension is dropped (donor rule).
     A qualitative-only observation is kept without a numeric quantity.
 
+    Args:
+        tags: Optional validation-stage tag decision per quantity (same order). When
+            given, the record's ``evidence_source`` is the decided tag and the
+            proposed tag, reasons and derivation are kept beside it (T06B, H3 F2/F8).
+
     Returns:
         Number of quantity records written.
     """
+    if tags is not None and len(tags) != len(quantities):
+        raise ValueError("tags must align with quantities")
     written = 0
     sections = _sections(document)
-    for quantity in quantities:
+    for index, quantity in enumerate(quantities):
+        decision = tags[index] if tags is not None else None
         if quantity.raw_value is not None and dimension_mismatch(quantity.name, quantity.raw_unit):
             logger.info("Dropping %s: unit %r contradicts its dimension", quantity.name, quantity.raw_unit)
             continue
@@ -380,11 +389,15 @@ def record_reported_quantities(
             qid = "observation:" + stable_evidence_id(pub_path, f"{quantity.name}|{key}")
         sink.put_quantity(QuantityRecord(
             quantity_id=qid, work_id=work_id, name=quantity.name, quantity=normalized,
-            evidence_source=quantity.evidence_source, uncertainty=quantity.uncertainty,
+            evidence_source=decision.tag if decision else quantity.evidence_source,
+            uncertainty=quantity.uncertainty,
             extraction_confidence=quantity.extraction_confidence,
             evidence_ids=(evidence.ref.evidence_id,) if evidence else (),
             sample_id=quantity.sample_id, processing_state=quantity.processing_state,
             qualitative_value=quantity.qualitative_value, missing=tuple(missing),
+            proposed_evidence_source=decision.proposed if decision else None,
+            tag_reasons=decision.reasons if decision else (),
+            derivation=decision.derivation if decision else None,
         ))
         written += 1
     return written

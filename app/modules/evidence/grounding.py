@@ -15,8 +15,9 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
+from typing import List, Tuple
 
-from .units import INVERSE_UNIT_TO_NM_INV, LENGTH_UNIT_SPELLINGS, canonical_unit
+from .units import INVERSE_UNIT_TO_NM_INV, LENGTH_UNIT_SPELLINGS, canonical_unit, unit_dimension
 
 
 #: Closed set of verdicts returned by :func:`source_support`.
@@ -26,6 +27,7 @@ SUPPORT_VERDICTS = (
 )
 
 
+_NUMBER = re.compile(r"(?<![\w.])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
 _UNCERTAINTY_GAP = re.compile(r"^(?:\u00b1|\+/-|\+-)\s*(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?\s*")
 
 
@@ -92,3 +94,26 @@ def source_support(
             if equivalent:
                 return "source_supported"
     return "value_unit_not_supported"
+
+
+def printed_quantities(quote: str) -> List[Tuple[float, str]]:
+    """Every ``(number, unit)`` pair printed in ``quote`` whose unit has a known dimension (F2W, T06B).
+
+    The unit is the shortest token after the number (past a stated uncertainty)
+    that :func:`~app.modules.evidence.units.unit_dimension` recognises, with the
+    same token boundaries as :func:`source_support`. A number with no recognised
+    unit is not listed. Used to check that a derived value's inputs are printed.
+    """
+    text = normalize(quote or "")
+    found: List[Tuple[float, str]] = []
+    for match in _NUMBER.finditer(text):
+        tail = _UNCERTAINTY_GAP.sub("", text[match.end():].lstrip(" $\\"), count=1)
+        for end in range(1, min(24, len(tail)) + 1):
+            if end < len(tail) and (tail[end].isalnum() or tail[end] in "^-⁻¹"):
+                continue
+            if unit_dimension(tail[:end]) != "unknown":
+                value = float(match[0])
+                if math.isfinite(value):
+                    found.append((value, tail[:end]))
+                break
+    return found
