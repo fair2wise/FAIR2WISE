@@ -96,7 +96,8 @@ def test_linkml_runtime_version_is_part_of_the_fingerprint(registry, monkeypatch
 def test_fingerprints_of_registered_assets_are_all_different(registry):
     fps = registered_fingerprints(registry)
     assert set(fps.values()) == {"matkg_schema", "rsoxs_schema", "bl1101_schema", "xray_schema",
-                                 "xray_schema_extract"}  # the known-broken extract overlay is not selectable
+                                 "xray_schema_extract",  # the known-broken extract overlay is not selectable
+                                 "matkg_schema@0.3.0", "rsoxs_schema@0.3.0"}  # T22C set, pending review
 
 
 def test_binding_verified_legacy_stale_and_unknown(registry):
