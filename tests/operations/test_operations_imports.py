@@ -15,8 +15,9 @@ sys.path.insert(0, {repo!r})
 env = dict(os.environ); before = set(sys.modules)
 import app.modules.operations as ops
 import app.modules.operations.papers, app.modules.operations.summary_compat
+import app.modules.operations.graph, app.modules.operations.corpus, app.modules.operations.reports
 import app.modules.runtime_bridge.bootstrap
-ops.PaperSummaryTool, ops.LegacySummaryPath
+ops.PaperSummaryTool, ops.LegacySummaryPath, ops.GraphOperationsTool, ops.CorpusAuditTool, ops.OperationReport
 new = sorted(set(sys.modules) - before)
 print(json.dumps({{"new": new, "env_changed": dict(os.environ) != env}}))
 """
