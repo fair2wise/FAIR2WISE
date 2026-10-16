@@ -180,3 +180,14 @@ Also: at most 2 workers run in parallel.
 when the base is `/`). The CI frozen-UI tree is re-pinned from `75a19b98…` to
 `2cc7ccd3778bac46794cbd1ef254211e617cc38d`. Historical documents keep the
 baseline hash. Any further `ui/` change still needs owner approval.
+
+## O-U2: judge-model picker in the settings panel (2026-10-16)
+
+**Decision.** H3 B7 follow-up: "model judges should be able to picked from a
+dropdown with what's currently available (not hardcoded)"; asked where, "in the
+settings panel in the UI". Approved `ui/` change: the settings panel gets a
+judge-model dropdown populated at run time from the models the configured
+backend currently lists (no hardcoded model). The choice is a setting read by
+the separate validation runner (binary suite, non-blocking for the app per H3
+B); each report records the judge model used. Implemented with T11B; the CI
+frozen-UI pin is updated in that change (as O-U1).
