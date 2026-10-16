@@ -77,7 +77,8 @@ class Harness:
                 "F2W_SUPERVISOR_STATUS": str(self.status)}
         base.update(env or {})
         self.err = open(self.stderr_path, "w", encoding="utf-8")
-        self.proc = subprocess.Popen([sys.executable, str(SUPERVISOR), "--profile-file", str(profile), *(args or [])],
+        argv = [sys.executable, str(SUPERVISOR), "--profile-file", str(profile), *(args or [])]
+        self.proc = subprocess.Popen(argv,
                                      env=base, stdout=subprocess.PIPE, stderr=self.err, text=True)
         return self.proc
 
@@ -270,7 +271,8 @@ def test_preflight_failure_starts_nothing(h):
 def test_preflight_runs_with_the_resolved_environment(h):
     out = h.tmp / "preflight-env.json"
     profile = h.profile([h.service("api", alive_for=0.2)],
-                        preflight=[["@python", "-c", f"import json, os; json.dump(dict(os.environ), open({str(out)!r}, 'w'))"]],
+                        preflight=[["@python", "-c",
+                                    f"import json, os; json.dump(dict(os.environ), open({str(out)!r}, 'w'))"]],
                         env={"F2W_WORKDIR": "/state/session"})
     h.start(profile)
     h.until(h.ready)

@@ -43,7 +43,8 @@ def write_profile(tmp: Path, *, data_dir: Path, python: str, port: int) -> Path:
                   F2W_TILED_PORT=str(port), PYTHONPATH=str(REPO), F2W_RESOURCE_ROOT=str(REPO))
     data = dict(local, cwd=str(REPO), locked_env=locked, preflight=[],
                 services=[dict(tiled, argv=["@python", str(TILED_SERVICE)]),
-                          {"name": "api", "argv": ["@python", str(FAKE), "--name", "api", "--log", str(tmp / "ev.log")],
+                          {"name": "api",
+                           "argv": ["@python", str(FAKE), "--name", "api", "--log", str(tmp / "ev.log")],
                            "health": {"alive_for": 0.2}, "stop_timeout": 3}])
     path = tmp / "profile.json"
     path.write_text(json.dumps(data), encoding="utf-8")

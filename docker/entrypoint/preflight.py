@@ -13,7 +13,8 @@ exactly what the API would refuse later:
    ``:local`` has the isolated Tiled interpreter.
 4. Mounts (``ansible_input_contract.md`` section 3): each ``required_mounts`` path exists,
    is a writable directory and, where ``/proc/self/mountinfo`` exists, is (or lies on) a
-   mount point other than ``/``, so state never silently lands in the container layer. Nothing is created or chowned.
+   mount point other than ``/``, so state never silently lands in the container layer.
+   Nothing is created or chowned.
 5. ``F2W_TILED_WRITER_SECRET_FILE``, when set, is a readable file (its value is never read
    into the output).
 6. The UI bundle's ``f2w-build.json`` matches ``F2W_PUBLIC_PREFIX`` and the gateway

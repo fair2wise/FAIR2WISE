@@ -26,7 +26,8 @@ PROFILE_PATH = "/etc/fair2wise/profile.json"
 
 def test_stage_layout():
     names = DF.names
-    for name in ("frontend-build", "docs-build", "frontend", "tiled-server-build", "runtime-base", *FINALS, "agent"):
+    expected = ("frontend-build", "docs-build", "frontend", "tiled-server-build", "runtime-base", *FINALS, "agent")
+    for name in expected:
         assert name in names, name
     assert "pixi" not in names  # Splash/pixi retired
     for name in (*FINALS, "agent"):

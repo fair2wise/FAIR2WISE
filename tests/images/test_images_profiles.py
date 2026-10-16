@@ -170,7 +170,8 @@ def test_als_dev_and_prod_cannot_be_swapped():
         resolved("als-dev", {"F2W_DEPLOYMENT_PROFILE": "als-prod"})
     with pytest.raises(SUP.ProfileError):
         resolved("als-prod", {"F2W_TILED_URL": "https://tiled-staging.als.lbl.gov/"})
-    env = resolved("als-prod", {"F2W_TILED_URL": "https://tiled.als.lbl.gov/", "F2W_DEPLOYMENT_PROFILE": "als-prod"})
+    env = resolved("als-prod", {"F2W_TILED_URL": "https://tiled.als.lbl.gov/",
+                                "F2W_DEPLOYMENT_PROFILE": "als-prod"})
     assert env["F2W_TILED_URL"] == "https://tiled.als.lbl.gov"
 
 

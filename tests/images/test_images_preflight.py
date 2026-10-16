@@ -40,9 +40,11 @@ def setup(tmp_path: Path, name: str, *, mounted=True):
     profile["required_mounts"] = mounts
     ui = tmp_path / "www" / "fair2wise"
     ui.mkdir(parents=True)
-    (ui / gw.BUILD_MANIFEST_NAME).write_text(json.dumps(gw.PublicLayout("/fair2wise").as_manifest()), encoding="utf-8")
+    manifest = json.dumps(gw.PublicLayout("/fair2wise").as_manifest())
+    (ui / gw.BUILD_MANIFEST_NAME).write_text(manifest, encoding="utf-8")
     run = tmp_path / "run"
-    profile["gateway"] = {"build_manifest": str(ui / gw.BUILD_MANIFEST_NAME), "template": str(REPO / "docker/nginx.conf"),
+    profile["gateway"] = {"build_manifest": str(ui / gw.BUILD_MANIFEST_NAME),
+                          "template": str(REPO / "docker/nginx.conf"),
                           "rendered": str(run / "conf.d" / "default.conf"),
                           "runtime_dirs": [str(run / "tmp" / "proxy")]}
     env, _ = SUP.resolve_environment({}, SUP.parse_profile(profile))
