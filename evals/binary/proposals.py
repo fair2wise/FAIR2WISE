@@ -40,6 +40,11 @@ GS = "tests/graph/test_graph_tiled_server.py"
 GI = "tests/graph/test_graph_identity.py"
 OS = "tests/operations/test_paper_summary_service.py"
 OT = "tests/operations/test_paper_summary_tool.py"
+OR = "tests/operations/test_operation_reports.py"
+OC = "tests/operations/test_corpus_audit.py"
+OW = "tests/operations/test_work_identity.py"
+OG = "tests/operations/test_graph_operations.py"
+GO = "tests/graph/test_graph_operations_tiled.py"
 RPP = "tests/read_path/test_read_path_parity.py"
 RPQ = "tests/read_path/test_qa_route.py"
 RPT = "tests/read_path/test_read_tool.py"
@@ -380,17 +385,41 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_complete_display_when_everything_is_listed",
             "test_same_output_as_the_baseline_function",
             "test_query_scoped_omitted_note_is_not_read_as_the_total",
-        ),
+        )
+        + n(
+            OC,
+            "test_synthetic_corpus_matches_corpus_qa_and_counts_distinct_works",
+            "test_committed_corpora_match_the_cli_baseline",
+            "test_xray_corpus_histogram_overcount_is_disclosed_and_corrected",
+        )
+        + n(
+            OG,
+            "test_statistics_counting_units_duplicates_dangling_and_works",
+            "test_legacy_block_matches_analyze_kgs_on_committed_graphs",
+            "test_growth_series_matches_analyze_kgs_growth_with_work_denominators",
+            "test_empty_graph_is_a_complete_zero_population",
+        )
+        + n(GO, "test_statistics_match_json_and_exclude_forge_records"),
         "partial",
-        "Population counts of the baseline summary function on synthetic populations",
+        "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph"
+        " statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations",
         "Known complete-population count on an owner-approved real population (H3 oracle)",
         fixtures=["tests/operations/fixtures/"],
     ),
-    "OPS-02": blocked(
-        ["H3 (owner definition of how repeated Work references are deduplicated)", T08B],
-        n(OS, "test_duplicate_labels_count_as_separate_records"),
-        "The approved dedupe/counting definition does not exist yet; the baseline counts duplicate labels as"
-        " separate records",
+    "OPS-02": oracle(
+        n(
+            OW,
+            "test_repeated_work_references_are_one_work",
+            "test_pairwise_rule_matches_harvest_works_same_identity",
+            "test_two_journal_dois_are_never_merged_even_with_equal_titles",
+        )
+        + n(OC, "test_synthetic_corpus_matches_corpus_qa_and_counts_distinct_works")
+        + n(OG, "test_statistics_counting_units_duplicates_dangling_and_works"),
+        "partial",
+        "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under"
+        " work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed",
+        "Owner review of work-identity/1 on a real repeated-paper population",
+        supporting=n(OS, "test_duplicate_labels_count_as_separate_records"),
     ),
     "OPS-03": oracle(
         n(
@@ -399,7 +428,17 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_query_scoped_omitted_note_is_not_read_as_the_total",
         )
         + n(GJ, "test_find_entities_flags_partial_results")
-        + n(GS, "test_partial_scan_is_flagged_not_absent"),
+        + n(GS, "test_partial_scan_is_flagged_not_absent")
+        + n(OR, "test_partial_scan_is_never_ok_and_says_so", "test_completeness_follows_the_scan_and_cannot_be_set_independently")
+        + n(OC, "test_capped_scan_is_partial_and_names_the_bound", "test_tool_partial_unknown_denied_and_invalid")
+        + n(
+            OG,
+            "test_capped_scan_is_partial_never_complete",
+            "test_growth_stops_partial_and_lists_unread_graphs",
+            "test_unknown_paper_is_not_found_but_a_partial_scan_is_unknown",
+            "test_tool_partial_scope_unknown_and_invalid",
+        )
+        + n(GO, "test_capped_tiled_scan_is_partial_not_complete"),
         "full",
         "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete",
     ),
@@ -410,9 +449,11 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_result_is_bounded_with_long_definitions",
             "test_same_output_as_the_baseline_function",
         )
-        + n(OT, "test_ok_result_is_typed_bounded_and_cites_eligible_pages"),
+        + n(OT, "test_ok_result_is_typed_bounded_and_cites_eligible_pages")
+        + n(OR, "test_display_truncation_keeps_totals_and_completeness")
+        + n(OG, "test_paper_subgraph_by_key_doi_and_arxiv"),
         "partial",
-        "Display bounding keeps the same output as the baseline and never reads as the total",
+        "Display bounding keeps the same output as the baseline and never changes totals or completeness",
         "Totals unchanged under truncation on a gold population (H3 oracle)",
     ),
     "OPS-05": oracle(
