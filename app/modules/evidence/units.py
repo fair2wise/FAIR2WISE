@@ -33,7 +33,13 @@ __all__ = [
     "NormalizedQuantity",
     "normalize_quantity",
     "ENERGY_TO_EV",
+    "INSTRUMENT_QUANTITY_DIMENSION",
     "INVERSE_UNIT_TO_NM_INV",
+    "RECIPROCAL_DERIVATION_REL_TOL",
+    "base_quantity_name",
+    "expected_dimension",
+    "quantity_unit_mismatch",
+    "reciprocal_derivation",
     "LENGTH_TO_NM",
     "LENGTH_UNIT_SPELLINGS",
     "QUANTITY_DIMENSION",
@@ -324,6 +330,82 @@ def dimension_mismatch(quantity_name: str, unit: str) -> str:
         f"scaling -- the value is most likely correct and the NAME wrong "
         f"(a q filed as a period, or a 2-theta filed as a q)."
     )
+
+
+# --- F2W (T06B, H3 F8 gate 3): dimensions beyond the donor quantity names ----
+
+#: Instrument settings a paper may print or a pipeline may assume (F8). Kept apart
+#: from ``QUANTITY_DIMENSION``, which tests pin to the donor ``QuantityName`` set.
+#: ``beam_center`` is in pixels and has no dimension here, so it is unchecked.
+INSTRUMENT_QUANTITY_DIMENSION: dict[str, str] = {
+    "beam_energy": "energy",
+    "photon_energy": "energy",
+    "wavelength": "length",
+    "sample_detector_distance": "length",
+    "detector_distance": "length",
+    "pixel_size": "length",
+    "incidence_angle": "angle",
+}
+
+#: Peak quantity names produced by the structure strategy (``peak_q[(100)]``).
+_PEAK_DIMENSION = {"peak_q": "reciprocal", "peak_d_spacing": "length"}
+
+
+def base_quantity_name(name: str) -> str:
+    """``peak_q[(100)]`` -> ``peak_q``; other names unchanged (stripped)."""
+    return (name or "").split("[", 1)[0].strip()
+
+
+def expected_dimension(name: str) -> Optional[str]:
+    """What a quantity name measures (donor names, peak names, instrument settings), or ``None``."""
+    base = base_quantity_name(name)
+    return QUANTITY_DIMENSION.get(base) or _PEAK_DIMENSION.get(base) or INSTRUMENT_QUANTITY_DIMENSION.get(base)
+
+
+def quantity_unit_mismatch(name: str, unit: str) -> str:
+    """:func:`dimension_mismatch` over :func:`expected_dimension` (F8 gate 3); ``""`` is the pass.
+
+    Same rule as the donor guard: an unknown name or an unknown unit passes, a
+    provable contradiction (a length printed in nm^-1, an energy in degrees) does not.
+    """
+    expected = expected_dimension(name)
+    if expected is None or not unit:
+        return ""
+    actual = unit_dimension(unit)
+    if actual == "unknown" or actual == expected:
+        return ""
+    return f"{base_quantity_name(name)} is a {expected} quantity but its unit {unit!r} is {actual}"
+
+
+#: Relative tolerance for recognising ``d = 2*pi/q`` against a printed partner (rounding of both numbers).
+RECIPROCAL_DERIVATION_REL_TOL = 0.01
+
+
+def reciprocal_derivation(value: float, unit: str, partner_value: float, partner_unit: str) -> Optional[dict]:
+    """Provenance when ``value unit`` equals ``2*pi / (partner_value partner_unit)``, else ``None``.
+
+    Covers d-spacing from q and q from d. Both sides are converted through the
+    closed tables above (``nm`` / ``nm^-1``); an unknown unit, a non-positive
+    number or a same-dimension pair is ``None``, never a guess.
+    """
+    mine, theirs = unit_dimension(unit), unit_dimension(partner_unit)
+    if {mine, theirs} != {"length", "reciprocal"}:
+        return None
+    if not (math.isfinite(value) and math.isfinite(partner_value)) or value <= 0 or partner_value <= 0:
+        return None
+    own = normalize_quantity(value, unit)
+    partner = normalize_quantity(partner_value, partner_unit)
+    if own.value is None or partner.value is None:
+        return None
+    computed = 2.0 * math.pi / partner.value
+    if not math.isclose(own.value, computed, rel_tol=RECIPROCAL_DERIVATION_REL_TOL):
+        return None
+    formula = "d = 2*pi/q" if mine == "length" else "q = 2*pi/d"
+    return {
+        "formula": formula, "from_value": partner_value, "from_unit": partner_unit,
+        "computed_value": computed, "computed_unit": own.unit, "stated_value": value, "stated_unit": unit,
+        "rel_tol": RECIPROCAL_DERIVATION_REL_TOL, "profile": CONVERSION_PROFILE,
+    }
 
 
 # --- F2W: raw + normalized with conversion provenance ----------------------

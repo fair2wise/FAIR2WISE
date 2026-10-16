@@ -143,7 +143,9 @@ def test_technique_table_uses_exact_aliases_only():
     assert technique_class("RSoXS", {"ExperimentalTechnique"}) == "ExperimentalTechnique"
 
 
-def test_t06_gates_stay_closed():
+def test_t06_gates_match_the_h3_decision():
     from app.modules.extraction import H3_GATES
 
-    assert not any(H3_GATES.values())  # mapping exists; applying it in the T06 stage is not switched on here
+    # T06B opened the approved H3 gates; 0.3.0 is still used only on explicit selection (pending review).
+    assert dict(H3_GATES) == {"apply_validation_mappings": True, "new_schema_slots": True,
+                              "canonical_merge": False, "publish": False}

@@ -639,7 +639,7 @@
         "case_sha256": "a67b78c1bb50afc781e846736b3785c924335e17370e3bc0da8926f354cd5860",
         "config_sha256": "351f2c498403df1479ff6dfcef560f8ace7c10420d18817d7701fc03b2415ea6",
         "model_sha256": null,
-        "oracle_source_sha256": "cf08eccc727964817452e7f2a890dd3d48431d781dfa22a208c002265ca3010b",
+        "oracle_source_sha256": "2b92d13a43e40e236182c33cdd0064bed3686cf8f466a3e9c533f912f51490e3",
         "schema_sha256": null
       },
       "input_fixture_refs": [

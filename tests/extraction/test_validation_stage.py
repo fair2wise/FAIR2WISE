@@ -1,4 +1,5 @@
-"""T06 acceptance (pre-H3): annotated examples trace to source/version/location; bad cases are withheld."""
+"""T06/T06B acceptance: annotated examples trace to source/version/location; F8 failures are withheld and
+every retained value carries its evidence-source tag (H3 F2/F8)."""
 
 from __future__ import annotations
 
@@ -20,7 +21,9 @@ from app.modules.extraction.strategies.legacy_f2w import LegacyF2WStrategy
 from app.modules.extraction.strategies.paper_structure import PaperStructureStrategy
 from app.modules.extraction.structured_output import TextCompletionAdapter
 
-from tests.evidence.evidence_fixtures import CASES, PUB_PATH, WORK_ID, case_quantities, make_document
+from tests.evidence.evidence_fixtures import (
+    CASES, EXPECTED_TAGS, PUB_PATH, WORK_ID, case_quantities, make_document,
+)
 from tests.extraction.extraction_fakes import make_extractor, page_texts_with_code
 from tests.extraction.test_forge_strategies import ENTITY_REPLY, STRUCTURE_REPLY
 
@@ -45,7 +48,14 @@ def test_annotated_cases_are_retained_or_withheld_as_annotated():
             assert str(index) not in withheld, (case_id, withheld.get(str(index)))
     retained = sum(1 for c in CASES if c[2] == "retained")
     assert report.accepted == report.written == retained
-    assert report.mapping_applied is False and report.published is False
+    assert report.mapping_applied is False and report.published is False and report.schema_mapping is None
+    assert set(EXPECTED_TAGS) == {c[0] for c in CASES if c[2] == "retained"}
+    expected_tags = {}
+    for tag in EXPECTED_TAGS.values():
+        expected_tags[tag] = expected_tags.get(tag, 0) + 1
+    assert report.tags == dict(sorted(expected_tags.items()))
+    assert report.retagged == [{"name": "domain_spacing", "proposed": "reported", "tag": "cited",
+                                "reasons": ["attributed_sentence"]}]
 
 
 def test_every_retained_assertion_traces_to_source_version_and_location():
@@ -128,7 +138,11 @@ def test_document_validation_attaches_evidence_refs_and_withholds_lexical_failur
     cited = validate_against_document(
         _chunk(obs_quote="Previous reports found a domain spacing of 40 nm [12].", value=40.0),
         doc, work_id=WORK_ID, pub_path=PUB_PATH)
-    assert "reported_status_in_attributed_sentence" in cited.withheld[0].reasons
+    # H3 F8: tagged cited, not withheld; the proposed tag stays visible.
+    assert not cited.withheld and cited.observations[0].status == "cited"
+    decision = cited.tags["observation:o1"]
+    assert (decision.proposed.value, decision.tag.value, decision.reasons) == ("reported", "cited",
+                                                                              ("attributed_sentence",))
 
 
 # --- comparison and gates ---------------------------------------------------
@@ -157,11 +171,18 @@ def test_all_strategies_run_on_identical_fixture_and_compare(tmp_path):
 
 
 def test_h3_gates_are_closed_and_enforced():
-    assert dict(H3_GATES) == {"apply_validation_mappings": False, "new_schema_slots": False,
+    """Publish and canonical merge stay closed and enforced; only the H3-approved gates are open.
+
+    The name is kept because binary case oracles (EXT-05, LOCAL-09, SCH-03) cite this node id.
+    """
+    assert dict(H3_GATES) == {"apply_validation_mappings": True, "new_schema_slots": True,
                               "canonical_merge": False, "publish": False}
-    for gate in H3_GATES:
-        with pytest.raises(PermissionError):
-            require_gate(gate)
+    require_gate("apply_validation_mappings")
+    require_gate("new_schema_slots")
+    with pytest.raises(PermissionError, match="C4"):
+        require_gate("canonical_merge")
+    with pytest.raises(PermissionError, match="H5"):
+        require_gate("publish")
     with pytest.raises(TypeError):
         H3_GATES["publish"] = True  # type: ignore[index]
     with pytest.raises(KeyError):

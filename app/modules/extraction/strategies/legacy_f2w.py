@@ -108,7 +108,7 @@ class LegacyF2WStrategy:
         filename, coverage = self.run(source)
         terms = [t for t in self.extractor.terms_dict.values() if filename in (t.get("source_papers") or [])]
         snippets = [s for s in self.extractor.code_snippets if s.get("source_paper") == filename]
-        mentions = [m for term in terms for m in _mentions_for(term, filename)]
+        mentions = [m for term in terms for m in mentions_for_term(term, filename)]
         document = source.document
         return ExtractionResult(
             strategy=self.name, strategy_version=self.version, work_id=source.work_id,
@@ -126,8 +126,9 @@ class LegacyF2WStrategy:
         )
 
 
-def _mentions_for(term: Dict[str, Any], filename: str) -> List[ExtractedMention]:
-    """One mention per (page, snippet) of this file for one terms-JSON entry."""
+def mentions_for_term(term: Dict[str, Any], filename: str, *, extracted_by: str = STRATEGY_NAME
+                      ) -> List[ExtractedMention]:
+    """One mention per (page, snippet) of this file for one terms-JSON entry (shared by the agent strategy)."""
     pages = list(term.get("pages") or [])
     snippets = [s for s in term.get("context_snippets") or [] if s.get("source_paper") == filename]
     attributes = {k: frozen_copy(term[k]) for k in _CHEMICAL_FIELDS if term.get(k) is not None}
@@ -136,7 +137,7 @@ def _mentions_for(term: Dict[str, Any], filename: str) -> List[ExtractedMention]
     if term.get("properties"):
         attributes["properties"] = frozen_copy(term["properties"])
     base = dict(surface=str(term.get("term", "")), category=str(term.get("category") or "Thing"),
-                canonical=False, slug=str(term.get("term", "")).strip().lower(), extracted_by=STRATEGY_NAME,
+                canonical=False, slug=str(term.get("term", "")).strip().lower(), extracted_by=extracted_by,
                 attributes=attributes)
     if not snippets:
         page: Optional[int] = pages[0] if pages else None
@@ -148,4 +149,6 @@ def _mentions_for(term: Dict[str, Any], filename: str) -> List[ExtractedMention]
     ]
 
 
-__all__ = ["STRATEGY_NAME", "STRATEGY_VERSION", "LegacyF2WStrategy", "TextPages"]
+_mentions_for = mentions_for_term
+
+__all__ = ["STRATEGY_NAME", "STRATEGY_VERSION", "LegacyF2WStrategy", "TextPages", "mentions_for_term"]

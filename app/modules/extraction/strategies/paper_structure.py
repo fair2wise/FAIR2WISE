@@ -101,18 +101,40 @@ class PaperStructureExtraction(BaseModel):
 
 # --- attribution: a literature contrast is not this paper's claim ---------
 
+# F2W (T06B, H3 F2): a sentence attributes its claim to other work only on an
+# EXPLICIT cue. A bare passive ("A peak was observed at ...") is the paper's own
+# measurement and must stay "reported"; the donor's passive-voice cue
+# ("was/were observed/reported ...") and its contrast cues ("unlike", "whereas",
+# "in contrast to") are dropped for that reason.
 _ATTRIBUTION_CUES = (
-    r"(?:other|some|several|previous|earlier)\s+(?:research\s+)?"
-    r"(?:groups?|workers?|authors?|studies|reports?|work)",
-    r"\bet\s+al\.?",
-    r"(?:has|have|had|was|were|been)\s+(?:previously\s+|also\s+)?"
-    r"(?:been\s+)?(?:reported|observed|described|proposed|suggested|assigned)",
-    r"\b(?:in|by)\s+(?:contrast|comparison)\s+(?:to|with)",
-    r"\b(?:unlike|whereas)\b",
-    r"\bref(?:s|erences?)?\.?\s*\d",
+    # phrases naming other work
+    r"\b(?:other|some|several|previous|earlier|prior)\s+(?:research\s+)?"
+    r"(?:groups?|workers?|authors?|studies|reports?|work)\b",
+    r"\bpreviously\s+(?:been\s+)?(?:reported|observed|shown|described|found|demonstrated|proposed)\b",
+    r"\breported\s+by\b",
+    r"\breported\s+in\s+(?:refs?\b|references?\b|the\s+literature\b|previous\b|earlier\b|prior\b|\[)",
+    r"\baccording\s+to\b(?!\s+(?:eq|eqs|equation|equations|fig|figs|figure|figures|table|tables)\b)",
     r"\bliterature\b",
+    # citation markers
+    r"\bet\s+al\b\.?",
+    r"\bref(?:s|erences?)?\.?\s*\d",
+    r"\[\s*\d{1,3}(?:\s*[,;\u2013-]\s*\d{1,3})*\s*\]",
+)
+#: Case-sensitive cues (they rely on a capitalised name).
+_NAME_CUES = (
+    # "as found by Smith", "observed by Smith" (a capitalised name, not "by GIWAXS")
+    r"\b(?:[Aa]s\s+)?(?:found|observed|shown|reported|described)\s+by\s+[A-Z][a-z]+",
+    # author-year: "Smith (2019)", "Smith et al. (2019)", "(Smith, 2019)", "(Smith and Lee 2019)"
+    r"\b[A-Z][a-z]+(?:\s+et\s+al\.?)?\s+\((?:19|20)\d{2}[a-z]?\)",
+    r"\(\s*[A-Z][a-z]+(?:\s+(?:et\s+al\.?|and\s+[A-Z][a-z]+))?,?\s+(?:19|20)\d{2}[a-z]?\s*\)",
+    # "(12)" or "(3, 4)" right before punctuation or the end; not a Miller index like "(100)" or "(010)"
+    r"\((?![0-2]{3}\))[1-9]\d{0,2}(?:\s*[,\u2013-]\s*\d{1,3})*\)(?=\s*(?:[.,;:]|$))",
+    # superscript reference numbers after a word or punctuation ("films.\u00b9\u00b2", "films\u00b3");
+    # never after "\u207b" (nm\u207b\u00b9) and never after a 1-2 letter unit (cm\u00b2)
+    r"(?:\b[A-Za-z]{3,}|[.,)])[\u2070\u00b9\u00b2\u00b3\u2074-\u2079]+",
 )
 _ATTRIBUTION_RE = re.compile("|".join(_ATTRIBUTION_CUES), re.IGNORECASE)
+_NAME_RE = re.compile("|".join(_NAME_CUES))
 _ABBREVIATIONS = ("et al", "e.g", "i.e", "cf", "vs", "fig", "figs", "eq", "eqs", "ref", "refs", "no", "vol",
                   "ca", "approx", "st", "nd", "rd", "th")
 _PHASE_TERMS = re.compile(
@@ -122,9 +144,23 @@ _PHASE_TERMS = re.compile(
 )
 
 
+_ORDINALS = ("st", "nd", "rd", "th")
+
+
 def _ends_abbreviation(text: str, dot: int) -> bool:
+    # F2W (T06B): an abbreviation must be a whole word ("blend." is a sentence end,
+    # not "nd."), and an ordinal suffix counts only after a digit ("2nd.").
     prefix = text[max(0, dot - 12):dot].lower()
-    return any(prefix.endswith(a) for a in _ABBREVIATIONS)
+    for abbreviation in _ABBREVIATIONS:
+        if not prefix.endswith(abbreviation):
+            continue
+        before = prefix[:-len(abbreviation)]
+        if abbreviation in _ORDINALS:
+            if before and before[-1].isdigit():
+                return True
+        elif not before or not before[-1].isalpha():
+            return True
+    return False
 
 
 def sentence_around(text: str, start: int, end: int) -> str:
@@ -151,8 +187,15 @@ def sentence_around(text: str, start: int, end: int) -> str:
 
 
 def is_attributed(sentence: str) -> bool:
-    """Whether a sentence attributes its claim to other work (cue-based, lexical only)."""
-    return bool(_ATTRIBUTION_RE.search(sentence or ""))
+    """Whether a sentence attributes its claim to other work, on an explicit cue only (lexical).
+
+    Cues: a citation marker ([n], (n) before punctuation, superscript numbers,
+    author-year, "et al.", "ref."), or a phrase such as "previously reported/
+    observed/shown", "reported by/in", "according to", "as found by <Name>",
+    "previous studies", "literature". A bare passive is not a cue.
+    """
+    text = sentence or ""
+    return bool(_ATTRIBUTION_RE.search(text) or _NAME_RE.search(text))
 
 
 def attributed_phase_mentions(text: str) -> List[Tuple[str, str]]:

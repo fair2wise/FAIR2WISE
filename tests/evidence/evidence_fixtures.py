@@ -2,7 +2,8 @@
 
 The paper is invented; every sentence is written here. ``CASES`` annotates what a
 strategy might propose for it and whether the validation stage must retain or
-withhold it, and why. No network, model or real PDF is involved.
+withhold it, and why (H3 F8 gates); ``EXPECTED_TAGS`` gives the evidence-source
+tag each retained case ends with (H3 F2/F8). No network, model or real PDF is involved.
 """
 
 from __future__ import annotations
@@ -79,7 +80,7 @@ CASES: List[Tuple[str, Dict[str, Any], str, Any]] = [
     ("cited-marked-reported", dict(name="domain_spacing", raw_value=40.0, raw_unit="nm",
                                    quote="Previous reports found a domain spacing of 40 nm [12].",
                                    location_label="Discussion"),
-     "withheld", "reported_status_in_attributed_sentence"),
+     "retained", None),
     ("invented-quote", dict(name="domain_spacing", raw_value=31.0, raw_unit="nm",
                             quote="The domain spacing is 31 nm.", location_label="Results"),
      "withheld", "evidence_quote_not_found"),
@@ -94,11 +95,20 @@ CASES: List[Tuple[str, Dict[str, Any], str, Any]] = [
      "withheld", "unit_dimension_mismatch"),
     ("no-quote", dict(name="domain_spacing", raw_value=25.0, raw_unit="nm", quote="", location_label="Results"),
      "withheld", "missing_quote"),
-    ("assumed-geometry", dict(name="beam_energy", raw_value=284.0, raw_unit="eV", evidence_source="assumed",
-                              quote="We report resonant soft X-ray scattering (RSoXS) of PM6:Y6 blend films.",
-                              location_label="Abstract"),
-     "withheld", "assumed_instrument_geometry_not_paper_evidence"),
+    # An assumed value whose number is not in its quote fails F8 gate 2, like any other value.
+    ("assumed-geometry-not-in-quote", dict(name="beam_energy", raw_value=284.0, raw_unit="eV",
+                                           evidence_source="assumed",
+                                           quote="We report resonant soft X-ray scattering (RSoXS) of PM6:Y6 "
+                                                 "blend films.",
+                                           location_label="Abstract"),
+     "withheld", "value_unit_not_supported"),
 ]
+
+#: Tag each retained case ends with (cited stays cited; reported in an attributing sentence becomes cited).
+EXPECTED_TAGS: Dict[str, str] = {
+    "q-exact-glyph": "reported", "thickness-uncertainty": "reported", "spacing-normalized": "reported",
+    "cited-value": "cited", "cited-marked-reported": "cited",
+}
 
 
 def make_quantity(kwargs: Dict[str, Any]) -> ReportedQuantity:
