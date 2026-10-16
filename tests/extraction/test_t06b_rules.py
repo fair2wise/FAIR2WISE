@@ -107,7 +107,7 @@ def test_cited_and_assumed_values_are_never_presented_as_the_papers_measurement(
     assumed = {r["name"]: r for r in by_tag["assumed"]}
     assert assumed["pixel_size"]["proposed_evidence_source"] == "reported"
     assert assumed["pixel_size"]["tag_reasons"] == ["assumed_instrument_value"]
-    assert report.tags == {"assumed": 2, "cited": 3, "derived": 1, "reported": 2}
+    assert report.tags == {"assumed": 2, "cited": 6, "derived": 1, "reported": 5}
     json.dumps(report.to_dict())
 
 
@@ -156,3 +156,47 @@ def test_document_validation_tags_observations_for_the_schema_mapping():
     assert [(w.record_id, w.reasons) for w in out.withheld] == [("o4", ("unit_dimension_mismatch",))]
     assert out.tags["observation:o3"].derivation["formula"] == "d = 2*pi/q"
     assert out.mapping_applied is False
+
+
+@pytest.mark.parametrize("sentence, attributed", [
+    ("A peak was observed at q = 0.18 nm^-1 for the blend.", False),
+    ("Peaks were observed at 0.30 and 0.45 nm^-1.", False),
+    ("The (100) reflection was observed at q = 3.0 nm^-1.", False),
+    ("A lamellar spacing of 2.1 nm was observed by GIWAXS.", False),
+    ("Unlike the as-cast film, the annealed film shows a domain spacing of 30 nm.", False),
+    ("The spacing follows according to Eq. 2 from the peak position.", False),
+    ("The beam footprint was 1 cm\u00b2 at q = 0.3 nm\u207b\u00b9.", False),
+    ("The peak is assigned to the (010) plane.", False),
+    ("A peak was previously observed at 0.18 nm^-1 [12].", True),
+    ("As observed by Smith et al., the peak sits at 0.18 nm^-1.", True),
+    ("The domain spacing is 40 nm (12).", True),
+    ("The domain spacing is 40 nm.\u00b9\u00b2", True),
+    ("The spacing of these films\u00b3 is 40 nm.", True),
+    ("Lee (2019) found a film thickness of 90 nm.", True),
+    ("A film thickness of 90 nm was found (Lee and Park, 2019).", True),
+    ("A thickness of 90 nm was reported by the manufacturer.", True),
+    ("The spacing reported in ref. 4 is 40 nm.", True),
+    ("According to the literature, the spacing is 40 nm.", True),
+    ("As found by Kim, the spacing is 40 nm.", True),
+    ("Other groups reported a gyroid here.", True),
+])
+def test_attribution_needs_an_explicit_cue(sentence, attributed):
+    from app.modules.extraction.strategies.paper_structure import is_attributed
+
+    assert is_attributed(sentence) is attributed
+
+
+@pytest.mark.parametrize("text, quote, expected", [
+    ("A peak was observed for the blend. It was previously observed [12].", "A peak was observed for the blend.",
+     "A peak was observed for the blend."),
+    ("The film was measured first. Smith et al. disagree.", "The film was measured first.",
+     "The film was measured first."),
+    ("Smith et al. measured 80 nm. We measured 25 nm.", "Smith et al. measured 80 nm.",
+     "Smith et al. measured 80 nm."),
+    ("It peaked on the 2nd. day of annealing. Done.", "It peaked on the 2nd.", "It peaked on the 2nd. day of annealing."),
+])
+def test_sentence_window_ends_at_real_sentence_ends(text, quote, expected):
+    from app.modules.extraction.strategies.paper_structure import sentence_around
+
+    start = text.index(quote)
+    assert sentence_around(text, start, start + len(quote) - 1) == expected

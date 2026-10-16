@@ -31,7 +31,18 @@ DISCUSSION = (
     "Smith et al. measured a film thickness of 80 nm."
 )
 
-SECTIONS = (("Experimental", EXPERIMENTAL, 2), ("Results", RESULTS, 3), ("Discussion", DISCUSSION, 5))
+#: Attribution boundary (F2/F8.4): only an explicit cue makes a sentence attributing.
+COMPARISON = (
+    "A peak was observed at q = 0.18 nm^-1 for the blend. "
+    "A peak was previously observed at 0.18 nm^-1 [12]. "
+    "As observed by Smith et al., the peak sits at 0.18 nm^-1. "
+    "A lamellar spacing of 2.1 nm was observed by GIWAXS. "
+    "Unlike the as-cast film, the annealed film shows a domain spacing of 30 nm. "
+    "Lee (2019) found a film thickness of 90 nm."
+)
+
+SECTIONS = (("Experimental", EXPERIMENTAL, 2), ("Results", RESULTS, 3), ("Discussion", DISCUSSION, 5),
+            ("Comparison", COMPARISON, 6))
 
 
 def make_document() -> ParsedDocument:
@@ -93,6 +104,28 @@ CONTROLS: List[Control] = [
     Control("attributing-et-al", "F8.4", dict(name="film_thickness", raw_value=80.0, raw_unit="nm",
                                               quote="Smith et al. measured a film thickness of 80 nm.",
                                               location_label="Discussion"), "retained", "cited"),
+    # F8.4 boundary: a bare passive is the paper's own measurement; explicit cues make it cited.
+    Control("bare-passive-stays-reported", "F8.4", dict(name="first_peak_q", raw_value=0.18, raw_unit="nm^-1",
+                                                         quote="A peak was observed at q = 0.18 nm^-1 for the blend.",
+                                                         location_label="Comparison"), "retained", "reported"),
+    Control("previously-observed-citation-cited", "F8.4", dict(
+        name="first_peak_q", raw_value=0.18, raw_unit="nm^-1",
+        quote="A peak was previously observed at 0.18 nm^-1 [12].", location_label="Comparison"),
+        "retained", "cited"),
+    Control("as-observed-by-et-al-cited", "F8.4", dict(
+        name="first_peak_q", raw_value=0.18, raw_unit="nm^-1",
+        quote="As observed by Smith et al., the peak sits at 0.18 nm^-1.", location_label="Comparison"),
+        "retained", "cited"),
+    Control("observed-by-technique-stays-reported", "F8.4", dict(
+        name="d10_spacing", raw_value=2.1, raw_unit="nm", quote="A lamellar spacing of 2.1 nm was observed by GIWAXS.",
+        location_label="Comparison"), "retained", "reported"),
+    Control("contrast-without-citation-stays-reported", "F8.4", dict(
+        name="domain_spacing", raw_value=30.0, raw_unit="nm",
+        quote="Unlike the as-cast film, the annealed film shows a domain spacing of 30 nm.",
+        location_label="Comparison"), "retained", "reported"),
+    Control("author-year-cited", "F8.4", dict(name="film_thickness", raw_value=90.0, raw_unit="nm",
+                                              quote="Lee (2019) found a film thickness of 90 nm.",
+                                              location_label="Comparison"), "retained", "cited"),
     # F8.5: assumed instrument geometry -> assumed
     Control("assumed-detector-distance", "F8.5", dict(name="sample_detector_distance", raw_value=488.0,
                                                       raw_unit="mm", evidence_source="assumed",
