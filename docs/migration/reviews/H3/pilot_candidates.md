@@ -35,9 +35,11 @@ is approved.
 - The brief names 12 cases: EXT-01 to EXT-04, FIG-01 to FIG-03, QA-01 to QA-04
   and OPS-04.
 - The H3 decision speaks of "13 cases needing real-paper fixtures". The 13th is
-  most likely **OPS-02** (repeated Work references deduplicated). It is the
-  only other case blocked on H3 source truth. It is covered below where a
-  paper helps.
+  **LOCAL-02** (end-to-end local workflows from intake to publication and graph
+  editing). It needs an isolated run on one real paper, not labelled answers,
+  so any paper chosen here serves it. **OPS-02** (repeated Work references
+  deduplicated) is a separate case still waiting on an approved counting
+  definition; candidate C helps it where noted below.
 
 ### EXT-04 needs a preprint and a published version. What the corpus holds
 
