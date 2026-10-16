@@ -40,7 +40,7 @@ def adapter(replies=(), default=ENTITY_REPLY, **kw) -> TextCompletionAdapter:
 # --- registry ----------------------------------------------------------------
 
 def test_forge_strategies_are_optional_and_need_explicit_opt_in():
-    assert set(OPTIONAL_STRATEGIES) == {"forge_paper", "forge_paper_structure"}
+    assert set(OPTIONAL_STRATEGIES) == {"forge_paper", "forge_paper_structure", "f2w_term_extractor_agent"}
     for name in OPTIONAL_STRATEGIES:
         with pytest.raises(PermissionError):
             strategy_class(name)
