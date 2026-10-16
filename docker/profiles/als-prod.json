@@ -83,6 +83,8 @@
       "nginx",
       "-t",
       "-q",
+      "-e",
+      "stderr",
       "-c",
       "/opt/fair2wise/entrypoint/nginx-main.conf"
     ]
@@ -143,6 +145,8 @@
       "name": "gateway",
       "argv": [
         "nginx",
+        "-e",
+        "stderr",
         "-c",
         "/opt/fair2wise/entrypoint/nginx-main.conf"
       ],
