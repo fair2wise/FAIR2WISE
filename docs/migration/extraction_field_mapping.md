@@ -1,10 +1,16 @@
-# Extraction field mapping (T06, proposed; STOP H3)
+# Extraction field mapping (T06; H3 decided, T22C schema rows)
 
-Status: **proposal for owner review at H3. Nothing in this table is applied.**
-`app.modules.extraction.H3_GATES` keeps `apply_validation_mappings`,
-`new_schema_slots`, `canonical_merge` and `publish` closed. Current schema meanings
-are unchanged; `RSoXSMeasurement is_a ExperimentalTechnique` is preserved and the
-measurement/technique split is out of scope (docs/adr/schema-ownership.md, D20).
+Status: **H3 decided (docs/migration/reviews/H3/decision.json).** Rows marked
+`approved H3` point at classes and slots of schema set 0.3.0
+(`storage/schema/v0.3.0/`, T22C). That set is additive and still **pending the
+owner's review of `docs/migration/reviews/H3/schema_diff_T22C.md`**: no default
+build, extraction or publish path uses it, and the T06 validation stage does not
+apply these mappings yet (`app.modules.extraction.H3_GATES` stays closed; the
+schema-side adapter is `app/modules/schema/experiment_mapping.py`).
+`RSoXSMeasurement is_a ExperimentalTechnique` is preserved and keeps meaning a
+technique; one run is the new `MeasurementRun` (F5 overrides the D20 rule that kept
+measurement instances out of scope, in the additive form the owner chose).
+Rows still marked `PENDING H3` were not part of T22C.
 
 Scope: donor fields from E-01 (`pdf_extraction.py`), E-02 (`scientific_records.py`),
 E-08 (`extraction.py`, observation half) and E-09 (evidence rows of
@@ -44,22 +50,22 @@ schema slot, class, or hard validation gate that needs owner approval.
 | (parser provenance) | `EvidenceRef.parser_revision` (= `parser_key`), `EvidenceRecord.parser` | Parser/version/config that produced the text | R | `parser_revision_unknown` marker if version missing | adapter |
 | `caveat` | `EvidenceRecord.caveat` | Strategy caveat | O | Bounded to 1000 chars | adapter |
 | evidence node id (`md5(pub|text...)`) | `EvidenceRef.evidence_id` (`evidence:<16 hex>`) | Deterministic id, donor-compatible digest | R | Same inputs give the same id | adapter |
-| `forge:extractedFrom`, `forge:supportedBy` edges | `QuantityRecord.evidence_ids`, `EvidenceRecord.section_id` | Quote-to-section and value-to-quote links | C | — | **PENDING H3**: graph predicates for these links (F2W has only the string slot `has_evidence`) |
+| `forge:extractedFrom`, `forge:supportedBy` edges | 0.3.0 `supporting_quote` (Thing → `EvidenceQuote`), `quote_located_in_section` (`EvidenceQuote` → `PaperSection`); records: `QuantityRecord.evidence_ids`, `EvidenceRecord.section_id` | Value-to-quote and quote-to-section links | C | Only a located quote becomes an `EvidenceQuote` | **approved H3** (F7); was PENDING H3 |
 
 ## 2. Reported values (E-02 `ScientificObservation`, E-08 `ExtractedValue`/`ReportedPeak`, E-09 quantity rows)
 
 | Donor field | F2W field (current or T06 record) | Intended meaning | Opt. | Validation | Status |
 |---|---|---|---|---|---|
 | `quantity_label` / `quantity` (closed `QuantityName`) | `QuantityRecord.name`; terms JSON `properties[].property` | What was measured, as the strategy labels it | R | `dimension_mismatch` vs unit; donor names are not F2W slots | adapter; **PENDING H3**: mapping of each donor name (e.g. `domain_spacing`, `film_thickness`, `first_peak_q`) to an F2W property/slot |
-| `value` | `NormalizedQuantity.raw_value`; terms JSON `properties[].value` | Number exactly as printed | C | Finite; `source_support` requires the same number next to an equivalent unit inside the quote | adapter |
+| `value` | 0.3.0 `QuantityValue.numeric_value`; `NormalizedQuantity.raw_value`; terms JSON `properties[].value` | Number exactly as printed | C | Finite; `source_support` requires the same number next to an equivalent unit inside the quote | **approved H3** (F2: every value captured) |
 | `unit` | `NormalizedQuantity.raw_unit`; LinkML `unit` (MaterialProperty) | Unit exactly as printed | C | Closed tables only; unknown unit → `unit_not_convertible` | existing (`unit`) + adapter |
 | (normalized value) | `NormalizedQuantity.value`/`unit`/`factor`/`profile` | Value in nm, nm^-1, eV or deg with conversion provenance | C | `forge-units-v1`; refuses rather than guesses (no `pint`) | adapter; **PENDING H3**: whether a normalized value becomes a schema slot |
-| `qualitative_value` | `QuantityRecord.qualitative_value` | Non-numeric result as printed | C | A record needs a value or a qualitative value | adapter |
-| `uncertainty`, `uncertainty_kind` | `MeasuredUncertainty(value, kind)`; terms JSON `properties[].uncertainty` (value only) | Uncertainty the paper states for the measurement | O | ≥ 0; never mixed with extraction confidence; `uncertainty_not_stated` marker | existing (value) + adapter (kind); **PENDING H3**: `uncertainty_kind` slot |
+| `qualitative_value` | 0.3.0 `QuantityValue.qualitative_value`; `QuantityRecord.qualitative_value` | Non-numeric result as printed | C | A record needs a value or a qualitative value | **approved H3** (F2) |
+| `uncertainty`, `uncertainty_kind` | 0.3.0 `QuantityValue.uncertainty_value` (≥ 0), `uncertainty_kind` (`UncertaintyKindEnum`: standard_deviation/standard_error/interval/unknown); `MeasuredUncertainty(value, kind)` | Uncertainty the paper states for the measurement | O | ≥ 0; never mixed with extraction confidence; `uncertainty_not_stated` marker | **approved H3** (F3) |
 | chunk `confidence` / extraction `confidence` | `QuantityRecord.extraction_confidence`; `ChunkCoverage` | Confidence of the extraction step | O | [0, 1]; says nothing about the measurement | adapter |
-| `status` / `observation_status` (reported/cited/derived/assumed) | `EvidenceSource` on `ReportedQuantity`/`QuantityRecord` | How the source relates to the value (evidence-source axis) | R | `reported` inside an attributing sentence is withheld; not a scientific class | adapter; **PENDING H3**: slot name and whether `cited`/`assumed` values may enter the graph at all |
-| `sample_ids`, `sample_id`, `processing_state`, `temperature_k` | `QuantityRecord.sample_id`, `processing_state`; `temperature_k` in `side_outputs.structure` | Paper-local qualifiers | O | `source_support` qualifier check available; dangling sample refs withheld | adapter; **PENDING H3**: sample-qualifier slots |
-| `measurement_id` | `ExperimentChunk` link only | Observation-to-measurement link | O | Unknown measurement ref withheld | **PENDING H3** (no measurement-instance class; not introduced) |
+| `status` / `observation_status` (reported/cited/derived/assumed) | 0.3.0 `evidence_source_tag` (`EvidenceSourceEnum`, required on `QuantityValue`, optional on `RunCondition`); `EvidenceSource` on `ReportedQuantity`/`QuantityRecord` | How the source relates to the value (evidence-source axis) | R | All values captured and tagged, none withheld for its tag (F2); a `reported` value inside an attributing sentence is tagged `cited` and an assumed instrument value `assumed` (F8; T06B changes today's withholding to tagging) | **approved H3** (F2/F8) |
+| `sample_ids`, `sample_id`, `processing_state`, `temperature_k` | 0.3.0 sample qualifiers on `QuantityValue`: `qualifier_sample` (→ `Sample`), `qualifier_processing_state`, `qualifier_temperature_k`; records: `QuantityRecord.sample_id`, `processing_state` | Paper-local qualifiers | O | `source_support` qualifier check available; dangling sample refs withheld | **approved H3** (F3) |
+| `measurement_id` | 0.3.0 `run_produced_quantity` (`MeasurementRun` → `QuantityValue`) | Observation-to-measurement link | O | Unknown measurement ref withheld | **approved H3** (F5) |
 | `ReportedPeak.q_value`/`q_unit`, `d_spacing_value`/`d_spacing_unit`, `label`, `direction` | `ReportedQuantity` `peak_q[label]` / `peak_d_spacing[label]`; LinkML `peak_positions`, `d_spacing`, `peak_assignments` (strings) | Reflection positions as printed | C | Never derive q from d or back; reciprocal units via closed table | **PENDING H3**: whether to populate the existing string slots `peak_positions`/`d_spacing`/`peak_assignments` on `ExperimentalTechnique` |
 | `location` | `ReportedQuantity.location_label` → `EvidenceRecord.section_label` | Region label | O | Pointer only, never evidence text | adapter |
 
@@ -67,10 +73,10 @@ schema slot, class, or hard validation gate that needs owner approval.
 
 | Donor field | F2W field | Intended meaning | Opt. | Validation | Status |
 |---|---|---|---|---|---|
-| `SampleRecord` (`sample_id`, `label`, `composition`, `phase`, `processing_state`, `preparation`) | none (terms JSON has materials, not samples) | One paper-local physical sample | O | Quote must be located | **PENDING H3**: new class or keep as candidate-only record |
-| `MeasurementRecord.technique` | terms JSON term with category `ExperimentalTechnique`/`RSoXSMeasurement` | Technique used | R | Free string; not a typed RSoXS slot | **PENDING H3**: mapping to existing classes without changing their meaning |
-| `MeasurementRecord.instrument` | none (`Device` is not an instrument class) | Instrument used | O | — | **PENDING H3** |
-| `MeasurementRecord.conditions` (`dict[str,str]`) | LinkML `Condition` class / `process_parameters` (strings) | Measurement conditions | O | Generic strings, not typed slots | **PENDING H3** |
+| `SampleRecord` (`sample_id`, `label`, `composition`, `phase`, `processing_state`, `preparation`) | 0.3.0 `Sample` (`sample_label`, `sample_composition`, `sample_phase`, `sample_processing_state`, `sample_preparation`); `made_of_material` → `Material` per composition entry; `supporting_quote` | One paper-local physical sample | O | Quote must be located | **approved H3** (F5) |
+| `MeasurementRecord.technique` | 0.3.0 `MeasurementRun.run_of_technique` → `ExperimentalTechnique`, or `RSoXSMeasurement` for the exact RSoXS aliases (existing classes, meaning unchanged) | Technique used | R | Free string; exact alias table only, no fuzzy class match | **approved H3** (F5/F6) |
+| `MeasurementRecord.instrument` | 0.3.0 `MeasurementRun.run_on_instrument` → `Instrument` (`instrument_category`: beamline/endstation/detector; never guessed); not `Device` | Instrument used | O | Shared across papers by name, canonicalized in T07 | **approved H3** (F5/F6) |
+| `MeasurementRecord.conditions` (`dict[str,str]`) | 0.3.0 `MeasurementRun.run_stated_condition` → `RunCondition is_a Condition` (`condition_name`, `condition_text` as printed, `numeric_value` + `unit` when the text is a number and a unit, `evidence_source_tag`) | Measurement conditions | O | Typed name/value/unit; no invented numbers | **approved H3** (F5) |
 | `morphology`, `orientation`, `material_system`, `evidence` (E-08) | `ExtractionResult.unmapped`, `side_outputs.structure` | Paper-level structural reading | O | Closed enums; morphology `unknown` when not stated | **PENDING H3**: LinkML `Structure` class usage |
 
 ## 4. Entity mentions (E-01)
@@ -78,7 +84,7 @@ schema slot, class, or hard validation gate that needs owner approval.
 | Donor field | F2W field | Intended meaning | Opt. | Validation | Status |
 |---|---|---|---|---|---|
 | `ResolvedTerm.surface` | `ExtractedMention.surface`; terms JSON `term` | Text as the source/model gave it | R | Kept even when canonical | adapter |
-| `ResolvedTerm.category` (`technique`/`analysis`/`instrument`/`material`) | `ExtractedMention.category` (donor taxon); terms JSON `category` (LinkML class) | Kind of entity | R | Not remapped | **PENDING H3**: taxon → class table (proposed: technique→`ExperimentalTechnique` (RSoXS → `RSoXSMeasurement`), analysis→`Method`, instrument→none, material→`Material`/`ChemicalEntity`) |
+| `ResolvedTerm.category` (`technique`/`analysis`/`instrument`/`material`) | `ExtractedMention.category` (donor taxon); terms JSON `category` (LinkML class) | Kind of entity | R | Not remapped | **approved H3** (F6): technique→`ExperimentalTechnique` (RSoXS → `RSoXSMeasurement`), analysis→`Method`, instrument→0.3.0 `Instrument`, material→`Material`/`ChemicalEntity` |
 | `ResolvedTerm.canonical`, `slug`, `name` | `ExtractedMention.canonical`, `slug` | Resolved against an approved vocabulary | R | Default resolver keeps every term a candidate | **PENDING H3/T07**: approved vocabulary authority |
 | `software` | `ExtractedMention.attributes.software` | Analysis software | O | — | adapter; **PENDING H3**: slot |
 | `identity` (`explicit_definition`, `molecular_structure`, SMILES) | `ExtractedMention.attributes.identity`; terms JSON `smiles`/`chebi` | How identity was decided | O | SMILES kept as `explicit_smiles_unverified` (no RDKit check in T06) | adapter |
@@ -99,7 +105,11 @@ schema slot, class, or hard validation gate that needs owner approval.
    once mapped.
 5. Whether `cited` and `derived` values may be published at all, and with which marker.
 
-## 6. Owner questions for H3
+H3 decided (F8): gates 1 (quote located; number and unit in the quote) and 3 are hard
+gates on graph writes. Gates 2 and 4 become tags instead (`cited`, `assumed`), and
+every value is captured with its `evidence_source_tag` (F2).
+
+## 6. Owner questions for H3 (answered 2026-10-16, decision.json; kept for the record)
 
 - Approve or amend the donor quantity-name → F2W property/slot mapping (section 2).
 - Approve the evidence-source axis slot and its allowed values.
