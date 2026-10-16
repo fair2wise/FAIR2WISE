@@ -40,6 +40,10 @@ class Prefixed:
         """``app.post(prefix + path)``."""
         return self.app.post(self.prefix + path, **kw)
 
+    def put(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+        """``app.put(prefix + path)``."""
+        return self.app.put(self.prefix + path, **kw)
+
 
 def operations(request: Request) -> F2WOperations:
     """The app's operations service, or fail closed."""

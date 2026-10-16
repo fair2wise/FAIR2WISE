@@ -75,6 +75,11 @@ API_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     # audit and operations status
     _v("V21", "GET", "/audit/status", "jobs.admin", note="AuditRecorder.status with the degraded flag"),
     _v("V22", "GET", "/ops/status", "jobs.admin", note="ingestion monitor DTO (O-07): jobs, review queue, audit"),
+    # validation judge model (owner O-U2): deployment-wide, admin-only on ALS (T25D)
+    _v("V23", "GET", "/validation/judge-model", "settings.global",
+       note="deployment judge model plus the provider's live model list; no binary verdict is read"),
+    _v("V24", "PUT", "/validation/judge-model", "settings.global",
+       note="set or clear the judge; must be in the live model list" + _FRESH),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

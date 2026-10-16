@@ -50,6 +50,7 @@ Fields are those of `AgentSettingsUpdate` (the PUT body) plus `provider` (LLM-01
 | `targeted_max_pages` | deployment-wide (admin) | Parameter of the same shared extraction pipeline. |
 | `workflow_mode` | deployment-wide (admin) | Owner Q5: admin-only. A legacy no-op in the UI API; download, extraction, KG rebuild and Tiled publication are separately admin-only (`ingest.acquire`, `ingest.extract`, `graph.publish`). |
 | server default graph list | deployment-wide (startup) | The deployment default selection comes from startup configuration (`cfg.graphs` / `cfg.graph`); on ALS no PUT field changes it, since every selection field is personal. |
+| `judge_model` (validation, `/v1/validation/judge-model`, not a `PUT /settings` field) | deployment-wide (admin) | Owner O-U2. The judge decides validation verdicts that are gate evidence for the whole deployment, and on ALS validation runs are admin actions. A per-user judge would let two users report the same revision under different judges, or let a non-admin pick the judge of an admin's run. Stored once at `<workdir>/validation/judge_model.json`; must be in the provider's live model list when set (T11B). |
 | any unknown field | deployment-wide (fail closed) | Dropped by the body model today; `settings_update_plan` treats unknown names as deployment-wide. |
 
 ## Notes

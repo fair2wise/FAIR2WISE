@@ -33,7 +33,7 @@ def _call(client, policy):
     path = _sample(policy.path)
     if policy.method == "GET":
         return client.get(path, params={"target": ALS_TILED + "/api#f2w"})
-    return client.post(path, json={})
+    return client.request(policy.method, path, json={})
 
 
 def _ctx(als, who, **kw):
