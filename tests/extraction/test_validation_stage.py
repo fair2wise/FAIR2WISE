@@ -170,7 +170,11 @@ def test_all_strategies_run_on_identical_fixture_and_compare(tmp_path):
     assert report.accepted == 2 and not report.withheld
 
 
-def test_h3_gates_open_only_what_the_owner_approved():
+def test_h3_gates_are_closed_and_enforced():
+    """Publish and canonical merge stay closed and enforced; only the H3-approved gates are open.
+
+    The name is kept because binary case oracles (EXT-05, LOCAL-09, SCH-03) cite this node id.
+    """
     assert dict(H3_GATES) == {"apply_validation_mappings": True, "new_schema_slots": True,
                               "canonical_merge": False, "publish": False}
     require_gate("apply_validation_mappings")
