@@ -77,7 +77,8 @@
       "blocked_by": [
         "T25C (no-login local workflows and real ALS Tiled role enforcement)",
         "T08B (Tiled importer over saved JSON, receipts, writes)",
-        "T10 (durable jobs and curation)"
+        "T10 (durable jobs and curation)",
+        "H3 B4 pilot labels (owner-run CBORG labelling of pilot papers A-C, then human review to gold; python -m evals.binary.label)"
       ],
       "case_id": "LOCAL-02",
       "case_revision": 2,
@@ -110,10 +111,10 @@
       "family": "LOCAL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "94eb0d20a47add8d19a70d6e079cc0e3a1208db5041e995711a9cc394409bb7f",
+        "case_sha256": "69adf194e650c85e358df03031640154c0bcda65cbcf5308fe30ead7d1e08c4d",
         "config_sha256": "c59fa70d246a14d1a2eae1bdec521c2394ca47ca4f9b38332c02fcfb96a4ada1",
         "model_sha256": null,
-        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
+        "oracle_source_sha256": "6574a0caae51e1cecc9424ab3b54d864d8a307c3b586649d839058a9f20102e7",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -138,6 +139,15 @@
         "ref": null,
         "status": "proposed"
       },
+      "pilot_labels": {
+        "papers": [
+          "A",
+          "B",
+          "C"
+        ],
+        "requirement": "H3 B4: results rest on labels of these pilot papers; model labels are provisional (reported PROVISIONAL, never PASS) until a person reviews them into gold",
+        "rule": "any"
+      },
       "readiness": "blocked",
       "required": true,
       "schema_ref": null,
@@ -145,7 +155,8 @@
         "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
         "docs/migration/companion/binary_case_inventory.json",
         "docs/migration/reviews/H1/owner_decisions.md",
-        "docs/migration/reviews/H2/decision.json"
+        "docs/migration/reviews/H2/decision.json",
+        "docs/migration/reviews/H3/pilot_candidates.md"
       ],
       "suite": "local_access",
       "supersedes": "LOCAL-02 revision 1 (companion v8.0 binary_case_inventory.json)",

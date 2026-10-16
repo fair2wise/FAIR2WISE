@@ -13,7 +13,16 @@ Semantics (BINARY_EVALUATION_SPEC sections 2-3, plan section 12):
   fully covered by its oracle and un-drifted. One exception makes the gate NOT_PASS;
 * no aggregate score is produced, only counts;
 * the repeat policy is read from the manifest header (declared in advance) and there is
-  no retry-on-failure path.
+  no retry-on-failure path;
+* the 13 pilot-label cases (``evals.binary.labeling.pilot.CASE_PAPERS``) carry a
+  ``label_basis``: ``gold``, ``provisional`` or ``missing``. A verdict resting on provisional
+  (model, unreviewed) labels is reported as ``PROVISIONAL`` (``reported_verdict``), which is
+  never PASS for the gate; missing labels keep the case blocked (H3 B4);
+* the judge model (``--judge-model`` or the deployment setting under ``--settings-workdir``,
+  owner O-U2) and the model under test are recorded in every report, and a run whose
+  labeller, judge and model under test are not pairwise different is refused.
+
+Reports carry ids, statuses, counts and hashes only: no raw prompt, quote or source text.
 """
 
 from __future__ import annotations
@@ -29,6 +38,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from evals.binary.assertions.base import Outcome
 from evals.binary.assertions.pytest_nodes import PytestNodeExecutor
 from evals.binary.assertions.rubric import RubricExecutor
+from evals.binary.labeling.basis import GOLD, MISSING, PROVISIONAL, LabelSet, load_label_set
+from evals.binary.labeling.roles import RoleSeparationError, check_roles, resolve_judge_model
 from evals.binary.model import (
     CASES_DIR,
     EXECUTION_STATES,
@@ -42,7 +53,7 @@ from evals.binary.model import (
 )
 from evals.binary.sanitize import sanitize
 
-RUNNER_REVISION = "t11a-runner-1"
+RUNNER_REVISION = "t11b-runner-1"
 _STATE_PRIORITY = ("error", "timeout", "judge_invalid", "missing_fixture", "skipped", "blocked")
 
 CheckFn = Callable[[Dict[str, Any]], Outcome]
@@ -145,6 +156,10 @@ class Runner:
         now: Optional[Callable[[], str]] = None,
         revision: Optional[Callable[[], Dict[str, Any]]] = None,
         root: Path = REPO_ROOT,
+        labels: Optional[LabelSet] = None,
+        judge_model: Optional[str] = None,
+        judge_model_source: str = "none",
+        model_under_test: Optional[str] = None,
     ):
         self.manifest = manifest
         self.policy = validate_repeat_policy(manifest.header["repeat_policy"])
@@ -154,6 +169,24 @@ class Runner:
         self.now = now or (lambda: _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         self.revision = revision or (lambda: source_revision(root))
         self.root = root
+        self.labels = labels if labels is not None else LabelSet()
+        self.judge_model = judge_model
+        self.judge_model_source = judge_model_source if judge_model else "none"
+        self.model_under_test = model_under_test
+        check_roles(judge=judge_model, model_under_test=model_under_test, labelers=self.labels.labeler_models)
+
+    def model_block(self) -> Dict[str, Any]:
+        """Models of this run: judge (and where it was chosen), model under test, labellers."""
+        return {
+            "mode": "fake_or_none",
+            "live_model_used": False,
+            "judge_revision": None,
+            "judge_model": self.judge_model,
+            "judge_model_source": self.judge_model_source,
+            "model_under_test": self.model_under_test,
+            "labeler_models": self.labels.labeler_models,
+            "role_separation": "checked: labeller, judge and model under test are pairwise different",
+        }
 
     def run(self, only: Optional[Sequence[str]] = None) -> Dict[str, Any]:
         """Run the selected cases (all when ``only`` is None); the gate always covers all required cases."""
@@ -184,7 +217,8 @@ class Runner:
             "required_membership_sha256": self.manifest.header["required_membership_sha256"],
             "config_sha256": sha256_text(canonical_json({"policy": self.policy, "runner": RUNNER_REVISION})),
             "source": self.revision(),
-            "model": {"mode": "fake_or_none", "live_model_used": False, "judge_revision": None},
+            "model": self.model_block(),
+            "labels": self.labels.summary(),
             "repeat_policy": self.policy,
             "started_at": started,
             "finished_at": self.now(),
@@ -257,6 +291,9 @@ class Runner:
     def _result(
         self, case: Dict[str, Any], outcome: Outcome, support: List[Outcome], run_states: List[str]
     ) -> Dict[str, Any]:
+        basis = self.labels.case_basis(case["case_id"])
+        if basis is not None and basis["status"] == MISSING and outcome.execution_state == "blocked":
+            outcome.reason_codes = list(outcome.reason_codes) + ["pilot_labels_missing"]
         frozen = case["hashes"].get("oracle_source_sha256")
         current = source_files_sha256(oracle_files(case), self.root) if frozen else None
         supporting_evidence = None
@@ -281,6 +318,8 @@ class Runner:
             "approval_status": case["owner_approval"]["status"],
             "expected_rule": case["expected_rule"],
             "verdict": outcome.verdict,
+            "reported_verdict": reported_verdict(outcome.verdict, basis),
+            "label_basis": basis,
             "execution_state": outcome.execution_state,
             "actual": sanitize(outcome.actual),
             "reason_codes": sorted(set(outcome.reason_codes)),
@@ -298,6 +337,19 @@ class Runner:
         }
 
 
+def reported_verdict(verdict: Optional[str], basis: Optional[Dict[str, Any]]) -> Optional[str]:
+    """``PROVISIONAL`` for a verdict resting on provisional (unreviewed model) labels, else the verdict.
+
+    A case with ``missing`` labels keeps the verdict of whatever ran (synthetic oracles only);
+    the gate still blocks it with ``pilot_labels:missing``.
+    """
+    if verdict is None:
+        return None
+    if basis is not None and basis["status"] == PROVISIONAL:
+        return "PROVISIONAL"
+    return verdict
+
+
 def compute_gate(manifest: Manifest, results: Sequence[Dict[str, Any]], complete: bool = True) -> Dict[str, Any]:
     """Binary gate over the frozen required membership; never rescued by other cases."""
     expected = sorted(manifest.header.get("required_case_ids") or manifest.required_ids)
@@ -309,10 +361,14 @@ def compute_gate(manifest: Manifest, results: Sequence[Dict[str, Any]], complete
         if row is None:
             reasons.append("no_result")
         else:
+            shown = row.get("reported_verdict", row["verdict"])
             if row["execution_state"] != "completed":
                 reasons.append(f"execution_state:{row['execution_state']}")
-            elif row["verdict"] != "PASS":
-                reasons.append(f"verdict:{row['verdict']}")
+            elif shown != "PASS":
+                reasons.append(f"verdict:{shown}")
+            basis = row.get("label_basis")
+            if basis is not None and basis.get("status") != GOLD:
+                reasons.append(f"pilot_labels:{basis.get('status')}")
             if row["approval_status"] != "approved":
                 reasons.append(f"owner_approval:{row['approval_status']}")
             if row["coverage"] != "full":
@@ -359,6 +415,9 @@ def counts(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "total": len(results),
         "by_execution_state": {s: by_state.get(s, 0) for s in EXECUTION_STATES},
         "by_verdict": dict(sorted(by_verdict.items())),
+        "by_reported_verdict": dict(sorted(Counter(r.get("reported_verdict") or "none" for r in results).items())),
+        "by_label_basis": dict(sorted(Counter((r.get("label_basis") or {}).get("status", "not_applicable")
+                                              for r in results).items())),
         "by_family": {f: dict(sorted(c.items())) for f, c in sorted(by_family.items())},
         "by_readiness": dict(sorted(Counter(r["readiness"] for r in results).items())),
     }
@@ -374,6 +433,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--basename", default="binary_report")
     parser.add_argument("--only", nargs="*", default=None, help="run only these case ids (not gate evidence)")
     parser.add_argument("--timeout", type=float, default=1800.0, help="seconds per pytest batch")
+    parser.add_argument("--labels-dir", type=Path, default=None,
+                        help="private pilot label directory (provisional or gold labels, H3 B4)")
+    parser.add_argument("--judge-model", default=None, help="judge model id (overrides the deployment setting)")
+    parser.add_argument("--settings-workdir", type=Path, default=None,
+                        help="F2W workdir whose validation/judge_model.json holds the settings-panel judge (O-U2)")
+    parser.add_argument("--model-under-test", default=None, help="model id of the system under test")
     args = parser.parse_args(argv)
     manifest = load_manifest(args.cases_dir)
     problems = manifest.validate()
@@ -381,7 +446,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("manifest is invalid:\n  " + "\n  ".join(problems), file=sys.stderr)
         return 2
     rubrics = reports.load_rubrics(args.cases_dir)
-    runner = Runner(manifest, executor=PytestNodeExecutor(timeout=args.timeout), rubrics=rubrics)
+    judge, source = resolve_judge_model(args.judge_model, args.settings_workdir)
+    try:
+        runner = Runner(manifest, executor=PytestNodeExecutor(timeout=args.timeout), rubrics=rubrics,
+                        labels=load_label_set(args.labels_dir), judge_model=judge, judge_model_source=source,
+                        model_under_test=args.model_under_test)
+    except RoleSeparationError as exc:
+        print(f"refused: {sanitize(exc)}", file=sys.stderr)
+        return 2
     report = runner.run(only=args.only)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     reports.write_all(report, args.out_dir, args.basename)

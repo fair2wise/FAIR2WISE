@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from evals.binary import proposals
+from evals.binary.labeling.pilot import CASE_PAPERS
 from evals.binary.model import (
     CASES_DIR,
     MANIFEST_VERSION,
@@ -39,6 +40,10 @@ SPEC = "docs/migration/companion/BINARY_EVALUATION_SPEC.md"
 DECISIONS = "docs/migration/reviews/H1/owner_decisions.md"
 H2_DECISION = "docs/migration/reviews/H2/decision.json"
 CHANGES_DOC = "docs/migration/reviews/H3/case_changes.md"
+PILOT_DOC = "docs/migration/reviews/H3/pilot_candidates.md"
+#: Blocker named by every pilot-label case until reviewed (gold) labels exist (H3 B4).
+B4_LABELS = ("H3 B4 pilot labels (owner-run CBORG labelling of pilot papers A-C, then human review to gold;"
+             " python -m evals.binary.label)")
 
 REPEAT_POLICY = {
     "runs": 1,
@@ -155,6 +160,19 @@ def build_case(companion_case: Dict[str, Any]) -> Dict[str, Any]:
         if change.get("title"):
             record["title"] = change["title"]
         record["source_refs"] = record["source_refs"] + [DECISIONS, H2_DECISION]
+    if cid in CASE_PAPERS:
+        spec = CASE_PAPERS[cid]
+        record["pilot_labels"] = {
+            "papers": list(spec["papers"]),
+            "rule": spec["rule"],
+            "requirement": (
+                "H3 B4: results rest on labels of these pilot papers; model labels are provisional (reported"
+                " PROVISIONAL, never PASS) until a person reviews them into gold"
+            ),
+        }
+        if record["readiness"] != "executable":
+            record["blocked_by"] = list(record["blocked_by"]) + [B4_LABELS]
+        record["source_refs"] = record["source_refs"] + [PILOT_DOC]
     record["source_refs"] = sorted(set(record["source_refs"]))
     # hashes last: they cover the finished record
     record["hashes"] = {

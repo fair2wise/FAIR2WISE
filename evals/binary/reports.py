@@ -3,8 +3,11 @@
 All three keep the verdict (PASS/FAIL) and the execution state apart. JUnit mapping:
 PASS -> passing testcase; FAIL -> ``failure``; timeout/error/judge_invalid/missing_fixture
 -> ``error`` (an infrastructure or fixture problem, not a content failure); skipped and
-blocked -> ``skipped``. A skipped or errored required case is never a pass; the suite
-property ``gate_status`` carries the binary gate and CI must read it.
+blocked -> ``skipped``; a verdict resting on provisional pilot labels (``reported_verdict``
+PROVISIONAL, H3 B4) -> ``skipped`` with type ``provisional_labels``, never a passing
+testcase. A skipped or errored required case is never a pass; the suite property
+``gate_status`` carries the binary gate and CI must read it. Reports carry the judge model,
+the model under test and the labelling models, never raw prompts or source text.
 """
 
 from __future__ import annotations
@@ -41,6 +44,9 @@ def to_junit(report: Dict[str, Any]) -> str:
         ("gate_status", report["gate"]["status"]),
         ("manifest_sha256", report["manifest_sha256"]),
         ("runner_revision", report["runner_revision"]),
+        ("judge_model", (report.get("model") or {}).get("judge_model")),
+        ("judge_model_source", (report.get("model") or {}).get("judge_model_source")),
+        ("model_under_test", (report.get("model") or {}).get("model_under_test")),
     ):
         ET.SubElement(props, "property", name=key, value=str(value))
     families: Dict[str, List[Dict[str, Any]]] = {}
@@ -53,7 +59,12 @@ def to_junit(report: Dict[str, Any]) -> str:
         for row in sorted(rows, key=lambda r: r["case_id"]):
             case = ET.SubElement(suite, "testcase", classname=f"binary.{family}", name=row["case_id"])
             detail = sanitize(f"{row['execution_state']}: {row['actual']}", 600)
-            if row["execution_state"] == "completed" and row["verdict"] == "FAIL":
+            if row["execution_state"] == "completed" and row.get("reported_verdict") == "PROVISIONAL":
+                ET.SubElement(case, "skipped", message=sanitize(
+                    f"PROVISIONAL: verdict {row['verdict']} rests on unreviewed model labels; not a pass", 600),
+                    type="provisional_labels")
+                counts["skipped"] += 1
+            elif row["execution_state"] == "completed" and row["verdict"] == "FAIL":
                 ET.SubElement(case, "failure", message=detail, type="binary_verdict_fail")
                 counts["failures"] += 1
             elif row["execution_state"] in _ERROR_STATES:
@@ -73,6 +84,14 @@ def to_junit(report: Dict[str, Any]) -> str:
 
 def _cell(text: Any) -> str:
     return str(text).replace("|", "\\|").replace("\n", " ")
+
+
+def _models_line(model: Dict[str, Any]) -> str:
+    labellers = ", ".join(f"`{m}`" for m in model.get("labeler_models") or []) or "none"
+    return (
+        f"- Judge model: `{model.get('judge_model')}` (source: {model.get('judge_model_source')}); model under"
+        f" test: `{model.get('model_under_test')}`; labelling models: {labellers}"
+    )
 
 
 def to_markdown(report: Dict[str, Any]) -> str:
@@ -95,6 +114,7 @@ def to_markdown(report: Dict[str, Any]) -> str:
             f"dirty tracked files: {report['source'].get('dirty')}"
         ),
         f"- Model: {report['model']['mode']} (live model used: {report['model']['live_model_used']})",
+        _models_line(report.get("model") or {}),
         (
             f"- Repeat policy: {report['repeat_policy']['runs']} run(s), {report['repeat_policy']['aggregation']},"
             f" retry_on_failure={report['repeat_policy']['retry_on_failure']}"
@@ -125,17 +145,36 @@ def to_markdown(report: Dict[str, Any]) -> str:
     out += [f"| {f} | {', '.join(f'{k}={v}' for k, v in c.items())} |" for f, c in counts["by_family"].items()]
     out += [
         "",
+        "## Pilot labels (H3 B4)",
+        "",
+        (
+            "A verdict resting on provisional (unreviewed model) labels is shown as PROVISIONAL and never passes"
+            " the gate. Missing labels keep the 13 label cases blocked."
+        ),
+        "",
+        "| paper | status | labelling models | items | labelling calls complete |",
+        "| --- | --- | --- | ---: | --- |",
+    ]
+    for pid, info in sorted(((report.get("labels") or {}).get("papers") or {}).items()):
+        out.append(
+            f"| {pid} | {info.get('status')} | {', '.join(info.get('labeler_models') or []) or '-'} |"
+            f" {info.get('items', 0)} | {info.get('labeling_calls_complete')} |"
+        )
+    out += [
+        "",
         "## Every case",
         "",
-        "| case | verdict | execution_state | readiness | coverage | approval | actual / reason |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| case | verdict | execution_state | labels | readiness | coverage | approval | actual / reason |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for r in report["results"]:
         why = r["actual"]
         if r["blocked_by"] and r["execution_state"] == "blocked":
             why = "blocked by " + "; ".join(r["blocked_by"])
+        basis = (r.get("label_basis") or {}).get("status", "-")
+        shown = r.get("reported_verdict", r["verdict"])
         out.append(
-            f"| {r['case_id']} | {r['verdict'] or '-'} | {r['execution_state']} | {r['readiness']} | "
+            f"| {r['case_id']} | {shown or '-'} | {r['execution_state']} | {basis} | {r['readiness']} | "
             f"{r['coverage']} | {r['approval_status']} | {_cell(sanitize(why, 220))} |"
         )
     out += ["", "## Gate blockers", ""]
