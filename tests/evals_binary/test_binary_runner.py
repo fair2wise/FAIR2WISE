@@ -267,5 +267,6 @@ def test_counts_hold_no_score():
     report, _ = run(
         [H.make_case("A-01"), H.make_case("A-02")], {"primary:A-01": H.passed(), "primary:A-02": H.failed()}
     )
-    assert set(report["counts"]) == {"total", "by_execution_state", "by_verdict", "by_family", "by_readiness"}
+    assert set(report["counts"]) == {"total", "by_execution_state", "by_verdict", "by_family", "by_readiness",
+                                     "by_reported_verdict", "by_label_basis"}
     assert "score" not in json.dumps(report).lower().replace("scores", "")

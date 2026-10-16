@@ -9,7 +9,7 @@
 | Entrypoint | Behaviour |
 | --- | --- |
 | `app.modules.f2w_agent.api.create_app(cfg, *, cors_origins, deployment, startup_config, identity_port, credential_store, clock)` | Unchanged signature and routes: the 19 UI routes, ALS sign-in handlers, access control and disclosure projection. The frozen UI and T18A/T18B contract tests use it as before. |
-| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 22 `/v1` routes, the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`. |
+| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 24 `/v1` routes, the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`. |
 | `python -m app.modules.f2w_agent.cli api` | Unchanged (legacy app). `api --jobs-api` serves `create_api_app`. |
 | `python -m app.api.cli --root DIR jobs|cases|audit|ops ...` | Calls `F2WOperations` directly with a `cli` context (local profile only). |
 | `F2WOperations` | Direct Python use (SDK, notebooks, FORGE). Same methods the routes call. |
@@ -50,7 +50,7 @@ Legacy SSE framing (`event:`/`data:` LF blocks, as `/chat/stream`) with `JobEven
 
 ## 3. Route policies (`app/api/policies.py`, DEP-19)
 
-All 22 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
+All 24 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
 
 - A route whose effect needs one fixed capability declares it, so the dependency refuses the caller first and, for an admin capability, re-runs the ALS role check.
 - Routes whose capability depends on the job kind or on ownership declare no entry capability (signed-in on ALS) and rely on `JobService`; their mutating handlers re-run the ALS role check (`fresh_request_context`).
@@ -73,6 +73,8 @@ All 22 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V20 | POST /v1/publications/rollback | `graph.publish` | human only, audited; H5 gate |
 | V21 | GET /v1/audit/status | `jobs.admin` | `AuditRecorder.status` with `degraded` |
 | V22 | GET /v1/ops/status | `jobs.admin` | O-07 monitor DTO |
+| V23 | GET /v1/validation/judge-model | `settings.global` | deployment-wide validation judge (owner O-U2) plus the provider's live model list; added by T11B |
+| V24 | PUT /v1/validation/judge-model | `settings.global` | set or clear the judge; refused unless the model is in the current live list; fresh role check (T11B) |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
 

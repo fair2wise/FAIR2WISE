@@ -7,6 +7,8 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
 * the ``/v1`` jobs, curation review, publication and status routes
   (``app/api/routes_*.py``), each declared in :mod:`app.api.policies`, all thin over one
   :class:`~app.api.operations.F2WOperations` that SDK, CLI and worker callers use directly;
+* the ``/v1/validation/judge-model`` routes behind the settings panel's judge dropdown
+  (owner O-U2; :mod:`app.modules.validation_settings`);
 * the browser-origin gate (:mod:`app.api.origin_gate`) and the request-body cap
   (:mod:`app.api.upload_limits`) on ``/v1/`` and ``/auth/``;
 * the scope-change wiring: an ALS sign-out or a dropped admin role calls
@@ -56,6 +58,7 @@ def create_api_app(
     max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     sse_poll_seconds: float = 0.5,
     sse_max_seconds: float = 300.0,
+    judge_settings: Optional[Any] = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -70,13 +73,17 @@ def create_api_app(
         publication_gate: H5 gate for the default operations (default: no target allowed).
         max_body_bytes: Request-body cap on ``/v1/`` and ``/auth/``.
         sse_poll_seconds / sse_max_seconds: Job event stream polling and maximum length.
+        judge_settings: Validation judge-model service (O-U2); default a
+            :class:`~app.modules.validation_settings.JudgeModelService` over
+            ``<workdir>/validation/judge_model.json`` and the live CBORG model list.
 
     Raises:
         StartupConfigError: As ``create_app``, or ``operations`` bound to other settings.
     """
     from ..modules.f2w_agent.api import DEFAULT_CORS_ORIGINS, create_app
     from . import routes_jobs as jobs, routes_publications as publications, routes_review as review
-    from . import routes_status as status
+    from . import routes_status as status, routes_validation as validation
+    from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
     app = create_app(cfg, cors_origins=cors_origins, deployment=deployment, startup_config=startup_config,
                      identity_port=identity_port, credential_store=credential_store, clock=clock)
@@ -97,6 +104,10 @@ def create_api_app(
     review.install(app)
     publications.install(app)
     status.install(app)
+    if judge_settings is None:
+        judge_settings = JudgeModelService(JudgeModelStore(judge_settings_path(Path(cfg.workdir))))
+    app.state.f2w_judge_settings = judge_settings
+    validation.install(app)
 
     allowed = list(cors_origins or DEFAULT_CORS_ORIGINS)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes, path_prefixes=GUARDED_PREFIXES)

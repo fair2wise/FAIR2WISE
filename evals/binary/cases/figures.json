@@ -2,7 +2,8 @@
   "cases": [
     {
       "blocked_by": [
-        "H3 (owner-approved gold fixtures and source truth)"
+        "H3 (owner-approved gold fixtures and source truth)",
+        "H3 B4 pilot labels (owner-run CBORG labelling of pilot papers A-C, then human review to gold; python -m evals.binary.label)"
       ],
       "case_id": "FIG-01",
       "case_revision": 1,
@@ -28,10 +29,10 @@
       "family": "FIG",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "015df421c86235ca32c95b2a347166ea639d98b18dc757fff9a22c8709dadbc0",
+        "case_sha256": "363a2270b6ac83b4ef534859f10619c5e245aaa1d81b2a268d87540d2cb2db53",
         "config_sha256": "4e397b2d6e0efd0099e8e5fb57227461b7561dc8a3159b83550545a6853a4738",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "6af762829503aed706ce25b8909da7d374a7dea463f184b1520225ac195be08c",
         "schema_sha256": null
       },
       "input_fixture_refs": [],
@@ -58,12 +59,22 @@
         "ref": null,
         "status": "proposed"
       },
+      "pilot_labels": {
+        "papers": [
+          "A",
+          "B",
+          "C"
+        ],
+        "requirement": "H3 B4: results rest on labels of these pilot papers; model labels are provisional (reported PROVISIONAL, never PASS) until a person reviews them into gold",
+        "rule": "all"
+      },
       "readiness": "needs_h3_rubric",
       "required": true,
       "schema_ref": null,
       "source_refs": [
         "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
-        "docs/migration/companion/binary_case_inventory.json"
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H3/pilot_candidates.md"
       ],
       "suite": "figures",
       "supersedes": null,
@@ -71,7 +82,8 @@
     },
     {
       "blocked_by": [
-        "H3 (owner-approved gold fixtures and source truth)"
+        "H3 (owner-approved gold fixtures and source truth)",
+        "H3 B4 pilot labels (owner-run CBORG labelling of pilot papers A-C, then human review to gold; python -m evals.binary.label)"
       ],
       "case_id": "FIG-02",
       "case_revision": 1,
@@ -97,10 +109,10 @@
       "family": "FIG",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "1fbaf748880b4021f82939c6e7186baed715ad2ac3b3703c3bd60a46a7ffe851",
+        "case_sha256": "f8d1e2b4c5ac071781f4fc2720f76528ced8c78b6faad887a3890d35a63b01d7",
         "config_sha256": "5961fedfc4c02c11b694aed4564e8e215ba6157404c41f2e22d846a627c16857",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "6af762829503aed706ce25b8909da7d374a7dea463f184b1520225ac195be08c",
         "schema_sha256": null
       },
       "input_fixture_refs": [],
@@ -125,12 +137,22 @@
         "ref": null,
         "status": "proposed"
       },
+      "pilot_labels": {
+        "papers": [
+          "A",
+          "B",
+          "C"
+        ],
+        "requirement": "H3 B4: results rest on labels of these pilot papers; model labels are provisional (reported PROVISIONAL, never PASS) until a person reviews them into gold",
+        "rule": "all"
+      },
       "readiness": "needs_h3_rubric",
       "required": true,
       "schema_ref": null,
       "source_refs": [
         "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
-        "docs/migration/companion/binary_case_inventory.json"
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H3/pilot_candidates.md"
       ],
       "suite": "figures",
       "supersedes": null,
@@ -162,10 +184,10 @@
       "family": "FIG",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "100e6c41a0835d4d63a1d2c9172bd6187c6e1b5c9a1941b4c7be1a6e4270d0bc",
+        "case_sha256": "d41424cf2120166aa63d456f5e45839d090220199c32a9fad46eaafd93f00d3a",
         "config_sha256": "016aa525941b5a5659ea7b3f38e16ba2cf9ffe43d1013643f4de15846c219384",
         "model_sha256": null,
-        "oracle_source_sha256": "0073c92db52c47ca549bdf76078a1809bf60c535d4f0a891de5303e7486d9313",
+        "oracle_source_sha256": "b39cbef48894ae7074072175b982e081798b666907743f2239374f4039cb4e60",
         "schema_sha256": null
       },
       "input_fixture_refs": [],
@@ -194,12 +216,22 @@
         "ref": null,
         "status": "proposed"
       },
+      "pilot_labels": {
+        "papers": [
+          "A",
+          "B",
+          "C"
+        ],
+        "requirement": "H3 B4: results rest on labels of these pilot papers; model labels are provisional (reported PROVISIONAL, never PASS) until a person reviews them into gold",
+        "rule": "all"
+      },
       "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
         "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
-        "docs/migration/companion/binary_case_inventory.json"
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H3/pilot_candidates.md"
       ],
       "suite": "figures",
       "supersedes": null,

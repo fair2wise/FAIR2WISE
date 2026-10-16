@@ -247,10 +247,10 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "e5bee7519b704c33e215604b05bff85bcac8f82ec641bf11cf7526518d433763",
+        "case_sha256": "4b998a7346eca0ce0cc1db3ad4c64b3b5bf73157652c3013d5b0f1546106bde4",
         "config_sha256": "bf9be30993c7e1f2de55bc133af1f6d4bc71ea1897477352e92a1a86f8e9ebaa",
         "model_sha256": null,
-        "oracle_source_sha256": "a9e39f0c22404cda74c84ba16ae913899ac60364c257b21ffb051552e8f09197",
+        "oracle_source_sha256": "a3c593c1c139cb99af38e3bee3063d8956a7b528cf8a67c0ec1b2f2f318ac794",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -279,12 +279,22 @@
         "ref": null,
         "status": "proposed"
       },
+      "pilot_labels": {
+        "papers": [
+          "A",
+          "B",
+          "C"
+        ],
+        "requirement": "H3 B4: results rest on labels of these pilot papers; model labels are provisional (reported PROVISIONAL, never PASS) until a person reviews them into gold",
+        "rule": "all"
+      },
       "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
         "docs/migration/companion/BINARY_EVALUATION_SPEC.md",
-        "docs/migration/companion/binary_case_inventory.json"
+        "docs/migration/companion/binary_case_inventory.json",
+        "docs/migration/reviews/H3/pilot_candidates.md"
       ],
       "suite": "operations",
       "supersedes": null,
