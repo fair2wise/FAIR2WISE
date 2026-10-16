@@ -212,6 +212,27 @@ def _snippet_volume(graph: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _string_findings(location: str, text: str, key: Optional[str]) -> List[Finding]:
+    """R3/R4/R5 findings for one string value (the value itself is never stored)."""
+    found: List[Finding] = []
+    hit = False
+    for name, pattern in _SECRET_PATTERNS:
+        if pattern.search(text):
+            found.append(Finding("R3", "reject", location, f"secret-like value ({name})", key))
+            hit = True
+            break
+    if not hit:
+        for token in _TOKEN.findall(text):
+            if not _HEX_ONLY.match(token) and _entropy(token) >= _ENTROPY_BITS:
+                found.append(Finding("R3", "reject", location, "high-entropy token", key))
+                break
+    if _LOCAL_PATH.search(text):
+        found.append(Finding("R4", "reject", location, "absolute local path", key))
+    if _BEARER_URL.search(text):
+        found.append(Finding("R5", "reject", location, "signed or tokenized URL", key))
+    return found
+
+
 def check_disclosure(
     graph: Mapping[str, Any],
     *,
@@ -239,22 +260,7 @@ def check_disclosure(
             key = allowlist_key("graph.json", record_id, field_name, text)
             if key in allowlist:
                 continue
-            location = f"{record_id}:{where}"
-            hit = False
-            for name, pattern in _SECRET_PATTERNS:
-                if pattern.search(text):
-                    findings.append(Finding("R3", "reject", location, f"secret-like value ({name})", key))
-                    hit = True
-                    break
-            if not hit:
-                for token in _TOKEN.findall(text):
-                    if not _HEX_ONLY.match(token) and _entropy(token) >= _ENTROPY_BITS:
-                        findings.append(Finding("R3", "reject", location, "high-entropy token", key))
-                        break
-            if _LOCAL_PATH.search(text):
-                findings.append(Finding("R4", "reject", location, "absolute local path", key))
-            if _BEARER_URL.search(text):
-                findings.append(Finding("R5", "reject", location, "signed or tokenized URL", key))
+            findings.extend(_string_findings(f"{record_id}:{where}", text, key))
     findings.sort(key=lambda f: (f.rule, f.location, f.detail))
     status = "pass" if not findings else ("owner_waiver" if waiver_ref else "fail")
     return DisclosureReport(DISCLOSURE_CHECK_VERSION, status, findings, _snippet_volume(graph),
@@ -341,17 +347,36 @@ def verify_snapshot_dir(snapshot_dir: Path) -> VerifiedSnapshot:
 # --------------------------------------------------------------------------- Git-pinned verification
 
 _GIT_ENV = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "LC_ALL": "C", "GIT_TERMINAL_PROMPT": "0",
-            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_OPTIONAL_LOCKS": "0"}
+            "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_LITERAL_PATHSPECS": "1"}
+
+#: The only Git subcommands this module can run. All of them read; none of them writes objects, refs, the
+#: index, the working tree or a remote. There is no add, commit, tag, fetch or push path (T26B acceptance:
+#: "no automatic Git push"); the owner runs the printed commands by hand.
+GIT_READ_ONLY_COMMANDS = frozenset({"cat-file", "ls-tree", "rev-parse", "status", "check-ignore", "hash-object",
+                                    "ls-files"})
 
 
-def _git(repo: Path, *args: str) -> bytes:
-    """Run ``git -C <repo> ...`` with an argument list (no shell) and a scrubbed environment."""
+def _git(repo: Path, *args: str, stdin: Optional[bytes] = None, ok_codes: Tuple[int, ...] = (0,)) -> bytes:
+    """Run a read-only ``git -C <repo> ...`` with an argument list (no shell) and a scrubbed environment.
+
+    Raises:
+        ReleaseVerificationError: ``git_write_refused`` for any subcommand outside
+            :data:`GIT_READ_ONLY_COMMANDS` (or ``hash-object -w``), before any process starts; ``git`` when
+            Git cannot run or exits with a code outside ``ok_codes``.
+    """
+    if not args or args[0] not in GIT_READ_ONLY_COMMANDS or (
+            args[0] == "hash-object" and any(a == "--write" or a.startswith("-w") for a in args[1:])):
+        raise ReleaseVerificationError("git_write_refused",
+                                       f"git {args[0] if args else ''} is not a read-only command; the release "
+                                       "tooling never writes to Git (the owner runs the printed commands)")
     try:
         done = subprocess.run(["git", "-C", str(repo), "--no-pager", *args], capture_output=True, check=False,
-                              env=_GIT_ENV, timeout=60)
+                              env=_GIT_ENV, timeout=60,
+                              **({"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}))
     except (OSError, subprocess.SubprocessError) as exc:
         raise ReleaseVerificationError("git", f"git could not run: {type(exc).__name__}") from None
-    if done.returncode != 0:
+    if done.returncode not in ok_codes:
         raise ReleaseVerificationError("git", f"git {args[0]} failed")
     return done.stdout
 
@@ -407,6 +432,7 @@ class VerifiedRelease:
     graph: VerifiedArtifact
     manifest_artifact: VerifiedArtifact
     compat: Tuple[VerifiedArtifact, ...]
+    validation: Optional[VerifiedArtifact] = None
 
 
 def verify_git_release(
@@ -421,8 +447,10 @@ def verify_git_release(
     Args:
         repo: Git repository (working tree or bare); only objects are read, never the working tree.
         data_commit: Full commit id.
-        artifacts: Descriptor-style entries ``{"role": graph|manifest|compat_copy, "path", "sha256",
-            "git_blob"?}``: exactly one graph and one manifest, any number of compat copies.
+        artifacts: Descriptor-style entries ``{"role": graph|manifest|validation|compat_copy, "path",
+            "sha256", "git_blob"?}``: exactly one graph and one manifest, at most one validation report (it
+            must be the sibling ``validation.json`` and hash to ``validation.report_sha256``), any number of
+            compat copies.
         supported_schema_fingerprints: When given, the manifest's ``schema.import_fingerprint`` must be in it.
 
     Raises:
@@ -433,7 +461,7 @@ def verify_git_release(
         by_role.setdefault(str(item.get("role")), []).append(item)
     if len(by_role.get("graph", [])) != 1 or len(by_role.get("manifest", [])) != 1:
         raise ReleaseVerificationError("layout", "exactly one graph and one manifest artifact are required")
-    if set(by_role) - {"graph", "manifest", "compat_copy"}:
+    if set(by_role) - {"graph", "manifest", "validation", "compat_copy"} or len(by_role.get("validation", [])) > 1:
         raise ReleaseVerificationError("layout", "unsupported artifact role")
     loaded: Dict[str, List[VerifiedArtifact]] = {}
     for role, items in by_role.items():
@@ -461,8 +489,14 @@ def verify_git_release(
     for art in loaded.get("compat_copy", []):
         if art.data != graph.data or declared.get(art.path) != art.sha256:
             raise ReleaseVerificationError("manifest_mismatch", f"compat copy {art.path} is not the graph bytes")
+    validation = (loaded.get("validation") or [None])[0]
+    if validation is not None and (validation.path != graph.path.rsplit("/", 1)[0] + "/validation.json"
+                                   or validation.sha256 != manifest.validation.report_sha256):
+        raise ReleaseVerificationError("manifest_mismatch",
+                                       "validation.json is not the report the manifest binds")
     if supported_schema_fingerprints is not None and (
             manifest.schema_block.import_fingerprint not in supported_schema_fingerprints):
         raise ReleaseVerificationError("schema_unsupported",
                                        "manifest schema fingerprint is not in the supported set")
-    return VerifiedRelease(data_commit, manifest, graph, manifest_art, tuple(loaded.get("compat_copy", [])))
+    return VerifiedRelease(data_commit, manifest, graph, manifest_art, tuple(loaded.get("compat_copy", [])),
+                           validation)
