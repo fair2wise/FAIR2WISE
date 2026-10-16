@@ -122,6 +122,24 @@ def test_malformed_items_are_counted_not_invented_and_the_call_counts_as_missing
     assert expected in doc["missing"]
 
 
+def test_a_paper_without_parsed_figures_records_the_figure_task_missing(synth):
+    # a text-only PDF: no figure call is made and the gap is explicit
+    F.make_pdf(synth.papers / "synthetic.pdf", figure=False)
+    paper = F.synthetic_paper("synthetic.pdf", F.file_sha256(synth.papers / "synthetic.pdf"))
+    P.PILOT_PAPERS["A"] = paper  # restored by the synth fixture's monkeypatch.setitem
+    assert _label(synth) == 1
+    doc = _doc(synth)
+    assert {"task": "figures", "scope": "figures", "call_id": None, "reason": "no_figures_parsed"} in doc["missing"]
+    assert [c["task"] for c in doc["calls"]] == ["values", "context"]
+
+
+def test_figure_readings_are_labelled_from_the_caption_and_flagged_for_visual_check(synth):
+    _label(synth)
+    figs = [i for i in _doc(synth)["items"] if i["kind"] == "figure_reading"]
+    assert figs and figs[0]["quote_status"] in ("exact", "normalized")
+    assert "needs_visual_check" in figs[0]["flags"]
+
+
 def test_failed_and_unparsable_calls_are_recorded_missing(synth):
     assert _label(synth, factory=F.fake_factory(fail=("figures",), garbage=("context",))) == 1
     doc = _doc(synth)

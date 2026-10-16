@@ -247,9 +247,12 @@ def label_version(paper: PilotPaper, version: PilotVersion, parsed: ParsedPaper,
             chunk = [p for p in pages if first <= p["page"] <= last]
             prompt = guide.build_prompt(TASK_VALUES, paper, version, pages=chunk, page_range=f"{first}-{last}")
             plan.append((TASK_VALUES, f"{first}-{last}", prompt))
-    if TASK_FIGURES in version.tasks:
+    if TASK_FIGURES in version.tasks and parsed.figures:
         plan.append((TASK_FIGURES, "figures", guide.build_prompt(TASK_FIGURES, paper, version,
                                                                  figures=parsed.figures)))
+    elif TASK_FIGURES in version.tasks:
+        # nothing to ask about: recorded as missing so FIG cases cannot rest on an empty answer
+        missing.append({"task": TASK_FIGURES, "scope": "figures", "call_id": None, "reason": "no_figures_parsed"})
     if TASK_CONTEXT in version.tasks:
         plan.append((TASK_CONTEXT, f"1-{len(pages)}", guide.build_prompt(TASK_CONTEXT, paper, version, pages=pages)))
     for index, (task, scope, prompt) in enumerate(plan, start=1):

@@ -29,17 +29,34 @@ JUDGE = "fake-judge"
 MUT = "fake-model-under-test"
 
 
-def make_pdf(path: Path, pages: Optional[List[List[str]]] = None) -> Path:
-    """Write a small text-only PDF with the synthetic sentences."""
+FIGURE_CAPTION = "Figure 1. Synthetic scattering profile of film X."
+
+
+def _gradient_png() -> bytes:
+    """A 200x200 grey gradient (a usable figure image for the parser)."""
+    import fitz
+
+    pix = fitz.Pixmap(fitz.csGRAY, fitz.IRect(0, 0, 200, 200), False)
+    for y in range(200):
+        for x in range(200):
+            pix.set_pixel(x, y, ((x + y) % 256,))
+    return pix.tobytes("png")
+
+
+def make_pdf(path: Path, pages: Optional[List[List[str]]] = None, figure: bool = True) -> Path:
+    """Write a small PDF with the synthetic sentences and, on page 2, one captioned figure."""
     import fitz
 
     doc = fitz.open()
-    for lines in pages or [PAGE_1, PAGE_2]:
+    for index, lines in enumerate(pages or [PAGE_1, PAGE_2]):
         page = doc.new_page()
         y = 72
         for line in lines:
             page.insert_text((72, y), line, fontsize=11)
             y += 18
+        if figure and index == 1:
+            page.insert_image(fitz.Rect(72, 200, 272, 400), stream=_gradient_png())
+            page.insert_text((72, 420), FIGURE_CAPTION, fontsize=9)
     path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(path))
     doc.close()
@@ -90,7 +107,14 @@ VALUES_ANSWER = {
     ],
     "table_totals": [],
 }
-FIGURES_ANSWER = {"figure_readings": [], "figure_totals": []}
+FIGURES_ANSWER = {
+    "figure_readings": [{"figure": "Fig. 1", "panel": None, "page": 2, "element": "x_axis", "quantity": "q",
+                         "unit": None, "scale": "unknown", "range": None, "reading": None, "ambiguous": True,
+                         "withhold_reason": "axis unit not stated", "needs_visual_check": True,
+                         "quote": FIGURE_CAPTION}],
+    "figure_totals": [{"figure": "Fig. 1", "panels": 1, "curves_per_panel": None, "page": 2,
+                       "quote": FIGURE_CAPTION}],
+}
 CONTEXT_ANSWER = {
     "absent_quantities": [{"quantity": "exposure time", "why_absent": "not stated", "trap": None,
                            "nearest_quote": {"page": None, "quote": None}}],
