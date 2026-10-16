@@ -196,3 +196,6 @@ ui/playwright/.cache/
 
 # FORGE donor source and local migration scratch (plan/specs live in docs/migration/)
 AGENT/
+
+# T11B pilot labels: private paper quotes and parsed text (H3 B4); default dir is outside the repo
+.pilot_labels/
