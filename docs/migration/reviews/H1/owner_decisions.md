@@ -172,3 +172,11 @@ to T15; (3) remaining import-time settings (kg_rag_api, CBORG cap, repo-root
 paths) move to startup in one later cleanup task with parity tests;
 (4) console scripts with T14; (5) the first GitHub CI run is the Linux check.
 Also: at most 2 workers run in parallel.
+
+## O-U1: frozen UI re-pin for the /fair2wise prefix (2026-10-16)
+
+**Decision.** "A5: I approve." T24C changed two lines in `ui/src/app/App.tsx`
+(router `basename` and logo path from `import.meta.env.BASE_URL`, identical
+when the base is `/`). The CI frozen-UI tree is re-pinned from `75a19b98…` to
+`2cc7ccd3778bac46794cbd1ef254211e617cc38d`. Historical documents keep the
+baseline hash. Any further `ui/` change still needs owner approval.

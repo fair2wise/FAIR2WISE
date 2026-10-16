@@ -21,7 +21,8 @@ concurrency:
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "20"
-  FROZEN_UI_TREE: 75a19b9823bc924a6391311191d3e41a5b4917ff
+  # Re-pinned 2026-10-16 (owner O-U1): T24C build-base router/logo change for /fair2wise.
+  FROZEN_UI_TREE: 2cc7ccd3778bac46794cbd1ef254211e617cc38d
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"

@@ -13,6 +13,13 @@
     "F5_design": {
       "RSoXSMeasurement relation": "Additive (Recommended)",
       "Instrument class": "Yes, add Instrument (Recommended)"
+    },
+    "2026-10-16": {
+      "A1/B4": "I dont understand what Work families are in AI",
+      "A2/B7": "model judges should be able to picked from a dropdown with what's currently available (not hardcoded)",
+      "A3": "remind me what F2 is. I feel like cited values should be published",
+      "A4/STOP-1..6": "we might need to plan deeper how tiled graph edits will happen. One case would be removing a previous version KG out of tiled graph and ingest the latest version (only done by admins, without affecting any other parts of the tiled graph)",
+      "A5": "I approve"
     }
   },
   "recorded_interpretation": {
@@ -21,8 +28,9 @@
   },
   "open_items": {
     "F5": "Resolved 2026-10-15: additive versioned schema change (task T22C, plan_addenda.md A4): new Sample, Measurement and Instrument classes; RSoXSMeasurement keeps its technique meaning; existing graphs stay valid.",
-    "B4": "Owner to name the pilot Work families and a labeler.",
-    "B7": "Owner to choose the CBORG judge model."
+    "B4": "Term 'Work family' explained 2026-10-16; awaiting owner selection or approval of a proposed list, and a labeler.",
+    "B7": "Owner: the judge model is chosen at run time from the models currently available (no hardcoded model). Where the picker lives is awaiting confirmation.",
+    "F2": "Owner leans to publishing cited values; awaiting confirmation of the marker rule and of assumed values."
   },
   "not_authorized": [
     "Any push, pull request, or remote write (F2W or FORGE)",
