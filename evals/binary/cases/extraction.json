@@ -33,7 +33,7 @@
         "config_sha256": "6123b8db932be546a01c2ebff717f99dffc7f4941fd8a483fca513761b40866f",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
-        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+        "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [
         "tests/extraction/extraction_fakes.py"
@@ -102,7 +102,7 @@
         "config_sha256": "0098b453de52d6216299ea5c1e0c204aed47b36a9a2e839f66e355321bd70826",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
-        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+        "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [
         "tests/evidence/evidence_fixtures.py"
@@ -171,7 +171,7 @@
         "config_sha256": "eac1f0cfb7697578552722e60c49c57e13ee9049c9eaec1fa9217e1b0989a848",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
-        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+        "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [
         "tests/evidence/evidence_fixtures.py",
@@ -239,7 +239,7 @@
         "config_sha256": "b15762e55d127628f553865aa95fa67afa87cbdd48c9b60a3cd048a77335dfa6",
         "model_sha256": null,
         "oracle_source_sha256": "b66dd1a52ca5568bc04f9b599ba97adef5ff3a77368ca6d71a67ee7d2cac2937",
-        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+        "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [
         "tests/evidence/evidence_fixtures.py",
@@ -308,7 +308,7 @@
         "config_sha256": "6f946d315291218b65bf15a251cb811a2a6c3a40f7ca861903e5cde2610a5c8e",
         "model_sha256": null,
         "oracle_source_sha256": "ddf933e4fb19eccd9c27e0c58530532bd8cc286fd700f4350a4285b25eb58a97",
-        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+        "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [
         "tests/extraction/extraction_fakes.py"

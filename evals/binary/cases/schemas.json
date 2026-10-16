@@ -30,7 +30,7 @@
         "config_sha256": "0ccf99e68ea28513b48ea5bc257f1abc042b348fde6817a2f8e6732c11c1c734",
         "model_sha256": null,
         "oracle_source_sha256": "8c4a3fe0cc753273187d6426e5ba4a0f825c103fd76418167f09db7a44fbdb6e",
-        "schema_sha256": "0ab58f2d9073b1e1fbf55eb4c4598572524023f45f6c0049f4e379d50cef94ca"
+        "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [],
       "model_ref": "fake_or_none",
@@ -288,7 +288,7 @@
         "config_sha256": "f8c2f38cb51c7f45cd815edd2b30815a1274851eb290d2428d1ffa27a9d74773",
         "model_sha256": null,
         "oracle_source_sha256": "aa55692bcda59da988037b62d55531b83392320aa1db28adf1de74e6772666b5",
-        "schema_sha256": "8269251b1bdaaf92750b58db04013910f596f35519b6cebbcbb036241d51b175"
+        "schema_sha256": "b74c38750a3bceeea346fc109b0ffebf34cf8f13dd3adf1f6f8f676dee886997"
       },
       "input_fixture_refs": [],
       "model_ref": "fake_or_none",
