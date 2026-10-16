@@ -4,7 +4,11 @@
 for the agent runtime, the CLI and the legacy UI. It is not a runtime, a second
 registry or a general script executor. T19B adds the first operation,
 :mod:`.papers` (``lit_summarize_extracted_terms``), which wraps the existing
-deterministic ``summarize_extracted_terms`` unchanged.
+deterministic ``summarize_extracted_terms`` unchanged. T19C adds the graph
+operations (:mod:`.graph`: ``kg_compute_statistics``, ``kg_compare_snapshots``,
+``kg_paper_subgraph``, ``kg_recent_entities``), the corpus audit and Work identity
+(:mod:`.corpus`: ``curate_audit_corpus``) and the shared report contract and job
+wrapper (:mod:`.reports`).
 
 Importing this package has no side effects: no environment or file reads, no
 registry or model construction, and no import of the F2W agent modules (they
@@ -29,6 +33,15 @@ _EXPORTS: Dict[str, Tuple[str, str]] = {
     "LegacySummaryPath": ("summary_compat", "LegacySummaryPath"),
     "build_legacy_summary_path": ("summary_compat", "build_legacy_summary_path"),
     "session_paper_resolver": ("summary_compat", "session_paper_resolver"),
+    "GraphOperationsTool": ("graph", "GraphOperationsTool"),
+    "ANALYZE_KNOWLEDGE_GRAPH_SKILL": ("graph", "ANALYZE_KNOWLEDGE_GRAPH_SKILL"),
+    "CorpusAuditTool": ("corpus", "CorpusAuditTool"),
+    "AUDIT_LITERATURE_CORPUS_SKILL": ("corpus", "AUDIT_LITERATURE_CORPUS_SKILL"),
+    "WorkIndex": ("corpus", "WorkIndex"),
+    "mapping_corpus_resolver": ("corpus", "mapping_corpus_resolver"),
+    "OperationReport": ("reports", "OperationReport"),
+    "operation_dispatch": ("reports", "operation_dispatch"),
+    "register_operation_jobs": ("reports", "register_operation_jobs"),
 }
 
 __all__ = sorted(_EXPORTS)

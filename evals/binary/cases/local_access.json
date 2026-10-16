@@ -113,7 +113,7 @@
         "case_sha256": "94eb0d20a47add8d19a70d6e079cc0e3a1208db5041e995711a9cc394409bb7f",
         "config_sha256": "c59fa70d246a14d1a2eae1bdec521c2394ca47ca4f9b38332c02fcfb96a4ada1",
         "model_sha256": null,
-        "oracle_source_sha256": "eef2ef41897f7d2670b9b9ed4c40a6b283b661ec03b8205439735f0dee786c8d",
+        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
         "schema_sha256": null
       },
       "input_fixture_refs": [
