@@ -24,6 +24,9 @@
     "2026-10-16b": {
       "A1": "What is A1 blocking? 12 papers sounds like too many",
       "A3/F2": "For A3, let's capture all values and tag with reported, cited, derived, assumed"
+    },
+    "2026-10-16c": {
+      "A1/B4": "for A1, let's pick one paper for now"
     }
   },
   "recorded_interpretation": {
@@ -32,7 +35,7 @@
   },
   "open_items": {
     "F5": "Resolved 2026-10-15: additive versioned schema change (task T22C, plan_addenda.md A4): new Sample, Measurement and Instrument classes; RSoXSMeasurement keeps its technique meaning; existing graphs stay valid.",
-    "B4": "Owner considers 12 papers too many; a smaller pilot set is proposed 2026-10-16. Awaiting owner choice and a labeler.",
+    "B4": "Owner: one pilot paper for now (more may be added later). Awaiting the choice of paper and a labeler. Cases the single paper cannot exercise (likely EXT-04 preprint/published versions, possibly FIG-03 ambiguous figure) stay partly covered, so the binary gate stays closed for them until more papers are added or the owner records a test-specification correction.",
     "B7": "Owner: the judge model is chosen at run time from the models currently available (no hardcoded model). Where the picker lives is awaiting confirmation.",
     "F2": "Resolved 2026-10-16: all values (reported, cited, derived, assumed) are captured as graph content with an evidence-source tag; none is withheld for its tag. Answers about what a paper measured must use the tag (an assumed or cited value is never presented as the paper's own measurement). Replaces the packet recommendation."
   },
