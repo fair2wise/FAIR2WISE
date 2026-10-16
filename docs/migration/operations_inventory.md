@@ -110,3 +110,17 @@ Constraints shared by all five:
 5. **OQ5 (retirement):** retire or keep `ingest_rsoxs_v3.py`, `build_v7_kg.py`, `ingest_bl1101_v7.py`, and the stray `scripts/app/modules/kg_rag_api.py`?
 6. **OQ6 (list_missing output):** should the CLI keep writing the repo-root file while the Tool writes only artifacts?
 7. **OQ7 (analyze_kgs skips):** should the legacy CLI keep skipping unrecognized checkpoint names silently?
+
+## 8. T19C implementation record
+
+T19C implements the graph and corpus operations after H3 (K1 distinct Works; K2 versioned histogram; K3 §3/§5 excluded; K4-K7 deferred). Code: `app/modules/operations/{graph,corpus,reports}.py`. Tests: `tests/operations/test_{operation_reports,work_identity,corpus_audit,graph_operations}.py`, `tests/graph/test_graph_operations_tiled.py`. Binary oracles OPS-01..04 bind these tests (all cases stay `proposed`).
+
+| Tool | Method | Counting unit | Complete / partial | Backends |
+| --- | --- | --- | --- | --- |
+| `kg_compute_statistics` (OP03, RT-03) | `kg-statistics/1` | distinct node ids; distinct (s,p,o) triples; distinct Works (`work-identity/1`) | `ScanControl` bound/deadline -> `partial` + `ToolStatus.PARTIAL` | JSON (snapshot), Tiled (live, unisolated) |
+| `kg_compare_snapshots` (OP03, RT-07) | `kg-growth/1` | as above; legacy growth with distinct-Work denominators | unread graphs listed; partial | JSON, Tiled |
+| `kg_paper_subgraph` (K-10, RT-59) | `kg-paper-subgraph/1` | node ids citing one Work; internal/boundary triples | absent paper after a partial scan is `UNAVAILABLE`, not `NOT_FOUND` | JSON, Tiled |
+| `kg_recent_entities` (K-11, RT-08) | `kg-recent/1` | node ids created after `since` | as above | Tiled (`createdAt`); JSON: `UNSUPPORTED_CAPABILITY` |
+| `curate_audit_corpus` (OP02) | `corpus-audit/1` | per section, legacy units kept; distinct Works; `papers_per_year/2` | term-entry bound -> partial | extracted-terms file via injected resolver |
+
+Legacy CLIs (`corpus_qa.py`, `analyze_kgs.py`) are byte-identical to the T19A baseline; parity tests compare Tool figures against them on synthetic and committed data. Not done in T19C: OP04 (`list_missing_rsoxs_papers`) and OP05 (`get_pdf_years`) depend on script-only PubTemp parsing and on PyMuPDF (E2); O-01, O-10, O-12, O-13, O-14 are literature-store/network/PDF-scan operator workflows outside GraphPort.
