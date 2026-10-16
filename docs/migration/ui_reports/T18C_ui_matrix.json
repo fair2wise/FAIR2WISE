@@ -1,0 +1,178 @@
+{
+  "task": "T18C",
+  "gate": "H6 (evidence only, not claimed)",
+  "frozen_ui_tree": "2cc7ccd3778bac46794cbd1ef254211e617cc38d",
+  "backend_base": "forge_merge 9c282e5",
+  "tiled": "0.2.18 disposable",
+  "report": "docs/migration/ui_reports/T18C_full_parity.md",
+  "cases": [
+    {
+      "id": "UI01",
+      "status": "pass",
+      "evidence": "tests/e2e/live_backend/full/tiled.full.ts; T18B; T18A replay",
+      "finding": null
+    },
+    {
+      "id": "UI02",
+      "status": "pass",
+      "evidence": "T18A settings_put_ollama; T18B expectNothingPublished",
+      "finding": null
+    },
+    {
+      "id": "UI03",
+      "status": "pass",
+      "evidence": "tests/e2e/live_backend/settings-graphs.spec.ts (T18B)",
+      "finding": null
+    },
+    {
+      "id": "UI04",
+      "status": "fail_blocked",
+      "evidence": "edit.full.ts (502 fail-closed pass; Tiled save test.fail); test_closure_api.py::test_ui04_*",
+      "finding": "F1 STOP-1..6"
+    },
+    {
+      "id": "UI05",
+      "status": "pass",
+      "evidence": "T18B qa-citations; edit.full.ts citation readback",
+      "finding": null
+    },
+    {
+      "id": "UI06",
+      "status": "not_exercised",
+      "evidence": "fake inference cannot show numeric/conceptual distinction",
+      "finding": "binary suite"
+    },
+    {
+      "id": "UI07",
+      "status": "partial",
+      "evidence": "T18B source RAG; publications-disclosure.full.ts PDF quote",
+      "finding": "OPS/MP not driven"
+    },
+    {
+      "id": "UI08",
+      "status": "pass",
+      "evidence": "all T18C streams strictly parsed",
+      "finding": null
+    },
+    {
+      "id": "UI09",
+      "status": "pass",
+      "evidence": "T18B stream-faults; test_ui10_retry_*",
+      "finding": null
+    },
+    {
+      "id": "UI10",
+      "status": "partial",
+      "evidence": "T18B Stop; pending.full.ts replays; test_ui26_*",
+      "finding": "Stop during action stream not driven; T18B L3"
+    },
+    {
+      "id": "UI11",
+      "status": "pass",
+      "evidence": "pending.full.ts",
+      "finding": null
+    },
+    {
+      "id": "UI12",
+      "status": "pass_wire",
+      "evidence": "pending.full.ts",
+      "finding": "F2 STOP-4 (splash_reimport faked)"
+    },
+    {
+      "id": "UI13",
+      "status": "pass",
+      "evidence": "sessions.full.ts",
+      "finding": null
+    },
+    {
+      "id": "UI14",
+      "status": "pass",
+      "evidence": "edit.full.ts node search/detail; T18A",
+      "finding": null
+    },
+    {
+      "id": "UI15",
+      "status": "fail_on_tiled_pass_baseline",
+      "evidence": "edit.full.ts (Splash fake)",
+      "finding": "F1"
+    },
+    {
+      "id": "UI16",
+      "status": "fail_on_tiled_pass_baseline",
+      "evidence": "edit.full.ts (Splash fake)",
+      "finding": "F1 STOP-1/2"
+    },
+    {
+      "id": "UI17",
+      "status": "fail_on_tiled_pass_baseline",
+      "evidence": "edit.full.ts (Splash fake)",
+      "finding": "F1 STOP-3"
+    },
+    {
+      "id": "UI18",
+      "status": "pass",
+      "evidence": "edit.full.ts JSON read-only; T18A upload; T25C",
+      "finding": null
+    },
+    {
+      "id": "UI19",
+      "status": "partial",
+      "evidence": "tiled.full.ts identity chips + neighbourhood on real Tiled; PDF citations",
+      "finding": "OPS/MP not driven; F6"
+    },
+    {
+      "id": "UI20",
+      "status": "pass",
+      "evidence": "publications-disclosure.full.ts",
+      "finding": null
+    },
+    {
+      "id": "UI21",
+      "status": "not_exercised",
+      "evidence": "T18A settings; mocked kg-viewer.spec.ts",
+      "finding": "no live clipping check"
+    },
+    {
+      "id": "UI22",
+      "status": "pass",
+      "evidence": "sessions.full.ts",
+      "finding": null
+    },
+    {
+      "id": "UI23",
+      "status": "pass",
+      "evidence": "T18B errors; no-Splash 502; Tiled off fallback; T25C outage",
+      "finding": null
+    },
+    {
+      "id": "UI24",
+      "status": "pass_contract_fail_d19",
+      "evidence": "test_closure_api.py::test_ui24_* (xfail strict D19)",
+      "finding": "F3"
+    },
+    {
+      "id": "UI25",
+      "status": "pass",
+      "evidence": "test_ui25_*; sessions.full.ts; T25C",
+      "finding": null
+    },
+    {
+      "id": "UI26",
+      "status": "pass_with_finding",
+      "evidence": "test_closure_tiled.py (managed+external); test_ui26_*",
+      "finding": "F4; real publication H5-gated"
+    },
+    {
+      "id": "UI27",
+      "status": "pass",
+      "evidence": "tiled.full.ts; test_legacy_live_tiled_lookup_*",
+      "finding": "F7"
+    },
+    {
+      "id": "UI28",
+      "status": "partial",
+      "evidence": "full suite on create_api_app; test_ui28_*",
+      "finding": "FORGE host blocked on T15"
+    }
+  ]
+}
