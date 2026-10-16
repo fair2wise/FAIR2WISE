@@ -43,8 +43,8 @@ env -i PATH=$S/venv-app/bin:/usr/bin:/bin HOME=$S/home TMPDIR=$S/home LANG=en_US
 | Frontend unit tests (`npm test`) | 97/97 passed in 11 files |
 | Closure tests without Tiled | 14 passed, 3 skipped (need Tiled), 1 xfailed (F3) |
 | Closure tests with Tiled | 3 passed (both Tiled modes, legacy lookup) |
-| Disposable-Tiled job | see section 7 |
-| Full pytest `--ignore=tests/deepeval` | see section 7 |
+| Disposable-Tiled job | 260 passed, 1 xfailed (F3) |
+| Full pytest `--ignore=tests/deepeval` | 3 failed (known), 3021 passed, 135 skipped, 5 xfailed; `compare_known_failures.py`: 0 problems |
 
 ## 3. UI01-UI28 executed matrix
 
@@ -132,10 +132,8 @@ The route set is exactly these six. `stream: true` still returns the single JSON
 
 ## 7. Repeat-suite results
 
-Filled in from the runs in this branch (see the task report for the final numbers):
-
-- Full pytest `--ignore=tests/deepeval`: recorded in the task report; `compare_known_failures.py` must report 0 problems.
-- Disposable-Tiled job (`F2W_TILED_PYTHON` set): `tests/tiled tests/graph tests/graph_import tests/security_live tests/api_v1_live tests/contracts/legacy_ui/closure`.
+- Full pytest `--ignore=tests/deepeval` (no Tiled): 3 failed, 3021 passed, 135 skipped, 5 xfailed. `compare_known_failures.py`: 3 known, 0 problems.
+- Disposable-Tiled job (`F2W_TILED_PYTHON` set) over `tests/tiled tests/graph tests/graph_import tests/security_live tests/api_v1_live tests/contracts/legacy_ui/closure`: 260 passed, 1 xfailed (F3). This includes the T25C ALS reader/admin sessions on the legacy app (reader chat-only, privileged work denied before effects, admin effects, sign-out, expiry, downgrade, outage), the local no-login cases, and the T14 `/v1` live permissions. No disposable server was left running.
 
 ## 8. Limits
 
