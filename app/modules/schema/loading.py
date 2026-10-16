@@ -22,6 +22,7 @@ from .registry import (
     REGISTRY_VERSION,
     RegistryError,
     SchemaEntry,
+    pre_s4_bytes,
     sha256_bytes,
 )
 
@@ -78,17 +79,40 @@ def load_yaml_asset(entry: SchemaEntry) -> Any:
     return yaml.safe_load(entry.abs_path.read_text(encoding="utf-8"))
 
 
-def closure_files(entry: SchemaEntry) -> List[Tuple[str, str]]:
+class _NoPreS4Form(Exception):
+    pass
+
+
+def _file_hash(data: bytes, pre_s4: bool) -> str:
+    if not pre_s4:
+        return sha256_bytes(data)
+    before = pre_s4_bytes(data)
+    if before is None:
+        raise _NoPreS4Form()
+    return sha256_bytes(before)
+
+
+def closure_files(entry: SchemaEntry, *, pre_s4: bool = False) -> List[Tuple[str, str]]:
     """Sorted ``(file name, sha256)`` pairs of the resolved import closure (local files only).
 
     The closure comes from ``SchemaView.imports_closure()``, so import resolution is LinkML's own.
     ``linkml:*`` imports resolve inside ``linkml_runtime`` and are covered by its version in the fingerprint.
+
+    Args:
+        pre_s4: Hash each file as it was before the H3 S4 licence-line change (:func:`pre_s4_bytes`).
+
+    Raises:
+        SchemaLoadError: an import is unresolvable, or (``pre_s4``) a file of the closure never had the
+            pre-S4 licence line.
     """
     _require_linkml(entry)
     sv = SchemaView(str(entry.abs_path))
     root_name = sv.schema.name
     base = entry.abs_path.parent
-    pairs: Dict[str, str] = {entry.file: entry.sha256}
+    root_hash = entry.pre_s4_sha256 if pre_s4 else entry.sha256  # bytes as discovered
+    if root_hash is None:
+        raise SchemaLoadError(f"{entry.path} has no pre-S4 form")
+    pairs: Dict[str, str] = {entry.file: root_hash}
     for name in sv.imports_closure():
         if name == root_name or name.startswith("linkml:"):
             continue
@@ -97,26 +121,44 @@ def closure_files(entry: SchemaEntry) -> List[Tuple[str, str]]:
         if not path.is_absolute():
             path = base / path
         try:
-            pairs[path.name] = sha256_bytes(path.read_bytes())
+            pairs[path.name] = _file_hash(path.read_bytes(), pre_s4)
         except OSError as exc:
             raise SchemaLoadError(f"import {name!r} of {entry.path} is unresolvable: {exc.strerror}") from None
+        except _NoPreS4Form:
+            raise SchemaLoadError(f"import {name!r} of {entry.path} has no pre-S4 form") from None
     return sorted(pairs.items())
 
 
-def closure_fingerprint(entry: SchemaEntry) -> str:
+def closure_fingerprint(entry: SchemaEntry, *, pre_s4: bool = False) -> str:
     """Deterministic fingerprint of ``entry``'s resolved import closure.
 
     SHA-256 over canonical JSON of the registry version, the ``linkml-runtime`` version and the sorted
     ``(file name, file sha256)`` pairs. A one-byte change in any file of the closure changes it; moving the
     checkout, changing the working directory or re-running does not.
+
+    ``pre_s4=True`` gives the fingerprint the same closure had before the H3 S4 licence-line change (T22C),
+    computed from the reconstructed bytes, never from a stored value.
     """
     body = {
         "registry_version": REGISTRY_VERSION,
         "linkml_runtime": linkml_runtime_version(),
-        "files": [list(p) for p in closure_files(entry)],
+        "files": [list(p) for p in closure_files(entry, pre_s4=pre_s4)],
     }
     blob = json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
+
+
+def pre_s4_fingerprint(entry: SchemaEntry) -> Optional[str]:
+    """Fingerprint ``entry``'s closure had before the S4 licence change, or ``None`` if it has no such form.
+
+    Only base-set entries whose whole closure carried ``license: MIT`` have one; a T22C schema set never did.
+    """
+    if entry.schema_set is not None or entry.pre_s4_sha256 is None:
+        return None
+    try:
+        return closure_fingerprint(entry, pre_s4=True)
+    except SchemaLoadError:
+        return None
 
 
 def probe_known_issue(entry: SchemaEntry) -> Optional[str]:

@@ -116,12 +116,20 @@ class SourceSnapshot:
 
 
 def default_supported_schema_fingerprints(registry: Any = None) -> frozenset:
-    """Import fingerprints of every selectable registered schema (computed, not hard-coded)."""
-    from app.modules.schema.loading import closure_fingerprint
+    """Import fingerprints of every selectable registered schema in use (computed, not hard-coded).
+
+    Includes each base schema's fingerprint from before the H3 S4 licence-line change, so a snapshot built
+    before T22C still imports. Excludes schema sets pending owner review (T22C): publishing a graph bound to
+    one needs an explicit ``supported_schema_fingerprints`` from the caller.
+    """
+    from app.modules.schema.loading import closure_fingerprint, pre_s4_fingerprint
     from app.modules.schema.registry import SchemaRegistry
 
     registry = registry or SchemaRegistry.discover()
-    return frozenset(closure_fingerprint(e) for e in registry if e.is_linkml and not e.known_broken)
+    usable = [e for e in registry if e.is_linkml and not e.known_broken and not e.pending_review]
+    current = {closure_fingerprint(e) for e in usable}
+    before = {pre_s4_fingerprint(e) for e in usable}
+    return frozenset(current | {fp for fp in before if fp})
 
 
 def load_source(source: Source, *, supported_schema_fingerprints: Collection[str]) -> SourceSnapshot:

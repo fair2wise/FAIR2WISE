@@ -18,7 +18,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
-from .loading import closure_fingerprint, load_helper
+from .loading import closure_fingerprint, load_helper, pre_s4_fingerprint
 from .registry import (
     NORMALIZER_TERM_EXTRACTOR,
     REGISTRY_VERSION,
@@ -33,6 +33,12 @@ UNKNOWN_SOURCE_DATA = "unknown_source_data"
 CATEGORIES = (CONTRACT_ERROR, LEGACY_WARNING, INCOMPLETE_EXTRACTION, UNKNOWN_SOURCE_DATA)
 
 REPORT_VERSION = "1"
+
+#: Binding statuses. ``verified_pre_s4_licence``: the artifact carries the fingerprint this schema had before the
+#: H3 S4 licence-line change; the bytes differ only in that line, proven by reconstruction (T22C).
+BINDING_VERIFIED = "verified"
+BINDING_VERIFIED_PRE_S4 = "verified_pre_s4_licence"
+BINDING_LEGACY = "legacy_unverified"
 _PREDICATE_PREFIX = "rel:"
 _TOP_N = 20
 
@@ -42,11 +48,22 @@ class SchemaBindingError(ValueError):
 
 
 def registered_fingerprints(registry: SchemaRegistry) -> Dict[str, str]:
-    """``closure fingerprint -> schema id`` for every selectable LinkML asset."""
+    """``closure fingerprint -> schema id`` for every selectable LinkML asset (all schema sets)."""
     out: Dict[str, str] = {}
     for entry in registry:
         if entry.is_linkml and not entry.known_broken:
             out[closure_fingerprint(entry)] = entry.schema_id
+    return out
+
+
+def pre_s4_fingerprints(registry: SchemaRegistry) -> Dict[str, str]:
+    """``pre-S4 closure fingerprint -> schema id`` for every selectable base LinkML asset (T22C)."""
+    out: Dict[str, str] = {}
+    for entry in registry:
+        if entry.is_linkml and not entry.known_broken:
+            fp = pre_s4_fingerprint(entry)
+            if fp:
+                out[fp] = entry.schema_id
     return out
 
 
@@ -56,19 +73,24 @@ def check_binding(
     """Compare an artifact's claimed schema fingerprint with ``entry``.
 
     Returns:
-        ``"verified"`` when equal, ``"legacy_unverified"`` when the artifact carries no fingerprint
-        (warning only; the artifact is neither invalid nor reclassified).
+        ``"verified"`` when equal, ``"verified_pre_s4_licence"`` when the claim is ``entry``'s fingerprint
+        from before the S4 licence-line change (same classes and slots), ``"legacy_unverified"`` when the
+        artifact carries no fingerprint (warning only; the artifact is neither invalid nor reclassified).
 
     Raises:
         SchemaBindingError: the artifact claims a fingerprint that differs from ``entry`` (stale) or that no
             registered schema has (unknown). The message says "schema <id>@<fp> not registered".
     """
     if not claimed:
-        return "legacy_unverified"
+        return BINDING_LEGACY
     actual = actual or closure_fingerprint(entry)
     if claimed == actual:
-        return "verified"
+        return BINDING_VERIFIED
+    if claimed == pre_s4_fingerprint(entry):
+        return BINDING_VERIFIED_PRE_S4
     known = registered_fingerprints(registry) if registry is not None else {}
+    if registry is not None:
+        known.update({fp: sid for fp, sid in pre_s4_fingerprints(registry).items() if fp not in known})
     if claimed in known:
         raise SchemaBindingError(
             f"artifact is bound to registered schema {known[claimed]!r}, not {entry.schema_id!r} "
@@ -227,13 +249,13 @@ def validate_graph(
         CONTRACT_ERROR: {"count": len(errors), "unit": "items", "examples": sorted(errors)[:_TOP_N]},
         LEGACY_WARNING: {
             "count": unknown_nodes + unknown_edges + domain_range + dangling + (
-                1 if status == "legacy_unverified" else 0),
+                1 if status == BINDING_LEGACY else 0),
             "unit": "mixed; see the per-kind counts",
             "nodes_with_category_outside_closure": unknown_nodes,
             "edges_with_predicate_outside_closure": unknown_edges,
             "edges_failing_domain_range": domain_range,
             "edges_with_missing_endpoint_node": dangling,
-            "artifact_without_schema_fingerprint": status == "legacy_unverified",
+            "artifact_without_schema_fingerprint": status == BINDING_LEGACY,
             "categories_outside_closure": _top(bad_categories),
             "predicates_outside_closure": _top(bad_predicates),
         },

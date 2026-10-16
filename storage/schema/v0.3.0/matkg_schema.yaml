@@ -1,0 +1,1612 @@
+# Schema set 0.3.0 (T22C): additive version of the base matkg_schema.yaml 0.2.0, pending owner review
+# (docs/migration/reviews/H3/schema_diff_T22C.md). No default build, extraction or publish path uses it.
+id: https://w3id.org/matkg
+name: matkg
+description: Materials Knowledge Graph Schema
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
+version: 0.3.0
+
+prefixes:
+  matkg: https://w3id.org/matkg/
+  linkml: https://w3id.org/linkml/
+  biolink: https://w3id.org/biolink/
+  schema: http://schema.org/
+  xsd: http://www.w3.org/2001/XMLSchema#
+  dcterms: http://purl.org/dc/terms/
+  chemrof: https://w3id.org/chemrof/
+  CHEBI: http://purl.obolibrary.org/obo/CHEBI_
+  OBI: http://purl.obolibrary.org/obo/OBI_
+  qudt: http://qudt.org/schema/qudt/
+  pav: http://purl.org/pav/
+  goldbook: https://goldbook.iupac.org/terms/view/
+  PUBCHEM.ELEMENT: https://pubchem.ncbi.nlm.nih.gov/element/
+
+default_prefix: matkg
+default_range: string
+
+imports:
+  - linkml:types
+
+classes:
+
+  Graph:
+    description: A knowledge graph consisting of things (nodes) and associations between them (edges)
+    tree_root: true
+    slots:
+      - description
+      - things
+      - associations
+
+  Thing:
+    description: A generic grouping for any identifiable entity
+    abstract: true
+    slots:
+      - id
+      - name
+      - category
+      - raw_category
+      - type
+      - description
+      - provided_by
+      - publication_year
+      - paper_title
+      - authors
+      - institutions
+      - doi
+      - journal
+      - volume
+      - issue
+      - pages_range
+      - abstract_text
+      - keywords
+      - publications
+      - has_code_snippet
+    annotations:
+      owl: Class
+
+  Publication:
+    description: Source publication metadata associated with a graph entity
+    slots:
+      - source_paper
+      - publication_year
+      - paper_title
+      - authors
+      - institutions
+      - doi
+      - journal
+      - volume
+      - issue
+      - pages_range
+      - abstract_text
+      - keywords
+    annotations:
+      owl: Class
+
+  Material:
+    is_a: Thing
+    description: A material, substance, or physical entity
+    slots:
+      - formula
+      - material_type
+    slot_usage:
+      id:
+        description: A unique identifier for this material
+        required: true
+    annotations:
+      owl: Class
+
+  Component:
+    is_a: Thing
+    description: A functional part, layer, electrode, separator, substrate, or other component of a material system or device
+
+  Condition:
+    is_a: Thing
+    description: An experimental, processing, operating, or environmental condition
+
+  Interface:
+    is_a: Thing
+    description: A boundary, surface, interphase, or contact region between materials or components
+
+  Measurement:
+    is_a: Thing
+    description: A measurement, observation, or characterization result
+
+  Method:
+    is_a: Thing
+    description: A general method, algorithm, experimental setup, computational approach, or workflow
+
+  Parameter:
+    is_a: Thing
+    description: A controllable or measured parameter such as pressure, voltage, current density, time, temperature, or concentration
+
+  Phenomenon:
+    is_a: Thing
+    description: A physical, chemical, electrochemical, or structural phenomenon
+
+  Process:
+    is_a: Thing
+    description: A transformation, growth, fabrication, degradation, nucleation, deposition, or other process
+
+  Property:
+    is_a: Thing
+    description: A property, performance metric, behavior, or characteristic of a material, component, device, or process
+
+  Structure:
+    is_a: Thing
+    description: A morphology, phase, crystal structure, geometry, texture, or structural feature
+
+  ConjugatedPolymer:
+    is_a: Material
+    description: A conjugated polymer used in organic electronics
+    slots:
+      - backbone_structure
+      - side_chain_structure
+      - monomer_units
+      - molecular_weight
+      - regioregularity
+    slot_usage:
+      material_type:
+        string_serialization: "conjugated_polymer"
+
+  ChemicalEntity:
+    is_a: Thing
+    description: A chemical entity, such as an element, compound, or mixture
+    slots:
+      - formula
+      - molecular_weight
+    slot_usage:
+      id:
+        description: A unique identifier for this chemical entity
+        required: true
+    id_prefixes:
+      - CHEBI
+
+  Compound:
+    is_a: ChemicalEntity
+    description: A chemical compound or molecular species
+
+  Element:
+    is_a: ChemicalEntity
+    description: A chemical element or elemental species
+
+  Device:
+    is_a: Thing
+    description: A physical device or component made from materials
+    slots:
+      - architecture
+      - device_type
+      - substrate
+      - electrode_material
+      - power_conversion_efficiency
+      - active_area
+    slot_usage:
+      id:
+        description: A unique identifier for this device
+        required: true
+    id_prefixes:
+      - OBI
+
+  PhotovoltaicCell:
+    is_a: Device
+    description: A device that converts light energy into electrical energy
+    slots:
+      - power_conversion_efficiency
+      - active_area
+      - substrate
+      - electrode_material
+    slot_usage:
+      device_type:
+        string_serialization: "photovoltaic_cell"
+
+  OFET:
+    is_a: Device
+    description: Organic Field-Effect Transistor - a transistor that uses an organic semiconductor in its channel
+    slots:
+      - channel_material
+      - channel_length
+      - channel_width
+      - gate_dielectric
+      - threshold_voltage
+      - on_off_ratio
+    slot_usage:
+      device_type:
+        string_serialization: "organic_field_effect_transistor"
+
+  MaterialProperty:
+    is_a: Property
+    description: A property or characteristic of a material
+    slots:
+      - unit
+      - quantifiable
+      - property_type
+    slot_usage:
+      id:
+        description: A unique identifier for this property
+        required: true
+
+  ElectronicProperty:
+    is_a: MaterialProperty
+    description: Electronic properties of materials
+    slots:
+      - energy_level
+    slot_usage:
+      property_type:
+        string_serialization: "electronic"
+
+  ProcessingMethod:
+    is_a: Method
+    description: A method or technique for processing or modifying materials
+    slots:
+      - process_parameters
+      - method_type
+    slot_usage:
+      id:
+        description: A unique identifier for this processing method
+        required: true
+
+  ExperimentalTechnique:
+    is_a: Thing
+    description: A technique or method used to characterize or analyze materials
+    slots:
+      - measured_property
+      - technique_type
+      - scattering_technique
+      - peak_positions
+      - d_spacing
+      - peak_assignments
+    slot_usage:
+      id:
+        description: A unique identifier for this experimental technique
+        required: true
+
+  CodeSnippet:
+    is_a: Thing
+    description: A reusable code block extracted from a publication, implementing an algorithm or data analysis routine
+    slots:
+      - code_snippet
+      - code_language
+      - code_description
+      - function_name
+      - code_domain
+      - domain_features
+    slot_usage:
+      id:
+        description: A unique identifier for this code snippet
+        required: true
+    annotations:
+      owl: Class
+
+  DomainFeature:
+    is_a: Thing
+    description: A schema-defined scientific metadata item extracted from code context
+    slots:
+      - feature_name
+      - feature_value
+      - feature_units
+      - feature_source_text
+    slot_usage:
+      id:
+        description: A unique identifier for this domain feature
+        required: false
+    annotations:
+      owl: Class
+
+  Association:
+    description: A typed association between a subject entity and an object entity
+    comments:
+      - We follow biolink in having a property-graph style schema, where edges can be instantiated
+    abstract: true
+    slots:
+      - id
+      - subject
+      - predicate
+      - object
+      - provided_by
+      - has_evidence
+    class_uri: rdf:Statement
+    annotations:
+      owl: Class
+
+  MaterialHasProperty:
+    is_a: Association
+    description: Association between a material and a property it possesses
+    slot_usage:
+      subject:
+        range: Material
+        description: The material that has the property
+        required: true
+      object:
+        range: MaterialProperty
+        description: The property of the material
+        required: true
+
+  DeviceContainsMaterial:
+    is_a: Association
+    description: Association between a device and the materials it contains
+    slot_usage:
+      subject:
+        range: Device
+        description: The device containing the material
+        required: true
+      object:
+        range: Material
+        description: The material contained in the device
+        required: true
+
+  MaterialProcessedBy:
+    is_a: Association
+    description: Association between a material and a processing method
+    slot_usage:
+      subject:
+        range: Material
+        description: The material being processed
+        required: true
+      object:
+        range: ProcessingMethod
+        description: The processing method applied to the material
+        required: true
+
+  PropertyMeasuredBy:
+    is_a: Association
+    description: Association between a property and the technique used to measure it
+    slot_usage:
+      subject:
+        range: MaterialProperty
+        description: The property being measured
+        required: true
+      object:
+        range: ExperimentalTechnique
+        description: The technique used to measure the property
+        required: true
+
+  # --- 0.3.0 (T22C; H3 F2/F3/F5/F6/F7). Additive: nothing above this line changed meaning. ---
+
+  Sample:
+    is_a: Thing
+    description: >-
+      One physical specimen described in one paper, such as "PM6:Y6 film annealed at 150 C".
+      Paper-local: samples from two papers are never the same node. A Sample is made of one or
+      more Material nodes (made_of_material) and is not itself a Material.
+    slots:
+      - sample_label
+      - sample_composition
+      - sample_phase
+      - sample_processing_state
+      - sample_preparation
+      - made_of_material
+      - supporting_quote
+    slot_usage:
+      id:
+        description: A unique identifier for this paper-local sample
+        required: true
+    annotations:
+      owl: Class
+      h3_decision: F5
+
+  Instrument:
+    is_a: Thing
+    description: >-
+      A beamline, endstation or detector on which a measurement was made, such as
+      "ALS beamline 11.0.1.2" or "Pilatus 1M". Unlike a Sample it is shared across papers
+      (canonicalization, T07). Not a Device: Device keeps meaning a device made from materials.
+    slots:
+      - instrument_category
+      - supporting_quote
+    slot_usage:
+      id:
+        description: A unique identifier for this instrument
+        required: true
+    annotations:
+      owl: Class
+      h3_decision: F5/F6
+
+  MeasurementRun:
+    is_a: Measurement
+    description: >-
+      One measurement run reported in one paper: a technique applied to one or more samples on an
+      instrument under stated conditions, with the values it produced. The technique is an
+      ExperimentalTechnique node (RSoXSMeasurement for RSoXS), which keeps meaning a technique.
+      The parent Measurement keeps its broader 0.2.0 meaning.
+    slots:
+      - run_of_technique
+      - run_measured_sample
+      - run_on_instrument
+      - run_stated_condition
+      - run_produced_quantity
+      - supporting_quote
+    slot_usage:
+      id:
+        description: A unique identifier for this paper-local measurement run
+        required: true
+    annotations:
+      owl: Class
+      h3_decision: F5
+
+  RunCondition:
+    is_a: Condition
+    description: >-
+      One condition stated for one measurement run, such as "photon energy 284.8 eV" or
+      "measured in vacuum": its name, the text as printed and, when printed, a number and unit.
+    slots:
+      - condition_name
+      - condition_text
+      - numeric_value
+      - unit
+      - evidence_source_tag
+    annotations:
+      owl: Class
+      h3_decision: F5
+
+  QuantityValue:
+    is_a: Thing
+    description: >-
+      One value a paper states, exactly as printed (number and unit, or a qualitative value),
+      tagged with how the paper relates to it (evidence_source_tag: reported, cited, derived or
+      assumed). Every value is kept whatever its tag; the tag says what it is (H3 F2).
+      The uncertainty the paper states is kept apart from any extraction confidence.
+    slots:
+      - quantity_label
+      - numeric_value
+      - unit
+      - qualitative_value
+      - uncertainty_value
+      - uncertainty_kind
+      - evidence_source_tag
+      - qualifier_sample
+      - qualifier_processing_state
+      - qualifier_temperature_k
+      - supporting_quote
+    slot_usage:
+      id:
+        description: A unique identifier for this value
+        required: true
+      evidence_source_tag:
+        required: true
+    annotations:
+      owl: Class
+      h3_decision: F2/F3/F7
+
+  EvidenceQuote:
+    is_a: Thing
+    description: >-
+      One sentence quoted verbatim from one source version and located in its stored text,
+      exactly or under a recorded normalization. A quote that cannot be located never becomes
+      an EvidenceQuote. Located is lexical support, not proof that the claim is true.
+    slots:
+      - quote_text
+      - quote_match_type
+      - quote_char_start
+      - quote_char_end
+      - quote_page
+      - source_version
+      - source_sha256
+      - parser_revision
+      - quote_located_in_section
+    slot_usage:
+      id:
+        description: Deterministic evidence id (evidence:<16 hex>)
+        required: true
+      quote_text:
+        required: true
+    annotations:
+      owl: Class
+      h3_decision: F7
+
+  PaperSection:
+    is_a: Thing
+    description: >-
+      One section of one parsed source version (for example "Results"), the region whose stored
+      text contains an EvidenceQuote.
+    slots:
+      - section_label
+      - section_page
+      - work_id
+      - source_version
+    slot_usage:
+      id:
+        description: Structural section id within its source version
+        required: true
+    annotations:
+      owl: Class
+      h3_decision: F7
+
+slots:
+
+  things:
+    description: A collection of entities
+    range: Thing
+    required: true
+    inlined_as_list: true
+    multivalued: true
+
+  associations:
+    description: A collection of associations
+    range: Association
+    required: true
+    inlined_as_list: true
+    multivalued: true
+
+  id:
+    identifier: true
+    description: A unique identifier for an entity
+    required: true
+    range: uriorcurie
+    slot_uri: rdf:ID
+
+  name:
+    description: A human-readable name for an entity
+    range: string
+    required: false
+    slot_uri: rdfs:label
+    annotations:
+      owl: AnnotationAssertion
+
+  category:
+    description: The category or type of an entity
+    range: uriorcurie
+    is_a: type
+
+  raw_category:
+    description: Original category label emitted by an extractor before schema normalization
+    range: string
+    required: false
+    slot_uri: matkg:raw_category
+    annotations:
+      owl: AnnotationAssertion
+
+  type:
+    description: The type or class of an entity
+    range: uriorcurie
+    designates_type: true
+    slot_uri: rdf:type
+    annotations:
+      owl.fstring: "SubClassOf({id} {V})"
+
+  description:
+    description: A human-readable description of an entity
+    range: string
+    required: false
+    slot_uri: dcterms:description
+    annotations:
+      owl: AnnotationAssertion
+
+  formula:
+    description: Chemical formula of a material or chemical entity
+    range: string
+    required: false
+    slot_uri: chemrof:formula
+    annotations:
+      owl: AnnotationAssertion
+
+  molecular_weight:
+    description: Molecular weight in g/mol
+    range: float
+    required: false
+    annotations:
+      owl: AnnotationAssertion
+
+  property_type:
+    description: The type or category of property (e.g., mechanical, thermal, electrical)
+    range: string
+    required: false
+    annotations:
+      owl: AnnotationAssertion
+
+  unit:
+    description: The unit of measurement for a quantifiable property
+    range: string
+    required: false
+    slot_uri: qudt:unit
+    annotations:
+      owl: AnnotationAssertion
+
+  quantifiable:
+    description: Whether the property can be quantified numerically
+    range: boolean
+    required: false
+    annotations:
+      owl: AnnotationAssertion
+
+  subject:
+    description: The subject or source entity in an association
+    range: Thing
+    required: true
+    slot_uri: rdf:subject
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  predicate:
+    description: The predicate or relationship type of an association
+    range: uriorcurie
+    required: true
+    designates_type: true
+    annotations:
+      owl.fstring: "SubClassOf({id} {V})"
+
+  object:
+    description: The object or target entity in an association
+    range: Thing
+    required: true
+    slot_uri: rdf:object
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  provided_by:
+    description: The source or provider of the entity or association (e.g., DOI)
+    range: string
+    required: false
+    slot_uri: pav:providedBy
+    annotations:
+      owl: AnnotationAssertion
+
+  publication_year:
+    description: The year the source paper was published (e.g., 2023)
+    range: integer
+    required: false
+    slot_uri: dcterms:date
+    annotations:
+      owl: AnnotationAssertion
+
+  paper_title:
+    description: Full title of the source publication
+    range: string
+    required: false
+    slot_uri: dcterms:title
+    annotations:
+      owl: AnnotationAssertion
+
+  authors:
+    description: List of authors of the source publication
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: dcterms:creator
+    annotations:
+      owl: AnnotationAssertion
+
+  institutions:
+    description: Affiliated institutions or organizations of the authors
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: schema:affiliation
+    annotations:
+      owl: AnnotationAssertion
+
+  doi:
+    description: Digital Object Identifier of the source publication
+    range: string
+    required: false
+    slot_uri: dcterms:identifier
+    annotations:
+      owl: AnnotationAssertion
+
+  journal:
+    description: Name of the journal or conference where the paper was published
+    range: string
+    required: false
+    slot_uri: dcterms:isPartOf
+    annotations:
+      owl: AnnotationAssertion
+
+  volume:
+    description: Volume number of the journal issue
+    range: string
+    required: false
+    slot_uri: schema:volumeNumber
+    annotations:
+      owl: AnnotationAssertion
+
+  issue:
+    description: Issue number of the journal volume
+    range: string
+    required: false
+    slot_uri: schema:issueNumber
+    annotations:
+      owl: AnnotationAssertion
+
+  pages_range:
+    description: Page range of the article within the journal
+    range: string
+    required: false
+    slot_uri: schema:pagination
+    annotations:
+      owl: AnnotationAssertion
+
+  abstract_text:
+    description: Abstract of the source publication
+    range: string
+    required: false
+    slot_uri: dcterms:abstract
+    annotations:
+      owl: AnnotationAssertion
+
+  keywords:
+    description: Author-supplied or indexed keywords for the source publication
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: dcterms:subject
+    annotations:
+      owl: AnnotationAssertion
+
+  source_paper:
+    description: Local source PDF filename or source identifier for a publication
+    range: string
+    required: false
+    slot_uri: dcterms:source
+    annotations:
+      owl: AnnotationAssertion
+
+  publications:
+    description: Publications that discuss or mention this entity
+    range: Publication
+    required: false
+    multivalued: true
+    inlined_as_list: true
+    slot_uri: dcterms:references
+
+  has_evidence:
+    description: Evidence supporting the association
+    range: string
+    required: false
+    slot_uri: dcterms:source
+    annotations:
+      owl: AnnotationAssertion
+
+  material_type:
+    description: The type or category of material
+    range: string
+    required: false
+    slot_uri: matkg:material_type
+    annotations:
+      owl: AnnotationAssertion
+
+  backbone_structure:
+    description: The main chain structure of a polymer
+    range: string
+    required: false
+    slot_uri: matkg:backbone_structure
+    annotations:
+      owl: AnnotationAssertion
+
+  side_chain_structure:
+    description: The side chain structure of a polymer
+    range: string
+    required: false
+    slot_uri: matkg:side_chain_structure
+    annotations:
+      owl: AnnotationAssertion
+
+  monomer_units:
+    description: The monomer units that make up a polymer
+    range: string
+    required: false
+    slot_uri: matkg:monomer_units
+    annotations:
+      owl: AnnotationAssertion
+
+  regioregularity:
+    description: The measure of the structural regularity of a polymer
+    range: float
+    required: false
+    slot_uri: matkg:regioregularity
+    annotations:
+      owl: AnnotationAssertion
+
+  channel_material:
+    description: The semiconductor material used in the channel of a transistor
+    range: string
+    required: false
+    slot_uri: matkg:channel_material
+    annotations:
+      owl: AnnotationAssertion
+
+  channel_length:
+    description: The length of the transistor channel in micrometers
+    range: float
+    required: false
+    slot_uri: matkg:channel_length
+    annotations:
+      owl: AnnotationAssertion
+
+  channel_width:
+    description: The width of the transistor channel in micrometers
+    range: float
+    required: false
+    slot_uri: matkg:channel_width
+    annotations:
+      owl: AnnotationAssertion
+
+  gate_dielectric:
+    description: The insulating material between gate and channel
+    range: string
+    required: false
+    slot_uri: matkg:gate_dielectric
+    annotations:
+      owl: AnnotationAssertion
+
+  threshold_voltage:
+    description: Minimum gate-to-source voltage for conducting path
+    range: float
+    required: false
+    slot_uri: matkg:threshold_voltage
+    annotations:
+      owl: AnnotationAssertion
+
+  on_off_ratio:
+    description: Ratio of on-state to off-state current
+    range: float
+    required: false
+    slot_uri: matkg:on_off_ratio
+    annotations:
+      owl: AnnotationAssertion
+
+  device_type:
+    description: The type or category of device
+    range: string
+    required: false
+    slot_uri: matkg:device_type
+    annotations:
+      owl: AnnotationAssertion
+
+  architecture:
+    description: The structural design or layout of a device
+    range: string
+    required: false
+    slot_uri: matkg:architecture
+    annotations:
+      owl: AnnotationAssertion
+
+  power_conversion_efficiency:
+    description: Efficiency of converting input power to output power (%)
+    range: float
+    required: false
+    slot_uri: matkg:power_conversion_efficiency
+    annotations:
+      owl: AnnotationAssertion
+
+  active_area:
+    description: Active area of a device in square centimeters
+    range: float
+    required: false
+    slot_uri: matkg:active_area
+    annotations:
+      owl: AnnotationAssertion
+
+  substrate:
+    description: Base material on which a device is fabricated
+    range: string
+    required: false
+    slot_uri: matkg:substrate
+    annotations:
+      owl: AnnotationAssertion
+
+  electrode_material:
+    description: Material used for electrodes in a device
+    range: string
+    required: false
+    slot_uri: matkg:electrode_material
+    annotations:
+      owl: AnnotationAssertion
+
+  energy_level:
+    description: Energy level (HOMO, LUMO, work function, etc.) in eV
+    range: float
+    required: false
+    slot_uri: matkg:energy_level
+    annotations:
+      owl: AnnotationAssertion
+
+  process_parameters:
+    description: Parameters and conditions of a processing method
+    range: string
+    required: false
+    slot_uri: matkg:process_parameters
+    annotations:
+      owl: AnnotationAssertion
+
+  method_type:
+    description: The type or category of processing method
+    range: string
+    required: false
+    slot_uri: matkg:method_type
+    annotations:
+      owl: AnnotationAssertion
+
+  technique_type:
+    description: The type or category of experimental technique
+    range: string
+    required: false
+    slot_uri: matkg:technique_type
+    annotations:
+      owl: AnnotationAssertion
+      code_domain_feature: true
+
+  measured_property:
+    description: The property being measured by an experimental technique
+    range: string
+    required: false
+    slot_uri: matkg:measured_property
+    annotations:
+      owl: AnnotationAssertion
+      code_domain_feature: true
+
+  scattering_technique:
+    description: Specific scattering technique (SAXS, WAXS, GIWAXS, GISAXS)
+    range: string
+    required: false
+    slot_uri: matkg:scattering_technique
+    annotations:
+      owl: AnnotationAssertion
+      code_domain_feature: true
+
+  peak_positions:
+    description: Observed scattering peak positions (e.g., "q = 0.38 A^-1")
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:peak_positions
+    annotations:
+      owl: AnnotationAssertion
+      code_domain_feature: true
+
+  d_spacing:
+    description: d-spacing values derived from scattering peaks
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:d_spacing
+    annotations:
+      owl: AnnotationAssertion
+      code_domain_feature: true
+
+  peak_assignments:
+    description: Crystallographic assignments of scattering peaks
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:peak_assignments
+    annotations:
+      owl: AnnotationAssertion
+      code_domain_feature: true
+
+  function_name:
+    description: Name of the primary function or class in a code snippet
+    range: string
+    required: false
+    slot_uri: matkg:function_name
+    annotations:
+      owl: AnnotationAssertion
+
+  code_snippet:
+    description: Verbatim code block implementing an algorithm or analysis routine
+    range: string
+    required: false
+    slot_uri: matkg:code_snippet
+    annotations:
+      owl: AnnotationAssertion
+
+  code_language:
+    description: Programming language of the code snippet
+    range: string
+    required: false
+    slot_uri: matkg:code_language
+    annotations:
+      owl: AnnotationAssertion
+
+  code_description:
+    description: Plain-English description of what the code snippet does
+    range: string
+    required: false
+    slot_uri: matkg:code_description
+    annotations:
+      owl: AnnotationAssertion
+
+  code_domain:
+    description: Scientific domain of the code snippet (e.g., xray, md_simulation, dft, ml)
+    range: string
+    required: false
+    slot_uri: matkg:code_domain
+    annotations:
+      owl: AnnotationAssertion
+
+  domain_features:
+    description: Schema-driven domain-specific metadata extracted from code context
+    range: DomainFeature
+    required: false
+    multivalued: true
+    inlined_as_list: true
+    slot_uri: matkg:domain_features
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_name:
+    description: Schema slot or feature name represented by this domain feature
+    range: string
+    required: false
+    slot_uri: matkg:feature_name
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_value:
+    description: Extracted value for the domain feature
+    range: string
+    required: false
+    slot_uri: matkg:feature_value
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_units:
+    description: Units associated with the extracted feature value
+    range: string
+    required: false
+    slot_uri: matkg:feature_units
+    annotations:
+      owl: AnnotationAssertion
+
+  feature_source_text:
+    description: Source text supporting the extracted feature value
+    range: string
+    required: false
+    slot_uri: matkg:feature_source_text
+    annotations:
+      owl: AnnotationAssertion
+
+  has_code_snippet:
+    description: A code snippet related to this entity
+    range: CodeSnippet
+    required: false
+    multivalued: true
+    slot_uri: matkg:has_code_snippet
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  related_to:
+    description: Broad fallback relation between two entities when the source text supports a relationship but no narrower predicate is available
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:related_to
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  part_of:
+    description: Subject is a part, layer, component, region, or member of the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:part_of
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  has_property:
+    description: Subject has, exhibits, or is characterized by the object property or behavior
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:has_property
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  processed_by:
+    description: Subject is fabricated, treated, modified, prepared, grown, or otherwise processed by the object process or method
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:processed_by
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  used_in:
+    description: Subject is used in, applied in, or relevant to the object device, method, process, or application
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:used_in
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  causes:
+    description: Subject causes, drives, initiates, enables, or contributes to the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:causes
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  affects:
+    description: Subject affects, changes, controls, influences, improves, suppresses, or degrades the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:affects
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  measures:
+    description: Subject method, measurement, or technique measures, probes, observes, or quantifies the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:measures
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  occurs_in:
+    description: Subject occurs in, at, during, or under the object condition, structure, component, device, process, or system
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:occurs_in
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  contains:
+    description: Subject contains, includes, incorporates, or is composed with the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:contains
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  applied_to:
+    description: Subject method, process, condition, or material is applied to the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:applied_to
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  composed_of:
+    description: Subject is composed of, made of, or constituted by the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:composed_of
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  belongs_to:
+    description: Subject belongs to, is categorized within, or is a member of the object grouping or system
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:belongs_to
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  forms_on:
+    description: Subject forms, deposits, grows, or nucleates on the object
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:forms_on
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  provides_site_for:
+    description: Subject provides a site, surface, interface, or location for the object process or structure
+    domain: Thing
+    range: Thing
+    required: false
+    multivalued: true
+    slot_uri: matkg:provides_site_for
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  # --- 0.3.0 (T22C) slots. New names only; no 0.2.0 slot changed. ---
+
+  sample_label:
+    description: The sample's label as the paper prints it (e.g. "S2", "annealed film")
+    domain: Sample
+    range: string
+    required: false
+    slot_uri: matkg:sample_label
+    annotations:
+      owl: AnnotationAssertion
+
+  sample_composition:
+    description: What the sample contains, as printed (e.g. "PM6", "Y6", "1:1.2 by weight")
+    domain: Sample
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:sample_composition
+    annotations:
+      owl: AnnotationAssertion
+
+  sample_phase:
+    description: Phase or state of the sample as printed (e.g. "thin film", "solution", "crystalline")
+    domain: Sample
+    range: string
+    required: false
+    slot_uri: matkg:sample_phase
+    annotations:
+      owl: AnnotationAssertion
+
+  sample_processing_state:
+    description: Processing state of the sample as printed (e.g. "as-cast", "annealed at 150 C for 10 min")
+    domain: Sample
+    range: string
+    required: false
+    slot_uri: matkg:sample_processing_state
+    annotations:
+      owl: AnnotationAssertion
+
+  sample_preparation:
+    description: Preparation steps as printed, in order (e.g. "spin-coated from chloroform")
+    domain: Sample
+    range: string
+    required: false
+    multivalued: true
+    slot_uri: matkg:sample_preparation
+    annotations:
+      owl: AnnotationAssertion
+
+  made_of_material:
+    description: The sample is made of the object material (the paper-independent Material node)
+    domain: Sample
+    range: Material
+    required: false
+    multivalued: true
+    slot_uri: matkg:made_of_material
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  instrument_category:
+    description: Whether the instrument is a beamline, an endstation or a detector
+    domain: Instrument
+    range: InstrumentKindEnum
+    required: false
+    slot_uri: matkg:instrument_category
+    annotations:
+      owl: AnnotationAssertion
+
+  run_of_technique:
+    description: The technique this run used (an ExperimentalTechnique node, e.g. RSoXSMeasurement)
+    domain: MeasurementRun
+    range: ExperimentalTechnique
+    required: false
+    slot_uri: matkg:run_of_technique
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  run_measured_sample:
+    description: A sample this run measured
+    domain: MeasurementRun
+    range: Sample
+    required: false
+    multivalued: true
+    slot_uri: matkg:run_measured_sample
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  run_on_instrument:
+    description: The instrument (beamline, endstation or detector) this run used
+    domain: MeasurementRun
+    range: Instrument
+    required: false
+    slot_uri: matkg:run_on_instrument
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  run_stated_condition:
+    description: A condition stated for this run
+    domain: MeasurementRun
+    range: RunCondition
+    required: false
+    multivalued: true
+    slot_uri: matkg:run_stated_condition
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  run_produced_quantity:
+    description: A value this run produced
+    domain: MeasurementRun
+    range: QuantityValue
+    required: false
+    multivalued: true
+    slot_uri: matkg:run_produced_quantity
+    annotations:
+      owl: ObjectSomeValuesFrom
+
+  condition_name:
+    description: Name of the condition as printed (e.g. "photon energy", "temperature", "atmosphere")
+    domain: RunCondition
+    range: string
+    required: false
+    slot_uri: matkg:condition_name
+    annotations:
+      owl: AnnotationAssertion
+
+  condition_text:
+    description: The condition's value exactly as printed (e.g. "284.8 eV", "in vacuum")
+    domain: RunCondition
+    range: string
+    required: false
+    slot_uri: matkg:condition_text
+    annotations:
+      owl: AnnotationAssertion
+
+  quantity_label:
+    description: What the value is of, as the extractor labels it (e.g. "domain_spacing", "film_thickness")
+    domain: QuantityValue
+    range: string
+    required: false
+    slot_uri: matkg:quantity_label
+    annotations:
+      owl: AnnotationAssertion
+
+  numeric_value:
+    description: The number exactly as printed, in the printed unit (no conversion)
+    range: float
+    required: false
+    slot_uri: matkg:numeric_value
+    annotations:
+      owl: AnnotationAssertion
+
+  qualitative_value:
+    description: A non-numeric value as printed (e.g. "face-on", "no phase separation")
+    domain: QuantityValue
+    range: string
+    required: false
+    slot_uri: matkg:qualitative_value
+    annotations:
+      owl: AnnotationAssertion
+
+  uncertainty_value:
+    description: >-
+      The uncertainty the paper states for the value, in the value's unit. Never an extraction
+      confidence.
+    domain: QuantityValue
+    range: float
+    minimum_value: 0
+    required: false
+    slot_uri: matkg:uncertainty_value
+    annotations:
+      owl: AnnotationAssertion
+      h3_decision: F3
+
+  uncertainty_kind:
+    description: What the stated uncertainty means (standard deviation, standard error, interval, unknown)
+    domain: QuantityValue
+    range: UncertaintyKindEnum
+    required: false
+    slot_uri: matkg:uncertainty_kind
+    annotations:
+      owl: AnnotationAssertion
+      h3_decision: F3
+
+  evidence_source_tag:
+    description: >-
+      How the source relates to the value: its own result (reported), another work's result it
+      cites (cited), a value it derives from its own results (derived), or an assumption
+      (assumed). Every value is captured and tagged; none is dropped for its tag (H3 F2).
+    range: EvidenceSourceEnum
+    required: false
+    slot_uri: matkg:evidence_source_tag
+    annotations:
+      owl: AnnotationAssertion
+      h3_decision: F2
+
+  qualifier_sample:
+    description: Sample qualifier - the paper-local sample(s) the value is about
+    domain: QuantityValue
+    range: Sample
+    required: false
+    multivalued: true
+    slot_uri: matkg:qualifier_sample
+    annotations:
+      owl: ObjectSomeValuesFrom
+      h3_decision: F3
+
+  qualifier_processing_state:
+    description: Sample qualifier - the processing state the value applies to, as printed (e.g. "annealed")
+    domain: QuantityValue
+    range: string
+    required: false
+    slot_uri: matkg:qualifier_processing_state
+    annotations:
+      owl: AnnotationAssertion
+      h3_decision: F3
+
+  qualifier_temperature_k:
+    description: Sample qualifier - the sample temperature the value applies to, in kelvin, when printed
+    domain: QuantityValue
+    range: float
+    required: false
+    slot_uri: matkg:qualifier_temperature_k
+    annotations:
+      owl: AnnotationAssertion
+      h3_decision: F3
+
+  supporting_quote:
+    description: >-
+      Evidence link - the subject (a value, sample, run or instrument) is supported by the object
+      located quote (H3 F7, value-to-evidence)
+    domain: Thing
+    range: EvidenceQuote
+    required: false
+    multivalued: true
+    slot_uri: matkg:supporting_quote
+    annotations:
+      owl: ObjectSomeValuesFrom
+      h3_decision: F7
+
+  quote_text:
+    description: The quoted sentence exactly as the source prints it
+    domain: EvidenceQuote
+    range: string
+    required: false
+    slot_uri: matkg:quote_text
+    annotations:
+      owl: AnnotationAssertion
+
+  quote_match_type:
+    description: How the quote was located in the stored text (exact, or normalized under a recorded profile)
+    domain: EvidenceQuote
+    range: QuoteMatchEnum
+    required: false
+    slot_uri: matkg:quote_match_type
+    annotations:
+      owl: AnnotationAssertion
+
+  quote_char_start:
+    description: Start offset of the quote in the stored section text
+    domain: EvidenceQuote
+    range: integer
+    minimum_value: 0
+    required: false
+    slot_uri: matkg:quote_char_start
+    annotations:
+      owl: AnnotationAssertion
+
+  quote_char_end:
+    description: End offset (exclusive) of the quote in the stored section text
+    domain: EvidenceQuote
+    range: integer
+    minimum_value: 0
+    required: false
+    slot_uri: matkg:quote_char_end
+    annotations:
+      owl: AnnotationAssertion
+
+  quote_page:
+    description: First page of the containing section, when the parser can say
+    domain: EvidenceQuote
+    range: integer
+    required: false
+    slot_uri: matkg:quote_page
+    annotations:
+      owl: AnnotationAssertion
+
+  source_version:
+    description: The exact source version (parsed document) the offsets refer to
+    range: string
+    required: false
+    slot_uri: matkg:source_version
+    annotations:
+      owl: AnnotationAssertion
+
+  source_sha256:
+    description: SHA-256 of the source file bytes the quote was located in
+    domain: EvidenceQuote
+    range: string
+    required: false
+    slot_uri: matkg:source_sha256
+    annotations:
+      owl: AnnotationAssertion
+
+  parser_revision:
+    description: Parser, version and configuration that produced the stored text
+    domain: EvidenceQuote
+    range: string
+    required: false
+    slot_uri: matkg:parser_revision
+    annotations:
+      owl: AnnotationAssertion
+
+  quote_located_in_section:
+    description: Evidence link - the quote's stored text lies in the object section (H3 F7, quote-to-section)
+    domain: EvidenceQuote
+    range: PaperSection
+    required: false
+    slot_uri: matkg:quote_located_in_section
+    annotations:
+      owl: ObjectSomeValuesFrom
+      h3_decision: F7
+
+  section_label:
+    description: The section heading as the parsed source gives it (e.g. "3. Results and Discussion")
+    domain: PaperSection
+    range: string
+    required: false
+    slot_uri: matkg:section_label
+    annotations:
+      owl: AnnotationAssertion
+
+  section_page:
+    description: First page of the section, when the parser can say
+    domain: PaperSection
+    range: integer
+    required: false
+    slot_uri: matkg:section_page
+    annotations:
+      owl: AnnotationAssertion
+
+  work_id:
+    description: Canonical id of the work (paper) the section belongs to
+    domain: PaperSection
+    range: string
+    required: false
+    slot_uri: matkg:work_id
+    annotations:
+      owl: AnnotationAssertion
+
+enums:
+
+  EvidenceSourceEnum:
+    description: How a source relates to a value it states (H3 F2, F8)
+    permissible_values:
+      reported:
+        description: The paper's own result, stated in its own voice
+      cited:
+        description: >-
+          A result the paper attributes to other work. A "reported" value inside a sentence that
+          attributes it to other work is tagged cited.
+      derived:
+        description: A value the paper computes from its own stated results (e.g. d = 2 pi / q)
+      assumed:
+        description: >-
+          A value assumed rather than measured, such as a nominal instrument setting. Never
+          presented as the paper's own measurement.
+
+  UncertaintyKindEnum:
+    description: What a stated uncertainty means (H3 F3)
+    permissible_values:
+      standard_deviation:
+        description: One standard deviation of the measured values
+      standard_error:
+        description: Standard error of the mean
+      interval:
+        description: A stated range or confidence interval
+      unknown:
+        description: An uncertainty is stated but the paper does not say which kind
+
+  QuoteMatchEnum:
+    description: How a quote was located in the stored source text
+    permissible_values:
+      exact:
+        description: The quote occurs verbatim
+      normalized:
+        description: The quote occurs after the recorded normalization profile (whitespace, glyphs, NFKC)
+
+  InstrumentKindEnum:
+    description: The three instrument kinds the owner named at H3 (F5)
+    permissible_values:
+      beamline:
+        description: A synchrotron or other beamline (e.g. ALS 11.0.1.2)
+      endstation:
+        description: An endstation on a beamline (e.g. the RSoXS endstation)
+      detector:
+        description: A detector (e.g. a CCD or a hybrid pixel detector)

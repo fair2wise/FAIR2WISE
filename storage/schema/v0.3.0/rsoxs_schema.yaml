@@ -1,0 +1,71 @@
+# Schema set 0.3.0 (T22C): additive version of the base matkg_schema.yaml 0.2.0, pending owner review
+# (docs/migration/reviews/H3/schema_diff_T22C.md). No default build, extraction or publish path uses it.
+id: https://w3id.org/matkg/rsoxs
+name: rsoxs
+title: RSoXS v2 overlay
+description: >
+  Thin rsoxs_v2 overlay on storage/schema/v0.3.0/matkg_schema.yaml (schema set 0.3.0).
+  Adds RSoXSMeasurement plus resonant-scattering slots used by term extraction.
+  Do not merge this graph with the x-ray demo KG.
+# LBNL BSD-style licence: FAIR to WISE (F2W) Copyright (c) 2025, The Regents of the
+# University of California, through Lawrence Berkeley National Laboratory. See LICENSE.txt.
+license: BSD-3-Clause-LBNL
+version: rsoxs_v2
+
+prefixes:
+  matkg: https://w3id.org/matkg/
+  linkml: https://w3id.org/linkml/
+  xsd: http://www.w3.org/2001/XMLSchema#
+
+default_prefix: matkg
+default_range: string
+
+imports:
+  - matkg_schema
+
+classes:
+  RSoXSMeasurement:
+    is_a: ExperimentalTechnique
+    description: >
+      A technique: resonant soft X-ray scattering, measured or simulated
+      (RSoXS, R-SoXS, P-RSoXS, CyRSoXS). This class names the technique, not a
+      single run; one run that uses it is a MeasurementRun whose
+      run_of_technique points at this node. Prefer this class over the
+      parent ExperimentalTechnique for RSoXS, polarized RSoXS, and resonant
+      elastic soft X-ray scattering.
+    slots:
+      - photon_energy_eV
+      - absorption_edge
+      - scattering_technique
+      - polarization
+    slot_usage:
+      technique_type:
+        string_serialization: "rsoxs"
+      scattering_technique:
+        string_serialization: "RSoXS"
+
+# NOTE: W3C PROV-O vocabulary reference (classes, relations, namespace) has been
+# moved to storage/schema/prov_vocabulary.yaml to keep this file LinkML-valid.
+# See app/modules/prov.py for Python implementation helpers.
+
+slots:
+  photon_energy_eV:
+    description: Incident photon energy in electronvolts
+    range: float
+    domain: RSoXSMeasurement
+    annotations:
+      code_domain_feature: true
+
+  absorption_edge:
+    description: Absorption edge used for resonant contrast (e.g. C K-edge, N K-edge)
+    range: string
+    domain: RSoXSMeasurement
+    annotations:
+      code_domain_feature: true
+
+  polarization:
+    description: X-ray polarization state (linear, circular, unpolarized, P-RSoXS)
+    range: string
+    domain: RSoXSMeasurement
+    annotations:
+      code_domain_feature: true

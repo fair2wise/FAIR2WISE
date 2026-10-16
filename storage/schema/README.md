@@ -22,6 +22,7 @@ Implementation: `app/modules/f2w_agent/multi_kg.py` (`graph_id_for_path`,
 | `bl1101_motor_stage_map.yaml` | Reproducible motor → `BeamlineStage` map for ops ingest | Used by `scripts/ingest_bl1101.py` |
 | `tiled_sim_seed.yaml` | RNG seed and ESAF/proposal/sample templates for sim ingest | Tiled Graph / `scripts/ingest_tiled_sim.py` |
 | `prov_vocabulary.yaml` | W3C PROV-O *reference* (not LinkML) | See below |
+| `v0.3.0/matkg_schema.yaml`, `v0.3.0/rsoxs_schema.yaml` | Schema set 0.3.0 (T22C): additive Sample, MeasurementRun, Instrument and evidence slots | **Pending owner review**; selected only explicitly (`rsoxs_schema@0.3.0`). See below |
 
 Do not point the RSoXS extractor at `xray_schema.yaml`, and do not harvest
 X-ray fundamentals PDFs into `papers/rsoxs/`. Synchrotron tomography PDFs go
@@ -64,3 +65,21 @@ json2kg writes versioned files under `storage/kg/`:
 v1 files are never deleted during promotion. Experiment identity (ESAF,
 Proposal, Sample, BlueskyRun) is **not** stored in these JSON KGs from ops v8
 onward — see `mkdocs/docs/architecture.md` (Multi-KG layout / Tiled identity).
+
+## Schema set 0.3.0 (T22C, pending owner review)
+
+`v0.3.0/` holds a later, additive version of `matkg_schema.yaml` (0.3.0) and
+`rsoxs_schema.yaml` (rsoxs_v2). The files keep the base names, so
+`imports: [matkg_schema]` resolves to the sibling of the same version. The
+registry lists them as `matkg_schema@0.3.0` and `rsoxs_schema@0.3.0`, pending
+owner review of `docs/migration/reviews/H3/schema_diff_T22C.md`. No default
+path uses them: `registry.select`, snapshot builds and the default Tiled
+supported set all refuse them unless the caller asks explicitly.
+`bl1101_schema.yaml` and the xray schemas stay on the base set.
+
+## Licence
+
+Every LinkML schema here is under the repository licence (`LICENSE.txt`, LBNL
+BSD-style, SPDX `BSD-3-Clause-LBNL`). Until H3 S4 the files said `license: MIT`.
+The registry can rebuild the earlier bytes, so artifacts bound to those
+fingerprints still bind.

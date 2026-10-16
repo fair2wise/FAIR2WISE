@@ -89,5 +89,5 @@ Carried from `schema_inventory.json`:
 1. **Q1 (`rsoxs_schema_extract.yaml`):** keep it as known-broken, or approve a versioned fix?
 2. **Q2 (local default schema):** should local-profile extraction default to `matkg_schema.yaml` or `rsoxs_schema.yaml`?
 3. **Q3 (`extract_terms.py` normalizer):** keep its divergent behavior or unify it with `term_extractor/schema.py` (a reviewed behavior change)?
-4. **Q4 (license):** the schemas declare MIT, while the repository `LICENSE.txt` is LBNL BSD-style. Which applies?
+4. **Q4 (license):** the schemas declare MIT, while the repository `LICENSE.txt` is LBNL BSD-style. Which applies? *Answered at H3 (S4): LBNL BSD-style; applied in T22C (`license: BSD-3-Clause-LBNL`).*
 5. **Q5 (xray graphs):** should xray graphs be bound to `xray_schema.yaml`?

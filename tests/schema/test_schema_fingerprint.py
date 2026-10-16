@@ -96,7 +96,8 @@ def test_linkml_runtime_version_is_part_of_the_fingerprint(registry, monkeypatch
 def test_fingerprints_of_registered_assets_are_all_different(registry):
     fps = registered_fingerprints(registry)
     assert set(fps.values()) == {"matkg_schema", "rsoxs_schema", "bl1101_schema", "xray_schema",
-                                 "xray_schema_extract"}  # the known-broken extract overlay is not selectable
+                                 "xray_schema_extract",  # the known-broken extract overlay is not selectable
+                                 "matkg_schema@0.3.0", "rsoxs_schema@0.3.0"}  # T22C set, pending review
 
 
 def test_binding_verified_legacy_stale_and_unknown(registry):
@@ -109,3 +110,51 @@ def test_binding_verified_legacy_stale_and_unknown(registry):
         check_binding(registry, rsoxs, other)
     with pytest.raises(SchemaBindingError, match="not registered"):
         check_binding(registry, rsoxs, "ab" * 32)
+
+
+# --- T22C: H3 S4 licence line ------------------------------------------------
+
+def test_every_linkml_schema_declares_the_lbnl_bsd_licence(registry):
+    from app.modules.schema.loading import load_schema_view
+    from app.modules.schema.registry import LICENCE_ID
+
+    license_text = (REPO / "LICENSE.txt").read_text(encoding="utf-8")
+    assert "Lawrence Berkeley National Laboratory" in license_text and "Enhancements" in license_text
+    for entry in registry:
+        if entry.is_linkml:
+            raw = entry.abs_path.read_text(encoding="utf-8")
+            assert "license: MIT" not in raw and f"license: {LICENCE_ID}\n" in raw, entry.path
+            assert "See LICENSE.txt" in raw
+            if not entry.known_broken:
+                assert load_schema_view(entry).schema.license == LICENCE_ID
+
+
+def test_pre_s4_fingerprint_is_reconstructed_and_still_binds(registry):
+    """An artifact built before the S4 licence change (old fingerprint) still verifies, with its own status."""
+    from app.modules.schema.loading import pre_s4_fingerprint
+    from app.modules.schema.registry import pre_s4_bytes, sha256_bytes
+
+    for sid in LINKML:
+        entry = registry.get(sid)
+        old = pre_s4_fingerprint(entry)
+        assert old and old != closure_fingerprint(entry)
+        assert sha256_bytes(pre_s4_bytes(entry.abs_path.read_bytes())) == entry.pre_s4_sha256
+        assert check_binding(registry, entry, old) == "verified_pre_s4_licence"
+    rsoxs = registry.get("rsoxs_schema")
+    with pytest.raises(SchemaBindingError, match="bound to registered schema 'bl1101_schema'"):
+        check_binding(registry, rsoxs, pre_s4_fingerprint(registry.get("bl1101_schema")))
+
+
+def test_pre_s4_fingerprint_matches_a_true_copy_of_the_old_bytes(registry, copy_dir):
+    """Write the reconstructed pre-S4 files to disk: their ordinary fingerprint equals the computed one."""
+    from app.modules.schema.loading import pre_s4_fingerprint
+    from app.modules.schema.registry import pre_s4_bytes
+
+    for path in copy_dir.glob("*.yaml"):
+        before = pre_s4_bytes(path.read_bytes())
+        if before is not None:
+            path.write_bytes(before)
+    old_registry = SchemaRegistry.discover(copy_dir)
+    for sid in LINKML:
+        assert closure_fingerprint(old_registry.get(sid)) == pre_s4_fingerprint(registry.get(sid))
+        assert pre_s4_fingerprint(old_registry.get(sid)) is None  # those bytes never had the new block

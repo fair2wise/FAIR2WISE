@@ -128,6 +128,9 @@ class SnapshotRequest:
         now: Creation time (tests); default UTC now.
         owner_waiver_ref / disclosure_allowlist: Disclosure exceptions (reviewed, by key).
         registry: Schema registry to use (default: discover the packaged one).
+        allow_pending_review_schema: Bind a schema whose set is still pending owner review (T22C
+            ``rsoxs_schema@0.3.0``...). Off by default: no build uses an unreviewed schema unless asked twice,
+            by ``schema_id`` and by this flag.
     """
 
     corpus: str
@@ -149,6 +152,7 @@ class SnapshotRequest:
     owner_waiver_ref: Optional[str] = None
     disclosure_allowlist: FrozenSet[str] = frozenset()
     registry: Optional[SchemaRegistry] = None
+    allow_pending_review_schema: bool = False
 
 
 @dataclass(frozen=True)
@@ -236,6 +240,9 @@ def _choose_schema(request: SnapshotRequest, registry: SchemaRegistry):
             entry, source = registry.get(DEFAULT_SCHEMA_ID), "default"
     if not entry.is_linkml or entry.known_broken:
         raise SnapshotError(f"{entry.path} cannot be bound: not a selectable LinkML schema")
+    if entry.pending_review and not request.allow_pending_review_schema:
+        raise SnapshotError(f"{entry.path} is pending owner review (schema set {entry.schema_set}); pass "
+                            "allow_pending_review_schema=True to build with it")
     return entry, source
 
 

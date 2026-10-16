@@ -8,7 +8,7 @@ Works on BOTH:
 
 Output schema is exactly what KnowledgeGraph expects.
 
-Author: ChatGPT License: MIT
+Author: ChatGPT License: LBNL BSD-style (BSD-3-Clause-LBNL), see LICENSE.txt
 """
 from __future__ import annotations
 import json, argparse, hashlib
