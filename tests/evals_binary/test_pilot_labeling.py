@@ -218,9 +218,12 @@ def test_explicit_dotenv_only(monkeypatch, tmp_path):
     named = tmp_path / "owner.env"
     named.write_text("CBORG_API_KEY=from-the-named-file\n")
     monkeypatch.setenv("F2W_DOTENV", str(named))
-    cli._load_explicit_dotenv()
-    assert os.environ["CBORG_API_KEY"] == "from-the-named-file"
-    monkeypatch.delenv("CBORG_API_KEY")
+    try:
+        cli._load_explicit_dotenv()
+        assert os.environ["CBORG_API_KEY"] == "from-the-named-file"
+    finally:
+        # load_dotenv wrote os.environ directly; monkeypatch did not record it, so remove it here
+        os.environ.pop("CBORG_API_KEY", None)
 
 
 def test_real_client_goes_through_the_shared_admission_slot(monkeypatch):
