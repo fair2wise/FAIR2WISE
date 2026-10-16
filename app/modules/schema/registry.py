@@ -394,12 +394,21 @@ class SchemaRegistry:
                 return None  # same name, different bytes: a different, unregistered asset
         return entry
 
-    def for_graph(self, graph_path: str) -> Optional[SchemaEntry]:
-        """Overlay for a KG file name, reusing ``multi_kg.schema_path_for_graph`` (filename patterns)."""
+    def for_graph(self, graph_path: str, schema_set: Optional[str] = None) -> Optional[SchemaEntry]:
+        """Overlay for a KG file name, reusing ``multi_kg.schema_path_for_graph`` (filename patterns).
+
+        With ``schema_set`` (an explicit selection, never a default), the set's version of that overlay is
+        returned when the set has one; an overlay the set does not contain stays on the base entry.
+        """
         from ..f2w_agent.multi_kg import schema_path_for_graph
 
         path = schema_path_for_graph(graph_path)
-        return self.resolve(path) if path else None
+        entry = self.resolve(path) if path else None
+        if entry is None or schema_set is None:
+            return entry
+        if not any(s.version == schema_set for s in SCHEMA_SETS):
+            raise RegistryError(f"schema set {schema_set!r} is not registered")
+        return self.entries.get(f"{entry.schema_id}@{schema_set}", entry)
 
     def select(self, schema_id: str, purpose: str = "extraction", *, allow_pending_review: bool = False) -> SchemaEntry:
         """Entry that may be used for ``purpose``; known-broken or unsuitable assets raise a clear error.

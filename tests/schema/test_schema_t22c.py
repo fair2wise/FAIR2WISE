@@ -225,3 +225,12 @@ def test_frozen_t22b_normalization_outcomes_hold_under_the_new_version(registry)
     for sid, head in (("matkg_schema@0.3.0", "Thing"), ("rsoxs_schema@0.3.0", "RSoXSMeasurement")):
         helper = load_helper(registry.get(sid))
         assert [_outcome(helper, copy.deepcopy(t)) for t in TERMS] == [(head, "RSoXS", FROZEN_RELATIONS)] + FROZEN_TAIL
+
+
+def test_graph_binding_under_a_set_is_explicit(registry):
+    assert registry.for_graph("matkg_rsoxs_v2.json").schema_id == "rsoxs_schema"
+    assert registry.for_graph("matkg_rsoxs_v2.json", schema_set="0.3.0").schema_id == "rsoxs_schema@0.3.0"
+    assert registry.for_graph("matkg_bl1101_v9.json", schema_set="0.3.0").schema_id == "bl1101_schema"
+    assert registry.for_graph("matkg_with_code.json", schema_set="0.3.0") is None
+    with pytest.raises(RegistryError, match="not registered"):
+        registry.for_graph("matkg_rsoxs_v2.json", schema_set="9.9.9")
