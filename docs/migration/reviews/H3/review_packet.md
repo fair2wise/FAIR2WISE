@@ -2,7 +2,7 @@
 
 Gate: H3
 Approver: project owner
-Status: **awaiting owner decision**
+Status: **approved 2026-10-16, B4 to follow** (see `decision.json`)
 
 H3 asks the owner to approve the PASS/FAIL cases and oracles, the schema
 binding under the preserved schema, the field mappings for extracted records,
@@ -134,6 +134,6 @@ what B7/C4 approve. Approving H3 does not publish anything.
 
 ## Owner decision
 
-Decision:
-Limits:
-Date:
+Decision: approved ("Approve, B4 to follow"); rest of packet as recommended, with the F2/F8 changes in `decision.json`
+Limits: B4 pilot papers and labeler open; C4 paid rerun needs owner go; publication still H5
+Date: 2026-10-16
