@@ -810,7 +810,7 @@ def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mappi
     ``schema_pending_review`` (a schema set such as 0.3.0 that binds only with explicit selection),
     ``schema_unselectable``, ``validation_mismatch`` (validation.json records another fingerprint or a failure).
     """
-    from app.modules.schema.loading import closure_fingerprint  # lazy: keeps importers of releases light
+    from app.modules.schema.loading import SchemaLoadError, closure_fingerprint  # lazy import
     from app.modules.schema.registry import RegistryError, SchemaRegistry
 
     block = manifest.schema_block
@@ -833,7 +833,11 @@ def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mappi
         raise ReleaseRefused("schema_pending_review",
                              f"schema {block.name!r} belongs to set {entry.schema_set}, pending owner review; it "
                              "binds only with explicit selection (--allow-pending-review-schema)")
-    actual = closure_fingerprint(entry)
+    try:
+        actual = closure_fingerprint(entry)
+    except SchemaLoadError:
+        raise ReleaseRefused("schema_unselectable",
+                             f"schema {block.name!r} import closure cannot be resolved") from None
     if block.import_fingerprint != actual:
         raise ReleaseRefused("schema_fingerprint_mismatch",
                              f"schema {block.name!r} closure fingerprint differs from the manifest "
@@ -851,7 +855,7 @@ def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mappi
 # --------------------------------------------------------------------------- evidence availability
 
 _WEB_SOURCE = re.compile(r"^(?:[a-z][a-z0-9+.-]*://|(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}/)")
-_PRIVATE_REF = re.compile(r"^private:(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._:/-]+$")
+_PRIVATE_REF = re.compile(r"^private:(?!.*\.\.)[A-Za-z0-9._:/-]+$")
 
 
 @dataclass

@@ -77,9 +77,10 @@ def test_evidence_with_other_bytes_or_an_invalid_ref_is_refused(fx, tmp_path):
                                   evidence_root=root)
     assert err.value.code == "evidence_mismatch"
     for bad in ({"ref": "/Users/someone/papers/paper_alpha.pdf"}, {"ref": "private:../../etc/passwd"},
-                {"sha256": "short"}):
-        assert _rows(_check(fx, inventory=_inventory(**bad), evidence_root=root))["paper_alpha.pdf"][
-            "status"] == "invalid"
+                {"ref": "private:papers/../../x"}, {"sha256": "short"}):
+        for store in (root, None):  # invalid with or without a mounted store; the bad ref is never recorded
+            row = _rows(_check(fx, inventory=_inventory(**bad), evidence_root=store))["paper_alpha.pdf"]
+            assert row["status"] == "invalid" and row["ref"] is None
 
 
 def test_web_sources_are_recorded_external_and_never_fetched(empty_fx):

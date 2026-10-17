@@ -215,6 +215,16 @@ def test_unregistered_schema_name_is_refused(fx):
     refused(fx, "schema_unregistered")
 
 
+def test_schema_with_an_unresolvable_import_closure_is_refused(fx, monkeypatch):
+    from app.modules.schema import loading
+
+    def broken(entry, **_):
+        raise loading.SchemaLoadError("import closure cannot be resolved")
+
+    monkeypatch.setattr(loading, "closure_fingerprint", broken)
+    refused(fx, "schema_unselectable")
+
+
 def test_validation_json_must_be_present_and_agree(fx):
     fx.snapshot.validation_path.chmod(0o644)
     fx.snapshot.validation_path.unlink()
