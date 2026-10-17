@@ -1058,10 +1058,12 @@ def bind_binary_report(report_bytes: bytes, *, ref: str, corpus: str, snapshot_i
     """Bind an executed ``evals.binary`` report to this snapshot and read its verdict.
 
     The report must carry a ``subject`` block ``{"kind": "kg_snapshot", "corpus", "snapshot_id", "graph_sha256",
-    "manifest_sha256"}`` naming the bytes it ran against. The verdict starts from ``gate.status`` and can only go
-    down: a PROVISIONAL marker (``gate.provisional``, a ``PROVISIONAL`` status, or any result flagged
-    ``provisional``) caps it at PROVISIONAL; blocking cases or a non-completed/non-PASS required result cap it at
-    NOT_PASS. Nothing here turns PROVISIONAL or NOT_PASS into PASS.
+    "manifest_sha256"}`` naming the bytes it ran against (the runner's ``--subject-snapshot`` writes it). The
+    verdict starts from ``gate.status`` and can only go down. The canonical provisional marker is the boolean
+    ``gate.provisional`` the runner writes; a ``PROVISIONAL`` status, or any result whose ``reported_verdict``
+    is ``PROVISIONAL`` (the per-result form the flag is derived from, checked so a report whose flag disagrees
+    with its rows is still capped), caps it at PROVISIONAL. Blocking cases or a non-completed/non-PASS
+    required result cap it at NOT_PASS. Nothing here turns PROVISIONAL or NOT_PASS into PASS.
 
     Raises:
         ReleaseRefused: ``binary_report_invalid``, ``binary_report_unbound`` (no subject) or
@@ -1089,7 +1091,9 @@ def bind_binary_report(report_bytes: bytes, *, ref: str, corpus: str, snapshot_i
         raise ReleaseRefused("binary_report_mismatch", "the binary report was run against a different snapshot")
     verdict, reasons = str(status), []
     results = [r for r in report.get("results") or [] if isinstance(r, Mapping)]
-    if gate.get("provisional") or any(r.get("provisional") for r in results):
+    if gate.get("provisional") is not None and not isinstance(gate.get("provisional"), bool):
+        raise ReleaseRefused("binary_report_invalid", "gate.provisional must be a boolean")
+    if gate.get("provisional") or any(r.get("reported_verdict") == "PROVISIONAL" for r in results):
         verdict = _lower(verdict, "PROVISIONAL")
         reasons.append("provisional_results")
     if gate.get("blocking_cases") or any(

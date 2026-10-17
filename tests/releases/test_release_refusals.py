@@ -266,7 +266,7 @@ def test_report_without_a_subject_or_of_another_kind_is_refused(fx):
     ("NOT_PASS", {}, "NOT_PASS"),
     ("PROVISIONAL", {}, "PROVISIONAL"),
     ("PASS", {"results": [{"case_id": "X", "required": True, "execution_state": "completed",
-                           "verdict": "PASS", "provisional": True}]}, "PROVISIONAL"),
+                           "verdict": "PASS", "reported_verdict": "PROVISIONAL"}]}, "PROVISIONAL"),
     ("PASS", {"gate": {"status": "PASS", "provisional": True}}, "PROVISIONAL"),
     ("PASS", {"results": [{"case_id": "X", "required": True, "execution_state": "skipped",
                            "verdict": None}]}, "NOT_PASS"),
