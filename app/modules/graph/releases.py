@@ -10,8 +10,21 @@ Three checks, none of which needs Tiled, a network or credentials:
   commit must be a full object id (a branch, tag or abbreviation never selects data), the blob listed by
   ``git ls-tree`` must hash to the pinned SHA-256, and the manifest and flat copies must agree.
 
-Git is read with fixed argument lists (``subprocess`` without a shell) and a scrubbed environment. Only this
-module talks to Git; snapshot creation does not import it for that purpose and calls no subprocess.
+T26B adds the commit-ready release path (operator facade: ``scripts/prepare_kg_release.py``):
+
+* :func:`validate_commit_candidate` - schema binding, validation.json and manifest hashes, disclosure re-run,
+  private dependencies (:func:`check_private_dependencies`), evidence availability
+  (:func:`check_evidence_availability`), binding to an executed binary report (:func:`bind_binary_report`;
+  a PROVISIONAL or NOT_PASS verdict is recorded as such, never raised) and a Git preflight
+  (:func:`check_worktree`). :func:`build_release_record` turns the result into the tested-release record.
+* :func:`verify_snapshot_selection` - after the owner commits: the bytes at ``(commit, path)`` must equal the
+  tested bytes; :func:`build_data_release_descriptor` then emits the T26A descriptor (state ``candidate``).
+* :func:`lookup_snapshot`, :func:`export_snapshot_selection`, :func:`verify_release_dependencies` - immutable
+  lookup, hash-checked export to a mount and the promotion-time private-asset gate.
+
+Git is read with fixed argument lists (``subprocess`` without a shell) and a scrubbed environment, and only
+through :data:`GIT_READ_ONLY_COMMANDS`: this module cannot add, commit, tag, fetch or push. Only this module
+talks to Git; snapshot creation does not import it for that purpose and calls no subprocess.
 """
 from __future__ import annotations
 
@@ -212,6 +225,27 @@ def _snippet_volume(graph: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _string_findings(location: str, text: str, key: Optional[str]) -> List[Finding]:
+    """R3/R4/R5 findings for one string value (the value itself is never stored)."""
+    found: List[Finding] = []
+    hit = False
+    for name, pattern in _SECRET_PATTERNS:
+        if pattern.search(text):
+            found.append(Finding("R3", "reject", location, f"secret-like value ({name})", key))
+            hit = True
+            break
+    if not hit:
+        for token in _TOKEN.findall(text):
+            if not _HEX_ONLY.match(token) and _entropy(token) >= _ENTROPY_BITS:
+                found.append(Finding("R3", "reject", location, "high-entropy token", key))
+                break
+    if _LOCAL_PATH.search(text):
+        found.append(Finding("R4", "reject", location, "absolute local path", key))
+    if _BEARER_URL.search(text):
+        found.append(Finding("R5", "reject", location, "signed or tokenized URL", key))
+    return found
+
+
 def check_disclosure(
     graph: Mapping[str, Any],
     *,
@@ -239,22 +273,7 @@ def check_disclosure(
             key = allowlist_key("graph.json", record_id, field_name, text)
             if key in allowlist:
                 continue
-            location = f"{record_id}:{where}"
-            hit = False
-            for name, pattern in _SECRET_PATTERNS:
-                if pattern.search(text):
-                    findings.append(Finding("R3", "reject", location, f"secret-like value ({name})", key))
-                    hit = True
-                    break
-            if not hit:
-                for token in _TOKEN.findall(text):
-                    if not _HEX_ONLY.match(token) and _entropy(token) >= _ENTROPY_BITS:
-                        findings.append(Finding("R3", "reject", location, "high-entropy token", key))
-                        break
-            if _LOCAL_PATH.search(text):
-                findings.append(Finding("R4", "reject", location, "absolute local path", key))
-            if _BEARER_URL.search(text):
-                findings.append(Finding("R5", "reject", location, "signed or tokenized URL", key))
+            findings.extend(_string_findings(f"{record_id}:{where}", text, key))
     findings.sort(key=lambda f: (f.rule, f.location, f.detail))
     status = "pass" if not findings else ("owner_waiver" if waiver_ref else "fail")
     return DisclosureReport(DISCLOSURE_CHECK_VERSION, status, findings, _snippet_volume(graph),
@@ -343,15 +362,35 @@ def verify_snapshot_dir(snapshot_dir: Path) -> VerifiedSnapshot:
 _GIT_ENV = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "LC_ALL": "C", "GIT_TERMINAL_PROMPT": "0",
             "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_OPTIONAL_LOCKS": "0"}
 
+#: The only Git subcommands this module can run. All of them read; none of them writes objects, refs, the
+#: index, the working tree or a remote. There is no add, commit, tag, fetch or push path (T26B acceptance:
+#: "no automatic Git push"); the owner runs the printed commands by hand.
+GIT_READ_ONLY_COMMANDS = frozenset({"cat-file", "ls-tree", "rev-parse", "status", "check-ignore", "hash-object",
+                                    "ls-files"})
 
-def _git(repo: Path, *args: str) -> bytes:
-    """Run ``git -C <repo> ...`` with an argument list (no shell) and a scrubbed environment."""
+
+def _git(repo: Path, *args: str, stdin: Optional[bytes] = None, ok_codes: Tuple[int, ...] = (0,)) -> bytes:
+    """Run a read-only ``git -C <repo> ...`` with an argument list (no shell) and a scrubbed environment.
+
+    Raises:
+        ReleaseVerificationError: ``git_write_refused`` for any subcommand outside
+            :data:`GIT_READ_ONLY_COMMANDS` (or ``hash-object -w``), before any process starts; ``git`` when
+            Git cannot run or exits with a code outside ``ok_codes``.
+    """
+    if not args or args[0] not in GIT_READ_ONLY_COMMANDS or (
+            args[0] == "hash-object" and any(a == "--write" or a.startswith("-w") for a in args[1:])):
+        raise ReleaseVerificationError("git_write_refused",
+                                       f"git {args[0] if args else ''} is not a read-only command; the release "
+                                       "tooling never writes to Git (the owner runs the printed commands)")
     try:
+        # Paths are literal pathspecs (a '*' in a path is not a glob); check-ignore takes plain paths only.
+        env = _GIT_ENV if args[0] == "check-ignore" else {**_GIT_ENV, "GIT_LITERAL_PATHSPECS": "1"}
         done = subprocess.run(["git", "-C", str(repo), "--no-pager", *args], capture_output=True, check=False,
-                              env=_GIT_ENV, timeout=60)
+                              env=env, timeout=60,
+                              **({"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}))
     except (OSError, subprocess.SubprocessError) as exc:
         raise ReleaseVerificationError("git", f"git could not run: {type(exc).__name__}") from None
-    if done.returncode != 0:
+    if done.returncode not in ok_codes:
         raise ReleaseVerificationError("git", f"git {args[0]} failed")
     return done.stdout
 
@@ -407,6 +446,7 @@ class VerifiedRelease:
     graph: VerifiedArtifact
     manifest_artifact: VerifiedArtifact
     compat: Tuple[VerifiedArtifact, ...]
+    validation: Optional[VerifiedArtifact] = None
 
 
 def verify_git_release(
@@ -421,8 +461,10 @@ def verify_git_release(
     Args:
         repo: Git repository (working tree or bare); only objects are read, never the working tree.
         data_commit: Full commit id.
-        artifacts: Descriptor-style entries ``{"role": graph|manifest|compat_copy, "path", "sha256",
-            "git_blob"?}``: exactly one graph and one manifest, any number of compat copies.
+        artifacts: Descriptor-style entries ``{"role": graph|manifest|validation|compat_copy, "path",
+            "sha256", "git_blob"?}``: exactly one graph and one manifest, at most one validation report (it
+            must be the sibling ``validation.json`` and hash to ``validation.report_sha256``), any number of
+            compat copies.
         supported_schema_fingerprints: When given, the manifest's ``schema.import_fingerprint`` must be in it.
 
     Raises:
@@ -433,7 +475,7 @@ def verify_git_release(
         by_role.setdefault(str(item.get("role")), []).append(item)
     if len(by_role.get("graph", [])) != 1 or len(by_role.get("manifest", [])) != 1:
         raise ReleaseVerificationError("layout", "exactly one graph and one manifest artifact are required")
-    if set(by_role) - {"graph", "manifest", "compat_copy"}:
+    if set(by_role) - {"graph", "manifest", "validation", "compat_copy"} or len(by_role.get("validation", [])) > 1:
         raise ReleaseVerificationError("layout", "unsupported artifact role")
     loaded: Dict[str, List[VerifiedArtifact]] = {}
     for role, items in by_role.items():
@@ -461,8 +503,997 @@ def verify_git_release(
     for art in loaded.get("compat_copy", []):
         if art.data != graph.data or declared.get(art.path) != art.sha256:
             raise ReleaseVerificationError("manifest_mismatch", f"compat copy {art.path} is not the graph bytes")
+    validation = (loaded.get("validation") or [None])[0]
+    if validation is not None and (validation.path != graph.path.rsplit("/", 1)[0] + "/validation.json"
+                                   or validation.sha256 != manifest.validation.report_sha256):
+        raise ReleaseVerificationError("manifest_mismatch",
+                                       "validation.json is not the report the manifest binds")
     if supported_schema_fingerprints is not None and (
             manifest.schema_block.import_fingerprint not in supported_schema_fingerprints):
         raise ReleaseVerificationError("schema_unsupported",
                                        "manifest schema fingerprint is not in the supported set")
-    return VerifiedRelease(data_commit, manifest, graph, manifest_art, tuple(loaded.get("compat_copy", [])))
+    return VerifiedRelease(data_commit, manifest, graph, manifest_art, tuple(loaded.get("compat_copy", [])),
+                           validation)
+
+
+# =========================================================================== T26B: commit-ready release
+#
+# prepare (before the owner commits)                 after the owner commits
+# ------------------------------------                -------------------------------------------------
+# validate_commit_candidate(repo, snapshot, report)   verify_snapshot_selection(repo, record, commit)
+#   -> CommitCandidate -> build_release_record()        -> committed bytes == tested bytes, by commit+path
+#   (tested bytes + binary verdict + owner commands)  build_data_release_descriptor() (T26A schema 9.2)
+#                                                     export_snapshot_selection() / lookup_snapshot()
+#
+# Nothing here writes to Git. The owner runs the printed `git add` / `git commit` commands; nothing pushes.
+
+RELEASE_RECORD_KIND = "f2w.kg_tested_release"
+RELEASE_RECORD_VERSION = "1"
+PRIVATE_DEPENDENCY_CHECK_VERSION = "1"
+EVIDENCE_CHECK_VERSION = "1"
+BINARY_REPORT_KIND = "binary_evaluation_report"
+#: Verdicts in increasing order of strength. A verdict is only ever lowered, never raised.
+BINARY_VERDICTS = ("NOT_PASS", "PROVISIONAL", "PASS")
+
+
+class ReleaseRefused(ReleaseVerificationError):
+    """A snapshot is not commit-ready, or committed bytes are not the tested bytes.
+
+    Attributes:
+        code: Stable refusal reason (see ``REFUSAL_CODES`` in the module docs / the T26B report).
+        findings: Supporting findings (private-dependency or disclosure rules); values are never echoed.
+    """
+
+    def __init__(self, code: str, message: str, findings: Sequence[Finding] = ()) -> None:
+        super().__init__(code, message)
+        self.findings = list(findings)
+
+
+def git_blob_id(data: bytes, object_format: str = "sha1") -> str:
+    """Git blob object id of ``data`` (what ``git hash-object --no-filters`` prints), computed without Git."""
+    if object_format not in ("sha1", "sha256"):
+        raise ReleaseRefused("git", f"unsupported Git object format {object_format!r}")
+    return hashlib.new(object_format, b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def canonical_json_bytes(doc: Any) -> bytes:
+    """Sorted keys, two-space indent, UTF-8, trailing newline (records, reports, descriptors)."""
+    return (json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def _nul_split(blob: bytes) -> List[str]:
+    return [part.decode("utf-8", "surrogateescape") for part in blob.split(b"\0") if part]
+
+
+# --------------------------------------------------------------------------- Git working-tree state
+
+
+def _object_format(repo: Path) -> str:
+    try:
+        fmt = _git(repo, "rev-parse", "--show-object-format").decode().strip()
+    except ReleaseVerificationError:
+        fmt = "sha1"  # Git before 2.25 knows only SHA-1 repositories
+    return fmt or "sha1"
+
+
+def _head(repo: Path) -> Optional[str]:
+    out = _git(repo, "rev-parse", "-q", "--verify", "HEAD^{commit}", ok_codes=(0, 1)).decode().strip()
+    return out or None
+
+
+def _repo_root(repo: Path) -> Path:
+    """``repo`` must be the top of a Git working tree (not a subdirectory, not a bare repository)."""
+    repo = Path(repo)
+    try:
+        inside = _git(repo, "rev-parse", "--is-inside-work-tree").decode().strip()
+        top = Path(_git(repo, "rev-parse", "--show-toplevel").decode().strip())
+    except ReleaseVerificationError:
+        raise ReleaseRefused("not_a_work_tree", "repository is not a Git working tree") from None
+    if inside != "true" or top.resolve() != repo.resolve():
+        raise ReleaseRefused("not_a_work_tree", "pass the top directory of the Git working tree")
+    return repo
+
+
+def _tree_blobs(repo: Path, commit: Optional[str], paths: Sequence[str]) -> Dict[str, Tuple[str, str]]:
+    """``path -> (mode, blob)`` for regular entries of ``paths`` at ``commit`` (empty when no commit)."""
+    if not commit or not paths:
+        return {}
+    out: Dict[str, Tuple[str, str]] = {}
+    for entry in _nul_split(_git(repo, "ls-tree", "-z", commit, "--", *paths)):
+        meta, _, name = entry.partition("\t")
+        mode, kind, blob = meta.split(" ")
+        out[name] = (mode, blob if kind == "blob" else kind)
+    return out
+
+
+def _index_blobs(repo: Path, paths: Sequence[str]) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for entry in _nul_split(_git(repo, "ls-files", "-s", "-z", "--", *paths)):
+        meta, _, name = entry.partition("\t")
+        out[name] = meta.split(" ")[1]
+    return out
+
+
+def _tracked(repo: Path, paths: Sequence[str]) -> set:
+    return set(_nul_split(_git(repo, "ls-files", "-z", "--", *paths))) if paths else set()
+
+
+def _ignored(repo: Path, paths: Sequence[str]) -> set:
+    """Paths Git would ignore (tracked files are never reported: ``check-ignore`` consults the index)."""
+    if not paths:
+        return set()
+    out = _git(repo, "check-ignore", "-z", "--stdin", stdin=b"".join(p.encode() + b"\0" for p in paths),
+               ok_codes=(0, 1))
+    return set(_nul_split(out))
+
+
+def check_worktree(repo: Path, candidate: Mapping[str, bytes], *, object_format: str,
+                   allow_untracked: bool = False) -> Dict[str, Any]:
+    """Git preflight for a commit candidate (``candidate`` maps repo paths to the tested bytes).
+
+    Refusals: ``dirty_worktree`` (any staged, modified, deleted, renamed or conflicted path outside the candidate,
+    or an untracked one unless ``allow_untracked``), ``frozen_overwrite`` (a candidate path already committed
+    with other bytes, or modified in the working tree), ``staged_bytes_differ`` (the index holds other bytes for a
+    candidate path) and ``filter_would_change_bytes`` (``.gitattributes``/config filters would store different
+    bytes than the tested ones).
+    """
+    paths = sorted(candidate)
+    head = _head(repo)
+    entries = _nul_split(_git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"))
+    dirty: List[str] = []
+    untracked_outside = 0
+    for entry in entries:
+        code, path = entry[:2], entry[3:]
+        if path in candidate:
+            if code not in ("??", "A ", "AM"):  # new file; "AM" is caught by the staged-bytes check below
+                raise ReleaseRefused("frozen_overwrite",
+                                     f"{path} is a frozen snapshot path that Git sees as changed ({code.strip()})")
+            continue
+        if code == "??" and allow_untracked:
+            untracked_outside += 1
+            continue
+        dirty.append(f"{code.strip() or '?'} {path}")
+    if dirty:
+        raise ReleaseRefused("dirty_worktree",
+                             f"the working tree has {len(dirty)} change(s) outside the candidate (first: "
+                             f"{dirty[0]}); commit or stash them first so only the tested files are committed")
+    committed = _tree_blobs(repo, head, paths)
+    staged = _index_blobs(repo, paths)
+    already: List[str] = []
+    for path in paths:
+        blob = git_blob_id(candidate[path], object_format)
+        if path in committed:
+            if committed[path][1] != blob:
+                raise ReleaseRefused("frozen_overwrite",
+                                     f"{path} is already committed with different bytes; snapshots are immutable")
+            already.append(path)
+        if path in staged and staged[path] != blob:
+            raise ReleaseRefused("staged_bytes_differ", f"the index holds different bytes for {path}")
+        filtered = _git(repo, "hash-object", "--stdin", f"--path={path}", stdin=candidate[path]).decode().strip()
+        if filtered != blob:
+            raise ReleaseRefused("filter_would_change_bytes",
+                                 f"Git attributes or filters would store {path} with other bytes; mark KG paths "
+                                 "-text (release_contract.md section 3)")
+    return {"object_format": object_format, "base_commit": head, "worktree_clean": True,
+            "untracked_outside_candidate": untracked_outside, "already_committed": already}
+
+
+# --------------------------------------------------------------------------- private dependencies
+
+#: Repository roots whose files may be private (gitignored papers, parsed packages, job state ...).
+_PATH_TOKEN = re.compile(
+    r"(?<![A-Za-z0-9_.~/:@%-])(?:\./)?((?:papers|storage|workdir|runs|logs|data|\.cache|AGENT|\.agents)/"
+    r"[A-Za-z0-9._/@+%=,~-]*)")
+_SOURCE_INDEX = ("storage/source_index/", "source_index/")
+_CROP_FIELDS = frozenset({"crop", "crops", "crop_path", "crop_url", "crop_ref", "figure_crop", "figure_crops",
+                          "image_path", "image_url", "image_bytes", "image_b64", "figure_image", "page_image"})
+_DATA_IMAGE = re.compile(r"(?i)\bdata:image/")
+
+
+def _walk_keys(value: Any, where: str) -> Iterator[Tuple[str, str, Any]]:
+    """``(location, key, value)`` for every mapping entry at any depth."""
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            here = f"{where}.{key}" if where else str(key)
+            yield here, str(key), item
+            yield from _walk_keys(item, here)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            yield from _walk_keys(item, f"{where}[{index}]")
+
+
+def _path_tokens(text: str) -> List[str]:
+    out = []
+    for match in _PATH_TOKEN.finditer(text):
+        token = match.group(1).rstrip(".,;:)]}'\"")
+        if token.count("/") >= 1 and ".." not in token and not token.endswith("/"):
+            out.append(token)
+    return out
+
+
+def _is_parsed_package(path: str) -> bool:
+    return "/parsed/" in f"/{path}" or path.endswith("/paper.json") or path.endswith(".parsed.json")
+
+
+def _manifest_refs(manifest: KGManifest) -> List[Tuple[str, str]]:
+    """``(location, ref)`` of every repository reference a manifest makes."""
+    refs: List[Tuple[str, str]] = [("schema.path", manifest.schema_block.path)]
+    refs += [(f"inputs[{i}].ref", item.ref) for i, item in enumerate(manifest.inputs)]
+    if manifest.corpus_revision.source_list_ref:
+        refs.append(("corpus_revision.source_list_ref", manifest.corpus_revision.source_list_ref))
+    if manifest.validation.report_ref:
+        refs.append(("validation.report_ref", manifest.validation.report_ref))
+    return refs
+
+
+def check_private_dependencies(
+    repo: Path,
+    graph: Mapping[str, Any],
+    manifest_doc: Mapping[str, Any],
+    validation_doc: Mapping[str, Any],
+    *,
+    candidate_paths: Collection[str],
+    allowlist: Collection[str] = frozenset(),
+) -> List[Finding]:
+    """Refuse dependencies on material that must stay out of Git (task T26B; release_contract.md section 4).
+
+    Rules (all ``reject``):
+
+    * ``D1`` a reference into the source-RAG index (``storage/source_index/``).
+    * ``D2`` a repository path, in the graph or a manifest reference, that Git ignores (gitignored ``papers/``,
+      ``storage/terminology/*.json`` terms files, job state ...). Tracked files (for example the beamline ops
+      documents kept by O-G1) and the candidate's own files are fine.
+    * ``D3`` figure crops or page images: a non-empty crop/image field, or an embedded ``data:image/`` value.
+    * ``D4`` a parsed paper package (``.../parsed/...``, ``paper.json``, ``*.parsed.json``).
+    * ``D5`` a manifest reference that is repository-relative but not tracked in Git (use ``private:``).
+    * ``R3``/``R4``/``R5`` credentials, absolute local paths and signed URLs in ``manifest.json`` and
+      ``validation.json`` (the graph itself is covered by :func:`check_disclosure`).
+
+    Values are never echoed; a finding names the record, field and rule only.
+    """
+    findings: List[Finding] = []
+    graph_tokens: Dict[str, str] = {}
+    for record_id, field_name, value in _records(graph):
+        for where, key, item in [(field_name, field_name, value)] + list(_walk_keys(value, field_name)):
+            if key in _CROP_FIELDS and item not in (None, "", [], {}):
+                findings.append(Finding("D3", "reject", f"{record_id}:{where}", "figure crop or page image field"))
+        for where, text in _walk(value, field_name):
+            if allowlist_key("graph.json", record_id, field_name, text) in allowlist:
+                continue
+            location = f"{record_id}:{where}"
+            if _DATA_IMAGE.search(text):
+                findings.append(Finding("D3", "reject", location, "embedded image bytes"))
+            for token in _path_tokens(text):
+                if token.startswith(_SOURCE_INDEX):
+                    findings.append(Finding("D1", "reject", location, "reference into the source-RAG index"))
+                elif _is_parsed_package(token):
+                    findings.append(Finding("D4", "reject", location, "reference to a parsed paper package"))
+                elif token not in candidate_paths:
+                    graph_tokens.setdefault(token, location)
+    refs = _manifest_refs(parse_manifest(canonical_json_bytes(manifest_doc)))
+    repo_refs = {ref: where for where, ref in refs
+                 if not ref.startswith("private:") and ref not in candidate_paths}
+    for ref, where in repo_refs.items():
+        if ref.startswith(_SOURCE_INDEX):
+            findings.append(Finding("D1", "reject", f"manifest:{where}", "reference into the source-RAG index"))
+        elif _is_parsed_package(ref):
+            findings.append(Finding("D4", "reject", f"manifest:{where}", "reference to a parsed paper package"))
+    ignored = _ignored(repo, sorted(set(graph_tokens) | set(repo_refs)))
+    for token in sorted(ignored & set(graph_tokens)):
+        findings.append(Finding("D2", "reject", graph_tokens[token],
+                                f"references a gitignored path under {token.split('/', 1)[0]}/"))
+    tracked = _tracked(repo, sorted(repo_refs))
+    for ref, where in sorted(repo_refs.items()):
+        if ref in ignored:
+            findings.append(Finding("D2", "reject", f"manifest:{where}",
+                                    f"references a gitignored path under {ref.split('/', 1)[0]}/"))
+        elif ref not in tracked:
+            findings.append(Finding("D5", "reject", f"manifest:{where}",
+                                    "repository reference is not tracked in Git; use a private: reference"))
+    for label, doc in (("manifest", manifest_doc), ("validation", validation_doc)):
+        for where, text in _walk(doc, ""):
+            findings.extend(_string_findings(f"{label}:{where}", text, None))
+    unique = {(f.rule, f.location, f.detail): f for f in findings}
+    return sorted(unique.values(), key=lambda f: (f.rule, f.location, f.detail))
+
+
+# --------------------------------------------------------------------------- schema binding
+
+
+def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mapping[str, Any], *,
+                         allow_pending_review_schema: bool = False) -> Dict[str, Any]:
+    """The manifest's schema block must name a selectable schema of the repository, by path, bytes and closure
+    fingerprint, and agree with ``validation.json``.
+
+    Refusals: ``schema_fingerprint_missing``, ``schema_unregistered``, ``schema_mismatch`` (path or file hash),
+    ``schema_fingerprint_mismatch`` (closure fingerprint, including a pre-S4 fingerprint),
+    ``schema_pending_review`` (a schema set such as 0.3.0 that binds only with explicit selection),
+    ``schema_unselectable``, ``validation_mismatch`` (validation.json records another fingerprint or a failure).
+    """
+    from app.modules.schema.loading import SchemaLoadError, closure_fingerprint  # lazy import
+    from app.modules.schema.registry import RegistryError, SchemaRegistry
+
+    block = manifest.schema_block
+    if not block.import_fingerprint:
+        raise ReleaseRefused("schema_fingerprint_missing",
+                             "manifest schema.import_fingerprint is missing; the importer cannot bind the schema")
+    schema_dir = Path(repo) / "storage" / "schema"
+    if not schema_dir.is_dir():
+        raise ReleaseRefused("schema_unregistered", "the repository has no storage/schema directory")
+    registry = SchemaRegistry.discover(schema_dir)
+    try:
+        entry = registry.get(block.name)
+    except RegistryError:
+        raise ReleaseRefused("schema_unregistered", f"schema {block.name!r} is not registered") from None
+    if entry.path != block.path or entry.sha256 != block.sha256:
+        raise ReleaseRefused("schema_mismatch", f"schema {block.name!r} bytes or path differ from the manifest")
+    if not entry.is_linkml or entry.known_broken:
+        raise ReleaseRefused("schema_unselectable", f"schema {block.name!r} is not a selectable LinkML schema")
+    if entry.pending_review and not allow_pending_review_schema:
+        raise ReleaseRefused("schema_pending_review",
+                             f"schema {block.name!r} belongs to set {entry.schema_set}, pending owner review; it "
+                             "binds only with explicit selection (--allow-pending-review-schema)")
+    try:
+        actual = closure_fingerprint(entry)
+    except SchemaLoadError:
+        raise ReleaseRefused("schema_unselectable",
+                             f"schema {block.name!r} import closure cannot be resolved") from None
+    if block.import_fingerprint != actual:
+        raise ReleaseRefused("schema_fingerprint_mismatch",
+                             f"schema {block.name!r} closure fingerprint differs from the manifest "
+                             "(stale or edited)")
+    recorded = (validation_doc.get("schema") or {}) if isinstance(validation_doc, Mapping) else {}
+    if recorded.get("import_fingerprint") != actual or validation_doc.get("status") != "pass":
+        raise ReleaseRefused("validation_mismatch",
+                             "validation.json does not record a passing validation against this schema "
+                             "fingerprint")
+    return {"name": entry.schema_id, "path": entry.path, "sha256": entry.sha256, "version": entry.version,
+            "import_fingerprint": actual, "binding": "verified", "schema_set": entry.schema_set,
+            "review_status": entry.review_status}
+
+
+# --------------------------------------------------------------------------- evidence availability
+
+_WEB_SOURCE = re.compile(r"^(?:[a-z][a-z0-9+.-]*://|(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}/)")
+_PRIVATE_REF = re.compile(r"^private:(?!.*\.\.)[A-Za-z0-9._:/-]+$")
+
+
+@dataclass
+class EvidenceReport:
+    """Path-free availability of every evidence locator and required private asset (hash in the record)."""
+
+    sources: List[Dict[str, Any]]
+    unlocated_snippets: int
+
+    @property
+    def counts(self) -> Dict[str, int]:
+        """Sources by status."""
+        return dict(sorted(Counter(s["status"] for s in self.sources).items()))
+
+    @property
+    def status(self) -> str:
+        """``fail`` (a mismatch or invalid reference), ``incomplete`` (some unavailable, recorded) or
+        ``complete``."""
+        if any(s["status"] in ("mismatch", "invalid") for s in self.sources):
+            return "fail"
+        return "incomplete" if any(s["status"] == "unavailable" for s in self.sources) else "complete"
+
+    @property
+    def required_unavailable(self) -> List[str]:
+        """Required private assets that are not available (they block promotion)."""
+        return sorted(str(s["ref"] or s["source"]) for s in self.sources
+                      if s["required"] and s["status"] != "available")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """JSON-ready body."""
+        return {"report_kind": "f2w.kg_evidence_availability", "check_version": EVIDENCE_CHECK_VERSION,
+                "status": self.status, "counts": self.counts, "unlocated_snippets": self.unlocated_snippets,
+                "required_unavailable": self.required_unavailable, "sources": self.sources}
+
+    @property
+    def sha256(self) -> str:
+        """Hash of the canonical report bytes."""
+        return sha256_bytes(canonical_json_bytes(self.to_dict()))
+
+
+def _locators(graph: Mapping[str, Any]) -> Tuple[Counter, int]:
+    """Locator counts per source id, and the number of snippets that carry no source."""
+    counts: Counter = Counter()
+    unlocated = 0
+    nodes = graph.get("things") if "things" in graph else graph.get("nodes")
+    edges = graph.get("associations") if "associations" in graph else graph.get("edges")
+    for node in nodes or []:
+        if not isinstance(node, Mapping):
+            continue
+        for snip in node.get("context_snippets") or []:
+            if isinstance(snip, Mapping):
+                source = snip.get("source_paper")
+                if isinstance(source, str) and source.strip():
+                    counts[source.strip()] += 1
+                else:
+                    unlocated += 1
+        for source in node.get("source_papers") or []:
+            if isinstance(source, str) and source.strip():
+                counts[source.strip()] += 1
+    for edge in edges or []:
+        evidence = edge.get("has_evidence") if isinstance(edge, Mapping) else None
+        for item in evidence if isinstance(evidence, list) else [evidence]:
+            if isinstance(item, Mapping) and isinstance(item.get("source_paper"), str):
+                counts[item["source_paper"].strip()] += 1
+    return counts, unlocated
+
+
+def _asset_status(ref: Any, sha256: Any, evidence_root: Optional[Path]) -> Tuple[str, Optional[str]]:
+    if not isinstance(ref, str) or not _PRIVATE_REF.match(ref) or not isinstance(sha256, str) or not _SHA256.match(
+            sha256):
+        return "invalid", "inventory_entry_needs_private_ref_and_sha256"
+    if evidence_root is None:
+        return "unavailable", "no_evidence_root"
+    root = Path(evidence_root).resolve()
+    target = (root / ref[len("private:"):]).resolve()
+    if root != target and root not in target.parents:
+        return "invalid", "ref_escapes_evidence_root"
+    if not target.is_file():
+        return "unavailable", "missing_at_evidence_root"
+    digest = hashlib.sha256()
+    with target.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return ("available", None) if digest.hexdigest() == sha256 else ("mismatch", "sha256_differs")
+
+
+def check_evidence_availability(
+    repo: Optional[Path],
+    graph: Mapping[str, Any],
+    manifest: KGManifest,
+    *,
+    inventory: Optional[Mapping[str, Any]] = None,
+    evidence_root: Optional[Path] = None,
+) -> EvidenceReport:
+    """Every evidence locator either resolves or is recorded as unavailable; nothing is fetched or rebuilt.
+
+    A locator source is classified as ``external`` (a web source: recorded, never fetched), ``available`` (a file
+    tracked in the repository, or a ``private:`` inventory asset whose bytes at ``evidence_root`` hash to the
+    inventory's sha256), ``unavailable`` (no inventory entry, no evidence root, or missing there), ``mismatch``
+    (present with other bytes) or ``invalid`` (an inventory entry that is not a ``private:`` ref plus sha256).
+    Required private assets are checked the same way and marked ``required``: inventory sources flagged
+    ``"required": true``, the inventory's ``required_private_assets`` list, and the manifest's
+    ``evidence.required_private_assets`` when the manifest model carries that optional block.
+
+    Args:
+        inventory: ``{"sources": {<source id>: {"ref": "private:...", "sha256": ..., "required"?: bool}},
+            "required_private_assets"?: [{"ref", "sha256"}]}`` (operator supplied; never committed).
+        evidence_root: Mounted private store that ``private:`` refs resolve under (never recorded).
+    """
+    counts, unlocated = _locators(graph)
+    entries = dict((inventory or {}).get("sources") or {})
+    repo_like = [s for s in counts if "/" in s and not _WEB_SOURCE.match(s) and _REPO_PATH.match(s)]
+    tracked = _tracked(repo, repo_like) if repo is not None and repo_like else set()
+    sources: List[Dict[str, Any]] = []
+    for source in sorted(counts):
+        row: Dict[str, Any] = {"source": source, "locators": counts[source], "required": False, "ref": None,
+                               "sha256": None}
+        if source in tracked:
+            row.update(kind="repository", status="available", reason=None, ref=source)
+        elif _WEB_SOURCE.match(source):
+            row.update(kind="web", status="external", reason="not_fetched")
+        elif source in entries:
+            entry = entries[source] if isinstance(entries[source], Mapping) else {}
+            status, reason = _asset_status(entry.get("ref"), entry.get("sha256"), evidence_root)
+            row.update(kind="private", status=status, reason=reason, required=entry.get("required") is True,
+                       ref=entry.get("ref") if status != "invalid" else None,
+                       sha256=entry.get("sha256") if status != "invalid" else None)
+        else:
+            row.update(kind="private", status="unavailable", reason="not_in_inventory")
+        sources.append(row)
+    evidence = manifest.model_dump(mode="json", by_alias=True).get("evidence") or {}
+    required = list(evidence.get("required_private_assets") or []) + list(
+        (inventory or {}).get("required_private_assets") or [])
+    for asset in (a if isinstance(a, Mapping) else {} for a in required):
+        status, reason = _asset_status(asset.get("ref"), asset.get("sha256"), evidence_root)
+        sources.append({"source": asset.get("ref"), "locators": 0, "required": True, "kind": "private",
+                        "status": status, "reason": reason, "ref": asset.get("ref"),
+                        "sha256": asset.get("sha256")})
+    return EvidenceReport(sources, unlocated)
+
+
+def verify_release_dependencies(repo: Optional[Path], graph: Mapping[str, Any], manifest: KGManifest, *,
+                                inventory: Optional[Mapping[str, Any]] = None,
+                                evidence_root: Optional[Path] = None) -> EvidenceReport:
+    """Promotion-time dependency gate: required private assets must be present with the pinned bytes.
+
+    Raises:
+        ReleaseRefused: ``evidence_mismatch`` (an asset or inventory entry is wrong) or ``evidence_unavailable``
+            (a required asset is missing). Nothing is rebuilt and nothing is added to Git to make it pass.
+    """
+    report = check_evidence_availability(repo, graph, manifest, inventory=inventory, evidence_root=evidence_root)
+    if report.status == "fail":
+        raise ReleaseRefused("evidence_mismatch", "an evidence asset or inventory entry does not match its pin")
+    if report.required_unavailable:
+        raise ReleaseRefused("evidence_unavailable",
+                             f"{len(report.required_unavailable)} required private evidence asset(s) are "
+                             "unavailable")
+    return report
+
+
+# --------------------------------------------------------------------------- binary report binding
+
+
+@dataclass(frozen=True)
+class BinaryReportBinding:
+    """The binary report a candidate was tested against, and its verdict as recorded (never raised)."""
+
+    sha256: str
+    ref: str
+    suite: str
+    manifest_sha256: Optional[str]
+    runner_revision: Optional[str]
+    gate_status: str
+    verdict: str
+    reasons: Tuple[str, ...]
+    subject: Mapping[str, Any]
+    source_commit: Optional[str]
+    source_dirty: Optional[bool]
+
+    @property
+    def passed(self) -> bool:
+        """True only for a PASS verdict (PROVISIONAL and NOT_PASS are not passes)."""
+        return self.verdict == "PASS"
+
+    def to_dict(self) -> Dict[str, Any]:
+        """JSON-ready form for the release record."""
+        return {"sha256": self.sha256, "ref": self.ref, "suite": self.suite,
+                "manifest_sha256": self.manifest_sha256,
+                "runner_revision": self.runner_revision, "gate_status": self.gate_status, "verdict": self.verdict,
+                "passed": self.passed, "verdict_reasons": list(self.reasons), "subject": dict(self.subject),
+                "source_commit": self.source_commit, "source_dirty": self.source_dirty}
+
+
+def _lower(verdict: str, other: str) -> str:
+    return min(verdict, other, key=BINARY_VERDICTS.index)
+
+
+def bind_binary_report(report_bytes: bytes, *, ref: str, corpus: str, snapshot_id: str, graph_sha256: str,
+                       manifest_sha256: str) -> BinaryReportBinding:
+    """Bind an executed ``evals.binary`` report to this snapshot and read its verdict.
+
+    The report must carry a ``subject`` block ``{"kind": "kg_snapshot", "corpus", "snapshot_id", "graph_sha256",
+    "manifest_sha256"}`` naming the bytes it ran against. The verdict starts from ``gate.status`` and can only go
+    down: a PROVISIONAL marker (``gate.provisional``, a ``PROVISIONAL`` status, or any result flagged
+    ``provisional``) caps it at PROVISIONAL; blocking cases or a non-completed/non-PASS required result cap it at
+    NOT_PASS. Nothing here turns PROVISIONAL or NOT_PASS into PASS.
+
+    Raises:
+        ReleaseRefused: ``binary_report_invalid``, ``binary_report_unbound`` (no subject) or
+            ``binary_report_mismatch`` (the subject names other bytes or another snapshot).
+    """
+    if not isinstance(ref, str) or not (_REPO_PATH.match(ref) or _PRIVATE_REF.match(ref)):
+        raise ReleaseRefused("binary_report_invalid",
+                             "the binary report ref must be repository-relative or private: (no local paths)")
+    try:
+        report = json.loads(report_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise ReleaseRefused("binary_report_invalid", "the binary report is not JSON") from None
+    if not isinstance(report, Mapping) or report.get("report_kind") != BINARY_REPORT_KIND:
+        raise ReleaseRefused("binary_report_invalid", "not an evals.binary report (report_kind)")
+    gate = report.get("gate") if isinstance(report.get("gate"), Mapping) else {}
+    status = gate.get("status")
+    if status not in BINARY_VERDICTS:
+        raise ReleaseRefused("binary_report_invalid", f"unknown gate status {status!r}")
+    subject = report.get("subject")
+    if not isinstance(subject, Mapping) or not subject.get("graph_sha256") or not subject.get("manifest_sha256"):
+        raise ReleaseRefused("binary_report_unbound",
+                             "the binary report names no snapshot bytes (subject.graph_sha256/manifest_sha256)")
+    if (subject.get("graph_sha256"), subject.get("manifest_sha256")) != (graph_sha256, manifest_sha256) or (
+            subject.get("corpus", corpus), subject.get("snapshot_id", snapshot_id)) != (corpus, snapshot_id):
+        raise ReleaseRefused("binary_report_mismatch", "the binary report was run against a different snapshot")
+    verdict, reasons = str(status), []
+    results = [r for r in report.get("results") or [] if isinstance(r, Mapping)]
+    if gate.get("provisional") or any(r.get("provisional") for r in results):
+        verdict = _lower(verdict, "PROVISIONAL")
+        reasons.append("provisional_results")
+    if gate.get("blocking_cases") or any(
+            r.get("required") and (r.get("execution_state") != "completed" or r.get("verdict") != "PASS")
+            for r in results):
+        verdict = _lower(verdict, "NOT_PASS")
+        reasons.append("required_case_not_completed_pass")
+    reasons += [str(x) for x in gate.get("gate_reasons") or []]
+    source = report.get("source") if isinstance(report.get("source"), Mapping) else {}
+    version = report.get("manifest_version")
+    return BinaryReportBinding(
+        sha256=sha256_bytes(report_bytes), ref=ref, suite=f"evals.binary/{version or 'unknown'}",
+        manifest_sha256=report.get("manifest_sha256"), runner_revision=report.get("runner_revision"),
+        gate_status=str(status), verdict=verdict, reasons=tuple(sorted(set(reasons))),
+        subject={k: subject.get(k) for k in ("kind", "corpus", "snapshot_id", "graph_sha256", "manifest_sha256",
+                                             "data_commit") if subject.get(k) is not None},
+        source_commit=source.get("commit"), source_dirty=source.get("dirty"))
+
+
+# --------------------------------------------------------------------------- commit-ready validation
+
+
+@dataclass(frozen=True)
+class CandidateArtifact:
+    """A tested file: the bytes Git must later return for ``path``."""
+
+    role: str
+    path: str
+    sha256: str
+    size_bytes: int
+    git_blob: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Record form."""
+        return {"role": self.role, "path": self.path, "sha256": self.sha256, "size_bytes": self.size_bytes,
+                "git_blob": self.git_blob}
+
+
+@dataclass(frozen=True)
+class CommitCandidate:
+    """A snapshot that passed every commit-ready check."""
+
+    manifest: KGManifest
+    artifacts: Tuple[CandidateArtifact, ...]
+    schema: Mapping[str, Any]
+    disclosure: DisclosureReport
+    evidence: EvidenceReport
+    binary_report: BinaryReportBinding
+    git: Mapping[str, Any]
+
+    @property
+    def release_id(self) -> str:
+        """``<corpus>-<snapshot>-<graph sha256 prefix>``: stable for the same bytes."""
+        return f"{self.manifest.corpus}-{self.manifest.snapshot_id}-{self.manifest.graph.sha256[:12]}"
+
+    @property
+    def paths(self) -> List[str]:
+        """Repository paths the owner commits."""
+        return [a.path for a in self.artifacts]
+
+
+def validate_commit_candidate(
+    repo: Path,
+    snapshot: str,
+    *,
+    binary_report: bytes,
+    binary_report_ref: str,
+    evidence_inventory: Optional[Mapping[str, Any]] = None,
+    evidence_root: Optional[Path] = None,
+    allowlist: Collection[str] = frozenset(),
+    allow_pending_review_schema: bool = False,
+    allow_untracked: bool = False,
+) -> CommitCandidate:
+    """Validate ``storage/kg/<corpus>/v<N>`` in ``repo`` for commit. Reads only; writes nothing anywhere.
+
+    Order: layout and hashes (:func:`verify_snapshot_dir`, validation.json required), R1 paths, schema binding,
+    disclosure re-run (must reproduce the manifest's report hash and be commit-ready), private dependencies,
+    evidence availability, binary report binding, then the Git preflight.
+
+    Raises:
+        ReleaseRefused: the first failing check (``code`` says which).
+    """
+    repo = _repo_root(repo)
+    rel = str(snapshot).replace("\\", "/").strip("/")
+    match = re.match(r"^storage/kg/([a-z0-9][a-z0-9_-]*)/(v[1-9][0-9]*)$", rel)
+    if not match or Path(snapshot).is_absolute():
+        raise ReleaseRefused("bad_path", "snapshot must be the repository-relative storage/kg/<corpus>/v<N>")
+    try:
+        verified = verify_snapshot_dir(repo / rel)
+    except ReleaseVerificationError as exc:
+        raise ReleaseRefused(exc.code, str(exc)) from None
+    manifest = verified.manifest
+    files = {name: (repo / rel / name) for name in SNAPSHOT_FILES}
+    if not files["validation.json"].is_file():
+        raise ReleaseRefused("validation_missing", "validation.json is required for a commit candidate")
+    if manifest.validation.status != "pass":
+        raise ReleaseRefused("validation_failed", "the manifest records a failing schema validation")
+    blobs = {f"{rel}/{name}": path.read_bytes() for name, path in files.items()}
+    for compat in verified.compat_paths:
+        blobs[compat] = verified.graph_bytes
+    roles = {f"{rel}/graph.json": "graph", f"{rel}/manifest.json": "manifest",
+             f"{rel}/validation.json": "validation"}
+    path_findings = check_paths(blobs)
+    if path_findings:
+        raise ReleaseRefused("private_dependency", "candidate paths are outside the allowlist", path_findings)
+    try:
+        validation_doc = json.loads(blobs[f"{rel}/validation.json"].decode("utf-8"))
+        manifest_doc = json.loads(blobs[f"{rel}/manifest.json"].decode("utf-8"))
+        graph = json.loads(verified.graph_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise ReleaseRefused("tampered", "a snapshot file is not JSON") from None
+    schema = check_schema_binding(repo, manifest, validation_doc,
+                                  allow_pending_review_schema=allow_pending_review_schema)
+    disclosure = check_disclosure(graph, paths=sorted(blobs), allowlist=allowlist,
+                                  waiver_ref=manifest.disclosure.waiver_ref)
+    if disclosure.sha256 != manifest.disclosure.report_sha256 or disclosure.status != manifest.disclosure.status:
+        raise ReleaseRefused("disclosure_stale", "the disclosure check no longer reproduces the manifest's report "
+                             "(different rules, allowlist or bytes)", disclosure.findings)
+    if not disclosure.commit_ready:
+        raise ReleaseRefused("disclosure_failed", "the disclosure check rejects the graph", disclosure.findings)
+    private = check_private_dependencies(repo, graph, manifest_doc, validation_doc, candidate_paths=set(blobs),
+                                         allowlist=allowlist)
+    if private:
+        raise ReleaseRefused("private_dependency",
+                             f"{len(private)} private dependency finding(s): {sorted({f.rule for f in private})}",
+                             private)
+    evidence = check_evidence_availability(repo, graph, manifest, inventory=evidence_inventory,
+                                           evidence_root=evidence_root)
+    if evidence.status == "fail":
+        raise ReleaseRefused("evidence_mismatch", "an evidence inventory entry is invalid or its bytes differ")
+    binding = bind_binary_report(binary_report, ref=binary_report_ref, corpus=manifest.corpus,
+                                 snapshot_id=manifest.snapshot_id, graph_sha256=verified.graph_sha256,
+                                 manifest_sha256=verified.manifest_sha256)
+    object_format = _object_format(repo)
+    git_state = check_worktree(repo, blobs, object_format=object_format, allow_untracked=allow_untracked)
+    artifacts = tuple(
+        CandidateArtifact(roles.get(path, "compat_copy"), path, sha256_bytes(data), len(data),
+                          git_blob_id(data, object_format))
+        for path, data in sorted(blobs.items(), key=lambda kv: (kv[0] not in roles, kv[0])))
+    return CommitCandidate(manifest, artifacts, schema, disclosure, evidence, binding, git_state)
+
+
+_REPOSITORY = re.compile(r"^[A-Za-z0-9.-]+(?:/[A-Za-z0-9._-]+)+$")
+
+
+def owner_commands(candidate: CommitCandidate, record_name: str, repository: str) -> List[str]:
+    """The exact commands the owner runs from the repository root. Nothing runs them automatically, and there is
+    deliberately no push: publishing the branch is a separate, reviewed owner action outside this tool."""
+    paths = " ".join(candidate.paths)
+    manifest = candidate.manifest
+    message = (f"data(kg): freeze {manifest.corpus}/{manifest.snapshot_id} "
+               f"(graph sha256 {manifest.graph.sha256[:12]}, binary {candidate.binary_report.verdict})")
+    return [
+        f"git status --short --ignored -- {paths}",
+        f"git -c core.autocrlf=false -c core.safecrlf=false add -f -- {paths}",
+        "git diff --cached --name-only",
+        f"git commit -m {json.dumps(message)} -- {paths}",
+        f"python3 scripts/prepare_kg_release.py verify-committed --record {record_name} "
+        "--commit \"$(git rev-parse HEAD)\" --out <release-dir>",
+        "# no push: publishing the branch is a separate owner decision outside this tool",
+    ]
+
+
+def build_release_record(candidate: CommitCandidate, *, record_name: str, repository: str) -> Dict[str, Any]:
+    """The tested-release record (``f2w.kg_tested_release`` v1), written BEFORE the commit exists.
+
+    It names the tested bytes (path, sha256, expected Git blob), the checks they passed and the binary report and
+    verdict they were tested against. It holds no commit id, no local path and no credential; the T26A data-release
+    descriptor is derived from it only after :func:`verify_snapshot_selection` succeeds on the commit.
+    """
+    if not _REPOSITORY.match(repository or ""):
+        raise ReleaseRefused("record_invalid",
+                             "repository must be a canonical identity such as github.com/org/repo")
+    manifest = candidate.manifest
+    record = {
+        "record_kind": RELEASE_RECORD_KIND, "record_version": RELEASE_RECORD_VERSION,
+        "release_id": candidate.release_id, "state": "tested_uncommitted", "repository": repository,
+        "corpus": manifest.corpus, "snapshot_id": manifest.snapshot_id, "graph_id": manifest.graph_id,
+        "artifacts": [a.to_dict() for a in candidate.artifacts],
+        "schema": dict(candidate.schema),
+        "validation": {"status": manifest.validation.status, "report_sha256": manifest.validation.report_sha256,
+                       "suite": manifest.validation.suite},
+        "disclosure": {"check_version": candidate.disclosure.check_version, "status": candidate.disclosure.status,
+                       "report_sha256": candidate.disclosure.sha256, "waiver_ref": candidate.disclosure.waiver_ref,
+                       "informational": candidate.disclosure.to_dict()["informational"]},
+        "private_dependencies": {"check_version": PRIVATE_DEPENDENCY_CHECK_VERSION, "status": "pass",
+                                 "findings": []},
+        "evidence": {"report_sha256": candidate.evidence.sha256, **candidate.evidence.to_dict()},
+        "binary_report": candidate.binary_report.to_dict(),
+        "code": {"code_commit": manifest.created.code_commit, "json2kg_sha256": manifest.created.json2kg_sha256},
+        "git": dict(candidate.git),
+        "owner_commands": owner_commands(candidate, record_name, repository),
+        "automation": {"git_writes": "none", "push": "never"},
+    }
+    leaks = [where for where, text in _walk(record, "") if _LOCAL_PATH.search(text) or any(
+        p.search(text) for _, p in _SECRET_PATTERNS)]
+    if leaks:  # defensive: the record is meant to be shareable
+        raise ReleaseRefused("private_dependency",
+                             f"release record would carry a local path or secret at {leaks[0]}")
+    return record
+
+
+# --------------------------------------------------------------------------- committed == tested
+
+_RECORD_ROLES = ("graph", "manifest", "validation", "compat_copy")
+
+
+def parse_release_record(data: bytes) -> Dict[str, Any]:
+    """Load and shape-check a tested-release record."""
+    try:
+        record = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise ReleaseRefused("record_invalid", "the release record is not JSON") from None
+    if not isinstance(record, Mapping) or (record.get("record_kind"), record.get("record_version")) != (
+            RELEASE_RECORD_KIND, RELEASE_RECORD_VERSION):
+        raise ReleaseRefused("record_invalid", "not an f2w.kg_tested_release v1 record")
+    if not _REPOSITORY.match(str(record.get("repository"))) or not isinstance(record.get("binary_report"),
+                                                                              Mapping):
+        raise ReleaseRefused("record_invalid", "the record lacks a repository identity or binary report")
+    items = record.get("artifacts")
+    if not isinstance(items, list) or not items:
+        raise ReleaseRefused("record_invalid", "the record lists no artifacts")
+    for item in items:
+        if not isinstance(item, Mapping) or item.get("role") not in _RECORD_ROLES or not _REPO_PATH.match(
+                str(item.get("path"))) or not _SHA256.match(str(item.get("sha256"))) or not _GIT_COMMIT.match(
+                str(item.get("git_blob"))):
+            raise ReleaseRefused("record_invalid", "an artifact entry is malformed")
+    return dict(record)
+
+
+@dataclass(frozen=True)
+class CommittedRelease:
+    """Committed bytes that equal the tested bytes, resolved by commit and path."""
+
+    data_commit: str
+    record: Mapping[str, Any]
+    release: VerifiedRelease
+    artifacts: Tuple[VerifiedArtifact, ...]
+
+
+def verify_snapshot_selection(repo: Path, record: Mapping[str, Any], data_commit: str) -> CommittedRelease:
+    """Compare the bytes at ``data_commit`` with the tested bytes in ``record``, path by path.
+
+    Every tested artifact must exist at the commit as a regular blob with the recorded blob id and sha256, the
+    snapshot directory at the commit must hold nothing else, the manifest/graph/compat set must verify as a release
+    (:func:`verify_git_release`), and the bound schema file at the commit must hash to the recorded schema sha256.
+    Import and promotion call this (or :func:`verify_git_release` on a descriptor) before using any byte.
+
+    Raises:
+        ReleaseRefused: ``committed_differs_from_tested`` (bytes, blob, missing path or extra file),
+            ``object_format_mismatch``, or a :func:`verify_git_release` code.
+    """
+    record = parse_release_record(canonical_json_bytes(record))
+    if (record.get("git") or {}).get("object_format", "sha1") != _object_format(repo):
+        raise ReleaseRefused("object_format_mismatch", "the repository uses a different Git object format")
+    loaded: List[VerifiedArtifact] = []
+    for item in record["artifacts"]:
+        try:
+            loaded.append(verify_git_artifact(repo, data_commit, item["path"], item["sha256"],
+                                              git_blob=item["git_blob"]))
+        except ReleaseVerificationError as exc:
+            if exc.code in ("bad_commit", "git"):
+                raise
+            raise ReleaseRefused("committed_differs_from_tested", f"{item['path']}: {exc}") from None
+    snapshot_dir = f"storage/kg/{record['corpus']}/{record['snapshot_id']}"
+    present = {p for p in _nul_split(_git(repo, "ls-tree", "-z", "--name-only", data_commit, "--",
+                                          snapshot_dir + "/"))}
+    expected = {i["path"] for i in record["artifacts"] if i["path"].startswith(snapshot_dir + "/")}
+    if present != expected:
+        raise ReleaseRefused("committed_differs_from_tested",
+                             f"the committed snapshot directory differs from the tested set (extra: "
+                             f"{sorted(present - expected)}, missing: {sorted(expected - present)})")
+    try:
+        release = verify_git_release(repo, data_commit, record["artifacts"])
+        schema = record.get("schema") or {}
+        verify_git_artifact(repo, data_commit, str(schema.get("path")), str(schema.get("sha256")))
+    except ReleaseVerificationError as exc:
+        raise ReleaseRefused(exc.code if exc.code != "wrong_hash" else "committed_differs_from_tested",
+                             str(exc)) from None
+    return CommittedRelease(data_commit, record, release, tuple(loaded))
+
+
+def build_data_release_descriptor(committed: CommittedRelease, *, importer_name: str,
+                                  importer_version: str) -> Dict[str, Any]:
+    """T26A data-release descriptor (``schemas/data_release_descriptor.schema.json``), state ``candidate``.
+
+    Created only after the commit exists and verified equal to the tested bytes. ``staging.binary_report.passed``
+    is true only for a recorded PASS verdict; PROVISIONAL and NOT_PASS stay ``false`` (the exact verdict stays in
+    the release record with the same ``release_id``). ``data_commit`` there is the commit whose bytes were verified
+    identical to the ones the report ran against. The state never advances here: ``staging_validated`` and later
+    states belong to the staging import and promotion (T26C).
+    """
+    record, release = committed.record, committed.release
+    binary = record["binary_report"]
+    manifest = release.manifest
+    descriptor = {
+        "descriptor_version": "1", "release_id": record["release_id"], "repository": record["repository"],
+        "data_commit": committed.data_commit, "corpus": record["corpus"], "snapshot_id": record["snapshot_id"],
+        "graph_id": record["graph_id"],
+        "artifacts": [{"role": a["role"], "path": a["path"], "sha256": a["sha256"], "git_blob": a["git_blob"],
+                       "size_bytes": a["size_bytes"]} for a in record["artifacts"]],
+        "compatibility": {"schema_sha256": manifest.schema_block.sha256,
+                          "import_fingerprint": manifest.schema_block.import_fingerprint,
+                          "importer": {"name": importer_name, "version": importer_version},
+                          "code_commits": [manifest.created.code_commit], "image_digests": []},
+        "disclosure": {"status": manifest.disclosure.status, "report_sha256": manifest.disclosure.report_sha256,
+                       "check_version": manifest.disclosure.check_version},
+        "staging": {"binary_report": {
+            "sha256": binary["sha256"], "ref": binary["ref"], "suite": binary["suite"],
+            "passed": binary["verdict"] == "PASS" and bool(binary["passed"]),
+            "graph_sha256": release.graph.sha256, "manifest_sha256": release.manifest_artifact.sha256,
+            "data_commit": committed.data_commit}},
+        "state": "candidate", "supersedes": None, "rollback_to": None,
+    }
+    if manifest.disclosure.waiver_ref:
+        descriptor["disclosure"]["waiver_ref"] = manifest.disclosure.waiver_ref
+    return descriptor
+
+
+# --------------------------------------------------------------------------- immutable lookup and export
+
+
+def lookup_snapshot(repo: Path, data_commit: str, corpus: str, snapshot_id: str) -> VerifiedRelease:
+    """Resolve ``storage/kg/<corpus>/<snapshot_id>`` at an immutable commit and hash-check it.
+
+    The manifest is read from the commit; the graph, validation report and compat copies are then pinned by the
+    manifest's hashes. A branch, tag or abbreviated id never selects data (``bad_commit``).
+    """
+    if not CORPUS_RE.match(corpus or "") or not re.match(r"^v[1-9][0-9]*$", snapshot_id or ""):
+        raise ReleaseVerificationError("bad_path", "corpus/snapshot_id are not a frozen snapshot name")
+    if not _GIT_COMMIT.match(data_commit or ""):
+        raise ReleaseVerificationError("bad_commit", "data_commit must be a full lowercase Git object id")
+    if _git(repo, "cat-file", "-t", data_commit).strip() != b"commit":
+        raise ReleaseVerificationError("bad_commit", "object is not a commit")
+    base = f"storage/kg/{corpus}/{snapshot_id}"
+    listing = _tree_blobs(repo, data_commit, [f"{base}/manifest.json"])
+    if f"{base}/manifest.json" not in listing:
+        raise ReleaseVerificationError("missing", f"{base}/manifest.json does not exist at the pinned commit")
+    manifest_bytes = _git(repo, "cat-file", "blob", listing[f"{base}/manifest.json"][1])
+    try:
+        manifest = parse_manifest(manifest_bytes)
+    except ValueError as exc:
+        raise ReleaseVerificationError("manifest_mismatch", f"manifest does not validate: {exc}") from None
+    items = [{"role": "graph", "path": f"{base}/graph.json", "sha256": manifest.graph.sha256},
+             {"role": "manifest", "path": f"{base}/manifest.json", "sha256": sha256_bytes(manifest_bytes)}]
+    if _tree_blobs(repo, data_commit, [f"{base}/validation.json"]):
+        items.append({"role": "validation", "path": f"{base}/validation.json",
+                      "sha256": manifest.validation.report_sha256})
+    items += [{"role": "compat_copy", "path": c.path, "sha256": c.sha256} for c in manifest.compat_paths or []]
+    return verify_git_release(repo, data_commit, items)
+
+
+def export_snapshot_selection(repo: Path, data_commit: str, artifacts: Sequence[Mapping[str, Any]],
+                              dest_root: Path) -> List[Dict[str, Any]]:
+    """Export pinned artifacts from ``data_commit`` to ``dest_root/<path>`` (a mount), byte for byte.
+
+    The selection is verified first (:func:`verify_git_release`); each file is created exclusively, synced and
+    re-hashed after writing. An existing identical file is accepted (idempotent re-export); an existing different
+    file, a symlink on the way or a write that does not read back identically is refused. The working tree of
+    ``repo`` is never read and nothing is written to Git.
+
+    Raises:
+        ReleaseVerificationError: a verification code, ``export_conflict`` or ``export_failed``.
+    """
+    release = verify_git_release(repo, data_commit, artifacts)
+    chosen = [release.graph, release.manifest_artifact, *release.compat] + (
+        [release.validation] if release.validation is not None else [])
+    root = Path(dest_root)
+    if root.is_symlink():
+        raise ReleaseVerificationError("export_conflict", "the export root is a symlink")
+    root.mkdir(parents=True, exist_ok=True)
+    root = root.resolve()
+    done: List[Dict[str, Any]] = []
+    for art in chosen:
+        target = root.joinpath(*art.path.split("/"))
+        for parent in [target, *target.parents]:
+            if parent == root:
+                break
+            if parent.is_symlink():
+                raise ReleaseVerificationError("export_conflict", f"{art.path}: a symlink is on the export path")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        status = "written"
+        if os.path.lexists(target):
+            if target.read_bytes() != art.data:
+                raise ReleaseVerificationError("export_conflict", f"{art.path} exists at the export root with "
+                                               "other bytes; exported files are never overwritten")
+            status = "already_present"
+        else:
+            tmp = target.with_name(f".{target.name}.export-{os.getpid()}.tmp")
+            try:
+                with tmp.open("xb") as handle:
+                    handle.write(art.data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.link(tmp, target)  # never replaces an existing file
+            except FileExistsError:
+                raise ReleaseVerificationError("export_conflict", f"{art.path} appeared during export") from None
+            except OSError as exc:
+                raise ReleaseVerificationError("export_failed", f"{art.path}: {exc.strerror}") from None
+            finally:
+                if tmp.exists():
+                    tmp.unlink()
+        if sha256_bytes(target.read_bytes()) != art.sha256:
+            raise ReleaseVerificationError("export_failed",
+                                           f"{art.path} does not read back with the pinned sha256")
+        done.append({"path": art.path, "sha256": art.sha256, "git_blob": art.git_blob, "status": status})
+    return done

@@ -1,9 +1,7 @@
 {
   "cases": [
     {
-      "blocked_by": [
-        "T26B (committed artifact validation and export)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-01",
       "case_revision": 1,
       "change_reason": null,
@@ -22,32 +20,37 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Committed JSON equals validated graph bytes",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "Commit/path/sha256 and staging PASS result identify identical snapshot/manifest; mutation forces new validation.",
       "expected_rule_source": "companion_expected_rule",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "73bdac5caaac22e15457cbe3d754c012280a832eaad4bb66b2d314f64e541b00",
-        "config_sha256": "478d4b96441dce8e0400838af162ed4ab7cb6721e8dc8fd5779389d56cab9aca",
+        "case_sha256": "5fa8b82ab207c6e5e687b52a2485af1f4b44db77d17f06246981383d69dfe7ee",
+        "config_sha256": "a813eec69bd513b20044e90a740a6449968d09675be05013bbcb7b8b366e2a93",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "cb7b1bd30cd4bd244fe047c9a72fc064ab475fd9fcae848e188fd2e3e33de84c",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/contracts/json_kg/"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Committed blob equals the tested bytes by commit+path; any mutation or a report bound to other bytes is refused; a non-PASS verdict is never recorded as passed",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/contracts/json_kg/test_json_kg_contract.py::test_fixture_files_match_manifest_hashes"
+        "selectors": [
+          "tests/releases/test_release_happy_path.py::test_prepare_commit_verify_describe_export",
+          "tests/releases/test_release_refusals.py::test_bytes_edited_between_prepare_and_commit_fail_committed_equals_tested",
+          "tests/releases/test_release_refusals.py::test_a_later_commit_that_rewrites_the_snapshot_fails_against_the_tested_record",
+          "tests/releases/test_release_refusals.py::test_an_extra_or_missing_committed_file_in_the_snapshot_directory_is_refused",
+          "tests/releases/test_release_refusals.py::test_report_for_a_different_snapshot_is_refused",
+          "tests/releases/test_release_refusals.py::test_provisional_and_not_pass_verdicts_are_recorded_and_never_upgraded"
         ],
-        "uncovered": "Commit/path/sha256 identity of a validated graph needs the committed-artifact validator"
+        "supporting_selectors": [],
+        "uncovered": "Staging import of the committed artifact and the staging PASS report (T26C, T08B)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -55,7 +58,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -197,9 +200,7 @@
       "title": "Production import has independent authorization and receipt"
     },
     {
-      "blocked_by": [
-        "T26B (committed artifact validation and export)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-04",
       "case_revision": 2,
       "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D1 (verbatim snippets in stored KG JSON, 2026-10-12); H1 owner_decisions O-G1 (what is tracked in Git, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
@@ -218,32 +219,38 @@
       },
       "companion_expected_rule": "Check tracked graph/manifests without exposing full papers, crops, raw source bodies or credentials.",
       "companion_title": "Git commit candidates exclude private source and secrets",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "Check tracked graph/manifests without exposing full papers, crops, raw source bodies or credentials. Owner decision update: stored KG JSON may contain verbatim context snippets and is tracked in Git; research papers, raw PDFs, full parsed bodies, figure crops, the source-RAG index, credentials, local paths and operational databases must not be tracked.",
       "expected_rule_source": "owner_decision",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "3c9ce1f0507f61a687ae995baa50362b3374dafdbe2fc406500dce85816ace02",
-        "config_sha256": "178290419abf0e39c989b0786e0648f400573e1460d40274d8c5695a8155e764",
+        "case_sha256": "a81e7acea52aaa44e358a22aa1e6dfda2331264e419d6ad9fa2edd3e2dc66743",
+        "config_sha256": "e7c27f45e1ff728ed423a314d576c313c2ceaac1512a17408bd3f53337f65957",
         "model_sha256": null,
-        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
+        "oracle_source_sha256": "6acb2efa09f1bdc2c3cad5877cd89d18176417632cd93c4d5486d87822175af3",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/contracts/json_kg/"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Commit-ready check refuses gitignored papers, the source-RAG index, parsed bodies, crops, credentials and local paths before commit, while tracked ops documents and snippets stay allowed",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/contracts/json_kg/test_json_kg_contract.py::test_fixture_inputs_carry_no_local_paths"
+        "selectors": [
+          "tests/releases/test_release_refusals.py::test_reference_to_gitignored_papers_is_refused",
+          "tests/releases/test_release_refusals.py::test_tracked_beamline_ops_documents_are_not_private",
+          "tests/releases/test_release_refusals.py::test_source_rag_index_parsed_bodies_and_crops_are_refused",
+          "tests/releases/test_release_refusals.py::test_full_parsed_bodies_local_paths_and_credentials_in_the_graph_are_refused",
+          "tests/releases/test_release_refusals.py::test_gitignored_or_untracked_manifest_references_are_refused",
+          "tests/releases/test_release_refusals.py::test_local_path_or_secret_in_manifest_is_refused",
+          "tests/releases/test_release_refusals.py::test_extra_files_in_the_snapshot_directory_are_refused"
         ],
-        "uncovered": "The tracked-artifact disclosure check does not exist yet"
+        "supporting_selectors": [],
+        "uncovered": "The CI re-check of committed blobs on push (.github workflow, T24D)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -251,7 +258,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -330,9 +337,7 @@
       "title": "Tracked graph snapshots remain outside image layers"
     },
     {
-      "blocked_by": [
-        "T26B (committed artifact validation and export)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-06",
       "case_revision": 1,
       "change_reason": null,
@@ -351,28 +356,32 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Private evidence dependencies are checked without hidden rebuild",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "Missing private asset yields explicit blocked/degraded capability rather than model calls or source commit.",
       "expected_rule_source": "companion_expected_rule",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "14ed626e7102565e41401c0cfa9e67671ea1e10e5417b400552625e9b091360c",
-        "config_sha256": "d9dce071bded394088dfbd19f9af83bc08feb9fbc7e1926be4a33179ac3f4f19",
+        "case_sha256": "0b69d3c3174bc07eb69c8e5328f4a4177e5490679324de6f33229b02d475d1c6",
+        "config_sha256": "bfb482f2465c92e471aecc524e158947bb8b4f2142dbe784bf585fd92f1db3ce",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "33cd6bfd66be19e1beda137ad3c47be00b97b566edd2a26d872b1665f0dc791d",
         "schema_sha256": null
       },
       "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Unavailable evidence is recorded explicitly; a missing or altered required private asset blocks promotion with no rebuild and nothing added to Git",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/releases/test_release_evidence_and_cli.py::test_unresolvable_locators_are_recorded_as_unavailable_not_dropped",
+          "tests/releases/test_release_evidence_and_cli.py::test_evidence_with_other_bytes_or_an_invalid_ref_is_refused",
+          "tests/releases/test_release_evidence_and_cli.py::test_required_private_assets_block_promotion_when_missing"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Private-asset dependency checks belong to the promotion validator"
+        "uncovered": "Runtime degraded-capability state on a target without the assets (T26C/T08B)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -380,7 +389,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
