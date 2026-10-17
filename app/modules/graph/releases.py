@@ -645,7 +645,7 @@ def check_worktree(repo: Path, candidate: Mapping[str, bytes], *, object_format:
     for entry in entries:
         code, path = entry[:2], entry[3:]
         if path in candidate:
-            if code not in ("??", "A ", "!!"):
+            if code not in ("??", "A ", "AM"):  # new file; "AM" is caught by the staged-bytes check below
                 raise ReleaseRefused("frozen_overwrite",
                                      f"{path} is a frozen snapshot path that Git sees as changed ({code.strip()})")
             continue
