@@ -78,6 +78,10 @@ PK = "tests/packaging/test_public_api.py"
 PR = "tests/packaging/test_resources.py"
 LS = "tests/literature/test_staging.py"
 CO = "tests/canonicalization/test_canon_online.py"
+RLH = "tests/releases/test_release_happy_path.py"
+RLR = "tests/releases/test_release_refusals.py"
+RLE = "tests/releases/test_release_evidence_and_cli.py"
+RLP = "tests/releases/test_release_no_push.py"
 
 
 def n(file: str, *names: str) -> List[str]:
@@ -1113,10 +1117,21 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Ordinary chat/session recording never uses the service writer",
     ),
     # ---- Git promotion --------------------------------------------------------------------------------------
-    "REL-01": blocked(
-        [T26B],
-        n(JK, "test_fixture_files_match_manifest_hashes"),
-        "Commit/path/sha256 identity of a validated graph needs the committed-artifact validator",
+    "REL-01": oracle(
+        n(RLH, "test_prepare_commit_verify_describe_export")
+        + n(
+            RLR,
+            "test_bytes_edited_between_prepare_and_commit_fail_committed_equals_tested",
+            "test_a_later_commit_that_rewrites_the_snapshot_fails_against_the_tested_record",
+            "test_an_extra_or_missing_committed_file_in_the_snapshot_directory_is_refused",
+            "test_report_for_a_different_snapshot_is_refused",
+            "test_provisional_and_not_pass_verdicts_are_recorded_and_never_upgraded",
+        ),
+        "partial",
+        "Committed blob equals the tested bytes by commit+path; any mutation or a report bound to other bytes is"
+        " refused; a non-PASS verdict is never recorded as passed",
+        "Staging import of the committed artifact and the staging PASS report (T26C, T08B)",
+        supporting=n(JK, "test_fixture_files_match_manifest_hashes"),
     ),
     "REL-02": blocked(
         [T26B, T08B], note="Production promotion without inference needs the promotion path and importer"
@@ -1126,13 +1141,36 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         n(SW, "test_staging_approval_does_not_authorize_prod"),
         "Target-scoped import plan and receipt are not built",
     ),
-    "REL-04": blocked(
-        [T26B],
-        n(JK, "test_fixture_inputs_carry_no_local_paths"),
-        "The tracked-artifact disclosure check does not exist yet",
+    "REL-04": oracle(
+        n(
+            RLR,
+            "test_reference_to_gitignored_papers_is_refused",
+            "test_tracked_beamline_ops_documents_are_not_private",
+            "test_source_rag_index_parsed_bodies_and_crops_are_refused",
+            "test_full_parsed_bodies_local_paths_and_credentials_in_the_graph_are_refused",
+            "test_gitignored_or_untracked_manifest_references_are_refused",
+            "test_local_path_or_secret_in_manifest_is_refused",
+            "test_extra_files_in_the_snapshot_directory_are_refused",
+        ),
+        "partial",
+        "Commit-ready check refuses gitignored papers, the source-RAG index, parsed bodies, crops, credentials and"
+        " local paths before commit, while tracked ops documents and snippets stay allowed",
+        "The CI re-check of committed blobs on push (.github workflow, T24D)",
+        supporting=n(JK, "test_fixture_inputs_carry_no_local_paths"),
     ),
     "REL-05": blocked([T24B, T24D], note="Build-context and layer inspection needs the image build"),
-    "REL-06": blocked([T26B], note="Private-asset dependency checks belong to the promotion validator"),
+    "REL-06": oracle(
+        n(
+            RLE,
+            "test_unresolvable_locators_are_recorded_as_unavailable_not_dropped",
+            "test_evidence_with_other_bytes_or_an_invalid_ref_is_refused",
+            "test_required_private_assets_block_promotion_when_missing",
+        ),
+        "partial",
+        "Unavailable evidence is recorded explicitly; a missing or altered required private asset blocks"
+        " promotion with no rebuild and nothing added to Git",
+        "Runtime degraded-capability state on a target without the assets (T26C/T08B)",
+    ),
     "REL-07": blocked(
         [T10, T26B, T23B], note="Journal reconciliation into a new committed JSON version is not built"
     ),
