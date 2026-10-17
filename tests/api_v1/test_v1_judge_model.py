@@ -200,8 +200,18 @@ def test_no_application_path_imports_or_names_the_binary_suite():
     """H3 B: the app stores the judge id only; it never reads or waits on a binary verdict."""
     from pathlib import Path
 
+    import re
+
     root = Path(__file__).resolve().parents[2]
-    offenders = [str(p.relative_to(root)) for base in ("app", "scripts", "docker", ".github")
-                 for p in (root / base).rglob("*") if p.is_file() and p.suffix in (".py", ".yml", ".yaml", ".sh")
-                 and ("evals.binary" in p.read_text(errors="ignore") or "evals/binary" in p.read_text(errors="ignore"))]
-    assert offenders == []
+    # T26B release promotion records an executed report's verdict (plan D17/T26B); it parses the
+    # report file, never imports the suite, and never gates the running app, so it may name it.
+    release_tooling = {"app/modules/graph/releases.py", "scripts/prepare_kg_release.py"}
+    imports_evals = re.compile(r"^\s*(from|import)\s+evals\b", re.M)
+    files = [p for base in ("app", "scripts", "docker", ".github") for p in (root / base).rglob("*")
+             if p.is_file() and p.suffix in (".py", ".yml", ".yaml", ".sh")]
+    importers = [str(p.relative_to(root)) for p in files if imports_evals.search(p.read_text(errors="ignore"))]
+    namers = [str(p.relative_to(root)) for p in files
+              if str(p.relative_to(root)) not in release_tooling
+              and ("evals.binary" in p.read_text(errors="ignore") or "evals/binary" in p.read_text(errors="ignore"))]
+    assert importers == []
+    assert namers == []
