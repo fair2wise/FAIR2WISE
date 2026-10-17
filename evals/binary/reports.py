@@ -42,6 +42,7 @@ def to_junit(report: Dict[str, Any]) -> str:
     props = ET.SubElement(root, "properties")
     for key, value in (
         ("gate_status", report["gate"]["status"]),
+        ("gate_provisional", bool(report["gate"].get("provisional"))),
         ("manifest_sha256", report["manifest_sha256"]),
         ("runner_revision", report["runner_revision"]),
         ("judge_model", (report.get("model") or {}).get("judge_model")),
@@ -94,6 +95,15 @@ def _models_line(model: Dict[str, Any]) -> str:
     )
 
 
+def _subject_line(subject: Any) -> str:
+    if not isinstance(subject, dict):
+        return "- Subject: none (the report is not bound to a KG snapshot)"
+    return (
+        f"- Subject: {subject.get('kind')} `{subject.get('corpus')}/{subject.get('snapshot_id')}`, graph sha256"
+        f" `{str(subject.get('graph_sha256'))[:16]}`, manifest sha256 `{str(subject.get('manifest_sha256'))[:16]}`"
+    )
+
+
 def to_markdown(report: Dict[str, Any]) -> str:
     """Human-readable report listing every case that is not a complete, approved PASS."""
     gate, counts = report["gate"], report["counts"]
@@ -103,6 +113,11 @@ def to_markdown(report: Dict[str, Any]) -> str:
         f"**Gate status: {gate['status']}**",
         "",
         f"- Required cases: {gate['required_case_count']}; blocking the gate: {gate['blocking_case_count']}",
+        (
+            f"- Provisional results: {bool(gate.get('provisional'))}"
+            f" ({', '.join(gate.get('provisional_case_ids') or []) or 'none'})"
+        ),
+        _subject_line(report.get("subject")),
         f"- Gate reasons: {', '.join(gate['gate_reasons']) or 'none'}; human gates: "
         + ", ".join(f"{k}={v}" for k, v in sorted(gate["human_gates"].items())),
         (
