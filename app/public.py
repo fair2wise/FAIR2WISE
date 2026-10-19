@@ -8,7 +8,11 @@ the methods that exist today are implemented:
 - :meth:`F2WClient.summarize_paper_terms`: the T19B deterministic paper summary
   (``lit_summarize_extracted_terms``), run through an authorizing executor;
 - :meth:`LiteratureAgent.delegate`: a delegated literature task through the
-  LangGraph supervisor.
+  LangGraph supervisor;
+- :meth:`F2WClient.submit_ingest`, :meth:`~F2WClient.get_job`, :meth:`~F2WClient.cancel_job`,
+  :meth:`~F2WClient.plan_publication` and :meth:`~F2WClient.approve_plan`: forwarded unchanged
+  to the shared :class:`~app.api.operations.F2WOperations` service the ``/v1`` routes call, so
+  the same authorization applies as over HTTP (C2). They need ``operations=`` at construction.
 
 The other methods of the specification raise ``NotImplementedError`` naming the
 task that implements them.
@@ -19,11 +23,14 @@ LangGraph code. Construction opens no network connection.
 """
 from __future__ import annotations
 
-from typing import Any, FrozenSet, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, FrozenSet, Mapping, Optional, Sequence, Union
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult
 from .modules.security.authorization import DeploymentSettings
+
+if TYPE_CHECKING:  # the operations service is imported only by callers that pass one
+    from .api.operations import F2WOperations
 
 __all__ = ("F2WClient", "LiteratureAgent", "create_literature_agent")
 
@@ -39,13 +46,21 @@ class F2WClient:
     Build it with :meth:`from_settings` (it then owns the application and closes
     it) or wrap an existing application. Two clients share no registry, executor,
     ledger or checkpointer.
+
+    ``operations`` is the deployment's shared :class:`~app.api.operations.F2WOperations`
+    (the object the ``/v1`` routes call). The job and publication methods forward to it;
+    without it they raise ``ContractError(UNSUPPORTED_CAPABILITY)``.
     """
 
-    def __init__(self, application: F2WApplication, *, owns_application: bool = False) -> None:
+    def __init__(self, application: F2WApplication, *, owns_application: bool = False,
+                 operations: Optional["F2WOperations"] = None) -> None:
         if not isinstance(application, F2WApplication):
             raise TypeError("application must be an F2WApplication")
+        if operations is not None and operations.settings != application.settings:
+            raise ValueError("operations and application must share the same DeploymentSettings")
         self._app = application
         self._owns = owns_application
+        self._ops = operations
         self._summary: Optional[Any] = None  # (executor, tool), built on first use
 
     @classmethod
@@ -56,6 +71,7 @@ class F2WClient:
         retrieval: Any,
         chat_model: Any = None,
         checkpointer: Any = None,
+        operations: Optional["F2WOperations"] = None,
         **options: Any,
     ) -> "F2WClient":
         """Build a client from explicit settings (no ``.env`` or environment read).
@@ -65,16 +81,31 @@ class F2WClient:
             retrieval: The retrieval service (``runtime_bridge.retrieval.LegacyRetrievalService``).
             chat_model: Optional LangChain chat model for delegated tasks.
             checkpointer: Optional LangGraph checkpointer for delegated threads.
+            operations: Optional shared ``F2WOperations`` for the job and publication methods.
             **options: Further ``F2WApplication`` keyword arguments (limits, admission, ...).
         """
         app = F2WApplication(settings=settings, retrieval=retrieval, chat_model=chat_model,
                              checkpointer=checkpointer, **options)
-        return cls(app, owns_application=True)
+        return cls(app, owns_application=True, operations=operations)
 
     @property
     def application(self) -> F2WApplication:
         """The wrapped application service."""
         return self._app
+
+    @property
+    def operations(self) -> Optional["F2WOperations"]:
+        """The shared operations service, or ``None`` when none was given."""
+        return self._ops
+
+    def _operations(self, method: str) -> "F2WOperations":
+        if self._ops is None:
+            from .modules.contracts.errors import ContractError, ErrorCode
+
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                f"F2WClient.{method} needs the deployment's F2WOperations "
+                                "(F2WClient(..., operations=...))")
+        return self._ops
 
     # -- lifecycle -------------------------------------------------------------------
 
@@ -155,6 +186,45 @@ class F2WClient:
         tool.ledger.pop(result.provenance_id)  # the client returns the typed result only
         return result
 
+    # -- jobs and publication: forwarded to the shared F2WOperations (same policy as /v1) -----
+
+    def submit_ingest(self, ctx: RequestContext, request: Any) -> Any:
+        """Submit an ``ingest`` job (``F2WOperations.submit_job``; ``POST /v1/jobs`` with kind ``ingest``).
+
+        ``request`` is an ``OperationInputs`` or its dict form. Returns the ``JobHandle``.
+        """
+        return self._operations("submit_ingest").submit_job(ctx, "ingest", request)
+
+    def get_job(self, ctx: RequestContext, job_id: str) -> Any:
+        """The job's ``JobHandle`` (``F2WOperations.get_job``; ``GET /v1/jobs/{id}``)."""
+        return self._operations("get_job").get_job(ctx, job_id)
+
+    def cancel_job(self, ctx: RequestContext, job_id: str) -> Any:
+        """Cancel the job (``F2WOperations.cancel_job``; ``POST /v1/jobs/{id}/cancel``)."""
+        return self._operations("cancel_job").cancel_job(ctx, job_id)
+
+    def plan_publication(self, ctx: RequestContext, snapshot_id: str, target: Any) -> Any:
+        """Submit a publication job that plans ``snapshot_id`` for ``target`` (H5 gate applies).
+
+        Forwards to ``F2WOperations.submit_publication`` (``POST /v1/publications``) and returns
+        its ``JobHandle``. The job computes the ``ChangePlan``; read it with
+        ``client.operations.current_plan(ctx, job_id)`` once the job awaits review.
+        """
+        return self._operations("plan_publication").submit_publication(ctx, snapshot_id, target)
+
+    def approve_plan(self, ctx: RequestContext, plan: Union[Any, str], *, job_id: str,
+                     approver_credential: Any = None, expires_at: Any = None) -> Any:
+        """Approve the publication job's current plan (``F2WOperations.approve_publication``).
+
+        ``plan`` is the ``ChangePlan`` the reviewer was shown, or its ``plan_sha256``; another
+        current plan is ``STALE_APPROVAL``. On ALS ``approver_credential`` is the approver's own
+        Tiled credential (fresh role check). Returns ``{"approval": ..., "job": ...}`` exactly
+        like ``POST /v1/publications/{job_id}/approval``.
+        """
+        plan_sha256 = plan if isinstance(plan, str) else plan.plan_sha256
+        return self._operations("approve_plan").approve_publication(
+            ctx, job_id, plan_sha256, approver_credential=approver_credential, expires_at=expires_at)
+
     # -- specified, not implemented yet ------------------------------------------------------
 
     def search_literature(self, ctx: RequestContext, query: str, limit: int = 20) -> ToolResult:
@@ -177,21 +247,6 @@ class F2WClient:
 
     def trace_provenance(self, ctx: RequestContext, record_id: str) -> ToolResult:
         raise _pending("trace_provenance", "T08")
-
-    def submit_ingest(self, ctx: RequestContext, request: Any) -> Any:
-        raise _pending("submit_ingest", "T10")
-
-    def get_job(self, ctx: RequestContext, job_id: str) -> Any:
-        raise _pending("get_job", "T10")
-
-    def cancel_job(self, ctx: RequestContext, job_id: str) -> Any:
-        raise _pending("cancel_job", "T10")
-
-    def plan_publication(self, ctx: RequestContext, snapshot_id: str, target: Any) -> Any:
-        raise _pending("plan_publication", "T10")
-
-    def approve_plan(self, ctx: RequestContext, plan: Any) -> Any:
-        raise _pending("approve_plan", "T10")
 
     def publish_plan(self, ctx: RequestContext, plan: Any, approval: Any) -> Any:
         raise _pending("publish_plan", "T08B")
