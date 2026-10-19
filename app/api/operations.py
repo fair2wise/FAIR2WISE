@@ -170,13 +170,6 @@ class F2WOperations:
                 raise ContractError(ErrorCode.INVALID_INPUT, f"invalid job inputs: {exc}") from None
         return self.jobs.submit(ctx, kind, inputs, settings_revision=settings_revision)
 
-    def _visible(self, ctx: RequestContext, job: Any) -> bool:
-        try:
-            self.jobs._visible(ctx, job)  # noqa: SLF001 - the service's own visibility rule, not a copy
-        except ContractError:
-            return False
-        return True
-
     def list_jobs(self, ctx: RequestContext, *, state: Optional[str] = None, kind: Optional[str] = None,
                   limit: int = 100) -> List[JobHandle]:
         """Most recently updated jobs the caller may see (creator or ``jobs.admin``, corpus scope)."""
@@ -185,8 +178,7 @@ class F2WOperations:
         except ValueError:
             raise ContractError(ErrorCode.INVALID_INPUT, f"unknown job state {state!r}") from None
         limit = max(1, min(int(limit), 1000))
-        rows = self.jobs.store.list_jobs(state=wanted, kind=kind, limit=1000)
-        return [job.handle() for job in rows if self._visible(ctx, job)][:limit]
+        return [job.handle() for job in self.jobs.list_visible(ctx, state=wanted, kind=kind, limit=limit)]
 
     def get_job(self, ctx: RequestContext, job_id: str) -> JobHandle:
         """The job's handle."""

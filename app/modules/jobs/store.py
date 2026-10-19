@@ -289,7 +289,39 @@ class JobStore:
         self, *, state: Optional[JobState] = None, kind: Optional[str] = None, limit: int = 100
     ) -> List[JobRecord]:
         """Most recently updated jobs, optionally filtered."""
-        clauses, params = [], []
+        return self.list_jobs_scoped(state=state, kind=kind, limit=limit)
+
+    def list_jobs_scoped(
+        self,
+        *,
+        created_by: Optional[str] = None,
+        within_scope: Optional[Iterable[str]] = None,
+        state: Optional[JobState] = None,
+        kind: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[JobRecord]:
+        """Most recently updated jobs, filtered in SQL (C3; T14 Q8).
+
+        Args:
+            created_by: Only jobs whose ``created_by`` is this subject; ``None`` for any creator.
+            within_scope: Only jobs whose ``inputs.corpus_scope`` is a subset of these corpora (a job
+                with an empty scope always qualifies); ``None`` for any scope.
+            state / kind: Optional equality filters.
+            limit: Maximum rows, clamped to 1..1000, applied after every filter.
+        """
+        clauses: List[str] = []
+        params: List[Any] = []
+        if created_by is not None:
+            clauses.append("created_by=?")
+            params.append(created_by)
+        if within_scope is not None:
+            allowed = sorted(set(within_scope))
+            outside = "s.value NOT IN (" + ", ".join("?" * len(allowed)) + ")" if allowed else "1"
+            clauses.append(
+                "NOT EXISTS (SELECT 1 FROM json_each(jobs.inputs, '$.corpus_scope') AS s "  # noqa: S608
+                f"WHERE s.type != 'null' AND {outside})"
+            )
+            params.extend(allowed)
         if state is not None:
             clauses.append("state=?")
             params.append(state.value)
