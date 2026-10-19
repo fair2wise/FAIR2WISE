@@ -18,7 +18,8 @@ exactly what the API would refuse later:
 5. ``F2W_TILED_WRITER_SECRET_FILE``, when set, is a readable file (its value is never read
    into the output).
 6. The UI bundle's ``f2w-build.json`` matches ``F2W_PUBLIC_PREFIX`` and the gateway
-   template renders for it (``app.modules.deployment.gateway``), written to the runtime dir.
+   template renders for it and for ``F2W_GATEWAY_PORT`` (default 8080, not the API or Tiled
+   port) (``app.modules.deployment.gateway``), written to the runtime dir.
 
 Prints one JSON summary; exit 0 when every check passes, 78 otherwise.
 """
@@ -130,9 +131,15 @@ def check(env: Mapping[str, str], profile: Mapping[str, Any], *, mountinfo: Path
         try:
             layout = gw.layout_from_env(env)
             gw.check_build_agreement(gw.read_build_manifest(Path(gateway["build_manifest"])), layout)
+            upstream = env.get(gw.API_UPSTREAM_ENV) or gw.DEFAULT_API_UPSTREAM
+            port = gw.gateway_port_from_env(env)
+            taken = {gw.validate_upstream(upstream).rsplit(":", 1)[1]: "the API upstream",
+                     (env.get("F2W_TILED_PORT") or "").strip(): "F2W_TILED_PORT"}
+            if str(port) in taken:
+                raise gw.PrefixConfigError(f"{gw.GATEWAY_PORT_ENV}={port} is already {taken[str(port)]}")
             text = gw.render_nginx_conf(Path(gateway["template"]).read_text(encoding="utf-8"),
-                                        upstream=env.get(gw.API_UPSTREAM_ENV) or gw.DEFAULT_API_UPSTREAM,
-                                        layout=layout)
+                                        upstream=upstream, layout=layout, listen_port=port)
+            facts["gateway_port"] = port
             out = Path(gateway["rendered"])
             out.parent.mkdir(parents=True, exist_ok=True)
             for sub in gateway.get("runtime_dirs", []):

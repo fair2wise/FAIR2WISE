@@ -115,11 +115,26 @@ def create_api_app(
     return app
 
 
-def run_api(cfg: Any, *, host: str, port: int, cors_origins: Optional[List[str]] = None) -> None:
-    """Serve :func:`create_api_app` with uvicorn (``cli api --jobs-api``)."""
+def run_api(cfg: Any, *, host: str, port: int, cors_origins: Optional[List[str]] = None,
+            root_path: Optional[str] = None) -> None:
+    """Serve :func:`create_api_app` with uvicorn (``cli api --jobs-api``).
+
+    ``root_path`` is the ASGI root path behind the ``/fair2wise`` gateway (T24C, C6). ``None``
+    reads it from the trusted startup setting ``F2W_PUBLIC_PREFIX`` exactly as the legacy
+    ``f2w_agent.api.run_api`` does (``/fair2wise`` -> ``/fair2wise/api``; unset -> none). Routes
+    stay rooted; only generated URLs (``/docs`` -> ``openapi.json``) carry the prefix.
+    """
+    import os
+
     import uvicorn
 
-    uvicorn.run(create_api_app(cfg, cors_origins=cors_origins), host=host, port=port)
+    from ..modules.deployment.gateway import layout_from_env, uvicorn_options
+
+    if root_path is None:
+        options = uvicorn_options(layout_from_env(os.environ))
+    else:
+        options = {"root_path": root_path} if root_path else {}
+    uvicorn.run(create_api_app(cfg, cors_origins=cors_origins), host=host, port=port, **options)
 
 
 __all__ = ("GUARDED_PREFIXES", "create_api_app", "run_api")

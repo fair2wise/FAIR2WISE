@@ -32,15 +32,18 @@ RUN python gateway.py mkdocs-config --source mkdocs/mkdocs.yml --out mkdocs/.mkd
 FROM nginx:1.27-alpine AS frontend
 
 # docker/nginx.conf is the /fair2wise gateway template; the image entrypoint fills
-# only F2W_* placeholders (the private API host:port) into conf.d/default.conf.
+# only F2W_* placeholders (the private API host:port and the listen port) into
+# conf.d/default.conf.
 ENV F2W_API_UPSTREAM=127.0.0.1:8090 \
+    F2W_GATEWAY_PORT=8080 \
     NGINX_ENVSUBST_FILTER=^F2W_
 COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=frontend-build /build/ui/dist /usr/share/nginx/html/fair2wise
 COPY --from=docs-build /build/site /usr/share/nginx/html/fair2wise/docs
 
+EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=12 \
-    CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1
+    CMD wget -qO- "http://127.0.0.1:${F2W_GATEWAY_PORT}/healthz" >/dev/null || exit 1
 
 LABEL Name="fair2wise-frontend" \
       Version="2.0" \
@@ -95,16 +98,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYSTOW_HOME=/var/lib/fair2wise/cache/pystow \
     F2W_PUBLIC_PREFIX=/fair2wise \
     F2W_API_UPSTREAM=127.0.0.1:8090 \
+    F2W_GATEWAY_PORT=8080 \
     F2W_RESOURCE_ROOT=/app \
     PYTHONPATH=/app \
     F2W_DOTENV=off
 
 # tini is PID 1 (signal delivery, orphan reaping); nginx is the in-container gateway, run
-# unprivileged on port 80 (file capability; Docker >= 20.10 also allows low ports).
+# unprivileged on F2W_GATEWAY_PORT (default 8080, the T24A one-ingress contract), so it needs
+# no file capability (C6).
 RUN apt-get update && \
-    apt-get install --no-install-recommends -y ca-certificates curl tini nginx libcap2-bin && \
-    setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx && \
-    apt-get purge -y libcap2-bin && apt-get autoremove -y && \
+    apt-get install --no-install-recommends -y ca-certificates curl tini nginx && \
     rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled/* /etc/nginx/conf.d/* && \
     groupadd --system --gid 10001 fair2wise && \
     useradd --system --uid 10001 --gid 10001 --home-dir /home/fair2wise --create-home \
@@ -142,13 +145,13 @@ RUN python app/modules/deployment/gateway.py check-build \
     chmod 0700 /var/lib/fair2wise/state
 
 USER 10001:10001
-EXPOSE 80
+EXPOSE 8080
 STOPSIGNAL SIGTERM
 
 # Gateway liveness only; capability readiness (Tiled, model, mounts) is /fair2wise/api/health
 # and the supervisor status file /run/fair2wise/supervisor.json.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=6 \
-    CMD curl -fsS http://127.0.0.1/fair2wise/healthz >/dev/null || exit 1
+    CMD curl -fsS "http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/healthz" >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--", "python", "/opt/fair2wise/entrypoint/f2w_supervisor.py", "--profile-file", "/etc/fair2wise/profile.json"]
 

@@ -16,6 +16,10 @@ Public route                            Behaviour
 ``/fair2wise/healthz``, ``/healthz``    gateway health (no secrets, no corpus)
 ======================================  =====================================================
 
+The gateway listens on :data:`GATEWAY_PORT_ENV` (default :data:`DEFAULT_GATEWAY_PORT`, 8080,
+the T24A one-ingress contract): an unprivileged port, so the image's nginx needs no file
+capability.
+
 The gateway (``docker/nginx.conf``) is the only component that strips the prefix. The API
 keeps its rooted routes and only learns ``root_path`` so that generated URLs (FastAPI
 ``/docs`` -> ``openapi.json``, OpenAPI ``servers``, redirects) carry the prefix; the UI is
@@ -52,6 +56,11 @@ DEFAULT_PUBLIC_PREFIX = "/fair2wise"
 API_UPSTREAM_ENV = "F2W_API_UPSTREAM"
 #: The API listens on private loopback inside the combined image (DEPLOYMENT_STRATEGY s.2).
 DEFAULT_API_UPSTREAM = "127.0.0.1:8090"
+#: Gateway template placeholder and trusted startup setting for the gateway's listen port (C6).
+GATEWAY_PORT_ENV = "F2W_GATEWAY_PORT"
+#: The one container ingress port of the T24A contract (``docker_profile_contract.md``). Unprivileged,
+#: so nginx needs no ``cap_net_bind_service``.
+DEFAULT_GATEWAY_PORT = 8080
 #: Written by ``ui/vite.config.ts`` into the build output (``dist/f2w-build.json``).
 BUILD_MANIFEST_NAME = "f2w-build.json"
 
@@ -162,28 +171,54 @@ def validate_upstream(value: str) -> str:
     return text
 
 
+def validate_listen_port(value: Any) -> int:
+    """Return the gateway listen port as an int (``1..65535``).
+
+    Raises:
+        PrefixConfigError: For anything but a plain decimal port in range.
+    """
+    text = str(value if value is not None else "").strip()
+    if not re.fullmatch(r"\d{1,5}", text) or not 1 <= int(text) <= 65535:
+        raise PrefixConfigError(f"{GATEWAY_PORT_ENV} must be a port number 1-65535, got {value!r}")
+    return int(text)
+
+
+def gateway_port_from_env(env: Mapping[str, str]) -> int:
+    """Read :data:`GATEWAY_PORT_ENV` from trusted startup settings (default :data:`DEFAULT_GATEWAY_PORT`)."""
+    raw = env.get(GATEWAY_PORT_ENV)
+    return validate_listen_port(raw) if raw is not None and str(raw).strip() else DEFAULT_GATEWAY_PORT
+
+
 def render_nginx_conf(template: str, *, upstream: str = DEFAULT_API_UPSTREAM,
-                      layout: PublicLayout = PublicLayout(DEFAULT_PUBLIC_PREFIX)) -> str:
-    """Fill ``${F2W_API_UPSTREAM}`` in ``docker/nginx.conf`` and check it routes ``layout``.
+                      layout: PublicLayout = PublicLayout(DEFAULT_PUBLIC_PREFIX),
+                      listen_port: Any = DEFAULT_GATEWAY_PORT) -> str:
+    """Fill ``${F2W_API_UPSTREAM}`` and ``${F2W_GATEWAY_PORT}`` in ``docker/nginx.conf`` and check it.
 
     The official nginx image does the same substitution with ``envsubst`` when the file is
     installed as ``/etc/nginx/templates/default.conf.template``; this function is the
     validated equivalent for other process managers and for tests.
 
     Raises:
-        PrefixConfigError: Unknown placeholders, a bad upstream, or a template whose API
-            location is not ``<prefix>/api/`` for the runtime prefix.
+        PrefixConfigError: Unknown placeholders, a bad upstream or port, a template whose
+            ``listen`` is not the port placeholder, or a template whose API location is not
+            ``<prefix>/api/`` for the runtime prefix.
     """
     if not layout.prefixed:
         raise PrefixConfigError("the gateway always serves under a prefix; set F2W_PUBLIC_PREFIX")
-    unknown = sorted({m.group(1) for m in _PLACEHOLDER.finditer(template)} - {API_UPSTREAM_ENV})
+    unknown = sorted({m.group(1) for m in _PLACEHOLDER.finditer(template)} - {API_UPSTREAM_ENV, GATEWAY_PORT_ENV})
     if unknown:
         raise PrefixConfigError(f"unknown gateway template placeholders: {', '.join(unknown)}")
     if f"location ^~ {layout.api_root_path}/ " not in template:
         raise PrefixConfigError(
             f"gateway template does not route {layout.api_root_path}/; the gateway, the UI build and "
             f"{PREFIX_ENV}={layout.prefix} must agree (rebuild for a different prefix)")
-    return template.replace("${" + API_UPSTREAM_ENV + "}", validate_upstream(upstream))
+    listens = re.findall(r"^\s*listen\s+([^;]*);", template, flags=re.M)
+    if listens != ["${" + GATEWAY_PORT_ENV + "}"]:
+        raise PrefixConfigError(f"gateway template must have exactly one 'listen ${{{GATEWAY_PORT_ENV}}};' "
+                                f"(found {listens}); the listen port is a startup setting")
+    port = validate_listen_port(listen_port)
+    return (template.replace("${" + API_UPSTREAM_ENV + "}", validate_upstream(upstream))
+            .replace("${" + GATEWAY_PORT_ENV + "}", str(port)))
 
 
 def read_build_manifest(path: Path) -> Dict[str, str]:
@@ -229,6 +264,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     render.add_argument("--template", type=Path, required=True)
     render.add_argument("--upstream", default=DEFAULT_API_UPSTREAM)
     render.add_argument("--prefix", default=DEFAULT_PUBLIC_PREFIX)
+    render.add_argument("--listen-port", default=str(DEFAULT_GATEWAY_PORT))
     render.add_argument("--out", type=Path)
     check = sub.add_parser("check-build", help="compare the UI build manifest with a runtime prefix")
     check.add_argument("--manifest", type=Path, required=True)
@@ -240,7 +276,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         if args.command == "render-nginx":
             text = render_nginx_conf(args.template.read_text(encoding="utf-8"), upstream=args.upstream,
-                                     layout=PublicLayout(normalize_prefix(args.prefix)))
+                                     layout=PublicLayout(normalize_prefix(args.prefix)),
+                                     listen_port=args.listen_port)
             if args.out:
                 args.out.write_text(text, encoding="utf-8")
             else:

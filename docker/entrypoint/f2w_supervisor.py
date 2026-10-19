@@ -12,7 +12,7 @@ service    command                                       required   health
 tiled      ``tiled_service.py`` (``:local`` only)        no         ``GET :8765/healthz``
 api        ``api_service.py`` on ``127.0.0.1:8090``      yes        ``GET :8090/health``
 worker     ``python -m app.modules.workers``             yes        alive for a grace period
-gateway    nginx with ``docker/nginx.conf``              yes        ``GET :80/fair2wise/healthz``
+gateway    nginx with ``docker/nginx.conf``              yes        ``GET :8080/fair2wise/healthz``
 =========  ============================================  =========  ==========================
 
 Rules (``DEPLOYMENT_STRATEGY.md`` section 2, ``docker_profile_contract.md`` sections 5-6):

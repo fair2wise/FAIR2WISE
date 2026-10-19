@@ -92,12 +92,12 @@ services:
       # UI at /fair2wise/, API at /fair2wise/api (docker/nginx.conf).
       F2W_API_UPSTREAM: agent:8090
     ports:
-      - "127.0.0.1:${F2W_UI_PORT:-5173}:80"
+      - "127.0.0.1:${F2W_UI_PORT:-5173}:8080"
     depends_on:
       agent:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 5s
       timeout: 3s
       start_period: 10s

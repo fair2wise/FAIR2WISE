@@ -69,6 +69,7 @@ def test_preflight_accepts_the_image_layout(tmp_path, name):
     assert result["ok"], result["problems"]
     rendered = Path(profile["gateway"]["rendered"]).read_text(encoding="utf-8")
     assert "server 127.0.0.1:8090;" in rendered and "${" not in rendered
+    assert "listen 8080;" in rendered and result["facts"]["gateway_port"] == 8080
     assert Path(profile["gateway"]["runtime_dirs"][0]).is_dir()
     assert result["facts"]["tiled_mode"] == profile["tiled_mode"]
 
@@ -155,10 +156,67 @@ def test_api_service_serves_the_jobs_api_under_the_prefix(tmp_path, monkeypatch)
     argv = ["--backend", "cborg", "--model", "lbl/cborg-chat", "--kg-mode", "json",
             "--graph", "storage/kg/matkg_rsoxs_v1.json", "--schema", "storage/schema/rsoxs_schema.yaml",
             "--workdir", str(tmp_path / "session"), "api", "--host", "127.0.0.1", "--port", "8090"]
-    app, options = api.build(argv, os.environ)
+    # C6: the service runs the CLI's own ``api --jobs-api`` path (app.api.main.run_api), which
+    # applies root_path from F2W_PUBLIC_PREFIX; uvicorn.run is captured instead of serving.
+    import uvicorn
+
+    served = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append((app, kw)))
+    assert api.command(argv, os.environ) == argv + ["--jobs-api"]
+    assert api.main(argv) == 0
+    ((app, options),) = served
     assert options == {"host": "127.0.0.1", "port": 8090, "root_path": "/fair2wise/api"}
     paths = {getattr(r, "path", "") for r in app.routes}
     assert "/health" in paths and any(p.startswith("/v1/jobs") for p in paths)
     assert (tmp_path / "session" / "operations" / "jobs.sqlite3").exists()  # the worker's --db
     with pytest.raises(SystemExit):
-        api.build(argv[:-4] + ["--host", "0.0.0.0", "--port", "8090"], os.environ)
+        api.command(argv[:-4] + ["--host", "0.0.0.0", "--port", "8090"], os.environ)
+    with pytest.raises(SystemExit, match="only the 'api' command"):
+        api.command(argv[:-5] + ["status"], os.environ)
+
+
+def test_api_service_passes_cors_origins_from_the_environment(monkeypatch):
+    api = _load("api_service")
+    argv = ["api", "--host", "127.0.0.1", "--port", "8090"]
+    env = {"F2W_CORS_ORIGINS": "https://a.example, ,https://b.example"}
+    assert api.command(argv, env) == argv + ["--jobs-api", "--cors-origin", "https://a.example",
+                                             "--cors-origin", "https://b.example"]
+    assert api.command(argv + ["--jobs-api"], {}) == argv + ["--jobs-api"]
+    with pytest.raises(SystemExit, match="not both"):
+        api.command(argv + ["--cors-origin", "https://c.example"], env)
+
+
+def test_jobs_api_run_api_applies_root_path_from_the_public_prefix(monkeypatch):
+    """C6: ``cli api --jobs-api`` (app.api.main.run_api) gets root_path like the legacy run_api."""
+    import uvicorn
+
+    from app.api import main as api_main
+
+    served = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append(kw))
+    monkeypatch.setattr(api_main, "create_api_app", lambda cfg, cors_origins=None: ("app", cors_origins))
+    monkeypatch.setenv("F2W_PUBLIC_PREFIX", "/fair2wise")
+    api_main.run_api(object(), host="127.0.0.1", port=8090)
+    monkeypatch.delenv("F2W_PUBLIC_PREFIX")
+    api_main.run_api(object(), host="127.0.0.1", port=8090)
+    api_main.run_api(object(), host="127.0.0.1", port=8090, root_path="/x/api")
+    monkeypatch.setenv("F2W_PUBLIC_PREFIX", "/fair2wise")
+    api_main.run_api(object(), host="127.0.0.1", port=8090, root_path="")
+    assert served == [{"host": "127.0.0.1", "port": 8090, "root_path": "/fair2wise/api"},
+                      {"host": "127.0.0.1", "port": 8090},
+                      {"host": "127.0.0.1", "port": 8090, "root_path": "/x/api"},
+                      {"host": "127.0.0.1", "port": 8090}]
+
+
+@pytest.mark.parametrize("port,ok", [("8080", True), ("9000", True), ("8090", False), ("8765", False),
+                                     ("http", False), ("0", False)])
+def test_preflight_gateway_port(tmp_path, port, ok):
+    """C6: F2W_GATEWAY_PORT renders into ``listen``; it may not be the API or managed Tiled port."""
+    profile, env, mountinfo = setup(tmp_path, "local")
+    env["F2W_GATEWAY_PORT"] = port
+    result = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "no-tiled")
+    assert result["ok"] is ok, result["problems"]
+    if ok:
+        assert f"listen {port};" in Path(profile["gateway"]["rendered"]).read_text(encoding="utf-8")
+    else:
+        assert any("gateway" in p and "F2W_GATEWAY_PORT" in p for p in result["problems"])

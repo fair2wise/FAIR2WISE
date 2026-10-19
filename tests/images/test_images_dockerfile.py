@@ -101,7 +101,8 @@ def test_finals_run_the_supervisor_under_tini_as_non_root(name):
     assert DF.last(name, "CMD") is None
     assert DF.last(name, "USER").args.strip() == "10001:10001"
     health = DF.last(name, "HEALTHCHECK").args
-    assert "http://127.0.0.1/fair2wise/healthz" in health  # gateway liveness only
+    assert '"http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/healthz"' in health  # gateway liveness only
+    assert DF.last(name, "EXPOSE").args.strip() == "8080"
     assert DF.last(name, "STOPSIGNAL").args.strip() == "SIGTERM"
     copies = [c for s in DF.lineage(name) for c in s.copies()]
     assert (None, ["docker/entrypoint/"], "/opt/fair2wise/entrypoint/") in copies
@@ -112,6 +113,7 @@ def test_runtime_base_disables_implicit_dotenv_and_fixes_the_prefix():
     assert env["F2W_DOTENV"] == "off"
     assert env["F2W_PUBLIC_PREFIX"] == "/fair2wise"
     assert env["F2W_API_UPSTREAM"] == "127.0.0.1:8090"
+    assert env["F2W_GATEWAY_PORT"] == "8080"
     assert "F2W_DEPLOYMENT_PROFILE" not in env  # only the finals choose a profile
 
 
@@ -180,3 +182,17 @@ def test_splash_stays_only_in_the_legacy_agent_target():
         assert not any(p.startswith("splash_links") for p in DF.context_sources(name)), name
         assert "SPLASH_LINKS_REPO" not in DF.effective_env(name), name
         assert not any("pixi" in i.args for s in DF.lineage(name) for i in s.of("RUN")), name
+
+
+def test_gateway_listens_unprivileged_without_setcap():
+    """C6: the gateway port is 8080 (T24A contract), so nginx gets no file capability."""
+    text = (REPO / "Dockerfile").read_text(encoding="utf-8")
+    assert "setcap" not in text and "libcap2-bin" not in text and "cap_net_bind_service=" not in text
+    for name in ("frontend", "runtime-base", *FINALS):
+        assert DF.effective_env(name)["F2W_GATEWAY_PORT"] == "8080", name
+        assert DF.last(name, "EXPOSE").args.strip() == "8080", name
+        assert "${F2W_GATEWAY_PORT}" in DF.last(name, "HEALTHCHECK").args, name
+    for compose, host in (("compose.yaml", "5175"), ("compose.splash.yaml", "5173")):
+        body = (REPO / compose).read_text(encoding="utf-8")
+        assert f'"127.0.0.1:${{F2W_UI_PORT:-{host}}}:8080"' in body and ":80\"" not in body, compose
+        assert '"http://127.0.0.1:8080/healthz"' in body, compose

@@ -28,7 +28,11 @@ Tracked `storage/kg` and `storage/terminology` JSON are included (owner O-D1, H0
 | 1 | `tiled` (`tiled_service.py` -> T20B lifecycle) | yes | **absent** | 127.0.0.1:8765 | `/healthz` | no: 3 restarts with backoff, never for exit 78 |
 | 2 | `api` (`api_service.py`: T14 jobs API, `root_path=/fair2wise/api`) | yes | yes | 127.0.0.1:8090 | `/health` | yes |
 | 3 | `worker` (`python -m app.modules.workers`) | yes | yes | none | alive 3 s | yes |
-| 4 | `gateway` (nginx with `docker/nginx.conf`) | yes | yes | 0.0.0.0:80 | `/fair2wise/healthz` | yes |
+| 4 | `gateway` (nginx with `docker/nginx.conf`) | yes | yes | 0.0.0.0:8080 (`F2W_GATEWAY_PORT`) | `/fair2wise/healthz` | yes |
+
+The gateway is the one container ingress. It listens on `F2W_GATEWAY_PORT` (profile default
+`8080`, the T24A contract; overridable at run time, refused if it equals the API or Tiled port).
+The port is unprivileged, so the uid-10001 nginx needs no `setcap`/`cap_net_bind_service`.
 
 Stop: SIGTERM to the container -> gateway (SIGQUIT, 15 s), worker (SIGTERM, 45 s; running jobs
 return to `queued`), api (20 s), tiled (25 s; data kept), then SIGKILL per process group. Use
@@ -97,7 +101,7 @@ Run `:local` (loopback only):
 
 ```sh
 docker volume create f2w-state && docker volume create f2w-tiled
-docker run -d --name f2w-local -p 127.0.0.1:8080:80 --stop-timeout 120 \
+docker run -d --name f2w-local -p 127.0.0.1:8080:8080 --stop-timeout 120 \
   -v f2w-state:/var/lib/fair2wise/state -v f2w-tiled:/var/lib/fair2wise/tiled \
   -e CBORG_API_KEY ghcr.io/fair2wise/fair2wise:local
 curl -fsS http://127.0.0.1:8080/fair2wise/healthz
@@ -110,7 +114,7 @@ docker start f2w-local                                                          
 Run an ALS image (disposable host; central Tiled is contacted only by app features):
 
 ```sh
-docker run -d --name f2w-als-dev -p 127.0.0.1:8081:80 --stop-timeout 120 \
+docker run -d --name f2w-als-dev -p 127.0.0.1:8081:8080 --stop-timeout 120 \
   -v f2w-als-state:/var/lib/fair2wise/state \
   -v /path/to/writer.secret:/run/secrets/tiled_writer:ro -e F2W_TILED_WRITER_SECRET_FILE=/run/secrets/tiled_writer \
   ghcr.io/fair2wise/fair2wise:als-dev
