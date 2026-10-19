@@ -6,6 +6,7 @@
   "authorization_mode": "tiled_authenticated",
   "tiled_mode": "external",
   "tiled_url": "https://tiled.als.lbl.gov",
+  "cors_origins_required": true,
   "bundles_tiled_server": false,
   "cwd": "/app",
   "locked_env": {
@@ -37,6 +38,7 @@
     "F2W_LIVE_TILED"
   ],
   "env": {
+    "F2W_GATEWAY_PORT": "8080",
     "F2W_BACKEND": "cborg",
     "F2W_MODEL": "lbl/cborg-chat",
     "F2W_GRAPH": "storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json",
@@ -152,7 +154,7 @@
       ],
       "required": true,
       "health": {
-        "http": "http://127.0.0.1:80/fair2wise/healthz",
+        "http": "http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/healthz",
         "timeout": 30
       },
       "stop_signal": "SIGQUIT",

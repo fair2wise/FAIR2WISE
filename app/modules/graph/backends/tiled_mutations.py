@@ -23,7 +23,7 @@ import requests
 
 from ..identity_adapter import GRAPH_KEY, LITERATURE_OWNER, OWNER_KEY
 from ..ports import ContractError, ErrorCode, TruncatedGraphRead
-from .tiled_client import TiledGraphClient
+from .tiled_client import TiledCredentialRejected, TiledGraphClient
 
 _ENTITY_FIELDS = "id name entityType uri properties"
 _LINK_FIELDS = "id predicate subjectId objectId properties accessBlob"
@@ -58,8 +58,8 @@ class TiledMutationClient(TiledGraphClient):
                                 f"Tiled graph at {self.base_url} is unavailable ({type(exc).__name__}); "
                                 "the write outcome is unknown, reconcile by scan") from None
         if resp.status_code in (401, 403):
-            raise ContractError(ErrorCode.DENIED, f"Tiled graph rejected the writer credential "
-                                                  f"(HTTP {resp.status_code})")
+            raise TiledCredentialRejected(f"Tiled graph rejected the writer credential "
+                                          f"(HTTP {resp.status_code})", resp.status_code)
         if resp.status_code >= 500 or resp.status_code == 404:
             raise ContractError(ErrorCode.UNAVAILABLE, f"Tiled graph answered HTTP {resp.status_code}")
         try:

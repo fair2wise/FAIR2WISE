@@ -100,7 +100,10 @@ def test_api_worker_gateway_wiring(name):
     assert (REPO / env["F2W_SCHEMA"]).is_file()
     assert units["gateway"][0] == "nginx"
     health = {s.name: s.health for s in profile.services}
-    assert health["gateway"].http == "http://127.0.0.1:80/fair2wise/healthz"
+    assert profile.services[-1].health.http == "http://127.0.0.1:${F2W_GATEWAY_PORT}/fair2wise/healthz"
+    assert env["F2W_GATEWAY_PORT"] == "8080"  # default; an operator may set another port
+    assert SUP.substitute([profile.services[-1].health.http], env) == ["http://127.0.0.1:8080/fair2wise/healthz"]
+    assert resolved(name, {"F2W_GATEWAY_PORT": "9000"})["F2W_GATEWAY_PORT"] == "9000"
     assert health["api"].http == "http://127.0.0.1:8090/health"
 
 

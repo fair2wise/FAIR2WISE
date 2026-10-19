@@ -144,6 +144,24 @@ class JobService:
             return
         raise ContractError(ErrorCode.NOT_FOUND, "no such job")
 
+    def list_visible(
+        self, ctx: RequestContext, *, state: Optional[JobState] = None, kind: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[JobRecord]:
+        """Most recently updated jobs ``ctx`` may see, filtered in SQL by the store (C3).
+
+        The same rule as :meth:`_visible`, expressed as store filters: ``jobs.admin`` sees every
+        job; anyone else sees the jobs they created whose corpus scope is within theirs (any scope
+        for ``local_trusted``). Tests check the two agree on every job.
+        """
+        if ctx.has("jobs.admin"):
+            return self.store.list_jobs_scoped(state=state, kind=kind, limit=limit)
+        local = ctx.mode.value == "local_trusted"
+        return self.store.list_jobs_scoped(
+            created_by=ctx.principal.subject, within_scope=None if local else ctx.corpus_scope,
+            state=state, kind=kind, limit=limit,
+        )
+
     # --- API-facing operations ---------------------------------------------------------
 
     def submit(

@@ -28,7 +28,11 @@ Tracked `storage/kg` and `storage/terminology` JSON are included (owner O-D1, H0
 | 1 | `tiled` (`tiled_service.py` -> T20B lifecycle) | yes | **absent** | 127.0.0.1:8765 | `/healthz` | no: 3 restarts with backoff, never for exit 78 |
 | 2 | `api` (`api_service.py`: T14 jobs API, `root_path=/fair2wise/api`) | yes | yes | 127.0.0.1:8090 | `/health` | yes |
 | 3 | `worker` (`python -m app.modules.workers`) | yes | yes | none | alive 3 s | yes |
-| 4 | `gateway` (nginx with `docker/nginx.conf`) | yes | yes | 0.0.0.0:80 | `/fair2wise/healthz` | yes |
+| 4 | `gateway` (nginx with `docker/nginx.conf`) | yes | yes | 0.0.0.0:8080 (`F2W_GATEWAY_PORT`) | `/fair2wise/healthz` | yes |
+
+The gateway is the one container ingress. It listens on `F2W_GATEWAY_PORT` (profile default
+`8080`, the T24A contract; overridable at run time, refused if it equals the API or Tiled port).
+The port is unprivileged, so the uid-10001 nginx needs no `setcap`/`cap_net_bind_service`.
 
 Stop: SIGTERM to the container -> gateway (SIGQUIT, 15 s), worker (SIGTERM, 45 s; running jobs
 return to `queued`), api (20 s), tiled (25 s; data kept), then SIGKILL per process group. Use
@@ -53,6 +57,17 @@ then subject to the same locks); children always get `F2W_DOTENV=off`.
 | `F2W_TILED_URL` | forbidden | fixed central URL |
 | `F2W_TILED_DATA_DIR` / `_PYTHON` / `_PORT` | fixed (`/var/lib/fair2wise/tiled`, `/opt/tiled/venv/bin/python`, `8765`) | forbidden |
 | `F2W_LOCAL_BIND` | allowed (`network` warns) | forbidden |
+| `F2W_CORS_ORIGINS` | optional (unset: the API's development localhost origins) | **required** (`cors_origins_required`): comma-separated `https://host[:port]` origins of the deployed UI; unset or malformed exits 78, never a fallback to the development origins |
+
+## Edge proxy requirement (T24E)
+
+The ALS edge proxy in front of the gateway (Ansible/Traefik, T24E) **must overwrite
+`X-Forwarded-Proto`** with the scheme the browser used (`https` on ALS), replacing any value the
+client sent. The gateway passes on only the literal values `http`/`https` it receives
+(`docker/nginx.conf`, `$f2w_forwarded_proto`) and uvicorn believes it only from the loopback
+gateway, so a client-supplied header that the edge lets through would reach the API's URL and
+same-origin decisions. Recorded in `docs/migration/plan_addenda.md` ("Deployment notes for T24E",
+OPEN_DECISIONS C8).
 
 ## Mounts
 
@@ -90,14 +105,14 @@ docker run --rm --entrypoint /opt/tiled/venv/bin/python ghcr.io/fair2wise/fair2w
   'import tiled; print(tiled.__version__)'                                        # 0.2.18
 docker run --rm --entrypoint sh ghcr.io/fair2wise/fair2wise:als-dev -c 'test ! -e /opt/tiled'
 docker run --rm -e F2W_DEPLOYMENT_PROFILE=local ghcr.io/fair2wise/fair2wise:als-prod; echo $?   # 78
-docker run --rm ghcr.io/fair2wise/fair2wise:als-dev; echo $?                       # 78: state not mounted
+docker run --rm ghcr.io/fair2wise/fair2wise:als-dev; echo $?                       # 78: state not mounted, no F2W_CORS_ORIGINS
 ```
 
 Run `:local` (loopback only):
 
 ```sh
 docker volume create f2w-state && docker volume create f2w-tiled
-docker run -d --name f2w-local -p 127.0.0.1:8080:80 --stop-timeout 120 \
+docker run -d --name f2w-local -p 127.0.0.1:8080:8080 --stop-timeout 120 \
   -v f2w-state:/var/lib/fair2wise/state -v f2w-tiled:/var/lib/fair2wise/tiled \
   -e CBORG_API_KEY ghcr.io/fair2wise/fair2wise:local
 curl -fsS http://127.0.0.1:8080/fair2wise/healthz
@@ -110,9 +125,10 @@ docker start f2w-local                                                          
 Run an ALS image (disposable host; central Tiled is contacted only by app features):
 
 ```sh
-docker run -d --name f2w-als-dev -p 127.0.0.1:8081:80 --stop-timeout 120 \
+docker run -d --name f2w-als-dev -p 127.0.0.1:8081:8080 --stop-timeout 120 \
   -v f2w-als-state:/var/lib/fair2wise/state \
   -v /path/to/writer.secret:/run/secrets/tiled_writer:ro -e F2W_TILED_WRITER_SECRET_FILE=/run/secrets/tiled_writer \
+  -e F2W_CORS_ORIGINS=https://<ui-host> \
   ghcr.io/fair2wise/fair2wise:als-dev
 ```
 

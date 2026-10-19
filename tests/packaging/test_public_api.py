@@ -88,14 +88,25 @@ def test_agent_factory_argument_rules():
 @pytest.mark.parametrize("method,args,task", [
     ("search_literature", ("q",), "T05"), ("resolve_work", ("doi",), "T05"), ("read_paper", ("w",), "T05"),
     ("read_section", ("w", "s"), "T05"), ("get_evidence", (["e"],), "T06"), ("query_knowledge", ("q",), "T08"),
-    ("trace_provenance", ("r",), "T08"), ("submit_ingest", ({},), "T10"), ("get_job", ("j",), "T10"),
-    ("cancel_job", ("j",), "T10"), ("plan_publication", ("s", "t"), "T10"), ("approve_plan", ({},), "T10"),
-    ("publish_plan", ({}, {}), "T08B"),
+    ("trace_provenance", ("r",), "T08"), ("publish_plan", ({}, {}), "T08B"),
 ])
 def test_unimplemented_methods_name_their_task(method, args, task):
     client = _client()
     with pytest.raises(NotImplementedError, match=task):
         getattr(client, method)(client.context_for(), *args)
+
+
+@pytest.mark.parametrize("method,args", [
+    ("submit_ingest", ({},)), ("get_job", ("j",)), ("cancel_job", ("j",)), ("plan_publication", ("s", "t")),
+])
+def test_job_methods_without_operations_are_unsupported(method, args):
+    """C2: these forward to F2WOperations (tests/api_v1/test_v1_sdk_client.py); none given here."""
+    from app.modules.contracts.errors import ContractError, ErrorCode
+
+    client = _client()
+    with pytest.raises(ContractError) as err:
+        getattr(client, method)(client.context_for(), *args)
+    assert err.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
 
 
 def _run(code: str) -> dict:

@@ -40,6 +40,18 @@ GRAPHQL_PATH = "/api/graphql"
 _MUTATION_RE = re.compile(r"^\s*(#[^\n]*\n\s*)*mutation\b", re.IGNORECASE)
 
 
+class TiledCredentialRejected(ContractError):
+    """Tiled answered HTTP 401/403 to the configured credential.
+
+    Still ``DENIED`` for readers; the importer maps it to ``WRITER_UNAUTHORIZED`` (the credential
+    there is always the runtime writer).
+    """
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(ErrorCode.DENIED, message, retryable=False)
+        self.status = status
+
+
 def graphql_endpoint_for(base_url: str) -> str:
     """GraphQL endpoint for a normalized Tiled base URL."""
     return base_url.rstrip("/") + GRAPHQL_PATH
@@ -123,8 +135,8 @@ class TiledGraphClient:
             raise ContractError(ErrorCode.UNAVAILABLE,
                                 f"Tiled graph at {self.base_url} is unavailable ({type(exc).__name__})") from None
         if resp.status_code in (401, 403):
-            raise ContractError(ErrorCode.DENIED, f"Tiled graph at {self.base_url} rejected the credential "
-                                                  f"(HTTP {resp.status_code})")
+            raise TiledCredentialRejected(f"Tiled graph at {self.base_url} rejected the credential "
+                                          f"(HTTP {resp.status_code})", resp.status_code)
         if resp.status_code >= 500 or resp.status_code == 404:
             raise ContractError(ErrorCode.UNAVAILABLE,
                                 f"Tiled graph at {self.base_url} answered HTTP {resp.status_code}")

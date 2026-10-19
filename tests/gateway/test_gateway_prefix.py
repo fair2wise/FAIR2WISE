@@ -505,12 +505,13 @@ def test_auth09_no_tiled_auth_or_admin_proxy_through_the_gateway(als_prefixed):
 # ------------------------------------------------------------------ image packaging
 
 
-def test_official_image_envsubst_touches_only_the_upstream_placeholder():
+def test_official_image_envsubst_touches_only_the_upstream_and_port_placeholders():
     """The nginx image substitutes ``$F2W_*`` / ``${F2W_*}`` (NGINX_ENVSUBST_FILTER=^F2W_) only."""
     template = CONF.read_text(encoding="utf-8")
-    assert set(re.findall(r"\$\{?F2W_[A-Za-z0-9_]*\}?", template)) == {"${F2W_API_UPSTREAM}"}
+    assert set(re.findall(r"\$\{?F2W_[A-Za-z0-9_]*\}?", template)) == {"${F2W_API_UPSTREAM}", "${F2W_GATEWAY_PORT}"}
     dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
     assert "NGINX_ENVSUBST_FILTER=^F2W_" in dockerfile and "F2W_API_UPSTREAM=127.0.0.1:8090" in dockerfile
+    assert "F2W_GATEWAY_PORT=8080" in dockerfile
 
 
 @pytest.mark.skipif(not __import__("os").environ.get("GATEWAY_IMAGE_ROOT"),
@@ -535,3 +536,39 @@ def test_built_ui_and_docs_through_the_gateway(harness):
     for rel in re.findall(r'href="(\.\./[^"#]+)"', page)[:20]:
         target = httpx.URL("https://f2w.example/fair2wise/docs/agent-api/").join(rel)
         assert target.path.startswith("/fair2wise/docs/") and client.get(target.path).status_code == 200, rel
+
+
+# ------------------------------------------------------------------ C6: configurable listen port
+
+
+def test_gateway_listens_on_8080_by_default_and_on_the_configured_port():
+    assert gw.DEFAULT_GATEWAY_PORT == 8080
+    model = NginxModel(rendered())
+    assert [d.args for d in model.server if d.name == "listen"] == [["8080"]]
+    text = gw.render_nginx_conf(CONF.read_text(encoding="utf-8"), layout=LAYOUT, listen_port="9000")
+    assert [d.args for d in NginxModel(text).server if d.name == "listen"] == [["9000"]]
+    assert "${" not in text
+    assert gw.gateway_port_from_env({}) == 8080 and gw.gateway_port_from_env({"F2W_GATEWAY_PORT": " "}) == 8080
+    assert gw.gateway_port_from_env({"F2W_GATEWAY_PORT": "8443"}) == 8443
+
+
+@pytest.mark.parametrize("value", ["0", "65536", "80a", "-1", "8080;", "8080 ssl", "", "1e3"])
+def test_gateway_port_refuses_anything_but_a_port(value):
+    with pytest.raises(gw.PrefixConfigError, match="F2W_GATEWAY_PORT"):
+        gw.render_nginx_conf(CONF.read_text(encoding="utf-8"), layout=LAYOUT, listen_port=value)
+
+
+def test_template_must_take_the_listen_port_from_the_placeholder():
+    template = CONF.read_text(encoding="utf-8")
+    with pytest.raises(gw.PrefixConfigError, match="listen"):
+        gw.render_nginx_conf(template.replace("listen ${F2W_GATEWAY_PORT};", "listen 80;"), layout=LAYOUT)
+    with pytest.raises(gw.PrefixConfigError, match="listen"):
+        gw.render_nginx_conf(template.replace("listen ${F2W_GATEWAY_PORT};",
+                                              "listen ${F2W_GATEWAY_PORT};\n    listen 80;"), layout=LAYOUT)
+
+
+def test_cli_renders_the_listen_port(tmp_path):
+    out = tmp_path / "default.conf"
+    assert gw.main(["render-nginx", "--template", str(CONF), "--listen-port", "8181", "--out", str(out)]) == 0
+    assert "listen 8181;" in out.read_text()
+    assert gw.main(["render-nginx", "--template", str(CONF), "--listen-port", "http"]) == 2
