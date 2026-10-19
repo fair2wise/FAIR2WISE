@@ -53,12 +53,13 @@ _NON_LINKML = {
     "xray_seed_instances": CLASS_EXAMPLE,
 }
 
-# selectable_for values: "extraction", "graph-view" (see ADR 2.2). Unknown (Q5) xray binding is not decided here.
+# selectable_for values: "extraction", "graph-view" (see ADR 2.2). x-ray graphs bind xray_schema by file name
+# (owner decision H3 S5, ``multi_kg.schema_path_for_graph``).
 _SELECTABLE = {
     "matkg_schema": ("extraction",),
     "rsoxs_schema": ("extraction", "graph-view"),
     "bl1101_schema": ("graph-view",),
-    "xray_schema": ("extraction",),
+    "xray_schema": ("extraction", "graph-view"),
     "xray_schema_extract": ("extraction",),
 }
 

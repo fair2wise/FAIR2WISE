@@ -42,11 +42,11 @@ def test_legacy_normalizer_entrypoints_are_recorded():
 
 
 def test_graph_filename_pattern_selection_matches_multi_kg(registry):
-    """F2: schema_path_for_graph picks overlays by filename; xray and others have none (kept as is)."""
+    """F2: schema_path_for_graph picks overlays by filename; xray graphs bind xray_schema (H3 S5); others none."""
     assert registry.for_graph("storage/kg/matkg_rsoxs_v4.json") is registry.get("rsoxs_schema")
     assert registry.for_graph("matkg_bl1101_v7.json") is registry.get("bl1101_schema")
     assert registry.for_graph("matkg_with_code.json") is None
-    assert registry.for_graph("matkg_xray_papers_cborg_chat.json") is None
+    assert registry.for_graph("matkg_xray_papers_cborg_chat.json") is registry.get("xray_schema")
 
 
 def test_default_schema_is_matkg_not_an_interpretation_fallback():

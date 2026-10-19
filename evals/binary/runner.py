@@ -20,7 +20,14 @@ Semantics (BINARY_EVALUATION_SPEC sections 2-3, plan section 12):
   never PASS for the gate; missing labels keep the case blocked (H3 B4);
 * the judge model (``--judge-model`` or the deployment setting under ``--settings-workdir``,
   owner O-U2) and the model under test are recorded in every report, and a run whose
-  labeller, judge and model under test are not pairwise different is refused.
+  labeller, judge and model under test are not pairwise different is refused;
+* ``gate.provisional`` is the canonical provisional marker read by KG release tooling
+  (``app.modules.graph.releases.bind_binary_report``): true when any result's
+  ``reported_verdict`` is PROVISIONAL. It never changes ``gate.status``, which stays binary;
+* ``--subject-snapshot storage/kg/<corpus>/<id>`` binds the report to a frozen KG snapshot:
+  the snapshot is hash-verified before and after the run and a ``subject`` block
+  ``{kind: kg_snapshot, corpus, snapshot_id, graph_sha256, manifest_sha256}`` is written into
+  the report. Without the option no subject is written.
 
 Reports carry ids, statuses, counts and hashes only: no raw prompt, quote or source text.
 """
@@ -54,6 +61,7 @@ from evals.binary.model import (
 from evals.binary.sanitize import sanitize
 
 RUNNER_REVISION = "t11b-runner-1"
+SUBJECT_KIND = "kg_snapshot"
 _STATE_PRIORITY = ("error", "timeout", "judge_invalid", "missing_fixture", "skipped", "blocked")
 
 CheckFn = Callable[[Dict[str, Any]], Outcome]
@@ -389,8 +397,11 @@ def compute_gate(manifest: Manifest, results: Sequence[Dict[str, Any]], complete
     if any(v != "approved" for v in human.values()):
         gate_reasons.append("human_gate_not_approved")
     status = "PASS" if not blocking and not gate_reasons else "NOT_PASS"
+    provisional_ids = sorted(r["case_id"] for r in results if r.get("reported_verdict") == "PROVISIONAL")
     return {
         "status": status,
+        "provisional": bool(provisional_ids),
+        "provisional_case_ids": provisional_ids,
         "required_case_count": len(expected),
         "blocking_case_count": len(blocking),
         "blocking_cases": blocking,
@@ -401,6 +412,35 @@ def compute_gate(manifest: Manifest, results: Sequence[Dict[str, Any]], complete
             "PASS only if every required case is completed PASS, owner-approved and fully covered, "
             "the required membership matches, and all human gates are approved"
         ),
+    }
+
+
+class SubjectError(ValueError):
+    """The ``--subject-snapshot`` directory is not a verifiable frozen KG snapshot."""
+
+
+def snapshot_subject(snapshot_dir: Path) -> Dict[str, Any]:
+    """The report ``subject`` for a frozen ``storage/kg/<corpus>/<id>`` snapshot.
+
+    The directory is verified with the release checker's own hash check (layout, manifest, graph and
+    validation hashes), so the subject names exactly the bytes ``prepare_kg_release`` later compares.
+    No local path is recorded.
+
+    Raises:
+        SubjectError: the directory is missing, tampered or not a frozen snapshot.
+    """
+    from app.modules.graph.releases import ReleaseVerificationError, verify_snapshot_dir
+
+    try:
+        verified = verify_snapshot_dir(Path(snapshot_dir))
+    except ReleaseVerificationError as exc:
+        raise SubjectError(f"subject snapshot does not verify: {exc.code}") from None
+    return {
+        "kind": SUBJECT_KIND,
+        "corpus": verified.manifest.corpus,
+        "snapshot_id": verified.manifest.snapshot_id,
+        "graph_sha256": verified.graph_sha256,
+        "manifest_sha256": verified.manifest_sha256,
     }
 
 
@@ -439,6 +479,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--settings-workdir", type=Path, default=None,
                         help="F2W workdir whose validation/judge_model.json holds the settings-panel judge (O-U2)")
     parser.add_argument("--model-under-test", default=None, help="model id of the system under test")
+    parser.add_argument("--subject-snapshot", type=Path, default=None,
+                        help="frozen storage/kg/<corpus>/<id> the report is bound to (writes the subject block)")
     args = parser.parse_args(argv)
     manifest = load_manifest(args.cases_dir)
     problems = manifest.validate()
@@ -454,7 +496,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except RoleSeparationError as exc:
         print(f"refused: {sanitize(exc)}", file=sys.stderr)
         return 2
+    subject = None
+    if args.subject_snapshot is not None:
+        try:
+            subject = snapshot_subject(args.subject_snapshot)
+        except SubjectError as exc:
+            print(f"refused: {sanitize(exc)}", file=sys.stderr)
+            return 2
     report = runner.run(only=args.only)
+    if subject is not None:
+        try:
+            after = snapshot_subject(args.subject_snapshot)
+        except SubjectError as exc:
+            after = {"error": str(exc)}
+        if after != subject:
+            print("refused: the subject snapshot changed during the run", file=sys.stderr)
+            return 2
+        report["subject"] = subject
     args.out_dir.mkdir(parents=True, exist_ok=True)
     reports.write_all(report, args.out_dir, args.basename)
     print(f"gate: {report['gate']['status']}; {report['counts']['by_execution_state']}")
