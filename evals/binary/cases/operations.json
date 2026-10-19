@@ -26,20 +26,21 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "b4a4906754990298289e30a7e0ad9099585e7c41aa8fcfd1b8a7f1f99bbbf791",
-        "config_sha256": "b0ac5ea1755363b7261343711079f76cb2166c6f0bf94499c6a6aae7970dbfdb",
+        "case_sha256": "2f1130c36f2d61f4806f1c7d3f0af6b0427ee823af9926416aae651f7cc2feb5",
+        "config_sha256": "5dc3d7aac5e9e44b66bf41a8fe984dc92e55cd2f0a1d782d399674ab9fa059c8",
         "model_sha256": null,
-        "oracle_source_sha256": "1d96e2bb4295d1005227c348186c1c8b8c585c45513ab0ece2b10d6f46ca148f",
+        "oracle_source_sha256": "b6a056d5d74bf40d9c020ee39ff203b5689468393de347b5d253434eaac4353e",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/graph/graph_samples.py",
         "tests/operations/fixtures/",
+        "tests/operations/scale_population.py",
         "tests/operations/summary_fakes.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations",
+        "covers": "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations; T19D: every operation's totals equal independently computed ground truth on synthetic populations 2-12x a 1M-token context (60k entities / 191k edges, 60k term entries, 120k session records; 15k live Tiled entities in parity with frozen JSON), computed by code with no model within measured time and memory bounds; figure/table-derived (T09) records count exactly once; no output carries source material (D19); the operations never generate, compile or run code (static AST, runtime tripwires, read-only specs)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -53,7 +54,28 @@
           "tests/operations/test_graph_operations.py::test_legacy_block_matches_analyze_kgs_on_committed_graphs",
           "tests/operations/test_graph_operations.py::test_growth_series_matches_analyze_kgs_growth_with_work_denominators",
           "tests/operations/test_graph_operations.py::test_empty_graph_is_a_complete_zero_population",
-          "tests/graph/test_graph_operations_tiled.py::test_statistics_match_json_and_exclude_forge_records"
+          "tests/graph/test_graph_operations_tiled.py::test_statistics_match_json_and_exclude_forge_records",
+          "tests/operations/test_scale_population.py::test_populations_are_far_larger_than_a_model_context",
+          "tests/operations/test_scale_population.py::test_graph_statistics_equal_ground_truth_over_the_whole_graph",
+          "tests/operations/test_scale_population.py::test_paper_subgraph_totals_equal_ground_truth_while_the_preview_is_cut",
+          "tests/operations/test_scale_population.py::test_growth_between_two_large_versions_equals_set_arithmetic",
+          "tests/operations/test_scale_population.py::test_corpus_audit_equals_ground_truth_over_every_term_entry",
+          "tests/operations/test_scale_population.py::test_paper_summary_counts_every_page_grounded_record",
+          "tests/operations/test_scale_population.py::test_every_operation_stays_within_time_and_memory_bounds",
+          "tests/operations/test_scale_tiled.py::test_live_statistics_equal_frozen_json_over_the_whole_graph",
+          "tests/operations/test_scale_tiled.py::test_live_growth_and_subgraph_equal_frozen_json",
+          "tests/operations/test_figure_evidence.py::test_summary_counts_figure_and_table_records_once_under_page_eligibility",
+          "tests/operations/test_figure_evidence.py::test_graph_counts_figure_and_table_derived_entities_once",
+          "tests/operations/test_figure_evidence.py::test_corpus_counts_figure_and_table_entries_once",
+          "tests/operations/test_corpus_near_duplicates.py::test_pruned_pair_loop_equals_corpus_qa",
+          "tests/operations/test_no_code_generation.py::test_no_code_execution_primitive_in_the_operations_or_their_read_path",
+          "tests/operations/test_no_code_generation.py::test_the_wrapped_legacy_summary_runs_no_generated_code",
+          "tests/operations/test_no_code_generation.py::test_operations_over_the_large_populations_touch_no_code_primitive",
+          "tests/operations/test_no_code_generation.py::test_code_shaped_inputs_are_data_never_code",
+          "tests/operations/test_no_code_generation.py::test_specs_are_read_only_and_take_no_code",
+          "tests/operations/test_no_code_generation.py::test_no_code_runner_tool_exists_in_the_application",
+          "tests/operations/test_no_code_generation.py::test_job_dispatch_runs_only_reviewed_operations",
+          "tests/operations/test_figure_evidence.py::test_no_source_material_in_any_output_or_artifact"
         ],
         "supporting_selectors": [],
         "uncovered": "Known complete-population count on an owner-approved real population (H3 oracle)"
@@ -101,19 +123,20 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "aaa425e1b1b02c7edee95d879cdaeb0e566567627b731db0c2125f5adb983f1d",
-        "config_sha256": "3d7ad43bc7444d7633340138e6d823b10ed2c395c275527a540f010f09155d2a",
+        "case_sha256": "07f05fb3d8c48240caa01a6fadc4d5668c9deb56ed79fe7f848ca905a88c0f88",
+        "config_sha256": "a6711e0fafa270ce2e1008ea835a0a12fdb0bbb64ef6efd524be00f7fd16f735",
         "model_sha256": null,
-        "oracle_source_sha256": "db6d0d91a4d96518b1d1311dc77721e97d9f297085d5690e9d2277b7fb7e6264",
+        "oracle_source_sha256": "41021b11363d2787a64520bbe49946efc072a8fa2f82ffb617250850a1b42370",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/operations/fixtures/",
+        "tests/operations/scale_population.py",
         "tests/operations/summary_fakes.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed",
+        "covers": "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed; T19D: executable on synthetic repeated-paper populations (preprint/published pairs by DOI label or by title and first author, later arXiv versions, the 10.48550 stem, one file under several directories, renamed byte-identical copies with identical metadata, byte-identical duplicate records, a Work reappearing in a later graph version) in graph statistics, subgraphs, growth and the corpus audit, at 60k scale; a renamed copy with no identifier stays a disclosed key-only Work (no content-hash rule in work-identity/1)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -121,10 +144,19 @@
           "tests/operations/test_work_identity.py::test_pairwise_rule_matches_harvest_works_same_identity",
           "tests/operations/test_work_identity.py::test_two_journal_dois_are_never_merged_even_with_equal_titles",
           "tests/operations/test_corpus_audit.py::test_synthetic_corpus_matches_corpus_qa_and_counts_distinct_works",
-          "tests/operations/test_graph_operations.py::test_statistics_counting_units_duplicates_dangling_and_works"
+          "tests/operations/test_graph_operations.py::test_statistics_counting_units_duplicates_dangling_and_works",
+          "tests/operations/test_repeated_works.py::test_preprint_versions_and_published_paper_are_one_work_in_a_graph",
+          "tests/operations/test_repeated_works.py::test_preprint_published_pair_by_title_is_one_work_in_the_corpus_audit",
+          "tests/operations/test_repeated_works.py::test_different_journal_dois_with_one_title_stay_two_works",
+          "tests/operations/test_repeated_works.py::test_one_file_under_several_directories_is_one_key_and_one_work",
+          "tests/operations/test_repeated_works.py::test_renamed_byte_identical_copy_with_the_same_metadata_is_one_work",
+          "tests/operations/test_repeated_works.py::test_renamed_copy_without_any_identifier_is_disclosed_not_merged",
+          "tests/operations/test_repeated_works.py::test_byte_identical_duplicate_records_collapse_by_their_unit",
+          "tests/operations/test_repeated_works.py::test_a_work_reappearing_as_its_preprint_is_not_a_new_work",
+          "tests/operations/test_repeated_works.py::test_repeated_reference_population_at_scale_counts_each_work_once"
         ],
         "supporting_selectors": [],
-        "uncovered": "Owner review of work-identity/1 on a real repeated-paper population"
+        "uncovered": "Owner review of work-identity/1 on a real repeated-paper population (waits for the H3 B4 pilot labels)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -169,10 +201,10 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "2dc7348cf5924bee0c74b2a2b552bfdc54516d17ae7aa3868e0ce026f04f8531",
-        "config_sha256": "a4c6f08c7e10c1943c8d7bbf497c68fa6bf96ea8913d5ea84643ec809313b6f4",
+        "case_sha256": "81074a97689c28195625d0a4d41ccb2c70a5c2b1f8eef2a9ddaab86f2530df62",
+        "config_sha256": "fb6835c8596a8c0b51484ba2cba25b1c50337e33a224e459045ddbaa1354ba01",
         "model_sha256": null,
-        "oracle_source_sha256": "7b149a0275eace614e524377a63e0464bb007fd8054c1a95d9818afdefe6c4cd",
+        "oracle_source_sha256": "2c92dde8753673438585bf6b4acd2040fa2779413d55f8c216615805a53ccc12",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -183,7 +215,7 @@
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete",
+        "covers": "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete; T19D: record bounds and deadlines below a 60k-entity population give partial/PARTIAL with the exact count read and the reason, also on live Tiled, and the same operation as a job covers the whole population",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -199,7 +231,15 @@
           "tests/operations/test_graph_operations.py::test_growth_stops_partial_and_lists_unread_graphs",
           "tests/operations/test_graph_operations.py::test_unknown_paper_is_not_found_but_a_partial_scan_is_unknown",
           "tests/operations/test_graph_operations.py::test_tool_partial_scope_unknown_and_invalid",
-          "tests/graph/test_graph_operations_tiled.py::test_capped_tiled_scan_is_partial_not_complete"
+          "tests/graph/test_graph_operations_tiled.py::test_capped_tiled_scan_is_partial_not_complete",
+          "tests/operations/test_scale_completeness.py::test_inline_bound_below_the_population_is_partial",
+          "tests/operations/test_scale_completeness.py::test_bound_equal_to_the_population_is_complete",
+          "tests/operations/test_scale_completeness.py::test_inline_tool_bound_is_partial_never_ok",
+          "tests/operations/test_scale_completeness.py::test_deadline_stops_a_large_scan_as_partial",
+          "tests/operations/test_scale_completeness.py::test_absent_work_after_a_partial_scan_is_unknown_not_absent",
+          "tests/operations/test_scale_completeness.py::test_capped_corpus_audit_is_partial_and_says_how_much",
+          "tests/operations/test_scale_completeness.py::test_job_covers_the_population_the_inline_bound_cannot",
+          "tests/operations/test_scale_tiled.py::test_capped_live_scan_is_partial"
         ],
         "supporting_selectors": [],
         "uncovered": ""
@@ -247,19 +287,20 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "4b998a7346eca0ce0cc1db3ad4c64b3b5bf73157652c3013d5b0f1546106bde4",
-        "config_sha256": "bf9be30993c7e1f2de55bc133af1f6d4bc71ea1897477352e92a1a86f8e9ebaa",
+        "case_sha256": "3fc85152a958c5c11ca7a013ad35c895dcf9c7924c23878efce3270bb6fd3aba",
+        "config_sha256": "9c754a16c81e8171112e235e2b171b7b2fd5128bbbc2a751c0dd37cb4a957180",
         "model_sha256": null,
-        "oracle_source_sha256": "a3c593c1c139cb99af38e3bee3063d8956a7b528cf8a67c0ec1b2f2f318ac794",
+        "oracle_source_sha256": "0c06820179a5c47621e1596898bb49b1198b62cae1bc5e31e948bcd716271622",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/operations/fixtures/",
+        "tests/operations/scale_population.py",
         "tests/operations/summary_fakes.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Display bounding keeps the same output as the baseline and never changes totals or completeness",
+        "covers": "Display bounding keeps the same output as the baseline and never changes totals or completeness; T19D: on 60k-entity populations and live Tiled, result bounds, node caps and max_terms shorten previews only, metrics/coverage/completeness are unchanged, previews are not totals, and the user projection keeps every total",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -268,7 +309,18 @@
           "tests/operations/test_paper_summary_service.py::test_same_output_as_the_baseline_function",
           "tests/operations/test_paper_summary_tool.py::test_ok_result_is_typed_bounded_and_cites_eligible_pages",
           "tests/operations/test_operation_reports.py::test_display_truncation_keeps_totals_and_completeness",
-          "tests/operations/test_graph_operations.py::test_paper_subgraph_by_key_doi_and_arxiv"
+          "tests/operations/test_graph_operations.py::test_paper_subgraph_by_key_doi_and_arxiv",
+          "tests/operations/test_scale_completeness.py::test_smaller_result_bounds_shorten_previews_only",
+          "tests/operations/test_scale_completeness.py::test_preview_examples_are_not_the_totals",
+          "tests/operations/test_scale_completeness.py::test_subgraph_node_cap_changes_the_preview_only",
+          "tests/operations/test_scale_completeness.py::test_summary_display_cap_never_changes_term_count",
+          "tests/operations/test_scale_completeness.py::test_query_scoped_summary_keeps_the_full_count",
+          "tests/operations/test_scale_population.py::test_statistics_tool_result_is_bounded_and_complete",
+          "tests/operations/test_scale_population.py::test_corpus_tool_result_is_bounded_and_complete",
+          "tests/operations/test_scale_population.py::test_paper_summary_tool_result_is_bounded",
+          "tests/operations/test_scale_tiled.py::test_recent_entities_count_every_live_entity_while_the_preview_is_cut",
+          "tests/operations/test_scale_tiled.py::test_live_tool_result_is_bounded_and_marked_unisolated",
+          "tests/operations/test_figure_evidence.py::test_disclosure_projection_keeps_every_total"
         ],
         "supporting_selectors": [],
         "uncovered": "Totals unchanged under truncation on a gold population (H3 oracle)"

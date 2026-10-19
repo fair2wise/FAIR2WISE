@@ -124,3 +124,20 @@ T19C implements the graph and corpus operations after H3 (K1 distinct Works; K2 
 | `curate_audit_corpus` (OP02) | `corpus-audit/1` | per section, legacy units kept; distinct Works; `papers_per_year/2` | term-entry bound -> partial | extracted-terms file via injected resolver |
 
 Legacy CLIs (`corpus_qa.py`, `analyze_kgs.py`) are byte-identical to the T19A baseline; parity tests compare Tool figures against them on synthetic and committed data. Not done in T19C: OP04 (`list_missing_rsoxs_papers`) and OP05 (`get_pdf_years`) depend on script-only PubTemp parsing and on PyMuPDF (E2); O-01, O-10, O-12, O-13, O-14 are literature-store/network/PDF-scan operator workflows outside GraphPort.
+
+## 9. T19D scale and correctness evidence (for H4; the gate is not claimed)
+
+Tests: `tests/operations/test_{scale_population,scale_completeness,scale_tiled,repeated_works,figure_evidence,no_code_generation,corpus_near_duplicates}.py`; populations in `tests/operations/scale_population.py` (ground truth by construction and set arithmetic, never by the operations code). OPS-01..04 bind them; every case stays `proposed`.
+
+| Population | Size | x 1M-token context (4 chars/token) |
+| --- | --- | --- |
+| JSON graph | 60 000 entities, 190 900 edge records, 2 368 Works over 4 136 paper keys | ~12 |
+| extracted-terms corpus | 60 000 term entries, 1 500 Works over 2 000 keys | ~11 |
+| session terms | 120 000 records, 41 563 page-grounded for the active paper | ~2.5 |
+| live Tiled 0.2.18 | 15 000 + 6 000 entities, 36 078 links, 600 FORGE rows | >2 |
+
+Measured (Apple laptop, one process, no model, no socket): `kg_compute_statistics` 2.4 s (JSON) / 5.5 s (Tiled, complete paging); `kg_paper_subgraph` 2.2 s / 5.0 s; `kg_compare_snapshots` 4.4 s (2 x ~60k) / 10.1 s (Tiled); `kg_recent_entities` 5.1 s (Tiled); `curate_audit_corpus` 7.4-8.1 s; `lit_summarize_extracted_terms` 0.9-1.1 s. Resident memory added per operation in a fresh process: 277-430 MiB. Every inline result is at most 7000 characters.
+
+Change made for scale: `curate_audit_corpus` §1 arXiv x journal near-duplicate check was O(arXiv x journal) at ~0.5 ms per pair (over 4 minutes for 3 000 keys); it now prunes by exact lower bounds and a banded edit distance (same pairs, order and scores as `corpus_qa`, parity-tested). It is still quadratic in pairs (~30 us/pair on adversarial titles).
+
+Open: work-identity/1 does not merge a renamed copy with no DOI, arXiv id or title (no content-hash rule; disclosed as `works_identified_by_key_only`); operations count figure/table-derived records by their existing citation fields (`source_papers`, pages, snippets) and report no per-modality breakdown; a T09 EvidenceRef whose Work is cited only through `evidence[].work_id` is not counted. Real-paper review of K1 waits for the H3 B4 pilot labels.

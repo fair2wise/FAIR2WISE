@@ -45,6 +45,13 @@ OC = "tests/operations/test_corpus_audit.py"
 OW = "tests/operations/test_work_identity.py"
 OG = "tests/operations/test_graph_operations.py"
 GO = "tests/graph/test_graph_operations_tiled.py"
+OSP = "tests/operations/test_scale_population.py"
+OSC = "tests/operations/test_scale_completeness.py"
+OST = "tests/operations/test_scale_tiled.py"
+ORW = "tests/operations/test_repeated_works.py"
+OFE = "tests/operations/test_figure_evidence.py"
+ONC = "tests/operations/test_no_code_generation.py"
+OND = "tests/operations/test_corpus_near_duplicates.py"
 RPP = "tests/read_path/test_read_path_parity.py"
 RPQ = "tests/read_path/test_qa_route.py"
 RPT = "tests/read_path/test_read_tool.py"
@@ -403,12 +410,47 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_growth_series_matches_analyze_kgs_growth_with_work_denominators",
             "test_empty_graph_is_a_complete_zero_population",
         )
-        + n(GO, "test_statistics_match_json_and_exclude_forge_records"),
+        + n(GO, "test_statistics_match_json_and_exclude_forge_records")
+        + n(
+            OSP,
+            "test_populations_are_far_larger_than_a_model_context",
+            "test_graph_statistics_equal_ground_truth_over_the_whole_graph",
+            "test_paper_subgraph_totals_equal_ground_truth_while_the_preview_is_cut",
+            "test_growth_between_two_large_versions_equals_set_arithmetic",
+            "test_corpus_audit_equals_ground_truth_over_every_term_entry",
+            "test_paper_summary_counts_every_page_grounded_record",
+            "test_every_operation_stays_within_time_and_memory_bounds",
+        )
+        + n(OST, "test_live_statistics_equal_frozen_json_over_the_whole_graph",
+            "test_live_growth_and_subgraph_equal_frozen_json")
+        + n(
+            OFE,
+            "test_summary_counts_figure_and_table_records_once_under_page_eligibility",
+            "test_graph_counts_figure_and_table_derived_entities_once",
+            "test_corpus_counts_figure_and_table_entries_once",
+        )
+        + n(OND, "test_pruned_pair_loop_equals_corpus_qa")
+        + n(
+            ONC,
+            "test_no_code_execution_primitive_in_the_operations_or_their_read_path",
+            "test_the_wrapped_legacy_summary_runs_no_generated_code",
+            "test_operations_over_the_large_populations_touch_no_code_primitive",
+            "test_code_shaped_inputs_are_data_never_code",
+            "test_specs_are_read_only_and_take_no_code",
+            "test_no_code_runner_tool_exists_in_the_application",
+            "test_job_dispatch_runs_only_reviewed_operations",
+        )
+        + n(OFE, "test_no_source_material_in_any_output_or_artifact"),
         "partial",
         "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph"
-        " statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations",
+        " statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations; T19D: every"
+        " operation's totals equal independently computed ground truth on synthetic populations 2-12x a 1M-token"
+        " context (60k entities / 191k edges, 60k term entries, 120k session records; 15k live Tiled entities in"
+        " parity with frozen JSON), computed by code with no model within measured time and memory bounds;"
+        " figure/table-derived (T09) records count exactly once; no output carries source material (D19); the"
+        " operations never generate, compile or run code (static AST, runtime tripwires, read-only specs)",
         "Known complete-population count on an owner-approved real population (H3 oracle)",
-        fixtures=["tests/operations/fixtures/"],
+        fixtures=["tests/operations/fixtures/", "tests/operations/scale_population.py"],
     ),
     "OPS-02": oracle(
         n(
@@ -418,12 +460,30 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_two_journal_dois_are_never_merged_even_with_equal_titles",
         )
         + n(OC, "test_synthetic_corpus_matches_corpus_qa_and_counts_distinct_works")
-        + n(OG, "test_statistics_counting_units_duplicates_dangling_and_works"),
+        + n(OG, "test_statistics_counting_units_duplicates_dangling_and_works")
+        + n(
+            ORW,
+            "test_preprint_versions_and_published_paper_are_one_work_in_a_graph",
+            "test_preprint_published_pair_by_title_is_one_work_in_the_corpus_audit",
+            "test_different_journal_dois_with_one_title_stay_two_works",
+            "test_one_file_under_several_directories_is_one_key_and_one_work",
+            "test_renamed_byte_identical_copy_with_the_same_metadata_is_one_work",
+            "test_renamed_copy_without_any_identifier_is_disclosed_not_merged",
+            "test_byte_identical_duplicate_records_collapse_by_their_unit",
+            "test_a_work_reappearing_as_its_preprint_is_not_a_new_work",
+            "test_repeated_reference_population_at_scale_counts_each_work_once",
+        ),
         "partial",
         "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under"
-        " work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed",
-        "Owner review of work-identity/1 on a real repeated-paper population",
+        " work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed; T19D:"
+        " executable on synthetic repeated-paper populations (preprint/published pairs by DOI label or by title"
+        " and first author, later arXiv versions, the 10.48550 stem, one file under several directories, renamed"
+        " byte-identical copies with identical metadata, byte-identical duplicate records, a Work reappearing in a"
+        " later graph version) in graph statistics, subgraphs, growth and the corpus audit, at 60k scale; a"
+        " renamed copy with no identifier stays a disclosed key-only Work (no content-hash rule in work-identity/1)",
+        "Owner review of work-identity/1 on a real repeated-paper population (waits for the H3 B4 pilot labels)",
         supporting=n(OS, "test_duplicate_labels_count_as_separate_records"),
+        fixtures=["tests/operations/scale_population.py"],
     ),
     "OPS-03": oracle(
         n(
@@ -442,9 +502,22 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_unknown_paper_is_not_found_but_a_partial_scan_is_unknown",
             "test_tool_partial_scope_unknown_and_invalid",
         )
-        + n(GO, "test_capped_tiled_scan_is_partial_not_complete"),
+        + n(GO, "test_capped_tiled_scan_is_partial_not_complete")
+        + n(
+            OSC,
+            "test_inline_bound_below_the_population_is_partial",
+            "test_bound_equal_to_the_population_is_complete",
+            "test_inline_tool_bound_is_partial_never_ok",
+            "test_deadline_stops_a_large_scan_as_partial",
+            "test_absent_work_after_a_partial_scan_is_unknown_not_absent",
+            "test_capped_corpus_audit_is_partial_and_says_how_much",
+            "test_job_covers_the_population_the_inline_bound_cannot",
+        )
+        + n(OST, "test_capped_live_scan_is_partial"),
         "full",
-        "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete",
+        "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete; T19D: record"
+        " bounds and deadlines below a 60k-entity population give partial/PARTIAL with the exact count read and"
+        " the reason, also on live Tiled, and the same operation as a job covers the whole population",
     ),
     "OPS-04": oracle(
         n(
@@ -455,10 +528,31 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         )
         + n(OT, "test_ok_result_is_typed_bounded_and_cites_eligible_pages")
         + n(OR, "test_display_truncation_keeps_totals_and_completeness")
-        + n(OG, "test_paper_subgraph_by_key_doi_and_arxiv"),
+        + n(OG, "test_paper_subgraph_by_key_doi_and_arxiv")
+        + n(
+            OSC,
+            "test_smaller_result_bounds_shorten_previews_only",
+            "test_preview_examples_are_not_the_totals",
+            "test_subgraph_node_cap_changes_the_preview_only",
+            "test_summary_display_cap_never_changes_term_count",
+            "test_query_scoped_summary_keeps_the_full_count",
+        )
+        + n(
+            OSP,
+            "test_statistics_tool_result_is_bounded_and_complete",
+            "test_corpus_tool_result_is_bounded_and_complete",
+            "test_paper_summary_tool_result_is_bounded",
+        )
+        + n(OST, "test_recent_entities_count_every_live_entity_while_the_preview_is_cut",
+            "test_live_tool_result_is_bounded_and_marked_unisolated")
+        + n(OFE, "test_disclosure_projection_keeps_every_total"),
         "partial",
-        "Display bounding keeps the same output as the baseline and never changes totals or completeness",
+        "Display bounding keeps the same output as the baseline and never changes totals or completeness; T19D:"
+        " on 60k-entity populations and live Tiled, result bounds, node caps and max_terms shorten previews only,"
+        " metrics/coverage/completeness are unchanged, previews are not totals, and the user projection keeps"
+        " every total",
         "Totals unchanged under truncation on a gold population (H3 oracle)",
+        fixtures=["tests/operations/scale_population.py"],
     ),
     "OPS-05": oracle(
         n(
