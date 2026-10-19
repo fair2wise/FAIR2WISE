@@ -418,9 +418,107 @@ def _levenshtein(a: str, b: str) -> int:
 
 def _title_overlap(a: str, b: str) -> float:
     wa, wb = set(_normalise(a).split()), set(_normalise(b).split())
+    return _set_overlap(wa, wb)
+
+
+def _set_overlap(wa: Set[str], wb: Set[str]) -> float:
     if not wa or not wb:
         return 0.0
     return len(wa & wb) / len(wa | wb)
+
+
+def _bag_distance(ca: Counter, cb: Counter) -> int:
+    """Character-multiset distance: a lower bound of the Levenshtein distance (one edit moves it by <= 1)."""
+    return max(sum((ca - cb).values()), sum((cb - ca).values()))
+
+
+def _levenshtein_within(a: str, b: str, limit: int) -> Optional[int]:
+    """``_levenshtein(a, b)`` when it is at most ``limit``, else ``None`` (banded DP with early exit).
+
+    Cells farther than ``limit`` from the diagonal cannot be within ``limit``, and every alignment
+    passes through each row, so a row whose minimum exceeds ``limit`` ends the computation.
+    """
+    m, n = len(a), len(b)
+    if abs(m - n) > limit:
+        return None
+    cap = limit + 1
+    prev = [j if j <= limit else cap for j in range(n + 1)]
+    for i in range(1, m + 1):
+        cur = [cap] * (n + 1)
+        cur[0] = i if i <= limit else cap
+        row_min = cur[0]
+        ca = a[i - 1]
+        for j in range(max(1, i - limit), min(n, i + limit) + 1):
+            v = prev[j - 1] + (ca != b[j - 1])
+            if prev[j] + 1 < v:
+                v = prev[j] + 1
+            if cur[j - 1] + 1 < v:
+                v = cur[j - 1] + 1
+            cur[j] = v if v < cap else cap
+            if v < row_min:
+                row_min = v
+        if row_min > limit:
+            return None
+        prev = cur
+    return prev[n] if prev[n] <= limit else None
+
+
+#: corpus_qa §1: a title pair is near-duplicate when its 100-character prefixes are fewer than 10 edits apart.
+_NEAR_LEV = 10
+_NEAR_PREFIX = 100
+
+
+def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) -> List[Tuple[str, str, float]]:
+    """The corpus_qa §1 arXiv x journal near-duplicate list, in the same order and with the same scores.
+
+    Same rule as ``corpus_qa.audit_duplicate_works`` (word Jaccard >= 0.80, else both titles longer
+    than 30 characters and Levenshtein(prefix 100) < 10), but the word sets are computed once per
+    title and the edit distance runs only for pairs that pass two exact lower bounds (length
+    difference and character-bag distance below 10). The result is identical; T19D measures
+    the pair loop at corpus scale (the plain loop costs about 0.5 ms per pair). The edit distance
+    itself is banded (:func:`_levenshtein_within`): only distances below 10 matter.
+    """
+    words: Dict[int, Set[str]] = {}
+    bags: Dict[int, Counter] = {}
+
+    def word_set(title: Any) -> Set[str]:
+        key = id(title)
+        if key not in words:
+            words[key] = set(_normalise(title).split())
+        return words[key]
+
+    def bag(prefix: str) -> Counter:
+        key = id(prefix)
+        if key not in bags:
+            bags[key] = Counter(prefix)
+        return bags[key]
+
+    prefixes: Dict[int, str] = {}
+
+    def prefix_of(title: str) -> str:
+        key = id(title)
+        if key not in prefixes:
+            prefixes[key] = title[:_NEAR_PREFIX]
+        return prefixes[key]
+
+    near: List[Tuple[str, str, float]] = []
+    for adoi, atitle in arxiv.items():
+        if not atitle:
+            continue
+        for jdoi, jtitle in journal.items():
+            if not jtitle:
+                continue
+            overlap = _set_overlap(word_set(atitle), word_set(jtitle))
+            if overlap >= 0.80:
+                near.append((adoi, jdoi, overlap))
+            elif len(atitle) > 30 and len(jtitle) > 30:
+                pa, pj = prefix_of(atitle), prefix_of(jtitle)
+                if abs(len(pa) - len(pj)) >= _NEAR_LEV or _bag_distance(bag(pa), bag(pj)) >= _NEAR_LEV:
+                    continue  # both are lower bounds of the edit distance: lev >= 10 for certain
+                lev = _levenshtein_within(pa, pj, _NEAR_LEV - 1)
+                if lev is not None:
+                    near.append((adoi, jdoi, 1.0 - lev / 100))
+    return near
 
 
 def _doi_from_filename(filename: str) -> str:
@@ -475,20 +573,7 @@ def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex
                 doi_to_title[doi] = meta.get("paper_title") or ""
     arxiv = {d: ti for d, ti in doi_to_title.items() if _is_arxiv(d)}
     journal = {d: ti for d, ti in doi_to_title.items() if not _is_arxiv(d)}
-    near: List[Tuple[str, str, float]] = []
-    for adoi, atitle in arxiv.items():
-        if not atitle:
-            continue
-        for jdoi, jtitle in journal.items():
-            if not jtitle:
-                continue
-            overlap = _title_overlap(atitle, jtitle)
-            if overlap >= 0.80:
-                near.append((adoi, jdoi, overlap))
-            elif len(atitle) > 30 and len(jtitle) > 30:
-                lev = _levenshtein(atitle[:100], jtitle[:100])
-                if lev < 10:
-                    near.append((adoi, jdoi, 1.0 - lev / 100))
+    near = _near_duplicate_pairs(arxiv, journal)
     metrics = {
         "legacy": {"unique_doi_keys": len(doi_to_terms), "internal_dup_count": len(internal),
                    "arxiv_papers": len(arxiv), "journal_papers": len(journal),
