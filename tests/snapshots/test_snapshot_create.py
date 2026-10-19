@@ -165,6 +165,7 @@ def test_extraction_fingerprint_ignores_revision_order_and_missing_revisions_are
 def test_schema_selection_and_fingerprint_binding(make, registry, tmp_path):
     assert make(corpus="bl1101").manifest.schema_block.name == "bl1101_schema"
     assert make(corpus="other").manifest.schema_block.name == "matkg_schema"
+    assert make(corpus="xray").manifest.schema_block.name == "xray_schema"  # H3 S5: matkg_xray_v1.json pattern
     assert make(corpus="forced", schema_id="xray_schema").manifest.schema_block.name == "xray_schema"
     with pytest.raises(RegistryError):
         make(corpus="nope", schema_id="not_a_schema")

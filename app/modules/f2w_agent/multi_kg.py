@@ -19,6 +19,11 @@ XRAY_DEMO_GRAPH = "storage/kg/matkg_xray_papers_cborg_chat.json"
 XRAY_DEMO_NAME = "matkg_xray_papers_cborg_chat.json"
 _BL1101_SNAPSHOT_RE = re.compile(r"^matkg_bl1101_v(\d+)\.json$")
 _RSOXS_SNAPSHOT_RE = re.compile(r"^matkg_rsoxs_v(\d+)\.json$")
+#: X-ray literature graphs (H3 S5): the ``matkg_xray_vN.json`` snapshots (``scripts/harvest_xray.py``, the
+#: snapshot builder's flat copy for corpus ``xray``) and named x-ray graphs such as the demo
+#: ``matkg_xray_papers_cborg_chat.json``. Only ``.json`` graph files match (not ``.json.bak`` copies).
+_XRAY_GRAPH_RE = re.compile(r"^matkg_xray(?:_[A-Za-z0-9][A-Za-z0-9._-]*)?\.json$")
+XRAY_SCHEMA_PATH = "storage/schema/xray_schema.yaml"
 
 _GRAPH_ID_BY_NAME = {
     "matkg_rsoxs_v1.json": "rsoxs_v1",
@@ -128,8 +133,18 @@ def graph_label_for_id(graph_id: str) -> str:
     return graph_id
 
 
+def is_xray_graph(path: str) -> bool:
+    """True for an x-ray literature graph file (``matkg_xray_vN.json``, ``matkg_xray_<name>.json``)."""
+    return bool(_XRAY_GRAPH_RE.match(graph_filename(path)))
+
+
 def schema_path_for_graph(path: str) -> Optional[str]:
-    """LinkML overlay path for a KG file, or None when no overlay is known."""
+    """LinkML overlay path for a KG file, or None when no overlay is known.
+
+    Selection is by file name only: bl1101 and rsoxs patterns as before, and x-ray graphs bind
+    ``xray_schema.yaml`` (owner decision H3 S5). Every other graph returns None (callers then use their
+    default, ``matkg_schema``).
+    """
     name = graph_filename(path)
     if name in _SCHEMA_BY_NAME:
         return _SCHEMA_BY_NAME[name]
@@ -137,6 +152,8 @@ def schema_path_for_graph(path: str) -> Optional[str]:
         return "storage/schema/bl1101_schema.yaml"
     if _RSOXS_SNAPSHOT_RE.match(name) or name.startswith("matkg_rsoxs"):
         return "storage/schema/rsoxs_schema.yaml"
+    if _XRAY_GRAPH_RE.match(name):
+        return XRAY_SCHEMA_PATH
     return None
 
 
