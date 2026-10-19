@@ -216,3 +216,11 @@ T25D, T03B and T02B first (they can run in parallel), then the plan's
 post-H2 ports (T04 packaging, T05 literature/parsing, T06 extraction/evidence,
 T07 canonicalization, T08 graph ports and Tiled adapter, T09 paper figures,
 T10 jobs, T11 binary evaluation, T20B Tiled lifecycle) toward H3/H4.
+
+## Deployment notes for T24E
+
+- **T24E requirement (OPEN_DECISIONS C8):** the ALS edge proxy (Ansible/Traefik)
+  must overwrite `X-Forwarded-Proto` with the scheme the browser actually used,
+  never pass a client-supplied value through. The in-container gateway forwards
+  only the literal `http`/`https` it receives (`docker/nginx.conf`), and the API
+  builds its URLs and same-origin checks from it.

@@ -59,6 +59,16 @@ then subject to the same locks); children always get `F2W_DOTENV=off`.
 | `F2W_LOCAL_BIND` | allowed (`network` warns) | forbidden |
 | `F2W_CORS_ORIGINS` | optional (unset: the API's development localhost origins) | **required** (`cors_origins_required`): comma-separated `https://host[:port]` origins of the deployed UI; unset or malformed exits 78, never a fallback to the development origins |
 
+## Edge proxy requirement (T24E)
+
+The ALS edge proxy in front of the gateway (Ansible/Traefik, T24E) **must overwrite
+`X-Forwarded-Proto`** with the scheme the browser used (`https` on ALS), replacing any value the
+client sent. The gateway passes on only the literal values `http`/`https` it receives
+(`docker/nginx.conf`, `$f2w_forwarded_proto`) and uvicorn believes it only from the loopback
+gateway, so a client-supplied header that the edge lets through would reach the API's URL and
+same-origin decisions. Recorded in `docs/migration/plan_addenda.md` ("Deployment notes for T24E",
+OPEN_DECISIONS C8).
+
 ## Mounts
 
 | Container path | Images | Mode | Notes |
