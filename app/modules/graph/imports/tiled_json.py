@@ -33,10 +33,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Collection, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext
@@ -51,6 +52,7 @@ from app.modules.security.tiled_identity import normalize_tiled_target
 from .. import edit_journal as ej
 from .. import identity_adapter as ida
 from .. import literature_writer as lw
+from ..backends.tiled_client import TiledCredentialRejected
 from ..backends.tiled_mutations import TiledMutationClient
 from ..identity_adapter import IdentityLedger, assign_edge_ids
 from ..ports import ContractError, ErrorCode
@@ -82,6 +84,22 @@ class ImportVerificationError(ContractError):
         super().__init__(ErrorCode.CONFLICT, f"import verification failed: {list(mismatches)[:5]}",
                          retryable=True)
         self.mismatches = list(mismatches)
+
+
+@contextmanager
+def _writer_errors() -> Iterator[None]:
+    """Map Tiled's HTTP 401/403 to the import client's credential to ``WRITER_UNAUTHORIZED``.
+
+    The import client only ever carries the runtime writer credential, so a rejection here is a
+    writer problem (access_contract.md section 12), never a caller's missing capability. No retry with
+    another key and no fallback.
+    """
+    try:
+        yield
+    except TiledCredentialRejected as exc:
+        raise ContractError(ErrorCode.WRITER_UNAUTHORIZED,
+                            f"the Tiled writer credential was rejected (HTTP {exc.status}); "
+                            "graph writes are blocked", retryable=False) from None
 
 
 def _canon(value: Any) -> str:
@@ -435,7 +453,8 @@ def plan_import(source: Source, *, client: TiledMutationClient, settings: Deploy
     """Dry-run: preflight the snapshot, read the whole target, and return the exact plan. No writes.
 
     Raises:
-        ContractError: preflight refusal; ``UNAVAILABLE`` if Tiled cannot be read; ``CONFLICT`` for an
+        ContractError: preflight refusal; ``UNAVAILABLE`` if Tiled cannot be read;
+            ``WRITER_UNAUTHORIZED`` if Tiled rejects the writer credential (401/403); ``CONFLICT`` for an
             unreconciled acknowledged edit or an inconsistent target.
         TruncatedGraphRead: The target could not be read completely (a partial scan never plans).
     """
@@ -445,7 +464,8 @@ def plan_import(source: Source, *, client: TiledMutationClient, settings: Deploy
     scope = (src.manifest.corpus,)
     ej.check_import(edit_journal, target=target, scope=scope, lineage=[*src.lineage, *lineage],
                     resolutions=resolutions)
-    state = read_state(client, src.graph_id)
+    with _writer_errors():
+        state = read_state(client, src.graph_id)
     ops, counts = compute_ops(src, state)
     detail = {
         "adapter_version": ADAPTER_VERSION, "manifest_sha256": src.manifest_sha256, "graph_id": src.graph_id,
@@ -526,7 +546,8 @@ def apply_import(ctx: RequestContext, plan: ImportPlan, approval: Optional[Appro
 
     Raises:
         ContractError: ``DENIED``, ``STALE_APPROVAL``, ``CONFLICT`` (lease, stale source or target),
-            ``UNAVAILABLE`` (retryable; the snapshot is untouched), or :class:`ImportVerificationError`.
+            ``UNAVAILABLE`` (retryable; the snapshot is untouched), ``WRITER_UNAUTHORIZED`` (Tiled
+            rejected the writer credential with 401/403), or :class:`ImportVerificationError`.
     """
     fault = fault or (lambda _stage, _i: None)
     require(ctx, "graph.publish")
@@ -540,7 +561,8 @@ def apply_import(ctx: RequestContext, plan: ImportPlan, approval: Optional[Appro
     store = ReceiptStore(Path(state_dir) / "receipts")
     graph_id = plan.detail["graph_id"]
     if plan.is_noop:  # nothing to write: a valid receipt for this very revision answers it
-        state = read_state(client, graph_id)
+        with _writer_errors():
+            state = read_state(client, graph_id)
         for art in store.find(snapshot_sha256=change.input_sha256, adapter_version=plan.detail["adapter_version"],
                               graph_id=graph_id):
             if receipt_valid_for(art, target=change.target, revision=state.revision) \
@@ -560,7 +582,9 @@ def apply_import(ctx: RequestContext, plan: ImportPlan, approval: Optional[Appro
     journal = ImportJournal(run_dir / "journal.jsonl", clock)
     lease = Lease(root / "lease.json", clock, lease_seconds).acquire()
     try:
-        outcome = _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock, fault, existing)
+        with _writer_errors():
+            outcome = _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock, fault,
+                           existing)
     except Exception as exc:  # a crash (BaseException) deliberately leaves the lease to expire
         if journal.started():
             journal.append("run_failed", error=type(exc).__name__,

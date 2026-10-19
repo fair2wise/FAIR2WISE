@@ -137,13 +137,61 @@ def test_revoked_writer_key_fails_graph_operations_and_leaves_chat(monkeypatch, 
     with pytest.raises(ContractError) as err:
         tj.plan_import(snap, client=_als_writer_client(live_auth, writer.key), settings=als.settings,
                        supported_schema_fingerprints=tj.default_supported_schema_fingerprints(registry))
-    assert err.value.code is ErrorCode.DENIED and "rejected the credential" in str(err.value)
+    # C1: a writer 401/403 is ``writer_unauthorized``, not a generic ``denied`` (access contract section 12).
+    assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED and "HTTP 401" in str(err.value)
+    assert err.value.retryable is False and writer.key not in str(err.value)
     assert entity_count(live_auth) == before
     # Chat and sign-in are unaffected: the writer is never part of the caller's identity.
     resp = reader.post("/chat", json={"message": "What is Term A?", "session_id": "s-w",
                                       "client_turn_id": "t-w"})
     assert resp.status_code == 200 and "sign_in_required" not in resp.text
     assert als.client("admin").get("/settings").status_code == 200
+
+
+def test_wrong_writer_key_is_writer_unauthorized_and_writes_nothing(tmp_path, registry, live_auth):
+    """C1: a key Tiled never issued is ``writer_unauthorized`` at plan time; no fallback, no write."""
+    writer = create_service_account(live_auth)
+    settings = _als(live_auth, writer)
+    snap = _snapshot(tmp_path, registry)
+    before = entity_count(live_auth)
+    wrong = "f2w-wrong-writer-key-" + writer.key[::-1]
+    session = RecordingSession()
+    with pytest.raises(ContractError) as err:
+        tj.plan_import(snap, client=_als_writer_client(live_auth, wrong, session), settings=settings,
+                       supported_schema_fingerprints=tj.default_supported_schema_fingerprints(registry))
+    assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED and err.value.retryable is False
+    assert wrong not in str(err.value)
+    # Exactly the wrong key was sent: no retry with another key, no anonymous request.
+    assert session.authorizations and set(session.authorizations) == {f"Apikey {wrong}"}
+    assert entity_count(live_auth) == before
+
+
+def test_writer_revoked_after_approval_fails_apply_with_writer_unauthorized(tmp_path, registry, live_auth):
+    """C1: the key is revoked between an approved plan and apply: no write and no receipt."""
+    import httpx
+    from app.modules.security.tiled_identity import TiledWhoamiAdapter
+
+    writer = create_service_account(live_auth)
+    settings = _als(live_auth, writer)
+    snap = _snapshot(tmp_path, registry)
+    fingerprints = tj.default_supported_schema_fingerprints(registry)
+    client = _als_writer_client(live_auth, writer.key)
+    plan = tj.plan_import(snap, client=client, settings=settings, supported_schema_fingerprints=fingerprints)
+    with httpx.Client() as http:
+        port = TiledWhoamiAdapter(live_auth.url, http)
+        admin = TiledCredential(access_token(live_auth, "admin"), tiled_target=live_auth.url)
+        ctx = resolve_context(settings, admin, request_id="r-rev", identity_port=port, clock=utcnow)
+        approval = create_approval(ctx, plan.change, settings, approval_id="a-rev", clock=utcnow,
+                                   identity_port=port, approver_credential=admin)
+    revoke_service_key(live_auth, writer)
+    before = entity_count(live_auth)
+    state = tmp_path / "state"
+    with pytest.raises(ContractError) as err:
+        tj.apply_import(ctx, plan, approval, source=snap, client=client, settings=settings,
+                        supported_schema_fingerprints=fingerprints, state_dir=state, clock=utcnow)
+    assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED and err.value.retryable is False
+    assert entity_count(live_auth) == before
+    assert not [p for p in state.rglob("*") if p.is_file() and "receipts" in p.parts]
 
 
 def test_missing_local_writer_is_a_graph_error_not_sign_in(tmp_path, registry, live_single):
@@ -165,6 +213,10 @@ def test_missing_local_writer_is_a_graph_error_not_sign_in(tmp_path, registry, l
             approval = create_approval(ctx, plan.change, settings, approval_id="a-miss", clock=utcnow)
             tj.apply_import(ctx, plan, approval, source=snap, client=client, settings=settings,
                             supported_schema_fingerprints=fingerprints, state_dir=tmp_path / "state", clock=utcnow)
-        assert err.value.code in (ErrorCode.DENIED, ErrorCode.UNAVAILABLE), err.value
+        if credential:  # C1: a wrong writer key is a writer 401, reported as writer_unauthorized
+            assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED, err.value
+        else:
+            assert err.value.code in (ErrorCode.DENIED, ErrorCode.UNAVAILABLE,
+                                      ErrorCode.WRITER_UNAUTHORIZED), err.value
         assert "sign" not in str(err.value).lower()
     assert ctx.has("graph.publish")  # the local operator still holds every capability

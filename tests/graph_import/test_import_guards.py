@@ -326,3 +326,76 @@ def test_stopped_real_server_is_unavailable_not_empty(tmp_path, clock, fingerpri
         assert tree_bytes(snap.parents[1]) == before and client.writes == []
     finally:
         inst.destroy()
+
+
+# --------------------------------------------------------------------------- C1: writer 401/403
+
+
+class _RejectingWriter(MemoryTiled):
+    """Memory double whose writer credential is refused with ``status`` on the first write."""
+
+    def __init__(self, status):
+        super().__init__()
+        self.status = status
+        self.reject = False
+
+    def create_entity(self, **kw):
+        from app.modules.graph.backends.tiled_client import TiledCredentialRejected
+        if self.reject:
+            raise TiledCredentialRejected(f"Tiled graph rejected the writer credential (HTTP {self.status})",
+                                          self.status)
+        return super().create_entity(**kw)
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_writer_rejected_mid_apply_is_writer_unauthorized(status, snap, clock, fingerprints, tmp_path):
+    """C1: a writer 401/403 during apply is ``writer_unauthorized`` (not retryable), and no receipt is written."""
+    client = _RejectingWriter(status)
+    settings = DeploymentSettings(profile="local", writer_identity="f2w-writer", tiled_target=client.base_url)
+    ctx = local_operator_context(settings, request_id="w")
+    plan = tj.plan_import(snap, client=client, settings=settings, supported_schema_fingerprints=fingerprints)
+    approval = create_approval(ctx, plan.change, settings, approval_id="a", clock=clock)
+    client.reject = True
+    with pytest.raises(ContractError) as err:
+        tj.apply_import(ctx, plan, approval, source=snap, client=client, settings=settings,
+                        supported_schema_fingerprints=fingerprints, state_dir=tmp_path / "st", clock=clock)
+    assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED and not err.value.retryable
+    assert f"HTTP {status}" in str(err.value)
+    assert client.writes == [] and not ReceiptStore(tmp_path / "st" / "receipts").all()
+    failed = [json.loads(line) for p in (tmp_path / "st").rglob("journal.jsonl")
+              for line in p.read_text(encoding="utf-8").splitlines() if '"run_failed"' in line]
+    assert failed and all(r["code"] == "writer_unauthorized" for r in failed)
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_writer_rejected_on_scan_is_writer_unauthorized_at_plan(status, snap, fingerprints):
+    """C1: a 401/403 to the import client's read scan is the writer's, so planning reports it as such."""
+    import requests
+
+    class _Session:
+        def post(self, *_a, **_kw):
+            resp = requests.Response()
+            resp.status_code, resp._content = status, b'{"detail": "Invalid API key"}'
+            return resp
+
+    client = TiledMutationClient("http://127.0.0.1:59999", profile="test", credential="bad", session=_Session())
+    settings = DeploymentSettings(profile="local", writer_identity="f2w-writer", tiled_target=client.base_url)
+    with pytest.raises(ContractError) as err:
+        tj.plan_import(snap, client=client, settings=settings, supported_schema_fingerprints=fingerprints)
+    assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED and "bad" not in str(err.value)
+
+
+def test_wrong_writer_key_on_real_server_is_writer_unauthorized(snap, fingerprints, tiled_base):
+    """C1 on the disposable Tiled: a key it never issued fails planning with ``writer_unauthorized``."""
+    from tiled_server import start_tiled_instance, tiled_python
+    if tiled_python() is None:
+        pytest.skip("F2W_TILED_PYTHON is not set (needs tiled 0.2.18)")
+    inst = start_tiled_instance(tiled_base, seed=False)
+    try:
+        client = CountingClient(inst.url, profile="test", credential="f2w-not-the-writer-key")
+        settings = DeploymentSettings(profile="local", writer_identity="f2w-writer", tiled_target=inst.url)
+        with pytest.raises(ContractError) as err:
+            tj.plan_import(snap, client=client, settings=settings, supported_schema_fingerprints=fingerprints)
+        assert err.value.code is ErrorCode.WRITER_UNAUTHORIZED and client.writes == []
+    finally:
+        inst.destroy()

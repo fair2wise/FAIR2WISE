@@ -66,6 +66,7 @@ _STATUS: Dict[ErrorCode, int] = {
     ErrorCode.BUDGET_EXHAUSTED: 429,
     ErrorCode.CANCELLED: 409,
     ErrorCode.INTERNAL: 500,
+    ErrorCode.WRITER_UNAUTHORIZED: 503,  # deployment writer problem, not the caller's (no sign-in)
 }
 
 
@@ -326,7 +327,8 @@ async def _contract_error_handler(request: Request, exc: Exception) -> JSONRespo
     code = exc.code if isinstance(exc, ContractError) else ErrorCode.INTERNAL
     retryable = getattr(exc, "retryable", False)
     status = _STATUS.get(code, 500)
-    shown = status < 500 or code in (ErrorCode.UNAVAILABLE, ErrorCode.UNSUPPORTED_CAPABILITY)
+    shown = status < 500 or code in (ErrorCode.UNAVAILABLE, ErrorCode.UNSUPPORTED_CAPABILITY,
+                                     ErrorCode.WRITER_UNAUTHORIZED)
     message = str(exc) if shown else "internal error"
     headers = {"Retry-After": "5"} if code is ErrorCode.UNAVAILABLE else None
     return JSONResponse({"code": code.value, "message": message, "retryable": retryable},

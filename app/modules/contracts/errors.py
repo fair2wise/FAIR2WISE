@@ -26,6 +26,8 @@ class ErrorCode(str, Enum):
         BUDGET_EXHAUSTED: A configured time, cost or call budget is used up.
         CANCELLED: The caller or operator cancelled the work.
         INTERNAL: An unexpected failure; details stay in internal logs.
+        WRITER_UNAUTHORIZED: Tiled refused the configured writer credential (HTTP 401/403) on a
+            graph write path (access_contract.md section 12); not retryable, never a sign-in prompt.
     """
 
     INVALID_INPUT = "invalid_input"
@@ -39,6 +41,7 @@ class ErrorCode(str, Enum):
     BUDGET_EXHAUSTED = "budget_exhausted"
     CANCELLED = "cancelled"
     INTERNAL = "internal"
+    WRITER_UNAUTHORIZED = "writer_unauthorized"
 
 
 RETRYABLE_CODES = frozenset({ErrorCode.UNAVAILABLE, ErrorCode.CONFLICT})
