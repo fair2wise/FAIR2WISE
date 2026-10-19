@@ -161,16 +161,18 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 
 ## C. Technical defaults (I will apply these unless you object)
 
-| # | Item | Default |
-|---|---|---|
-| C1 | Importer maps a writer 401/403 from Tiled to `writer_unauthorized` (T25C/T14 Q1) | yes |
-| C2 | `F2WClient` methods that still raise `NotImplementedError` forward to the shared `F2WOperations` service (T14 Q2) | yes |
-| C3 | Scoped job-list query in the job store instead of filtering in the service (T14 Q8) | yes |
-| C4 | T10 files `jobs/sqlite.py` and `curation/repair.py` stay where they are (the plan had `infra/` and `extraction/`) | keep |
-| C5 | The T18C browser suite lives in `tests/e2e/live_backend/full/`, not `ui/e2e/...`, so the frozen UI tree hash is unchanged | keep |
-| C6 | `run_api --jobs-api` gets `root_path`, and the gateway port becomes configurable (8080 per contract), so nginx no longer needs `setcap` | yes |
-| C7 | `F2W_CORS_ORIGINS` is required on ALS images (no fallback to dev origins) | yes |
-| C8 | The ALS edge proxy must overwrite `X-Forwarded-Proto` (an Ansible/T24E requirement) | record for T24E |
+No objection was raised, so these defaults are applied (branch `forge_merge-cdefaults`).
+
+| # | Item | Default | Status |
+|---|---|---|---|
+| C1 | Importer maps a writer 401/403 from Tiled to `writer_unauthorized` (T25C/T14 Q1) | yes | applied, `a515b18` |
+| C2 | `F2WClient` methods that still raise `NotImplementedError` forward to the shared `F2WOperations` service (T14 Q2) | yes | applied, `083be8a` |
+| C3 | Scoped job-list query in the job store instead of filtering in the service (T14 Q8) | yes | applied, `be1c724` |
+| C4 | T10 files `jobs/sqlite.py` and `curation/repair.py` stay where they are (the plan had `infra/` and `extraction/`) | keep | applied (no change) |
+| C5 | The T18C browser suite lives in `tests/e2e/live_backend/full/`, not `ui/e2e/...`, so the frozen UI tree hash is unchanged | keep | applied (no change) |
+| C6 | `run_api --jobs-api` gets `root_path`, and the gateway port becomes configurable (8080 per contract), so nginx no longer needs `setcap` | yes | applied, `dba5f3e` |
+| C7 | `F2W_CORS_ORIGINS` is required on ALS images (no fallback to dev origins) | yes | applied, `139132f` |
+| C8 | The ALS edge proxy must overwrite `X-Forwarded-Proto` (an Ansible/T24E requirement) | record for T24E | applied (recorded), `6619cbf` |
 
 ---
 
