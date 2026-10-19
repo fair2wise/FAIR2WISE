@@ -11,7 +11,9 @@ Arguments are the ``f2w-agent`` CLI arguments (``app.modules.f2w_agent.cli.build
 ending with ``api --host 127.0.0.1 --port 8090``. The API binds loopback only; the gateway
 is the one public listener. CORS origins come from ``F2W_CORS_ORIGINS`` (comma-separated,
 passed on as ``--cors-origin``), or ``--cors-origin`` arguments, not both; with neither the
-API keeps its development defaults. The gateway is same-origin and needs none.
+API keeps its development defaults on ``:local`` only: an ALS profile
+(``F2W_DEPLOYMENT_PROFILE=als-*``) with no origin is refused here as in preflight (C7). The
+gateway is same-origin and needs none.
 
 No ``.env`` is read here: the supervisor already applied an explicit ``F2W_DOTENV`` and
 passes ``F2W_DOTENV=off``.
@@ -49,6 +51,8 @@ def command(argv: Sequence[str], environ: Mapping[str, str]) -> List[str]:
     origins = cors_origins(environ)
     if origins and args.cors_origin:
         raise SystemExit(f"set {CORS_ENV} or --cors-origin, not both")
+    if not (origins or args.cors_origin) and (environ.get("F2W_DEPLOYMENT_PROFILE") or "").startswith("als-"):
+        raise SystemExit(f"{CORS_ENV} is required on ALS images (no fallback to the development origins)")
     out = list(argv)
     if not args.jobs_api:
         out.append("--jobs-api")

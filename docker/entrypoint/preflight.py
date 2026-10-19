@@ -17,7 +17,11 @@ exactly what the API would refuse later:
    Nothing is created or chowned.
 5. ``F2W_TILED_WRITER_SECRET_FILE``, when set, is a readable file (its value is never read
    into the output).
-6. The UI bundle's ``f2w-build.json`` matches ``F2W_PUBLIC_PREFIX`` and the gateway
+6. CORS (C7): where the profile sets ``cors_origins_required`` (``:als-dev``, ``:als-prod``),
+   ``F2W_CORS_ORIGINS`` must list at least one origin; the API's development localhost
+   defaults are never a fallback there. Every listed origin must be a bare
+   ``http(s)://host[:port]`` (no path, wildcard or credentials). ``:local`` keeps the defaults.
+7. The UI bundle's ``f2w-build.json`` matches ``F2W_PUBLIC_PREFIX`` and the gateway
    template renders for it and for ``F2W_GATEWAY_PORT`` (default 8080, not the API or Tiled
    port) (``app.modules.deployment.gateway``), written to the runtime dir.
 
@@ -29,12 +33,27 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 EXIT_REFUSED = 78
 MOUNTINFO = Path("/proc/self/mountinfo")
+CORS_ENV = "F2W_CORS_ORIGINS"
+_ORIGIN = re.compile(r"^https?://(?:\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)(?::\d{1,5})?$")
+
+
+def check_cors(env: Mapping[str, str], profile: Mapping[str, Any]) -> List[str]:
+    """Problems with ``F2W_CORS_ORIGINS`` for this profile (empty when fine)."""
+    origins = [o.strip() for o in (env.get(CORS_ENV) or "").split(",") if o.strip()]
+    problems = [f"{CORS_ENV} entry {o!r} is not an origin like https://host[:port]" for o in origins
+                if not _ORIGIN.match(o)]
+    if profile.get("cors_origins_required") and not origins:
+        problems.append(f"{CORS_ENV} is required on the {profile.get('profile')} image: set the comma-separated "
+                        "browser origin(s) of the deployed UI (there is no fallback to the development "
+                        "localhost origins)")
+    return problems
 
 
 def mount_points(mountinfo: Path) -> Optional[set]:
@@ -123,6 +142,8 @@ def check(env: Mapping[str, str], profile: Mapping[str, Any], *, mountinfo: Path
     if secret and not (Path(secret).is_file() and os.access(secret, os.R_OK)):
         problems.append(f"F2W_TILED_WRITER_SECRET_FILE={secret} is not a readable file")
     facts["writer_secret_file"] = bool(secret)
+    problems += check_cors(env, profile)
+    facts["cors_origins"] = len([o for o in (env.get(CORS_ENV) or "").split(",") if o.strip()])
 
     gateway = profile.get("gateway") or {}
     if gateway:

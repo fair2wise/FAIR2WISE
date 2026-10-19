@@ -57,6 +57,7 @@ then subject to the same locks); children always get `F2W_DOTENV=off`.
 | `F2W_TILED_URL` | forbidden | fixed central URL |
 | `F2W_TILED_DATA_DIR` / `_PYTHON` / `_PORT` | fixed (`/var/lib/fair2wise/tiled`, `/opt/tiled/venv/bin/python`, `8765`) | forbidden |
 | `F2W_LOCAL_BIND` | allowed (`network` warns) | forbidden |
+| `F2W_CORS_ORIGINS` | optional (unset: the API's development localhost origins) | **required** (`cors_origins_required`): comma-separated `https://host[:port]` origins of the deployed UI; unset or malformed exits 78, never a fallback to the development origins |
 
 ## Mounts
 
@@ -94,7 +95,7 @@ docker run --rm --entrypoint /opt/tiled/venv/bin/python ghcr.io/fair2wise/fair2w
   'import tiled; print(tiled.__version__)'                                        # 0.2.18
 docker run --rm --entrypoint sh ghcr.io/fair2wise/fair2wise:als-dev -c 'test ! -e /opt/tiled'
 docker run --rm -e F2W_DEPLOYMENT_PROFILE=local ghcr.io/fair2wise/fair2wise:als-prod; echo $?   # 78
-docker run --rm ghcr.io/fair2wise/fair2wise:als-dev; echo $?                       # 78: state not mounted
+docker run --rm ghcr.io/fair2wise/fair2wise:als-dev; echo $?                       # 78: state not mounted, no F2W_CORS_ORIGINS
 ```
 
 Run `:local` (loopback only):
@@ -117,6 +118,7 @@ Run an ALS image (disposable host; central Tiled is contacted only by app featur
 docker run -d --name f2w-als-dev -p 127.0.0.1:8081:8080 --stop-timeout 120 \
   -v f2w-als-state:/var/lib/fair2wise/state \
   -v /path/to/writer.secret:/run/secrets/tiled_writer:ro -e F2W_TILED_WRITER_SECRET_FILE=/run/secrets/tiled_writer \
+  -e F2W_CORS_ORIGINS=https://<ui-host> \
   ghcr.io/fair2wise/fair2wise:als-dev
 ```
 

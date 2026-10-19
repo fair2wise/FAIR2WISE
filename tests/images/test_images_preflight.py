@@ -29,8 +29,14 @@ PRE = _load("preflight")
 SUP = _load("f2w_supervisor")
 
 
-def setup(tmp_path: Path, name: str, *, mounted=True):
-    """A profile whose mounts, UI manifest and runtime dirs live under ``tmp_path``."""
+ALS_ORIGIN = "https://fair2wise.example.lbl.gov"
+
+
+def setup(tmp_path: Path, name: str, *, mounted=True, cors=True):
+    """A profile whose mounts, UI manifest and runtime dirs live under ``tmp_path``.
+
+    ``cors``: give an ALS profile its required ``F2W_CORS_ORIGINS`` (C7).
+    """
     profile = json.loads((REPO / f"docker/profiles/{name}.json").read_text(encoding="utf-8"))
     mounts = []
     for m in profile["required_mounts"]:
@@ -48,6 +54,8 @@ def setup(tmp_path: Path, name: str, *, mounted=True):
                           "rendered": str(run / "conf.d" / "default.conf"),
                           "runtime_dirs": [str(run / "tmp" / "proxy")]}
     env, _ = SUP.resolve_environment({}, SUP.parse_profile(profile))
+    if cors and name != "local":
+        env["F2W_CORS_ORIGINS"] = ALS_ORIGIN
     if name == "local":
         python = tmp_path / "tiled-venv" / "python"
         python.parent.mkdir()
@@ -220,3 +228,67 @@ def test_preflight_gateway_port(tmp_path, port, ok):
         assert f"listen {port};" in Path(profile["gateway"]["rendered"]).read_text(encoding="utf-8")
     else:
         assert any("gateway" in p and "F2W_GATEWAY_PORT" in p for p in result["problems"])
+
+
+# --------------------------------------------------------------------------- C7: CORS on ALS images
+
+
+@pytest.mark.parametrize("name", ["als-dev", "als-prod"])
+def test_als_preflight_requires_cors_origins_without_a_dev_fallback(tmp_path, name):
+    profile, env, mountinfo = setup(tmp_path, name, cors=False)
+    assert profile["cors_origins_required"] is True
+    for value in (None, "", " , "):
+        if value is None:
+            env.pop("F2W_CORS_ORIGINS", None)
+        else:
+            env["F2W_CORS_ORIGINS"] = value
+        problems = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "none")["problems"]
+        assert any("F2W_CORS_ORIGINS is required" in p and "localhost" in p for p in problems), problems
+    env["F2W_CORS_ORIGINS"] = f"{ALS_ORIGIN},https://other.example:8443"
+    result = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "none")
+    assert result["ok"], result["problems"]
+    assert result["facts"]["cors_origins"] == 2
+
+
+@pytest.mark.parametrize("bad", ["*", "https://ui.example/fair2wise", "ui.example", "https://user@ui.example",
+                                 "ftp://ui.example", "https://ui.example/"])
+def test_cors_origins_must_be_bare_origins(tmp_path, bad):
+    profile, env, mountinfo = setup(tmp_path, "als-dev")
+    env["F2W_CORS_ORIGINS"] = f"{ALS_ORIGIN},{bad}"
+    problems = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "none")["problems"]
+    assert any("is not an origin" in p for p in problems), problems
+
+
+def test_local_keeps_its_default_origins(tmp_path):
+    profile, env, mountinfo = setup(tmp_path, "local")
+    assert profile["cors_origins_required"] is False and "F2W_CORS_ORIGINS" not in env
+    result = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "none")
+    assert result["ok"], result["problems"]
+    api = _load("api_service")
+    argv = ["api", "--host", "127.0.0.1", "--port", "8090"]
+    assert api.command(argv, {"F2W_DEPLOYMENT_PROFILE": "local"}) == argv + ["--jobs-api"]
+
+
+def test_als_preflight_cli_exits_78_without_cors_origins(tmp_path):
+    profile, env, mountinfo = setup(tmp_path, "als-prod", cors=False)
+    path = tmp_path / "profile.json"
+    path.write_text(json.dumps(profile), encoding="utf-8")
+    run_env = dict(env, PYTHONPATH=str(REPO), PATH=os.environ.get("PATH", ""), HOME=str(tmp_path))
+    run_env.pop("F2W_CORS_ORIGINS", None)
+    args = [sys.executable, str(EP / "preflight.py"), "--profile-file", str(path), "--mountinfo", str(mountinfo),
+            "--tiled-root", str(tmp_path / "none")]
+    done = subprocess.run(args, env=run_env, capture_output=True, text=True, timeout=120)
+    assert done.returncode == 78 and "F2W_CORS_ORIGINS is required" in done.stderr
+    done = subprocess.run(args, env=dict(run_env, F2W_CORS_ORIGINS=ALS_ORIGIN), capture_output=True, text=True,
+                          timeout=120)
+    assert done.returncode == 0, done.stderr
+
+
+@pytest.mark.parametrize("name", ["als-dev", "als-prod"])
+def test_als_api_service_refuses_to_fall_back_to_dev_origins(name):
+    api = _load("api_service")
+    argv = ["api", "--host", "127.0.0.1", "--port", "8090"]
+    with pytest.raises(SystemExit, match="F2W_CORS_ORIGINS is required"):
+        api.command(argv, {"F2W_DEPLOYMENT_PROFILE": name})
+    env = {"F2W_DEPLOYMENT_PROFILE": name, "F2W_CORS_ORIGINS": ALS_ORIGIN}
+    assert api.command(argv, env) == argv + ["--jobs-api", "--cors-origin", ALS_ORIGIN]

@@ -6,6 +6,7 @@
   "authorization_mode": "local_trusted",
   "tiled_mode": "managed",
   "tiled_url": null,
+  "cors_origins_required": false,
   "bundles_tiled_server": true,
   "cwd": "/app",
   "locked_env": {
