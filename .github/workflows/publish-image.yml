@@ -1,46 +1,330 @@
-name: Create and publish image
+# Publish tested FAIR2WISE candidates to GHCR and move channel tags (T24D).
+#
+# NOT ACTIVE UNTIL THE OWNER APPROVES O06. The tag rules are a proposal
+# (docs/migration/reviews/H6/o06_tag_rules_proposal.md). Every run fails in the `gate` job
+# unless the repository variable O06_APPROVED is exactly "true"; the publish and promote jobs
+# check it again. There is no push, tag or schedule trigger: a person with write access must
+# dispatch it, from the protected default branch or a protected vX.Y.Z tag, and a reviewer of
+# the job's GitHub environment must approve it.
+#
+#   operation=publish  push the three tested images of a build-app.yml run of this same commit
+#                      under immutable sha-<commit>-<variant> (and vX.Y.Z-<variant> on a tag).
+#                      Nothing is rebuilt: the saved images are loaded and their ids and layers
+#                      must equal the release manifest.
+#   operation=promote  move :local / :als-dev (environment ghcr-publish) or :als-prod
+#                      (environment ghcr-als-prod) to an already published digest by a
+#                      registry-side re-tag. Never backwards unless rollback=true with a reason.
+#
+# Credentials: only the job's GITHUB_TOKEN with packages: write, for ghcr.io. No repository or
+# environment secret is referenced, so CBORG, Tiled and other runtime credentials never reach
+# these jobs. Nothing here deploys to a host: Ansible rollout by digest is T24E/H7.
+name: Publish and promote images (O06 gated)
 
 on:
-  push:
-    branches: [ 'main' ]
-    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "publish (push a tested build-app run) or promote (move a channel tag)"
+        type: choice
+        required: true
+        options: [ publish, promote ]
+      build_run_id:
+        description: "publish: id of the successful build-app.yml run of this commit"
+        type: string
+        default: ""
+      binary_report:
+        description: "publish (optional): repository path of an evals.binary report to record (information only)"
+        type: string
+        default: ""
+      variant:
+        description: "promote: channel to move"
+        type: choice
+        options: [ none, local, als-dev, als-prod ]
+        default: none
+      digest:
+        description: "promote: sha256:... of the published variant image"
+        type: string
+        default: ""
+      rollback:
+        description: "promote: move the channel back to an older published digest"
+        type: boolean
+        default: false
+      reason:
+        description: "promote: change or rollback reason (required for a rollback)"
+        type: string
+        default: ""
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+permissions: {}
+
+# One registry writer at a time; a running publication or promotion is never cancelled.
+concurrency:
+  group: publish-image-ghcr
+  cancel-in-progress: false
 
 jobs:
-  build-and-push-image:
+  gate:
+    name: O06 approval, protected ref and inputs
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      semver: ${{ steps.ref.outputs.semver }}
+      image_repository: ${{ steps.ref.outputs.image_repository }}
+    steps:
+      - name: O06 tag rules approved by the owner (fails closed)
+        env:
+          O06_APPROVED: ${{ vars.O06_APPROVED }}
+        run: |
+          if [ "$O06_APPROVED" != "true" ]; then
+            echo "::error::O06 image tag rules are not owner-approved (repository variable O06_APPROVED is not 'true'). Nothing is published."
+            exit 1
+          fi
+      - name: Protected default branch or protected vX.Y.Z tag
+        id: ref
+        env:
+          REF: ${{ github.ref }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -eu
+          if [ "$REF_PROTECTED" != "true" ]; then
+            echo "::error::$REF is not protected (branch protection or ruleset required)"; exit 1
+          fi
+          semver=""
+          case "$REF_TYPE" in
+            branch)
+              if [ -z "$DEFAULT_BRANCH" ] || [ "$REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+                echo "::error::publishing runs only from the default branch $DEFAULT_BRANCH, not $REF"; exit 1
+              fi ;;
+            tag)
+              if ! printf '%s' "$REF_NAME" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+                echo "::error::$REF_NAME is not a vMAJOR.MINOR.PATCH release tag"; exit 1
+              fi
+              semver="$REF_NAME" ;;
+            *)
+              echo "::error::unsupported ref $REF"; exit 1 ;;
+          esac
+          echo "semver=$semver" >> "$GITHUB_OUTPUT"
+          echo "image_repository=$(printf 'ghcr.io/%s/fair2wise' "$OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - name: Validate the inputs
+        env:
+          OPERATION: ${{ inputs.operation }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          BINARY_REPORT: ${{ inputs.binary_report }}
+          VARIANT: ${{ inputs.variant }}
+          DIGEST: ${{ inputs.digest }}
+          ROLLBACK: ${{ inputs.rollback }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -eu
+          fail() { echo "::error::$1"; exit 1; }
+          case "$OPERATION" in
+            publish)
+              printf '%s' "$BUILD_RUN_ID" | grep -Eq '^[0-9]{1,20}$' || fail "build_run_id must be a run id"
+              if [ -n "$BINARY_REPORT" ]; then
+                printf '%s' "$BINARY_REPORT" | grep -Eq '^[A-Za-z0-9_./-]+\.json$' || fail "binary_report must be a repository path"
+                case "$BINARY_REPORT" in /*|*..*) fail "binary_report must be repository-relative" ;; esac
+              fi
+              [ "$VARIANT" = "none" ] && [ -z "$DIGEST" ] || fail "publish takes no variant or digest" ;;
+            promote)
+              case "$VARIANT" in local|als-dev|als-prod) ;; *) fail "promote needs a variant" ;; esac
+              printf '%s' "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$' || fail "digest must be sha256:<64 hex>"
+              if [ "$ROLLBACK" = "true" ] && [ -z "$REASON" ]; then fail "a rollback needs a reason"; fi ;;
+            *) fail "unknown operation" ;;
+          esac
+
+  publish:
+    name: Publish the tested candidate (immutable tags only)
+    needs: gate
+    if: inputs.operation == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: ghcr-publish
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      IMAGE_REPOSITORY: ${{ needs.gate.outputs.image_repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with: { persist-credentials: false }
+      - name: O06 still approved
+        env:
+          O06_APPROVED: ${{ vars.O06_APPROVED }}
+        run: test "$O06_APPROVED" = "true"
+      - name: The build run is a successful trusted build-app run of this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" > "$RUNNER_TEMP/build-run.json"
+          python3 - "$RUNNER_TEMP/build-run.json" <<'EOF'
+          import json, os, sys
+          run = json.load(open(sys.argv[1]))
+          want = {
+              "path": ".github/workflows/build-app.yml",
+              "conclusion": "success",
+              "head_sha": os.environ["GITHUB_SHA"],
+              "head_branch": os.environ["REF_NAME"],
+          }
+          problems = [f"{k}={run.get(k)!r}, expected {v!r}" for k, v in want.items() if run.get(k) != v]
+          if run.get("event") not in ("push", "workflow_dispatch"):
+              problems.append(f"event={run.get('event')!r}: only push or workflow_dispatch builds are published")
+          for key in ("repository", "head_repository"):
+              if (run.get(key) or {}).get("full_name") != os.environ["GITHUB_REPOSITORY"]:
+                  problems.append(f"{key} is not {os.environ['GITHUB_REPOSITORY']}")
+          if problems:
+              print("::error::build run refused: " + "; ".join(problems))
+              sys.exit(1)
+          print("build run ok:", run.get("html_url"))
+          EOF
+      - name: Download the manifest and the tested images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: |
+          set -euo pipefail
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-manifest -D candidate/manifest
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-images -D candidate/images
+      - name: Verify the manifest, then load and verify the images
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/release_manifest.py verify \
+            --manifest candidate/manifest/release-manifest.json --commit "$GITHUB_SHA"
+          (cd candidate/images && sha256sum -c images.tar.gz.sha256)
+          gunzip -c candidate/images/images.tar.gz | docker load
+          docker image inspect f2w-candidate:local f2w-candidate:als-dev f2w-candidate:als-prod > "$RUNNER_TEMP/loaded.json"
+          python3 scripts/ci/release_manifest.py verify \
+            --manifest candidate/manifest/release-manifest.json --commit "$GITHUB_SHA" \
+            --inspect "$RUNNER_TEMP/loaded.json" \
+            --ref local=f2w-candidate:local --ref als-dev=f2w-candidate:als-dev --ref als-prod=f2w-candidate:als-prod
+      - name: Log in to ghcr.io with the job token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Push immutable tags and record the digests
+        env:
+          SEMVER: ${{ needs.gate.outputs.semver }}
+          BINARY_REPORT: ${{ inputs.binary_report }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/publish_candidate.py \
+            --manifest candidate/manifest/release-manifest.json --repository "$IMAGE_REPOSITORY" \
+            --commit "$GITHUB_SHA" --semver "$SEMVER" --binary-report "$BINARY_REPORT" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --actor "$GITHUB_ACTOR" \
+            --out publication/release-publication.json
+          {
+            echo "### Published $GITHUB_SHA"
+            echo '```json'
+            python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(json.dumps(p["variants"], indent=2))' publication/release-publication.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: release-publication
+          path: publication/
+          retention-days: 90
+          if-no-files-found: error
+
+  promote:
+    name: Move :local or :als-dev to a published digest
+    needs: gate
+    if: inputs.operation == 'promote' && (inputs.variant == 'local' || inputs.variant == 'als-dev')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ghcr-publish
     permissions:
       contents: read
       packages: write
-
+    env:
+      IMAGE_REPOSITORY: ${{ needs.gate.outputs.image_repository }}
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: O06 still approved
+        env:
+          O06_APPROVED: ${{ vars.O06_APPROVED }}
+        run: test "$O06_APPROVED" = "true"
+      - name: Log in to ghcr.io with the job token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Re-tag the tested digest (no rebuild)
+        env:
+          VARIANT: ${{ inputs.variant }}
+          DIGEST: ${{ inputs.digest }}
+          ROLLBACK: ${{ inputs.rollback }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/promote_channel.py --repository "$IMAGE_REPOSITORY" --variant "$VARIANT" \
+            --digest "$DIGEST" --rollback "$ROLLBACK" --reason "$REASON" --actor "$GITHUB_ACTOR" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --out promotion/promotion.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: promotion-${{ inputs.variant }}
+          path: promotion/
+          retention-days: 90
+          if-no-files-found: error
 
-    - name: Log in to the Container registry
-      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract metadata (tags, labels) for Docker
-      id: meta
-      uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4
-      with:
-        context: .
-        file: Dockerfile
-        target: agent
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+  promote-als-prod:
+    name: Move :als-prod to the tested digest (production approval)
+    needs: gate
+    if: inputs.operation == 'promote' && inputs.variant == 'als-prod'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ghcr-als-prod
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_REPOSITORY: ${{ needs.gate.outputs.image_repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: O06 still approved
+        env:
+          O06_APPROVED: ${{ vars.O06_APPROVED }}
+        run: test "$O06_APPROVED" = "true"
+      - name: Log in to ghcr.io with the job token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Re-tag the tested als-prod digest staged with :als-dev (no rebuild)
+        env:
+          VARIANT: ${{ inputs.variant }}
+          DIGEST: ${{ inputs.digest }}
+          ROLLBACK: ${{ inputs.rollback }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/promote_channel.py --repository "$IMAGE_REPOSITORY" --variant "$VARIANT" \
+            --digest "$DIGEST" --rollback "$ROLLBACK" --reason "$REASON" --actor "$GITHUB_ACTOR" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --out promotion/promotion.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: promotion-als-prod
+          path: promotion/
+          retention-days: 90
+          if-no-files-found: error
