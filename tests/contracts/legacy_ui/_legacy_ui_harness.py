@@ -875,6 +875,37 @@ def normalize_volatile(value: Any) -> Any:
     return value
 
 
+# The ``env.settings`` keys the frozen trace contract defines. ``trace.settings_snapshot()``
+# records every ``F2W_*`` / ``KG_RAG_*`` variable of the process, so a variable that only
+# configures the test run (``F2W_TILED_PYTHON``, ``F2W_TIMING*``, a CI job's own knobs)
+# would otherwise land in the trace and break the comparison. These are the variables
+# ``install`` forces (docs/migration/ui_contracts/README.md, "Harness"; recorded in
+# fixtures/http/traces_get.json) plus the runtime-mode selectors that
+# fixtures/runtime/traces_get.langgraph*.json and ``expected_response`` define.
+# ``test_legacy_ui_contract`` checks that this set matches the fixtures.
+TRACE_SETTINGS_CONTRACT = frozenset({
+    "KG_RAG_RETRIEVAL_BACKEND", "KG_RAG_FORCE_CPU", "KG_RAG_GRAPH_SOURCE",
+    "F2W_SOURCE_RAG", "F2W_LIVE_TILED", "F2W_TRACE_ENABLED", "F2W_TRACE_DIR",
+    "F2W_RUNTIME", "F2W_QA_ROUTE",
+})
+
+
+def normalize_trace_settings(value: Any) -> Any:
+    """Restrict a trace payload's ``env.settings`` to ``TRACE_SETTINGS_CONTRACT``.
+
+    Only keys outside the contract are dropped. Every contract key keeps its value and
+    its order, and a contract key that is missing or extra still fails the comparison.
+    Other payloads are returned unchanged.
+    """
+    if not (isinstance(value, dict) and "turn_id" in value and "schema_version" in value):
+        return value
+    env = value.get("env")
+    if not (isinstance(env, dict) and isinstance(env.get("settings"), dict)):
+        return value
+    settings = {k: v for k, v in env["settings"].items() if k in TRACE_SETTINGS_CONTRACT}
+    return {**value, "env": {**env, "settings": settings}}
+
+
 CORS_HEADERS = ("access-control-allow-origin", "access-control-allow-credentials",
                 "access-control-allow-methods", "access-control-allow-headers", "vary")
 
@@ -908,7 +939,7 @@ def response_record(resp, ctx: Ctx) -> Dict[str, Any]:
         ]
     else:
         try:
-            record["json"] = normalize_volatile(sanitize_obj(resp.json(), ctx))
+            record["json"] = normalize_trace_settings(normalize_volatile(sanitize_obj(resp.json(), ctx)))
         except ValueError:
             record["text"] = sanitize_text(resp.text, ctx)
     return record
