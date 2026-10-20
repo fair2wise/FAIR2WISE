@@ -11,8 +11,8 @@ and the base images that were used. Nothing in it is a credential.
 candidate of the expected commit, or images whose identity differs from what was tested.
 
 :func:`build_publication` (used by ``publish_candidate.py``) records what the publish job
-pushed: per variant the registry manifest digest and the tags written. It may reference an
-``evals.binary`` report and its verdict for information; a verdict never gates
+pushed: per variant the registry manifest digest and the tags written. It may reference a
+binary evaluation report and its verdict for information; a verdict never gates
 a build or a publication (owner decision H3 B).
 
 Standard library only; never imports the application (no ``load_dotenv`` side effects).
@@ -235,7 +235,7 @@ def verify_images(manifest: Mapping[str, Any], inspected: Sequence[Mapping[str, 
 
 
 def binary_reference(root: Path, rel_path: str) -> Dict[str, Any]:
-    """Information-only reference to an ``evals.binary`` report (never a gate)."""
+    """Information-only reference to a binary evaluation report (never a gate)."""
     path = (root / rel_path).resolve()
     if root.resolve() not in path.parents:
         raise ManifestError("binary report must be inside the repository")

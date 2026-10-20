@@ -33,7 +33,7 @@ on:
         type: string
         default: ""
       binary_report:
-        description: "publish (optional): repository path of an evals.binary report to record (information only)"
+        description: "publish (optional): repository path of a binary evaluation report to record (information only)"
         type: string
         default: ""
       variant:
