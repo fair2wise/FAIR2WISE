@@ -85,6 +85,8 @@ class FakeImage:
             return done(1, out=self.o.get("find", ""))
         if entry == "sh":
             return done(self.o.get("opt_tiled", 0 if self.variant != "local" else 1))
+        if entry == "python" and rest[:1] == [ic.PREFLIGHT[0]]:
+            return self.preflight(args)
         if entry and entry.endswith("python"):
             return done(out="0.2.18\n")
         if rest == ["--check"]:
@@ -95,8 +97,22 @@ class FakeImage:
                                         "services": services}))
         # A refusal: the profile refuses everything the checks try.
         code = self.o.get("refusal_code", 78)
-        text = "preflight: F2W_CORS_ORIGINS is required" if "--tmpfs" in args else "refused"
+        text = "preflight: F2W_CORS_ORIGINS is required" if "--tmpfs" in args else "refused: not a mount point"
         return done(code, err=text)
+
+    def preflight(self, args: List[str]) -> subprocess.CompletedProcess:
+        """The image preflight run directly: passes only with every mount and, on ALS, CORS."""
+        mounted = {a.split(":", 1)[0] for i, a in enumerate(args) if i and args[i - 1] == "--tmpfs"}
+        cors = any(a.startswith("F2W_CORS_ORIGINS=") for a in args)
+        problems = [f"{m} is not a mount point" for m in ic.MOUNTS[self.variant] if m not in mounted]
+        if self.variant != "local" and not cors:
+            problems.append("F2W_CORS_ORIGINS is required")
+        facts = {"profile": self.variant, "gateway_port": self.o.get("gateway_port", 8080),
+                 "cors_origins": int(cors)}
+        result = {"ok": not problems, "problems": problems, "facts": facts}
+        if problems:
+            return done(78, err=json.dumps(result))
+        return done(out=json.dumps(result))
 
 
 @pytest.mark.parametrize("variant", ic.VARIANTS)
@@ -112,8 +128,13 @@ def test_image_checks_pass_for_a_correct_image(variant: str) -> None:
     else:
         assert {"no tiled server (/opt/tiled absent)", "exit 78: F2W_CORS_ORIGINS required",
                 "exit 78: state not mounted, no F2W_CORS_ORIGINS", "exit 78: other central F2W_TILED_URL"} <= names
+    assert "exit 78: state not mounted" in names
+    assert "preflight passes as deployed" in names
     runs = [c for c in fake.calls if c[0] == "run"]
     assert runs and all(c[c.index("--network") + 1] == "none" for c in runs)
+    # The ALS plan and preflight are resolved as deployed: with a browser origin.
+    check = next(c for c in runs if c[-1] == "--check")
+    assert ("-e", f"F2W_CORS_ORIGINS={ic.CI_ORIGIN}") in zip(check, check[1:]) or variant == "local"
     for call in runs:
         passed = [call[i + 1].split("=", 1)[0] for i, a in enumerate(call) if a == "-e"]
         assert not [n for n in passed if ic.SECRET_NAME.search(n)], passed
@@ -131,6 +152,7 @@ def test_image_checks_pass_for_a_correct_image(variant: str) -> None:
     ({"labels": {"f2w.profile": "als-prod"}}, "label f2w.profile"),
     ({"labels": {"org.opencontainers.image.revision": OLDER}}, "label revision is the build commit"),
     ({"env": ["CBORG_API_KEY=x"]}, "no credential names in the image environment"),
+    ({"gateway_port": 8090}, "preflight passes as deployed"),
 ])
 def test_image_checks_fail_on_a_bad_image(override: Dict[str, Any], failed: str) -> None:
     fake = FakeImage("als-dev", **override)

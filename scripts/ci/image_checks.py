@@ -11,6 +11,9 @@ into the release manifest:
 * private-file ``find``: no PDF, source index, Tiled catalog, dotenv, SQLite or ``/app/papers``;
 * ``id``: uid 10001;
 * Tiled presence (``:local``: ``/opt/tiled/venv`` imports the pinned version) or absence (ALS);
+* preflight passes as deployed: with its state (and, for ``:local``, Tiled) directories
+  mounted and, for the ALS images, ``F2W_CORS_ORIGINS`` set, the image preflight exits 0 and
+  renders the gateway on port 8080 (so the refusals below are caused by what they name);
 * exit-78 refusals: a switched profile, a forbidden or foreign ``F2W_TILED_URL``, and for the
   ALS images unmounted state and a missing ``F2W_CORS_ORIGINS``.
 
@@ -42,7 +45,15 @@ BASE_PATH = "/fair2wise"
 GATEWAY_PORT = "8080"
 RUNTIME_UID = "10001"
 EXIT_CONFIG = 78
+# A syntactically valid browser origin for the ALS images; nothing listens there and every
+# check container is network-less.
 CI_ORIGIN = "https://f2w-ci.invalid"
+PREFLIGHT = ("/opt/fair2wise/entrypoint/preflight.py", "--profile-file", "/etc/fair2wise/profile.json")
+MOUNTS = {
+    "local": ("/var/lib/fair2wise/state", "/var/lib/fair2wise/tiled"),
+    "als-dev": ("/var/lib/fair2wise/state",),
+    "als-prod": ("/var/lib/fair2wise/state",),
+}
 
 # docker/profiles/README.md, "Static checks on the built images".
 PRIVATE_FIND = (
@@ -118,6 +129,18 @@ class Checker:
         self.report = Report(variant, image)
 
     # -- helpers -------------------------------------------------------------------------
+    @property
+    def deployed_env(self) -> Dict[str, str]:
+        """Runtime variables the variant needs as deployed (no credential)."""
+        return {} if self.variant == "local" else {"F2W_CORS_ORIGINS": CI_ORIGIN}
+
+    def tmpfs_mounts(self) -> List[str]:
+        """Throwaway mounts for the variant's required state directories."""
+        out: List[str] = []
+        for path in MOUNTS[self.variant]:
+            out += ["--tmpfs", f"{path}:uid={RUNTIME_UID},gid={RUNTIME_UID},mode=0700"]
+        return out
+
     def docker(self, *args: str) -> subprocess.CompletedProcess:
         return self.runner(list(args), self.timeout)
 
@@ -180,7 +203,7 @@ class Checker:
         self.report.add("no credential names in the image environment", not leaked, ",".join(leaked))
 
     def check_plan(self) -> None:
-        proc = self.container("--check")
+        proc = self.container("--check", env=self.deployed_env)
         try:
             plan = json.loads(proc.stdout)
         except ValueError:
@@ -206,6 +229,26 @@ class Checker:
             problems.append(f"tiled service {'missing' if self.variant == 'local' else 'present'}")
         self.report.add("--check plan", not problems, "; ".join(problems) or ",".join(map(str, services)))
 
+    def check_preflight(self) -> None:
+        proc = self.container(*PREFLIGHT, env=self.deployed_env, entrypoint="python", extra=self.tmpfs_mounts())
+        try:  # the summary is on stdout when preflight passes, on stderr (with any logs) when not
+            result = json.loads(proc.stdout or "")
+        except ValueError:
+            result = None
+        if not isinstance(result, dict):
+            result = {}
+        facts = result.get("facts") or {}
+        problems = []
+        if proc.returncode != 0 or result.get("ok") is not True:
+            problems.append(f"exit {proc.returncode}: {(proc.stderr or '').strip()[-300:]}")
+        if str(facts.get("gateway_port")) != GATEWAY_PORT:
+            problems.append(f"gateway_port {facts.get('gateway_port')!r}")
+        if facts.get("profile") != self.variant:
+            problems.append(f"profile {facts.get('profile')!r}")
+        if self.variant != "local" and not facts.get("cors_origins"):
+            problems.append("F2W_CORS_ORIGINS not seen")
+        self.report.add("preflight passes as deployed", not problems, "; ".join(problems))
+
     def check_private_files(self) -> None:
         proc = self.container("-c", PRIVATE_FIND, entrypoint="sh")
         found = (proc.stdout or "").strip()
@@ -230,24 +273,24 @@ class Checker:
     def check_refusals(self) -> None:
         other = next(v for v in VARIANTS if v != self.variant)
         self.refusal(f"exit 78: F2W_DEPLOYMENT_PROFILE={other}", env={"F2W_DEPLOYMENT_PROFILE": other})
+        self.refusal("exit 78: state not mounted", env=self.deployed_env, expect_text="not a mount point")
         if self.variant == "local":
             self.refusal("exit 78: forbidden F2W_TILED_URL", env={"F2W_TILED_URL": TILED_URL["als-prod"]})
             return
         foreign = TILED_URL["als-prod" if self.variant == "als-dev" else "als-dev"]
         self.refusal("exit 78: other central F2W_TILED_URL", env={"F2W_TILED_URL": foreign})
         self.refusal("exit 78: state not mounted, no F2W_CORS_ORIGINS", env={})
-        self.refusal("exit 78: F2W_CORS_ORIGINS required", env={},
-                     extra=["--tmpfs", f"/var/lib/fair2wise/state:uid={RUNTIME_UID},gid={RUNTIME_UID},mode=0700"],
+        self.refusal("exit 78: F2W_CORS_ORIGINS required", env={}, extra=self.tmpfs_mounts(),
                      expect_text="F2W_CORS_ORIGINS")
         self.refusal("exit 78: malformed F2W_CORS_ORIGINS", env={"F2W_CORS_ORIGINS": "not-an-origin"},
-                     extra=["--tmpfs", f"/var/lib/fair2wise/state:uid={RUNTIME_UID},gid={RUNTIME_UID},mode=0700"],
-                     expect_text="F2W_CORS_ORIGINS")
+                     extra=self.tmpfs_mounts(), expect_text="F2W_CORS_ORIGINS")
 
     def run_all(self) -> Report:
         self.check_inspect()
         if not self.report.identity.get("image_id"):
             return self.report
         self.check_plan()
+        self.check_preflight()
         self.check_private_files()
         self.check_uid()
         self.check_tiled()
