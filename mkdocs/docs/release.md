@@ -111,33 +111,37 @@ changes, and known issues.
 
 ## Container publishing
 
-`.github/workflows/publish-image.yml` runs on pushes to `main` and tags matching
-`v*`. It logs into GitHub Container Registry and publishes the root
-`Dockerfile`'s **agent** target as:
+Two workflows handle the FAIR2WISE images (T24D):
 
-```text
-ghcr.io/<owner>/<repository>:<metadata-generated-tag>
-```
+- `.github/workflows/build-app.yml` builds the `local`, `als-dev` and `als-prod`
+  targets from one commit on pushes and pull requests to `main` and
+  `forge_merge` and on `v*` tags. It runs the `tests/images` checks and the
+  post-build image checks from `docker/profiles/README.md` on each image,
+  without network. These include a preflight run with state mounted (and, on
+  the ALS images, `F2W_CORS_ORIGINS` set) that must render the gateway on port
+  8080, and the exit-78 refusals. Each run writes a
+  `release-manifest` artifact with the commit, each variant's image id and
+  layers, the lock hashes, the Tiled wheel hash and the frozen UI tree. It
+  never logs in to a registry.
+- `.github/workflows/publish-image.yml` runs only on manual dispatch, from the
+  protected default branch or a protected `vX.Y.Z` tag, inside the
+  `ghcr-publish` / `ghcr-als-prod` environments.
+    - It pushes the tested images without rebuilding them as
+      `sha-<commit>-<variant>` (and `vX.Y.Z-<variant>`).
+    - It moves the `:local`, `:als-dev` and `:als-prod` channel tags by
+      re-tagging an already published digest.
 
-The exact tag set and OCI labels come from `docker/metadata-action`; inspect the
-workflow output rather than guessing a tag. Consumers should pin the resulting
-digest for a reproducible deployment.
+!!! important "Not active yet"
 
-!!! important "Compose still builds locally"
+    The tag rules (O06) are a proposal awaiting owner approval
+    (`docs/migration/reviews/H6/o06_tag_rules_proposal.md`). Until the
+    repository variable `O06_APPROVED` is `true`, every publish run fails before
+    it writes anything.
 
-    The current publishing workflow does not publish the frontend target or
-    the vendored Splash image. The canonical `compose.yaml` has `build:` entries
-    for all services and therefore builds from a clone. Pulling the GHCR agent
-    image alone is not a complete FAIR2WISE stack.
-
-Before changing the workflow to publish the entire stack:
-
-1. give agent, frontend, and Splash distinct image names;
-2. publish all three from the same tag and architecture matrix;
-3. add digest-pinned `image:` references without removing the supported local
-   build path;
-4. verify multi-architecture base-image and Pixi compatibility; and
-5. update Compose upgrade/rollback and supply-chain documentation.
+Publishing a tag is not a deployment. Hosts are rolled out by digest through
+Ansible, which is a separate, approved step. The legacy compose `agent` target
+is no longer published. `compose.yaml` builds every service locally from a
+clone.
 
 Local pre-publish builds can be inspected directly:
 
