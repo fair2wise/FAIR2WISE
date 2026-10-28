@@ -116,7 +116,10 @@ Two workflows handle the FAIR2WISE images (T24D):
 - `.github/workflows/build-app.yml` builds the `local`, `als-dev` and `als-prod`
   targets from one commit on pushes and pull requests to `main` and
   `forge_merge` and on `v*` tags. It runs the `tests/images` checks and the
-  post-build image checks from `docker/profiles/README.md`. Each run writes a
+  post-build image checks from `docker/profiles/README.md` on each image,
+  without network. These include a preflight run with state mounted (and, on
+  the ALS images, `F2W_CORS_ORIGINS` set) that must render the gateway on port
+  8080, and the exit-78 refusals. Each run writes a
   `release-manifest` artifact with the commit, each variant's image id and
   layers, the lock hashes, the Tiled wheel hash and the frozen UI tree. It
   never logs in to a registry.
