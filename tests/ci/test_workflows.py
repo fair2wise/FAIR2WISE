@@ -4,10 +4,12 @@ build-app.yml builds and checks the three variants of one commit and records the
 release manifest; publish-image.yml publishes and promotes them. These tests keep the
 security properties from drifting:
 
-* no pull_request_target, no secrets, read-only pull requests, SHA-pinned actions;
+* no pull_request_target or workflow_run, no secrets (not even ``secrets: inherit``),
+  read-only pull requests, every action a reviewed full-SHA pin (no placeholders);
 * publishing only by manual dispatch, from a protected default branch or vX.Y.Z tag, inside
-  GitHub environments, after an O06_APPROVED check that fails closed, with only the job's
-  GITHUB_TOKEN and ``packages: write``;
+  the literal GitHub environments ghcr-publish / ghcr-als-prod, after an O06_APPROVED check
+  that fails closed and cannot be bypassed with always()/failure()/continue-on-error, with
+  only the job's GITHUB_TOKEN and ``packages: write``;
 * promotion is a re-tag, never a rebuild; nothing deploys to a host;
 * every built variant gets the tests/images and docker/profiles/README.md checks and its
   identity goes into the release manifest.
@@ -37,6 +39,18 @@ UNTRUSTED_EXPR = re.compile(
     r"\$\{\{\s*(inputs\.|github\.event\.|github\.head_ref|github\.ref_name|github\.actor|vars\.|"
     r"steps\.[^}]*outputs|needs\.[^}]*outputs)"
 )
+# Every action any workflow uses (all GitHub-owned actions/*; no third-party action), with
+# the commit its tag pointed to when the pin was taken (T01, 2026-10-12). A new action or a
+# moved pin must be added here after review; there are no placeholder pins. Docker build and
+# push use the runner's docker CLI, so no docker/* action is used.
+REVIEWED_ACTIONS = {
+    "actions/checkout": ("11d5960a326750d5838078e36cf38b85af677262", "v4"),
+    "actions/setup-node": ("49933ea5288caeca8642d1e84afbd3f7d6820020", "v4"),
+    "actions/setup-python": ("a26af69be951a213d495a4c3e4e4022e16d87065", "v5"),
+    "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4"),
+}
+PLACEHOLDER_SHA = re.compile(r"^(.)\1{39}$|^(0123456789abcdef){2}01234567$|^deadbeef", re.IGNORECASE)
+GATE_BYPASS = re.compile(r"\b(always|failure|cancelled)\s*\(")
 DEPLOY_WORDS = re.compile(r"\b(ansible|ansible-playbook|ssh|scp|rsync|kubectl|helm|docker\s+compose|"
                           r"docker-compose|systemctl)\b", re.IGNORECASE)
 
@@ -101,7 +115,34 @@ def test_every_action_is_pinned_to_a_full_commit_sha(path: Path) -> None:
     assert not [r for r in refs if r.startswith("docker://")], "docker:// actions are not digest-reviewed"
 
 
+@pytest.mark.parametrize("path", sorted(WORKFLOWS.glob("*.y*ml")), ids=lambda p: p.name)
+def test_every_action_is_a_reviewed_pin_not_a_placeholder(path: Path) -> None:
+    wf = load(path)
+    refs = [step["uses"] for _, step in steps(wf) if "uses" in step]
+    refs += [job["uses"] for job in wf["jobs"].values() if "uses" in job]
+    for ref in refs:
+        if ref.startswith("./"):
+            continue
+        name, _, sha = ref.partition("@")
+        assert not PLACEHOLDER_SHA.search(sha), f"{path.name}: placeholder pin {ref}"
+        assert name in REVIEWED_ACTIONS, f"{path.name}: {name} is not a reviewed action"
+        assert sha == REVIEWED_ACTIONS[name][0], f"{path.name}: {ref} is not the reviewed pin"
+    text = path.read_text(encoding="utf-8")
+    for name, (sha, tag) in REVIEWED_ACTIONS.items():
+        for line in text.splitlines():
+            if f"uses: {name}@{sha}" in line:
+                assert line.rstrip().endswith(f"# {tag}"), f"{path.name}: the pin comment names the tag: {line}"
+
+
 # ---------------------------------------------------------------- owned workflows --------
+@pytest.mark.parametrize("path", OWNED, ids=lambda p: p.name)
+def test_no_job_inherits_or_passes_secrets(path: Path) -> None:
+    for job_id, job in load(path)["jobs"].items():
+        assert "secrets" not in job, f"{path.name}:{job_id} passes secrets"
+        for step in job.get("steps", []):
+            assert "secrets" not in str(step.get("with") or {}), f"{path.name}:{job_id}"
+
+
 @pytest.mark.parametrize("path", OWNED, ids=lambda p: p.name)
 def test_no_secret_is_referenced(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
@@ -251,6 +292,34 @@ def test_every_writer_job_is_gated_and_in_an_environment(publish: Dict[str, Any]
     assert "inputs.variant == 'als-prod'" in writers["promote-als-prod"]["if"]
     assert writers["promote"]["environment"] == "ghcr-publish"
     assert "als-prod" not in writers["promote"]["if"].replace("inputs.variant == 'als-dev'", "")
+
+
+def test_the_gate_cannot_be_bypassed(publish: Dict[str, Any]) -> None:
+    gate = publish["jobs"]["gate"]
+    assert "if" not in gate and "continue-on-error" not in gate
+    assert not [s for s in gate["steps"] if "if" in s or "continue-on-error" in s]
+    for job_id, job in publish["jobs"].items():
+        if job_id == "gate":
+            continue
+        # A writer that ran on always()/failure() would start although the gate failed.
+        assert not GATE_BYPASS.search(str(job.get("if", ""))), job_id
+        assert "continue-on-error" not in job, job_id
+        for step in job["steps"]:
+            if step.get("run") == 'test "$O06_APPROVED" = "true"':
+                assert "if" not in step and "continue-on-error" not in step, job_id
+        # The O06 re-check comes before the registry login.
+        names = [s.get("run", "") for s in job["steps"]]
+        o06 = names.index('test "$O06_APPROVED" = "true"')
+        login = next(i for i, r in enumerate(names) if "docker login" in r)
+        assert o06 < login, job_id
+
+
+def test_environments_are_the_two_named_approval_boundaries(publish: Dict[str, Any]) -> None:
+    envs = {job_id: job.get("environment") for job_id, job in publish["jobs"].items()}
+    assert envs == {"gate": None, "publish": "ghcr-publish", "promote": "ghcr-publish",
+                    "promote-als-prod": "ghcr-als-prod"}
+    # Literal names: an expression could pick an unprotected environment at run time.
+    assert all(e is None or "${{" not in e for e in envs.values())
 
 
 def test_only_the_job_token_logs_in_to_ghcr(publish: Dict[str, Any]) -> None:
