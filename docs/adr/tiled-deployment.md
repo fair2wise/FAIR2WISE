@@ -177,7 +177,7 @@ These are design names, not existing APIs.
 - `F2W_TILED_MODE` = `managed | external`. Each profile fixes it: local→managed, als-*→external. A mismatch is a startup error.
 - `F2W_TILED_URL`. External only; must equal the profile's fixed URL. Normalize the trailing slash (`tiled_graph.normalize_tiled_uri`).
 - `F2W_TILED_EXPECTED_VERSION`. Exact string, set from the H1 record.
-- `F2W_TILED_WRITER_SECRET_FILE`. Path to a file; never the value itself.
+- `F2W_TILED_WRITER_SECRET_FILE`. Path to a file; never the value itself. The file must be a regular file, mode `0600` or `0400` (no group or other bits), owned by the uid running F2W; preflight and every read refuse anything else (AUD-15, `tiled_config.check_private_file`). The generated `:local` key (`secrets/writer.key`, written `0600`) satisfies this.
 - `F2W_TILED_CA_BUNDLE`. Optional; ALS TLS.
 - `F2W_TILED_DATA_DIR`. Managed only; default `/var/lib/fair2wise/tiled`.
 - Legacy `TILED_URI`, `TILED_API_KEY` and `F2W_LIVE_TILED` stay accepted for the standalone developer launcher (`scripts/start_agent_backend.sh`) only. The image entrypoints ignore them, so the ambient `.env` cannot redirect a deployed image.

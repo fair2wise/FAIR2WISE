@@ -95,13 +95,14 @@ from ..tiled_graph import (
 )
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
+from ...api.auth import undeclared_routes
 from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
 from ...api.origin_gate import OriginGateMiddleware
 from ...api.sessions import TiledSessionStore, install_session_routes
 from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
 from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ..contracts.context import RequestContext
-from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS
+from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
@@ -7369,6 +7370,9 @@ def create_app(
         append_annotation(record)
         return {"status": "ok", "turn_id": req.turn_id, "verdict": req.verdict}
 
+    missing = undeclared_routes(app)
+    if missing:  # DEP-19 at startup: a route without a declared policy never serves (fail closed)
+        raise StartupConfigError(f"config_rejected: routes without a declared access policy: {', '.join(missing)}")
     return app
 
 

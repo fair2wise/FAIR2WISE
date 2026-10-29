@@ -15,8 +15,9 @@ exactly what the API would refuse later:
    is a writable directory and, where ``/proc/self/mountinfo`` exists, is (or lies on) a
    mount point other than ``/``, so state never silently lands in the container layer.
    Nothing is created or chowned.
-5. ``F2W_TILED_WRITER_SECRET_FILE``, when set, is a readable file (its value is never read
-   into the output).
+5. ``F2W_TILED_WRITER_SECRET_FILE``, when set, is a readable regular file, mode ``0600`` or
+   ``0400`` and owned by the running uid (AUD-15; ``tiled_config.check_private_file``). Its
+   value is never read into the output.
 6. CORS (C7): where the profile sets ``cors_origins_required`` (``:als-dev``, ``:als-prod``),
    ``F2W_CORS_ORIGINS`` must list at least one origin; the API's development localhost
    defaults are never a fallback there. Every listed origin must be a bare
@@ -139,8 +140,15 @@ def check(env: Mapping[str, str], profile: Mapping[str, Any], *, mountinfo: Path
 
     problems += check_mounts(profile.get("required_mounts", []), mountinfo=mountinfo)
     secret = (env.get("F2W_TILED_WRITER_SECRET_FILE") or "").strip()
-    if secret and not (Path(secret).is_file() and os.access(secret, os.R_OK)):
-        problems.append(f"F2W_TILED_WRITER_SECRET_FILE={secret} is not a readable file")
+    if secret:
+        from app.modules.deployment.tiled_config import check_private_file
+
+        try:
+            check_private_file(Path(secret))
+            if not os.access(secret, os.R_OK):
+                raise TiledConfigError(f"Tiled secret file {secret} is not readable")
+        except TiledConfigError as exc:
+            problems.append(f"F2W_TILED_WRITER_SECRET_FILE={secret} refused: {exc}")
     facts["writer_secret_file"] = bool(secret)
     problems += check_cors(env, profile)
     facts["cors_origins"] = len([o for o in (env.get(CORS_ENV) or "").split(",") if o.strip()])

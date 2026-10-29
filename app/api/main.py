@@ -32,6 +32,7 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import FastAPI
 
 from ..modules.security.authorization import StartupConfigError
+from .auth import undeclared_routes
 from .operations import F2WOperations, PublicationGate, build_operations
 from .origin_gate import OriginGateMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
@@ -114,6 +115,9 @@ def create_api_app(
     allowed = effective_cors_origins(cors_origins, is_local=settings.is_local)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes, path_prefixes=GUARDED_PREFIXES)
     app.add_middleware(OriginGateMiddleware, allowed_origins=allowed, path_prefixes=GUARDED_PREFIXES)
+    missing = undeclared_routes(app)
+    if missing:  # DEP-19 at startup: every mounted route carries a declared policy (fail closed)
+        raise StartupConfigError(f"config_rejected: routes without a declared access policy: {', '.join(missing)}")
     return app
 
 

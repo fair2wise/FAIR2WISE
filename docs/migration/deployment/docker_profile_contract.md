@@ -143,6 +143,6 @@ The edge forwards `/fair2wise` unchanged. The in-container gateway is the only p
 2. Check that `F2W_BASE_PATH` equals `/fair2wise` and matches `f2w-build.json`.
 3. Tiled:
    - `local`: `F2W_TILED_MODE=managed`, and the `/var/lib/fair2wise/tiled` mount exists and is writable by the UID.
-   - ALS: `F2W_TILED_MODE=external`, `F2W_TILED_URL` equals the fixed URL, `F2W_TILED_WRITER_SECRET_FILE` is readable, and no Tiled server config or venv is present.
+   - ALS: `F2W_TILED_MODE=external`, `F2W_TILED_URL` equals the fixed URL, `F2W_TILED_WRITER_SECRET_FILE` is a readable regular file with mode `0600`/`0400` owned by the running uid, and no Tiled server config or venv is present.
 4. Check each required mount exists with the expected mode (`ansible_input_contract.md` section 3). If a mount is missing, stop with an actionable error. Never fall back to container-local storage.
 5. Never `source .env`. The baseline launcher sources `.env` (`scripts/start_agent_backend.sh:74-79`). Image entrypoints do not.
