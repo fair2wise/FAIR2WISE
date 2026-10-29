@@ -284,6 +284,21 @@ against the code myself.
 - **T28C: Image diet and reproducibility** (before H6; benefits T24E now). PC-1 decision applied, CPU torch or opt-in semantic extra, hash-locked requirements, drop `scripts/app/`, release-manifest check that shipped `storage/` files are tracked. Acceptance: `:local` under 4 GB; CI and local digests describe the same inputs; private-planting test covers terminology.
 - **T28D: Documentation and register sync** (before H6). README/MkDocs rewritten for the three-image, JSON-default architecture; ADR statuses and the two stale ADRs; plan O-T1 annotations; `task_graph.json` statuses; T26A Q2-Q6 and the TTL mismatch into `OPEN_DECISIONS.md`.
 
+### 6. Applied on 2026-10-29 (integrator record)
+
+| Item | Commit | Note |
+|---|---|---|
+| AUD-08 CPU torch, baked MiniLM models | `a32e752` | semantic backend now works offline in every image; rebuild required |
+| AUD-07 / A5-2 binary rebinding and stale texts | `f4f4746` (T28B) | 86 PASS / 22 blocked with fakes; H3 recording awaits the owner (`python -m evals.binary.approve`) |
+| AUD-09 Tiled suites in CI, no `\|\| true` | `f4f4746` (T28B) | |
+| AUD-13 known failures 3 -> 1 | `f4f4746` (T28B) | only the splash-wipe entry remains |
+| AUD-01 stage re-authorization | `12156d1` (T28A) | `JobAuthority`; unwired capability is a startup error; live downgrade test |
+| AUD-03 model API projection and loopback bind | `12156d1` (T28A) | T18C F3 expected failure now passes |
+| AUD-04 legacy origin gate, 128 MiB cap, no ALS CORS fallback | `12156d1` (T28A) | B8/B9 applied as part of T28A |
+| AUD-15 secret file mode/owner; startup route assertion | `12156d1` (T28A) | |
+
+Still open from A5: A5-1/PC-1 (terminology files in the image, owner decision), AUD-02 (import-time dotenv in two legacy entry points and the stale `scripts/app/` copy), AUD-11/AUD-12 docs and ADRs (T28D), AUD-05/06/10/14/16 and the notes. Full suite after T28A+T28B: 4,585 passed, 1 known failure.
+
 Dependencies: T28A and T28B block H4. T28C and T28D block H6 and may run in
 parallel with T12 and the Tiled editing tasks. All four take the existing
 gate and branch rules; none needs a schema or UI change.
