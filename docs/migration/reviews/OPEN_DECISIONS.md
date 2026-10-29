@@ -211,6 +211,18 @@ Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
 | D2.9 | Pin base images by digest | Yes |
 | D2.10 | Require a binary report reference in each release | Record it; never gating (H3 B) |
 
+### D3. Audit 2026-10-29 (plan_addenda.md A5)
+
+| # | Decision | Recommendation |
+|---|---|---|
+| D3.1 | PC-1: paper snippets in images (`storage/terminology/*.json`, gitignored, 321 MB, ~141k snippets) | Exclude from images; keep gitignored |
+| D3.2 | PC-2: cumulative D19 budget per paper per session | Add a cap; number to be chosen |
+| D3.3 | PC-3: make T28A (authority wiring) a hard precondition of H4 | Yes |
+| D3.4 | PC-5: owner records the H3 approval in the binary manifest (T28B) | Yes |
+| D3.5 | PC-6: approval TTL (code: 1 h everywhere; B14 said 24 h placeholder) | None on `:local`, 24 h on ALS |
+| D3.6 | Approve tasks T28A-T28D as proposed in A5 | Approve |
+| D3.7 | T26A release-contract questions Q2-Q6 (never recorded; see `docs/migration/companion` T26A notes) | Carry into T28D for the owner |
+
 ---
 
 ## Already settled (for reference)

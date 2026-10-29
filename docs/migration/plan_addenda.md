@@ -210,6 +210,84 @@ additive form the owner chose.
   the new node types; owner reviews the schema diff before it is used to build
   or publish any graph.
 
+## A5 (2026-10-29, audit): findings to fix, hardening and points of concern
+
+Status: **proposed by the integrating agent; nothing here is approved.** Owner
+decides which items become tasks, which are accepted as-is, and which gate owns
+each. Evidence: `docs/migration/reviews/audit/2026-10-29/` (independent code
+audit, 20 findings AUD-01..AUD-16 plus notes; a fresh fake-model binary run).
+Severity words are the auditor's; I verified AUD-01, 02, 03, 04, 09 and 10
+against the code myself.
+
+### 1. Where the plan stands
+
+- **Gates:** H0-H3 approved (H3 on 2026-10-16, B4 to follow). H4-H8 open.
+- **Tasks:** 47 of the 54 task-graph entries are merged on `forge_merge`
+  (99 first-parent commits since the 222b1e7 baseline). Open: T07B (needs the
+  C4 rerun), T12 (pilot), T13, T15 (with Alex), T16A/B, T19E, T24E, T26C, plus
+  the addendum tasks T17B (H8), T22C-follow-ons, T27 (H7) and the seven Tiled
+  editing tasks proposed in `tiled_graph_editing_plan.md` (awaiting Q1-Q16).
+- **Tests:** 4,416 pass in one isolated run with the Tiled server tests
+  included; 3 known failures carried from H0.
+- **Images:** `:local` built and run for the first time on 2026-10-29. It
+  exposed one real build bug (MkDocs `watch`, fixed in c9cf9b0) and the two
+  size/reproducibility findings below. `:als-dev`/`:als-prod` are unbuilt.
+- **Binary suite, fresh run with fakes:** 56 completed PASS, 52 blocked, gate
+  NOT_PASS. Of the 52 blocked, **30 are blocked only on tasks that have since
+  merged** (T08B, T10, T23B, T24B-D, T26B) and 22 on open work (T24E 7, pilot
+  labels 9, O03 3, T13/T15/T26C 3). The manifest still records
+  `H3: not_approved`, so all 108 cases count as gate-blocking.
+
+### 2. Findings that need fixing
+
+| ID | Sev. | Finding (evidence) | Fix | Owner |
+|---|---|---|---|---|
+| AUD-01 | high | Job stages never re-authorize in production. `StageContext.require` returns `None` when no authority is wired (`app/modules/jobs/pipeline.py:214-219`); neither `register` caller passes one (`jobs/publication.py:112`, `operations/reports.py:389`); `WorkerAuthority` is used only by tests. On ALS a running job keeps privileged effects after sign-out or downgrade, except where a publication approval is invalidated. | Wire `WorkerAuthority` into `JobService.register` by default; make an unwired `required_capability` a startup error, not a no-op; add an ALS downgrade-mid-job test. | T28A, before H4 |
+| A5-1 | high | **Image content depends on the builder's disk.** `storage/terminology/*.json` is gitignored (`.gitignore:185`) but `Dockerfile` copies the whole directory; the local image carries 9 untracked harvest files (321 MB, ~141k paper snippets) that a CI build will not. `tests/images/test_images_context.py:111` asserts the directory ships. O-D1 says the directory "stays in Git", which the ignore rule contradicts. | Owner decision (section 4, PC-1); then either track the files or exclude `storage/terminology/*.json` in `.dockerignore` and fix the test. Add a release-manifest check that every shipped `storage/` file is tracked at the commit. | T28C |
+| AUD-08 | medium | 7.1 GB of the 13.2 GB image is CUDA PyTorch: `requirements/semantic.in` pins `torch>=2.12.0` with no index, Linux resolves `torch 2.15.0+cu132` plus 3.3 GB of `nvidia-*` wheels, while the image sets `KG_RAG_FORCE_CPU=1`. `runtime.txt` and the Tiled constraints have no hashes; `pip check` fails (huggingface-hub vs click). | CPU wheel index for torch (or make semantic deps an opt-in extra and image); hash-lock both files (B24/B25). Target well under 4 GB. | T28C |
+| AUD-07 + A5-2 | medium | Binary suite not reconciled after H3: `evals/binary/cases/index.json` says `H3: not_approved`; 30 cases blocked on merged tasks; 8 cases carry stale "unbuilt" text (JSON-03/04, REL-04, LLM-01, LOCAL-01/02/06, EXT-05). | Record the H3 approval in the manifest with the `decision.json` ref (human step, not agent self-approval); rebind the 30 cases to the landed tests; refresh the 8 texts; rerun and commit the report as H4 evidence. | T28B, before H4 |
+| AUD-03 | medium | The legacy model-compatible API (`kg_rag_api.create_fastapi_app`) has no request context and no disclosure projector; `run_fastapi` binds `0.0.0.0:11435` (`kg_rag_api.py:339`); `project_model_chat` exists but is never called. Only nginx's 404 keeps it off ALS. T18C F3. | Apply the projector to the two chat routes; default bind to loopback; or retire the route behind a flag. | B6, T28A |
+| AUD-04 | medium | Origin gate and body cap cover only `/v1/` and `/auth/` (`app/api/main.py:39`); legacy `/graph/upload` is unbounded; `create_app` falls back to dev localhost CORS origins with `allow_credentials=True` (`f2w_agent/api.py:6822`) so C7 holds only through preflight. | Apply the gate and a 128 MB cap to the 19 legacy routes (B8/B9); remove the CORS fallback on ALS profiles in code. | T28A |
+| AUD-09 | medium | No CI job runs the Tiled-gated suites (~260 tests in 11 `skipif` modules); `forge-merge-ci.yml:86` runs plain pytest with `|| true`. | Add a CI job that installs the hash-checked Tiled wheel and sets `F2W_TILED_PYTHON`; drop `|| true` once compare_known_failures is the gate. | T28B |
+| AUD-02 | medium | Import-time `load_dotenv()` remains in `app/run_pipeline_cborg.py:30`, `scripts/run.py:19`, `scripts/app/modules/kg_rag_api.py:59`, bypassing `F2W_DOTENV`; `COPY scripts/` ships the stale `scripts/app/modules/kg_rag_api.py` into every image. | Move the three to `dotenv_entry`; stop copying `scripts/app/` (or delete it under T17B). | T17B / T28C |
+| AUD-11 | medium | README and four MkDocs pages still describe the Splash architecture, `frontend:80` and `KG_RAG_GRAPH_SOURCE=splash` as the default; MkDocs is built into all three images. `plan.md` says Tiled 0.2.19 in 18 places without the O-T1 note. | Docs refresh task; annotate plan D22/D24/D33 with O-T1. | T28D (or fold into T16A) |
+
+### 3. Hardening (low; do with the nearest task)
+
+- **AUD-05:** the 40% page rule is per response; ledger limits default to `None`, so a page can be reconstructed over several turns, and the echo guard ignores runs under 200 characters. Consistent with O-D2; recorded as a concern (PC-2).
+- **AUD-06:** `/v1` responses use path-only projection; review excerpts rely on the 600-character cap (B10).
+- **AUD-10:** approval TTL is 1 h on every profile (`app/api/operations.py:58`); B14 calls it a "24 h placeholder" and recommends none on `:local`. Code and register disagree.
+- **AUD-12:** ADRs out of date: `schema-ownership.md` still forbids measurement-instance classes (overridden by T22C/A4); `job-and-approval-lifecycle.md` calls expiry "proposed"; every ADR still says `Status: Proposed` after H1.
+- **AUD-13:** two of the three known failures are one-line test-isolation fixes carried since H0 (`TestMakeChatClient` reads an ambient `CBORG_API_KEY`). Fix them and shrink the list to one.
+- **AUD-14:** `companion/task_graph.json` still marks every task `not_started`; T11B, T25C and T22C edited files outside their ownership; T11B re-pinned `FROZEN_UI_TREE` itself (under O-U2, but the pin change should be a separate integrator commit).
+- **AUD-15:** the writer secret file is checked for readability only, not mode or owner.
+- **AUD-16:** every `:local` user can read raw traces, including the network bind; fine for a trusted laptop, worth a note in the `:local` docs.
+- **Notes:** stale `TODO(T03)` in `agent_runtime/supervisor.py:92`; 4 pyflakes items; startup does not assert `undeclared_routes == []`; T26A's release-contract questions Q2-Q6 were never copied into `OPEN_DECISIONS.md`; D1.5 derived tolerance is still 1% in code.
+- **Local dev only:** Docker on Colima has no IPv6 by default, so CBORG refuses the container's IPv4 address. Fixed on this machine with Colima `network.address: true`, Docker IPv6 and a mounted `/etc/gai.conf`; `docker/profiles/README.md` should say so, and the image could offer `F2W_PREFER_IPV6=1`.
+
+### 4. Points of concern for the owner
+
+| # | Concern | Options |
+|---|---|---|
+| PC-1 | **Paper snippets in the image.** Shipping `storage/terminology/*.json` puts ~141k verbatim snippets from private papers into every image, including ALS images whose users are not all trusted. O-D1 accepted snippets in tracked KG JSON; the terminology harvest files are larger, untracked, and not needed by any image service (only legacy scripts read them). | (a) exclude them from images and keep them gitignored (recommended); (b) track them in Git and keep shipping, accepting the disclosure surface; (c) ship only on `:local`. |
+| PC-2 | **D19 across turns.** No cumulative per-paper budget, so patient prompting can reconstruct a page. | Keep per-response rule (O-D2), or add a per-session per-paper cap with a stated number. |
+| PC-3 | **Authority gap (AUD-01)** is the one place the ALS fail-closed story is not true today; it must be closed before any ALS deployment test (T24E), not just before H6. | Make T28A a hard precondition of H4. |
+| PC-4 | **Image reproducibility.** Until A5-1/AUD-08 land, the digest recorded by T24D's release manifest does not describe what a developer built locally. | Treat local builds as untested until CI builds exist. |
+| PC-5 | **Binary suite understates progress.** 56 of 108 cases pass today, and ~30 more are runnable; the report reads as 0/108 because the H3 approval was never recorded. | Approve the recording step in T28B. |
+| PC-6 | **Approval TTL** (1 h everywhere) may expire approvals during long ALS reviews. | Confirm B14: none on `:local`, 24 h on ALS, or keep 1 h. |
+| PC-7 | **Two legacy entry points still ignore `F2W_DOTENV`** and one is shipped in the image (AUD-02). | Retire under T17B or fix now. |
+
+### 5. Proposed tasks (owner to approve)
+
+- **T28A: Authorization and surface hardening** (before H4). AUD-01, AUD-03, AUD-04, AUD-15, startup `undeclared_routes` assertion. Acceptance: an ALS downgrade mid-job stops the job before its next effect; legacy routes carry the origin gate and body cap; model API projected and loopback-bound; all under existing fail-closed tests.
+- **T28B: Binary suite reconciliation and CI** (before H4). Record the H3 approval (owner-signed), rebind the 30 cases, refresh stale texts, run the suite in CI with the Tiled wheel, fix the two trivial known failures. Acceptance: committed post-H3 report; `compare_known_failures` gates CI without `|| true`.
+- **T28C: Image diet and reproducibility** (before H6; benefits T24E now). PC-1 decision applied, CPU torch or opt-in semantic extra, hash-locked requirements, drop `scripts/app/`, release-manifest check that shipped `storage/` files are tracked. Acceptance: `:local` under 4 GB; CI and local digests describe the same inputs; private-planting test covers terminology.
+- **T28D: Documentation and register sync** (before H6). README/MkDocs rewritten for the three-image, JSON-default architecture; ADR statuses and the two stale ADRs; plan O-T1 annotations; `task_graph.json` statuses; T26A Q2-Q6 and the TTL mismatch into `OPEN_DECISIONS.md`.
+
+Dependencies: T28A and T28B block H4. T28C and T28D block H6 and may run in
+parallel with T12 and the Tiled editing tasks. All four take the existing
+gate and branch rules; none needs a schema or UI change.
+
 ## Order after H2
 
 T25D, T03B and T02B first (they can run in parallel), then the plan's
