@@ -1,7 +1,7 @@
 {
   "record": "Known pre-existing test failures, tracked not skipped (plan section 5.3)",
   "accepted_at": "H0 (decision.json, 2026-10-09)",
-  "updated": "2026-10-12: the 15 test_bl1101_ingest errors are gone since matkg_bl1101_v7.json is committed (O-G1, 0d3d294); H1-4 (fail closed without CBORG_API_KEY) changed the TestMakeChatClient failure message",
+  "updated": "2026-10-12: the 15 test_bl1101_ingest errors are gone since matkg_bl1101_v7.json is committed (O-G1, 0d3d294); H1-4 (fail closed without CBORG_API_KEY) changed the TestMakeChatClient failure message; 2026-10-29 (T28B, audit AUD-13): the two TestMakeChatClient entries are gone, the tests now set a dummy CBORG_API_KEY with monkeypatch instead of needing an ambient one",
   "environment": "isolated: git archive export, env -i, no .env, requirements.txt + requirements/dev.txt",
   "known_failures": [
     {
@@ -9,18 +9,6 @@
       "kind": "failure",
       "message_contains": "pixi not found on PATH",
       "reason": "Checks for pixi on PATH before validating --allow-splash-wipe (precondition ordering)."
-    },
-    {
-      "id": "tests.test_strip_ansi_and_helpers.TestMakeChatClient::test_cborg_backend",
-      "kind": "failure",
-      "message_contains": "CBORG_API_KEY is not set",
-      "reason": "Unit test constructs a CBORG client and only passes with an ambient CBORG_API_KEY (test-isolation defect). Since H1-4 the client fails closed with an explicit message instead of the openai SDK's 'Missing credentials'."
-    },
-    {
-      "id": "tests.test_strip_ansi_and_helpers.TestMakeChatClient::test_cborg_openai_alias",
-      "kind": "failure",
-      "message_contains": "CBORG_API_KEY is not set",
-      "reason": "Unit test constructs a CBORG client and only passes with an ambient CBORG_API_KEY (test-isolation defect). Since H1-4 the client fails closed with an explicit message instead of the openai SDK's 'Missing credentials'."
     }
   ]
 }
