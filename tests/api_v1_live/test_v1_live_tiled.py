@@ -51,8 +51,10 @@ def _build_live(monkeypatch, tmp_path, inst):
         return WorkerAuthority(ctx_for(job), settings, identity_port=port, clock=utcnow,
                                credential_provider=credential).check(*caps)
 
+    # Publication runs under the service's default JobAuthority: the initiating subject's credential
+    # is looked up in the real session store by subject (bound at each resolved request).
     v1 = _build(monkeypatch, tmp_path, settings, port=port, store=store, worker_ctx=ctx_for, authority=authority,
-                clock=utcnow, after_install=loopback_only)
+                clock=utcnow, after_install=loopback_only, credential_lookup=store.credential_for_subject)
 
     def sign_in(user):
         client = TestClient(v1.app, base_url="https://testserver", raise_server_exceptions=False)

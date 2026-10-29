@@ -17,6 +17,7 @@ from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobEvent, JobHandle, JobState
 from ..llm_admission import ProviderAdmission
+from ..security.authorization import DeploymentSettings, JobAuthority, StartupConfigError
 from .keys import OperationInputs
 from .pipeline import Pipeline, PipelineRunner
 from .store import JobRecord, JobStore, LeaseLost
@@ -48,6 +49,15 @@ class JobService:
     Args:
         store: The durable job store.
         owner: Identity recorded as the lease owner of this process (for example ``worker-<pid>``).
+        settings: Startup ``DeploymentSettings`` of this deployment. With them the service wires a
+            :class:`~app.modules.security.authorization.JobAuthority` into every registered kind,
+            so stages re-authorize the initiating subject before each effect (AUD-01). Without
+            them a kind that declares a ``required_capability`` cannot be registered unless it
+            brings its own ``authority``.
+        identity_port: ALS identity port for the default authority.
+        credential_lookup: ``subject -> current credential or None`` (the server-side session
+            store) for the default authority on ALS.
+        clock: Current time for the default authority.
     """
 
     def __init__(
@@ -57,9 +67,18 @@ class JobService:
         owner: str = "worker",
         admission: Any = None,
         heartbeat_interval: Optional[float] = None,
+        settings: Optional[DeploymentSettings] = None,
+        identity_port: Optional[Any] = None,
+        credential_lookup: Optional[Callable[[str], Any]] = None,
+        clock: Optional[Callable[[], Any]] = None,
     ) -> None:
         self.store = store
         self.owner = owner
+        #: Default stage authority (``None`` when the service was built without deployment settings).
+        self.authority: Optional[JobAuthority] = None
+        if settings is not None:
+            self.authority = JobAuthority(settings, identity_port=identity_port, credential_lookup=credential_lookup,
+                                          clock=clock)
         #: Shared provider admission (the same controllers chat, workers and evaluations use).
         self.admission = admission if admission is not None else ProviderAdmission()
         #: Seconds between lease renewals while a job runs (``None``: renew only through progress calls).
@@ -82,10 +101,30 @@ class JobService:
         extra: Optional[Mapping[str, Any]] = None,
         on_denied: Optional[Callable[[JobRecord, str], None]] = None,
     ) -> RegisteredKind:
-        """Declare a job kind. ``authority`` re-authorizes the initiating subject before every stage."""
+        """Declare a job kind.
+
+        ``authority`` re-authorizes the initiating subject before every stage; by default the
+        service's :class:`~app.modules.security.authorization.JobAuthority`. A kind whose
+        pipeline declares a ``required_capability`` is refused when neither exists (fail closed,
+        AUD-01): a stage must never run its privileged effect without re-authorization.
+
+        Raises:
+            StartupConfigError: ``required_capability`` declared and no authority available.
+            ValueError: No capability known for ``kind``.
+        """
         cap = capability or DEFAULT_KIND_CAPABILITIES.get(kind)
         if cap is None:
             raise ValueError(f"no capability known for job kind {kind!r}")
+        if authority is None:
+            authority = self.authority
+        if authority is None:
+            guarded = [spec.name for spec in pipeline.specs if spec.required_capability]
+            if guarded:
+                raise StartupConfigError(
+                    f"config_rejected: job kind {kind!r} declares required_capability on stage(s) "
+                    f"{', '.join(guarded)} but no worker authority is wired; build the JobService with "
+                    "deployment settings or pass authority="
+                )
         runner = PipelineRunner(
             self.store,
             pipeline,

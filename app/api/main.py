@@ -92,7 +92,8 @@ def create_api_app(
     if operations is None:
         operations = build_operations(settings, operations_root or Path(cfg.workdir) / "operations",
                                       identity_port=identity_port, clock=clock or _utcnow,
-                                      publication_gate=publication_gate)
+                                      publication_gate=publication_gate,
+                                      credential_lookup=runtime.credential_lookup())
     elif operations.settings != settings:
         raise StartupConfigError("config_rejected: operations are bound to another deployment profile or target")
     if operations.identity_port is None:

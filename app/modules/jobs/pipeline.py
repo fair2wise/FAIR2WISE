@@ -213,9 +213,15 @@ class StageContext:
             raise JobStopped("stop requested")
 
     def require(self, *capabilities: str) -> Any:
-        """Re-authorize before an effect (workers never keep stale authority)."""
+        """Re-authorize the initiating subject before an effect (workers never keep stale authority).
+
+        Raises:
+            ContractError: ``DENIED`` when no authority is wired for this kind (fail closed; trusted
+                wiring registers every kind with one, see ``JobService.register``), or when the
+                authority stops the run (sign-out, downgrade, revocation, expiry).
+        """
         if self._authority is None:
-            return None
+            raise ContractError(ErrorCode.DENIED, "worker stopped: no authority is wired for this job kind")
         return self._authority(self.job, capabilities)
 
     def progress(self, **counters: int) -> None:
@@ -292,6 +298,11 @@ class PipelineRunner:
         keys = self.pipeline.keys(job.inputs)
         stored = {s.stage: s for s in self.store.stages(job_id)}
         stage_name = "job"
+        # A per-run authority (``JobAuthority.for_job``) keeps its stop across the run's stages.
+        authority = self._authority
+        begin = getattr(authority, "for_job", None)
+        if callable(begin):
+            authority = begin(job)
         try:
             self._invalidate_incompatible(lease, job, keys, stored)
             for position, spec in enumerate(self.pipeline.specs):
@@ -321,7 +332,7 @@ class PipelineRunner:
                             outcome=StageOutcome.SKIPPED_COMPATIBLE,
                         )
                     continue
-                self._run_stage(lease, job, spec, position, keys[spec.name])
+                self._run_stage(lease, job, spec, position, keys[spec.name], authority)
             blockers = self.publication_blockers(job_id)
             if blockers:
                 self.store.set_state(
@@ -378,7 +389,8 @@ class PipelineRunner:
             ordered = [s.name for s in self.pipeline.specs if s.name in set(stale)]
             self.store.invalidate(lease, job.job_id, ordered, "inputs changed; recomputing affected stages only")
 
-    def _run_stage(self, lease: Lease, job: JobRecord, spec: StageSpec, position: int, key: str) -> None:
+    def _run_stage(self, lease: Lease, job: JobRecord, spec: StageSpec, position: int, key: str,
+                   authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None) -> None:
         job_id = job.job_id
         ctx = StageContext(
             self.store,
@@ -386,7 +398,7 @@ class PipelineRunner:
             job,
             spec,
             key,
-            authority=self._authority,
+            authority=authority if authority is not None else self._authority,
             admission=self._admission,
             extra=self._extra,
             interrupt=self._interrupt,

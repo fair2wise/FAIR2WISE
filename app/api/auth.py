@@ -123,6 +123,17 @@ class AccessRuntime:
             except Exception:  # noqa: BLE001 - one listener must not hide the change from the rest
                 logger.exception("scope-change listener failed")
 
+    def bind_session_subject(self, session_token: Optional[str], ctx: RequestContext) -> None:
+        """Index a verified ALS session by its subject, so workers can look the credential up (AUD-01)."""
+        bind = getattr(self.credential_store, "bind_subject", None)
+        if session_token and callable(bind) and not self.settings.is_local:
+            bind(session_token, ctx.principal.subject)
+
+    def credential_lookup(self) -> Optional[Callable[[str], Optional[TiledCredential]]]:
+        """``subject -> current credential`` over the session store, or ``None`` when it has no subject index."""
+        lookup = getattr(self.credential_store, "credential_for_subject", None)
+        return lookup if callable(lookup) else None
+
     def observe(self, ctx: RequestContext) -> None:
         """Record a verified ALS caller's admin flag; notify listeners when it was dropped."""
         if self.settings.is_local:
@@ -233,6 +244,8 @@ def _resolve(request: Request, policy: Optional[RoutePolicy], *, fresh: bool = F
         require_fresh=fresh or bool(policy and policy.needs_fresh_role_check),
     )
     runtime.observe(ctx)
+    if credential is not None:
+        runtime.bind_session_subject(token, ctx)
     if policy is None:
         if not settings.is_local:
             raise ContractError(ErrorCode.DENIED, "route has no declared access policy")

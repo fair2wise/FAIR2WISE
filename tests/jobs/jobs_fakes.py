@@ -11,6 +11,7 @@ from app.modules.contracts.context import (
     RequestContext,
 )
 from app.modules.jobs.keys import OperationInputs
+from app.modules.security.authorization import DeploymentSettings
 
 
 class Clock:
@@ -59,3 +60,8 @@ def inputs(**kw: Any) -> OperationInputs:
     )
     base.update(kw)
     return OperationInputs(**base)
+
+
+def local_settings() -> DeploymentSettings:
+    """``:local`` deployment settings: ``JobService(store, settings=...)`` wires the local-operator authority."""
+    return DeploymentSettings(profile="local", writer_identity="f2w-writer")

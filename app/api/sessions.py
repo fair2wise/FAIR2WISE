@@ -95,6 +95,9 @@ class _Session:
     refresh_token: Optional[str] = field(repr=False)
     expires_at: Optional[datetime]
     created_at: datetime
+    #: Verified subject of the session once a request resolved it (``bind_subject``); workers
+    #: look the session up by it (``credential_for_subject``). Never taken from request data.
+    subject: Optional[str] = None
 
 
 class TiledSessionStore:
@@ -240,12 +243,44 @@ class TiledSessionStore:
             raise ContractError(ErrorCode.UNAVAILABLE, f"Tiled refresh answered HTTP {resp.status_code}",
                                 retryable=True)
         access, refresh, expires_at = self._tokens(resp)
-        new = _Session(access, refresh or sess.refresh_token, expires_at, sess.created_at)
+        new = _Session(access, refresh or sess.refresh_token, expires_at, sess.created_at, sess.subject)
         with self._lock:
             if key not in self._sessions:  # signed out meanwhile
                 return None
             self._sessions[key] = new
         return new
+
+    def bind_subject(self, session_token: str, subject: str) -> None:
+        """Record the verified ``subject`` of a session (called by the server after ``resolve_context``)."""
+        if not session_token or not subject:
+            return
+        key = self._key(session_token)
+        with self._lock:
+            sess = self._sessions.get(key)
+            if sess is not None and sess.subject != subject:
+                self._sessions[key] = _Session(sess.access_token, sess.refresh_token, sess.expires_at,
+                                               sess.created_at, subject)
+
+    def credential_for_subject(self, subject: str) -> Optional[TiledCredential]:
+        """The current credential of ``subject``'s newest live session, or ``None`` once signed out.
+
+        This is the worker's ``credential_lookup`` (``JobAuthority``): a job keeps its authority
+        only while its initiating subject still has a session in this store.
+
+        Raises:
+            ContractError: ``UNAVAILABLE`` when a needed refresh cannot reach Tiled.
+        """
+        if not subject:
+            return None
+        with self._lock:
+            matches = [(key, sess) for key, sess in self._sessions.items() if sess.subject == subject]
+        for key, sess in sorted(matches, key=lambda item: item[1].created_at, reverse=True):
+            if sess.expires_at is not None and self._clock() + CLOCK_SKEW_TOLERANCE >= sess.expires_at:
+                sess = self._refresh(key, sess)
+                if sess is None:
+                    continue
+            return TiledCredential(sess.access_token, tiled_target=self.tiled_target, expires_at=sess.expires_at)
+        return None
 
     def drop(self, key: str) -> Optional[_Session]:
         """Forget a session by its store key."""

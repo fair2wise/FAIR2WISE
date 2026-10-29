@@ -17,7 +17,7 @@ from app.modules.jobs.publish_store import PublishStore
 from app.modules.jobs.sqlite import OperationalDB
 from app.modules.provenance import AuditLog, AuditRecorder
 from app.modules.security.authorization import worker_context
-from tests.jobs.jobs_fakes import Clock, Crash, local_ctx
+from tests.jobs.jobs_fakes import Clock, Crash, local_ctx, local_settings
 
 TARGET = "http://tiled.example:8000/api#f2w"
 NOW = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
@@ -252,7 +252,7 @@ class World:
         self.clock = Clock(NOW.timestamp())
         self.jobs_db = OperationalDB(tmp_path / "ops.sqlite3")
         self.jobs_store = JobStore(None, db=self.jobs_db, lease_seconds=lease_seconds, clock=self.clock)
-        self.service = JobService(self.jobs_store)
+        self.service = JobService(self.jobs_store, settings=local_settings())
         self.snapshots, self.tiled, self.index, self.probe = FakeSnapshots(), FakeTiled(), FakeIndex(), FakeProbe()
         self.step = FakeStep(self.tiled, self.snapshots, self.clock)
         self.log = AuditLog(tmp_path / "audit.sqlite3", clock=self.clock)

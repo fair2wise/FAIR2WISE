@@ -113,14 +113,16 @@ def _build(monkeypatch: Any, tmp_path: Path, settings: DeploymentSettings, *, po
            store: Any, worker_ctx: Callable[[Any], RequestContext],
            authority: Optional[Callable[[Any, Any], Any]], clock: Any, rehearsal: bool = True,
            publication: bool = True, after_install: Optional[Callable[[Any], None]] = None,
-           **app_kw: Any) -> V1App:
+           credential_lookup: Optional[Callable[[str], Any]] = None, **app_kw: Any) -> V1App:
     ctx = H.install(monkeypatch, tmp_path / "ws", REPO)
     if after_install is not None:
         after_install(monkeypatch)  # live tests re-open 127.0.0.1 after the harness blocked sockets
     monkeypatch.delenv("F2W_RUNTIME", raising=False)
     epoch = Clock(NOW.timestamp())
     db = OperationalDB(tmp_path / "ops.sqlite3")
-    jobs = JobService(JobStore(None, db=db, clock=epoch))
+    # The service's default JobAuthority (AUD-01) covers kinds registered without one (publication).
+    jobs = JobService(JobStore(None, db=db, clock=epoch), settings=settings, clock=clock,
+                      identity_port=None if settings.is_local else port, credential_lookup=credential_lookup)
     ingest_log: List[str] = []
     jobs.register("ingest", fake_ingest_pipeline(ingest_log), authority=authority)
     snapshots, tiled, index, probe = FakeSnapshots(), FakeTiled(), FakeIndex(), FakeProbe()
@@ -206,5 +208,5 @@ def build_als(monkeypatch: Any, tmp_path: Path, **kw: Any) -> V1App:
                                ).check(*caps)
 
     app = _build(monkeypatch, tmp_path, settings, port=port, store=store, worker_ctx=recorded, authority=authority,
-                 clock=clock, **kw)
+                 clock=clock, credential_lookup=lambda subject: store.get(by_subject.get(subject, "")), **kw)
     return app
