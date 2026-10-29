@@ -1060,9 +1060,9 @@
           "currently_returns": "LLM answer from RAG_SYSTEM prompt over KG context that includes, per source paper of each rendered node, a 1000-char window of the full PDF text centred on query terms ([PDF name] blocks).",
           "source_ref": "app/modules/kg_rag_api.py:141-143,458-471,760-775,1242-1247; app/modules/kg_rag_api.py:246-282",
           "size_bound": "context: CONTEXT_CHAR_BUDGET*0.75 = 12000 chars; snippet KG_RAG_SNIP=1000 (env-tunable); answer unbounded",
-          "reconstruction_risk": "HIGH [inferred]: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; no output constraint or exact-quote check.",
-          "conforms_to_D19_today": "no",
-          "notes": ""
+          "reconstruction_risk": "MEDIUM: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; since T28A each answer passes DisclosureProjector.project_model_chat with the rendered windows as source regions (quotes verified, verbatim echo clipped at 40% of a window, O-D2); per-response rule only (PC-2).",
+          "conforms_to_D19_today": "yes",
+          "notes": "T28A (AUD-03): create_fastapi_app installs access control (R20-R25 via request_context) and projects both chat routes."
         },
         {
           "field": "error",
@@ -1078,7 +1078,7 @@
       ],
       "serves_pdf": false,
       "serves_full_text": false,
-      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "notes": "Independent model-compatible proxy (create_fastapi_app); since T28A run_fastapi binds 127.0.0.1:11435 by default (KG_RAG_API_HOST / --api-host widen it) and every route resolves the server-built request context.",
       "binary_cases": [
         "SEC-04",
         "QUOTE-02",
@@ -1087,7 +1087,7 @@
       "route_class": "quote-bounded",
       "route_class_incl_non_source_fields": "quote-bounded",
       "exposes_internal_paths_or_raw_errors": false,
-      "current_auth": "none"
+      "current_auth": "request_context (R20-R25): local operator on :local; signed-in ALS user, chat routes not exposed on ALS"
     },
     {
       "route_id": "R21",
@@ -1106,9 +1106,9 @@
           "currently_returns": "LLM answer from RAG_SYSTEM prompt over KG context that includes, per source paper of each rendered node, a 1000-char window of the full PDF text centred on query terms ([PDF name] blocks).",
           "source_ref": "app/modules/kg_rag_api.py:141-143,458-471,760-775,1242-1247; app/modules/kg_rag_api.py:246-282",
           "size_bound": "context: CONTEXT_CHAR_BUDGET*0.75 = 12000 chars; snippet KG_RAG_SNIP=1000 (env-tunable); answer unbounded",
-          "reconstruction_risk": "HIGH [inferred]: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; no output constraint or exact-quote check.",
-          "conforms_to_D19_today": "no",
-          "notes": ""
+          "reconstruction_risk": "MEDIUM: the caller chooses the hint terms that position the 1000-char window, so successive queries can move the window across a paper; since T28A each answer passes DisclosureProjector.project_model_chat with the rendered windows as source regions (quotes verified, verbatim echo clipped at 40% of a window, O-D2); per-response rule only (PC-2).",
+          "conforms_to_D19_today": "yes",
+          "notes": "T28A (AUD-03): create_fastapi_app installs access control (R20-R25 via request_context) and projects both chat routes."
         },
         {
           "field": "error",
@@ -1124,7 +1124,7 @@
       ],
       "serves_pdf": false,
       "serves_full_text": false,
-      "notes": "Independent model-compatible proxy (create_fastapi_app); run_fastapi binds 0.0.0.0:11435 with no auth and no CORS policy (kg_rag_api.py:321-330).",
+      "notes": "Independent model-compatible proxy (create_fastapi_app); since T28A run_fastapi binds 127.0.0.1:11435 by default (KG_RAG_API_HOST / --api-host widen it) and every route resolves the server-built request context.",
       "binary_cases": [
         "SEC-04",
         "QUOTE-02",
@@ -1133,7 +1133,7 @@
       "route_class": "quote-bounded",
       "route_class_incl_non_source_fields": "quote-bounded",
       "exposes_internal_paths_or_raw_errors": false,
-      "current_auth": "none"
+      "current_auth": "request_context (R20-R25): local operator on :local; signed-in ALS user, chat routes not exposed on ALS"
     },
     {
       "route_id": "R22",

@@ -22,7 +22,10 @@ if __name__ == "__main__" and not __package__:
 
 import argparse
 import asyncio
+import contextlib
+import contextvars
 import datetime
+import hashlib
 import json
 import logging
 import math
@@ -39,7 +42,7 @@ import aiohttp
 import openai
 import requests
 from colorama import Fore, Style, init as colorama_init
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
@@ -202,28 +205,154 @@ colorama_init(autoreset=True)
 
 # ───────────────────── FastAPI proxy for OpenWebUI ─────────────────────
 
+#: Default bind address of ``run_fastapi`` (AUD-03): loopback. ``KG_RAG_API_HOST`` or
+#: ``--api-host`` widen it explicitly (for example ``0.0.0.0``), never by default.
+DEFAULT_API_HOST = "127.0.0.1"
+DEFAULT_API_PORT = 11435
+
+#: PDF snippets ``KnowledgeGraph.build_context`` put into the prompt of the running model-API
+#: turn, as ``(pdf name, snippet)``; ``None`` outside :func:`capture_pdf_snippets`.
+_PDF_SNIPPETS: contextvars.ContextVar[Optional[List[Tuple[str, str]]]] = contextvars.ContextVar(
+    "kg_rag_pdf_snippets", default=None)
+
+
+@contextlib.contextmanager
+def capture_pdf_snippets():
+    """Collect the PDF snippets rendered into the prompt while the block runs (D19 sources)."""
+    captured: List[Tuple[str, str]] = []
+    token = _PDF_SNIPPETS.set(captured)
+    try:
+        yield captured
+    finally:
+        _PDF_SNIPPETS.reset(token)
+
+
+class ModelTurnSources:
+    """PDF windows one model-API turn showed the model, as disclosure source regions (D19, O-D2).
+
+    Each ``[PDF name]`` snippet that :meth:`KnowledgeGraph.build_context` rendered becomes one
+    :class:`~app.modules.security.disclosure.SourceRef` (work = PDF file name, version = the
+    snippet's digest). :meth:`read` is the ``(source_version, locator) -> text`` hook a
+    ``QuoteVerifier`` calls inside a ``SourceAccessScope``; the projector then clips verbatim
+    echoes beyond the 40% rule and verifies quotes against the retained window, exactly as the
+    legacy UI chat routes do (``app/api/source_text.py``).
+    """
+
+    VERSION_PREFIX = "kg-rag-snippet"
+
+    def __init__(self, snippets: Sequence[Tuple[str, str]] = ()) -> None:
+        self._text: Dict[Tuple[str, str], str] = {}
+        for pdf, snippet in snippets:
+            self.add(pdf, snippet)
+
+    def add(self, pdf: str, snippet: str) -> None:
+        """Keep one rendered snippet of ``pdf``."""
+        text = str(snippet or "").strip()
+        if not text:
+            return
+        name = Path(str(pdf)).name
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        self._text[(name, f"{self.VERSION_PREFIX}:sha256:{digest}")] = text
+
+    def __bool__(self) -> bool:
+        return bool(self._text)
+
+    def refs(self) -> List[Any]:
+        """One ``SourceRef`` per retained snippet."""
+        from .contracts.evidence import SourceLocator
+        from .security.disclosure import SourceRef
+
+        return [SourceRef(name, version, SourceLocator(), f"[PDF: {name}]") for name, version in sorted(self._text)]
+
+    def work_ids(self) -> List[str]:
+        """PDF names the regions belong to (the grant's ``work_ids``)."""
+        return sorted({name for name, _version in self._text})
+
+    def read(self, source_version: str, locator: Any) -> Optional[str]:
+        """Retained text of one region; only ever called by a ``QuoteVerifier`` under a grant."""
+        for (_name, version), text in self._text.items():
+            if version == source_version:
+                return text
+        return None
+
+
 def create_fastapi_app(
     graph_file: str,
     backend: str = LLM_BACKEND,
     model: Optional[str] = None,
+    *,
+    deployment: Optional[Any] = None,
+    startup_config: Optional[Dict[str, str]] = None,
+    identity_port: Optional[Any] = None,
+    credential_store: Optional[Any] = None,
 ) -> FastAPI:
     """Create a FastAPI app that proxies chat requests through the KG-RAG pipeline.
+
+    Access and disclosure (AUD-03, T28A): the six routes carry the ``ROUTE_POLICIES`` R20-R25
+    through the server-built request context (``app.api.auth.request_context``, surface
+    ``MODEL_API_SURFACE``): the local operator on ``:local``; a signed-in ALS user elsewhere,
+    where the two chat routes are not exposed (``on_als=False``, D-T8). Both chat answers pass
+    through ``DisclosureProjector.project_model_chat`` with the turn's PDF windows as source
+    regions, so a model that echoes its prompt cannot return more than 40% of a window (O-D2).
 
     Args:
         graph_file: Path to the KG graph JSON file.
         backend: LLM backend to use ('ollama', 'cborg', or 'cborg-openai').
         model: Model name override; defaults to backend-specific env var.
+        deployment: ``DeploymentSettings``; default built from ``startup_config``
+            (``os.environ`` when ``None``, profile ``local`` when unset), as ``create_app``.
+        startup_config / identity_port / credential_store: As ``create_app`` (ALS profiles need
+            the port and the store, or startup is refused).
 
     Returns:
         Configured FastAPI application with /v1/chat/completions endpoint.
+
+    Raises:
+        StartupConfigError: Refused startup configuration, or an undeclared route.
     """
+    from app.api.auth import AccessRuntime, install_access_control, request_context, undeclared_routes
+    from app.api.legacy_ui import deployment_settings_from
+    from .contracts.context import RequestContext
+    from .security.authorization import MODEL_API_SURFACE, StartupConfigError
+    from .security.content_access import ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceKind
+    from .security.disclosure import DisclosureProjector, QuoteVerifier, Viewer
+
+    settings = deployment if deployment is not None else deployment_settings_from(startup_config)
+    if not settings.is_local and (identity_port is None or credential_store is None):
+        raise StartupConfigError("config_rejected: ALS profiles need identity_port and credential_store")
     app = FastAPI(title="KG-RAG Chat Proxy")
+    runtime = AccessRuntime(settings, identity_port=identity_port, credential_store=credential_store,
+                            surface=MODEL_API_SURFACE)
+    install_access_control(app, runtime)
+    projector = DisclosureProjector()
+    source_authority = SourceAccessAuthority()
 
     kg = KnowledgeGraph(graph_file)
     cli = make_chat_client(backend=backend, model=model)
     rag_c = Conversation(RAG_SYSTEM)
     # base_c = Conversation(BASELINE_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file)
+
+    def _project(ctx: RequestContext, payload: Dict[str, Any], sources: ModelTurnSources) -> Any:
+        """Project a chat body for ``ctx`` with the turn's PDF windows as verifiable source regions."""
+        viewer = Viewer.from_context(ctx)
+        refs = sources.refs()
+        turn_projector, grant = projector, None
+        if refs:
+            try:
+                grant = source_authority.issue(ctx, purpose=ReadPurpose.QUOTE_VERIFICATION,
+                                               kinds=(SourceKind.PARSED_TEXT,), work_ids=sources.work_ids())
+                verifier = QuoteVerifier(sources.read, source_authority.scope(ctx, grant))
+                turn_projector = DisclosureProjector(budget=projector.budget, verifier=verifier,
+                                                     ledger=projector.ledger, roots=projector.roots)
+            except SourceAccessDenied as exc:
+                logger.warning("model API quote verification grant refused: %s", exc.reason)
+                refs = []
+        try:
+            return turn_projector.project_model_chat(payload, viewer, sources=refs)
+        finally:
+            if grant is not None:
+                source_authority.revoke(grant)
 
     async def _answer_messages(messages: Sequence[Dict[str, str]]) -> str:
         """Answer the last user message from *messages* using KG-RAG context."""
@@ -252,31 +381,33 @@ def create_fastapi_app(
         return rag_resp
 
     @app.post("/api/chat")
-    async def api_chat(req: Request):
+    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)):
         """Handle incoming chat request: retrieve KG context, call LLM, return response."""
         body = await req.json()
         messages = body.get("messages", [])
         if not messages:
             return JSONResponse({"error": "No messages"}, status_code=400)
 
-        rag_resp = await _answer_messages(messages)
+        with capture_pdf_snippets() as snippets:
+            rag_resp = await _answer_messages(messages)
 
-        return {
+        return _project(ctx, {
             "model": cli.model,
             "message": {"role": "assistant", "content": rag_resp},
             "done": True,
-        }
+        }, ModelTurnSources(snippets))
 
     @app.post("/v1/chat/completions")
-    async def openai_chat_completions(req: Request):
+    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)):
         """Handle OpenAI-compatible chat completions for Open WebUI."""
         body = await req.json()
         messages = body.get("messages", [])
         if not messages:
             return JSONResponse({"error": {"message": "No messages"}}, status_code=400)
 
-        rag_resp = await _answer_messages(messages)
-        return {
+        with capture_pdf_snippets() as snippets:
+            rag_resp = await _answer_messages(messages)
+        return _project(ctx, {
             "id": f"chatcmpl-{int(time.time() * 1000)}",
             "object": "chat.completion",
             "created": int(time.time()),
@@ -288,10 +419,10 @@ def create_fastapi_app(
                     "finish_reason": "stop",
                 }
             ],
-        }
+        }, ModelTurnSources(snippets))
 
     @app.get("/api/tags")
-    async def list_models():
+    async def list_models(ctx: RequestContext = Depends(request_context)):
         """Return available model tags for OpenWebUI compatibility."""
         return {
             "models": [
@@ -300,12 +431,12 @@ def create_fastapi_app(
         }
 
     @app.get("/api/version")
-    async def ollama_version():
+    async def ollama_version(ctx: RequestContext = Depends(request_context)):
         """Return a minimal Ollama-compatible version response."""
         return {"version": "0.1.0"}
 
     @app.get("/v1/models")
-    async def openai_models():
+    async def openai_models(ctx: RequestContext = Depends(request_context)):
         """Return OpenAI-compatible model list for Open WebUI."""
         return {
             "object": "list",
@@ -320,23 +451,34 @@ def create_fastapi_app(
         }
 
     @app.get("/api/ps")
-    async def list_processes():
+    async def list_processes(ctx: RequestContext = Depends(request_context)):
         """Return running processes (stub for OpenWebUI compatibility)."""
         return {"processes": []}
 
+    missing = undeclared_routes(app)
+    if missing:
+        raise StartupConfigError(f"config_rejected: routes without a declared access policy: {', '.join(missing)}")
     return app
 
 
-def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: Optional[str] = None):
-    """Launch the FastAPI KG-RAG server on port 11435.
+def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: Optional[str] = None, *,
+                host: Optional[str] = None, port: int = DEFAULT_API_PORT):
+    """Launch the FastAPI KG-RAG server (default ``127.0.0.1:11435``).
 
     Args:
         graph_file: Path to the KG graph JSON file.
         backend: LLM backend to use ('ollama', 'cborg', or 'cborg-openai').
         model: Model name override; defaults to backend-specific env var.
+        host: Bind address. ``None`` reads ``KG_RAG_API_HOST`` and falls back to loopback
+            (:data:`DEFAULT_API_HOST`); widening to the network is an explicit choice (AUD-03).
+        port: TCP port.
     """
+    bind = (host or os.environ.get("KG_RAG_API_HOST") or DEFAULT_API_HOST).strip() or DEFAULT_API_HOST
+    if bind not in (DEFAULT_API_HOST, "localhost", "::1"):
+        logger.warning("KG-RAG model API bound to %s: reachable from the network; on :local every caller is the "
+                       "local operator", bind)
     app = create_fastapi_app(graph_file, backend=backend, model=model)
-    uvicorn.run(app, host="0.0.0.0", port=11435)
+    uvicorn.run(app, host=bind, port=port)
 
 # ───────────────────── Knowledge Gap Tracking ─────────────────────
 # We can use this to log missing nodes for later curation
@@ -1255,6 +1397,9 @@ class KnowledgeGraph:
                     snip = snippet_text(txt, PDF_SNIPPET_LEN, hint_terms)
                     if snip:
                         lines.append(f"[PDF {pdf}]\n{snip}")
+                        captured = _PDF_SNIPPETS.get()
+                        if captured is not None:
+                            captured.append((pdf, snip))
             if self.out_edges.get(ni.id):
                 rel_lines: List[str] = []
                 for e in sorted(self.out_edges[ni.id], key=lambda x: x["predicate"]):
@@ -1775,6 +1920,11 @@ if __name__ == "__main__":
     ap.add_argument("--competency", action="store_true", help="Run full competency Q set")
     ap.add_argument("--api", action="store_true", help="Run as FastAPI server")
     ap.add_argument(
+        "--api-host",
+        default=None,
+        help="Bind address for --api (default: KG_RAG_API_HOST or 127.0.0.1; 0.0.0.0 serves the network)",
+    )
+    ap.add_argument(
         "--backend",
         choices=["ollama", "cborg", "cborg-openai"],
         default=LLM_BACKEND,
@@ -1807,6 +1957,6 @@ if __name__ == "__main__":
     SHOW_BASELINE = args.show_baseline
 
     if args.api:
-        run_fastapi(str(args.graph), backend=args.backend, model=args.model)
+        run_fastapi(str(args.graph), backend=args.backend, model=args.model, host=args.api_host)
     else:
         main(args)

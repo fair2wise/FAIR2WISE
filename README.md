@@ -942,7 +942,7 @@ cd /path/to/FAIRtoWISE-FORUM-AI
 python3 app/modules/kg_rag_api.py --api --graph-source splash
 ```
 
-This starts FastAPI on `http://0.0.0.0:11435`. Verify it is running:
+This starts FastAPI on `http://127.0.0.1:11435` (loopback only; set `KG_RAG_API_HOST=0.0.0.0` or pass `--api-host 0.0.0.0` to serve the network). Verify it is running:
 
 ```bash
 curl http://localhost:11435/api/tags

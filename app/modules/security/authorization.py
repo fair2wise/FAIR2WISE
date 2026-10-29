@@ -659,6 +659,11 @@ FRAMEWORK_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("F02", _A, "GET", "/docs/oauth2-redirect", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
     _p("F03", _A, "GET", "/redoc", "health.read", public=True, note="FastAPI ReDoc (O-A8)"),
     _p("F04", _A, "GET", "/openapi.json", "health.read", public=True, note="FastAPI OpenAPI schema (O-A8)"),
+    # The same four pages on the model-compatible API (T28A: that app now installs access control too).
+    _p("F05", _M, "GET", "/docs", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
+    _p("F06", _M, "GET", "/docs/oauth2-redirect", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
+    _p("F07", _M, "GET", "/redoc", "health.read", public=True, note="FastAPI ReDoc (O-A8)"),
+    _p("F08", _M, "GET", "/openapi.json", "health.read", public=True, note="FastAPI OpenAPI schema (O-A8)"),
 )
 
 FRAMEWORK_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
