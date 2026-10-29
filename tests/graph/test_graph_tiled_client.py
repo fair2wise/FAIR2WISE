@@ -51,6 +51,7 @@ def test_credentials_come_from_runtime_config_not_environment(tmp_path, monkeypa
     monkeypatch.setenv("TILED_URI", "https://tiled.als.lbl.gov")
     secret = tmp_path / "writer.key"
     secret.write_text("filekey123\n", encoding="utf-8")
+    secret.chmod(0o600)  # AUD-15: a group/world-readable secret file is refused
     cfg = ExternalTiledConfig(profile="test", url="http://127.0.0.1:9", writer_secret_file=secret)
     session = FakeSession(FakeResp(200, {"data": {"entity": None}}))
     client = TiledGraphClient.from_external(cfg, session=session)
