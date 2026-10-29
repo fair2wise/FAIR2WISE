@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from _wiring_support import build_als, build_local
+from _wiring_support import build_als
 from security_fakes import staging_settings
 
 from app.api.upload_limits import LEGACY_MAX_BODY_BYTES
