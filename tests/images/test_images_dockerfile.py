@@ -196,3 +196,32 @@ def test_gateway_listens_unprivileged_without_setcap():
         body = (REPO / compose).read_text(encoding="utf-8")
         assert f'"127.0.0.1:${{F2W_UI_PORT:-{host}}}:8080"' in body and ":80\"" not in body, compose
         assert '"http://127.0.0.1:8080/healthz"' in body, compose
+
+
+# --------------------------------------------------------------- semantic retrieval -----
+def _runtime_base_runs() -> str:
+    return " ".join(i.args for i in DF.stage("runtime-base").of("RUN"))
+
+
+def test_semantic_deps_install_cpu_torch_and_refuse_cuda_builds():
+    """A5/AUD-08: the default index gives CUDA torch (~7 GB); images must take the CPU build."""
+    run = _runtime_base_runs()
+    assert "requirements/runtime.txt" in run and "requirements/semantic.in" in run
+    assert "--index-url https://download.pytorch.org/whl/cpu" in run
+    assert "torch.version.cuda is None" in run
+    assert "pip install -r requirements.txt" not in run  # semantic.in is installed separately, after CPU torch
+
+
+def test_embedding_models_are_baked_at_pinned_revisions_and_match_code_defaults():
+    run = _runtime_base_runs()
+    env = DF.effective_env("runtime-base")
+    assert env.get("HF_HOME") == "/opt/fair2wise/hf"
+    kg = (REPO / "app/modules/kg_rag_api.py").read_text(encoding="utf-8")
+    merge = (REPO / "app/modules/term_extractor/merge_index.py").read_text(encoding="utf-8")
+    for default, src in (("all-MiniLM-L6-v2", kg), ("paraphrase-MiniLM-L6-v2", merge)):
+        assert default in src, default
+        m = re.search(r"d\('sentence-transformers/%s', revision='([0-9a-f]{40})'\)" % re.escape(default), run)
+        assert m, f"{default} is not baked at a pinned revision"
+    assert "chmod -R a+rX /opt/fair2wise/hf" in run  # readable by uid 10001; no chown -R (mount-point test)
+    for name in FINALS:
+        assert DF.effective_env(name).get("HF_HUB_OFFLINE", json.load(open(REPO / f"docker/profiles/{name}.json"))["env"].get("HF_HUB_OFFLINE")) == "1", name

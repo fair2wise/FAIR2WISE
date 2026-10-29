@@ -148,3 +148,14 @@ uv pip compile /tmp/tiled.in --python-version 3.12 --python-platform x86_64-many
 `tests/images/` (no Docker): Dockerfile stage graph and content allowlist, simulated build
 context with planted private files, profile/app-validator agreement, the supervisor with fake
 children, preflight, the API wrapper, and (with `F2W_TILED_PYTHON`) a real supervised Tiled 0.2.18.
+
+
+## Semantic retrieval in the images
+
+Every image carries CPU-only torch, FAISS and sentence-transformers, plus the two
+embedding models the code defaults to (`all-MiniLM-L6-v2` for the QA retrieval path,
+`paraphrase-MiniLM-L6-v2` for the term-merge shortlist), baked at pinned revisions under
+`HF_HOME=/opt/fair2wise/hf`. `HF_HUB_OFFLINE=1` stays set, so nothing is downloaded at
+runtime. The profiles default to `KG_RAG_RETRIEVAL_BACKEND=lexical`; pass
+`-e KG_RAG_RETRIEVAL_BACKEND=semantic` to use the embedding backend. A different
+`KG_RAG_EMBED_MODEL` or `F2W_MERGE_EMBED_MODEL` is not in the image and will fail offline.

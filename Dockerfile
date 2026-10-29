@@ -117,8 +117,24 @@ WORKDIR /app
 
 COPY requirements.txt ./
 COPY requirements/runtime.txt requirements/semantic.in ./requirements/
+# Semantic retrieval (QA path and the term-merge shortlist) stays in every image. torch is
+# installed first from the PyTorch CPU index: on the default index Linux resolves CUDA
+# builds (+cu13x plus ~3 GB of nvidia-* wheels) that no image can use (no GPU,
+# KG_RAG_FORCE_CPU=1). The build fails if a CUDA build slips in.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.txt
+    python -m pip install -r requirements/runtime.txt && \
+    python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.12.0" && \
+    python -m pip install -r requirements/semantic.in && \
+    python -I -c "import sys, torch; sys.exit(0 if torch.version.cuda is None else 1)"
+
+# Embedding models the semantic backends load (code defaults: KG_RAG_EMBED_MODEL and
+# F2W_MERGE_EMBED_MODEL), fetched at build time at pinned revisions (Apache-2.0) so the
+# image serves them with HF_HUB_OFFLINE=1 and never downloads at runtime.
+ENV HF_HOME=/opt/fair2wise/hf
+RUN python -I -c "from huggingface_hub import snapshot_download as d; \
+    d('sentence-transformers/all-MiniLM-L6-v2', revision='1110a243fdf4706b3f48f1d95db1a4f5529b4d41'); \
+    d('sentence-transformers/paraphrase-MiniLM-L6-v2', revision='c9a2bfebc254878aee8c3aca9e6844d5bbb102d1')" && \
+    chmod -R a+rX /opt/fair2wise/hf
 
 # Allowlisted application content.
 COPY pyproject.toml config.yml LICENSE.txt ./
