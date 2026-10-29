@@ -27,6 +27,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 #: Default cap for one request body, in bytes (100 MiB).
 DEFAULT_MAX_BODY_BYTES = 100 * 1024 * 1024
+#: Cap on the legacy UI routes served by ``create_app`` (AUD-04): 128 MiB, the gateway's
+#: ``client_max_body_size 128m`` (``docker/nginx.conf``), so a directly exposed API refuses the
+#: same bodies nginx would.
+LEGACY_MAX_BODY_BYTES = 128 * 1024 * 1024
 _CHUNK_BYTES = 1 << 20
 #: Stable error code of an oversized body (413).
 TOO_LARGE_CODE = "payload_too_large"
@@ -139,5 +143,6 @@ class MaxBodySizeMiddleware:
         await response(scope, receive, send)
 
 
-__all__ = ("DEFAULT_MAX_BODY_BYTES", "MaxBodySizeMiddleware", "TOO_LARGE_CODE", "read_upload_limited",
+__all__ = ("DEFAULT_MAX_BODY_BYTES", "LEGACY_MAX_BODY_BYTES", "MaxBodySizeMiddleware", "TOO_LARGE_CODE",
+           "read_upload_limited",
            "require_pdf", "safe_child")

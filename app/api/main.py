@@ -10,7 +10,8 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
 * the ``/v1/validation/judge-model`` routes behind the settings panel's judge dropdown
   (owner O-U2; :mod:`app.modules.validation_settings`);
 * the browser-origin gate (:mod:`app.api.origin_gate`) and the request-body cap
-  (:mod:`app.api.upload_limits`) on ``/v1/`` and ``/auth/``;
+  (:mod:`app.api.upload_limits`) on ``/v1/`` and ``/auth/`` (``create_app`` itself gates the
+  legacy routes and caps their bodies at 128 MiB, AUD-04);
 * the scope-change wiring: an ALS sign-out or a dropped admin role calls
   ``F2WOperations.notify_scope_change`` (``JobService.notify_scope_change``), which
   invalidates dependent publication approvals.
@@ -80,7 +81,7 @@ def create_api_app(
     Raises:
         StartupConfigError: As ``create_app``, or ``operations`` bound to other settings.
     """
-    from ..modules.f2w_agent.api import DEFAULT_CORS_ORIGINS, create_app
+    from ..modules.f2w_agent.api import create_app, effective_cors_origins
     from . import routes_jobs as jobs, routes_publications as publications, routes_review as review
     from . import routes_status as status, routes_validation as validation
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
@@ -110,7 +111,7 @@ def create_api_app(
     app.state.f2w_judge_settings = judge_settings
     validation.install(app)
 
-    allowed = list(cors_origins or DEFAULT_CORS_ORIGINS)
+    allowed = effective_cors_origins(cors_origins, is_local=settings.is_local)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes, path_prefixes=GUARDED_PREFIXES)
     app.add_middleware(OriginGateMiddleware, allowed_origins=allowed, path_prefixes=GUARDED_PREFIXES)
     return app
