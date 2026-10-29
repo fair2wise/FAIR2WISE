@@ -20,6 +20,7 @@
     "sha256": "039a70fb484f6e1147840d1d96e90a5ae85b90ad4b34ecba7a9884d7023d6174",
     "version": "8.0"
   },
+  "human_gate_records": {},
   "human_gates": {
     "H3": "not_approved"
   },
