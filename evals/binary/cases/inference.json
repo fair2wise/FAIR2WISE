@@ -26,28 +26,34 @@
       "family": "LLM",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "b940debbd525fe40af785f7894b926a2cdb283a15a256371007f79268c1f8982",
-        "config_sha256": "a00b5d9c3e93c4294566890b84f2264bedaf15173df3a0ddd7fa95dbb70ba0ba",
+        "case_sha256": "df557ddf196cfeddeadd21d03595af048907c4878340aa19a9e28641b26247f0",
+        "config_sha256": "4e0d921c6baa89f72aef5a9870848d010c474f5ab350c6e058bee78bb325f4d0",
         "model_sha256": null,
-        "oracle_source_sha256": "e9deb0ae61326af5ca789bb51eec004c92522f756bb3b592cdb039837772bccf",
+        "oracle_source_sha256": "418ff6d144443f0a144118390166a8473a1abde74c40717ee13597d93ad7e567",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/read_path/read_path_fakes.py"
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/read_path/read_path_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Per-principal provider/model settings are what a turn uses; local settings stay server-wide",
+        "covers": "Per-principal provider/model settings are what a turn uses (also against a real 0.2.18 identity server); local settings stay server-wide; concurrent frozen-UI sessions keep their own state",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
           "tests/settings/test_personal_settings.py::test_two_principals_keep_independent_settings_and_turns_use_their_own",
           "tests/settings/test_personal_settings.py::test_local_settings_stay_server_wide",
           "tests/read_path/test_application.py::test_delegated_run_uses_f2w_prompt_skill_and_admission",
-          "tests/read_path/test_application.py::test_default_admission_is_the_shared_provider_admission"
+          "tests/read_path/test_application.py::test_default_admission_is_the_shared_provider_admission",
+          "tests/security_live/test_live_als_app.py::test_reader_personal_settings_are_their_own",
+          "tests/contracts/legacy_ui/closure/test_closure_api.py::test_ui25_concurrent_sessions_keep_their_own_state"
         ],
         "supporting_selectors": [],
-        "uncovered": "End-to-end frontend selection through every runtime path (T14/T18C)"
+        "uncovered": "The selection made in the frozen browser UI on the deployed ALS stack (T24E)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -272,7 +278,6 @@
     },
     {
       "blocked_by": [
-        "T10 (durable jobs and curation)",
         "O03 (owner approval of the job-settings rule)"
       ],
       "case_id": "LLM-05",
@@ -299,21 +304,26 @@
       "family": "LLM",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "86c2c20a166fe0c4ae81d20f2d60ba76c0981351fe4f28d47c8747e543baa2ea",
-        "config_sha256": "f7f2425386a2ade235e9962383df18ea3ee40009959cb7c895c27f20b8cd07fe",
+        "case_sha256": "298a5db4c32de85ff326212b1c0de309b1e4ca73d256ae9eedd6ceb3a35533ff",
+        "config_sha256": "918eaadbd1880604ae89248da7a26a2901c22cf918edc13041470e01a168cbfa",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
+      "input_fixture_refs": [
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
+      ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
         "covers": "",
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Live job settings revisions need durable jobs; the owner settings rule (O03) is pending"
+        "supporting_selectors": [
+          "tests/jobs/test_pipeline.py::test_resume_after_input_change_reruns_only_affected_stages"
+        ],
+        "uncovered": "Durable jobs exist (T10 landed); the owner settings rule for live job settings revisions (O03) is pending, so the expectation cannot be stated"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

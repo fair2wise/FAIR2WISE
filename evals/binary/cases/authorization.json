@@ -636,10 +636,7 @@
       "title": "ALS: Identity and publication grants are environment-bound"
     },
     {
-      "blocked_by": [
-        "T24C (prefix-correct gateway and existing UI/API deployment)",
-        "T25C (no-login local workflows and real ALS Tiled role enforcement)"
-      ],
+      "blocked_by": [],
       "case_id": "AUTH-09",
       "case_revision": 1,
       "change_reason": null,
@@ -662,7 +659,7 @@
       },
       "companion_expected_rule": null,
       "companion_title": "ALS: prefixed native Tiled sign-in works",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [
         "als-dev",
         "als-prod"
@@ -672,27 +669,41 @@
       "family": "AUTH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "551c32c40f7bf79473b3c26ead0d88612896bfd7417f87609b46fd4ef55d1aea",
-        "config_sha256": "ac35225a4bc20d2750a2dd0db237722c3b284410f965c65f075e96ae2e9c877b",
+        "case_sha256": "c1c62e0bb2a52207c7ee7f40cbb87605cd4f4980d71c653bda6095df8cc6a0b4",
+        "config_sha256": "1c8941f2c90b60d29bed1cbfd0ad22e31c94af777c680bb1ec425b0afa8556e1",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "0559f7c3ab354bba74b5ec3eb7b01753ed9ee9fa5b81e04b9fc9e33e4b3404f2",
         "schema_sha256": null
       },
       "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/gateway/nginx_model.py",
         "tests/graph/graph_samples.py",
-        "tests/security/security_fakes.py"
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Sign-in and return work beneath /fair2wise with a hardened prefix-scoped cookie; Tiled tokens stay server-side and are never a browser credential; no Tiled auth or admin route is proxied through the gateway; the round trip holds against a real multi-user 0.2.18 server (T24C, T25C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/graph/test_graph_tiled_client.py::test_als_hosts_are_never_rewritten_to_localhost",
-          "tests/security/test_security_tiled_adapter.py::test_admin_principal_is_parsed_from_0_2_18_shape"
+          "tests/security/test_security_tiled_adapter.py::test_admin_principal_is_parsed_from_0_2_18_shape",
+          "tests/gateway/test_gateway_prefix.py::test_auth09_sign_in_round_trip_under_the_prefix",
+          "tests/gateway/test_gateway_prefix.py::test_auth09_cookie_is_not_sent_outside_the_prefix",
+          "tests/gateway/test_gateway_prefix.py::test_auth09_external_providers_stay_unsupported",
+          "tests/gateway/test_gateway_prefix.py::test_auth09_no_tiled_auth_or_admin_proxy_through_the_gateway",
+          "tests/security_live/test_live_als_app.py::test_anonymous_gets_only_health_docs_and_sign_in",
+          "tests/security_live/test_live_als_app.py::test_a_tiled_token_sent_by_the_browser_is_not_a_credential",
+          "tests/security_live/test_live_als_app.py::test_sign_in_round_trip_keeps_tokens_server_side",
+          "tests/security_live/test_live_als_app.py::test_sign_out_ends_the_session_here_and_at_tiled",
+          "tests/security_live/test_live_units.py::test_handlers_set_a_hardened_cookie_and_never_return_tokens",
+          "tests/security_live/test_live_units.py::test_wrong_password_unknown_and_external_providers"
         ],
-        "uncovered": "Prefixed native Tiled sign-in return path needs the gateway and a real ALS Tiled"
+        "supporting_selectors": [],
+        "uncovered": "The central ALS Tiled's own sign-in provider behind the edge proxy (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -700,7 +711,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [

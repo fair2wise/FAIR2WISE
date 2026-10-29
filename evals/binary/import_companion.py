@@ -81,6 +81,24 @@ FIXTURE_DIRS = {
     "tests/contracts/legacy_ui": ["tests/contracts/legacy_ui/"],
     "tests/tiled": ["tests/fixtures/tiled_server.py"],
     "tests/graph_tiled": ["tests/fixtures/tiled_server.py"],
+    # landed after the H3 packet (rebound 2026-10-29)
+    "tests/graph_import": ["tests/graph_import/import_fakes.py", "tests/fixtures/tiled_server.py"],
+    "tests/jobs": ["tests/jobs/jobs_fakes.py", "tests/jobs/publish_fakes.py"],
+    "tests/snapshots": ["tests/snapshots/snapshot_fakes.py"],
+    "tests/images": ["tests/images/dockerfile_model.py", "tests/images/fake_service.py"],
+    "tests/gateway": ["tests/gateway/nginx_model.py"],
+    "tests/security_live": [
+        "tests/security_live/live_support.py",
+        "tests/security_live/live_apps.py",
+        "tests/fixtures/tiled_server.py",
+    ],
+    "tests/api_v1": ["tests/api_v1/_v1_support.py"],
+    "tests/api_v1_live": ["tests/fixtures/tiled_server.py"],
+    "tests/contracts/legacy_ui/closure": [
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+    ],
+    "tests/schema": ["tests/schema/t22c_fixtures.py"],
 }
 
 

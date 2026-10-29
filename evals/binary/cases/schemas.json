@@ -19,23 +19,25 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Selected overlay/imports preserved",
-      "coverage": "partial",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Selected overlay/imports preserved. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "cd68bfd585bcb0af18e42485c4040dd2069892af53da496b07cfafa6291c1fe0",
-        "config_sha256": "0ccf99e68ea28513b48ea5bc257f1abc042b348fde6817a2f8e6732c11c1c734",
+        "case_sha256": "f6ee5eb9923e092ebb7c44e8faf04f94df3a7d17915b145564122d615bc14514",
+        "config_sha256": "099e128c5335d12640d6e026bae4083ad02cae0d049f9be43e6245dac243e87e",
         "model_sha256": null,
-        "oracle_source_sha256": "8c4a3fe0cc753273187d6426e5ba4a0f825c103fd76418167f09db7a44fbdb6e",
+        "oracle_source_sha256": "e3dbb567162d51bd84a1a1ee97c3a4ad44d9d4bddecb9eda53e8288be60b18e2",
         "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
-      "input_fixture_refs": [],
+      "input_fixture_refs": [
+        "tests/schema/t22c_fixtures.py"
+      ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Current overlay/import structure loads and resolves",
+        "covers": "Current overlay/import structure loads and resolves; every inventoried schema asset is registered in place with unchanged bytes, the overlays stay distinct keys and the fingerprint closure covers the resolved imports (T22B)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -43,10 +45,14 @@
           "tests/test_xray_schema.py::test_imports_matkg_not_a_fork",
           "tests/test_xray_schema.py::test_xray_extract_schema_loads_with_linkml",
           "tests/packaging/test_resources.py::test_schema_defaults_resolve_from_any_working_directory",
-          "tests/packaging/test_resources.py::test_schema_helper_loads_default_schema_outside_repo"
+          "tests/packaging/test_resources.py::test_schema_helper_loads_default_schema_outside_repo",
+          "tests/schema/test_schema_registry.py::test_every_inventoried_yaml_asset_is_registered_in_place_with_unchanged_bytes",
+          "tests/schema/test_schema_registry.py::test_rsoxs_and_extract_overlay_are_distinct_registry_keys",
+          "tests/schema/test_schema_registry.py::test_inheritance_is_preserved_for_every_registered_overlay",
+          "tests/schema/test_schema_fingerprint.py::test_closure_covers_the_resolved_imports"
         ],
         "supporting_selectors": [],
-        "uncovered": "Selected overlay/imports preserved through the T22B registry (not merged)"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -129,9 +135,7 @@
       "title": "PROV reference is not loaded as LinkML"
     },
     {
-      "blocked_by": [
-        "T22B (schema registry, fingerprint and revision binding)"
-      ],
+      "blocked_by": [],
       "case_id": "SCH-03",
       "case_revision": 1,
       "change_reason": null,
@@ -149,32 +153,44 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Schema fingerprint pins result and job",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Schema fingerprint pins result and job. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "23241de46b0535b64e53d21d0abbbdd7e60df6d600f3c3ab399e2f1c082fdad5",
-        "config_sha256": "69d323a120ffffcefd4d391181f47cfdd9a25dffd6e8253aac554b1b9e0899d8",
+        "case_sha256": "e06431a5ccab0ce6288b1336445faae2642ab9eb6b4926a6c39d66748020e12d",
+        "config_sha256": "5abcc09cbd03b00cd15447bbc1354c84b9d711709204124ff785b636ff6dd06f",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "4079c0332e8b671b6e36805eefbfe11e3f1cd9a64416aef703725e760bf6bbaa",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/extraction/extraction_fakes.py"
+        "tests/extraction/extraction_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
+        "tests/schema/t22c_fixtures.py",
+        "tests/snapshots/snapshot_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The schema closure fingerprint is bound into every snapshot manifest (result), a missing, mismatched or changed fingerprint is refused before commit, and a job approval goes stale when the schema changes (T22B, T23B, T26B, T10)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/extraction/test_validation_stage.py::test_h3_gates_are_closed_and_enforced"
+        "selectors": [
+          "tests/extraction/test_validation_stage.py::test_h3_gates_are_closed_and_enforced",
+          "tests/schema/test_schema_fingerprint.py::test_binding_verified_legacy_stale_and_unknown",
+          "tests/schema/test_schema_fingerprint.py::test_any_import_byte_change_changes_dependent_fingerprints",
+          "tests/snapshots/test_snapshot_create.py::test_schema_selection_and_fingerprint_binding",
+          "tests/snapshots/test_snapshot_create.py::test_manifest_binds_graph_schema_extraction_corpus_and_validation",
+          "tests/releases/test_release_refusals.py::test_missing_schema_fingerprint_is_refused",
+          "tests/releases/test_release_refusals.py::test_mismatched_schema_fingerprint_is_refused",
+          "tests/releases/test_release_refusals.py::test_schema_file_changed_in_the_repository_is_refused",
+          "tests/jobs/test_publication.py::test_approval_arriving_after_schema_or_vocabulary_change_is_stale"
         ],
-        "uncovered": "Schema fingerprint pinning of results and jobs belongs to the schema registry"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -182,7 +198,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -194,10 +210,7 @@
       "title": "Schema fingerprint pins result and job"
     },
     {
-      "blocked_by": [
-        "T22B (schema registry, fingerprint and revision binding)",
-        "T10 (durable jobs and curation)"
-      ],
+      "blocked_by": [],
       "case_id": "SCH-04",
       "case_revision": 1,
       "change_reason": null,
@@ -215,31 +228,41 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Stale schema plan rejected",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Stale schema plan rejected. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "59847a4b87115daa57c414037c044c772a49cd7f247db4fc988e139c8fe137e0",
-        "config_sha256": "39ede4d74bd0ca8f3299609c5cfd86ec249cdcc3084a2df02a76985bb4cc2533",
+        "case_sha256": "de6a8ce972b5bc9c6ece6c0cd157c0bdb3b95929b671dd552d11a5bc3884f095",
+        "config_sha256": "b8b15bafba711ccd9c469088e0522cf9e1d28b6f070085fa9963796716e1ac1d",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "ce954066257a0bedb0079044cc063ea07eb85f7d96660bd7963802489b4610be",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "A plan approved against one schema revision is stale after the schema or vocabulary changes, the importer refuses a snapshot bound to a schema outside the supported set, and a pending-review schema binds only by explicit selection (T22B, T10, T08B, T26B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/contracts/test_shared_contracts.py::test_apply_plan_rejects_stale_approval",
-          "tests/canonicalization/test_canon_online.py::test_approval_must_name_the_exact_revision"
+          "tests/canonicalization/test_canon_online.py::test_approval_must_name_the_exact_revision",
+          "tests/jobs/test_publication.py::test_approval_arriving_after_schema_or_vocabulary_change_is_stale",
+          "tests/jobs/test_publication.py::test_approval_for_a_different_plan_is_stale",
+          "tests/jobs/test_crash_matrix.py::test_case_06_approval_after_candidate_schema_or_vocabulary_changed_is_stale",
+          "tests/graph_import/test_import_t22c_node_types.py::test_default_publish_set_refuses_the_pending_schema",
+          "tests/releases/test_release_refusals.py::test_pending_review_schema_set_binds_only_with_explicit_selection"
         ],
-        "uncovered": "Stale schema-plan rejection needs the schema revision binding; stale approvals are covered for other plans"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -247,7 +270,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -277,31 +300,36 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Preserved measurement/technique inheritance; no reclassification",
-      "coverage": "partial",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Preserved measurement/technique inheritance; no reclassification. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "SCH",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "f39518817be08abc02bb2c37a95dd423ff2b18b3668ea588dbc4f1a53ee697aa",
-        "config_sha256": "f8c2f38cb51c7f45cd815edd2b30815a1274851eb290d2428d1ffa27a9d74773",
+        "case_sha256": "a1e0d30f5450e01e0b9d7937e788978b6cd36ba279a4d6efaf02da42767e1847",
+        "config_sha256": "d3fe72f6a2c2f16931c40bcdfda52488440e04a1f8457a648b507bfd5bcc1094",
         "model_sha256": null,
-        "oracle_source_sha256": "aa55692bcda59da988037b62d55531b83392320aa1db28adf1de74e6772666b5",
+        "oracle_source_sha256": "dae4a3907564e29d75be2a5b20b6ec1e190a21af2b96c3ce3487689004a71f76",
         "schema_sha256": "b74c38750a3bceeea346fc109b0ffebf34cf8f13dd3adf1f6f8f676dee886997"
       },
-      "input_fixture_refs": [],
+      "input_fixture_refs": [
+        "tests/schema/t22c_fixtures.py"
+      ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Current RSoXS measurement inheritance is not redefined and inherited classes are not merged",
+        "covers": "RSoXS measurement inheritance is not redefined, inherited classes are not merged, inheritance is preserved for every registered overlay and the pre-S4 fingerprint still binds (T22B, T22C)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
           "tests/canonicalization/test_canon_online.py::test_different_classes_never_merge_even_when_one_inherits_the_other",
-          "tests/test_xray_schema.py::test_does_not_redefine_rsoxs_measurement"
+          "tests/test_xray_schema.py::test_does_not_redefine_rsoxs_measurement",
+          "tests/schema/test_schema_registry.py::test_rsoxs_measurement_is_still_an_experimental_technique",
+          "tests/schema/test_schema_registry.py::test_inheritance_is_preserved_for_every_registered_overlay",
+          "tests/schema/test_schema_fingerprint.py::test_pre_s4_fingerprint_is_reconstructed_and_still_binds"
         ],
         "supporting_selectors": [],
-        "uncovered": "Whole-schema inheritance fingerprint before/after migration (T22B)"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

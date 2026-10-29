@@ -1,10 +1,7 @@
 {
   "cases": [
     {
-      "blocked_by": [
-        "T24B (build shared runtime and the three image finals)",
-        "T24D (GitHub Actions build/publication and protected tags)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-01",
       "case_revision": 1,
       "change_reason": null,
@@ -23,28 +20,42 @@
       },
       "companion_expected_rule": null,
       "companion_title": "All three image variants contain the supported UI/backend/agents/worker",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "same reviewed source and dependency fingerprints",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "ab1fcc165f2eb5428492a7cd38b13038d0e00326cda12d847de9e07c42a63be3",
-        "config_sha256": "ce9c7fa3faacb4cad60a476fc9dc853aeb3d0fa46e8abba7542b11460a2463f6",
+        "case_sha256": "a6743d15e7416c2238e575c9d7fa726bf33bc5569d073fc45365f01bdb9b6c1b",
+        "config_sha256": "ed647a46ef0c0983cd339c6ee9f6de0e4bdc20f835642ad66bca81c54aa25587",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "d53da03b8cd0ee6c7d616275cc58a4a5b9705384069a10765edb9e4e487aa187",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The three finals derive from one runtime base that carries the app, UI bundle, worker and gateway; each bakes only its own profile; the release manifest records one commit, the dependency locks, the Tiled pin and the UI tree for all three (T24B, T24D)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/images/test_images_dockerfile.py::test_stage_layout",
+          "tests/images/test_images_dockerfile.py::test_t24c_stages_are_kept",
+          "tests/images/test_images_dockerfile.py::test_finals_bake_their_own_fixed_profile",
+          "tests/images/test_images_dockerfile.py::test_runtime_has_no_runtime_pip_or_seed_steps",
+          "tests/images/test_images_context.py::test_final_images_keep_code_schemas_and_tracked_kg_json",
+          "tests/images/test_images_profiles.py::test_services_and_order",
+          "tests/images/test_images_profiles.py::test_api_worker_gateway_wiring",
+          "tests/ci/test_release_scripts.py::test_manifest_records_commit_digests_locks_tiled_and_ui_tree",
+          "tests/ci/test_workflows.py::test_build_builds_all_three_variants_from_one_commit",
+          "tests/ci/test_workflows.py::test_every_variant_gets_the_post_build_checks"
+        ],
         "supporting_selectors": [],
-        "uncovered": "No image variants are built yet"
+        "uncovered": "Inspection of images actually built by build-app.yml (no CI build has run yet; local builds count as untested until then, audit PC-4; T24E/T28C)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -52,7 +63,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -64,9 +75,7 @@
       "title": "All three image variants contain the supported UI/backend/agents/worker"
     },
     {
-      "blocked_by": [
-        "T24B (build shared runtime and the three image finals)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-02",
       "case_revision": 2,
       "change_reason": "Recorded owner decision(s): H1 owner_decisions O-T1 (Tiled 0.2.18 interim pin, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
@@ -85,34 +94,41 @@
       },
       "companion_expected_rule": "no sidecar requirement; persistent local state",
       "companion_title": "Local image provisions supervised Tiled 0.2.19",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "no sidecar requirement; persistent local state Owner decision update: the interim pin is tiled==0.2.18 (wheel sha256 416079d4...fa06, sdist sha256 2f394326...1e27) in place of 0.2.19 until a final 0.2.19 exists; the managed server runs in its own environment.",
       "expected_rule_source": "owner_decision",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "859e95dc016321393117c6e5b1f11bd9a51bc710287726491f8e088b2c11eeb4",
-        "config_sha256": "b4c1b4fdbdaaa3e5969f96d676b77d953cf9f733e476114ed00da97648a8c6ea",
+        "case_sha256": "fafd0885e53c8ceb7f3961caa2e37b3ab1d148e240fac85da4a8c842093d6492",
+        "config_sha256": "102ce2c12b2dda015baf5d140991448af3c16edef9f9ccb3778c16b03561c4b9",
         "model_sha256": null,
-        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
+        "oracle_source_sha256": "be8e5b98793d386edcc143b131bda1fc4e16cf25e9ce2411700506bedb9cc1a6",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/fixtures/tiled_server.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Only :local bundles the hash-checked 0.2.18 server venv; the supervisor starts it on loopback 8765 and stops it keeping its mounted data; preflight refuses a :local without the Tiled interpreter (T24B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/tiled/test_tiled_deploy_config.py::test_local_profile_is_managed_on_loopback_8765",
           "tests/tiled/test_tiled_deploy_config.py::test_pin_is_exactly_0218",
-          "tests/tiled/test_tiled_server_lifecycle.py::test_launch_health_and_capabilities"
+          "tests/tiled/test_tiled_server_lifecycle.py::test_launch_health_and_capabilities",
+          "tests/images/test_images_dockerfile.py::test_only_local_bundles_the_managed_tiled_server",
+          "tests/images/test_images_dockerfile.py::test_tiled_server_pin_is_the_owner_pin_and_hash_checked",
+          "tests/images/test_images_tiled_service.py::test_managed_tiled_starts_supervised_and_stops_on_sigterm_keeping_data",
+          "tests/images/test_images_preflight.py::test_local_without_the_tiled_interpreter_is_refused",
+          "tests/images/test_images_profiles.py::test_mounts"
         ],
-        "uncovered": "The :local image does not exist; the supervised-Tiled lifecycle logic is covered by the T20B tests"
+        "supporting_selectors": [],
+        "uncovered": "The built :local image running its supervised Tiled in a container (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -120,7 +136,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -280,10 +296,7 @@
       "title": "Staging and production default to their exact assigned endpoints"
     },
     {
-      "blocked_by": [
-        "T24C (prefix-correct gateway and existing UI/API deployment)",
-        "T24B (build shared runtime and the three image finals)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-05",
       "case_revision": 2,
       "change_reason": "Recorded owner decision(s): H1 owner_decisions O-A7 (MkDocs under the prefix, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
@@ -302,28 +315,40 @@
       },
       "companion_expected_rule": "no compiled localhost API, lost path or SPA fallback for missing assets",
       "companion_title": "Every UI asset and deep link is served beneath /fair2wise",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "no compiled localhost API, lost path or SPA fallback for missing assets Owner decision update: the MkDocs site is built into every image (:local, :als-dev, :als-prod) and is served beneath /fair2wise.",
       "expected_rule_source": "owner_decision",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "a6c0570f940138352ffb3ebb31067a7b0d5aebbda952c9f2800ada97171d0bbe",
-        "config_sha256": "6555427add609594636d65cbe04817a7c56f6e0eec8896394456a65ce3ca985f",
+        "case_sha256": "5cad3abfe10e2e5e18c01565fc264fd0251148d0b08c2ab81994704111d70f62",
+        "config_sha256": "7481f7ebc26ec146dbca77b2c18ebe908e464beeeba42312a158a32af3d2235d",
         "model_sha256": null,
-        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
+        "oracle_source_sha256": "907ae317f8ef301b43bbb0319f3ca8627f5e1a08980250ed8fc571a83e0f7ec0",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/gateway/nginx_model.py",
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "UI assets, deep links and the MkDocs site resolve beneath /fair2wise from one origin, a missing asset is 404 not HTML, index is uncached and assets immutable, the image build checks the UI prefix (T24C, T24B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/gateway/test_gateway_prefix.py::test_ui_assets_docs_and_deep_links",
+          "tests/gateway/test_gateway_prefix.py::test_not_found_never_becomes_html",
+          "tests/gateway/test_gateway_prefix.py::test_index_is_not_cached_and_assets_are_immutable",
+          "tests/gateway/test_gateway_prefix.py::test_built_ui_and_docs_through_the_gateway",
+          "tests/gateway/test_gateway_prefix.py::test_static_ui_and_api_share_one_origin",
+          "tests/gateway/test_mkdocs_image_config.py::test_strict_build_from_the_docs_stage_layout",
+          "tests/images/test_images_dockerfile.py::test_build_checks_the_ui_prefix"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Prefix serving of UI assets, deep links and the MkDocs site needs the gateway and images"
+        "uncovered": "The real nginx in a built image serving the bundle (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -331,7 +356,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -345,9 +370,7 @@
       "title": "Every UI asset and deep link is served beneath /fair2wise"
     },
     {
-      "blocked_by": [
-        "T24C (prefix-correct gateway and existing UI/API deployment)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-06",
       "case_revision": 1,
       "change_reason": null,
@@ -366,34 +389,40 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Legacy API suffixes work behind one prefix-stripping boundary",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "settings/chat/graph/session schemas and response statuses unchanged",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "c18a6494ab57072bacba3cfaa036358e6bd10e3797bf74a7b4f97b57a50938b7",
-        "config_sha256": "00f994f504a448d49cee833b79a79932ffb9e90b241bef56989fad20f6123c99",
+        "case_sha256": "a7dd7cdc7a1b4fab6d3c8c68bd56a2f858edaf43819a73efcec0e869cb880719",
+        "config_sha256": "715be72b70063f8e49ca8e0f668c5964d6be1b7d10eb144eacd5bf892a6d0013",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "6215af957c4c5c87bb680695577bd542bd487664381548587d9fc2f94a5a13f2",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/contracts/legacy_ui/"
+        "tests/contracts/legacy_ui/",
+        "tests/gateway/nginx_model.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Exactly one prefix-stripping boundary; every recorded legacy flow returns the same schema and status under the prefix as unprefixed; encoded ids pass through unchanged (T24C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_route_set_is_the_frozen_19",
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_model_route_set_is_the_frozen_6",
-          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_openapi_matches_baseline"
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_openapi_matches_baseline",
+          "tests/gateway/test_gateway_prefix.py::test_exactly_one_prefix_stripping_boundary",
+          "tests/gateway/test_gateway_prefix.py::test_api_prefix_is_stripped_exactly_once_and_the_suffix_is_raw",
+          "tests/gateway/test_gateway_prefix.py::test_every_recorded_legacy_flow_is_unchanged_under_the_prefix",
+          "tests/gateway/test_gateway_prefix.py::test_unprefixed_direct_api_still_works",
+          "tests/gateway/test_gateway_prefix.py::test_encoded_node_ids_reach_the_route_unchanged"
         ],
-        "uncovered": "Behind-prefix equivalence needs the gateway; unprefixed schema/status equivalence is covered by the frozen contract tests"
+        "supporting_selectors": [],
+        "uncovered": "The real nginx in a built image (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -401,7 +430,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -413,9 +442,7 @@
       "title": "Legacy API suffixes work behind one prefix-stripping boundary"
     },
     {
-      "blocked_by": [
-        "T24C (prefix-correct gateway and existing UI/API deployment)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-07",
       "case_revision": 2,
       "change_reason": "Recorded owner decision(s): H1 owner_decisions O-A8 (FastAPI docs public, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
@@ -434,34 +461,39 @@
       },
       "companion_expected_rule": "no duplicate root_path or UI API/model API collision",
       "companion_title": "OpenAPI redirects and model-compatible routes have correct prefixes",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "no duplicate root_path or UI API/model API collision Owner decision update: /docs, /docs/oauth2-redirect, /redoc and /openapi.json are public on ALS as well as local and must carry the correct prefix.",
       "expected_rule_source": "owner_decision",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "915a5289450b1709039e4a5970b15c4f23a9648b132c6c7cded002b11a18ccf0",
-        "config_sha256": "48136d79713df32ea203e0f44f243772659797c3cb88999c3d5b1d41f15a1742",
+        "case_sha256": "5b90bd4ecc4337ac3a057da4fe021ebfc325b20018ac2dcf42c262f0a3db592f",
+        "config_sha256": "dfacb9824971e80865bced7a9709102b9797f6f89ee511ba5bd7555ecde9c7a7",
         "model_sha256": null,
-        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
+        "oracle_source_sha256": "d84ab3fc886c7b074132fc6b8d650aad11eb0141e51fb2925d7c74aa69ec44cc",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/api_wiring/_wiring_support.py",
-        "tests/contracts/legacy_ui/"
+        "tests/contracts/legacy_ui/",
+        "tests/gateway/nginx_model.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "/docs, /redoc and /openapi.json carry the prefix, redirects point back through it, root_path is passed only when prefixed and the API itself never strips it (T24C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_model_openapi_matches_baseline",
-          "tests/api_wiring/test_wiring_als_guards.py::test_api_docs_stay_public_on_als"
+          "tests/api_wiring/test_wiring_als_guards.py::test_api_docs_stay_public_on_als",
+          "tests/gateway/test_gateway_prefix.py::test_fastapi_docs_and_openapi_carry_the_prefix",
+          "tests/gateway/test_gateway_prefix.py::test_api_redirects_point_back_through_the_prefix",
+          "tests/gateway/test_gateway_prefix.py::test_run_api_passes_root_path_only_when_prefixed",
+          "tests/gateway/test_gateway_prefix.py::test_the_api_itself_never_strips_the_prefix"
         ],
-        "uncovered": "Prefix correctness of /docs, /redoc and /openapi.json needs the gateway"
+        "supporting_selectors": [],
+        "uncovered": "The real nginx in a built image (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -469,7 +501,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -484,7 +516,6 @@
     },
     {
       "blocked_by": [
-        "T24C (prefix-correct gateway and existing UI/API deployment)",
         "T24E (three-profile container, Ansible and restore integration)"
       ],
       "case_id": "DEP-08",
@@ -512,14 +543,16 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "0c53f5480d895f77c048a72f291eeafc83dd779ed108870e770abe9c6261ff4a",
-        "config_sha256": "0b28ea6c8a418d85916ec1155a481e7fbfa5751c4f5d515ff882e86194e002be",
+        "case_sha256": "765ef31ad4a63968b1db432d1c49a10a87f86336164ae0fa646ae515e37cfdda",
+        "config_sha256": "9fa105419ab5b873f014ca4e7a2c8b140e75111708da60104b051b8d74d71f47",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/contracts/legacy_ui/"
+        "tests/api_v1/_v1_support.py",
+        "tests/contracts/legacy_ui/",
+        "tests/gateway/nginx_model.py"
       ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
@@ -529,9 +562,11 @@
         "selectors": [],
         "supporting_selectors": [
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_framing_and_event_order",
-          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_survives_client_fragmentation"
+          "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_survives_client_fragmentation",
+          "tests/gateway/test_gateway_prefix.py::test_api_location_streams_without_buffering_and_keeps_long_streams_open",
+          "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
         ],
-        "uncovered": "SSE through a container and edge proxy needs the deployed stack"
+        "uncovered": "SSE framing is frozen and the gateway template streams without buffering (T24C landed); SSE through the running container and the ALS edge proxy needs the deployed stack"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -551,10 +586,7 @@
       "title": "SSE works through container and edge proxy"
     },
     {
-      "blocked_by": [
-        "T24B (build shared runtime and the three image finals)",
-        "T24D (GitHub Actions build/publication and protected tags)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-09",
       "case_revision": 1,
       "change_reason": null,
@@ -573,28 +605,37 @@
       },
       "companion_expected_rule": null,
       "companion_title": "No private papers or secrets occur in any image layer/build cache",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "inspect intermediate layers, not just final image filesystem",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "5d40c93281988b9351f643145eec16dd5cbc6c9b0a2315f8f96e25c79e4941d1",
-        "config_sha256": "88e0e13a48646499a4c4e867a9ea599a0197edd798116e9e89f8ece98759e866",
+        "case_sha256": "490f89a229eac4b7f3d14ea24f07dfddc997118f79eb6ababc17cfde689192b8",
+        "config_sha256": "26ab348ead6fe8640f2e5380b2571c25634d8bee2d10e474630d9d366e43a537",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "742e72899701d353c5040b686141598021e447564de13c8d610e3db40117f4ee",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The COPY allowlist and the .dockerignore backstop keep planted private files out of every final; no secret or broad copy in the Dockerfile; the post-build image check refuses a bad image (T24B, T24D)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/images/test_images_context.py::test_final_images_hold_no_private_content",
+          "tests/images/test_images_context.py::test_dockerignore_backstop_excludes_private_paths",
+          "tests/images/test_images_dockerfile.py::test_no_secrets_or_broad_copies",
+          "tests/ci/test_release_scripts.py::test_image_checks_pass_for_a_correct_image",
+          "tests/ci/test_release_scripts.py::test_image_checks_fail_on_a_bad_image"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Layer and build-cache inspection needs built images"
+        "uncovered": "Layer-by-layer inspection of a real build and its cache (image_checks runs in build-app.yml after the first CI build, T24E) and the untracked storage/terminology harvest files (audit A5-1, T28C)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -602,7 +643,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -676,9 +717,7 @@
       "title": "Private mounts remain unserved and survive restart/recreate"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-11",
       "case_revision": 1,
       "change_reason": null,
@@ -697,33 +736,42 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Admin importer enforces reviewed target and literature scope",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "browser/model cannot choose arbitrary URL/namespace or mutate FORGE sentinels",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "2da924683075cd7a293fadf07b5bd25e346ef0c73d70410385be6afbd7a5064e",
-        "config_sha256": "e6f71d1967ad68035cb479f337850bfc180c4146c4da62ba1a3a4d0122583646",
+        "case_sha256": "59a8ca80bd7d6e9f19f4e2a872279d74aca0ab5c4297dcf32d1197b912556c5b",
+        "config_sha256": "2aa5136f1756ffd2d6e0429c913731e9a4589608507134705f9279d55ce13273",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "08e16f9e94dbf45c41a9f7ab93da749fa3b930e1f36604da9a5ecb3cb4f53ce0",
         "schema_sha256": null
       },
       "input_fixture_refs": [
+        "tests/api_v1/_v1_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
         "tests/security/security_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The importer takes its target from the deployment profile, denies a missing capability or scope, refuses a target outside the deployment or the rehearsal allowlist, and never touches FORGE sentinels (T08B, T14)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/security/test_security_workers_approvals.py::test_als_approval_refused_for_non_admin_downgrade_worker_or_wrong_target",
-          "tests/security/test_security_workers_approvals.py::test_worker_context_cannot_move_between_deployments"
+          "tests/security/test_security_workers_approvals.py::test_worker_context_cannot_move_between_deployments",
+          "tests/graph_import/test_import_guards.py::test_missing_capability_and_scope_are_denied",
+          "tests/graph_import/test_import_guards.py::test_forge_sentinels_and_links_survive_and_t08a_reader_sees_the_import",
+          "tests/graph_import/test_import_guards.py::test_preflight_refusals",
+          "tests/api_v1/test_v1_local.py::test_publication_target_outside_the_deployment_is_denied",
+          "tests/api_v1/test_v1_local.py::test_h5_gate_refuses_every_target_without_a_rehearsal_allowlist",
+          "tests/api_v1/test_v1_cli_units.py::test_publication_gate_matches_base_and_namespace"
         ],
-        "uncovered": "The admin importer does not exist; the worker target/scope guard is covered"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -731,7 +779,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -813,10 +861,7 @@
       "title": "Audit distinguishes requester approver and executing admin"
     },
     {
-      "blocked_by": [
-        "T23B (immutable JSON snapshot service)",
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-13",
       "case_revision": 1,
       "change_reason": null,
@@ -835,28 +880,43 @@
       },
       "companion_expected_rule": null,
       "companion_title": "JSON creation succeeds without Tiled and import is inference-free",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "build/pull/start never automatically publishes a corpus",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "1945fb4ba7766f18b25c1a29126756c7e133419fc04a804eb71ceaf6f9cf65a7",
-        "config_sha256": "b5bfb06cf2bf07f308d014d5e85e7d9fb1336d29aab046c3eff8f757a9b0561c",
+        "case_sha256": "44a3eb05f4b42d7cc2b3b529f5301bbc15695ce425793b0507e80990c45e6119",
+        "config_sha256": "0ed40e5a351f5c4a35c6d8213049d98fd78f53ea38d4e2e9009003b70ac6db30",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "0fbf22d20620d2f927ce4ef4877c2cf7304867907356ba6b7c20033dabc31f31",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/api_v1/_v1_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py",
+        "tests/snapshots/snapshot_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "JSON creation runs with Tiled absent, the importer makes no parser, model or download call, the default operations register no publication, and the images seed nothing at build or start (T23B, T08B, T14, T24B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/snapshots/test_snapshot_create.py::test_build_runs_with_tiled_absent_network_blocked_and_no_shell",
+          "tests/snapshots/test_snapshot_create.py::test_a_fresh_interpreter_builds_without_importing_tiled_or_the_tiled_backends",
+          "tests/graph_import/test_import_guards.py::test_importer_never_parses_calls_a_model_or_downloads",
+          "tests/api_v1/test_v1_cli_units.py::test_default_operations_register_no_kind_and_no_publication",
+          "tests/images/test_images_dockerfile.py::test_runtime_has_no_runtime_pip_or_seed_steps",
+          "tests/images/test_images_profiles.py::test_services_and_order",
+          "tests/images/test_images_profiles.py::test_check_mode_prints_the_plan_without_starting"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Needs JSON creation without Tiled (snapshot service) and an inference-free importer"
+        "uncovered": "Start of a built container never publishing a corpus (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -864,7 +924,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -876,9 +936,7 @@
       "title": "JSON creation succeeds without Tiled and import is inference-free"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-14",
       "case_revision": 1,
       "change_reason": null,
@@ -897,33 +955,44 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Import receipts cannot cross local staging production targets",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "same JSON hash requires target-specific plan and receipt",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "a6256179d943493b6f6fa66ba861881503697079c4aeccba49c552b06d9e97d6",
-        "config_sha256": "5115b55653dc219c67a581cc55366fefaa6e07a2a6267be6eca470af4b23a9d7",
+        "case_sha256": "a5d5f942991b68cb764ec2e236bf24d46e5e989aee5e4efbe20b77492470f016",
+        "config_sha256": "66a1bf4d8108d0af197c5c685eeaf2580475a0e237ba636fb3079ddb6e0f45f0",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "516a56b606e70256aca667a3e90923da02029de6012b6b1894cabc9fc37e8a29",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/security/security_fakes.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The same JSON hash needs a target-specific plan, approval and receipt: local, staging and production receipts never cross, also between two real 0.2.18 servers (T08B, T10, T25C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/security/test_security_workers_approvals.py::test_local_approval_never_authorizes_an_als_target",
-          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod"
+          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod",
+          "tests/graph_import/test_import_guards.py::test_local_approval_cannot_authorize_an_als_target",
+          "tests/graph_import/test_import_guards.py::test_receipt_is_a_separate_hashed_immutable_artifact",
+          "tests/jobs/test_publication.py::test_pointer_only_moves_to_a_verified_receipt_for_its_own_target",
+          "tests/security_live/test_live_als_app.py::test_local_approval_cannot_authorize_the_als_target",
+          "tests/security_live/test_live_identity.py::test_an_approval_verified_by_one_server_does_not_authorize_another"
         ],
-        "uncovered": "Import receipts do not exist yet"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -931,7 +1000,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -943,9 +1012,7 @@
       "title": "Import receipts cannot cross local staging production targets"
     },
     {
-      "blocked_by": [
-        "T24D (GitHub Actions build/publication and protected tags)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-15",
       "case_revision": 1,
       "change_reason": null,
@@ -964,28 +1031,42 @@
       },
       "companion_expected_rule": null,
       "companion_title": "CI publication is trusted and prod promotion follows approved policy",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "PRs cannot publish tags or access runtime keys",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "f9ae11fefe848f79cabe6a41c6b736c56f79a0559e170fd6727e374e1bc9d0de",
-        "config_sha256": "11351c9aa1c86c25c166a80e0b6e6f74b54d90e751c9ba9555326aad02ce0653",
+        "case_sha256": "f783b75ef4b3bb1e80c882519e8d2b887a16ffc476eaea0202d09cbececfe283",
+        "config_sha256": "911d962132f843931c36b8688d58cb3f2c02704db245810f9e0cda9fa04061d4",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "59abfa676564a91c856b57286e8c9edfe94329f1c7db2a69a5f2d8215dae514f",
         "schema_sha256": null
       },
       "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Pull requests build read-only and never publish; publication is manual dispatch inside named environments behind an O06 gate that fails closed; promotion re-tags a published digest and :als-prod needs the same commit staged on :als-dev (T24D)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/ci/test_workflows.py::test_build_runs_for_prs_with_read_only_permissions",
+          "tests/ci/test_workflows.py::test_build_never_logs_in_pushes_or_publishes",
+          "tests/ci/test_workflows.py::test_no_secret_is_referenced",
+          "tests/ci/test_workflows.py::test_publish_is_manual_dispatch_only",
+          "tests/ci/test_workflows.py::test_gate_fails_closed_on_o06_and_protected_ref",
+          "tests/ci/test_workflows.py::test_every_writer_job_is_gated_and_in_an_environment",
+          "tests/ci/test_workflows.py::test_the_gate_cannot_be_bypassed",
+          "tests/ci/test_workflows.py::test_only_the_job_token_logs_in_to_ghcr",
+          "tests/ci/test_workflows.py::test_promotion_is_a_retag_of_a_published_digest",
+          "tests/ci/test_release_scripts.py::test_als_prod_needs_the_same_commit_staged_on_als_dev",
+          "tests/ci/test_release_scripts.py::test_promotion_refusals",
+          "tests/ci/test_release_scripts.py::test_publish_pushes_immutable_and_release_tags_never_channels",
+          "tests/ci/test_release_scripts.py::test_stale_build_cannot_move_a_channel_backwards_but_rollback_can"
+        ],
         "supporting_selectors": [],
-        "uncovered": "No CI publication workflow is under test"
+        "uncovered": "The O06 tag rules are a proposal the owner has not approved, and GitHub environment protection is server-side configuration (H6 / O06)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -993,7 +1074,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -1130,7 +1211,6 @@
     },
     {
       "blocked_by": [
-        "T10 (durable jobs and curation)",
         "T24E (three-profile container, Ansible and restore integration)"
       ],
       "case_id": "DEP-18",
@@ -1158,14 +1238,18 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "2655928c2546d3a23856b1fdb4aa3c92d8f5f0b1cc6768e656edc9096b9a1346",
-        "config_sha256": "3d67df90950d16be768c34ea24a3e35ec8e85d2c2e7ac22153c1188b0502277d",
+        "case_sha256": "4b8620836a9cac54a389860037edd7bbf1be9ab06bcef4d74349fe9003013656",
+        "config_sha256": "864e1affe5eaee3d05db35bb476a531e2f3fab939ece73c27cf4ab13beeae148",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/fixtures/tiled_server.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
       ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
@@ -1174,9 +1258,11 @@
         "rubric_ref": null,
         "selectors": [],
         "supporting_selectors": [
-          "tests/tiled/test_tiled_server_lifecycle.py::test_recovery_after_killed_server"
+          "tests/tiled/test_tiled_server_lifecycle.py::test_recovery_after_killed_server",
+          "tests/jobs/test_workers.py::test_graceful_shutdown_requeues_running_job_and_keeps_finished_stages",
+          "tests/images/test_images_supervisor.py::test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm"
         ],
-        "uncovered": "Container health and job drain need the images and the job runner"
+        "uncovered": "Job drain on shutdown and the supervisor's ordered health/stop are covered in-process (T10, T24B landed); container health and drain of the running images need the deployment integration"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1196,11 +1282,7 @@
       "title": "Process death termination and job drain preserve durable work"
     },
     {
-      "blocked_by": [
-        "T25C (no-login local workflows and real ALS Tiled role enforcement)",
-        "T18C (full frozen-frontend parity on actual Tiled)",
-        "T14 (FastAPI plus CLI/UI compatibility and job UX)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-19",
       "case_revision": 1,
       "change_reason": null,
@@ -1219,33 +1301,45 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Profile-specific access preserves truthful old-UI behavior",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "D34: local full functionality without sign-in. D30: ALS Tiled-admin editing and non-admin denial. No fake Save, lost edit, hidden publication or local-to-ALS access bypass.",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "48529c678b2a69461740f9983c281e599f97d30a2e164fdf9635e0c80c556b9e",
-        "config_sha256": "d2ae4fc50a869d10d6ba1cab836d4703cae5ce59df4e455eb58ef34a4ff86bfe",
+        "case_sha256": "dd8346eb24e3a44ff4f0cd244723e0f9007a7e074d86ff4d89c9ca57f6d4bebc",
+        "config_sha256": "62610e85d9f3afdf28ed5cf2a1eab7bb5a439670a6aa052f510ca8a53f313ca3",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "79fc0827eb7c097dba726a1a1114ff914a454e1f598b142608e37130b4416bda",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/security/security_fakes.py"
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "On :local every route and graph edit works without sign-in (D34); on an ALS-shaped real 0.2.18 server a Tiled admin's edits take effect and a non-admin is denied before any effect (D30); a Save is never faked, lost or applied twice across restart or retry (T25C, T14, T18C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/security/test_security_fastapi.py::test_local_every_exposed_inventoried_route_works_without_sign_in",
-          "tests/security/test_security_fastapi.py::test_als_user_is_chat_only_and_denied_before_effects"
+          "tests/security/test_security_fastapi.py::test_als_user_is_chat_only_and_denied_before_effects",
+          "tests/security_live/test_live_local_no_login.py::test_local_app_serves_every_route_without_sign_in",
+          "tests/security_live/test_live_local_no_login.py::test_local_graph_edit_and_tiled_uri_need_no_identity",
+          "tests/security_live/test_live_als_app.py::test_reader_privileged_work_is_denied_before_effects",
+          "tests/security_live/test_live_als_app.py::test_admin_privileged_work_takes_effect",
+          "tests/security_live/test_live_als_app.py::test_reader_cannot_change_deployment_wide_settings",
+          "tests/api_v1_live/test_v1_live_tiled.py::test_reader_is_chat_only_and_admin_publishes_with_a_real_role_check",
+          "tests/contracts/legacy_ui/closure/test_closure_api.py::test_ui26_pending_survives_restart_and_applies_exactly_once",
+          "tests/contracts/legacy_ui/closure/test_closure_api.py::test_ui10_retry_after_a_streamed_action_does_not_apply_twice"
         ],
-        "uncovered": "Truthful old-UI behaviour (Save, edits) needs the frozen UI on real Tiled; API-level access is covered by AUTH/LOCAL"
+        "supporting_selectors": [],
+        "uncovered": "The frozen browser UI against the deployed ALS stack (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1253,7 +1347,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -1392,9 +1486,7 @@
       "title": "Image and data rollback remain independent"
     },
     {
-      "blocked_by": [
-        "T24C (prefix-correct gateway and existing UI/API deployment)"
-      ],
+      "blocked_by": [],
       "case_id": "DEP-22",
       "case_revision": 1,
       "change_reason": null,
@@ -1413,28 +1505,36 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Base-path build/runtime mismatch is diagnosed",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "no attempt to fix immutable Vite build solely with runtime ENV",
       "expected_rule_source": "companion_expected_rule",
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "fc6ae4353fb9d10c438d3cd746fdcbb26bb51e15a72c7c46c1398b59b05d5497",
-        "config_sha256": "a20214e6c3bc8d10b9d3a10fee990d66e5a8649daaf33e2780df8befc360fab4",
+        "case_sha256": "2dec95b830f26d6374dfe660a7b4509a88def70ce019faf7b0038e401200c9b4",
+        "config_sha256": "c723a5bb0e4633cd8794209a31e79868012a40ae8a79050e7bdb37738b39c248",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "8d851ed41f1defa811687892a22b39bf3305bc355187bfcb63e0a5d807801d58",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/gateway/nginx_model.py",
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "A UI bundle built for another base path is refused at gateway render, at image preflight and at image build, each with a rebuild hint instead of a runtime ENV workaround (T24C, T24B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/gateway/test_gateway_prefix.py::test_build_runtime_prefix_mismatch_is_refused_with_a_rebuild_hint",
+          "tests/images/test_images_preflight.py::test_ui_built_for_another_prefix_is_refused",
+          "tests/images/test_images_dockerfile.py::test_build_checks_the_ui_prefix"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Build/runtime base-path diagnosis needs the frontend build in the images"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1442,7 +1542,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -1727,10 +1827,7 @@
       "title": "Owner A writes A, cannot write B"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)",
-        "T14 (FastAPI plus CLI/UI compatibility and job UX)"
-      ],
+      "blocked_by": [],
       "case_id": "TIL-05",
       "case_revision": 1,
       "change_reason": null,
@@ -1749,31 +1846,41 @@
       },
       "companion_expected_rule": null,
       "companion_title": "UI node/relationship/snippet edits read back",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: UI node/relationship/snippet edits read back. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "TIL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "2887e467c883f9405a50a8d75002b4c66e5990cf50c3fbcb151ee2df1c8f7203",
-        "config_sha256": "1ca5e6fda05f22a4dcf7cc49308dfe9f6c9293d9347b9321d41bc45ab84db0a4",
+        "case_sha256": "d53a81684a2ffa9f793e3391b703aec64aa4576ca4e8599a6b7a5f6ee6db28da",
+        "config_sha256": "8cc510e3d9055fded24e49c83effc2c06452b6573e912a26c50ccac41c3aea1e",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "02a121b703f0950b1fec61ba236d8f17c29c8d81e807bf766660b0777ae61427",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Node, relationship and snippet edits made through the UI routes are read back; edits are journalled (append-only, ordered) and reconciled through the Tiled import on a disposable 0.2.18 server (T08B, T18C, T25C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/test_f2w_api.py::test_patch_graph_node_updates_label_description_pubs_and_snippets",
-          "tests/test_f2w_api.py::test_relationship_updates_are_directed_idempotent_and_persisted"
+          "tests/test_f2w_api.py::test_relationship_updates_are_directed_idempotent_and_persisted",
+          "tests/contracts/legacy_ui/closure/test_closure_tiled.py::test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits",
+          "tests/security_live/test_live_local_no_login.py::test_local_graph_edit_and_tiled_uri_need_no_identity",
+          "tests/graph_import/test_import_guards.py::test_acknowledged_edit_is_never_lost_by_an_import",
+          "tests/graph_import/test_import_guards.py::test_edit_journal_is_durable_append_only_and_ordered"
         ],
-        "uncovered": "UI edits are read back through the legacy backend only; the Tiled write adapter and admin-only write path (D30) are not merged"
+        "supporting_selectors": [],
+        "uncovered": "A Tiled-admin edit from the frozen browser UI with non-admin denial (D30) on the deployed ALS stack (T24E)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1781,7 +1888,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -1794,8 +1901,7 @@
     },
     {
       "blocked_by": [
-        "T13 (publication and rollback rehearsal)",
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
+        "T13 (publication and rollback rehearsal)"
       ],
       "case_id": "TIL-06",
       "case_revision": 1,
@@ -1821,15 +1927,18 @@
       "family": "TIL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "8094b5cdbd2c733c788e79a9e45c6958e8f23bca2bad238b457cc3f04a2dc370",
-        "config_sha256": "53c07e56091a9680d133ae9313eb5f3d6f532d9bd7118e41cce9f5d005e25bc5",
+        "case_sha256": "21430b88e1a8724ba3b986cd257e389db1e2aa39ddea311319d7f9c293538448",
+        "config_sha256": "b85c0638c1ce920e9d8950b80d23829acc66021c079eb18439c61700e2733ad9",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/fixtures/tiled_server.py",
-        "tests/graph/graph_samples.py"
+        "tests/graph/graph_samples.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
       ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
@@ -1839,9 +1948,11 @@
         "selectors": [],
         "supporting_selectors": [
           "tests/graph/test_graph_tiled_server.py::test_scoping_and_forge_sentinel_isolation",
-          "tests/graph/test_graph_identity.py::test_ownership_requires_owner_uri_and_properties_to_agree"
+          "tests/graph/test_graph_identity.py::test_ownership_requires_owner_uri_and_properties_to_agree",
+          "tests/graph_import/test_import_flow.py::test_changed_snapshot_uses_create_new_revision_and_retires_old",
+          "tests/jobs/test_publication.py::test_rollback_restores_previous_pointer_and_keeps_candidate_history"
         ],
-        "uncovered": "Rollback of an F2W import needs the import/ownership ledger writes (T08B) and the rehearsal (T13)"
+        "uncovered": "Import ledger writes, revision retirement and pointer rollback are covered in-process (T08B, T10 landed); rollback of an F2W import on a shared Tiled needs the rehearsal (T13)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

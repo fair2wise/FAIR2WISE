@@ -89,6 +89,40 @@ RLH = "tests/releases/test_release_happy_path.py"
 RLR = "tests/releases/test_release_refusals.py"
 RLE = "tests/releases/test_release_evidence_and_cli.py"
 RLP = "tests/releases/test_release_no_push.py"
+# Landed after the H3 packet (rebound 2026-10-29, plan_addenda A5 AUD-07/A5-2):
+GIF = "tests/graph_import/test_import_flow.py"  # T08B
+GIG = "tests/graph_import/test_import_guards.py"  # T08B
+GIT = "tests/graph_import/test_import_t22c_node_types.py"  # T08B/T22C
+JBC = "tests/jobs/test_crash_matrix.py"  # T10
+JBP = "tests/jobs/test_pipeline.py"  # T10
+JBU = "tests/jobs/test_publication.py"  # T10
+JBW = "tests/jobs/test_workers.py"  # T10
+SNR = "tests/snapshots/test_release_verification.py"  # T23B
+SNC = "tests/snapshots/test_snapshot_create.py"  # T23B
+IMC = "tests/images/test_images_context.py"  # T24B
+IMD = "tests/images/test_images_dockerfile.py"  # T24B
+IMP = "tests/images/test_images_preflight.py"  # T24B
+IMF = "tests/images/test_images_profiles.py"  # T24B
+IMT = "tests/images/test_images_tiled_service.py"  # T24B
+IMS = "tests/images/test_images_supervisor.py"  # T24B
+GWP = "tests/gateway/test_gateway_prefix.py"  # T24C
+GWM = "tests/gateway/test_mkdocs_image_config.py"  # T24C
+CIW = "tests/ci/test_workflows.py"  # T24D
+CIR = "tests/ci/test_release_scripts.py"  # T24D
+SLA = "tests/security_live/test_live_als_app.py"  # T25C
+SLI = "tests/security_live/test_live_identity.py"  # T25C
+SLL = "tests/security_live/test_live_local_no_login.py"  # T25C
+SLU = "tests/security_live/test_live_units.py"  # T25C
+SLW = "tests/security_live/test_live_writer.py"  # T25C
+V1A = "tests/api_v1/test_v1_als.py"  # T14
+V1C = "tests/api_v1/test_v1_cli_units.py"  # T14
+V1L = "tests/api_v1/test_v1_local.py"  # T14
+V1T = "tests/api_v1_live/test_v1_live_tiled.py"  # T14
+SCF = "tests/schema/test_schema_fingerprint.py"  # T22B
+SCR = "tests/schema/test_schema_registry.py"  # T22B
+CLA = "tests/contracts/legacy_ui/closure/test_closure_api.py"  # T18C
+CLT = "tests/contracts/legacy_ui/closure/test_closure_tiled.py"  # T18C
+TILED_FIXTURE = ["tests/fixtures/tiled_server.py"]
 
 
 def n(file: str, *names: str) -> List[str]:
@@ -234,10 +268,18 @@ ORACLES: Dict[str, Dict[str, Any]] = {
     "EXT-05": oracle(
         n(XL, "test_completeness_is_reported_as_unknown_not_success")
         + n(XV, "test_withheld_cases_never_reach_the_sink", "test_h3_gates_are_closed_and_enforced")
-        + n(LS, "test_incomplete_extraction_is_never_importable"),
-        "partial",
-        "Incomplete extraction is reported unknown and is not importable from a staged package",
-        "Promotion/publication refusal end to end (needs T10 curation and T08B import)",
+        + n(LS, "test_incomplete_extraction_is_never_importable")
+        + n(
+            JBU,
+            "test_incomplete_packages_are_quarantined_with_a_reason_and_block_publication",
+            "test_staged_package_check_reads_real_paper_json_headers",
+        )
+        + n(JBC, "test_case_02_crash_during_extraction_retains_chunks_and_incomplete_coverage_blocks_publication")
+        + n(RLR, "test_validation_json_must_be_present_and_agree"),
+        "full",
+        "Incomplete extraction is reported unknown, is not importable from a staged package, is quarantined by"
+        " the publication job with a reason, and a snapshot whose validation does not agree is refused before"
+        " commit (T10 jobs and T26B release checks landed after the H3 packet)",
     ),
     # ---- chat -----------------------------------------------------------------------------------
     "QA-01": rubric_case(
@@ -625,21 +667,31 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Application-level owner write path (T08B)",
         fixtures=["tests/fixtures/tiled_server.py"],
     ),
-    "TIL-05": blocked(
-        [T08B, T14],
+    "TIL-05": oracle(
         n(
-            "tests/test_f2w_api.py",
+            F2,
             "test_patch_graph_node_updates_label_description_pubs_and_snippets",
             "test_relationship_updates_are_directed_idempotent_and_persisted",
-        ),
-        "UI edits are read back through the legacy backend only; the Tiled write adapter and admin-only write path"
-        " (D30) are not merged",
+        )
+        + n(CLT, "test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits")
+        + n(SLL, "test_local_graph_edit_and_tiled_uri_need_no_identity")
+        + n(GIG, "test_acknowledged_edit_is_never_lost_by_an_import", "test_edit_journal_is_durable_append_only_and_ordered"),
+        "partial",
+        "Node, relationship and snippet edits made through the UI routes are read back; edits are journalled"
+        " (append-only, ordered) and reconciled through the Tiled import on a disposable 0.2.18 server (T08B,"
+        " T18C, T25C)",
+        "A Tiled-admin edit from the frozen browser UI with non-admin denial (D30) on the deployed ALS stack"
+        " (T24E)",
+        fixtures=TILED_FIXTURE,
     ),
     "TIL-06": blocked(
-        [T13, T08B],
+        [T13],
         n(GS, "test_scoping_and_forge_sentinel_isolation")
-        + n(GI, "test_ownership_requires_owner_uri_and_properties_to_agree"),
-        "Rollback of an F2W import needs the import/ownership ledger writes (T08B) and the rehearsal (T13)",
+        + n(GI, "test_ownership_requires_owner_uri_and_properties_to_agree")
+        + n(GIF, "test_changed_snapshot_uses_create_new_revision_and_retires_old")
+        + n(JBU, "test_rollback_restores_previous_pointer_and_keeps_candidate_history"),
+        "Import ledger writes, revision retirement and pointer rollback are covered in-process (T08B, T10"
+        " landed); rollback of an F2W import on a shared Tiled needs the rehearsal (T13)",
     ),
     "TIL-07": oracle(
         n(TC, "test_pin_is_exactly_0218", "test_version_override_must_match_pin")
@@ -661,10 +713,14 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             RPA,
             "test_delegated_run_uses_f2w_prompt_skill_and_admission",
             "test_default_admission_is_the_shared_provider_admission",
-        ),
+        )
+        + n(SLA, "test_reader_personal_settings_are_their_own")
+        + n(CLA, "test_ui25_concurrent_sessions_keep_their_own_state"),
         "partial",
-        "Per-principal provider/model settings are what a turn uses; local settings stay server-wide",
-        "End-to-end frontend selection through every runtime path (T14/T18C)",
+        "Per-principal provider/model settings are what a turn uses (also against a real 0.2.18 identity server);"
+        " local settings stay server-wide; concurrent frozen-UI sessions keep their own state",
+        "The selection made in the frozen browser UI on the deployed ALS stack (T24E)",
+        fixtures=TILED_FIXTURE,
     ),
     "LLM-02": oracle(
         n(LA, "test_cborg_clients_fail_closed_without_key", "test_require_cborg_api_key_refuses_openai_fallback")
@@ -705,17 +761,39 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Provider backoff on real responses and worker cancel (T10, live provider)",
     ),
     "LLM-05": blocked(
-        [T10, O03], note="Live job settings revisions need durable jobs; the owner settings rule (O03) is pending"
+        [O03],
+        n(JBP, "test_resume_after_input_change_reruns_only_affected_stages"),
+        "Durable jobs exist (T10 landed); the owner settings rule for live job settings revisions (O03) is"
+        " pending, so the expectation cannot be stated",
     ),
     "LLM-06": blocked(
-        [T10, O03], note="Draft expectation pending O03; needs durable jobs with a resolved-model snapshot"
+        [O03],
+        n(JBP, "test_unit_keys_change_with_extractor_so_stale_chunks_are_not_reused"),
+        "Draft expectation pending O03; durable jobs with stage keys exist (T10 landed), the resolved-model"
+        " snapshot rule awaits the owner",
     ),
-    "LLM-07": blocked([T10, O03], note="Draft expectation pending O03; changed-model resume needs durable jobs"),
-    "LLM-08": blocked(
-        [T10],
-        n(SW, "test_als_worker_stops_on_downgrade_expiry_revocation"),
-        "Live rate-limit tightening for running jobs needs the job runner; revocation of ALS workers is covered by"
-        " AUTH-07",
+    "LLM-07": blocked(
+        [O03],
+        n(JBP, "test_changed_vocabulary_invalidates_only_canonicalization"),
+        "Draft expectation pending O03; changed-model resume semantics await the owner rule (T10 landed)",
+    ),
+    "LLM-08": oracle(
+        n(SW, "test_als_worker_stops_on_downgrade_expiry_revocation")
+        + n(
+            JBW,
+            "test_workers_share_quota_with_chat_and_evaluations",
+            "test_provider_calls_share_one_admission_controller_across_jobs",
+        )
+        + n(JBP, "test_authority_revocation_stops_job_and_notifies_scope_hooks")
+        + n(V1A, "test_worker_reauthorizes_and_stops_when_the_initiator_lost_admin")
+        + n(V1T, "test_real_role_downgrade_stops_the_worker_before_the_effect"),
+        "partial",
+        "Running jobs draw on the one provider admission controller shared with chat (a tightened cap binds their"
+        " next call) and stop before their next effect when the initiator's role is downgraded or revoked, on a"
+        " real 0.2.18 role check (T10, T14)",
+        "Default production wiring of the worker authority into JobService.register (audit AUD-01, T28A) and a"
+        " live provider tightening its limit under a running job (paid run, owner go)",
+        fixtures=TILED_FIXTURE,
     ),
     # ---- disclosure ------------------------------------------------------------------------------
     "SEC-01": oracle(
@@ -797,10 +875,18 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             PR,
             "test_schema_defaults_resolve_from_any_working_directory",
             "test_schema_helper_loads_default_schema_outside_repo",
-        ),
-        "partial",
-        "Current overlay/import structure loads and resolves",
-        "Selected overlay/imports preserved through the T22B registry (not merged)",
+        )
+        + n(
+            SCR,
+            "test_every_inventoried_yaml_asset_is_registered_in_place_with_unchanged_bytes",
+            "test_rsoxs_and_extract_overlay_are_distinct_registry_keys",
+            "test_inheritance_is_preserved_for_every_registered_overlay",
+        )
+        + n(SCF, "test_closure_covers_the_resolved_imports"),
+        "full",
+        "Current overlay/import structure loads and resolves; every inventoried schema asset is registered in"
+        " place with unchanged bytes, the overlays stay distinct keys and the fingerprint closure covers the"
+        " resolved imports (T22B)",
     ),
     "SCH-02": oracle(
         n(
@@ -812,30 +898,76 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "full",
         "The PROV vocabulary is a reference block, not loaded as LinkML schema content",
     ),
-    "SCH-03": blocked(
-        [T22B],
-        n("tests/extraction/test_validation_stage.py", "test_h3_gates_are_closed_and_enforced"),
-        "Schema fingerprint pinning of results and jobs belongs to the schema registry",
+    "SCH-03": oracle(
+        n(XV, "test_h3_gates_are_closed_and_enforced")
+        + n(
+            SCF,
+            "test_binding_verified_legacy_stale_and_unknown",
+            "test_any_import_byte_change_changes_dependent_fingerprints",
+        )
+        + n(
+            SNC,
+            "test_schema_selection_and_fingerprint_binding",
+            "test_manifest_binds_graph_schema_extraction_corpus_and_validation",
+        )
+        + n(
+            RLR,
+            "test_missing_schema_fingerprint_is_refused",
+            "test_mismatched_schema_fingerprint_is_refused",
+            "test_schema_file_changed_in_the_repository_is_refused",
+        )
+        + n(JBU, "test_approval_arriving_after_schema_or_vocabulary_change_is_stale"),
+        "full",
+        "The schema closure fingerprint is bound into every snapshot manifest (result), a missing, mismatched or"
+        " changed fingerprint is refused before commit, and a job approval goes stale when the schema changes"
+        " (T22B, T23B, T26B, T10)",
     ),
-    "SCH-04": blocked(
-        [T22B, T10],
-        n(CT, "test_apply_plan_rejects_stale_approval") + n(CO, "test_approval_must_name_the_exact_revision"),
-        "Stale schema-plan rejection needs the schema revision binding; stale approvals are covered for other"
-        " plans",
+    "SCH-04": oracle(
+        n(CT, "test_apply_plan_rejects_stale_approval")
+        + n(CO, "test_approval_must_name_the_exact_revision")
+        + n(
+            JBU,
+            "test_approval_arriving_after_schema_or_vocabulary_change_is_stale",
+            "test_approval_for_a_different_plan_is_stale",
+        )
+        + n(JBC, "test_case_06_approval_after_candidate_schema_or_vocabulary_changed_is_stale")
+        + n(GIT, "test_default_publish_set_refuses_the_pending_schema")
+        + n(RLR, "test_pending_review_schema_set_binds_only_with_explicit_selection"),
+        "full",
+        "A plan approved against one schema revision is stale after the schema or vocabulary changes, the"
+        " importer refuses a snapshot bound to a schema outside the supported set, and a pending-review schema"
+        " binds only by explicit selection (T22B, T10, T08B, T26B)",
     ),
     "SCH-05": oracle(
         n(CO, "test_different_classes_never_merge_even_when_one_inherits_the_other")
-        + n(XS, "test_does_not_redefine_rsoxs_measurement"),
-        "partial",
-        "Current RSoXS measurement inheritance is not redefined and inherited classes are not merged",
-        "Whole-schema inheritance fingerprint before/after migration (T22B)",
+        + n(XS, "test_does_not_redefine_rsoxs_measurement")
+        + n(
+            SCR,
+            "test_rsoxs_measurement_is_still_an_experimental_technique",
+            "test_inheritance_is_preserved_for_every_registered_overlay",
+        )
+        + n(SCF, "test_pre_s4_fingerprint_is_reconstructed_and_still_binds"),
+        "full",
+        "RSoXS measurement inheritance is not redefined, inherited classes are not merged, inheritance is"
+        " preserved for every registered overlay and the pre-S4 fingerprint still binds (T22B, T22C)",
     ),
     # ---- JSON graph publication ----------------------------------------------------------------------
-    "JSON-01": blocked(
-        [T23B],
+    "JSON-01": oracle(
         n(J2, "test_main_writes_graph_for_valid_input")
-        + n(JK, "test_repeated_builds_from_fresh_input_are_identical"),
-        "json2kg builds without Tiled, but the versioned snapshot service does not exist yet",
+        + n(JK, "test_repeated_builds_from_fresh_input_are_identical")
+        + n(
+            SNC,
+            "test_build_runs_with_tiled_absent_network_blocked_and_no_shell",
+            "test_a_fresh_interpreter_builds_without_importing_tiled_or_the_tiled_backends",
+            "test_snapshot_modules_contain_no_tiled_or_shell_use",
+            "test_cli_creates_a_snapshot_and_reports_json",
+            "test_graph_bytes_equal_the_frozen_json2kg_fixture",
+        )
+        + n(SLL, "test_local_json_build_approval_publication_and_graph_read"),
+        "full",
+        "json2kg output is unchanged and the versioned snapshot service builds it with Tiled absent, the network"
+        " blocked and no shell, from the CLI and from the local no-login API path (T23B, T25C)",
+        fixtures=TILED_FIXTURE,
     ),
     "JSON-02": oracle(
         whole(JK, J2, J2E),
@@ -843,59 +975,145 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "json2kg field identity, serialization and CLI behaviour match the frozen baseline",
         fixtures=["tests/contracts/json_kg/"],
     ),
-    "JSON-03": blocked(
-        [T23B],
+    "JSON-03": oracle(
         n(
             JK,
             "test_example_manifest_binds_exact_fixture_bytes_and_rejects_bad_paths",
             "test_fixture_files_match_manifest_hashes",
         )
-        + n(GJ, "test_manifest_hash_is_checked_and_cache_reloads_explicitly"),
-        "Immutable version creation is the unbuilt part",
+        + n(GJ, "test_manifest_hash_is_checked_and_cache_reloads_explicitly")
+        + n(
+            SNC,
+            "test_existing_snapshot_is_never_overwritten",
+            "test_tampering_after_freezing_is_detected_in_the_working_tree",
+            "test_a_working_file_is_never_an_approved_artifact",
+            "test_manifest_validates_against_the_normative_json_schema",
+            "test_legacy_flat_files_are_never_overwritten_or_reused",
+        )
+        + n(
+            SNR,
+            "test_a_pinned_release_verifies_and_returns_the_exact_bytes",
+            "test_wrong_hashes_are_rejected",
+            "test_manifest_and_compat_disagreements_are_rejected",
+            "test_working_tree_edits_do_not_change_what_a_commit_selects",
+        ),
+        "full",
+        "A frozen snapshot is never overwritten or reused, tampering after freezing is detected, the manifest"
+        " validates against the normative schema and its hashes must agree with the committed bytes (T23B)",
     ),
-    "JSON-04": blocked(
-        [T08B],
-        n(GJ, "test_round_trip_preserves_every_node_edge_and_bytes"),
-        "No importer exists to observe zero parser/inference/acquisition calls",
+    "JSON-04": oracle(
+        n(GJ, "test_round_trip_preserves_every_node_edge_and_bytes")
+        + n(GIG, "test_importer_never_parses_calls_a_model_or_downloads")
+        + n(GIF, "test_end_to_end_import_receipt_and_second_import_is_a_noop"),
+        "full",
+        "The importer makes zero parser, model or download calls (json2kg and requests are trapped, the module"
+        " source is scanned) and a second import of the same snapshot is a no-op (T08B)",
+        fixtures=TILED_FIXTURE,
     ),
-    "JSON-05": blocked(
-        [T08B],
-        n(GI, "test_edge_ids_follow_triple_identity", "test_ledger_never_rebinds_and_round_trips"),
-        "Same-target replay needs the importer",
+    "JSON-05": oracle(
+        n(GI, "test_edge_ids_follow_triple_identity", "test_ledger_never_rebinds_and_round_trips")
+        + n(
+            GIF,
+            "test_end_to_end_import_receipt_and_second_import_is_a_noop",
+            "test_replay_after_injected_crash_has_no_duplicates",
+            "test_supersession_replays_from_every_intermediate_state",
+        ),
+        "full",
+        "Replaying the same snapshot to the same target, including after a crash at every stage, creates no"
+        " duplicate facts or links (T08B)",
+        fixtures=TILED_FIXTURE,
     ),
-    "JSON-06": blocked(
-        [T08B, T26B],
+    "JSON-06": oracle(
         n(
             SW,
             "test_local_approval_never_authorizes_an_als_target",
             "test_staging_approval_does_not_authorize_prod",
+        )
+        + n(
+            GIG,
+            "test_local_approval_cannot_authorize_an_als_target",
+            "test_receipt_is_a_separate_hashed_immutable_artifact",
+        )
+        + n(JBU, "test_pointer_only_moves_to_a_verified_receipt_for_its_own_target")
+        + n(SLA, "test_local_approval_cannot_authorize_the_als_target"),
+        "full",
+        "An import receipt is a separate hashed artifact bound to its target; an approval or receipt for one"
+        " target never authorizes or activates another, also against a real 0.2.18 ALS-shaped server (T08B,"
+        " T10, T25C)",
+        fixtures=TILED_FIXTURE,
+    ),
+    "JSON-07": oracle(
+        n(GJ, "test_manifest_hash_is_checked_and_cache_reloads_explicitly")
+        + n(
+            GIG,
+            "test_no_approval_wrong_plan_expired_and_modified_plans_are_refused_without_writes",
+            "test_stale_base_revision_is_refused_without_writes",
+        )
+        + n(GIT, "test_default_publish_set_refuses_the_pending_schema")
+        + n(SNC, "test_tampering_after_freezing_is_detected_in_the_working_tree")
+        + n(SNR, "test_wrong_hashes_are_rejected", "test_manifest_and_compat_disagreements_are_rejected")
+        + n(
+            JBU,
+            "test_snapshot_changed_after_planning_is_quarantined_not_imported",
+            "test_candidate_changed_after_approval_invalidates_it_before_import",
         ),
-        "Import receipts do not exist yet; approval target binding is covered by AUTH-08/LOCAL-10",
+        "full",
+        "Tampered bytes, wrong hashes, a schema outside the supported set and a missing, wrong, expired or"
+        " modified approval are all refused without writes (T23B, T08B, T10)",
+        fixtures=TILED_FIXTURE,
     ),
-    "JSON-07": blocked(
-        [T23B, T08B],
-        n(GJ, "test_manifest_hash_is_checked_and_cache_reloads_explicitly"),
-        "Schema/approval mismatch rejection needs snapshot and importer",
-    ),
-    "JSON-08": blocked(
-        [T08B],
+    "JSON-08": oracle(
         n(
             GJ,
             "test_round_trip_preserves_every_node_edge_and_bytes",
             "test_records_are_graph_scoped_and_keep_old_fields",
         )
-        + n(GI, "test_uri_round_trip"),
-        "Needs the imported Tiled graph to compare against; the JSON backend side is covered",
+        + n(GI, "test_uri_round_trip")
+        + n(CLT, "test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits")
+        + n(GIG, "test_forge_sentinels_and_links_survive_and_t08a_reader_sees_the_import")
+        + n(GIT, "test_new_node_types_round_trip_through_the_tiled_import"),
+        "full",
+        "The Tiled read port over an imported graph equals the JSON read port: ids, fields, edge evidence and"
+        " code links survive, FORGE sentinels are untouched, new T22C node types round-trip (T08B, T18C)",
+        fixtures=TILED_FIXTURE,
     ),
-    "JSON-09": blocked(
-        [T08B, T10], note="Interrupted import and activation of partial graphs need the importer and job journal"
-    ),
-    "JSON-10": blocked(
-        [T08B, T10, T23B],
-        note=(
-            "Acknowledged UI edits surviving the next JSON version needs the journal reconciliation; D30"
-            " admin-only writeback applies"
+    "JSON-09": oracle(
+        n(
+            GIG,
+            "test_unavailable_tiled_leaves_json_intact_and_import_retryable",
+            "test_server_outage_mid_import_is_retryable_and_resumes",
+        )
+        + n(GIF, "test_replay_after_injected_crash_has_no_duplicates")
+        + n(
+            JBU,
+            "test_readback_verification_failure_quarantines_and_issues_no_receipt_or_pointer",
+            "test_index_failure_leaves_previous_pair_active",
+            "test_failure_of_the_step_never_invalidates_the_snapshot",
+        )
+        + n(
+            JBC,
+            "test_case_04_crash_after_graph_entities_before_links_and_receipt",
+            "test_case_05_crash_after_publication_before_active_index_switch",
         ),
+        "full",
+        "An interrupted import (outage, crash between entities and links, failed readback or index switch)"
+        " leaves the JSON intact, issues no receipt or pointer, keeps the previous graph active and resumes"
+        " without duplicates (T08B, T10)",
+        fixtures=TILED_FIXTURE,
+    ),
+    "JSON-10": oracle(
+        n(
+            GIG,
+            "test_acknowledged_edit_is_never_lost_by_an_import",
+            "test_edit_journal_is_durable_append_only_and_ordered",
+        )
+        + n(GIF, "test_changed_snapshot_uses_create_new_revision_and_retires_old")
+        + n(CLT, "test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits"),
+        "full",
+        "Acknowledged edits live in a durable append-only journal, a plan that would lose one is refused, a"
+        " changed snapshot becomes a new revision that retires the old, and edits are reconciled across a"
+        " re-import on a disposable 0.2.18 server (T08B, T18C; D30 admin-only writeback is the decided policy)",
+        fixtures=TILED_FIXTURE,
     ),
     # ---- quotes -----------------------------------------------------------------------------------
     "QUOTE-01": oracle(
@@ -931,12 +1149,37 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "A paraphrase or changed-source text is never labelled an exact quote",
     ),
     # ---- deployment (images, gateway, CI) ---------------------------------------------------------------
-    "DEP-01": blocked([T24B, T24D], note="No image variants are built yet"),
-    "DEP-02": blocked(
-        [T24B],
+    "DEP-01": oracle(
+        n(
+            IMD,
+            "test_stage_layout",
+            "test_t24c_stages_are_kept",
+            "test_finals_bake_their_own_fixed_profile",
+            "test_runtime_has_no_runtime_pip_or_seed_steps",
+        )
+        + n(IMC, "test_final_images_keep_code_schemas_and_tracked_kg_json")
+        + n(IMF, "test_services_and_order", "test_api_worker_gateway_wiring")
+        + n(CIR, "test_manifest_records_commit_digests_locks_tiled_and_ui_tree")
+        + n(CIW, "test_build_builds_all_three_variants_from_one_commit", "test_every_variant_gets_the_post_build_checks"),
+        "partial",
+        "The three finals derive from one runtime base that carries the app, UI bundle, worker and gateway; each"
+        " bakes only its own profile; the release manifest records one commit, the dependency locks, the Tiled"
+        " pin and the UI tree for all three (T24B, T24D)",
+        "Inspection of images actually built by build-app.yml (no CI build has run yet; local builds count as"
+        " untested until then, audit PC-4; T24E/T28C)",
+    ),
+    "DEP-02": oracle(
         n(TC, "test_local_profile_is_managed_on_loopback_8765", "test_pin_is_exactly_0218")
-        + n(TL, "test_launch_health_and_capabilities"),
-        "The :local image does not exist; the supervised-Tiled lifecycle logic is covered by the T20B tests",
+        + n(TL, "test_launch_health_and_capabilities")
+        + n(IMD, "test_only_local_bundles_the_managed_tiled_server", "test_tiled_server_pin_is_the_owner_pin_and_hash_checked")
+        + n(IMT, "test_managed_tiled_starts_supervised_and_stops_on_sigterm_keeping_data")
+        + n(IMP, "test_local_without_the_tiled_interpreter_is_refused")
+        + n(IMF, "test_mounts"),
+        "partial",
+        "Only :local bundles the hash-checked 0.2.18 server venv; the supervisor starts it on loopback 8765 and"
+        " stops it keeping its mounted data; preflight refuses a :local without the Tiled interpreter (T24B)",
+        "The built :local image running its supervised Tiled in a container (T24E deployment test)",
+        fixtures=TILED_FIXTURE,
     ),
     "DEP-03": oracle(
         n(
@@ -971,41 +1214,100 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "ALS targets are fixed per profile and never runtime-writable; local defaults and edits behave as decided",
         "Image environment defaults in the built variants (T24B/T24E)",
     ),
-    "DEP-05": blocked(
-        [T24C, T24B],
-        note="Prefix serving of UI assets, deep links and the MkDocs site needs the gateway and images",
+    "DEP-05": oracle(
+        n(
+            GWP,
+            "test_ui_assets_docs_and_deep_links",
+            "test_not_found_never_becomes_html",
+            "test_index_is_not_cached_and_assets_are_immutable",
+            "test_built_ui_and_docs_through_the_gateway",
+            "test_static_ui_and_api_share_one_origin",
+        )
+        + n(GWM, "test_strict_build_from_the_docs_stage_layout")
+        + n(IMD, "test_build_checks_the_ui_prefix"),
+        "partial",
+        "UI assets, deep links and the MkDocs site resolve beneath /fair2wise from one origin, a missing asset"
+        " is 404 not HTML, index is uncached and assets immutable, the image build checks the UI prefix (T24C,"
+        " T24B)",
+        "The real nginx in a built image serving the bundle (T24E deployment test)",
     ),
-    "DEP-06": blocked(
-        [T24C],
+    "DEP-06": oracle(
         n(
             CU,
             "test_ui_route_set_is_the_frozen_19",
             "test_model_route_set_is_the_frozen_6",
             "test_ui_openapi_matches_baseline",
+        )
+        + n(
+            GWP,
+            "test_exactly_one_prefix_stripping_boundary",
+            "test_api_prefix_is_stripped_exactly_once_and_the_suffix_is_raw",
+            "test_every_recorded_legacy_flow_is_unchanged_under_the_prefix",
+            "test_unprefixed_direct_api_still_works",
+            "test_encoded_node_ids_reach_the_route_unchanged",
         ),
-        "Behind-prefix equivalence needs the gateway; unprefixed schema/status equivalence is covered by the"
-        " frozen contract tests",
+        "partial",
+        "Exactly one prefix-stripping boundary; every recorded legacy flow returns the same schema and status"
+        " under the prefix as unprefixed; encoded ids pass through unchanged (T24C)",
+        "The real nginx in a built image (T24E deployment test)",
     ),
-    "DEP-07": blocked(
-        [T24C],
-        n(CU, "test_model_openapi_matches_baseline") + n(WA, "test_api_docs_stay_public_on_als"),
-        "Prefix correctness of /docs, /redoc and /openapi.json needs the gateway",
+    "DEP-07": oracle(
+        n(CU, "test_model_openapi_matches_baseline")
+        + n(WA, "test_api_docs_stay_public_on_als")
+        + n(
+            GWP,
+            "test_fastapi_docs_and_openapi_carry_the_prefix",
+            "test_api_redirects_point_back_through_the_prefix",
+            "test_run_api_passes_root_path_only_when_prefixed",
+            "test_the_api_itself_never_strips_the_prefix",
+        ),
+        "partial",
+        "/docs, /redoc and /openapi.json carry the prefix, redirects point back through it, root_path is passed"
+        " only when prefixed and the API itself never strips it (T24C)",
+        "The real nginx in a built image (T24E deployment test)",
     ),
     "DEP-08": blocked(
-        [T24C, T24E],
-        n(CU, "test_sse_framing_and_event_order", "test_sse_survives_client_fragmentation"),
-        "SSE through a container and edge proxy needs the deployed stack",
+        [T24E],
+        n(CU, "test_sse_framing_and_event_order", "test_sse_survives_client_fragmentation")
+        + n(GWP, "test_api_location_streams_without_buffering_and_keeps_long_streams_open")
+        + n(V1L, "test_job_stream_is_legacy_sse_with_ids_and_a_single_end"),
+        "SSE framing is frozen and the gateway template streams without buffering (T24C landed); SSE through"
+        " the running container and the ALS edge proxy needs the deployed stack",
     ),
-    "DEP-09": blocked([T24B, T24D], note="Layer and build-cache inspection needs built images"),
+    "DEP-09": oracle(
+        n(IMC, "test_final_images_hold_no_private_content", "test_dockerignore_backstop_excludes_private_paths")
+        + n(IMD, "test_no_secrets_or_broad_copies")
+        + n(CIR, "test_image_checks_pass_for_a_correct_image", "test_image_checks_fail_on_a_bad_image"),
+        "partial",
+        "The COPY allowlist and the .dockerignore backstop keep planted private files out of every final; no"
+        " secret or broad copy in the Dockerfile; the post-build image check refuses a bad image (T24B, T24D)",
+        "Layer-by-layer inspection of a real build and its cache (image_checks runs in build-app.yml after the"
+        " first CI build, T24E) and the untracked storage/terminology harvest files (audit A5-1, T28C)",
+    ),
     "DEP-10": blocked([T24E], note="Mount and restart behaviour needs the three-profile container integration"),
-    "DEP-11": blocked(
-        [T08B],
+    "DEP-11": oracle(
         n(
             SW,
             "test_als_approval_refused_for_non_admin_downgrade_worker_or_wrong_target",
             "test_worker_context_cannot_move_between_deployments",
-        ),
-        "The admin importer does not exist; the worker target/scope guard is covered",
+        )
+        + n(
+            GIG,
+            "test_missing_capability_and_scope_are_denied",
+            "test_forge_sentinels_and_links_survive_and_t08a_reader_sees_the_import",
+            "test_preflight_refusals",
+        )
+        + n(
+            V1L,
+            "test_publication_target_outside_the_deployment_is_denied",
+            "test_h5_gate_refuses_every_target_without_a_rehearsal_allowlist",
+        )
+        + n(V1C, "test_publication_gate_matches_base_and_namespace"),
+        "full",
+        "The importer takes its target from the deployment profile, denies a missing capability or scope, refuses"
+        " a target outside the deployment or the rehearsal allowlist, and never touches FORGE sentinels (T08B,"
+        " T14)",
+        fixtures=TILED_FIXTURE,
     ),
     "DEP-12": oracle(
         n(
@@ -1025,35 +1327,104 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         " local-operator",
         "Audit of an importer run and token-leak scan of its logs (T08B)",
     ),
-    "DEP-13": blocked(
-        [T23B, T08B], note="Needs JSON creation without Tiled (snapshot service) and an inference-free importer"
+    "DEP-13": oracle(
+        n(
+            SNC,
+            "test_build_runs_with_tiled_absent_network_blocked_and_no_shell",
+            "test_a_fresh_interpreter_builds_without_importing_tiled_or_the_tiled_backends",
+        )
+        + n(GIG, "test_importer_never_parses_calls_a_model_or_downloads")
+        + n(V1C, "test_default_operations_register_no_kind_and_no_publication")
+        + n(IMD, "test_runtime_has_no_runtime_pip_or_seed_steps")
+        + n(IMF, "test_services_and_order", "test_check_mode_prints_the_plan_without_starting"),
+        "partial",
+        "JSON creation runs with Tiled absent, the importer makes no parser, model or download call, the default"
+        " operations register no publication, and the images seed nothing at build or start (T23B, T08B, T14,"
+        " T24B)",
+        "Start of a built container never publishing a corpus (T24E deployment test)",
+        fixtures=TILED_FIXTURE,
     ),
-    "DEP-14": blocked(
-        [T08B],
+    "DEP-14": oracle(
         n(
             SW,
             "test_local_approval_never_authorizes_an_als_target",
             "test_staging_approval_does_not_authorize_prod",
-        ),
-        "Import receipts do not exist yet",
+        )
+        + n(
+            GIG,
+            "test_local_approval_cannot_authorize_an_als_target",
+            "test_receipt_is_a_separate_hashed_immutable_artifact",
+        )
+        + n(JBU, "test_pointer_only_moves_to_a_verified_receipt_for_its_own_target")
+        + n(SLA, "test_local_approval_cannot_authorize_the_als_target")
+        + n(SLI, "test_an_approval_verified_by_one_server_does_not_authorize_another"),
+        "full",
+        "The same JSON hash needs a target-specific plan, approval and receipt: local, staging and production"
+        " receipts never cross, also between two real 0.2.18 servers (T08B, T10, T25C)",
+        fixtures=TILED_FIXTURE,
     ),
-    "DEP-15": blocked([T24D], note="No CI publication workflow is under test"),
+    "DEP-15": oracle(
+        n(
+            CIW,
+            "test_build_runs_for_prs_with_read_only_permissions",
+            "test_build_never_logs_in_pushes_or_publishes",
+            "test_no_secret_is_referenced",
+            "test_publish_is_manual_dispatch_only",
+            "test_gate_fails_closed_on_o06_and_protected_ref",
+            "test_every_writer_job_is_gated_and_in_an_environment",
+            "test_the_gate_cannot_be_bypassed",
+            "test_only_the_job_token_logs_in_to_ghcr",
+            "test_promotion_is_a_retag_of_a_published_digest",
+        )
+        + n(
+            CIR,
+            "test_als_prod_needs_the_same_commit_staged_on_als_dev",
+            "test_promotion_refusals",
+            "test_publish_pushes_immutable_and_release_tags_never_channels",
+            "test_stale_build_cannot_move_a_channel_backwards_but_rollback_can",
+        ),
+        "partial",
+        "Pull requests build read-only and never publish; publication is manual dispatch inside named"
+        " environments behind an O06 gate that fails closed; promotion re-tags a published digest and :als-prod"
+        " needs the same commit staged on :als-dev (T24D)",
+        "The O06 tag rules are a proposal the owner has not approved, and GitHub environment protection is"
+        " server-side configuration (H6 / O06)",
+    ),
     "DEP-16": blocked([T24E], note="Ansible rollout and edge proxy are not built"),
     "DEP-17": blocked([T24E], note="Backup/restore of mounted state needs the container integration"),
     "DEP-18": blocked(
-        [T10, T24E],
-        n(TL, "test_recovery_after_killed_server"),
-        "Container health and job drain need the images and the job runner",
+        [T24E],
+        n(TL, "test_recovery_after_killed_server")
+        + n(JBW, "test_graceful_shutdown_requeues_running_job_and_keeps_finished_stages")
+        + n(IMS, "test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm"),
+        "Job drain on shutdown and the supervisor's ordered health/stop are covered in-process (T10, T24B"
+        " landed); container health and drain of the running images need the deployment integration",
     ),
-    "DEP-19": blocked(
-        [T25C, T18C, T14],
+    "DEP-19": oracle(
         n(
             SF,
             "test_local_every_exposed_inventoried_route_works_without_sign_in",
             "test_als_user_is_chat_only_and_denied_before_effects",
+        )
+        + n(SLL, "test_local_app_serves_every_route_without_sign_in", "test_local_graph_edit_and_tiled_uri_need_no_identity")
+        + n(
+            SLA,
+            "test_reader_privileged_work_is_denied_before_effects",
+            "test_admin_privileged_work_takes_effect",
+            "test_reader_cannot_change_deployment_wide_settings",
+        )
+        + n(V1T, "test_reader_is_chat_only_and_admin_publishes_with_a_real_role_check")
+        + n(
+            CLA,
+            "test_ui26_pending_survives_restart_and_applies_exactly_once",
+            "test_ui10_retry_after_a_streamed_action_does_not_apply_twice",
         ),
-        "Truthful old-UI behaviour (Save, edits) needs the frozen UI on real Tiled; API-level access is covered by"
-        " AUTH/LOCAL",
+        "partial",
+        "On :local every route and graph edit works without sign-in (D34); on an ALS-shaped real 0.2.18 server a"
+        " Tiled admin's edits take effect and a non-admin is denied before any effect (D30); a Save is never"
+        " faked, lost or applied twice across restart or retry (T25C, T14, T18C)",
+        "The frozen browser UI against the deployed ALS stack (T24E deployment test)",
+        fixtures=TILED_FIXTURE,
     ),
     "DEP-20": blocked(
         [T24E],
@@ -1061,7 +1432,14 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Profile-change persistence needs the deployment integration",
     ),
     "DEP-21": blocked([T24E, T13], note="Independent image and data rollback needs rehearsal"),
-    "DEP-22": blocked([T24C], note="Build/runtime base-path diagnosis needs the frontend build in the images"),
+    "DEP-22": oracle(
+        n(GWP, "test_build_runtime_prefix_mismatch_is_refused_with_a_rebuild_hint")
+        + n(IMP, "test_ui_built_for_another_prefix_is_refused")
+        + n(IMD, "test_build_checks_the_ui_prefix"),
+        "full",
+        "A UI bundle built for another base path is refused at gateway render, at image preflight and at image"
+        " build, each with a rebuild hint instead of a runtime ENV workaround (T24C, T24B)",
+    ),
     # ---- ALS authorization ------------------------------------------------------------------------------------
     "AUTH-01": oracle(
         n(
@@ -1189,11 +1567,34 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Identity and approval grants are bound to their ALS environment",
         "Import receipts and tokens across staging/production on real servers (T08B/T25C)",
     ),
-    "AUTH-09": blocked(
-        [T24C, T25C],
+    "AUTH-09": oracle(
         n(GC, "test_als_hosts_are_never_rewritten_to_localhost")
-        + n(ST, "test_admin_principal_is_parsed_from_0_2_18_shape"),
-        "Prefixed native Tiled sign-in return path needs the gateway and a real ALS Tiled",
+        + n(ST, "test_admin_principal_is_parsed_from_0_2_18_shape")
+        + n(
+            GWP,
+            "test_auth09_sign_in_round_trip_under_the_prefix",
+            "test_auth09_cookie_is_not_sent_outside_the_prefix",
+            "test_auth09_external_providers_stay_unsupported",
+            "test_auth09_no_tiled_auth_or_admin_proxy_through_the_gateway",
+        )
+        + n(
+            SLA,
+            "test_anonymous_gets_only_health_docs_and_sign_in",
+            "test_a_tiled_token_sent_by_the_browser_is_not_a_credential",
+            "test_sign_in_round_trip_keeps_tokens_server_side",
+            "test_sign_out_ends_the_session_here_and_at_tiled",
+        )
+        + n(
+            SLU,
+            "test_handlers_set_a_hardened_cookie_and_never_return_tokens",
+            "test_wrong_password_unknown_and_external_providers",
+        ),
+        "partial",
+        "Sign-in and return work beneath /fair2wise with a hardened prefix-scoped cookie; Tiled tokens stay"
+        " server-side and are never a browser credential; no Tiled auth or admin route is proxied through the"
+        " gateway; the round trip holds against a real multi-user 0.2.18 server (T24C, T25C)",
+        "The central ALS Tiled's own sign-in provider behind the edge proxy (T24E deployment test)",
+        fixtures=TILED_FIXTURE,
     ),
     "AUTH-10": oracle(
         n(SR, "test_forge_delegate_keeps_caller_capability")
@@ -1227,13 +1628,39 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Staging import of the committed artifact and the staging PASS report (T26C, T08B)",
         supporting=n(JK, "test_fixture_files_match_manifest_hashes"),
     ),
-    "REL-02": blocked(
-        [T26B, T08B], note="Production promotion without inference needs the promotion path and importer"
+    "REL-02": oracle(
+        n(GIG, "test_importer_never_parses_calls_a_model_or_downloads")
+        + n(JBU, "test_full_publication_verifies_receipts_and_activates")
+        + n(SNC, "test_build_runs_with_tiled_absent_network_blocked_and_no_shell")
+        + n(RLH, "test_lookup_and_export_never_select_by_branch_or_working_tree")
+        + n(RLP, "test_a_full_release_run_issues_only_read_only_git_and_never_touches_the_remote"),
+        "partial",
+        "Export selects committed bytes by commit and path, the importer makes no parser, model or download"
+        " call, publication verifies receipts and activates without rebuilding, and the release run is"
+        " read-only Git (T26B, T08B, T10)",
+        "The production promotion rehearsal on the real staging and production targets (T26C, T13)",
+        fixtures=TILED_FIXTURE,
     ),
-    "REL-03": blocked(
-        [T26B, T08B],
-        n(SW, "test_staging_approval_does_not_authorize_prod"),
-        "Target-scoped import plan and receipt are not built",
+    "REL-03": oracle(
+        n(SW, "test_staging_approval_does_not_authorize_prod")
+        + n(
+            GIG,
+            "test_local_approval_cannot_authorize_an_als_target",
+            "test_no_approval_wrong_plan_expired_and_modified_plans_are_refused_without_writes",
+            "test_receipt_is_a_separate_hashed_immutable_artifact",
+        )
+        + n(
+            JBU,
+            "test_pointer_only_moves_to_a_verified_receipt_for_its_own_target",
+            "test_import_requires_the_publish_capability_to_submit",
+        )
+        + n(SLI, "test_an_approval_verified_by_one_server_does_not_authorize_another"),
+        "partial",
+        "A production import needs its own target-scoped plan, an admin approval of exactly that plan and issues"
+        " its own hashed receipt; a staging approval or receipt, or one verified by another server, never"
+        " substitutes (T08B, T10, T25C)",
+        "The staging-then-production run on the real targets (T26C)",
+        fixtures=TILED_FIXTURE,
     ),
     "REL-04": oracle(
         n(
@@ -1245,14 +1672,38 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_gitignored_or_untracked_manifest_references_are_refused",
             "test_local_path_or_secret_in_manifest_is_refused",
             "test_extra_files_in_the_snapshot_directory_are_refused",
+        )
+        + n(
+            SNR,
+            "test_secrets_local_paths_and_signed_urls_are_rejected_without_echoing_values",
+            "test_path_allowlist_rejects_pdfs_crops_databases_env_and_private_stores",
+            "test_full_parsed_bodies_and_document_chunks_are_blocked_but_snippets_are_not",
+            "test_snapshot_creation_records_disclosure_status_and_blocks_commit_readiness",
         ),
         "partial",
         "Commit-ready check refuses gitignored papers, the source-RAG index, parsed bodies, crops, credentials and"
-        " local paths before commit, while tracked ops documents and snippets stay allowed",
-        "The CI re-check of committed blobs on push (.github workflow, T24D)",
+        " local paths before commit while tracked ops documents and snippets stay allowed; the snapshot records"
+        " its disclosure status and a failing one is not commit-ready (T26B, T23B)",
+        "A CI re-check of the committed snapshot blobs on push does not exist yet (the T24D workflows build"
+        " images and check them, not Git snapshots); it belongs to the promotion rehearsal (T26C)",
         supporting=n(JK, "test_fixture_inputs_carry_no_local_paths"),
     ),
-    "REL-05": blocked([T24B, T24D], note="Build-context and layer inspection needs the image build"),
+    "REL-05": oracle(
+        n(
+            IMC,
+            "test_final_images_hold_no_private_content",
+            "test_final_images_keep_code_schemas_and_tracked_kg_json",
+            "test_dockerignore_backstop_excludes_private_paths",
+        )
+        + n(IMD, "test_no_secrets_or_broad_copies")
+        + n(CIR, "test_image_checks_fail_on_a_bad_image"),
+        "partial",
+        "Every final keeps tracked KG JSON (owner O-D1) and excludes raw PDFs, parsed bodies, crops, the"
+        " source-RAG index, credentials and databases through the COPY allowlist and the .dockerignore backstop;"
+        " the post-build check refuses a bad image (T24B, T24D)",
+        "Intermediate layers and build cache of a real build (first CI build pending, T24E) and the untracked"
+        " storage/terminology harvest files the Dockerfile copies (audit A5-1 / PC-1, T28C)",
+    ),
     "REL-06": oracle(
         n(
             RLE,
@@ -1265,8 +1716,22 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         " promotion with no rebuild and nothing added to Git",
         "Runtime degraded-capability state on a target without the assets (T26C/T08B)",
     ),
-    "REL-07": blocked(
-        [T10, T26B, T23B], note="Journal reconciliation into a new committed JSON version is not built"
+    "REL-07": oracle(
+        n(
+            GIG,
+            "test_acknowledged_edit_is_never_lost_by_an_import",
+            "test_edit_journal_is_durable_append_only_and_ordered",
+        )
+        + n(GIF, "test_changed_snapshot_uses_create_new_revision_and_retires_old")
+        + n(SNC, "test_repair_creates_a_new_version_with_a_verified_parent", "test_existing_snapshot_is_never_overwritten")
+        + n(CLT, "test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits")
+        + n(RLR, "test_committed_snapshot_with_other_bytes_is_never_overwritten"),
+        "partial",
+        "Admin edits are journalled and reconciled into a new snapshot version with a verified parent; the"
+        " previous version and the committed bytes are never overwritten; an import that would erase an"
+        " acknowledged edit is refused (T08B, T23B, T26B, T18C)",
+        "Committing the reconciled version and promoting it end to end on the rehearsal target (T26C)",
+        fixtures=TILED_FIXTURE,
     ),
     "REL-08": blocked([T26C], note="Data rollback rehearsal"),
     "REL-09": blocked(
@@ -1277,18 +1742,30 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         n(SF, "test_local_every_exposed_inventoried_route_works_without_sign_in")
         + n(
             WS, "test_local_serves_every_route_with_zero_identity_calls", "test_local_health_is_full_and_path_free"
-        ),
+        )
+        + n(SLL, "test_local_app_serves_every_route_without_sign_in")
+        + n(GWP, "test_ui_assets_docs_and_deep_links"),
         "partial",
-        "Every inventoried route works locally without sign-in or identity calls, including with non-admin"
-        " credentials",
-        "Browser open of /fair2wise without a login redirect (T24C/T18C)",
+        "Every inventoried route works locally without sign-in or identity calls, including with non-admin,"
+        " expired or absent Tiled credentials against a real 0.2.18 server; /fair2wise and its deep links"
+        " resolve through the gateway without a redirect (T25C, T24C)",
+        "The browser opening the built :local image (T24E deployment test)",
+        fixtures=TILED_FIXTURE,
     ),
     "LOCAL-02": blocked(
-        [T25C, T08B, T10],
+        [H3GOLD],
         n(SF, "test_local_everything_allowed_without_sign_in_and_without_identity_calls")
-        + n(WS, "test_local_tiled_uri_stays_editable"),
-        "End-to-end local workflows (intake through publication and graph editing) need isolated fixtures and the"
-        " unmerged importer/jobs",
+        + n(WS, "test_local_tiled_uri_stays_editable")
+        + n(
+            SLL,
+            "test_local_app_serves_every_route_without_sign_in",
+            "test_local_json_build_approval_publication_and_graph_read",
+            "test_local_graph_edit_and_tiled_uri_need_no_identity",
+        ),
+        "The API-level local workflows (versioned JSON creation, approval, local Tiled publication, graph editing"
+        " and the Tiled URL setting) run without sign-in against disposable 0.2.18 servers (T25C, T08B, T10,"
+        " landed); whether literature intake, extraction and figure processing preserve their scientific"
+        " contracts on isolated fixtures rests on the pilot-paper labels (H3 B4)",
     ),
     "LOCAL-03": oracle(
         n(SW, "test_local_approval_is_local_operator_with_writer_and_no_identity")
@@ -1330,11 +1807,20 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         )
         + n(ST, "test_outages_and_bad_bodies_are_unavailable", "test_transport_errors_are_unavailable")
         + n(GS, "test_wrong_credential_is_denied_and_stopped_server_is_unavailable")
-        + n(SR, "test_identity_outage_never_enables_local_trust"),
-        "partial",
-        "Tiled credential/outage failures are truthful graph-operation errors, not empty results or trust grants",
-        "No sign-in challenge in the browser for a graph failure (T18C)",
-        fixtures=["tests/fixtures/tiled_server.py"],
+        + n(SR, "test_identity_outage_never_enables_local_trust")
+        + n(
+            SLW,
+            "test_missing_local_writer_is_a_graph_error_not_sign_in",
+            "test_revoked_writer_key_fails_graph_operations_and_leaves_chat",
+            "test_wrong_writer_key_is_writer_unauthorized_and_writes_nothing",
+        )
+        + n(GIG, "test_stopped_real_server_is_unavailable_not_empty")
+        + n(SLU, "test_handlers_set_a_hardened_cookie_and_never_return_tokens"),
+        "full",
+        "Missing, wrong or revoked local Tiled writer credentials and a stopped server are truthful graph-operation"
+        " errors (never a sign-in challenge, never empty results or a trust grant); chat and JSON capabilities"
+        " stay available; no credential reaches the browser (T25C, T08B)",
+        fixtures=TILED_FIXTURE,
     ),
     "LOCAL-07": oracle(
         n(SR, "test_als_with_local_trusted_refuses_startup", "test_identity_outage_never_enables_local_trust")
