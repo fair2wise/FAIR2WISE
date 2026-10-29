@@ -179,6 +179,17 @@ def _checks(tmp: Path, *, fail: Optional[str] = None) -> List[Path]:
     return paths
 
 
+def _in_git_work_tree() -> bool:
+    probe = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--is-inside-work-tree"],
+                           capture_output=True, text=True)
+    return probe.returncode == 0 and probe.stdout.strip() == "true"
+
+
+# build_manifest reads `git rev-parse <commit>:ui` from the checkout, as it does in CI. A
+# `git archive` export has no .git, so these cases cannot run there (same rule as 5177075).
+needs_git = pytest.mark.skipif(not _in_git_work_tree(), reason="release manifest needs a git checkout")
+
+
 def _manifest(tmp: Path, **kw: Any) -> Dict[str, Any]:
     head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True,
                           check=True).stdout.strip()
@@ -192,6 +203,7 @@ def _manifest(tmp: Path, **kw: Any) -> Dict[str, Any]:
     return manifest
 
 
+@needs_git
 def test_manifest_records_commit_digests_locks_tiled_and_ui_tree(tmp_path: Path) -> None:
     m = _manifest(tmp_path)
     assert m["schema"] == "f2w.release-manifest/v1"
@@ -210,6 +222,7 @@ def test_manifest_records_commit_digests_locks_tiled_and_ui_tree(tmp_path: Path)
         rm.verify_manifest(m, commit=m["commit"])
 
 
+@needs_git
 def test_manifest_with_a_failed_variant_is_never_publishable(tmp_path: Path) -> None:
     m = _manifest(tmp_path, fail="als-prod")
     assert not m["candidate_ok"]
@@ -217,6 +230,7 @@ def test_manifest_with_a_failed_variant_is_never_publishable(tmp_path: Path) -> 
         rm.verify_manifest(m, commit=m["commit"])
 
 
+@needs_git
 @pytest.mark.parametrize("mutate", [
     lambda m: m.update(event="pull_request"),
     lambda m: m.update(commit=OLDER),
@@ -234,6 +248,7 @@ def test_verify_manifest_refuses(tmp_path: Path, mutate) -> None:
         rm.verify_manifest(m, commit=commit)
 
 
+@needs_git
 def test_verify_images_needs_the_tested_ids_and_layers(tmp_path: Path) -> None:
     m = _manifest(tmp_path)
     loaded = [{"Id": e["image_id"], "RootFS": {"Layers": e["rootfs_layers"]}, "RepoTags": [f"f2w-candidate:{v}"],
