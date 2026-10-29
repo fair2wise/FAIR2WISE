@@ -176,11 +176,50 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 
 ---
 
+## D. Added since 2026-10-16
+
+### D1. Since H3 (extraction, schema, labels, operations)
+
+| # | Decision | Context | Recommendation |
+|---|---|---|---|
+| D1.1 | Approve schema set 0.3.0 (`reviews/H3/schema_diff_T22C.md`) | Until approved, builds and publishing refuse 0.3.0; the pilot cannot extract samples or runs | Approve |
+| D1.2 | Class name `MeasurementRun` (and `RunCondition`) | `Measurement` already exists (123 nodes in the rsoxs graphs) and keeps its meaning | Accept |
+| D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change |
+| D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release |
+| D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% |
+| D1.6 | A value both derived and in an attributing sentence | Tagged cited today | Keep cited |
+| D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag |
+| D1.8 | LOCAL-02 counts as gold with one reviewed paper | It needs a real run, not labels | Accept |
+| D1.9 | Content-hash step in Work counting (K1) | A renamed copy with no DOI, arXiv id or title counts separately | Add it, as a versioned rule change |
+| D1.10 | Near-duplicate title check | About 4.5 min at 10k keys | Run it as a job above a size limit |
+| D1.11 | Tiled scan that reaches the end of its listing | Reported complete, marked as a live read | Keep, with the warning |
+
+### D2. O06 image tag rules (T24D, `reviews/H6/o06_tag_rules_proposal.md`)
+
+Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
+
+| # | Decision | Proposal |
+|---|---|---|
+| D2.1 | Events per channel: do `:local`/`:als-dev` follow `forge_merge` pushes? | No: manual dispatch only |
+| D2.2 | Reviewers for `ghcr-publish` and `ghcr-als-prod`; block self-review? | Owner plus one; block self-review on prod |
+| D2.3 | Condition for promotion to `:als-prod` | Same digest already on `:als-dev` |
+| D2.4 | Registry name, owner and package visibility | `ghcr.io/fair2wise/fair2wise`, private |
+| D2.5 | Tag forms (full or short commit) | Full commit |
+| D2.6 | Stop publishing the legacy `agent` image | Yes |
+| D2.7 | Retention | Images 30 days, manifests 90 |
+| D2.8 | Platforms | amd64 only until O08 |
+| D2.9 | Pin base images by digest | Yes |
+| D2.10 | Require a binary report reference in each release | Record it; never gating (H3 B) |
+
+---
+
 ## Already settled (for reference)
 
-H0, H1 and H2 are approved. The H3 answers so far are B (non-blocking
-validation), S4 (LBNL BSD-style licence everywhere) and F5/F6 (Sample,
-Measurement and Instrument classes, additive; task T22C in
-`plan_addenda.md` A4). The workflow_mode decision (admin-only), the role-check
+H0, H1, H2 and H3 are approved (H3 on 2026-10-16). H3 answers include B
+(non-blocking validation), S4 (LBNL BSD-style licence everywhere), F2 (all
+values captured and tagged), F5/F6 (Sample, MeasurementRun and Instrument
+classes, additive; task T22C in `plan_addenda.md` A4), B4 (pilot papers A-C,
+provisional CBORG-model labels) and B7/O-U2 (judge model picked in the
+settings panel). The workflow_mode decision (admin-only), the role-check
 max age (O-A2: 60 s, capped at 900 s) and per-user default graphs were settled
 at H1/H2.
