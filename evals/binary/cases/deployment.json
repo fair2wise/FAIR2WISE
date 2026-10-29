@@ -322,8 +322,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "5cad3abfe10e2e5e18c01565fc264fd0251148d0b08c2ab81994704111d70f62",
-        "config_sha256": "7481f7ebc26ec146dbca77b2c18ebe908e464beeeba42312a158a32af3d2235d",
+        "case_sha256": "1247ed0be00605b0191975006bbf5d23752391fd4ea7f5307b0f5de83a1f66f4",
+        "config_sha256": "ffab621d58cc418cde63bda8e64c5ebf15fe83a80a7e02e370313cd0c4b03f8f",
         "model_sha256": null,
         "oracle_source_sha256": "907ae317f8ef301b43bbb0319f3ca8627f5e1a08980250ed8fc571a83e0f7ec0",
         "schema_sha256": null
@@ -342,13 +342,12 @@
           "tests/gateway/test_gateway_prefix.py::test_ui_assets_docs_and_deep_links",
           "tests/gateway/test_gateway_prefix.py::test_not_found_never_becomes_html",
           "tests/gateway/test_gateway_prefix.py::test_index_is_not_cached_and_assets_are_immutable",
-          "tests/gateway/test_gateway_prefix.py::test_built_ui_and_docs_through_the_gateway",
           "tests/gateway/test_gateway_prefix.py::test_static_ui_and_api_share_one_origin",
           "tests/gateway/test_mkdocs_image_config.py::test_strict_build_from_the_docs_stage_layout",
           "tests/images/test_images_dockerfile.py::test_build_checks_the_ui_prefix"
         ],
         "supporting_selectors": [],
-        "uncovered": "The real nginx in a built image serving the bundle (T24E deployment test)"
+        "uncovered": "The built bundle through the gateway (tests/gateway::test_built_ui_and_docs_through_the_gateway needs a GATEWAY_IMAGE_ROOT built by the image, so it is not a fake-run oracle) and the real nginx in a built image (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

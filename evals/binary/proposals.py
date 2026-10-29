@@ -1220,7 +1220,6 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_ui_assets_docs_and_deep_links",
             "test_not_found_never_becomes_html",
             "test_index_is_not_cached_and_assets_are_immutable",
-            "test_built_ui_and_docs_through_the_gateway",
             "test_static_ui_and_api_share_one_origin",
         )
         + n(GWM, "test_strict_build_from_the_docs_stage_layout")
@@ -1229,7 +1228,9 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "UI assets, deep links and the MkDocs site resolve beneath /fair2wise from one origin, a missing asset"
         " is 404 not HTML, index is uncached and assets immutable, the image build checks the UI prefix (T24C,"
         " T24B)",
-        "The real nginx in a built image serving the bundle (T24E deployment test)",
+        "The built bundle through the gateway (tests/gateway::test_built_ui_and_docs_through_the_gateway needs a"
+        " GATEWAY_IMAGE_ROOT built by the image, so it is not a fake-run oracle) and the real nginx in a built"
+        " image (T24E deployment test)",
     ),
     "DEP-06": oracle(
         n(
