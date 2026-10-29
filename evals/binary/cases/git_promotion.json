@@ -70,10 +70,7 @@
       "title": "Committed JSON equals validated graph bytes"
     },
     {
-      "blocked_by": [
-        "T26B (committed artifact validation and export)",
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-02",
       "case_revision": 1,
       "change_reason": null,
@@ -92,28 +89,40 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Production promotion invokes zero extraction or inference",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "Transfer/export/import approved Git JSON without parser/model/acquisition/canonicalization calls.",
       "expected_rule_source": "companion_expected_rule",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "361e57e5b6f8530e3b3fa191047dff763cda621735bfd62d16387880c9fbbb42",
-        "config_sha256": "305dcaf7f1a837358bb625c55dcaf297cdf5abd392da320fa8afd659e02c95b8",
+        "case_sha256": "8bd975e57302fe5c57a9c54823cf7ad6c48b243e9286d2c40b2fdf63dd0b6ff0",
+        "config_sha256": "0e5adb9afbc22546e032809edb52a6ee72f1d219f01deee96493774f0bf165d7",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "b81955348583e98e28f87ec5a64cb0085f18cb2277d5cf71ee5d5f8572918501",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
+        "tests/snapshots/snapshot_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Export selects committed bytes by commit and path, the importer makes no parser, model or download call, publication verifies receipts and activates without rebuilding, and the release run is read-only Git (T26B, T08B, T10)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/graph_import/test_import_guards.py::test_importer_never_parses_calls_a_model_or_downloads",
+          "tests/jobs/test_publication.py::test_full_publication_verifies_receipts_and_activates",
+          "tests/snapshots/test_snapshot_create.py::test_build_runs_with_tiled_absent_network_blocked_and_no_shell",
+          "tests/releases/test_release_happy_path.py::test_lookup_and_export_never_select_by_branch_or_working_tree",
+          "tests/releases/test_release_no_push.py::test_a_full_release_run_issues_only_read_only_git_and_never_touches_the_remote"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Production promotion without inference needs the promotion path and importer"
+        "uncovered": "The production promotion rehearsal on the real staging and production targets (T26C, T13)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -121,7 +130,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -133,10 +142,7 @@
       "title": "Production promotion invokes zero extraction or inference"
     },
     {
-      "blocked_by": [
-        "T26B (committed artifact validation and export)",
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-03",
       "case_revision": 1,
       "change_reason": null,
@@ -155,32 +161,44 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Production import has independent authorization and receipt",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "Staging receipt/approval cannot substitute for target-scoped production admin plan.",
       "expected_rule_source": "companion_expected_rule",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "997b51cb90a8ef083a63772ad4c78e1f6c8f0c9feae85ae3b3556eca2017abb5",
-        "config_sha256": "5c71dcc18c1485b84b6a356e29089a2ac99fecb0d529a01a389602a17de0f3c7",
+        "case_sha256": "58d4662793e8a5218505ccf4ff866ea2fcb5affe011edbc4951955c9131ff761",
+        "config_sha256": "708644e68cd113da330728244837171b4cf765a834d3e02a1c2f7ebc29be819e",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "47ebc2544cc836d498835057367e7ef43b90a2581cbde8131846a6dc5371d0ce",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/security/security_fakes.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "A production import needs its own target-scoped plan, an admin approval of exactly that plan and issues its own hashed receipt; a staging approval or receipt, or one verified by another server, never substitutes (T08B, T10, T25C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod"
+        "selectors": [
+          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod",
+          "tests/graph_import/test_import_guards.py::test_local_approval_cannot_authorize_an_als_target",
+          "tests/graph_import/test_import_guards.py::test_no_approval_wrong_plan_expired_and_modified_plans_are_refused_without_writes",
+          "tests/graph_import/test_import_guards.py::test_receipt_is_a_separate_hashed_immutable_artifact",
+          "tests/jobs/test_publication.py::test_pointer_only_moves_to_a_verified_receipt_for_its_own_target",
+          "tests/jobs/test_publication.py::test_import_requires_the_publish_capability_to_submit",
+          "tests/security_live/test_live_identity.py::test_an_approval_verified_by_one_server_does_not_authorize_another"
         ],
-        "uncovered": "Target-scoped import plan and receipt are not built"
+        "supporting_selectors": [],
+        "uncovered": "The staging-then-production run on the real targets (T26C)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -188,7 +206,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -226,18 +244,19 @@
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "a81e7acea52aaa44e358a22aa1e6dfda2331264e419d6ad9fa2edd3e2dc66743",
-        "config_sha256": "e7c27f45e1ff728ed423a314d576c313c2ceaac1512a17408bd3f53337f65957",
+        "case_sha256": "ed0a4a830b26b91017b19673f295015fc884b1511f7048c2bccdbb239373c16d",
+        "config_sha256": "37a353ee54aa899548bf675881ac42e4ad4951277133e56518d085c9a5fb5870",
         "model_sha256": null,
-        "oracle_source_sha256": "16d7ac18afa02cd42fdb757c504cbbd15e949a20bd97a59225dad3c69b86b5f9",
+        "oracle_source_sha256": "2e06361bdfab72ca3bfb126db7d16b5a49c81f25d566e014c8c21752b9bdb5e9",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/contracts/json_kg/"
+        "tests/contracts/json_kg/",
+        "tests/snapshots/snapshot_fakes.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Commit-ready check refuses gitignored papers, the source-RAG index, parsed bodies, crops, credentials and local paths before commit, while tracked ops documents and snippets stay allowed",
+        "covers": "Commit-ready check refuses gitignored papers, the source-RAG index, parsed bodies, crops, credentials and local paths before commit while tracked ops documents and snippets stay allowed; the snapshot records its disclosure status and a failing one is not commit-ready (T26B, T23B)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -247,10 +266,14 @@
           "tests/releases/test_release_refusals.py::test_full_parsed_bodies_local_paths_and_credentials_in_the_graph_are_refused",
           "tests/releases/test_release_refusals.py::test_gitignored_or_untracked_manifest_references_are_refused",
           "tests/releases/test_release_refusals.py::test_local_path_or_secret_in_manifest_is_refused",
-          "tests/releases/test_release_refusals.py::test_extra_files_in_the_snapshot_directory_are_refused"
+          "tests/releases/test_release_refusals.py::test_extra_files_in_the_snapshot_directory_are_refused",
+          "tests/snapshots/test_release_verification.py::test_secrets_local_paths_and_signed_urls_are_rejected_without_echoing_values",
+          "tests/snapshots/test_release_verification.py::test_path_allowlist_rejects_pdfs_crops_databases_env_and_private_stores",
+          "tests/snapshots/test_release_verification.py::test_full_parsed_bodies_and_document_chunks_are_blocked_but_snippets_are_not",
+          "tests/snapshots/test_release_verification.py::test_snapshot_creation_records_disclosure_status_and_blocks_commit_readiness"
         ],
         "supporting_selectors": [],
-        "uncovered": "The CI re-check of committed blobs on push (.github workflow, T24D)"
+        "uncovered": "A CI re-check of the committed snapshot blobs on push does not exist yet (the T24D workflows build images and check them, not Git snapshots); it belongs to the promotion rehearsal (T26C)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -272,10 +295,7 @@
       "title": "Git commit candidates exclude private source and secrets"
     },
     {
-      "blocked_by": [
-        "T24B (build shared runtime and the three image finals)",
-        "T24D (GitHub Actions build/publication and protected tags)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-05",
       "case_revision": 2,
       "change_reason": "Recorded owner decision(s): H1 owner_decisions O-D1 (verbatim snippets in stored KG JSON, 2026-10-12). Listed in docs/migration/reviews/H3/case_changes.md.",
@@ -294,28 +314,37 @@
       },
       "companion_expected_rule": "All three variants exclude Git-tracked corpus data from build context/final and intermediate layers.",
       "companion_title": "Tracked graph snapshots remain outside image layers",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "All three variants exclude Git-tracked corpus data from build context/final and intermediate layers. Owner decision update: tracked KG JSON (storage/kg, storage/terminology) is kept in the Docker image; raw PDFs, full parsed paper bodies, figure crops, the source-RAG index (storage/source_index), credentials, local paths and operational databases remain excluded from build context and all layers.",
       "expected_rule_source": "owner_decision",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "47c5a94c6852872dad3a84e986af74480d02d2e7a2f4e1d0fd7639479eeab254",
-        "config_sha256": "baceb7e25d4c85c2b25b314592ecf040b096eb8c8e2b82cb71a89a3368105f67",
+        "case_sha256": "d216c7e152064d6167038677a8bbe85f47d787959bee98dec54754862b9fb53c",
+        "config_sha256": "da6388537da4137cce4d5ef6067c4c54ba41dbb78119584c9306f1994f07080e",
         "model_sha256": null,
-        "oracle_source_sha256": "0390cd83309f71b347435622a1d000850e51267432ee24613c8b076a1f76327b",
+        "oracle_source_sha256": "b1977417ee107418a0426e3b2dcf0d97cb114a4480427c0c5e80d37484e1a8ea",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/images/dockerfile_model.py",
+        "tests/images/fake_service.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Every final keeps tracked KG JSON (owner O-D1) and excludes raw PDFs, parsed bodies, crops, the source-RAG index, credentials and databases through the COPY allowlist and the .dockerignore backstop; the post-build check refuses a bad image (T24B, T24D)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/images/test_images_context.py::test_final_images_hold_no_private_content",
+          "tests/images/test_images_context.py::test_final_images_keep_code_schemas_and_tracked_kg_json",
+          "tests/images/test_images_context.py::test_dockerignore_backstop_excludes_private_paths",
+          "tests/images/test_images_dockerfile.py::test_no_secrets_or_broad_copies",
+          "tests/ci/test_release_scripts.py::test_image_checks_fail_on_a_bad_image"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Build-context and layer inspection needs the image build"
+        "uncovered": "Intermediate layers and build cache of a real build (first CI build pending, T24E) and the untracked storage/terminology harvest files the Dockerfile copies (audit A5-1 / PC-1, T28C)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -323,7 +352,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -401,11 +430,7 @@
       "title": "Private evidence dependencies are checked without hidden rebuild"
     },
     {
-      "blocked_by": [
-        "T10 (durable jobs and curation)",
-        "T26B (committed artifact validation and export)",
-        "T23B (immutable JSON snapshot service)"
-      ],
+      "blocked_by": [],
       "case_id": "REL-07",
       "case_revision": 1,
       "change_reason": null,
@@ -424,28 +449,41 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Admin edits produce a new committed promotion version",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "Reconcile journal into new JSON, preserve previous version; older import cannot erase acknowledged edits.",
       "expected_rule_source": "companion_expected_rule",
       "family": "REL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "05dce16362426ba4a5b0e1387937a70df3bbb63f765e7b01be55b16aaf5cb51d",
-        "config_sha256": "b732087dc9bffa83827807abbbed55ecbee457be944848a7bd8f0ce483bb2291",
+        "case_sha256": "59bec562d7b9294d20026eb9de0cf778f9a77f724ceab85a86e632854ef98817",
+        "config_sha256": "e256dc7220dfe1b44d35f5f88bb61830d03bf945e90b195a7074cff3dd989190",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "839240824685c0e473cca3da9f8a07c48d7e6a3b28ce374128228175ad4918e7",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/snapshots/snapshot_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Admin edits are journalled and reconciled into a new snapshot version with a verified parent; the previous version and the committed bytes are never overwritten; an import that would erase an acknowledged edit is refused (T08B, T23B, T26B, T18C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/graph_import/test_import_guards.py::test_acknowledged_edit_is_never_lost_by_an_import",
+          "tests/graph_import/test_import_guards.py::test_edit_journal_is_durable_append_only_and_ordered",
+          "tests/graph_import/test_import_flow.py::test_changed_snapshot_uses_create_new_revision_and_retires_old",
+          "tests/snapshots/test_snapshot_create.py::test_repair_creates_a_new_version_with_a_verified_parent",
+          "tests/snapshots/test_snapshot_create.py::test_existing_snapshot_is_never_overwritten",
+          "tests/contracts/legacy_ui/closure/test_closure_tiled.py::test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits",
+          "tests/releases/test_release_refusals.py::test_committed_snapshot_with_other_bytes_is_never_overwritten"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Journal reconciliation into a new committed JSON version is not built"
+        "uncovered": "Committing the reconciled version and promoting it end to end on the rehearsal target (T26C)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -453,7 +491,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [

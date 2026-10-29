@@ -4,7 +4,9 @@ All 108 companion cases are imported; none is dropped. A case's expectation chan
 only where ``proposals.CHANGES`` cites a recorded owner decision, and each such change is
 listed in ``docs/migration/reviews/H3/case_changes.md`` for owner review. The companion
 file is read, never modified. Every case is written with ``owner_approval.status =
-proposed``; approval is an H3 owner act.
+proposed``; approval is an H3 owner act. The only way a case becomes ``approved`` is the
+owner-run ``python -m evals.binary.approve`` (see that module), which writes
+``evals/binary/approvals.json``; this generator reads that record and never creates it.
 
     python -m evals.binary.import_companion            # rewrite the generated files
     python -m evals.binary.import_companion --check    # exit 1 if they are out of date
@@ -17,7 +19,7 @@ import copy
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from evals.binary import proposals
 from evals.binary.labeling.pilot import CASE_PAPERS
@@ -36,6 +38,8 @@ from evals.binary.model import (
 from evals.binary.rubric_drafts import RUBRICS
 
 COMPANION = "docs/migration/companion/binary_case_inventory.json"
+#: Owner approval record written by ``evals.binary.approve`` (absent = nothing approved).
+APPROVALS = "evals/binary/approvals.json"
 SPEC = "docs/migration/companion/BINARY_EVALUATION_SPEC.md"
 DECISIONS = "docs/migration/reviews/H1/owner_decisions.md"
 H2_DECISION = "docs/migration/reviews/H2/decision.json"
@@ -81,6 +85,24 @@ FIXTURE_DIRS = {
     "tests/contracts/legacy_ui": ["tests/contracts/legacy_ui/"],
     "tests/tiled": ["tests/fixtures/tiled_server.py"],
     "tests/graph_tiled": ["tests/fixtures/tiled_server.py"],
+    # landed after the H3 packet (rebound 2026-10-29)
+    "tests/graph_import": ["tests/graph_import/import_fakes.py", "tests/fixtures/tiled_server.py"],
+    "tests/jobs": ["tests/jobs/jobs_fakes.py", "tests/jobs/publish_fakes.py"],
+    "tests/snapshots": ["tests/snapshots/snapshot_fakes.py"],
+    "tests/images": ["tests/images/dockerfile_model.py", "tests/images/fake_service.py"],
+    "tests/gateway": ["tests/gateway/nginx_model.py"],
+    "tests/security_live": [
+        "tests/security_live/live_support.py",
+        "tests/security_live/live_apps.py",
+        "tests/fixtures/tiled_server.py",
+    ],
+    "tests/api_v1": ["tests/api_v1/_v1_support.py"],
+    "tests/api_v1_live": ["tests/fixtures/tiled_server.py"],
+    "tests/contracts/legacy_ui/closure": [
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+    ],
+    "tests/schema": ["tests/schema/t22c_fixtures.py"],
 }
 
 
@@ -96,7 +118,18 @@ def _fixtures(case_files: List[str], declared: List[str]) -> List[str]:
     return sorted(r for r in refs if (REPO_ROOT / r).exists())
 
 
-def build_case(companion_case: Dict[str, Any]) -> Dict[str, Any]:
+def load_approvals(root: Path = REPO_ROOT) -> Optional[Dict[str, Any]]:
+    """The owner approval record, or ``None`` when no approval has been recorded."""
+    path = root / APPROVALS
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or "human_gates" not in data or "cases" not in data:
+        raise ValueError(f"{APPROVALS} is not an approval record")
+    return data
+
+
+def build_case(companion_case: Dict[str, Any], approvals: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Build one manifest record from a companion record and its proposal."""
     cid = companion_case["case_id"]
     spec = proposals.ORACLES[cid]
@@ -174,6 +207,14 @@ def build_case(companion_case: Dict[str, Any]) -> Dict[str, Any]:
             record["blocked_by"] = list(record["blocked_by"]) + [B4_LABELS]
         record["source_refs"] = record["source_refs"] + [PILOT_DOC]
     record["source_refs"] = sorted(set(record["source_refs"]))
+    granted = (approvals or {}).get("cases", {}).get(cid)
+    if granted:
+        # Only the owner-run approve command writes this record; the generator copies it.
+        record["owner_approval"] = {
+            "status": "approved",
+            "ref": granted["ref"],
+            "approved_by": granted["approved_by"],
+        }
     # hashes last: they cover the finished record
     record["hashes"] = {
         "case_sha256": "",
@@ -193,10 +234,10 @@ def build_case(companion_case: Dict[str, Any]) -> Dict[str, Any]:
     return record
 
 
-def build_all() -> Tuple[Dict[str, str], Dict[str, Any]]:
+def build_all(approvals: Optional[Dict[str, Any]] = None) -> Tuple[Dict[str, str], Dict[str, Any]]:
     """Return ``({relative file name: text}, in-memory header)`` for the whole generated manifest."""
     inventory = json.loads((REPO_ROOT / COMPANION).read_text(encoding="utf-8"))
-    cases = [build_case(c) for c in inventory["cases"]]
+    cases = [build_case(c, approvals) for c in inventory["cases"]]
     assert len(cases) == 108, "all companion cases must be imported"
     by_suite: Dict[str, List[Dict[str, Any]]] = {}
     for case in cases:
@@ -216,12 +257,21 @@ def build_all() -> Tuple[Dict[str, str], Dict[str, Any]]:
             + "\n"
         )
     required = sorted(c["case_id"] for c in cases if c["required"])
+    gate_records = (approvals or {}).get("human_gates", {})
+    human_gates = {"H3": gate_records.get("H3", {}).get("status", "not_approved")}
+    approved_count = sum(1 for c in cases if c["owner_approval"]["status"] == "approved")
     header = {
         "manifest_version": MANIFEST_VERSION,
-        "status": "proposed_for_h3_not_approved",
+        "status": (
+            "h3_recorded_by_owner" if human_gates["H3"] == "approved" else "proposed_for_h3_not_approved"
+        ),
         "note": (
             "All cases are proposals. Owner approval of cases, oracles and rubrics is the H3 gate; no agent"
             " approves."
+            if human_gates["H3"] != "approved"
+            else f"H3 approval recorded by the owner with python -m evals.binary.approve ({approved_count} of"
+            f" {len(cases)} cases approved; the rest stay proposed because their expected rule changed since the"
+            " reviewed packet). Rubrics stay draft until H3 B4 labels exist. No agent approves."
         ),
         "companion_source": {
             "path": COMPANION,
@@ -233,7 +283,8 @@ def build_all() -> Tuple[Dict[str, str], Dict[str, Any]]:
         "rubrics_file": "rubrics.json",
         "required_case_ids": required,
         "required_membership_sha256": sha256_text(canonical_json(required)),
-        "human_gates": {"H3": "not_approved"},
+        "human_gates": human_gates,
+        "human_gate_records": gate_records,
         "repeat_policy": REPEAT_POLICY,
     }
     files["index.json"] = json.dumps(header, indent=2, sort_keys=True) + "\n"
@@ -334,8 +385,8 @@ def changes_markdown(cases: List[Dict[str, Any]]) -> str:
 
 
 def write_outputs(root: Path = REPO_ROOT, cases_dir: Path = CASES_DIR) -> List[Path]:
-    """Write the generated manifest, rubrics and the changes document."""
-    files, _ = build_all()
+    """Write the generated manifest, rubrics and the changes document (approvals read from ``root``)."""
+    files, _ = build_all(load_approvals(root))
     written = []
     cases_dir.mkdir(parents=True, exist_ok=True)
     for name, text in files.items():
@@ -356,7 +407,7 @@ def write_outputs(root: Path = REPO_ROOT, cases_dir: Path = CASES_DIR) -> List[P
 
 def check_outputs(root: Path = REPO_ROOT, cases_dir: Path = CASES_DIR) -> List[str]:
     """Names of generated files that differ from what the generator would write now."""
-    files, _ = build_all()
+    files, _ = build_all(load_approvals(root))
     stale = [
         n
         for n, text in files.items()

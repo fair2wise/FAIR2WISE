@@ -61,9 +61,35 @@ def test_the_companion_file_is_the_one_the_manifest_was_generated_from():
 
 
 def test_nothing_is_approved_by_an_agent():
-    assert MANIFEST.header["human_gates"] == {"H3": "not_approved"}
-    for case in MANIFEST.cases:
-        assert case["owner_approval"] == {"status": "proposed", "ref": None, "approved_by": None}, case["case_id"]
+    """No approval exists unless the owner recorded one with ``python -m evals.binary.approve``.
+
+    Without ``evals/binary/approvals.json`` (the committed state until the owner acts) nothing
+    is approved. If the owner has recorded one, every approval must trace to that record,
+    which must trace to a decision file that says ``approved`` and still has the recorded hash.
+    """
+    record = import_companion.load_approvals()
+    if record is None:
+        assert MANIFEST.header["human_gates"] == {"H3": "not_approved"}
+        assert MANIFEST.header["human_gate_records"] == {}
+        for case in MANIFEST.cases:
+            assert case["owner_approval"] == {"status": "proposed", "ref": None, "approved_by": None}, case["case_id"]
+    else:
+        gate = record["human_gates"]["H3"]
+        decision_path = REPO_ROOT / gate["decision_ref"]
+        decision = json.loads(decision_path.read_text(encoding="utf-8"))
+        assert decision["gate"] == "H3" and decision["status"] == "approved"
+        assert hashlib.sha256(decision_path.read_bytes()).hexdigest() == gate["decision_sha256"]
+        assert gate["approved_by"].strip() and gate["status"] == "approved"
+        assert MANIFEST.header["human_gates"] == {"H3": "approved"}
+        assert MANIFEST.header["human_gate_records"] == record["human_gates"]
+        for case in MANIFEST.cases:
+            granted = record["cases"].get(case["case_id"])
+            if granted is None:
+                assert case["owner_approval"] == {"status": "proposed", "ref": None, "approved_by": None}
+            else:
+                assert case["owner_approval"] == {
+                    "status": "approved", "ref": gate["decision_ref"], "approved_by": gate["approved_by"],
+                }, case["case_id"]
     for rubric in load_rubrics().values():
         assert rubric["approval_status"] == "draft" and rubric["approval_ref"] is None
 

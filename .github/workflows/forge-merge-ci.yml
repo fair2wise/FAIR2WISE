@@ -79,16 +79,66 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements/dev.txt
+      # The pytest exit status is not the gate: a failure that is in the recorded
+      # known-failure set is tolerated, any other failure (or a known one now passing)
+      # fails the next step. The JUnit file must exist, so a crash before any test ran
+      # fails here instead of being compared against nothing (T28B, audit AUD-09).
       - name: Full suite (failures recorded, not hidden)
         run: |
           mkdir -p "$RUNNER_TEMP/home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
-            python -m pytest -q -p no:cacheprovider --junitxml=full.xml || true
-      - name: Compare with the known-failure set
+            python -m pytest -q -p no:cacheprovider --junitxml=full.xml; status=$?
+          test -s full.xml || exit "$status"
+      - name: Compare with the known-failure set (the gate)
         run: python scripts/ci/compare_known_failures.py full.xml docs/migration/reviews/H0/known_failures.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with: { name: full-junit, path: full.xml }
+
+  python-tiled-suites:
+    # The ~260 tests behind tests/fixtures/tiled_server.py skip without F2W_TILED_PYTHON.
+    # This job gives them the same isolated tiled[server]==0.2.18 environment as the
+    # :local image (Dockerfile tiled-server-build): the wheel is downloaded with --no-deps
+    # and checked against the owner pin (O-T1, PINNED_TILED_WHEEL_SHA256 in
+    # app/modules/deployment/tiled_config.py), installed into its own venv under the
+    # server constraints, never into the app environment. Servers are disposable
+    # 127.0.0.1 instances on ephemeral ports; no central Tiled, no credentials (T28B, AUD-09).
+    name: Tiled-backed suites (disposable 0.2.18 servers)
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - name: Install the H0 environment
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements/dev.txt
+      - name: Isolated Tiled 0.2.18 server environment (hash-checked wheel)
+        run: |
+          mkdir -p "$RUNNER_TEMP/tiled-wheel"
+          python -m pip download --no-deps --only-binary=:all: --dest "$RUNNER_TEMP/tiled-wheel" "tiled==0.2.18"
+          echo "416079d4b5c9acc5498197d48c05a951ee8f7c699ac3b07920ae907a8da7fa06  $RUNNER_TEMP/tiled-wheel/tiled-0.2.18-py3-none-any.whl" \
+            | sha256sum -c -
+          python -m venv "$RUNNER_TEMP/venv-tiled"
+          "$RUNNER_TEMP/venv-tiled/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/venv-tiled/bin/python" -m pip install \
+            --constraint docker/profiles/tiled-server/constraints.txt \
+            "$RUNNER_TEMP/tiled-wheel/tiled-0.2.18-py3-none-any.whl[server]"
+          "$RUNNER_TEMP/venv-tiled/bin/python" -m pip check
+          "$RUNNER_TEMP/venv-tiled/bin/python" -I -c "import sys, tiled; sys.exit(tiled.__version__ != '0.2.18')"
+      - name: Tiled-backed suites
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            F2W_TILED_PYTHON="$RUNNER_TEMP/venv-tiled/bin/python" \
+            python -m pytest tests/tiled tests/graph tests/graph_import tests/security_live tests/api_v1_live \
+              tests/images tests/contracts/legacy_ui/closure \
+              -q -p no:cacheprovider --junitxml=tiled.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with: { name: tiled-junit, path: tiled.xml }
 
   import-closure:
     name: Syntax check and legacy entrypoints
@@ -178,5 +228,6 @@ jobs:
       - run: pip install -r requirements/dev.txt
       - run: mkdocs build --strict -f mkdocs/mkdocs.yml
 
-  # Added when their fixtures exist: real-API browser tests against the frozen UI
-  # (T18B, required at H2) and disposable-Tiled publication/edit tests (T20B/T18C).
+  # Still to add when its fixtures exist: real-API browser tests against the frozen UI
+  # (T18B, required at H2). The disposable-Tiled suites (T20B/T08B/T25C/T18C) run in
+  # python-tiled-suites above.

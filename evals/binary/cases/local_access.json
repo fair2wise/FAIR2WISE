@@ -33,28 +33,34 @@
       "family": "LOCAL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "794c9cf327bdb090f9a2954fd42aea0403c52995958447481b6d607b38ad18f6",
-        "config_sha256": "1b7bfc54c11acf0b2880c383f126ff0611fe9796d05e523a96630c48e282fc27",
+        "case_sha256": "9ff024a2330a61ffd0f6d33c58d56fe4ff44da4e054e61e336d56d4a9b17510d",
+        "config_sha256": "c56651392557de5c3dac375a5de865dfa75bb2ff7aed1eab2fc5ed4248c3b4f4",
         "model_sha256": null,
-        "oracle_source_sha256": "cbfbd08badc778c90f195abf79a63b618065d981790a2c0b93e3d3fe6e60ee3c",
+        "oracle_source_sha256": "d0e887bc2e5dbf69adc3ae93f609553a6b9ec98280050693ed1445e78400c336",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/api_wiring/_wiring_support.py",
-        "tests/security/security_fakes.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/gateway/nginx_model.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Every inventoried route works locally without sign-in or identity calls, including with non-admin credentials",
+        "covers": "Every inventoried route works locally without sign-in or identity calls, including with non-admin, expired or absent Tiled credentials against a real 0.2.18 server; /fair2wise and its deep links resolve through the gateway without a redirect (T25C, T24C)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
           "tests/security/test_security_fastapi.py::test_local_every_exposed_inventoried_route_works_without_sign_in",
           "tests/api_wiring/test_wiring_startup.py::test_local_serves_every_route_with_zero_identity_calls",
-          "tests/api_wiring/test_wiring_startup.py::test_local_health_is_full_and_path_free"
+          "tests/api_wiring/test_wiring_startup.py::test_local_health_is_full_and_path_free",
+          "tests/security_live/test_live_local_no_login.py::test_local_app_serves_every_route_without_sign_in",
+          "tests/gateway/test_gateway_prefix.py::test_ui_assets_docs_and_deep_links"
         ],
         "supporting_selectors": [],
-        "uncovered": "Browser open of /fair2wise without a login redirect (T24C/T18C)"
+        "uncovered": "The browser opening the built :local image (T24E deployment test)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -75,9 +81,7 @@
     },
     {
       "blocked_by": [
-        "T25C (no-login local workflows and real ALS Tiled role enforcement)",
-        "T08B (Tiled importer over saved JSON, receipts, writes)",
-        "T10 (durable jobs and curation)",
+        "H3 (owner-approved gold fixtures and source truth)",
         "H3 B4 pilot labels (owner-run CBORG labelling of pilot papers A-C, then human review to gold; python -m evals.binary.label)"
       ],
       "case_id": "LOCAL-02",
@@ -111,15 +115,18 @@
       "family": "LOCAL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "69adf194e650c85e358df03031640154c0bcda65cbcf5308fe30ead7d1e08c4d",
-        "config_sha256": "c59fa70d246a14d1a2eae1bdec521c2394ca47ca4f9b38332c02fcfb96a4ada1",
+        "case_sha256": "e9c6db8595ae630e5adef2ad631ce49c3d4462b38ed2a5d51690fce44b3abf11",
+        "config_sha256": "4cb4c84dd200c1fac1712479f37889e23f1531381fa2290ae2996d590f56efeb",
         "model_sha256": null,
         "oracle_source_sha256": "6574a0caae51e1cecc9424ab3b54d864d8a307c3b586649d839058a9f20102e7",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/api_wiring/_wiring_support.py",
-        "tests/security/security_fakes.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
@@ -129,9 +136,12 @@
         "selectors": [],
         "supporting_selectors": [
           "tests/security/test_security_fastapi.py::test_local_everything_allowed_without_sign_in_and_without_identity_calls",
-          "tests/api_wiring/test_wiring_startup.py::test_local_tiled_uri_stays_editable"
+          "tests/api_wiring/test_wiring_startup.py::test_local_tiled_uri_stays_editable",
+          "tests/security_live/test_live_local_no_login.py::test_local_app_serves_every_route_without_sign_in",
+          "tests/security_live/test_live_local_no_login.py::test_local_json_build_approval_publication_and_graph_read",
+          "tests/security_live/test_live_local_no_login.py::test_local_graph_edit_and_tiled_uri_need_no_identity"
         ],
-        "uncovered": "End-to-end local workflows (intake through publication and graph editing) need isolated fixtures and the unmerged importer/jobs"
+        "uncovered": "The API-level local workflows (versioned JSON creation, approval, local Tiled publication, graph editing and the Tiled URL setting) run without sign-in against disposable 0.2.18 servers (T25C, T08B, T10, landed); whether literature intake, extraction and figure processing preserve their scientific contracts on isolated fixtures rests on the pilot-paper labels (H3 B4)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -409,7 +419,7 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Backend service failure is not a user login challenge",
-      "coverage": "partial",
+      "coverage": "full",
       "deployment_profiles": [
         "local"
       ],
@@ -418,20 +428,23 @@
       "family": "LOCAL",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "f2708ceba96e55f0bc4e5370db895418c090a1f6a4ca8a7424a2fec2c86e98c2",
-        "config_sha256": "b1ba4f2c06caf54ae5711d42f33b5a6900aacbf9f054683121e4f448020475a4",
+        "case_sha256": "09ce805dfc24b0d5a5874f719eebc49a1b67fb17811d93101385a5ef218a6216",
+        "config_sha256": "0f2d60481e521383fd82044f09ce6f9d39705ac4e89d3206705a9a5b9bb24f71",
         "model_sha256": null,
-        "oracle_source_sha256": "06abfad49f6e1f915a9986a953f4f006253e09577a28bbdff6bb1ab63c7f89bc",
+        "oracle_source_sha256": "8c3b0b766826cf53b7f6ec1bc8e74bdf339a3b2ec55205f14683829b12294753",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/fixtures/tiled_server.py",
         "tests/graph/graph_samples.py",
-        "tests/security/security_fakes.py"
+        "tests/graph_import/import_fakes.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Tiled credential/outage failures are truthful graph-operation errors, not empty results or trust grants",
+        "covers": "Missing, wrong or revoked local Tiled writer credentials and a stopped server are truthful graph-operation errors (never a sign-in challenge, never empty results or a trust grant); chat and JSON capabilities stay available; no credential reaches the browser (T25C, T08B)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -441,10 +454,15 @@
           "tests/security/test_security_tiled_adapter.py::test_outages_and_bad_bodies_are_unavailable",
           "tests/security/test_security_tiled_adapter.py::test_transport_errors_are_unavailable",
           "tests/graph/test_graph_tiled_server.py::test_wrong_credential_is_denied_and_stopped_server_is_unavailable",
-          "tests/security/test_security_settings_resolver.py::test_identity_outage_never_enables_local_trust"
+          "tests/security/test_security_settings_resolver.py::test_identity_outage_never_enables_local_trust",
+          "tests/security_live/test_live_writer.py::test_missing_local_writer_is_a_graph_error_not_sign_in",
+          "tests/security_live/test_live_writer.py::test_revoked_writer_key_fails_graph_operations_and_leaves_chat",
+          "tests/security_live/test_live_writer.py::test_wrong_writer_key_is_writer_unauthorized_and_writes_nothing",
+          "tests/graph_import/test_import_guards.py::test_stopped_real_server_is_unavailable_not_empty",
+          "tests/security_live/test_live_units.py::test_handlers_set_a_hardened_cookie_and_never_return_tokens"
         ],
         "supporting_selectors": [],
-        "uncovered": "No sign-in challenge in the browser for a graph failure (T18C)"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

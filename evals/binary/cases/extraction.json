@@ -339,35 +339,41 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Incomplete extraction cannot be promoted",
-      "coverage": "partial",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Incomplete extraction cannot be promoted. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "EXT",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "150db0ea246fa0689cf1e99c4ef2f8ae92a2296d9c23b85c7be9fcbc7797fa93",
-        "config_sha256": "6f946d315291218b65bf15a251cb811a2a6c3a40f7ca861903e5cde2610a5c8e",
+        "case_sha256": "e8bc22bab150751c03351ca56b683c4fb98dafe92a1a21764615fe3e04d4b87f",
+        "config_sha256": "5f6f8200318104a246f8adc59ffdae3bfe1ae7ae6626fd7c981b4d9b560d8dcc",
         "model_sha256": null,
-        "oracle_source_sha256": "d757a21fab940bd011703b16ad2b89587d7f722a2d1e6cf59bb0449921e8b80f",
+        "oracle_source_sha256": "3790287d38a2baea216ebbf1b791c89213c2517fc110c020aa2b03beb9146763",
         "schema_sha256": "0f12ae46d5eb1f2b83d7a93327ab268c2d2f8eba4e7a35263ee04557275829bd"
       },
       "input_fixture_refs": [
-        "tests/extraction/extraction_fakes.py"
+        "tests/extraction/extraction_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Incomplete extraction is reported unknown and is not importable from a staged package",
+        "covers": "Incomplete extraction is reported unknown, is not importable from a staged package, is quarantined by the publication job with a reason, and a snapshot whose validation does not agree is refused before commit (T10 jobs and T26B release checks landed after the H3 packet)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
           "tests/extraction/test_legacy_parity.py::test_completeness_is_reported_as_unknown_not_success",
           "tests/extraction/test_validation_stage.py::test_withheld_cases_never_reach_the_sink",
           "tests/extraction/test_validation_stage.py::test_h3_gates_are_closed_and_enforced",
-          "tests/literature/test_staging.py::test_incomplete_extraction_is_never_importable"
+          "tests/literature/test_staging.py::test_incomplete_extraction_is_never_importable",
+          "tests/jobs/test_publication.py::test_incomplete_packages_are_quarantined_with_a_reason_and_block_publication",
+          "tests/jobs/test_publication.py::test_staged_package_check_reads_real_paper_json_headers",
+          "tests/jobs/test_crash_matrix.py::test_case_02_crash_during_extraction_retains_chunks_and_incomplete_coverage_blocks_publication",
+          "tests/releases/test_release_refusals.py::test_validation_json_must_be_present_and_agree"
         ],
         "supporting_selectors": [],
-        "uncovered": "Promotion/publication refusal end to end (needs T10 curation and T08B import)"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

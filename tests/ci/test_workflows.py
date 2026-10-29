@@ -370,3 +370,87 @@ def test_o06_rules_are_a_proposal_and_publishing_waits_for_them() -> None:
                   "imagetools create", "T24E"):
         assert topic in text, topic
     assert "NOT ACTIVE UNTIL THE OWNER APPROVES O06" in PUBLISH.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------- forge-merge-ci.yml ------
+# T28B (audit AUD-09): the validation workflow runs the Tiled-backed suites against the
+# owner-pinned 0.2.18 wheel in an isolated venv, and the full suite is gated by
+# compare_known_failures instead of hiding failures behind ``|| true``.
+FORGE_CI = WORKFLOWS / "forge-merge-ci.yml"
+TILED_SUITES = ("tests/tiled", "tests/graph", "tests/graph_import", "tests/security_live", "tests/api_v1_live",
+                "tests/images", "tests/contracts/legacy_ui/closure")
+
+
+@pytest.fixture(scope="module")
+def forge_ci() -> Dict[str, Any]:
+    return load(FORGE_CI)
+
+
+def _job_script(job: Dict[str, Any]) -> str:
+    return "\n".join(s.get("run", "") for s in job["steps"])
+
+
+def test_tiled_job_installs_the_owner_pinned_wheel_into_its_own_venv(forge_ci: Dict[str, Any]) -> None:
+    from app.modules.deployment.tiled_config import PINNED_TILED_VERSION, PINNED_TILED_WHEEL, PINNED_TILED_WHEEL_SHA256
+
+    job = forge_ci["jobs"]["python-tiled-suites"]
+    assert job["needs"] == "guard" and "environment" not in job and "secrets" not in job
+    install = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Isolated Tiled"))
+    assert f'"tiled=={PINNED_TILED_VERSION}"' in install and "--no-deps" in install and "--only-binary=:all:" in install
+    assert f"{PINNED_TILED_WHEEL_SHA256}  $RUNNER_TEMP/tiled-wheel/{PINNED_TILED_WHEEL}" in install
+    assert "sha256sum -c -" in install, "the downloaded wheel is checked before anything is installed"
+    assert install.index("sha256sum -c") < install.index("python -m venv"), "check first, install second"
+    assert "--constraint docker/profiles/tiled-server/constraints.txt" in install
+    assert f"{PINNED_TILED_WHEEL}[server]" in install
+    assert "pip check" in install and f"tiled.__version__ != '{PINNED_TILED_VERSION}'" in install
+    # The server goes into $RUNNER_TEMP/venv-tiled only; the app environment never gets tiled.
+    assert "venv-tiled" in install
+    for step in job["steps"]:
+        run = step.get("run", "")
+        if "requirements.txt" in run:
+            assert "tiled" not in run.lower()
+
+
+def test_tiled_job_runs_every_tiled_backed_suite_with_the_isolated_interpreter(forge_ci: Dict[str, Any]) -> None:
+    job = forge_ci["jobs"]["python-tiled-suites"]
+    run = next(s["run"] for s in job["steps"] if s.get("name") == "Tiled-backed suites")
+    assert "env -i" in run, "no ambient environment reaches the servers"
+    assert 'F2W_TILED_PYTHON="$RUNNER_TEMP/venv-tiled/bin/python"' in run
+    for suite in TILED_SUITES:
+        assert f" {suite}" in run, suite
+    assert "|| true" not in run and "continue-on-error" not in job
+    assert "--junitxml=tiled.xml" in run
+    upload = next(s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@"))
+    assert upload["with"] == {"name": "tiled-junit", "path": "tiled.xml"} and upload["if"] == "always()"
+
+
+def test_forge_ci_never_names_a_central_tiled_or_a_credential(forge_ci: Dict[str, Any]) -> None:
+    text = yaml.safe_dump(forge_ci)
+    for word in ("TILED_API_KEY", "TILED_WRITER", "CBORG", "tiled.als", "als.lbl.gov", "8765", "8011", "secrets."):
+        assert word not in text, word
+    for job_id, job in forge_ci["jobs"].items():
+        for step in job.get("steps", []):
+            assert not DEPLOY_WORDS.search(step.get("run", "")), f"{job_id}: {step.get('name')}"
+
+
+def test_full_suite_is_gated_by_compare_known_failures_not_hidden(forge_ci: Dict[str, Any]) -> None:
+    job = forge_ci["jobs"]["python-baseline-suite"]
+    assert "|| true" not in _job_script(job)
+    assert "continue-on-error" not in job and not [s for s in job["steps"] if "continue-on-error" in s]
+    names = [s.get("name", "") for s in job["steps"]]
+    full = next(s for s in job["steps"] if s.get("name", "").startswith("Full suite"))
+    gate = next(s for s in job["steps"] if s.get("name", "").startswith("Compare with the known-failure set"))
+    assert names.index(full["name"]) < names.index(gate["name"])
+    assert "--junitxml=full.xml" in full["run"]
+    assert 'test -s full.xml || exit "$status"' in full["run"], "a run that produced no report fails outright"
+    assert gate["run"] == (
+        "python scripts/ci/compare_known_failures.py full.xml docs/migration/reviews/H0/known_failures.json"
+    )
+    assert "if" not in gate
+
+
+def test_known_failure_set_is_down_to_the_splash_wipe_entry() -> None:
+    known = yaml.safe_load((REPO / "docs/migration/reviews/H0/known_failures.json").read_text(encoding="utf-8"))
+    ids = [k["id"] for k in known["known_failures"]]
+    assert ids == ["tests.test_kg_update::test_splash_reimport_refuses_wipe_without_explicit_allow"]
+    assert all(k["reason"] for k in known["known_failures"])

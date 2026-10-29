@@ -1,9 +1,7 @@
 {
   "cases": [
     {
-      "blocked_by": [
-        "T23B (immutable JSON snapshot service)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-01",
       "case_revision": 1,
       "change_reason": null,
@@ -21,33 +19,43 @@
       },
       "companion_expected_rule": null,
       "companion_title": "KG builds as versioned JSON with Tiled unavailable",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: KG builds as versioned JSON with Tiled unavailable. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "06afcfbe13379631fd188e5770775309460fa8eaf604f01d4dbfea65be23b095",
-        "config_sha256": "16570fa9fbbac53aad44db389c248b6533098792fd218d6eaa2939a8d7ff075d",
+        "case_sha256": "11622e5a259d1cc69fa8f9e64171be9f04258fb2b87b0d38d34d68296bbea5d8",
+        "config_sha256": "e8d345d94c457d4ebfcf9acb2181ff47626cee851a31119767c2bb1763817626",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "268273900ae97af49c5c8d4697a8c3f889c929dd17cdd5a0b2d32489c5b45dcd",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/contracts/json_kg/"
+        "tests/contracts/json_kg/",
+        "tests/fixtures/tiled_server.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py",
+        "tests/snapshots/snapshot_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "json2kg output is unchanged and the versioned snapshot service builds it with Tiled absent, the network blocked and no shell, from the CLI and from the local no-login API path (T23B, T25C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/test_json2kg.py::test_main_writes_graph_for_valid_input",
-          "tests/contracts/json_kg/test_json_kg_contract.py::test_repeated_builds_from_fresh_input_are_identical"
+          "tests/contracts/json_kg/test_json_kg_contract.py::test_repeated_builds_from_fresh_input_are_identical",
+          "tests/snapshots/test_snapshot_create.py::test_build_runs_with_tiled_absent_network_blocked_and_no_shell",
+          "tests/snapshots/test_snapshot_create.py::test_a_fresh_interpreter_builds_without_importing_tiled_or_the_tiled_backends",
+          "tests/snapshots/test_snapshot_create.py::test_snapshot_modules_contain_no_tiled_or_shell_use",
+          "tests/snapshots/test_snapshot_create.py::test_cli_creates_a_snapshot_and_reports_json",
+          "tests/snapshots/test_snapshot_create.py::test_graph_bytes_equal_the_frozen_json2kg_fixture",
+          "tests/security_live/test_live_local_no_login.py::test_local_json_build_approval_publication_and_graph_read"
         ],
-        "uncovered": "json2kg builds without Tiled, but the versioned snapshot service does not exist yet"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -55,7 +63,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -132,9 +140,7 @@
       "title": "json2kg field identity and CLI compatibility retained"
     },
     {
-      "blocked_by": [
-        "T23B (immutable JSON snapshot service)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-03",
       "case_revision": 1,
       "change_reason": null,
@@ -152,35 +158,45 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Frozen JSON is immutable and hash/manifest agree",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Frozen JSON is immutable and hash/manifest agree. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "cf9e3d873c6df5576c5f16039806cba403d14ddb3dfc9c8b05145262b4a93650",
-        "config_sha256": "68ea5dd0b94c53fe30f88c261c9e6a1f42bb5a45ee707d238e8f7eb067305cab",
+        "case_sha256": "282f9fdf8ad6b248c95153aaa45232b1591d5c3da1ce803983f7f3175f345e43",
+        "config_sha256": "58d5649b48db13d1f013c44f569c73f07ecfe8626db427cca7dbf3741196d139",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "bf907743e6b268a91f7796b3e81a6807e64f9b85a76812e5557eafd1a084958b",
         "schema_sha256": null
       },
       "input_fixture_refs": [
         "tests/contracts/json_kg/",
-        "tests/graph/graph_samples.py"
+        "tests/graph/graph_samples.py",
+        "tests/snapshots/snapshot_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "A frozen snapshot is never overwritten or reused, tampering after freezing is detected, the manifest validates against the normative schema and its hashes must agree with the committed bytes (T23B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/contracts/json_kg/test_json_kg_contract.py::test_example_manifest_binds_exact_fixture_bytes_and_rejects_bad_paths",
           "tests/contracts/json_kg/test_json_kg_contract.py::test_fixture_files_match_manifest_hashes",
-          "tests/graph/test_graph_json_backend.py::test_manifest_hash_is_checked_and_cache_reloads_explicitly"
+          "tests/graph/test_graph_json_backend.py::test_manifest_hash_is_checked_and_cache_reloads_explicitly",
+          "tests/snapshots/test_snapshot_create.py::test_existing_snapshot_is_never_overwritten",
+          "tests/snapshots/test_snapshot_create.py::test_tampering_after_freezing_is_detected_in_the_working_tree",
+          "tests/snapshots/test_snapshot_create.py::test_a_working_file_is_never_an_approved_artifact",
+          "tests/snapshots/test_snapshot_create.py::test_manifest_validates_against_the_normative_json_schema",
+          "tests/snapshots/test_snapshot_create.py::test_legacy_flat_files_are_never_overwritten_or_reused",
+          "tests/snapshots/test_release_verification.py::test_a_pinned_release_verifies_and_returns_the_exact_bytes",
+          "tests/snapshots/test_release_verification.py::test_wrong_hashes_are_rejected",
+          "tests/snapshots/test_release_verification.py::test_manifest_and_compat_disagreements_are_rejected",
+          "tests/snapshots/test_release_verification.py::test_working_tree_edits_do_not_change_what_a_commit_selects"
         ],
-        "uncovered": "Immutable version creation is the unbuilt part"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -188,7 +204,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -200,9 +216,7 @@
       "title": "Frozen JSON is immutable and hash/manifest agree"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-04",
       "case_revision": 1,
       "change_reason": null,
@@ -220,32 +234,36 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Import performs zero parser, inference or acquisition calls",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Import performs zero parser, inference or acquisition calls. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "b1e3414939577e6c8fd79694e707f797eb9e45d7d71c36001611ed60d5fa7bda",
-        "config_sha256": "a631dc6237043778052b931dd7277b2a9be7901c963622417f0495de495a90ad",
+        "case_sha256": "1b075ae8e08ee12108b4c33bedbe63bc7ef2023a763c5c07688db46e3256832f",
+        "config_sha256": "243f4b257360b2c524615b87c649c6b9637771f261275bd0ec9e6a59d4bfd198",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "dcee0987cad6b7aebab0bcf59b7c3184dd8c9155891e2ec5582b889d5d7a943d",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/graph/graph_samples.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py",
+        "tests/graph_import/import_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The importer makes zero parser, model or download calls (json2kg and requests are trapped, the module source is scanned) and a second import of the same snapshot is a no-op (T08B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/graph/test_graph_json_backend.py::test_round_trip_preserves_every_node_edge_and_bytes"
+        "selectors": [
+          "tests/graph/test_graph_json_backend.py::test_round_trip_preserves_every_node_edge_and_bytes",
+          "tests/graph_import/test_import_guards.py::test_importer_never_parses_calls_a_model_or_downloads",
+          "tests/graph_import/test_import_flow.py::test_end_to_end_import_receipt_and_second_import_is_a_noop"
         ],
-        "uncovered": "No importer exists to observe zero parser/inference/acquisition calls"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -253,7 +271,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -265,9 +283,7 @@
       "title": "Import performs zero parser, inference or acquisition calls"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-05",
       "case_revision": 1,
       "change_reason": null,
@@ -285,33 +301,38 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Same-target replay creates no duplicate facts or links",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Same-target replay creates no duplicate facts or links. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "7da7862d1866ce72c23adb133cb36a7b8c9ca4c157d152881877ae0c3cf6073a",
-        "config_sha256": "6ab0dbd436a073ce6fcd6503642f3743245674a2c2cd928b4f333223a7b0580b",
+        "case_sha256": "a6acad9f83d9b6a8e4c61a82d097a4b34880af5d9ad6bc9e7a51d19e876c97c7",
+        "config_sha256": "8971a5db5256f760032259db526141cd6d04c7ccfabdc624781e376f0b07a8c3",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "8055e40c30183d97421223c48c89109607a0077b846b852ed48441fd731da9a0",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/graph/graph_samples.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py",
+        "tests/graph_import/import_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Replaying the same snapshot to the same target, including after a crash at every stage, creates no duplicate facts or links (T08B)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/graph/test_graph_identity.py::test_edge_ids_follow_triple_identity",
-          "tests/graph/test_graph_identity.py::test_ledger_never_rebinds_and_round_trips"
+          "tests/graph/test_graph_identity.py::test_ledger_never_rebinds_and_round_trips",
+          "tests/graph_import/test_import_flow.py::test_end_to_end_import_receipt_and_second_import_is_a_noop",
+          "tests/graph_import/test_import_flow.py::test_replay_after_injected_crash_has_no_duplicates",
+          "tests/graph_import/test_import_flow.py::test_supersession_replays_from_every_intermediate_state"
         ],
-        "uncovered": "Same-target replay needs the importer"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -319,7 +340,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -331,10 +352,7 @@
       "title": "Same-target replay creates no duplicate facts or links"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)",
-        "T26B (committed artifact validation and export)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-06",
       "case_revision": 1,
       "change_reason": null,
@@ -352,33 +370,43 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Import receipt cannot skip publication to another target",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Import receipt cannot skip publication to another target. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "97140d7bf908d2bfe281fa62e223683fd6badcbe04267099d60cab120823630c",
-        "config_sha256": "7a69e56212b01ab991c6a8060e3e1ce9cc55242156c434a69e4312891666555d",
+        "case_sha256": "270cae33fc81e2c4839e2463a392fba14e57ff76dc2636903f636bd694e1331f",
+        "config_sha256": "dce70ceae072784434437b741da41cba1be95c62f0d92fb389da14bb482fc6a8",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "ea70fceec1f74946e0f9c0a2a3ba05cba977f8cae4ffb41b0b5b072347bffb2d",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/security/security_fakes.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
+        "tests/security/security_fakes.py",
+        "tests/security_live/live_apps.py",
+        "tests/security_live/live_support.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "An import receipt is a separate hashed artifact bound to its target; an approval or receipt for one target never authorizes or activates another, also against a real 0.2.18 ALS-shaped server (T08B, T10, T25C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/security/test_security_workers_approvals.py::test_local_approval_never_authorizes_an_als_target",
-          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod"
+          "tests/security/test_security_workers_approvals.py::test_staging_approval_does_not_authorize_prod",
+          "tests/graph_import/test_import_guards.py::test_local_approval_cannot_authorize_an_als_target",
+          "tests/graph_import/test_import_guards.py::test_receipt_is_a_separate_hashed_immutable_artifact",
+          "tests/jobs/test_publication.py::test_pointer_only_moves_to_a_verified_receipt_for_its_own_target",
+          "tests/security_live/test_live_als_app.py::test_local_approval_cannot_authorize_the_als_target"
         ],
-        "uncovered": "Import receipts do not exist yet; approval target binding is covered by AUTH-08/LOCAL-10"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -386,7 +414,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -398,10 +426,7 @@
       "title": "Import receipt cannot skip publication to another target"
     },
     {
-      "blocked_by": [
-        "T23B (immutable JSON snapshot service)",
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-07",
       "case_revision": 1,
       "change_reason": null,
@@ -419,32 +444,45 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Tampered JSON or mismatched schema/approval is rejected",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Tampered JSON or mismatched schema/approval is rejected. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "b695ccce6a3c18b771eacb987ac9023e4f32c0acadcdba53faf8817808700d85",
-        "config_sha256": "9f5b0ae3c732205fe9c69e643d7b9af9beb11b1d2fb0940a9077f8a86f471f7b",
+        "case_sha256": "165d96f5144e64f3b5bab1e5793af33c124f18a2ab149d37a91c48bea027e483",
+        "config_sha256": "0a1f7830ab4e52c87d9d44250c65584f2a7858ff390290a2faad4cf7749c960d",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "e5df542c2b5cacc66b82a16746d3a25c0d235571f197e42d646599e8880061d2",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/graph/graph_samples.py"
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
+        "tests/snapshots/snapshot_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Tampered bytes, wrong hashes, a schema outside the supported set and a missing, wrong, expired or modified approval are all refused without writes (T23B, T08B, T10)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/graph/test_graph_json_backend.py::test_manifest_hash_is_checked_and_cache_reloads_explicitly"
+        "selectors": [
+          "tests/graph/test_graph_json_backend.py::test_manifest_hash_is_checked_and_cache_reloads_explicitly",
+          "tests/graph_import/test_import_guards.py::test_no_approval_wrong_plan_expired_and_modified_plans_are_refused_without_writes",
+          "tests/graph_import/test_import_guards.py::test_stale_base_revision_is_refused_without_writes",
+          "tests/graph_import/test_import_t22c_node_types.py::test_default_publish_set_refuses_the_pending_schema",
+          "tests/snapshots/test_snapshot_create.py::test_tampering_after_freezing_is_detected_in_the_working_tree",
+          "tests/snapshots/test_release_verification.py::test_wrong_hashes_are_rejected",
+          "tests/snapshots/test_release_verification.py::test_manifest_and_compat_disagreements_are_rejected",
+          "tests/jobs/test_publication.py::test_snapshot_changed_after_planning_is_quarantined_not_imported",
+          "tests/jobs/test_publication.py::test_candidate_changed_after_approval_invalidates_it_before_import"
         ],
-        "uncovered": "Schema/approval mismatch rejection needs snapshot and importer"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -452,7 +490,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -464,9 +502,7 @@
       "title": "Tampered JSON or mismatched schema/approval is rejected"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-08",
       "case_revision": 1,
       "change_reason": null,
@@ -484,34 +520,40 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Imported graph preserves required IDs, edge evidence and code links",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Imported graph preserves required IDs, edge evidence and code links. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "444b486e80c911e0269a78b8bd1b6a59bb16adbde464bb12d1626434d35556ed",
-        "config_sha256": "bfab12a5382087c09be77a6365fb217a7fe736179decad8c0c77806adab0ecd9",
+        "case_sha256": "c39e4b56b7c0b0ae1a8588bf6a79e8fd17cb13a83d8038b21a49c5b0d21adf2c",
+        "config_sha256": "3d995e04387d74cf642ac922b40e2a4ae270ad3ee15b9cac90e0e39a94304ec2",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "60a4748cc2ad467186a164bec62f7f38f4c9bfbfd6691f990f943b35b20b8a2b",
         "schema_sha256": null
       },
       "input_fixture_refs": [
-        "tests/graph/graph_samples.py"
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/graph/graph_samples.py",
+        "tests/graph_import/import_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "The Tiled read port over an imported graph equals the JSON read port: ids, fields, edge evidence and code links survive, FORGE sentinels are untouched, new T22C node types round-trip (T08B, T18C)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
+        "selectors": [
           "tests/graph/test_graph_json_backend.py::test_round_trip_preserves_every_node_edge_and_bytes",
           "tests/graph/test_graph_json_backend.py::test_records_are_graph_scoped_and_keep_old_fields",
-          "tests/graph/test_graph_identity.py::test_uri_round_trip"
+          "tests/graph/test_graph_identity.py::test_uri_round_trip",
+          "tests/contracts/legacy_ui/closure/test_closure_tiled.py::test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits",
+          "tests/graph_import/test_import_guards.py::test_forge_sentinels_and_links_survive_and_t08a_reader_sees_the_import",
+          "tests/graph_import/test_import_t22c_node_types.py::test_new_node_types_round_trip_through_the_tiled_import"
         ],
-        "uncovered": "Needs the imported Tiled graph to compare against; the JSON backend side is covered"
+        "supporting_selectors": [],
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -519,7 +561,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -531,10 +573,7 @@
       "title": "Imported graph preserves required IDs, edge evidence and code links"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)",
-        "T10 (durable jobs and curation)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-09",
       "case_revision": 1,
       "change_reason": null,
@@ -552,28 +591,42 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Interrupted import retains JSON and does not activate partial graph",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Interrupted import retains JSON and does not activate partial graph. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "41d8977e77bf7df831a9af06c568b73c11f56543bf5a9305f30df12daa697c0f",
-        "config_sha256": "e98310bf4c3ecda826e1374e342503c0dcce1255dea7ca019f4f18aa66f797fe",
+        "case_sha256": "e3e21b7861789805c46fc74dffbedcd1623693d5efc94d586be53c107d7f4ecf",
+        "config_sha256": "4161ce1168e7d76c0af4c5cf2d2885b8502acbdf3f5c53c6664cef01b44d7264",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "1f8cd6608497b9916a3da5c16f5ec5e39f0e07b53e84ffa430536b10de8ecca2",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "An interrupted import (outage, crash between entities and links, failed readback or index switch) leaves the JSON intact, issues no receipt or pointer, keeps the previous graph active and resumes without duplicates (T08B, T10)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/graph_import/test_import_guards.py::test_unavailable_tiled_leaves_json_intact_and_import_retryable",
+          "tests/graph_import/test_import_guards.py::test_server_outage_mid_import_is_retryable_and_resumes",
+          "tests/graph_import/test_import_flow.py::test_replay_after_injected_crash_has_no_duplicates",
+          "tests/jobs/test_publication.py::test_readback_verification_failure_quarantines_and_issues_no_receipt_or_pointer",
+          "tests/jobs/test_publication.py::test_index_failure_leaves_previous_pair_active",
+          "tests/jobs/test_publication.py::test_failure_of_the_step_never_invalidates_the_snapshot",
+          "tests/jobs/test_crash_matrix.py::test_case_04_crash_after_graph_entities_before_links_and_receipt",
+          "tests/jobs/test_crash_matrix.py::test_case_05_crash_after_publication_before_active_index_switch"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Interrupted import and activation of partial graphs need the importer and job journal"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -581,7 +634,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [
@@ -593,11 +646,7 @@
       "title": "Interrupted import retains JSON and does not activate partial graph"
     },
     {
-      "blocked_by": [
-        "T08B (Tiled importer over saved JSON, receipts, writes)",
-        "T10 (durable jobs and curation)",
-        "T23B (immutable JSON snapshot service)"
-      ],
+      "blocked_by": [],
       "case_id": "JSON-10",
       "case_revision": 1,
       "change_reason": null,
@@ -616,28 +665,37 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Acknowledged UI edits survive next JSON version and re-import",
-      "coverage": "none",
+      "coverage": "full",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Acknowledged UI edits survive next JSON version and re-import. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "JSON",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "313e8852de6008eb6d55bb2390b471bd81503f7952cf5728521573bc62c58c6f",
-        "config_sha256": "dd0bb7b85b50a7b5435caf4e325db647f249d293ba356b4d87159fec61850cba",
+        "case_sha256": "ffe85b6861eb3466ba9fb614d1b4fd93192ec43fe3c35e1e767a91631ed4add7",
+        "config_sha256": "8dd147104ae1671bdf9d06bf5d6bc5e8f7a74addcf5385c6d22c29f8ae5df779",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "8a2209c810c9d54a18689cd39d245e9e22e56ab020b12cb626c9ac4e37e7e94c",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "input_fixture_refs": [
+        "tests/contracts/legacy_ui/closure/closure_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/graph_import/import_fakes.py"
+      ],
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Acknowledged edits live in a durable append-only journal, a plan that would lose one is refused, a changed snapshot becomes a new revision that retires the old, and edits are reconciled across a re-import on a disposable 0.2.18 server (T08B, T18C; D30 admin-only writeback is the decided policy)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
+        "selectors": [
+          "tests/graph_import/test_import_guards.py::test_acknowledged_edit_is_never_lost_by_an_import",
+          "tests/graph_import/test_import_guards.py::test_edit_journal_is_durable_append_only_and_ordered",
+          "tests/graph_import/test_import_flow.py::test_changed_snapshot_uses_create_new_revision_and_retires_old",
+          "tests/contracts/legacy_ui/closure/test_closure_tiled.py::test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits"
+        ],
         "supporting_selectors": [],
-        "uncovered": "Acknowledged UI edits surviving the next JSON version needs the journal reconciliation; D30 admin-only writeback applies"
+        "uncovered": ""
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -645,7 +703,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [

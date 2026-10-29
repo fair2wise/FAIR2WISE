@@ -2,7 +2,6 @@
   "cases": [
     {
       "blocked_by": [
-        "T10 (durable jobs and curation)",
         "O03 (owner approval of the job-settings rule)"
       ],
       "case_id": "LLM-06",
@@ -29,21 +28,26 @@
       "family": "LLM",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "448aa2d8c2ec56c6407b71a82537e93d47dcd5a1ae824ba3a9c36eae13e7ffa9",
-        "config_sha256": "2772989afa36a631fef425bee66f8642ab5fa78b716b1eed361ac330d794fedd",
+        "case_sha256": "e6c4f5d4a29c0531c832da4ce0cb1b2a4b0c9adad2a175d5ff570ff5ffe77f5a",
+        "config_sha256": "33e9c4d17df5d4869b42b3632f78fe9c3a7b9f052b59e4036135cca6a50cb97b",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
+      "input_fixture_refs": [
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
+      ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
         "covers": "",
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Draft expectation pending O03; needs durable jobs with a resolved-model snapshot"
+        "supporting_selectors": [
+          "tests/jobs/test_pipeline.py::test_unit_keys_change_with_extractor_so_stale_chunks_are_not_reused"
+        ],
+        "uncovered": "Draft expectation pending O03; durable jobs with stage keys exist (T10 landed), the resolved-model snapshot rule awaits the owner"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -64,7 +68,6 @@
     },
     {
       "blocked_by": [
-        "T10 (durable jobs and curation)",
         "O03 (owner approval of the job-settings rule)"
       ],
       "case_id": "LLM-07",
@@ -91,21 +94,26 @@
       "family": "LLM",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "86d75914385e2f9a0e22eb4423716b45007b85ce6a6f7df133e6b4a7cd4588a4",
-        "config_sha256": "0ac5b58bcb37f19dbdb5259ad7fbc7c1cf12ded544836995c3d7a7654c2fa361",
+        "case_sha256": "21749a873cef6c97d45c3fecd74775bb315f0e6a7d5f751376c529c2133ff952",
+        "config_sha256": "090eaa940a7ad5de4ddac67915e2a010311a490ff6fc9089ffefb3410ba6cfdc",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
       },
-      "input_fixture_refs": [],
+      "input_fixture_refs": [
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py"
+      ],
       "model_ref": "live_model_selected_explicitly_at_run_time",
       "oracle": {
         "covers": "",
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Draft expectation pending O03; changed-model resume needs durable jobs"
+        "supporting_selectors": [
+          "tests/jobs/test_pipeline.py::test_changed_vocabulary_invalidates_only_canonicalization"
+        ],
+        "uncovered": "Draft expectation pending O03; changed-model resume semantics await the owner rule (T10 landed)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -125,9 +133,7 @@
       "title": "Changed-model resume is explicitly revised; defaults cannot silently drift"
     },
     {
-      "blocked_by": [
-        "T10 (durable jobs and curation)"
-      ],
+      "blocked_by": [],
       "case_id": "LLM-08",
       "case_revision": 1,
       "change_reason": null,
@@ -145,32 +151,41 @@
       },
       "companion_expected_rule": null,
       "companion_title": "Rate-limit tightening and access revocation remain live",
-      "coverage": "none",
+      "coverage": "partial",
       "deployment_profiles": [],
       "expected_rule": "As titled in the companion inventory: Rate-limit tightening and access revocation remain live. The companion records no separate rule text; H3 supplies the explicit rule.",
       "expected_rule_source": "companion_title",
       "family": "LLM",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "ab450a656f2eccd6498fb7576c1b6adc395101b16a7753659980172d9a88a536",
-        "config_sha256": "82667aa58ded009123279801ab08a2d3a83cb99a06361aa72ac2b1fa59ab9560",
+        "case_sha256": "0d13b209c89040b79bea6f4269d901f99bcefe0bf7b58aa8a873c9a04efce6e3",
+        "config_sha256": "830a1af9499262a2badcabf35a8197d2e128a62daef78276ad123fae5fe19685",
         "model_sha256": null,
-        "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
+        "oracle_source_sha256": "22ce5b7550ede7e5ec7c66a8ecae003986ed9a9ed7852529e7d582115c847323",
         "schema_sha256": null
       },
       "input_fixture_refs": [
+        "tests/api_v1/_v1_support.py",
+        "tests/fixtures/tiled_server.py",
+        "tests/jobs/jobs_fakes.py",
+        "tests/jobs/publish_fakes.py",
         "tests/security/security_fakes.py"
       ],
-      "model_ref": "live_model_selected_explicitly_at_run_time",
+      "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "",
-        "kind": null,
+        "covers": "Running jobs draw on the one provider admission controller shared with chat (a tightened cap binds their next call) and stop before their next effect when the initiator's role is downgraded or revoked, on a real 0.2.18 role check (T10, T14)",
+        "kind": "pytest_nodes",
         "rubric_ref": null,
-        "selectors": [],
-        "supporting_selectors": [
-          "tests/security/test_security_workers_approvals.py::test_als_worker_stops_on_downgrade_expiry_revocation"
+        "selectors": [
+          "tests/security/test_security_workers_approvals.py::test_als_worker_stops_on_downgrade_expiry_revocation",
+          "tests/jobs/test_workers.py::test_workers_share_quota_with_chat_and_evaluations",
+          "tests/jobs/test_workers.py::test_provider_calls_share_one_admission_controller_across_jobs",
+          "tests/jobs/test_pipeline.py::test_authority_revocation_stops_job_and_notifies_scope_hooks",
+          "tests/api_v1/test_v1_als.py::test_worker_reauthorizes_and_stops_when_the_initiator_lost_admin",
+          "tests/api_v1_live/test_v1_live_tiled.py::test_real_role_downgrade_stops_the_worker_before_the_effect"
         ],
-        "uncovered": "Live rate-limit tightening for running jobs needs the job runner; revocation of ALS workers is covered by AUTH-07"
+        "supporting_selectors": [],
+        "uncovered": "Default production wiring of the worker authority into JobService.register (audit AUD-01, T28A) and a live provider tightening its limit under a running job (paid run, owner go)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -178,7 +193,7 @@
         "ref": null,
         "status": "proposed"
       },
-      "readiness": "blocked",
+      "readiness": "executable",
       "required": true,
       "schema_ref": null,
       "source_refs": [

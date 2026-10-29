@@ -285,11 +285,15 @@ class TestMakeChatClient:
         client = kg_rag_api.make_chat_client(backend="ollama")
         assert isinstance(client, kg_rag_api.OllamaClient)
 
-    def test_cborg_backend(self):
+    # The CBORG client fails closed without a key (H1-4), so these two set a dummy one
+    # instead of depending on an ambient CBORG_API_KEY (audit AUD-13, test isolation).
+    def test_cborg_backend(self, monkeypatch):
+        monkeypatch.setenv("CBORG_API_KEY", "test-dummy-key-not-a-credential")
         client = kg_rag_api.make_chat_client(backend="cborg")
         assert isinstance(client, kg_rag_api.CBorgClient)
 
-    def test_cborg_openai_alias(self):
+    def test_cborg_openai_alias(self, monkeypatch):
+        monkeypatch.setenv("CBORG_API_KEY", "test-dummy-key-not-a-credential")
         client = kg_rag_api.make_chat_client(backend="cborg-openai")
         assert isinstance(client, kg_rag_api.CBorgClient)
 
