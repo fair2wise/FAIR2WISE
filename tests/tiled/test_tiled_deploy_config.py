@@ -1,5 +1,6 @@
 """T20B: Tiled managed/external configuration rules (no server needed)."""
 import json
+import os
 import stat
 from pathlib import Path
 
@@ -119,6 +120,53 @@ def test_secret_file_helpers(tmp_path):
     with pytest.raises(tc.TiledConfigError, match="Cannot read"):
         tc.read_secret_file(tmp_path / "missing")
     assert len(tc.generate_api_key()) == 64 and tc.generate_api_key().isalnum()
+
+
+@pytest.mark.parametrize("mode", [0o640, 0o604, 0o644, 0o660, 0o666, 0o601])
+def test_secret_file_readable_by_others_is_refused(tmp_path, mode):
+    """AUD-15: a group- or world-accessible writer secret never passes, even before it is read."""
+    path = tmp_path / "writer.key"
+    tc.write_private_file(path, "abc123\n")
+    path.chmod(mode)
+    with pytest.raises(tc.TiledConfigError, match="group- or world-accessible") as err:
+        tc.read_secret_file(path, alphanumeric=True)
+    assert "abc123" not in str(err.value) and f"{mode:04o}" in str(err.value)
+    with pytest.raises(tc.TiledConfigError):
+        tc.check_private_file(path)
+
+
+@pytest.mark.parametrize("mode", [0o600, 0o400])
+def test_secret_file_private_modes_pass(tmp_path, mode):
+    path = tmp_path / "writer.key"
+    tc.write_private_file(path, "abc123\n")
+    path.chmod(mode)
+    tc.check_private_file(path)
+    assert tc.read_secret_file(path, alphanumeric=True) == "abc123"
+
+
+def test_secret_file_owned_by_another_uid_is_refused(tmp_path, monkeypatch):
+    path = tmp_path / "writer.key"
+    tc.write_private_file(path, "abc123\n")
+    monkeypatch.setattr(tc.os, "getuid", lambda: path.stat().st_uid + 1)
+    with pytest.raises(tc.TiledConfigError, match="owned by uid"):
+        tc.read_secret_file(path)
+
+
+def test_secret_file_must_be_a_regular_file(tmp_path):
+    with pytest.raises(tc.TiledConfigError, match="not a regular file"):
+        tc.check_private_file(tmp_path)
+    link = tmp_path / "link.key"
+    tc.write_private_file(tmp_path / "real.key", "abc123\n")
+    link.symlink_to(tmp_path / "real.key")
+    tc.check_private_file(link)  # a link to a private regular file is fine (/run/secrets mounts)
+    assert tc.read_secret_file(link, alphanumeric=True) == "abc123"
+
+
+def test_generated_local_writer_key_satisfies_the_rule(tmp_path):
+    path = tmp_path / "secrets" / "writer.key"
+    tc.write_private_file(path, tc.generate_api_key() + "\n")
+    tc.check_private_file(path)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600 and path.stat().st_uid == os.getuid()
 
 
 def test_authn_spec_validation():

@@ -19,7 +19,7 @@ from app.modules.curation.repair import IncompleteRead, plan_reextraction
 from app.modules.jobs import JobService, JobStore, Pipeline, StageSpec
 from app.modules.jobs.sqlite import OperationalDB
 from app.modules.jobs.stages import acquire_stage
-from tests.jobs.jobs_fakes import Clock, Crash, inputs, local_ctx
+from tests.jobs.jobs_fakes import Clock, Crash, inputs, local_ctx, local_settings
 from tests.jobs.publish_fakes import TARGET, World, approval_for
 from tests.jobs.test_pipeline import FakeAcquirer, chunk_pipeline
 from tests.literature.lit_fakes import local_ctx as lit_ctx, minimal_pdf_bytes
@@ -48,7 +48,7 @@ def test_case_01_crash_after_pdf_download_before_manifest_update(tmp_path):
     acquirer.crash_after_download = True
     clock = Clock()
     store = JobStore(tmp_path / "j.sqlite3", lease_seconds=60, clock=clock)
-    service = JobService(store)
+    service = JobService(store, settings=local_settings())
     stage = acquire_stage(acquirer, docs, doi_of=lambda sc: "10.1/x", ctx_for=lambda sc: lit_ctx())
     service.register("ingest", Pipeline([StageSpec("acquire", stage, phase="parsing")]))
     handle = service.submit(local_ctx(), "ingest", inputs())

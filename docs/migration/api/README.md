@@ -93,7 +93,7 @@ A request with neither header (curl, SDK, tests) passes: it is not a browser CSR
 
 **Why not a session-bound CSRF token now.** Access contract section 9 asks for a CSRF token bound to the server session on ALS. The frozen UI has no sign-in page and cannot send a token, and changing it is out of scope. The session cookie is already `SameSite=Strict`, which stops cross-site requests from carrying it; the origin check adds protection against same-*site* siblings (other `*.lbl.gov` hosts), login CSRF, and simple (non-preflighted) POSTs. A synchronizer token arrives with the gateway sign-in UI (T24C); the handlers are ready to add it.
 
-**Not changed:** the 19 legacy UI routes keep their frozen behaviour (no origin gate), because the frozen UI and its tests run from several origins. Gating them is an owner decision (open question Q3).
+**Legacy routes (T28A, AUD-04).** Since T28A `create_app` itself applies the same origin gate to every state-changing request on the 19 legacy UI routes, and caps request bodies at 128 MiB (`LEGACY_MAX_BODY_BYTES`, the gateway's `client_max_body_size`). Same-origin browsers, the Vite development origins on `:local`, configured `cors_origins`, and non-browser callers see no change in any response; only cross-site state-changing requests (403 `cross_site_request`) and oversized bodies (413 `payload_too_large`) are refused before any route runs. On `als-dev`/`als-prod` an empty `cors_origins` no longer falls back to the localhost development origins with credentials (C7): it means no cross-origin browser access.
 
 **Sessions are in memory (T25C follow-up 2).** `TiledSessionStore` lives in one process; a restart signs everyone out. Left as is; a persistent or shared store is a T24 deployment item.
 

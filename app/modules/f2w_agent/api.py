@@ -95,11 +95,14 @@ from ..tiled_graph import (
 )
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
+from ...api.auth import undeclared_routes
 from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
+from ...api.origin_gate import OriginGateMiddleware
 from ...api.sessions import TiledSessionStore, install_session_routes
+from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
 from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ..contracts.context import RequestContext
-from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS
+from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
 from .session_memory import SessionMemory
 from .workflow_state import WorkflowStateStore
 
@@ -6784,6 +6787,18 @@ DEFAULT_CORS_ORIGINS = [
 ]
 
 
+def effective_cors_origins(cors_origins: Optional[List[str]], *, is_local: bool) -> List[str]:
+    """CORS allowlist for a deployment (AUD-04, C7).
+
+    ``:local`` keeps the Vite development origins as its fallback. On ``als-dev``/``als-prod``
+    the fallback is gone: an empty ``cors_origins`` means *no* cross-origin browser access
+    (the gateway serves the UI same-origin), never the localhost defaults with credentials.
+    """
+    if cors_origins:
+        return list(cors_origins)
+    return list(DEFAULT_CORS_ORIGINS) if is_local else []
+
+
 def create_app(
     cfg: CoordinatorConfig,
     *,
@@ -6817,13 +6832,23 @@ def create_app(
     if not guard.is_local and isinstance(credential_store, TiledSessionStore):
         install_session_routes(app, credential_store, guard.settings)  # T25C: ALS sign-in/sign-out
 
+    allowed_origins = effective_cors_origins(cors_origins, is_local=guard.is_local)
+    if not allowed_origins:
+        logger.info("CORS: no origins configured on %s; browser callers must be same-origin (C7)",
+                    guard.settings.profile.value)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins or list(DEFAULT_CORS_ORIGINS),
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # AUD-04: the 19 legacy routes get the browser-origin gate and the gateway-sized body cap
+    # (``app/api/main.py`` adds the same for ``/v1/`` and ``/auth/``). GET/HEAD/OPTIONS, same-origin
+    # and non-browser callers see no change; a cross-site state-changing request is refused
+    # before any route runs, and a body over 128 MiB is refused while it is still arriving.
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=LEGACY_MAX_BODY_BYTES, path_prefixes=("/",))
+    app.add_middleware(OriginGateMiddleware, allowed_origins=allowed_origins, path_prefixes=("/",))
 
     @app.get("/health")
     async def health(ctx: Optional[RequestContext] = Depends(ui_optional_context)) -> Dict[str, Any]:
@@ -7345,6 +7370,9 @@ def create_app(
         append_annotation(record)
         return {"status": "ok", "turn_id": req.turn_id, "verdict": req.verdict}
 
+    missing = undeclared_routes(app)
+    if missing:  # DEP-19 at startup: a route without a declared policy never serves (fail closed)
+        raise StartupConfigError(f"config_rejected: routes without a declared access policy: {', '.join(missing)}")
     return app
 
 

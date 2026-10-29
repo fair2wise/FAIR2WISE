@@ -434,8 +434,39 @@ def load_tiled_settings(environ: Mapping[str, str]) -> TiledSettings:
     return TiledSettings(profile=profile, mode=mode, managed=managed)
 
 
+def check_private_file(path: Path) -> None:
+    """Refuse a secret file other users could read or another uid owns (AUD-15).
+
+    Rule (``docs/adr/tiled-deployment.md`` section 4.1): the writer secret file is a regular
+    file, mode ``0600`` or ``0400`` (no group or other bits), owned by the uid running F2W.
+    Symlinks are followed (``/run/secrets`` mounts may be links); the target is what is
+    checked. Generated ``:local`` keys (:func:`write_private_file`) satisfy the rule.
+
+    Raises:
+        TiledConfigError: Missing, not a regular file, group/world-accessible or foreign-owned.
+            The message names the path and the mode, never the content.
+    """
+    try:
+        st = os.stat(path)
+    except OSError as exc:
+        raise TiledConfigError(f"Cannot read Tiled secret file {path}: {exc.strerror}") from None
+    if not stat.S_ISREG(st.st_mode):
+        raise TiledConfigError(f"Tiled secret file {path} is not a regular file")
+    mode = stat.S_IMODE(st.st_mode)
+    if mode & 0o077:
+        raise TiledConfigError(f"Tiled secret file {path} is group- or world-accessible (mode {mode:04o}); "
+                               "it must be 0600 or 0400")
+    getuid = getattr(os, "getuid", None)
+    if getuid is not None and st.st_uid != getuid():
+        raise TiledConfigError(f"Tiled secret file {path} is owned by uid {st.st_uid}, not the running uid "
+                               f"{getuid()}")
+
+
 def read_secret_file(path: Path, *, alphanumeric: bool = False) -> str:
     """Read a credential from a runtime secret file.
+
+    The file must pass :func:`check_private_file` (mode ``0600``/``0400``, owned by the
+    running uid) before a byte of it is read.
 
     Args:
         path: Secret file path.
@@ -445,9 +476,11 @@ def read_secret_file(path: Path, *, alphanumeric: bool = False) -> str:
         The stripped secret.
 
     Raises:
-        TiledConfigError: If the file is missing, empty, a symlink to nowhere or malformed.
-            The secret itself is never included in the message.
+        TiledConfigError: If the file is missing, empty, a symlink to nowhere, malformed,
+            readable by others or owned by another uid. The secret itself is never included
+            in the message.
     """
+    check_private_file(Path(path))
     try:
         value = Path(path).read_text(encoding="utf-8").strip()
     except OSError as exc:

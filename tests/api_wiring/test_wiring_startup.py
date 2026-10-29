@@ -37,6 +37,24 @@ def test_the_19_agent_policies_are_the_app_routes(local):
                                      ("GET", "/openapi.json")}
 
 
+def test_startup_refuses_an_undeclared_route(monkeypatch, tmp_path):
+    """T28A: ``undeclared_routes(app) == []`` is asserted at startup, not only in tests (fail closed)."""
+    from app.modules.f2w_agent import api as api_mod
+
+    monkeypatch.setattr(api_mod, "undeclared_routes", lambda app, surface=None: ["GET /unexpected"])
+    with pytest.raises(StartupConfigError, match="routes without a declared access policy: GET /unexpected"):
+        _create(monkeypatch, tmp_path)
+
+
+def test_api_factory_startup_refuses_an_undeclared_route(monkeypatch, tmp_path):
+    from app.api import main as main_mod
+
+    ctx = H.install(monkeypatch, tmp_path / "ws", REPO)
+    monkeypatch.setattr(main_mod, "undeclared_routes", lambda app, surface=None: ["POST /v1/unexpected"])
+    with pytest.raises(StartupConfigError, match="POST /v1/unexpected"):
+        main_mod.create_api_app(make_cfg(ctx))
+
+
 def test_undeclared_routes_is_empty_on_every_profile(local, als):
     assert undeclared_routes(local.app) == []
     assert undeclared_routes(als.app) == []

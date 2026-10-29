@@ -26,6 +26,7 @@ from app.modules.agent_runtime.policies import InMemoryEventSink
 from app.modules.contracts import ContractError, ErrorCode, ToolStatus
 from app.modules.contracts.jobs import JobState
 from app.modules.graph.backends.json import JsonGraphBackend
+from tests.jobs.jobs_fakes import local_settings
 from app.modules.jobs.keys import OperationInputs
 from app.modules.jobs.service import JobService
 from app.modules.jobs.store import JobStore
@@ -219,7 +220,7 @@ def test_job_covers_the_population_the_inline_bound_cannot(big_graph, big_corpus
     inline = _executor(*graph_tool.registrations()).execute(local_ctx(), TOOL_STATS, {"graph_id": "syn_big"})
     assert inline.status is ToolStatus.PARTIAL
     store = JobStore(tmp_path / "jobs.sqlite3")
-    service = JobService(store)
+    service = JobService(store, settings=local_settings())
     artifacts = FileDocumentStore(tmp_path / "artifacts")
     register_operation_jobs(service, operation_dispatch(graph_tool, corpus_tool),
                             lambda job: local_ctx(corpus_scope=frozenset(job.inputs.corpus_scope)),

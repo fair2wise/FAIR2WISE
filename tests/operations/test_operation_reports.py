@@ -9,6 +9,7 @@ import pytest
 from app.modules import llm_admission
 from app.modules.contracts import ContractError, ErrorCode, ToolStatus
 from app.modules.contracts.jobs import JobState
+from tests.jobs.jobs_fakes import local_settings
 from app.modules.jobs.service import JobService
 from app.modules.jobs.store import JobStore
 from app.modules.jobs.keys import OperationInputs
@@ -140,7 +141,7 @@ class _Suite:
 
 def _jobs(tmp_path, suite, **kw):
     store = JobStore(tmp_path / "jobs.sqlite3")
-    service = JobService(store)
+    service = JobService(store, settings=local_settings())
     artifacts = FileDocumentStore(tmp_path / "artifacts")
     register_operation_jobs(service, operation_dispatch(suite),
                             lambda job: local_ctx(corpus_scope=frozenset(job.inputs.corpus_scope)),

@@ -419,12 +419,19 @@ class F2WOperations:
 def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
                      identity_port: Optional[TiledIdentityPort] = None, epoch: Callable[[], float] = time.time,
                      clock: Clock = _utcnow, owner: str = "api",
-                     publication_gate: Optional[PublicationGate] = None) -> F2WOperations:
+                     publication_gate: Optional[PublicationGate] = None,
+                     credential_lookup: Optional[Callable[[str], Any]] = None) -> F2WOperations:
     """Build the default operations over SQLite stores under ``root`` (created if missing).
 
     Registers **no** job kind and no publication: real pipeline handlers need H3 and real
     publication needs H5. Trusted wiring registers kinds on ``ops.jobs`` (and builds a
-    :class:`~app.modules.jobs.publication.Publication` on it) when those gates allow.
+    :class:`~app.modules.jobs.publication.Publication` on it) when those gates allow. Every
+    kind registered there gets the service's default
+    :class:`~app.modules.security.authorization.JobAuthority` (``settings``, ``identity_port``,
+    ``credential_lookup``), so its stages re-authorize the initiating subject (AUD-01).
+
+    Raises:
+        StartupConfigError: ALS settings without ``identity_port`` or ``credential_lookup``.
     """
     from ..modules.curation.store import CurationStore
     from ..modules.jobs.store import JobStore
@@ -432,7 +439,8 @@ def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
 
     base = Path(root)
     base.mkdir(parents=True, exist_ok=True)
-    jobs = JobService(JobStore(base / "jobs.sqlite3", clock=epoch), owner=owner)
+    jobs = JobService(JobStore(base / "jobs.sqlite3", clock=epoch), owner=owner, settings=settings,
+                      identity_port=identity_port, credential_lookup=credential_lookup, clock=clock)
     curation = CurationStore(base / "curation.sqlite3", clock=epoch)
     audit = AuditRecorder(AuditLog(base / "audit.sqlite3", clock=epoch))
     return F2WOperations(settings, jobs, curation=curation, audit=audit, identity_port=identity_port,

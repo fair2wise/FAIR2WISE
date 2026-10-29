@@ -19,7 +19,7 @@ from app.modules.jobs import (
 )
 from app.modules.jobs.stages import BudgetExhausted, WorkUnit, acquire_stage, chunked_stage
 from app.modules.jobs.telemetry import job_progress
-from tests.jobs.jobs_fakes import Clock, Crash, inputs, local_ctx
+from tests.jobs.jobs_fakes import Clock, Crash, inputs, local_ctx, local_settings
 from tests.literature.lit_fakes import local_ctx as lit_ctx, minimal_pdf_bytes
 
 
@@ -352,7 +352,7 @@ def test_crash_after_pdf_download_before_manifest_update_recovers_without_second
     acq.crash_after_download = True
     clock = Clock()
     store = JobStore(tmp_path / "j.sqlite3", lease_seconds=60, clock=clock)
-    svc = JobService(store)
+    svc = JobService(store, settings=local_settings())
     spec = StageSpec(
         "acquire",
         acquire_stage(acq, docs, doi_of=lambda sc: sc.inputs.params["doi"], ctx_for=lambda sc: lit_ctx()),
@@ -382,7 +382,7 @@ def test_corrupt_stored_asset_is_quarantined_not_trusted(tmp_path):
     obj.unlink()
     obj.write_bytes(b"corrupted")
     store = JobStore(tmp_path / "j.sqlite3", clock=Clock())
-    svc = JobService(store)
+    svc = JobService(store, settings=local_settings())
     svc.register(
         "ingest",
         Pipeline(

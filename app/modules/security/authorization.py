@@ -22,8 +22,9 @@ import functools
 import inspect
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Tuple, TypeVar, Union
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, RoleCheckEvidence
 from ..contracts.context import (
@@ -658,6 +659,11 @@ FRAMEWORK_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("F02", _A, "GET", "/docs/oauth2-redirect", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
     _p("F03", _A, "GET", "/redoc", "health.read", public=True, note="FastAPI ReDoc (O-A8)"),
     _p("F04", _A, "GET", "/openapi.json", "health.read", public=True, note="FastAPI OpenAPI schema (O-A8)"),
+    # The same four pages on the model-compatible API (T28A: that app now installs access control too).
+    _p("F05", _M, "GET", "/docs", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
+    _p("F06", _M, "GET", "/docs/oauth2-redirect", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
+    _p("F07", _M, "GET", "/redoc", "health.read", public=True, note="FastAPI ReDoc (O-A8)"),
+    _p("F08", _M, "GET", "/openapi.json", "health.read", public=True, note="FastAPI OpenAPI schema (O-A8)"),
 )
 
 FRAMEWORK_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
@@ -887,6 +893,109 @@ class WorkerAuthority:
         """Stop the worker permanently and raise ``DENIED``."""
         self.stopped_reason = reason
         raise ContractError(ErrorCode.DENIED, f"worker stopped: {reason}")
+
+
+
+CredentialLookup = Callable[[str], Optional[TiledCredential]]
+
+
+class JobAuthority:
+    """Default stage authority of a ``JobService``: one :class:`WorkerAuthority` per job run (AUD-01).
+
+    ``JobService.register`` wires this for every kind that does not bring its own authority,
+    so a stage's ``required_capability`` and every ``StageContext.require`` call re-authorize
+    the *initiating* subject before the effect:
+
+    * ``:local``: the local-operator worker context; no credential is read and no identity
+      call is made (LOCAL-01, LOCAL-05).
+    * ALS: the initiating subject's *current* credential comes from ``credential_lookup``
+      (the server-side session store, by subject). A signed-out subject (``None``), a
+      rejected credential, a different subject or a role downgrade stops the run before its
+      next effect (AUTH-07). An identity outage raises ``UNAVAILABLE`` so the job may retry.
+
+    Args:
+        settings: Startup settings of the deployment running the worker.
+        identity_port: ALS identity port (required on ALS).
+        credential_lookup: ``subject -> current credential or None`` (required on ALS).
+        clock: Returns the current time.
+
+    Raises:
+        StartupConfigError: An ALS deployment without an identity port or credential lookup.
+    """
+
+    def __init__(self, settings: DeploymentSettings, *, identity_port: Optional[TiledIdentityPort] = None,
+                 credential_lookup: Optional[CredentialLookup] = None, clock: Optional[Clock] = None) -> None:
+        if not settings.is_local:
+            if identity_port is None:
+                raise StartupConfigError("config_rejected: ALS job authority needs an identity port")
+            if credential_lookup is None:
+                raise StartupConfigError("config_rejected: ALS job authority needs a credential lookup "
+                                         "(the server-side session store)")
+        self.settings = settings
+        self._port = identity_port
+        self._lookup = credential_lookup
+        self._clock: Clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def for_job(self, job: Any) -> Callable[[Any, Sequence[str]], RequestContext]:
+        """The authority of one run of ``job`` (a stopped run never resumes effects)."""
+        return _JobRunAuthority(self, job)
+
+    def __call__(self, job: Any, capabilities: Sequence[str]) -> RequestContext:
+        """One-off check (a runner that does not call :meth:`for_job`)."""
+        return self.for_job(job)(job, capabilities)
+
+    def _start(self, job: Any) -> WorkerAuthority:
+        """Build the run's worker authority from the initiating subject's current credential."""
+        settings = self.settings
+        subject = str(getattr(job, "created_by", "") or "")
+        run_id = str(getattr(job, "job_id", "") or uuid.uuid4().hex)
+        request_id = uuid.uuid4().hex
+        if settings.is_local:
+            if subject != LOCAL_OPERATOR:
+                raise ContractError(ErrorCode.DENIED, "worker stopped: job was not submitted by the local operator")
+            ctx = local_operator_context(settings, request_id=request_id, actor_kind=ActorKind.WORKER, run_id=run_id)
+            return WorkerAuthority(ctx, settings, clock=self._clock)
+        assert self._lookup is not None  # checked at construction
+        lookup = self._lookup
+        credential = lookup(subject)
+        if credential is None:
+            raise ContractError(ErrorCode.DENIED, "worker stopped: initiating credential signed_out")
+        try:
+            identity = verify_identity(settings, credential, identity_port=self._port, clock=self._clock,
+                                       require_fresh=True)
+        except Unauthenticated as exc:
+            raise ContractError(ErrorCode.DENIED, f"worker stopped: initiating credential {exc.reason}") from None
+        if identity.subject != subject:
+            raise ContractError(ErrorCode.DENIED, "worker stopped: credential belongs to another subject")
+        ctx = _als_context(settings, identity, request_id=request_id, session_id=None,
+                           actor_kind=ActorKind.WORKER, run_id=run_id)
+        return WorkerAuthority(ctx, settings, identity_port=self._port,
+                               credential_provider=lambda: lookup(subject), clock=self._clock)
+
+
+class _JobRunAuthority:
+    """Per-run state of :class:`JobAuthority`: the worker authority is built on first use."""
+
+    def __init__(self, parent: JobAuthority, job: Any) -> None:
+        self._parent = parent
+        self._job_id = getattr(job, "job_id", None)
+        self._worker: Optional[WorkerAuthority] = None
+        self.stopped_reason: Optional[str] = None
+
+    def __call__(self, job: Any, capabilities: Sequence[str]) -> RequestContext:
+        if self.stopped_reason is not None:
+            raise ContractError(ErrorCode.DENIED, f"worker stopped: {self.stopped_reason}")
+        if getattr(job, "job_id", None) != self._job_id:
+            raise ContractError(ErrorCode.DENIED, "worker stopped: authority belongs to another job")
+        if self._worker is None:
+            try:
+                self._worker = self._parent._start(job)
+            except ContractError as exc:
+                if exc.code is ErrorCode.DENIED:
+                    self.stopped_reason = str(exc).replace("worker stopped: ", "", 1)
+                raise
+        ctx = self._worker.check(*capabilities)
+        return ctx
 
 
 # --- approvals (section 11) ----------------------------------------------------------

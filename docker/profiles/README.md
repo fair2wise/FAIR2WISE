@@ -75,7 +75,7 @@ OPEN_DECISIONS C8).
 | --- | --- | --- | --- |
 | `/var/lib/fair2wise/state` | all | rw, uid 10001 | sessions, `session/operations/{jobs,curation,audit}.sqlite3`, traces. Required |
 | `/var/lib/fair2wise/tiled` | `:local` | rw, uid 10001 | catalog, writable storage, `secrets/writer.key`. Required |
-| `/run/secrets/tiled_writer` | ALS | ro | set `F2W_TILED_WRITER_SECRET_FILE` |
+| `/run/secrets/tiled_writer` | ALS | ro | set `F2W_TILED_WRITER_SECRET_FILE`; regular file, mode `0600`/`0400`, owned by uid 10001 (preflight refuses group/world-readable or foreign-owned files) |
 | `/var/lib/fair2wise/source_index` | optional | ro | set `HYBRID_RAG_LITERATURE_INDEX` / `HYBRID_RAG_OPS_INDEX` |
 
 Preflight refuses a required path that is missing, not writable, or not on a mount (named

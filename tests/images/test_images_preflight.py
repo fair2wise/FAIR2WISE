@@ -112,6 +112,22 @@ def test_missing_mount_and_unreadable_secret_are_refused(tmp_path):
     assert any("F2W_TILED_WRITER_SECRET_FILE" in p for p in problems)
 
 
+@pytest.mark.parametrize("mode", [0o644, 0o640, 0o660])
+def test_group_or_world_readable_secret_is_refused(tmp_path, mode):
+    """AUD-15: preflight checks mode and owner, not just readability."""
+    profile, env, mountinfo = setup(tmp_path, "local")
+    secret = tmp_path / "writer.key"
+    secret.write_text("abc123\n", encoding="utf-8")
+    secret.chmod(mode)
+    env["F2W_TILED_WRITER_SECRET_FILE"] = str(secret)
+    problems = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "none")["problems"]
+    assert any("F2W_TILED_WRITER_SECRET_FILE" in p and "group- or world-accessible" in p for p in problems)
+    assert not any("abc123" in p for p in problems)
+    secret.chmod(0o600)
+    problems = PRE.check(env, profile, mountinfo=mountinfo, tiled_root=tmp_path / "none")["problems"]
+    assert not any("F2W_TILED_WRITER_SECRET_FILE" in p for p in problems)
+
+
 def test_local_without_the_tiled_interpreter_is_refused(tmp_path):
     profile, env, mountinfo = setup(tmp_path, "local")
     env["F2W_TILED_PYTHON"] = str(tmp_path / "missing" / "python")

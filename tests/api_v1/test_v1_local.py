@@ -331,10 +331,14 @@ def test_gateway_forwarded_host_counts_as_same_origin(local):
     assert resp.status_code == 200
 
 
-def test_legacy_routes_are_not_gated(local):
+def test_legacy_routes_are_gated_too(local):
+    """T28A (AUD-04): the legacy routes carry the same origin gate; see docs/migration/api/README.md section 5."""
     resp = local.client(headers={"Origin": "https://evil.example"}).post(
         "/telemetry/ui", json={"events": [{"type": "citation_click"}]})
-    assert resp.status_code == 200  # frozen behavior; see docs/migration/api/README.md section 5
+    assert resp.status_code == 403 and resp.json()["code"] == "cross_site_request"
+    same = local.client(headers={"Origin": "http://testserver"}).post(
+        "/telemetry/ui", json={"events": [{"type": "citation_click"}]})
+    assert same.status_code == 200
 
 
 def test_request_body_cap_on_v1(monkeypatch, tmp_path):

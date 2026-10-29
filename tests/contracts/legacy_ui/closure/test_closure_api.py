@@ -1,7 +1,7 @@
 """T18C closure against the migrated API in-process (no Tiled, no network, no model).
 
 * UI24: the six model-compatible endpoints (``kg_rag_api.create_fastapi_app``) against the
-  frozen T18A fixtures, plus the D19 check on the proxy chat routes (expected failure).
+  frozen T18A fixtures, plus the D19 check on the proxy chat routes (passes since T28A).
 * UI04: editable ("splash") mode with **no Splash service**: the real Splash client runs
   against a refused 127.0.0.1 port. Reads keep working; Save fails closed (502), no write.
 * UI10/UI26 recovery: a pending decision survives an app restart; it applies exactly once;
@@ -67,10 +67,8 @@ def test_ui24_six_routes_and_no_streaming_format_change(monkeypatch, harness):
         assert resp.status_code == 200 and resp.headers["content-type"].startswith("application/json")
 
 
-@pytest.mark.xfail(strict=True, reason="T18C finding F3: the model-compatible proxy chat routes are not behind "
-                   "the T21B disclosure projection (route_field_map R20/R21 conforms_to_D19_today=no); a model "
-                   "that echoes its prompt returns the PDF window verbatim. Owner decision needed.")
 def test_ui24_model_proxy_does_not_echo_source_text(monkeypatch, harness):
+    """T18C finding F3, fixed by T28A (AUD-03): the proxy chat routes run behind the D19 projection."""
     from app.modules import kg_rag_api
 
     H.make_model_app(monkeypatch, harness)  # harness patches (lexical retrieval, fake client)
