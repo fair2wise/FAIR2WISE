@@ -250,11 +250,14 @@ def mkdocs_image_config(source: str) -> str:
     Pages then link relatively and work under ``/fair2wise/docs/`` on any host. (MkDocs only
     uses ``site_url`` for canonical links, the sitemap and the 404 page; the gateway answers
     a missing docs page with its own 404.)
+
+    The ``watch:`` block is dropped too: it only drives ``mkdocs serve`` reloads, and its
+    ``../app``-style paths do not exist in the docs build stage, which copies ``mkdocs/`` alone.
     """
     patched, count = re.subn(r"^site_url:.*$", 'site_url: ""', source, count=1, flags=re.M)
     if count != 1:
         raise PrefixConfigError("mkdocs.yml has no site_url line to replace")
-    return patched
+    return re.sub(r"^watch:[ \t]*\n(?:[ \t]+-.*\n?)*", "", patched, flags=re.M)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
