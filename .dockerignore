@@ -44,3 +44,6 @@ storage/artifacts
 storage/parsed
 storage/crops
 storage/state
+
+# graphify output and caches (local analysis only)
+**/graphify-out
