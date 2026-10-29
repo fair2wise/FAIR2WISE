@@ -18,7 +18,7 @@ import json
 import sys
 from typing import Any, List, Optional
 
-from ..modules.contracts.errors import ContractError
+from ..modules.contracts.errors import ContractError, ErrorCode
 from .legacy_ui import deployment_settings_from
 from .operations import F2WOperations, build_operations
 
@@ -101,6 +101,8 @@ def main(argv: Optional[List[str]] = None, *, environ: Optional[Any] = None) -> 
     args = build_parser().parse_args(argv)
     try:
         settings = deployment_settings_from(environ)
+        if not settings.is_local:  # ALS has no CLI sign-in (as F2WOperations.cli_context); refuse before any wiring
+            raise ContractError(ErrorCode.DENIED, "the operations CLI runs on the local profile only")
         ops = build_operations(settings, args.root, owner="cli")
         print(json.dumps(run(ops, args), indent=2, sort_keys=True, default=str))
     except ContractError as exc:
