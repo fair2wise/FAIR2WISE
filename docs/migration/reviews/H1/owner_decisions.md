@@ -279,3 +279,20 @@ frozen-UI pin is updated in that change (as O-U1).
   for the admin; the run does not fail closed on it.
 - **Q15 (F4/B26):** rollback below a carried-forward edit requires a reviewed conflict
   resolution.
+
+## Register walk-through, batch 8: Q16, B4, B5, B7 (2026-10-30)
+
+- **Q16 (O-E1 part 5, closes Q1-Q16):** one verified admin approves als-prod replacement or
+  purge, with `requested_by` and `approved_by` recorded; revisit before the first
+  production purge. The Tiled graph editing plan is now fully decided (Q1 revised to one
+  graph per corpus; Q7 multi-write per Save; Q13 capability read, O-U3; Q14 ignore and
+  continue; all others as recommended). The seven proposed tasks (T20C, T08C, T08D,
+  T23C, T18D, T18E, T10B) are approved to be added to the plan as addendum A6.
+- **B4 (O-P4):** folder browse/index routes on `:local` only, with root directories fixed
+  in configuration; disabled on ALS images.
+- **B5 (O-P4):** L-14..L-17 join T29 (parsing); job kinds J-11 / RT-27..32 become T10B;
+  OCR (V-05) and the missing `/v1` routes (cost control, bulk review, vocabulary quality,
+  figure-scale records) get their own small tasks before H6.
+- **B7 (O-A9):** "Expose on ALS for signed-in users": route `/fair2wise/model-api`
+  through the gateway with sign-in and the D19 projection (applied by T28A). Reverses
+  the T18C/T24C default (404 on ALS). Work item for the gateway and route policies.

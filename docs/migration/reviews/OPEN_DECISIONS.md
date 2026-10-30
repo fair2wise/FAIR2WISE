@@ -62,7 +62,7 @@ Two of these matter more than the rest:
 
 **Options.** Confirm, or name any items where you disagree.
 
-### A4. Tiled graph editing (STOP-1 to STOP-6)
+### A4. Tiled graph editing (STOP-1 to STOP-6) — **Decided 2026-10-30 (O-E1): Q1-Q16 answered in owner_decisions.md batches 4-8.**
 **Context.** In the frozen UI, editing a node or relationship and pressing
 Save still goes through Splash. On a Tiled server without Splash, Save fails
 safely with the old 502 error and writes nothing. This is T18C finding F1, and
@@ -109,15 +109,15 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | B1 | **Port Docling** (L-12 parser, L-13 parser pool/worker) | PyMuPDF, which is AGPL, is still the only parser. At H0 you said Alex wants Docling and asked to keep PyMuPDF for now with deprecation markers. The T05 merge deferred Docling without your approval, and no task owns it. | Make it a task: Docling behind the existing pluggable parser interface, compared with PyMuPDF on the pilot set before switching | **Decided 2026-10-30 (O-P2): port Docling and switch the default after parity; task T29.**
 | B2 | **Owner of licensing metadata** (L-18) | Each paper's licence or OA status is needed before anything is published at H5. Deferred in T05; no task owns it. | Add it to the Docling/parsing task, or as a small task before H5 | **Decided 2026-10-30 (O-P2): part of T29.**
 | B3 | **Six proposed exceptions** | R-08: don't port the Langfuse tracer (F2W traces plus the audit log cover it). X-05: don't port `seed_synthetic_kg.py` (a FORGE viewer fixture). X-07: don't port `bench_kg.py` (dev-only). RT-20 `add_annotation`: stays in FORGE. A-01 `openalex_supplement.json`: retire it once citation links are regenerated (L-17). RT-47 `table_csv`: internal to the agent only. | Approve all six | **Decided 2026-10-30 (O-P3): RT-20, A-01, RT-47 approved as exceptions; R-08 ported as opt-in; X-05/X-07 ported.**
-| B4 | **Folder browse/index routes** (RT-62 to RT-68) | FORGE has routes that list and index server folders. On ALS, any route that browses folders needs a fixed allowlist of roots, or it can expose the filesystem. | Allow them on `:local` only, with roots fixed in configuration; disabled on ALS |
-| B5 | **Unowned capabilities** | Corpus index (J-07); enrichment, topic-sweep and PDF-parse job kinds (J-11, RT-27 to RT-32); a real OCR engine (V-05); paper subgraph and graph growth/recent views (K-10, RT-59, RT-07, RT-08); O-10 and O-12 to O-14; reference parsing, section projection, paper context and citation links (L-14 to L-17); HTTP routes for cost control, bulk review, vocabulary quality and figure-scale records. | Graph views and O-items go to T19C (after H3). Job kinds go to a T10 follow-up. L-14 to L-17 go with B1. OCR: decide whether it is needed for this release |
+| B4 | **Folder browse/index routes** (RT-62 to RT-68) | FORGE has routes that list and index server folders. On ALS, any route that browses folders needs a fixed allowlist of roots, or it can expose the filesystem. | Allow them on `:local` only, with roots fixed in configuration; disabled on ALS | **Decided 2026-10-30 (O-P4): :local only, fixed roots.**
+| B5 | **Unowned capabilities** | Corpus index (J-07); enrichment, topic-sweep and PDF-parse job kinds (J-11, RT-27 to RT-32); a real OCR engine (V-05); paper subgraph and graph growth/recent views (K-10, RT-59, RT-07, RT-08); O-10 and O-12 to O-14; reference parsing, section projection, paper context and citation links (L-14 to L-17); HTTP routes for cost control, bulk review, vocabulary quality and figure-scale records. | Graph views and O-items go to T19C (after H3). Job kinds go to a T10 follow-up. L-14 to L-17 go with B1. OCR: decide whether it is needed for this release | **Decided 2026-10-30 (O-P4): L-14..17 -> T29; job kinds -> T10B; OCR and routes -> new tasks.**
 
 ### Security and disclosure
 
 | # | Decision | Context | Recommendation |
 |---|---|---|---|
 | B6 | **Model API chat routes** (T18C F3) | The two chat routes of the six-endpoint model API (Ollama/OpenAI compatible) skip the D19 quote limit. A model that echoes its prompt returns more than 40% of a page verbatim. `run_fastapi` also binds 0.0.0.0 with no auth. | Apply the disclosure projection to both routes and bind to loopback by default |
-| B7 | **Model API under the prefix** | `/fair2wise/model-api` returns 404, so the model API is not exposed on ALS. | Keep it unexposed on ALS; available on `:local` |
+| B7 | **Model API under the prefix** | `/fair2wise/model-api` returns 404, so the model API is not exposed on ALS. | Keep it unexposed on ALS; available on `:local` | **Decided 2026-10-30 (O-A9): expose on ALS for signed-in users.**
 | B8 | **Origin check on the 19 legacy routes** | The new `/v1` routes and sign-in refuse cross-site browser requests. The 19 frozen UI routes do not. | Add the check. Same-origin UI calls are unaffected |
 | B9 | **Size limit on legacy `/graph/upload`** | Unlimited today, as in the baseline. nginx caps uploads at 128 MB. | Add a cap that matches nginx (128 MB) |
 | B10 | **Reviewer excerpt length** | A curation case shows reviewers a 600-character quote from the source (D19). | Accept 600 characters |
