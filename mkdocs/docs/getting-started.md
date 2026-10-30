@@ -1,8 +1,18 @@
 # Getting started
 
+!!! note "Images versus source"
+
+    The supported deployment is one of the three images (`:local`,
+    `:als-dev`, `:als-prod`): one container, gateway on port 8080, everything
+    under `/fair2wise`. Build, check and run commands are in
+    `docker/profiles/README.md`; the architecture is summarized in
+    [Current architecture](current-architecture.md). This page covers running
+    **from source**: the Compose developer stack and the host scripts. Steps
+    marked **legacy** belong to the Splash editable mode.
+
 ## Prerequisites
 
-For the recommended Compose deployment:
+For the Compose developer stack:
 
 - Docker Engine or Docker Desktop with Docker Compose v2;
 - `CBORG_API_KEY` in an untracked `.env` (runtime inject, never baked into the image).
@@ -21,21 +31,24 @@ docker compose up
 Set `CBORG_API_KEY` in `.env` and leave `CBORG_IPV6_BIND` unset (the process
 probes a live global IPv6). Never commit `.env` or bake keys into the image.
 
-Open `http://127.0.0.1:5175`. The browser calls the agent at
-`http://127.0.0.1:8090`. **Never bind host 5174** (SSH).
+Open `http://127.0.0.1:5175/fair2wise/` (`/` redirects there). The UI calls
+the same-origin `/fair2wise/api`; the agent is also published at
+`http://127.0.0.1:8090`. The stack runs the JSON KG (`F2W_KG_MODE=json`,
+`KG_RAG_GRAPH_SOURCE=json`). **Never bind host 5174** (SSH).
 
 On macOS Docker Desktop, CBorg IPv6 from a container is usually blocked; use
 `./scripts/start_rsoxs_stack.sh` instead (daemonized agent+UI; does not stop
 paper extract). Linux Docker should enable IPv6 on the Compose network.
 
-The Splash stack remains `docker compose -f compose.splash.yaml up` (UI on 5173).
+**Legacy:** the Splash stack remains `docker compose -f compose.splash.yaml up`
+(gateway on 5173).
 
 
 ## Local-development prerequisites
 
 - Python 3.12
 - Node.js 20 or newer, including npm 10 or newer
-- Pixi for the vendored Splash Links environment
+- **Legacy only:** Pixi for the vendored Splash Links environment
 - `curl` for readiness checks
 - A CBORG API key for the default hosted model, or a local Ollama server
 
@@ -55,7 +68,7 @@ cd ui
 npm ci
 cd ..
 
-./scripts/install_pixi.sh
+./scripts/install_pixi.sh   # legacy Splash mode only
 ```
 
 Use `python3.12 -m pip install -r requirements.txt -r requirements/dev.txt`
@@ -68,6 +81,22 @@ Set `CBORG_API_KEY` in `.env` when using CBORG. For Ollama, set the backend and
 model variables described in [Configuration](configuration.md).
 
 ## Start without Docker
+
+JSON KG, daemonized agent + UI (ports 8090 and 5175):
+
+```bash
+./scripts/start_rsoxs_stack.sh
+```
+
+Or run the agent alone (`F2W_KG_MODE=json` is the script default) and the
+Vite dev server:
+
+```bash
+./scripts/start_agent_backend.sh
+./scripts/start_agent_frontend.sh
+```
+
+### Legacy: Splash launcher
 
 ```bash
 ./scripts/start_all.sh
@@ -85,30 +114,26 @@ The launcher:
 
 Press **Ctrl+C** in the launcher terminal to stop all managed processes.
 
-For the RSoXS JSON demo without Splash, prefer Docker or the daemonized host stack
-(survives Cursor session exit; does not stop `scripts/run.py` extract):
-
-```bash
-./scripts/start_rsoxs_stack.sh
-```
-
-UI is `http://127.0.0.1:5175`, agent `http://127.0.0.1:8090`. Stop with
+For the RSoXS JSON KG, the daemonized host stack above survives an editor
+session exit and does not stop a running `scripts/run.py` extract. UI is
+`http://127.0.0.1:5175`, agent `http://127.0.0.1:8090`. Stop with
 `./scripts/start_rsoxs_stack.sh stop`.
 
 
 ## Verify local-development services
 
 ```bash
-curl -fsS http://127.0.0.1:8081/splash_links/health
 curl -fsS http://127.0.0.1:8090/health
 curl -fsS http://127.0.0.1:5173/ >/dev/null
+curl -fsS http://127.0.0.1:8081/splash_links/health   # legacy Splash launcher only
 ```
 
-Open `http://127.0.0.1:5173` in a browser.
+Open `http://127.0.0.1:5173` (Vite) or `http://127.0.0.1:5175` (daemonized
+stack) in a browser.
 
 ## Run components separately
 
-=== "Splash Links"
+=== "Splash Links (legacy)"
 
     ```bash
     cd splash_links
@@ -135,11 +160,13 @@ Inspect resolved agent settings:
 python3 -m app.modules.launchers.f2w_agent status
 ```
 
-Ask once:
+Ask once (`--kg-mode json` is the default; `--kg-mode splash` is the legacy
+mode and needs a running Splash server):
 
 ```bash
 python3 -m app.modules.launchers.f2w_agent \
-  --kg-mode splash \
+  --kg-mode json \
+  --graph storage/kg/matkg_rsoxs_v1.json \
   --workdir runs/cli_session \
   ask "What is grazing-incidence X-ray scattering used for?"
 ```
@@ -147,7 +174,7 @@ python3 -m app.modules.launchers.f2w_agent \
 Start an interactive session:
 
 ```bash
-python3 -m app.modules.launchers.f2w_agent --kg-mode splash chat
+python3 -m app.modules.launchers.f2w_agent --graph storage/kg/matkg_rsoxs_v1.json chat
 ```
 
 Downloads and extraction require explicit approval unless

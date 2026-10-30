@@ -1,11 +1,20 @@
 # System architecture
 
-## Runtime topology
+!!! warning "Legacy stack"
+
+    The topology below is the developer / legacy Splash stack
+    (`compose.splash.yaml`, `start_all.sh`). The three release images run one
+    supervised container with a gateway on port 8080 under `/fair2wise`, the
+    JSON KG by default and Tiled (managed 0.2.18 on `:local`, central on ALS);
+    see [Current architecture](current-architecture.md). Splash is the legacy
+    editable mode kept until its retirement gate.
+
+## Runtime topology (legacy Splash stack)
 
 ```mermaid
 flowchart TB
     Browser[Browser]
-    UI[Nginx + React UI host :5173]
+    UI["Nginx gateway /fair2wise (container :8080, host :5173)"]
     API[Agent FastAPI :8090]
     Splash[Splash Links FastAPI :8081]
     DB[(SQLite / PostgreSQL)]
@@ -28,8 +37,11 @@ flowchart TB
 
 The UI never accesses Splash Links directly. All graph reads and edits pass
 through the agent API, which normalizes Splash records into the MatKG/UI shape.
-In Compose, the agent and Splash ports are not published to the host. Nginx is
-the only ingress and strips `/api` before forwarding requests to the agent.
+In the legacy Compose stack, the agent and Splash ports are not published to
+the host. Nginx is the only ingress and forwards `/fair2wise/api` to the agent.
+The default `compose.yaml` has no Splash service: it runs the agent with the
+JSON KG and publishes the gateway at `127.0.0.1:5175` (UI at `/fair2wise/`)
+and the agent at `127.0.0.1:8090`.
 
 ## Python package boundaries
 
@@ -44,17 +56,22 @@ the only ingress and strips `/api` before forwarding requests to the agent.
 | `splash_links.src.splash_links` | SQL-backed entity/link/embedding service and client |
 | `app.modules.legacy` | Historical pipelines retained for reference or compatibility |
 
-## Two HTTP APIs
+## HTTP APIs
 
-There are two separate FastAPI surfaces:
+There are three FastAPI surfaces:
 
 1. **Agent API** (`python3 -m app.modules.launchers.f2w_agent api`, normally
    port `8090`) is used by the current
    React application. It owns workflow state, graph editing, settings,
-   publication search, and SSE progress.
-2. **KG-RAG compatibility API** (`kg_rag_api.py --api`, normally port `11435`)
+   publication search, and SSE progress (the 19 frozen UI routes, D11).
+2. **Jobs API** (`... cli api --jobs-api`, `app.api.main.create_api_app`): the
+   same UI routes plus the 24 `/v1` jobs, review, publication, status and
+   validation routes. The images run this factory; see
+   `docs/migration/api/README.md`.
+3. **KG-RAG compatibility API** (`kg_rag_api.py --api`, normally port `11435`)
    mimics Ollama/OpenAI endpoints for OpenWebUI clients. It does not provide the
-   current UI workflow contract.
+   current UI workflow contract; it is loopback-bound and disclosure-projected
+   since T28A and is not exposed under `/fair2wise` on ALS.
 
 Do not point the React application at port `11435`.
 
@@ -78,8 +95,11 @@ flowchart LR
   snapshots, competency questions, and missing-node logs.
 - `runs/` contains mutable per-session PDFs, terms, graph snapshots, extraction
   manifests, memory, and workflow state.
-- `splash_links/links.sqlite` is the default local durable graph database;
-  Compose stores it in the `splash-data` named volume.
+- `splash_links/links.sqlite` is the legacy editable graph database
+  (Splash mode only); `compose.splash.yaml` stores it in the `splash-data`
+  named volume. The release images carry no Splash and no catalog database;
+  their durable state is the mounted `/var/lib/fair2wise/state` (and
+  `/var/lib/fair2wise/tiled` on `:local`).
 - `.run/` only contains launcher PID files.
 
 ## Configuration precedence

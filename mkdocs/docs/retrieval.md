@@ -7,8 +7,9 @@ agent workflow and the compatibility chat API.
 
 `KnowledgeGraph` loads either:
 
-- `things` and `associations` from a JSON file; or
-- paginated entities/links from Splash Links through GraphQL.
+- `things` and `associations` from a JSON file (the default for every
+  supported launcher); or
+- paginated entities/links from Splash Links through GraphQL (legacy mode).
 
 It builds:
 

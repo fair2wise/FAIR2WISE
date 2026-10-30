@@ -1,9 +1,20 @@
 # Fresh-machine deployment
 
-This runbook installs FAIR2WISE on a computer that has no existing images,
-volumes, or development environment. Docker Compose is the supported default:
-the clone supplies all application source and each computer builds its own
-images.
+!!! warning "Legacy Compose runbook"
+
+    This runbook describes the **Compose developer stack** built from a clone.
+    The phases, volumes, backup and rollback steps that mention Splash and
+    `splash-db-init` apply to the legacy `compose.splash.yaml` stack (gateway
+    on 5173); the default `compose.yaml` starts only the agent (JSON KG) and
+    the gateway on `127.0.0.1:5175/fair2wise/`. The supported deployment is
+    one of the three images (`:local`, `:als-dev`, `:als-prod`; gateway on
+    8080 under `/fair2wise`): see `docker/profiles/README.md` for build, check
+    and run commands and [Current architecture](current-architecture.md).
+    The ALS rollout (Ansible, edge proxy) is task T24E.
+
+This runbook installs the Compose developer stack on a computer that has no
+existing images, volumes, or development environment: the clone supplies all
+application source and each computer builds its own images.
 
 ## Before cloning
 
@@ -116,13 +127,16 @@ problem and not evidence that the database is incomplete.
 
 ## First start
 
-Start the complete application:
+Start the developer stack (JSON KG, agent + gateway at
+`http://127.0.0.1:5175/fair2wise/`):
 
 ```bash
 docker compose up
 ```
 
-The first start is intentionally slower than later starts. Expect these phases:
+**Legacy Splash stack** (`docker compose -f compose.splash.yaml up`, gateway on
+5173): the first start is intentionally slower than later starts. Expect these
+phases:
 
 1. Docker downloads base images and builds the frontend, agent, and Splash
    images.

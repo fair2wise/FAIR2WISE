@@ -96,7 +96,7 @@ To check a prefixed build with the unchanged Playwright suite:
 Only the frontend binds a host port:
 
 ```text
-127.0.0.1:5173 -> frontend:80
+127.0.0.1:5173 -> frontend:8080
 ```
 
 Rebuild the frontend after changing UI source, npm dependencies, Vite

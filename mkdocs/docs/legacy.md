@@ -23,7 +23,7 @@ reproducibility and reference. They are not imported by the current
 | Graph conversion | `app/modules/json2kg.py` |
 | RAG and model clients | `app/modules/kg_rag_api.py` |
 | NERSC agent workflow | `app.modules.launchers.f2w_agent` plus `scripts/run_nersc_3agent.sh` |
-| Graph persistence | Vendored `splash_links/` |
+| Graph persistence | Versioned JSON KG in `storage/kg/` (default) with gated publication into Tiled Graph; the vendored `splash_links/` is the legacy editable mode |
 
 ## Change policy
 
@@ -49,4 +49,13 @@ flowchart LR
 ```
 
 The active chat application does not require this ontology conversion. It uses
-MatKG JSON and Splash Links directly.
+MatKG JSON directly (and Splash Links in the legacy editable mode).
+
+## Splash Links
+
+`splash_links/`, `compose.splash.yaml`, `scripts/start_all.sh`,
+`scripts/wipe_splash_db.sh` and the `--kg-mode splash` paths are the legacy
+editable graph mode. They stay runnable until the Splash retirement gate
+(T16B/H7 or H8, `docs/migration/plan_addenda.md` A2) and are never built into
+the `:local`, `:als-dev` or `:als-prod` images. See
+[Splash Links](splash-links.md).

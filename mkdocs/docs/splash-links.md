@@ -1,4 +1,11 @@
-# Splash Links
+# Splash Links (legacy)
+
+!!! warning "Legacy"
+
+    Splash is deprecated and replaced by Tiled Graph (plan D03/D16). It is
+    kept as the legacy editable mode (`F2W_KG_MODE=splash`) until its approved
+    retirement gate (T16B/H7 or H8) and is not part of the three release
+    images. See [Current architecture](current-architecture.md).
 
 `splash_links/` is a vendored, independently packageable graph service. It
 stores arbitrary entities, directed predicate-labelled links, and vector
