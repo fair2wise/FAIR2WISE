@@ -2051,6 +2051,8 @@ def _json_graph_search_missing_topics(question: str, verdict: Dict[str, Any]) ->
 
 def _json_graph_should_search_candidates(question: str, verdict: Dict[str, Any]) -> bool:
     """JSON mode offers paper ingest unless on-topic nodes actually answer the ask."""
+    if verdict.get("operation"):
+        return False  # D3.16: a knowledge-operation figure answered the turn; no retrieval to supplement
     if _json_graph_wants_paper_ingest(question):
         return True
     return not _json_graph_nodes_address_question(question, verdict)

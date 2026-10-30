@@ -106,11 +106,14 @@ class SupervisedRead:
         delegated: The supervisor turn, or ``None`` if the planner raised.
         fallback: ``None`` when the supervisor's own tool call produced ``read``; otherwise why
             the direct call was used instead (``"planner_error:<Type>"`` or ``"no_tool_call"``).
+        operation: Name of the knowledge operation the planner chose instead of the read tool
+            (owner decision D3.16); ``read`` then carries its rendered figure as the answer.
     """
 
     read: Any
     delegated: Optional[DelegatedOutcome]
     fallback: Optional[str] = None
+    operation: Optional[str] = None
 
 
 class F2WApplication:
@@ -396,14 +399,18 @@ class F2WApplication:
         The supervisor plans the turn and calls ``answer_from_knowledge``; the tool
         arguments are pinned to this call's (question verbatim, history, flags), so the
         existing QA path receives exactly what :meth:`answer_from_knowledge` would pass.
-        Only that tool is offered to the planner (the UI QA contract is the read verdict; the
-        T19C operations stay available to :meth:`delegate`).
+        The planner is offered that tool and, when ``knowledge`` is registered, the five T19C
+        knowledge operations (owner decision D3.16, 2026-10-30): a figure question (counts,
+        growth, recent additions, a paper's subgraph, a corpus audit) may be answered by an
+        operation, whose bounded result is rendered as the turn's answer text
+        (:mod:`.runtime_bridge.operation_answer`) with no further model call.
         The first read of the turn is returned. If the planner raises or calls no tool,
         the direct call answers instead (``fallback`` says why). The one-turn thread is
         deleted afterwards unless ``keep_thread``.
         """
+        from .runtime_bridge.operation_answer import operation_verdict
         from .runtime_bridge.qa_route import pin_args, unpin_args
-        from .runtime_bridge.qa_tool import TOOL_NAME as READ_TOOL
+        from .runtime_bridge.qa_tool import TOOL_NAME as READ_TOOL, ReadOutcome
 
         self._require_supervisor()
         args = self._read_args(question, history, source_rag, use_live_tiled)
@@ -411,8 +418,12 @@ class F2WApplication:
         token = pin_args(args)
         delegated: Optional[DelegatedOutcome] = None
         fallback: Optional[str] = None
+        operation: Optional[str] = None
+        offered = {READ_TOOL}
+        if self.knowledge is not None:
+            offered.update(self.knowledge.operation_names())
         try:
-            delegated = await self.delegate(ctx, question, thread_id=tid, tools=frozenset({READ_TOOL}))
+            delegated = await self.delegate(ctx, question, thread_id=tid, tools=frozenset(offered))
         except ContractError:
             raise
         except Exception as exc:  # noqa: BLE001 - planner/provider failure: the direct call answers
@@ -430,12 +441,17 @@ class F2WApplication:
                 read = delegated.reads[0]
                 self.ledger.get(read.result.provenance_id, pop=True)
             else:
-                fallback = "no_tool_call"
-                logger.warning("supervisor QA route made no tool call; using the direct call")
+                figure = next((r for r in delegated.tool_results if r.tool in offered and r.tool != READ_TOOL), None)
+                if figure is not None:  # D3.16: the operation's rendered report is the answer
+                    operation = figure.tool
+                    read = ReadOutcome(result=figure, legacy_verdict=operation_verdict(figure))
+                else:
+                    fallback = "no_tool_call"
+                    logger.warning("supervisor QA route made no tool call; using the direct call")
         if read is None:
             read = await self.answer_from_knowledge(ctx, question, history=history, source_rag=source_rag,
                                                     use_live_tiled=use_live_tiled)
-        return SupervisedRead(read=read, delegated=delegated, fallback=fallback)
+        return SupervisedRead(read=read, delegated=delegated, fallback=fallback, operation=operation)
 
     def _drop_thread(self, ctx: RequestContext, thread_id: str) -> None:
         scoped = self._config(ctx, thread_id)["configurable"]["thread_id"]

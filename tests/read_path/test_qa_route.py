@@ -193,3 +193,39 @@ def test_delegated_outcome_distinguishes_answered_with_open_approval_from_blocke
     assert blocked.interrupted and blocked.blocked and not blocked.answered and blocked.final_text == ""
     plain = app._delegated_outcome("t", {"messages": [HumanMessage("q"), AIMessage(content="a")]})
     assert not plain.interrupted and not plain.blocked and plain.answered and plain.open_approvals == ()
+
+
+def test_ui_turn_may_answer_a_figure_question_with_a_knowledge_operation(graphs, tmp_path, monkeypatch):
+    """D3.16 (owner decision 2026-10-30): the planner is offered the knowledge operations beside the read tool;
+    when it picks kg_compute_statistics the bounded report is rendered as the answer text of a legacy verdict
+    (no selected nodes, no second model call), the legacy API never offers paper ingest for it, and the turn
+    records which operation answered."""
+    from app.modules.f2w_agent.api import _json_graph_should_search_candidates
+    from app.modules.runtime_bridge import legacy_adapter
+
+    _judge, kgs = graphs
+    calls: List[Dict[str, Any]] = []
+    chosen: Dict[str, str] = {}
+
+    def step(messages):
+        calls.append({"n": len(calls) + 1})
+        return tool_call("kg_compute_statistics", {"graph_id": chosen["graph_id"]}, "op1")
+
+    model = ScriptedChatModel(script=[step] * 5)
+    monkeypatch.setattr(legacy_adapter, "planning_model_provider", lambda p: (lambda: model))
+    monkeypatch.setenv("F2W_RUNTIME", "langgraph")
+    supervised = _pipeline(tmp_path, kgs, "ops")
+    # the operations name graphs by their registry id (the file stem without the schema prefix)
+    graph_id = supervised._read_path.application.knowledge.graph.port.graph_ids()[0]
+    chosen["graph_id"] = graph_id
+    question = f"how many entities and relations does {graph_id} hold?"
+    verdict = _run(supervised, [question])["verdicts"][0]
+    last = supervised._read_path.last_supervised
+    assert last.operation == "kg_compute_statistics" and last.fallback is None and last.delegated.reads == ()
+    assert len(calls) == 1  # one planning call; the report is rendered, not relayed by a model
+    assert verdict["status"] == "success" and verdict["sufficient"] is True and verdict["selected"] == []
+    assert verdict["operation"]["tool"] == "kg_compute_statistics" and verdict["operation"]["status"] == "ok"
+    assert "**kg_compute_statistics**" in verdict["answer"] and graph_id in verdict["answer"]
+    assert "entities" in verdict["answer"] and "Figures:" in verdict["answer"]
+    assert _json_graph_should_search_candidates(question, verdict) is False
+    assert supervised._read_path.application.ledger.__len__() == 0

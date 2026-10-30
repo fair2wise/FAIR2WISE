@@ -108,7 +108,11 @@ def test_supervisor_route_plans_every_read_turn_once(replay):
         return
     # One planning call per read turn, the read tool offered, the user's question passed on.
     assert len(planned) == sum(replay["hits"].values())
-    assert all(call["tools"] == ["answer_from_knowledge"] for call in planned)
+    # D3.16: the five knowledge operations are offered beside the read tool; the planner still picks the read tool.
+    for call in planned:
+        assert "answer_from_knowledge" in call["tools"]
+        assert set(call["tools"]) <= {"answer_from_knowledge", "kg_compute_statistics", "kg_compare_snapshots",
+                                      "kg_paper_subgraph", "kg_recent_entities", "curate_audit_corpus"}
     assert all(call["question"] for call in planned)
 
 
