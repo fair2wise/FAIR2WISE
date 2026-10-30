@@ -892,7 +892,8 @@ def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int):
         if os.path.exists(filename):
             logging.info(f"Already exists: {filename}")
             continue
-        success = download_pdf(pdf_url, filename)
+        if not download_pdf(pdf_url, filename):
+            logging.warning(f"Download failed: {filename}")
         time.sleep(3)  # respect rate limits
 
 

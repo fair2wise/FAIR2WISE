@@ -89,8 +89,13 @@ from .registry import ToolRegistry, effective_capabilities
 from .skills import SkillRegistry
 from .state import LiteratureState, RunContext, as_run_context
 
-# TODO(T03): placeholder only. T03 supplies the preserved F2W QA policy (prompts, evidence gates,
-# citations, fallback/abstention). Do not replace this with FORGE supervisor/science/simulation prompts.
+#: Default system prompt of :func:`build_literature_supervisor` when a caller injects none.
+#: Not on the ``F2W_RUNTIME=langgraph`` path: ``application.F2WApplication`` (T03) always passes
+#: ``runtime_bridge.bootstrap.QA_DELEGATION_PROMPT``, which only routes a question to the
+#: ``answer_from_knowledge`` tool and relays its answer; the preserved F2W QA policy (JUDGE_SYSTEM,
+#: numeric-claim and leeway rules, citation syntax, abstention) runs inside that tool, unchanged
+#: (T03, T03B). This text is for direct ``build_literature_supervisor`` callers and tests. Keep it
+#: free of FORGE supervisor/science/simulation prompt content.
 PLACEHOLDER_SYSTEM_PROMPT = (
     "You are a literature assistant for FAIR2WISE. Use only the tools you are given. Base answers on "
     "the evidence the tools return and cite it. If the tools return nothing relevant, say so plainly."
