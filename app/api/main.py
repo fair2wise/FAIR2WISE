@@ -10,10 +10,12 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
 * the ``/v1/validation/judge-model`` routes behind the settings panel's judge dropdown
   (owner O-U2; :mod:`app.modules.validation_settings`);
 * the ``/v1/operations`` routes (T19E) over the deployment's
-  :class:`~app.modules.operations.knowledge.KnowledgeOperations` (default: the JSON graphs
-  under ``storage/kg`` and the corpora under ``storage/terminology`` of the working
-  directory, as the legacy UI lists them), plus the ``knowledge_operation`` job kind
-  (``ops.run``) registered on the shared operations when no trusted wiring did so;
+  :class:`~app.modules.operations.knowledge.KnowledgeOperations` (default
+  ``KnowledgeOperations.from_deployment``: the JSON graphs under ``storage/kg`` and the
+  corpora under ``storage/terminology`` of the working directory, as the legacy UI lists
+  them, plus the deployment's Tiled graphs read-only on every profile, ``:local`` included,
+  owner decision D3.17), plus the ``knowledge_operation`` job kind (``ops.run``) registered
+  on the shared operations when no trusted wiring did so;
 * the browser-origin gate (:mod:`app.api.origin_gate`) and the request-body cap
   (:mod:`app.api.upload_limits`) on ``/v1/`` and ``/auth/`` (``create_app`` itself gates the
   legacy routes and caps their bodies at 128 MiB, AUD-04);
@@ -136,7 +138,9 @@ def create_api_app(
             :class:`~app.modules.validation_settings.JudgeModelService` over
             ``<workdir>/validation/judge_model.json`` and the live CBORG model list.
         knowledge_operations: ``KnowledgeOperations`` for ``/v1/operations`` (T19E); default
-            ``KnowledgeOperations.from_storage(Path.cwd())`` unless ``operations`` already carries one.
+            ``KnowledgeOperations.from_deployment(settings, startup_config or os.environ, Path.cwd())``
+            (JSON graphs plus the deployment's Tiled graphs, D3.17) unless ``operations`` already
+            carries one.
         model_api: Mount the model-compatible API (``kg_rag_api.create_fastapi_app`` over
             ``cfg.graph``, ``cfg.backend`` and ``cfg.model``) at ``MODEL_API_MOUNT`` with this
             app's settings, identity port and session store (owner decision B7). Off by default
@@ -172,7 +176,8 @@ def create_api_app(
     if knowledge_operations is not None and operations.knowledge is not None:
         raise StartupConfigError("config_rejected: knowledge_operations given but operations already carry one")
     if operations.knowledge is None:
-        operations.knowledge = knowledge_operations or KnowledgeOperations.from_storage(Path.cwd())
+        operations.knowledge = knowledge_operations or KnowledgeOperations.from_deployment(
+            settings, os.environ if startup_config is None else startup_config, Path.cwd())
     if not operations.jobs.has_kind(OPERATION_JOB_KIND):
         # The worker re-resolves the initiating subject with the same lookup the job authority uses (AUD-01).
         lookup = runtime.credential_lookup() or getattr(operations.jobs.authority, "credential_lookup", None)

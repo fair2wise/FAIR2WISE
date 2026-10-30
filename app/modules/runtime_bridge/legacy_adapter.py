@@ -38,6 +38,7 @@ principal.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import uuid
@@ -50,6 +51,8 @@ from ..security.authorization import DeploymentSettings
 from .mode import RuntimeConfigError
 from .qa_route import QaRoute, TracedPlanningModel, pipeline_planning_model, qa_route
 from .retrieval import LegacyRetrievalService
+
+logger = logging.getLogger(__name__)
 
 #: Placeholder writer identity for the read-only adapter; never used to write or to
 #: establish a caller's role (DeploymentSettings requires one).
@@ -143,13 +146,34 @@ def active_json_graph_files(pipeline: Any) -> List[str]:
     return out
 
 
-def build_knowledge_operations(pipeline: Any) -> Any:
-    """``KnowledgeOperations`` following ``pipeline``'s active graph selection and ``storage/terminology``."""
+def build_knowledge_operations(pipeline: Any, settings: Optional[DeploymentSettings] = None,
+                               environ: Optional[Mapping[str, str]] = None) -> Any:
+    """``KnowledgeOperations`` following ``pipeline``'s active graph selection and ``storage/terminology``.
+
+    The deployment's Tiled graphs are served beside the JSON selection (D3.17) when the
+    trusted startup configuration names a Tiled target (the managed loopback server on
+    ``:local``): the same read-only ``TiledGraphBackend`` and per-request writer credential
+    as :meth:`KnowledgeOperations.from_deployment`. The runtime's UI-settable ``tiled_uri``
+    is not used as a target: it carries no credential source (legacy ``TILED_API_KEY`` is
+    not read) and may name any host; with nothing configured the bundle stays JSON-only.
+    """
     from ..operations.corpus import CorpusAuditTool
-    from ..operations.knowledge import KnowledgeOperations, directory_corpus_resolver
+    from ..operations.knowledge import (
+        KnowledgeOperations,
+        directory_corpus_resolver,
+        resolve_tiled_settings,
+        tiled_backend_factory,
+    )
 
     corpus = CorpusAuditTool(directory_corpus_resolver(Path.cwd() / "storage" / "terminology"))
-    return KnowledgeOperations.from_graph_files(lambda: active_json_graph_files(pipeline), corpus=corpus)
+    if settings is None:
+        settings = legacy_deployment_settings(environ)
+    tiled, reason = resolve_tiled_settings(settings, os.environ if environ is None else environ)
+    knowledge = KnowledgeOperations.from_graph_files(lambda: active_json_graph_files(pipeline), corpus=corpus,
+                                                     tiled=tiled_backend_factory(tiled) if tiled else None)
+    if reason:
+        logger.info("legacy knowledge operations serve JSON graphs only: %s", reason)
+    return knowledge
 
 
 def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> LegacyReadPath:
@@ -175,7 +199,7 @@ def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] =
     limits = RuntimeLimits(max_retries=0, max_model_calls=1)
     application = F2WApplication(settings=settings, retrieval=service, chat_model=chat_model, limits=limits,
                                  provider=backend, name="f2w-legacy-ui",
-                                 knowledge=build_knowledge_operations(pipeline))
+                                 knowledge=build_knowledge_operations(pipeline, settings, environ))
 
     def context() -> RequestContext:
         key = str(getattr(pipeline, "_active_session_key", "") or "")
