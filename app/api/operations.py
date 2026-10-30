@@ -387,6 +387,29 @@ class F2WOperations:
         handle = pub.submit_approval(ctx, job_id, approval)
         return {"approval": _json(approval), "job": _json(handle)}
 
+    def apply_approval(self, ctx: RequestContext, plan: ChangePlan, approval: ApprovalRecord) -> JobHandle:
+        """Hand an existing approval to the publication job that planned ``plan`` (SDK ``publish_plan``).
+
+        The approval must have been created by ``security.authorization.create_approval`` (a human,
+        verified on ALS) and must name the job in ``operation_id``. ``approval.authorizes(plan)`` is
+        checked first; the job's ``Publication.submit_approval`` re-checks the human context,
+        ``curation.approve``, the scope and the staleness of plan, snapshot, schema, vocabulary and
+        target, then re-queues the job. The import itself runs in the job (the worker); the
+        ``ImportReceipt`` is read from ``job_view`` once the job has succeeded. Nothing writes a graph
+        here.
+
+        Raises:
+            ContractError: ``INVALID_INPUT`` (no ``operation_id``); ``STALE_APPROVAL`` (the approval does
+                not cover ``plan`` now); ``UNSUPPORTED_CAPABILITY`` (H5 gate); ``DENIED``; ``NOT_FOUND``.
+        """
+        pub = self._publication()
+        if not approval.operation_id:
+            raise ContractError(ErrorCode.INVALID_INPUT, "the approval names no publication job (operation_id)")
+        if not approval.authorizes(plan, self.clock()):
+            raise ContractError(ErrorCode.STALE_APPROVAL, "the approval does not cover this plan (or has expired)")
+        self.gate.check(plan.target, self.settings)
+        return pub.submit_approval(ctx, approval.operation_id, approval)
+
     def publication_pointer(self, ctx: RequestContext, target: str) -> Optional[Dict[str, Any]]:
         """The active publication pointer of ``target`` (``None`` when nothing is active)."""
         require(ctx, "chat.read_support")

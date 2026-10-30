@@ -58,31 +58,51 @@ Every call takes a `RequestContext`. Callers do not build authority:
 
 ## 4. Methods
 
-| Method | Effects | Returns | Notes |
-|---|---|---|---|
-| `search_literature(ctx, query, limit)` | network, read | `ToolResult` (hits) | discovery only; never ingests |
-| `resolve_work(ctx, identifier)` | network | `ToolResult` (Work) | DOI/arXiv/title resolution |
-| `read_paper(ctx, work_id)` | read private source | `ToolResult` (summary, sections index) | user-facing output passes the disclosure projection (T21A) |
-| `read_section(ctx, work_id, section)` | read private source | `ToolResult` (bounded text + evidence) | bounded; no full-text dump |
-| `get_evidence(ctx, evidence_ids)` | read | `ToolResult` (`EvidenceRef`s) | |
-| `query_knowledge(ctx, question, graphs)` | read | `ToolResult` | direct retrieval; no planning LLM |
-| `answer_from_knowledge(ctx, question, ...)` | read, model inference | legacy-compatible answer + citations | wraps the existing QA path unchanged (T03) |
-| `submit_ingest(ctx, request)` | write staged, network, model | `JobHandle` | requires ingest capability |
-| `get_job(ctx, job_id)` / `cancel_job(ctx, job_id)` | read / write | `JobHandle` | |
-| `plan_publication(ctx, snapshot_id, target)` | read | `ChangePlan` | snapshot must be frozen JSON |
-| `approve_plan(ctx, plan)` | write | `ApprovalRecord` | trusted operation; **not** an agent tool |
-| `publish_plan(ctx, plan, approval)` | write graph | `ImportReceipt` | checks `approval.authorizes(plan)` |
-| `trace_provenance(ctx, record_id)` | read | `ToolResult` | evidence vs execution provenance kept distinct |
+Status column (2026-10-30, T15 F2W-side surface, owner decision B30): **implemented** means
+the `F2WClient` method exists and goes through the same authorization path as the agent
+tools or the `/v1` routes; **pending** names what is missing. Typed results are
+`ToolResult` (status `ok`/`empty`/`partial`/`awaiting_review`/`denied`/`invalid`/
+`unavailable`/`error`), the job DTOs, or the bundle DTO.
+
+| Method | Effects | Returns | Status | Path / notes |
+|---|---|---|---|---|
+| `search_literature(ctx, query, limit, *, technique, material, year_from, year_to)` | network, read | `ToolResult` (external candidates) | implemented (T15 over T05) | `lit_search_papers` through the application executor; needs `literature=` (a `LiteratureToolset`); discovery only, never ingests; `limit > 25` is `invalid` |
+| `resolve_work(ctx, identifier)` | network | `ToolResult` (work record) | implemented (T15 over T05) | DOI (bare, URL, `doi:`) and arXiv (`arXiv:<id>`, URL; via `10.48550/arXiv.<id>`) through `lit_get_papers_by_doi`; `empty` = unknown work; OpenAlex `W` ids and titles are `invalid` (use `search_literature`) |
+| `read_paper(ctx, work_id)` | read private source | `ToolResult` (sections index) | implemented (T15 over T05) | `lit_read_paper`; needs the toolset's trusted `SourceAccessScope` (`denied` without one); agent-private: pass through `F2WClient.disclose` before user-facing output (D19) |
+| `read_section(ctx, work_id, section)` | read private source | `ToolResult` (bounded text + locator) | implemented (T15 over T05) | `lit_read_paper_section`; `not_found` carries `available_sections`; agent-private as above |
+| `get_evidence(ctx, evidence_ids)` | read | `ToolResult` (`EvidenceRef`s + candidate records) | implemented (T15 over T06) | candidate records of the application's `evidence=` source, `chat.ask` required; `partial` when some ids are unknown, `empty` when none is |
+| `evidence_bundle(ctx, work_id, *, include_quotes=False)` | read | `LiteratureEvidenceBundle` | implemented (T15) | the read-only bundle of plan T15 (`app/modules/evidence/bundle.py`): source version + checksum, quantities with raw/normalized units, evidence ids and locators, caveats; JSON `to_json`/`from_json`; quotes only on request |
+| `query_knowledge(ctx, question, graphs)` | read | `ToolResult` | **pending** | needs the K-12 `query_knowledge_graph` tools (`kg_find_entities`, `kg_get_summary`, `kg_read_paper`, plan section 10); T08 did not port them and no `plan_addenda` task (A6/A7) schedules them. `answer_from_knowledge` (direct read, QA model) and the T19C operations are the graph reads today |
+| `answer_from_knowledge(ctx, question, ...)` | read, model inference | `ReadOutcome` (legacy verdict + citations) | implemented (T03) | wraps the existing QA path unchanged |
+| `submit_ingest(ctx, request)` / `get_job` / `cancel_job` | write staged, network, model / read / write | `JobHandle` | implemented (C2) | forwarded to the shared `F2WOperations`; needs `operations=` |
+| `plan_publication(ctx, snapshot_id, target)` | read | `JobHandle` (plan via `operations.current_plan`) | implemented (C2) | H5 gate; snapshot must be frozen JSON |
+| `approve_plan(ctx, plan, *, job_id, approver_credential)` | write | `{"approval", "job"}` | implemented (C2) | `create_approval` + `Publication.submit_approval`; trusted operation, **not** an agent tool |
+| `publish_plan(ctx, plan, approval)` | write graph (in the job) | `JobHandle` | implemented (T15 over T10) | `F2WOperations.apply_approval`: `approval.authorizes(plan)` checked, then the publication job re-checks human/capability/scope/staleness and is re-queued; the `ImportReceipt` id is read from `operations.job_view` once succeeded. No direct graph write from the SDK |
+| `trace_provenance(ctx, record_id)` | read | `ToolResult` | **pending** | needs the K-12 `trace_provenance` tools (`kg_get_lineage`, `kg_get_connections`) and an execution-provenance lookup by `provenance_id`; neither is ported or scheduled (A6/A7). `get_evidence` answers the evidence side for candidate ids |
+| `graph_statistics` / `compare_graphs` / `paper_subgraph` / `recent_entities` / `audit_corpus` / `run_knowledge_operation` / `submit_knowledge_operation` / `knowledge_job_result` | read / job | `ToolResult` / `JobHandle` | implemented (T19E) | the five T19C operations, same `F2WOperations` as `/v1/operations` |
+| `summarize_paper_terms(ctx, scope, ...)` | read | `ToolResult` | implemented (T19B) | pinned `PaperScope`; authorizing executor |
+| `disclose(payload)` | none | projected payload | implemented (T15) | `DisclosureProjector.project_api_response`, the projection the `/v1` routes apply (D19); the SDK returns agent-private typed results and the consumer projects before showing a person |
 
 Errors raise `ContractError` subclasses with stable `ErrorCode`s, or return a
 `ToolResult` with a failure status. Empty, unavailable, denied, invalid,
-partial and awaiting-review stay distinguishable.
+partial and awaiting-review stay distinguishable. A method whose backing is not
+wired at construction (`literature=`, `evidence=`, `operations=`) raises
+`ContractError(UNSUPPORTED_CAPABILITY)`, never a silent empty result.
+
+Consumer example and contract test: `examples/forge_consumer.py` (both T15 paths against
+offline fakes) and `tests/packaging/test_forge_consumer_contract.py` (import as `f2w.public`
+from outside the checkout, isolation, stream termination, cancellation, error envelopes, id
+stability across SDK and HTTP, bundle JSON round trip, `publish_plan`).
 
 ## 5. FastAPI mapping
 
 `f2w.api.main` routes mirror the methods above under a versioned prefix (for
 example `/v1/literature/search`, `/v1/jobs/{id}`, `/v1/publications/plans`),
-served behind the `/fair2wise/api` gateway (T24A). Job progress streams use the
+served behind the `/fair2wise/api` gateway (T24A). As of 2026-10-30 the jobs,
+publication, review, status and `/v1/operations` routes exist; **no
+`/v1/literature/*` or `/v1/evidence/*` route exists yet** (the T15 literature and
+evidence methods are SDK-only; T31 does not list them either), so FORGE's HTTP path
+covers jobs/events/operations and the SDK path covers search/read/evidence. Job progress streams use the
 existing SSE framing (`event:`/`data:` LF blocks) with `JobEvent` payloads.
 Legacy routes keep their paths and shapes.
 
