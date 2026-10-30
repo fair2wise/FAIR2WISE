@@ -20,6 +20,8 @@ With no `operations` argument the factory builds `build_operations(settings, <wo
 
 Every method takes the server-resolved `RequestContext` first and forwards to the T10 services. The routes add HTTP validation, context resolution and response projection only.
 
+**Projection (AUD-06).** Every `/v1` response body and every `job_event` SSE payload passes through the app's one `DisclosureProjector`, via `project_api_response` (`app/api/routes_common.project`): private keys (snippets, prompts, source text, crops, local paths, secrets) are dropped, `file:` URIs and served-artifact paths are dropped, absolute paths become opaque `f2w://` ids, secrets are redacted and every string is clipped to 600 characters (the B10 bound; the curation excerpt is cut to `EVIDENCE_EXCERPT_CHARS` first). Loopback Tiled targets, `sha256:` artifact refs, full event lists and the `corpus-audit` section names are kept. No `/v1` route has a turn's retrieved regions, so no verbatim quote is ever confirmed on `/v1`; the clip is the bound. `tests/api_v1/test_v1_disclosure.py` plants a canary in each store and asserts it never leaves.
+
 | Area | Methods | Policy lives in |
 | --- | --- | --- |
 | Jobs | `submit_job`, `list_jobs`, `get_job`, `job_events`, `job_progress`, `cancel_job`, `resume_job`, `job_view` | `JobService` (kind capability, creator or `jobs.admin`, corpus scope) |
@@ -130,6 +132,6 @@ A request with neither header (curl, SDK, tests) passes: it is not a browser CSR
 - **Q3 (owner).** Should the 19 legacy UI routes also get the origin gate (access contract section 9)? It changes frozen behaviour for cross-origin dev setups.
 - **Q4 (owner).** Should the legacy `POST /graph/upload` get a body cap (I-05)? It is uncapped today.
 - **Q5 (T15/T17).** Remaining I-01 paper/graph routes need their services first; their dispositions belong in the T17 ledger.
-- **Q6 (owner, D19).** Curation case detail shows a 600-character evidence excerpt to reviewers (admins). Confirm the bound, or route it through the quote budget.
+- **Q6 (decided, B10).** Curation case detail shows a 600-character evidence excerpt to reviewers (admins); the owner accepted 600 characters (`OPEN_DECISIONS.md` B10). Since AUD-06 the excerpt also passes the projector's scrub (paths opaque, secrets redacted).
 - **Q7 (T24).** In-memory sessions (restart signs out); persistent store and CSRF synchronizer token with the gateway sign-in UI (T24C).
 - **Q8 (T10).** `JobService` has no scoped list; `F2WOperations.list_jobs` filters the store's list through the service's own visibility rule. A store-level scoped query would scale better.

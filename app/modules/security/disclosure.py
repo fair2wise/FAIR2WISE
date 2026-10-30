@@ -161,6 +161,15 @@ _ARTIFACT_VALUE_RE = re.compile(
     r"(?:^|/)(?:papers|static|assets|crops|figures|artifacts|page_images|source_index|blobs?)/\S*)"
 )
 
+# The same, for ``/v1`` bodies: ``file:`` URIs and served-artifact paths only. Loopback ``http``
+# URLs are kept there because the deployment's Tiled target is a loopback URL on ``:local``
+# (publication plans, pointers and approvals name it) and serves no artifact.
+_API_ARTIFACT_VALUE_RE = re.compile(
+    r"(?i)(?:^file:|(?:^|/)(?:papers|static|assets|crops|figures|artifacts|page_images|source_index|blobs?)/\S*)"
+)
+# A ``sections`` value that is a list of section *names* (``corpus-audit`` parameters), not section text.
+_SECTION_NAME_RE = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+
 # Absolute POSIX paths, home-relative paths, Windows paths and fixture placeholders.
 _PATH_TAIL = r"[^\s'\"<>\]\)\[,;]*"
 _ABS_PATH_RE = re.compile(
@@ -1441,6 +1450,58 @@ class DisclosureProjector:
     def project_paths_only(self, payload: Any) -> Any:
         """Project DTOs whose only internal-only content is local paths (health, session reset)."""
         return self._redact_value_paths(payload)
+
+    # ------------------------------------------------------------------ /v1 bodies
+
+    def project_api_response(self, body: Any) -> Any:
+        """Project a ``/v1`` response body or ``job_event`` SSE payload (AUD-06).
+
+        ``/v1`` DTOs are typed, but several carry text derived from sources or from the
+        local machine: the curation evidence excerpt, case payloads and model attempts,
+        job pause reasons and artifact refs, operation-report previews and warnings,
+        publication plans. Every body gets the D19 scrub the legacy routes apply to
+        unknown payloads: private keys (snippets, prompts, source text, crops, local
+        paths, secrets) are dropped, ``file:`` URIs and served-artifact paths are dropped,
+        absolute paths become opaque ``f2w://`` ids, secrets are redacted and every string
+        is clipped to ``max_progress_text_chars`` (600 characters, the B10 excerpt bound).
+
+        Two rules differ from :meth:`_scrub`, for the API's own data: lists are not cut
+        to 200 items (``/v1`` lists are bounded by their ``limit`` parameters and a
+        polling client must see every event), and loopback ``http`` URLs are kept
+        (the Tiled target on ``:local``). A ``sections`` key is kept when its value is a
+        list of section names (the ``corpus-audit`` parameters echo), never when it holds
+        text. Quote verification needs the turn's retrieved regions, which no ``/v1``
+        route has, so no verbatim quote is ever confirmed here; the clip is the bound.
+        """
+        return self._scrub_api(body, depth=0)
+
+    @staticmethod
+    def _api_section_names(key: str, value: Any) -> bool:
+        return key.lower() == "sections" and isinstance(value, (list, tuple)) and all(
+            isinstance(item, str) and _SECTION_NAME_RE.fullmatch(item) for item in value)
+
+    @staticmethod
+    def _api_artifact_value(value: Any) -> bool:
+        return isinstance(value, str) and bool(_API_ARTIFACT_VALUE_RE.search(value.strip()))
+
+    def _scrub_api(self, value: Any, *, depth: int) -> Any:
+        if depth > 16:
+            return None
+        if isinstance(value, Mapping):
+            out: Dict[str, Any] = {}
+            for key, item in value.items():
+                name = str(key)
+                if _PRIVATE_KEY_RE.match(name) and not self._api_section_names(name, item):
+                    continue
+                if self._api_artifact_value(item):
+                    continue
+                out[key] = self._scrub_api(item, depth=depth + 1)
+            return out
+        if isinstance(value, (list, tuple)):
+            return [self._scrub_api(v, depth=depth + 1) for v in value if not self._api_artifact_value(v)]
+        if isinstance(value, str):
+            return self._safe_str(value)
+        return value
 
     def project_model_chat(self, payload: Any, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> Any:
         """Project model-compatible proxy responses (``/api/chat``, ``/v1/chat/completions``)."""
