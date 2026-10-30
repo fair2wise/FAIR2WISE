@@ -2,7 +2,9 @@
 
 * ``create_fastapi_app`` installs the access runtime on ``MODEL_API_SURFACE``: every route is declared
   (``undeclared_routes == []``), the local operator serves ``:local``, an ALS caller must be signed in,
-  and the two chat routes are not exposed on ALS (R20/R21 ``on_als=False``).
+  and a signed-in ALS user reaches all six routes, the chat routes included (R20/R21 ``on_als=True``,
+  owner decision B7, O-A9, 2026-10-30; the images mount this app in the UI API process, see
+  ``app/api/main.py`` and ``tests/gateway/test_gateway_prefix.py``).
 * ALS startup without an identity port and session store is refused.
 * Both chat routes pass through ``project_model_chat`` with the turn's PDF windows as source regions:
   an echoing model cannot return more than 40% of a window (O-D2) on either route.
@@ -103,7 +105,7 @@ def test_als_startup_without_identity_wiring_is_refused(offline):
         kg_rag_api.create_fastapi_app(offline, backend="ollama", deployment=staging_settings())
 
 
-def test_als_requires_sign_in_and_never_exposes_the_chat_routes(offline):
+def test_als_requires_sign_in_and_serves_signed_in_users_with_the_projection(offline):
     port = FakeTiledIdentityPort(tiled_target=STAGING)
     store = InMemoryCredentialStore()
     for who, user in (("user", plain_user()), ("admin", admin_user())):
@@ -114,15 +116,21 @@ def test_als_requires_sign_in_and_never_exposes_the_chat_routes(offline):
     assert undeclared_routes(app) == []
     anon = TestClient(app)
     assert anon.get("/api/tags").status_code == 401
-    # The chat routes are not exposed on ALS at all, signed in or not (checked before the sign-in prompt).
-    assert anon.post("/api/chat", json={"messages": [{"role": "user", "content": "P3HT"}]}).status_code == 403
+    # B7: the chat routes are exposed on ALS; an anonymous caller gets the sign-in prompt, never a 403 or an answer.
+    for path in ("/api/chat", "/v1/chat/completions"):
+        resp = anon.post(path, json={"messages": [{"role": "user", "content": "P3HT"}]})
+        assert resp.status_code == 401 and resp.json()["code"] == "sign_in_required", (path, resp.text)
+    assert not port.calls  # no credential, nothing to verify
+    pick = {"/api/chat": lambda b: b["message"]["content"],
+            "/v1/chat/completions": lambda b: b["choices"][0]["message"]["content"]}
     for who in ("user", "admin"):
         signed = TestClient(app, cookies={SESSION_COOKIE: f"cookie-{who}"})
         assert signed.get("/api/tags").status_code == 200
         assert signed.get("/v1/models").status_code == 200
         for path in ("/api/chat", "/v1/chat/completions"):
-            resp = signed.post(path, json={"messages": [{"role": "user", "content": "P3HT"}]})
-            assert resp.status_code == 403, (who, path, resp.text)  # R20/R21: on_als=False (D-T8)
+            resp = signed.post(path, json={"messages": [{"role": "user", "content": "P3HT resonant scattering polymer"}]})
+            assert resp.status_code == 200, (who, path, resp.text)  # R20/R21: on_als=True (B7)
+            assert _echoed(pick[path](resp.json())) <= 8, (who, path)  # the D19 projection applies on ALS too
     assert port.calls  # identities were really verified
 
 

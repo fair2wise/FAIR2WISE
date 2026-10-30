@@ -94,7 +94,7 @@ def test_run_api_warns_when_local_binds_beyond_loopback(monkeypatch, caplog, ent
     monkeypatch.setattr(uvicorn, "run", lambda a, **kw: served.append((a, kw["host"])))
     monkeypatch.delenv("F2W_PUBLIC_PREFIX", raising=False)
     if entry == "jobs_api":
-        monkeypatch.setattr(api_main, "create_api_app", lambda cfg, cors_origins=None: app)
+        monkeypatch.setattr(api_main, "create_api_app", lambda cfg, cors_origins=None, **kw: app)  # B7: model_api kwargs
         run = lambda host: api_main.run_api(object(), host=host, port=1)  # noqa: E731
     else:
         monkeypatch.setattr(legacy, "create_app", lambda cfg, cors_origins=None: app)

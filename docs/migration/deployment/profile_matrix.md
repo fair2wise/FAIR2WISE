@@ -25,7 +25,7 @@
 | Public base path | `/fair2wise` | `/fair2wise` | `/fair2wise` |
 | UI entry | `/fair2wise/` | same | same |
 | UI API (browser) | Same origin `/fair2wise/api`; the gateway strips the prefix once | same | same |
-| Model-compatible API | `/fair2wise/model-api/*` if the profile exposes it | Exposure decided at H1 | Exposure decided at H1 |
+| Model-compatible API | `/fair2wise/model-api/*`, served in the API process (no sign-in) | `/fair2wise/model-api/*` for signed-in users, same session cookie as `/fair2wise/api` (owner B7, O-A9, 2026-10-30); non-browser token sign-in is D-T8 (open) | same |
 | Container ingress | One port, `8080` (gateway) | same | same |
 | Default host bind | `127.0.0.1:<host port>` | Reachable only from the authorized proxy (Ansible) | same |
 | Authorization mode | `local_trusted` (no sign-in, all capabilities) | `tiled_authenticated` | `tiled_authenticated` |

@@ -82,9 +82,11 @@ def test_layout_derives_every_public_url_from_one_prefix():
     assert LAYOUT.as_manifest() == {"public_prefix": "/fair2wise", "ui_base": "/fair2wise/",
                                     "api_base": "/fair2wise/api", "docs_url": "/fair2wise/docs/"}
     assert LAYOUT.cookie_path == "/fair2wise" and LAYOUT.health_path == "/fair2wise/healthz"
+    assert LAYOUT.model_api_root_path == "/fair2wise/model-api"  # B7: one segment below the process root
     assert gw.uvicorn_options(LAYOUT) == {"root_path": "/fair2wise/api"}
     plain = gw.layout_from_env({})
     assert plain.ui_base == "/" and plain.api_root_path == "" and plain.docs_url == "/docs/"
+    assert plain.model_api_root_path == gw.MODEL_API_MOUNT == "/model-api"
     assert gw.uvicorn_options(plain) == {}  # unprefixed developer launch: unchanged
     assert gw.layout_from_env({gw.PREFIX_ENV: "/fair2wise"}) == LAYOUT
 
@@ -116,6 +118,9 @@ def test_render_refuses_unknown_placeholders_and_a_prefix_the_gateway_does_not_r
         gw.render_nginx_conf(template, layout=gw.PublicLayout("/other"))
     with pytest.raises(gw.PrefixConfigError):
         gw.render_nginx_conf(template, layout=gw.PublicLayout(""))
+    with pytest.raises(gw.PrefixConfigError, match="model-api"):  # B7: the model API route is part of the contract
+        gw.render_nginx_conf(template.replace("location ^~ /fair2wise/model-api/ ", "location ^~ /fair2wise/mapi/ "),
+                             layout=LAYOUT)
     assert "${" not in rendered() and f"server {UPSTREAM};" in rendered()
 
 
@@ -145,27 +150,31 @@ def test_cli_renders_the_gateway_and_the_image_mkdocs_config(tmp_path, capsys):
 # ------------------------------------------------------------------ the gateway file itself
 
 
-def test_exactly_one_prefix_stripping_boundary():
-    """One proxy_pass, in the one API location; no rewrite, alias or second API route."""
+def test_the_gateway_is_the_only_prefix_stripping_boundary():
+    """Two proxied locations (UI API, model API; owner B7), one upstream process; no rewrite or alias."""
     model = NginxModel(rendered())
     proxied = [loc for loc in model.locations if loc.directive("proxy_pass")]
-    assert [(loc.modifier, loc.pattern) for loc in proxied] == [("^~", "/fair2wise/api/")]
+    assert [(loc.modifier, loc.pattern) for loc in proxied] == [("^~", "/fair2wise/api/"), ("^~", "/fair2wise/model-api/")]
     names = {d.name for loc in model.locations for d in loc.directives} | {d.name for d in model.server}
     assert not names & {"rewrite", "alias", "proxy_pass_request_headers", "uwsgi_pass", "fastcgi_pass"}
-    assert sum(len(loc.directive("proxy_pass")) for loc in model.locations) == 1
-    assert not any(loc.pattern.startswith(("/api", "/docs", "/assets")) for loc in model.locations)
+    assert sum(len(loc.directive("proxy_pass")) for loc in model.locations) == 2
+    assert not any(loc.pattern.startswith(("/api", "/docs", "/assets", "/model-api")) for loc in model.locations)
     assert list(model.upstreams) == ["f2w_api"] and model.upstreams["f2w_api"] == [UPSTREAM]
 
 
-def test_api_location_streams_without_buffering_and_keeps_long_streams_open():
+def test_api_locations_stream_without_buffering_and_keep_long_streams_open():
     model = NginxModel(rendered())
-    (api,) = [loc for loc in model.locations if loc.directive("proxy_pass")]
+    api, model_api = [loc for loc in model.locations if loc.directive("proxy_pass")]
     value = {d.name: " ".join(d.args) for d in api.directives if d.name != "proxy_set_header"}
     assert value["proxy_buffering"] == "off" and value["proxy_cache"] == "off" and value["gzip"] == "off"
     assert value["proxy_http_version"] == "1.1" and value["proxy_redirect"] == "off"
     assert int(value["proxy_read_timeout"].rstrip("s")) >= 900
     assert int(value["proxy_send_timeout"].rstrip("s")) >= 900
     assert value["client_max_body_size"] == "128m"  # bounded, but large KG JSON uploads still pass
+    # The model API location differs only in the URI it forwards (B7): same cap, headers and streaming.
+    strip = lambda loc: [(d.name, tuple(d.args)) for d in loc.directives if d.name not in ("proxy_pass", "if")]
+    assert strip(model_api) == strip(api)
+    assert model_api.directive("proxy_pass")[0].args == ["http://f2w_api$f2w_model_api_uri"]
 
 
 @pytest.mark.parametrize("uri,status,location", [
@@ -203,8 +212,9 @@ def test_ui_assets_docs_and_deep_links(model, static_root, uri, served):
     "/fair2wise/docs/missing/",
     "/fair2wise/docs/missing.html",
     "/fair2wise/api",  # the API root is not a route and never falls into the SPA
-    "/fair2wise/model-api/v1/chat/completions",  # not exposed by these images
-    "/fair2wise/model-api",
+    "/fair2wise/model-api",  # nor is the model API root (B7)
+    "/fair2wise/api/model-api/v1/models",  # the model API has one public path, not an alias under the UI API
+    "/fair2wise/api/model-api",
     "/api/health",  # no unprefixed alias of the API
     "/docs/", "/index.html", "/assets/index-abc123.js", "/settings",  # nothing outside the prefix
 ])
@@ -244,9 +254,26 @@ def test_api_prefix_is_stripped_exactly_once_and_the_suffix_is_raw(model, uri, u
     assert result.proxy_uri == upstream_uri
 
 
+@pytest.mark.parametrize("uri,upstream_uri", [
+    ("/fair2wise/model-api/v1/models", "/model-api/v1/models"),
+    ("/fair2wise/model-api/v1/chat/completions", "/model-api/v1/chat/completions"),
+    ("/fair2wise/model-api/api/chat", "/model-api/api/chat"),
+    ("/fair2wise/model-api/api/tags?x=a%20b", "/model-api/api/tags?x=a%20b"),  # raw bytes, not re-decoded
+    ("/fair2wise/model-api/docs", "/model-api/docs"),
+    ("/fair2wise/model-api/", "/model-api/"),
+    ("/fair2wise/model-api/fair2wise/model-api/v1/models", "/model-api/fair2wise/model-api/v1/models"),
+])
+def test_model_api_keeps_its_mount_segment_and_reaches_the_same_process(model, uri, upstream_uri):
+    """B7: ``/fair2wise/model-api/<p>`` -> ``/model-api/<p>`` on the one API upstream (``app/api/main.py`` mount)."""
+    result = route(model, uri, "POST")
+    assert result.kind == "proxy" and result.upstream == UPSTREAM
+    assert result.proxy_uri == upstream_uri
+
+
 def test_a_non_literal_prefix_does_not_reach_the_api(model):
     """``//fair2wise/api`` normalizes into the API location but has no literal prefix to strip."""
     assert route(model, "//fair2wise/api/health").status == 404
+    assert route(model, "//fair2wise/model-api/v1/models").status == 404
     climbed = route(model, "/fair2wise/api/../index.html")  # dot segments leave the API namespace
     assert climbed.kind == "static" and climbed.location_block.pattern == "/fair2wise/index.html"
 
@@ -500,6 +527,169 @@ def test_auth09_no_tiled_auth_or_admin_proxy_through_the_gateway(als_prefixed):
         assert resp.status_code in (401, 404) or ui_fallback, path
         assert "library_version" not in resp.text and "access-" not in resp.text, path
     assert tiled.paths == before  # nothing was forwarded to Tiled
+
+
+# ------------------------------------------------------------------ B7 (O-A9): the model API under /fair2wise/model-api
+
+MODEL_API = "/fair2wise/model-api"
+SIX_MODEL_ROUTES = {"/api/chat", "/v1/chat/completions", "/api/tags", "/api/version", "/v1/models", "/api/ps"}
+
+
+class _FixedModel:
+    """A chat client double for the model API (no provider is contacted)."""
+
+    model = "fixed"
+
+    async def chat(self, messages, *a, **k):
+        return "A short grounded answer."
+
+
+def _model_api_offline(monkeypatch):
+    from app.modules import kg_rag_api
+
+    monkeypatch.setattr(kg_rag_api, "GRAPH_SOURCE", "json", raising=False)
+    monkeypatch.setattr(kg_rag_api, "RETRIEVAL_BACKEND", "lexical", raising=False)
+    monkeypatch.setattr(kg_rag_api, "load_pdf_text", lambda path: "", raising=False)
+    monkeypatch.setattr(kg_rag_api, "make_chat_client", lambda backend, model=None: _FixedModel())
+
+
+@pytest.fixture
+def als_model_api(harness, static_root, monkeypatch):
+    """The image's app factory (``create_api_app(model_api=True)``) on ``als-dev`` behind the gateway."""
+    from _wiring_support import make_cfg
+
+    from app.api.main import create_api_app
+    from app.api.sessions import als_identity_wiring
+    from app.modules.security.authorization import DeploymentSettings
+
+    monkeypatch.delenv("F2W_RUNTIME", raising=False)
+    monkeypatch.setenv(gw.PREFIX_ENV, "/fair2wise")  # the model API root defaults from the trusted setting
+    _model_api_offline(monkeypatch)
+    tiled = ScriptedTiled()
+    settings = DeploymentSettings.for_disposable_test_target("als-dev", tiled_target=tiled.TARGET,
+                                                             writer_identity="w")
+    port, store = als_identity_wiring(settings, httpx.Client(transport=httpx.MockTransport(tiled.handler)))
+    app = create_api_app(make_cfg(harness), deployment=settings, identity_port=port, credential_store=store,
+                         model_api=True)
+    client = _prefixed_client(app, static_root, base_url="https://f2w.example")
+    return client, store, tiled
+
+
+def _ask(client, path, **kw):
+    return client.post(path, json={"messages": [{"role": "user", "content": "P3HT"}]}, **kw)
+
+
+def test_b7_model_api_takes_the_same_sign_in_and_never_answers_html(als_model_api):
+    """Anonymous: 401 ``sign_in_required`` (JSON); after the UI API sign-in the same cookie opens all six routes."""
+    browser, store, tiled = als_model_api
+    for path in (f"{MODEL_API}/v1/models", f"{MODEL_API}/api/tags"):
+        anon = browser.get(path)
+        assert anon.status_code == 401 and anon.json()["code"] == "sign_in_required", path
+        assert anon.headers["content-type"].startswith("application/json")
+    assert _ask(browser, f"{MODEL_API}/v1/chat/completions").status_code == 401  # exposed, so a sign-in prompt
+    assert _ask(browser, f"{MODEL_API}/api/chat").status_code == 401
+    assert browser.get(f"{MODEL_API}/api/version").status_code == 401  # D30: nothing but health before sign-in
+    assert "/api/v1/auth/whoami" not in tiled.paths  # no credential, so nothing to verify
+
+    resp = browser.post(f"{API}/auth/sign-in", json={"provider": "toy", "username": "bob", "password": "pw"})
+    assert resp.status_code == 200 and "Path=/fair2wise" in resp.headers["set-cookie"]  # covers /fair2wise/model-api
+    models = browser.get(f"{MODEL_API}/v1/models")
+    assert models.status_code == 200 and models.json()["data"][0]["id"] == "kg-rag:latest"
+    assert browser.get(f"{MODEL_API}/api/tags").json()["models"][0]["name"] == "kg-rag:latest"
+    assert browser.get(f"{MODEL_API}/api/version").json() == {"version": "0.1.0"}
+    assert browser.get(f"{MODEL_API}/api/ps").json() == {"processes": []}
+    chat = _ask(browser, f"{MODEL_API}/v1/chat/completions")
+    assert chat.status_code == 200, chat.text
+    assert chat.json()["choices"][0]["message"]["content"] == "A short grounded answer."
+    ollama = _ask(browser, f"{MODEL_API}/api/chat")
+    assert ollama.status_code == 200 and ollama.json()["message"]["content"] == "A short grounded answer."
+    assert "/api/v1/auth/whoami" in tiled.paths and len(store) == 1  # the identity was really verified
+    assert browser.post(f"{API}/auth/sign-out").json() == {"status": "signed_out"}
+    assert browser.get(f"{MODEL_API}/v1/models").status_code == 401
+
+
+def test_b7_model_api_has_one_public_path_and_advertises_it(als_model_api):
+    browser, _store, _tiled = als_model_api
+    docs = browser.get(f"{MODEL_API}/docs")
+    assert docs.status_code == 200 and "'/fair2wise/model-api/openapi.json'" in docs.text
+    assert "/fair2wise/model-api/docs/oauth2-redirect" in docs.text
+    assert "/fair2wise/model-api/openapi.json" in browser.get(f"{MODEL_API}/redoc").text
+    spec = browser.get(f"{MODEL_API}/openapi.json").json()
+    assert spec["servers"] == [{"url": "/fair2wise/model-api"}] and set(spec["paths"]) == SIX_MODEL_ROUTES
+    ui_spec = browser.get(f"{API}/openapi.json").json()
+    assert ui_spec["servers"] == [{"url": "/fair2wise/api"}]
+    assert not any(p.startswith("/model-api") for p in ui_spec["paths"])  # the mount is not part of the UI API schema
+    for uri in (f"{API}/model-api/v1/models", f"{API}/model-api", MODEL_API):
+        r = browser.get(uri)
+        assert r.status_code == 404 and not r.text.startswith("<!doctype html>"), uri
+    missing = browser.get(f"{MODEL_API}/missing")  # an unknown path inside the mount: the app's JSON 404, never HTML
+    assert missing.status_code == 404 and missing.headers["content-type"].startswith("application/json")
+
+
+def test_b7_cross_site_posts_to_the_model_api_are_refused_before_the_route(als_model_api):
+    """The legacy app's browser-origin gate wraps the mount (AUD-04): same protection as ``/chat``."""
+    browser, _store, _tiled = als_model_api
+    browser.post(f"{API}/auth/sign-in", json={"provider": "toy", "username": "bob", "password": "pw"})
+    evil = _ask(browser, f"{MODEL_API}/v1/chat/completions", headers={"Origin": "https://evil.example"})
+    assert evil.status_code == 403 and evil.json()["code"] == "cross_site_request"
+    fetch = _ask(browser, f"{MODEL_API}/api/chat", headers={"Sec-Fetch-Site": "cross-site"})
+    assert fetch.status_code == 403
+    same = _ask(browser, f"{MODEL_API}/v1/chat/completions", headers={"Origin": "https://f2w.example"})
+    assert same.status_code == 200
+
+
+def test_b7_local_serves_the_model_api_in_process_without_sign_in(harness, monkeypatch):
+    """``:local`` / developer launch: ``/model-api/...`` on the API port, local operator, generated URLs unprefixed."""
+    from _wiring_support import make_cfg
+    from security_fakes import ForbiddenIdentityPort, local_settings
+
+    from app.api.auth import undeclared_routes
+    from app.api.main import create_api_app
+
+    monkeypatch.delenv("F2W_RUNTIME", raising=False)
+    monkeypatch.delenv(gw.PREFIX_ENV, raising=False)
+    _model_api_offline(monkeypatch)
+    app = create_api_app(make_cfg(harness), deployment=local_settings(), identity_port=ForbiddenIdentityPort(),
+                         model_api=True)
+    assert undeclared_routes(app) == []
+    client = TestClient(app, raise_server_exceptions=False)
+    assert client.get("/model-api/v1/models").status_code == 200
+    assert _ask(client, "/model-api/api/chat").json()["message"]["content"] == "A short grounded answer."
+    assert "'/model-api/openapi.json'" in client.get("/model-api/docs").text
+    assert client.get("/model-api/openapi.json").json()["servers"] == [{"url": "/model-api"}]
+    assert client.get("/health").json()["status"] == "ok"  # the UI API is unchanged beside the mount
+    # Without the option (library and test callers) nothing is mounted.
+    plain = create_api_app(make_cfg(harness, kg_mode="json"), deployment=local_settings(),
+                           identity_port=ForbiddenIdentityPort())
+    assert TestClient(plain, raise_server_exceptions=False).get("/model-api/v1/models").status_code == 404
+
+
+def test_public_root_path_rewrites_only_the_mounted_scope():
+    """The shim gives the mounted app its public root; routing inside it sees the unchanged suffix."""
+    from app.api.main import PublicRootPath
+    from app.modules.security.authorization import StartupConfigError
+
+    seen = {}
+
+    async def inner(scope, receive, send):
+        seen.clear()
+        seen.update(scope)
+
+    shim = PublicRootPath(inner, "/fair2wise/model-api")
+    import asyncio
+
+    asyncio.run(shim({"type": "http", "root_path": "/fair2wise/api/model-api",
+                      "path": "/fair2wise/api/model-api/v1/mod%20els", "raw_path": b"/fair2wise/api/model-api/v1/mod%20els"},
+                     None, None))
+    assert seen["root_path"] == seen["app_root_path"] == "/fair2wise/model-api"
+    assert seen["path"] == "/fair2wise/model-api/v1/mod%20els" and seen["raw_path"] == b"/fair2wise/model-api/v1/mod%20els"
+    asyncio.run(shim({"type": "http", "root_path": "/model-api", "path": "/model-api/x"}, None, None))
+    assert seen["path"] == "/fair2wise/model-api/x" and "raw_path" not in seen
+    asyncio.run(shim({"type": "lifespan"}, None, None))
+    assert seen["type"] == "lifespan"
+    for bad in ("fair2wise/model-api", "/fair2wise/model-api/"):
+        with pytest.raises(StartupConfigError):
+            PublicRootPath(inner, bad)
 
 
 # ------------------------------------------------------------------ image packaging

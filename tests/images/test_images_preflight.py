@@ -216,9 +216,10 @@ def test_jobs_api_run_api_applies_root_path_from_the_public_prefix(monkeypatch):
 
     from app.api import main as api_main
 
-    served = []
+    served, built = [], []
     monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append(kw))
-    monkeypatch.setattr(api_main, "create_api_app", lambda cfg, cors_origins=None: ("app", cors_origins))
+    monkeypatch.setattr(api_main, "create_api_app",
+                        lambda cfg, cors_origins=None, **kw: built.append(kw) or ("app", cors_origins))
     monkeypatch.setenv("F2W_PUBLIC_PREFIX", "/fair2wise")
     api_main.run_api(object(), host="127.0.0.1", port=8090)
     monkeypatch.delenv("F2W_PUBLIC_PREFIX")
@@ -230,6 +231,11 @@ def test_jobs_api_run_api_applies_root_path_from_the_public_prefix(monkeypatch):
                       {"host": "127.0.0.1", "port": 8090},
                       {"host": "127.0.0.1", "port": 8090, "root_path": "/x/api"},
                       {"host": "127.0.0.1", "port": 8090}]
+    # B7: the image mounts the model API, whose public root follows the same trusted prefix setting.
+    assert built == [{"model_api": True, "model_api_root_path": "/fair2wise/model-api"},
+                     {"model_api": True, "model_api_root_path": "/model-api"},
+                     {"model_api": True, "model_api_root_path": "/model-api"},
+                     {"model_api": True, "model_api_root_path": "/fair2wise/model-api"}]
 
 
 @pytest.mark.parametrize("port,ok", [("8080", True), ("9000", True), ("8090", False), ("8765", False),

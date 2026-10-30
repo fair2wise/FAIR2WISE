@@ -33,6 +33,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.routing import Mount
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
@@ -202,12 +203,30 @@ def lookup_policy(method: str, path: str, surface: str) -> Optional[RoutePolicy]
 
 
 def undeclared_routes(app: FastAPI, surface: Optional[str] = None) -> List[str]:
-    """Return ``"METHOD path"`` for app routes without a declared policy (DEP-19)."""
+    """Return ``"METHOD path"`` for app routes without a declared policy (DEP-19).
+
+    A mounted sub-application is inspected recursively when it is a FastAPI app that carries
+    its own :class:`AccessRuntime` (``app.state.f2w_access``), through any wrapper exposing
+    ``.app`` (``app.api.main.PublicRootPath``); its findings are prefixed with the mount
+    path. Anything else mounted hides its routes from this check and is reported as
+    ``UNINSPECTABLE`` (fail closed).
+    """
     surface = surface or app.state.f2w_access.surface
     missing = []
     for route in app.routes:
+        if isinstance(route, Mount):
+            inner: Any = route.app
+            while not isinstance(inner, FastAPI) and hasattr(inner, "app"):
+                inner = inner.app
+            inner_runtime = getattr(getattr(inner, "state", None), "f2w_access", None)
+            if isinstance(inner, FastAPI) and isinstance(inner_runtime, AccessRuntime):
+                missing.extend(f"{route.path}{m}" if m.startswith("UNINSPECTABLE") else f"{route.path} {m}"
+                               for m in undeclared_routes(inner, inner_runtime.surface))
+            else:
+                missing.append(f"UNINSPECTABLE Mount {route.path}")
+            continue
         if not isinstance(getattr(route, "path", None), str):
-            # A mount or lazily included router hides its routes from this check: fail closed.
+            # A lazily included router hides its routes from this check: fail closed.
             missing.append(f"UNINSPECTABLE {type(route).__name__}")
             continue
         for method in sorted(getattr(route, "methods", None) or ()):

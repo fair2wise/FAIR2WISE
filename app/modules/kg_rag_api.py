@@ -36,7 +36,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 import time
-from typing import Any, Deque, Dict, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Sequence, Tuple
 from urllib.parse import urlparse
 import aiohttp
 import openai
@@ -285,15 +285,20 @@ def create_fastapi_app(
     startup_config: Optional[Dict[str, str]] = None,
     identity_port: Optional[Any] = None,
     credential_store: Optional[Any] = None,
+    clock: Optional[Callable[[], Any]] = None,
 ) -> FastAPI:
     """Create a FastAPI app that proxies chat requests through the KG-RAG pipeline.
 
     Access and disclosure (AUD-03, T28A): the six routes carry the ``ROUTE_POLICIES`` R20-R25
     through the server-built request context (``app.api.auth.request_context``, surface
-    ``MODEL_API_SURFACE``): the local operator on ``:local``; a signed-in ALS user elsewhere,
-    where the two chat routes are not exposed (``on_als=False``, D-T8). Both chat answers pass
+    ``MODEL_API_SURFACE``): the local operator on ``:local``; a signed-in ALS user elsewhere
+    (owner decision B7: browser-session sign-in through the UI API process, which mounts this app at
+    ``/model-api``, ``app/api/main.py``; token sign-in for non-browser clients is D-T8). Both chat answers pass
     through ``DisclosureProjector.project_model_chat`` with the turn's PDF windows as source
     regions, so a model that echoes its prompt cannot return more than 40% of a window (O-D2).
+
+    The chat client is created on the first chat turn, not here: the UI API process that mounts
+    this app starts without a provider key, exactly as it does for its own routes.
 
     Args:
         graph_file: Path to the KG graph JSON file.
@@ -303,6 +308,7 @@ def create_fastapi_app(
             (``os.environ`` when ``None``, profile ``local`` when unset), as ``create_app``.
         startup_config / identity_port / credential_store: As ``create_app`` (ALS profiles need
             the port and the store, or startup is refused).
+        clock: Current time for the access runtime (tests; shared with the UI API when mounted).
 
     Returns:
         Configured FastAPI application with /v1/chat/completions endpoint.
@@ -321,14 +327,24 @@ def create_fastapi_app(
     if not settings.is_local and (identity_port is None or credential_store is None):
         raise StartupConfigError("config_rejected: ALS profiles need identity_port and credential_store")
     app = FastAPI(title="KG-RAG Chat Proxy")
-    runtime = AccessRuntime(settings, identity_port=identity_port, credential_store=credential_store,
-                            surface=MODEL_API_SURFACE)
+    runtime_kw: Dict[str, Any] = {"identity_port": identity_port, "credential_store": credential_store,
+                                  "surface": MODEL_API_SURFACE}
+    if clock is not None:
+        runtime_kw["clock"] = clock
+    runtime = AccessRuntime(settings, **runtime_kw)
     install_access_control(app, runtime)
     projector = DisclosureProjector()
     source_authority = SourceAccessAuthority()
 
     kg = KnowledgeGraph(graph_file)
-    cli = make_chat_client(backend=backend, model=model)
+    clients: List[ChatClient] = []
+
+    def _client() -> ChatClient:
+        """The chat client, built on the first chat turn (startup never needs the provider key)."""
+        if not clients:
+            clients.append(make_chat_client(backend=backend, model=model))
+        return clients[0]
+
     rag_c = Conversation(RAG_SYSTEM)
     # base_c = Conversation(BASELINE_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file)
@@ -367,7 +383,7 @@ def create_fastapi_app(
         )
 
         rag_prompt = build_rag_prompt(q, ctx)
-        rag_resp = await cli.chat(rag_c.build(rag_prompt))
+        rag_resp = await _client().chat(rag_c.build(rag_prompt))
 
         missing: List[MissingNode] = []
         if all(ni.evidence_ct == 0 for ni in infos):
@@ -392,7 +408,7 @@ def create_fastapi_app(
             rag_resp = await _answer_messages(messages)
 
         return _project(ctx, {
-            "model": cli.model,
+            "model": _client().model,
             "message": {"role": "assistant", "content": rag_resp},
             "done": True,
         }, ModelTurnSources(snippets))

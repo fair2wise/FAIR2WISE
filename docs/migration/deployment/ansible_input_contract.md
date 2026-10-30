@@ -116,4 +116,4 @@ The binding sequence is ANSIBLE_HANDOFF.md, "Deployment sequence". Its verificat
 - Host mount roots, UID/GID mapping, quota.
 - Backup owner, destination, retention, RPO/RTO, encryption.
 - The writer principal identifier for each environment, and the escalation contact for the Tiled operators.
-- Whether `/fair2wise/model-api` is exposed on ALS.
+- ~~Whether `/fair2wise/model-api` is exposed on ALS.~~ Decided (owner B7, O-A9, 2026-10-30): exposed for signed-in users, served by the same gateway and API process; the edge forwards `/fair2wise` unchanged, so nothing changes for Ansible.

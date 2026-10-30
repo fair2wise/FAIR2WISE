@@ -20,6 +20,14 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
 * the scope-change wiring: an ALS sign-out or a dropped admin role calls
   ``F2WOperations.notify_scope_change`` (``JobService.notify_scope_change``), which
   invalidates dependent publication approvals.
+* with ``model_api=True`` (the image entrypoint ``run_api``), the model-compatible API
+  (:func:`app.modules.kg_rag_api.create_fastapi_app`, routes R20-R25) mounted at
+  :data:`~app.modules.deployment.gateway.MODEL_API_MOUNT` over the same deployment settings,
+  identity port and server-side session store, so the ALS session cookie signs a caller in
+  to both (owner decision B7, O-A9, 2026-10-30). The gateway forwards
+  ``/fair2wise/model-api/<path>`` as ``/model-api/<path>``; :class:`PublicRootPath` gives the
+  mounted app ``root_path=/fair2wise/model-api`` so its ``/docs`` and OpenAPI ``servers``
+  name the public path. Non-browser clients have no sign-in yet (D-T8).
 
 The legacy ``create_app`` / ``run_api`` / ``python -m app.modules.f2w_agent.cli api``
 entrypoints are unchanged; ``... cli api --jobs-api`` serves this factory instead.
@@ -30,12 +38,15 @@ has no side effects.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import FastAPI
+from starlette.types import ASGIApp, Receive, Scope, Send
 
+from ..modules.deployment.gateway import MODEL_API_MOUNT, layout_from_env
 from ..modules.security.authorization import StartupConfigError
 from .auth import undeclared_routes, warn_if_exposed
 from .operations import F2WOperations, PublicationGate, build_operations
@@ -48,6 +59,44 @@ GUARDED_PREFIXES = ("/v1/", "/auth/")
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class PublicRootPath:
+    """ASGI shim for a sub-application published under its own public path.
+
+    Starlette's ``Mount`` gives a mounted app ``root_path = <parent root_path> + <mount path>``
+    (``/fair2wise/api/model-api`` behind the gateway), which is not where the gateway publishes
+    it (``/fair2wise/model-api``). This rewrites ``root_path``, ``app_root_path``, ``path`` and
+    ``raw_path`` so routing inside the app is unchanged and every generated URL (FastAPI
+    ``/docs`` -> ``openapi.json``, OpenAPI ``servers``, redirects) carries ``public_root``.
+    Nothing is read from request headers: the public root is trusted startup configuration.
+
+    Attributes:
+        app: The wrapped application (``undeclared_routes`` inspects it through this attribute).
+        public_root: Rooted public path without a trailing slash, for example ``/fair2wise/model-api``.
+    """
+
+    def __init__(self, app: ASGIApp, public_root: str) -> None:
+        if not public_root.startswith("/") or public_root.endswith("/"):
+            raise StartupConfigError(f"config_rejected: public root must be /rooted without a trailing slash, "
+                                     f"got {public_root!r}")
+        self.app = app
+        self.public_root = public_root
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            mounted_root = scope.get("root_path", "")
+            path = scope["path"]
+            rest = path[len(mounted_root):] if mounted_root and path.startswith(mounted_root) else path
+            raw = scope.get("raw_path")
+            raw_root = mounted_root.encode("ascii", "surrogateescape")
+            if raw is not None and raw.startswith(raw_root):
+                raw = raw[len(raw_root):]
+            scope = dict(scope, root_path=self.public_root, app_root_path=self.public_root,
+                         path=self.public_root + rest)
+            if raw is not None:
+                scope["raw_path"] = self.public_root.encode("ascii") + raw
+        await self.app(scope, receive, send)
 
 
 def create_api_app(
@@ -67,6 +116,8 @@ def create_api_app(
     sse_max_seconds: float = 300.0,
     judge_settings: Optional[Any] = None,
     knowledge_operations: Optional[Any] = None,
+    model_api: bool = False,
+    model_api_root_path: Optional[str] = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -86,10 +137,18 @@ def create_api_app(
             ``<workdir>/validation/judge_model.json`` and the live CBORG model list.
         knowledge_operations: ``KnowledgeOperations`` for ``/v1/operations`` (T19E); default
             ``KnowledgeOperations.from_storage(Path.cwd())`` unless ``operations`` already carries one.
+        model_api: Mount the model-compatible API (``kg_rag_api.create_fastapi_app`` over
+            ``cfg.graph``, ``cfg.backend`` and ``cfg.model``) at ``MODEL_API_MOUNT`` with this
+            app's settings, identity port and session store (owner decision B7). Off by default
+            for library and test callers; ``run_api`` (the image entrypoint) turns it on.
+        model_api_root_path: Public root the mounted model API advertises (``/fair2wise/model-api``
+            behind the gateway). Default from ``F2W_PUBLIC_PREFIX`` in ``startup_config`` (or the
+            process environment), as ``PublicLayout.model_api_root_path``.
 
     Raises:
-        StartupConfigError: As ``create_app``, ``operations`` bound to other settings, or
-            ``knowledge_operations`` given beside ``operations`` that already carry one.
+        StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
+            ``knowledge_operations`` given beside ``operations`` that already carry one, or
+            ``model_api`` without a JSON graph in ``cfg.graph``.
     """
     from ..modules.f2w_agent.api import create_app, effective_cors_origins
     from . import routes_jobs as jobs, routes_operations as knowledge_routes, routes_publications as publications
@@ -132,6 +191,22 @@ def create_api_app(
     validation.install(app)
     knowledge_routes.install(app)
 
+    if model_api:
+        from ..modules.kg_rag_api import create_fastapi_app as create_model_api_app
+
+        if not cfg.graph:
+            raise StartupConfigError("config_rejected: the model-compatible API needs a JSON graph (cfg.graph)")
+        if model_api_root_path is None:
+            model_api_root_path = layout_from_env(os.environ if startup_config is None else startup_config
+                                                  ).model_api_root_path
+        # The legacy app's body cap (128 MiB) and browser-origin gate wrap every path of this app,
+        # the mount included (AUD-04); the gateway applies the same client_max_body_size.
+        model_app = create_model_api_app(str(cfg.graph), backend=cfg.backend, model=cfg.model, deployment=settings,
+                                         identity_port=runtime.identity_port,
+                                         credential_store=runtime.credential_store, clock=clock)
+        app.mount(MODEL_API_MOUNT, PublicRootPath(model_app, model_api_root_path), name="model-api")
+        app.state.f2w_model_api = model_app
+
     allowed = effective_cors_origins(cors_origins, is_local=settings.is_local)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes, path_prefixes=GUARDED_PREFIXES)
     app.add_middleware(OriginGateMiddleware, allowed_origins=allowed, path_prefixes=GUARDED_PREFIXES)
@@ -149,20 +224,24 @@ def run_api(cfg: Any, *, host: str, port: int, cors_origins: Optional[List[str]]
     reads it from the trusted startup setting ``F2W_PUBLIC_PREFIX`` exactly as the legacy
     ``f2w_agent.api.run_api`` does (``/fair2wise`` -> ``/fair2wise/api``; unset -> none). Routes
     stay rooted; only generated URLs (``/docs`` -> ``openapi.json``) carry the prefix.
-    """
-    import os
 
+    The model-compatible API is mounted (``model_api=True``, owner decision B7) and advertises
+    ``PublicLayout.model_api_root_path`` from the same ``F2W_PUBLIC_PREFIX`` setting, whatever
+    ``root_path`` says (``/fair2wise/model-api`` in the images, ``/model-api`` unprefixed).
+    """
     import uvicorn
 
-    from ..modules.deployment.gateway import layout_from_env, uvicorn_options
+    from ..modules.deployment.gateway import uvicorn_options
 
+    layout = layout_from_env(os.environ)
     if root_path is None:
-        options = uvicorn_options(layout_from_env(os.environ))
+        options = uvicorn_options(layout)
     else:
         options = {"root_path": root_path} if root_path else {}
-    app = create_api_app(cfg, cors_origins=cors_origins)
+    app = create_api_app(cfg, cors_origins=cors_origins, model_api=True,
+                         model_api_root_path=layout.model_api_root_path)
     warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
     uvicorn.run(app, host=host, port=port, **options)
 
 
-__all__ = ("GUARDED_PREFIXES", "create_api_app", "run_api")
+__all__ = ("GUARDED_PREFIXES", "PublicRootPath", "create_api_app", "run_api")
