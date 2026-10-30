@@ -138,6 +138,11 @@ class FakeClient:
         self.model = model
         self.fail, self.garbage, self.malformed = fail, garbage, malformed
         self.prompts: List[str] = []
+        self.image_calls: List[int] = []  # number of images attached per chat_with_images call
+
+    def chat_with_images(self, prompt: str, images) -> str:
+        self.image_calls.append(len(list(images)))
+        return self.chat(prompt)
 
     def chat(self, prompt: str) -> str:
         self.prompts.append(prompt)

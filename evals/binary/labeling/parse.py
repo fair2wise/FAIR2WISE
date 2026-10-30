@@ -18,7 +18,7 @@ import json
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class ParsedPaper:
         source_sha256: SHA-256 of the PDF bytes.
         parser_revision: ``<parser>-<version>-<config hash>`` (``ParsedDocument.parser_key``).
         pages: ``[{"page": n, "text": str}]`` in page order.
-        figures: ``[{"figure_id", "page", "caption", "text_layer": [str]}]``.
+        figures: ``[{"figure_id", "page", "caption", "text_layer": [str], "bbox": {l,t,r,b,...} | None}]``.
         tables: ``[{"table_id", "page", "caption", "n_rows", "n_cols"}]``.
         num_pages: Page count.
     """
@@ -90,7 +90,7 @@ def parse_pdf(pdf_path: Path) -> ParsedPaper:
             if fig.spans_path is not None and Path(fig.spans_path).is_file():
                 spans = [str(s.get("text", "")) for s in json.loads(Path(fig.spans_path).read_text("utf-8"))]
             figures.append({"figure_id": fig.figure_id, "page": fig.page, "caption": fig.caption,
-                            "text_layer": spans})
+                            "text_layer": spans, "bbox": fig.bbox.as_dict() if fig.bbox is not None else None})
     tables = [{"table_id": t.table_id, "page": t.page, "caption": t.caption, "n_rows": t.n_rows,
                "n_cols": t.n_cols} for t in document.tables]
     pages: List[Dict[str, Any]] = []
@@ -103,4 +103,45 @@ def parse_pdf(pdf_path: Path) -> ParsedPaper:
                        section_names=document.section_names())
 
 
-__all__ = ("ParsedPaper", "file_sha256", "parse_pdf")
+#: Render scale for figure crops sent to a vision model (D1.7): 2x the PDF's 72 dpi, PNG.
+FIGURE_CROP_DPI = 144
+FIGURE_CROP_MAX_SIDE = 1600
+
+
+def render_figure_crops(pdf_path: Path, figures: Sequence[Dict[str, Any]], *, dpi: int = FIGURE_CROP_DPI,
+                        max_side: int = FIGURE_CROP_MAX_SIDE) -> List[Optional[bytes]]:
+    """PNG bytes of each figure's area (``bbox`` on its ``page``), in ``figures`` order (D1.7).
+
+    A figure without a bbox, or a bbox that does not render, yields ``None`` so the caller can
+    say which figures the vision model saw. The whole page is never sent. The crop is scaled
+    to ``dpi`` and capped at ``max_side`` pixels on the longer edge.
+    """
+    import fitz  # DEPRECATED(pymupdf): the F2W parser's library
+
+    out: List[Optional[bytes]] = []
+    with fitz.open(str(pdf_path)) as doc:
+        for fig in figures:
+            box = fig.get("bbox")
+            page_no = int(fig.get("page") or 0)
+            if not isinstance(box, dict) or not (1 <= page_no <= doc.page_count):
+                out.append(None)
+                continue
+            try:
+                rect = fitz.Rect(float(box["l"]), float(box["t"]), float(box["r"]), float(box["b"]))
+                page = doc.load_page(page_no - 1)
+                rect = rect & page.rect
+                if rect.is_empty or rect.width < 4 or rect.height < 4:
+                    out.append(None)
+                    continue
+                zoom = dpi / 72.0
+                longest = max(rect.width, rect.height) * zoom
+                if longest > max_side:
+                    zoom *= max_side / longest
+                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=rect, alpha=False)
+                out.append(pix.tobytes("png"))
+            except Exception:  # noqa: BLE001 - an unrenderable figure is reported as unseen, never guessed
+                out.append(None)
+    return out
+
+
+__all__ = ("FIGURE_CROP_DPI", "FIGURE_CROP_MAX_SIDE", "ParsedPaper", "file_sha256", "parse_pdf", "render_figure_crops")

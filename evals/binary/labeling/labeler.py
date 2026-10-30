@@ -10,6 +10,13 @@ well-formed items whose quote cannot be located are kept and flagged.
 
 Every model call goes through the client, which holds the shared CBORG admission slot
 (:class:`app.modules.term_extractor.clients.CBorgChatClient` -> ``cborg_limiter.sync_slot``).
+
+Figures (owner decision D1.7, O-S3, 2026-10-30): by default the figure call is text-only
+(caption and the text layer inside the figure; picture-only readings come back as
+``needs_visual_check``). With ``figures_mode="multimodal"`` the caller passes PNG crops of
+the figure areas and the call goes to the same model as images plus the text prompt
+(:meth:`LabelClient.chat_with_images`); the model must be vision-capable. Off by default;
+the mode and the number of crops sent are recorded in the label document's provenance.
 """
 
 from __future__ import annotations
@@ -37,8 +44,11 @@ from evals.binary.sanitize import sanitize
 
 LABEL_FORMAT = "f2w-pilot-labels/1"
 LABEL_STATUS = "provisional_model_label"
-TOOL_REVISION = "t11b-label-1"
+TOOL_REVISION = "t11b-label-2"
 DEFAULT_PAGES_PER_CALL = 5
+FIGURES_TEXT = "text"
+FIGURES_MULTIMODAL = "multimodal"
+FIGURES_MODES = (FIGURES_TEXT, FIGURES_MULTIMODAL)
 
 #: Quote statuses that count as located.
 LOCATED = ("exact", "normalized", "dehyphenated")
@@ -47,11 +57,14 @@ _STATUS_RANK = {"exact": 0, "normalized": 1, "dehyphenated": 2, "not_applicable"
 
 
 class LabelClient(Protocol):
-    """A labelling model: ``model`` id and one blocking ``chat`` call."""
+    """A labelling model: ``model`` id, one blocking ``chat`` call and (for ``--figures multimodal``) one
+    ``chat_with_images`` call taking PNG bytes."""
 
     model: str
 
     def chat(self, prompt: str) -> str: ...
+
+    def chat_with_images(self, prompt: str, images: Sequence[bytes]) -> str: ...
 
 
 class CborgLabelClient:
@@ -66,6 +79,23 @@ class CborgLabelClient:
 
     def chat(self, prompt: str) -> str:
         return self._client.chat(prompt, temperature=0.0, timeout=self.timeout, trace_label="pilot_label")
+
+    def chat_with_images(self, prompt: str, images: Sequence[bytes]) -> str:
+        """One OpenAI-compatible chat call with the PNG crops attached (D1.7), under the same admission slot."""
+        import base64
+
+        from app.modules.cborg_http import collect_stream_text
+        from app.modules.cborg_limiter import sync_slot
+
+        content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for png in images:
+            data = base64.b64encode(png).decode("ascii")
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{data}"}})
+        with sync_slot():
+            resp = self._client.client.chat.completions.create(
+                model=self.model, messages=[{"role": "user", "content": content}], temperature=0.0,
+                timeout=self.timeout, stream=True)
+        return collect_stream_text(resp)
 
 
 def _now() -> str:
@@ -235,8 +265,24 @@ def _take_context(data: Dict[str, Any], col: _Collector, call_id: str, want_ques
 
 def label_version(paper: PilotPaper, version: PilotVersion, parsed: ParsedPaper, client: LabelClient, *,
                   pages_per_call: int = DEFAULT_PAGES_PER_CALL, source_file: str = "",
+                  figures_mode: str = FIGURES_TEXT, figure_images: Optional[Sequence[Optional[bytes]]] = None,
                   now: Callable[[], str] = _now, clock: Callable[[], float] = time.monotonic) -> Dict[str, Any]:
-    """Run the version's tasks through ``client`` and return its provisional label document."""
+    """Run the version's tasks through ``client`` and return its provisional label document.
+
+    ``figures_mode="multimodal"`` (D1.7) sends ``figure_images`` (one PNG or ``None`` per parsed
+    figure, in order) with the figure call through ``client.chat_with_images``; figures without
+    an image are still described by caption and text layer and the prompt says which ones the
+    model can see. ``figures_mode="text"`` (default) never sends an image.
+    """
+    if figures_mode not in FIGURES_MODES:
+        raise ValueError(f"figures_mode must be one of {FIGURES_MODES}, not {figures_mode!r}")
+    images: List[bytes] = []
+    if figures_mode == FIGURES_MULTIMODAL:
+        supplied = list(figure_images or [])
+        if len(supplied) != len(parsed.figures):
+            raise ValueError(f"figure_images must have one entry per parsed figure ({len(parsed.figures)}), "
+                             f"got {len(supplied)}")
+        images = [png for png in supplied if png]
     col = _Collector(paper.pilot_id, version.key, parsed)
     calls: List[Dict[str, Any]] = []
     missing: List[Dict[str, Any]] = []
@@ -248,8 +294,11 @@ def label_version(paper: PilotPaper, version: PilotVersion, parsed: ParsedPaper,
             prompt = guide.build_prompt(TASK_VALUES, paper, version, pages=chunk, page_range=f"{first}-{last}")
             plan.append((TASK_VALUES, f"{first}-{last}", prompt))
     if TASK_FIGURES in version.tasks and parsed.figures:
+        seen = None
+        if figures_mode == FIGURES_MULTIMODAL:
+            seen = [fig["figure_id"] for fig, png in zip(parsed.figures, supplied) if png]
         plan.append((TASK_FIGURES, "figures", guide.build_prompt(TASK_FIGURES, paper, version,
-                                                                 figures=parsed.figures)))
+                                                                 figures=parsed.figures, figures_seen=seen)))
     elif TASK_FIGURES in version.tasks:
         # nothing to ask about: recorded as missing so FIG cases cannot rest on an empty answer
         missing.append({"task": TASK_FIGURES, "scope": "figures", "call_id": None, "reason": "no_figures_parsed"})
@@ -260,8 +309,13 @@ def label_version(paper: PilotPaper, version: PilotVersion, parsed: ParsedPaper,
         record: Dict[str, Any] = {"call_id": call_id, "task": task, "scope": scope,
                                   "prompt_sha256": sha256_text(prompt), "started_at": now()}
         started = clock()
+        if task == TASK_FIGURES and figures_mode == FIGURES_MULTIMODAL:
+            record["images_sent"] = len(images)
         try:
-            raw = client.chat(prompt)
+            if task == TASK_FIGURES and figures_mode == FIGURES_MULTIMODAL and images:
+                raw = client.chat_with_images(prompt, images)
+            else:
+                raw = client.chat(prompt)
         except Exception as exc:  # noqa: BLE001 - a provider fault is recorded as missing, never filled in
             record.update(status="failed", error=sanitize(f"{type(exc).__name__}: {exc}", 300))
             raw = None
@@ -301,6 +355,8 @@ def label_version(paper: PilotPaper, version: PilotVersion, parsed: ParsedPaper,
             "created_at": now(),
             "tool_revision": TOOL_REVISION,
             "pages_per_call": pages_per_call,
+            "figures_mode": figures_mode,
+            "figure_images_sent": len(images) if figures_mode == FIGURES_MULTIMODAL else 0,
         },
         "complete": not missing,
         "calls": calls,
@@ -312,5 +368,6 @@ def label_version(paper: PilotPaper, version: PilotVersion, parsed: ParsedPaper,
     }
 
 
-__all__ = ("CborgLabelClient", "DEFAULT_PAGES_PER_CALL", "LABEL_FORMAT", "LABEL_STATUS", "LOCATED", "LabelClient",
-           "TOOL_REVISION", "calls_for", "label_version", "page_chunks", "parse_response")
+__all__ = ("CborgLabelClient", "DEFAULT_PAGES_PER_CALL", "FIGURES_MODES", "FIGURES_MULTIMODAL", "FIGURES_TEXT",
+           "LABEL_FORMAT", "LABEL_STATUS", "LOCATED", "LabelClient", "TOOL_REVISION", "calls_for", "label_version",
+           "page_chunks", "parse_response")

@@ -57,7 +57,7 @@ def test_registry_holds_the_three_owner_chosen_papers_and_the_13_cases():
 
 def test_guide_is_versioned_and_its_template_hash_is_pinned():
     # Editing the guide, schemas or task text must bump GUIDE_VERSION and this pin together.
-    assert guide.GUIDE_VERSION == "f2w-pilot-label-guide/1"
+    assert guide.GUIDE_VERSION == "f2w-pilot-label-guide/2"  # /2: multimodal figure instruction (D1.7)
     assert guide.template_sha256() == guide.GUIDE_TEMPLATE_SHA256
     for tag in P.VALUE_TAGS:
         assert f"`{tag}`" in guide.GUIDE
@@ -138,6 +138,62 @@ def test_figure_readings_are_labelled_from_the_caption_and_flagged_for_visual_ch
     figs = [i for i in _doc(synth)["items"] if i["kind"] == "figure_reading"]
     assert figs and figs[0]["quote_status"] in ("exact", "normalized")
     assert "needs_visual_check" in figs[0]["flags"]
+
+
+def test_figures_are_text_only_by_default_and_multimodal_sends_the_crops(synth):
+    """D1.7 (O-S3): the figure call is text-only unless --figures multimodal is given; then PNG crops of the
+    parsed figure areas are attached to the same call, the prompt names the visible figures, and the provenance
+    records the mode and the number of images."""
+    factory = F.fake_factory()
+    assert _label(synth, factory=factory) in (0, 1)
+    client = factory.clients[-1]
+    doc = _doc(synth)
+    assert doc["provenance"]["figures_mode"] == "text" and doc["provenance"]["figure_images_sent"] == 0
+    assert client.image_calls == []
+    fig_call = next(c for c in doc["calls"] if c["task"] == "figures")
+    assert "images_sent" not in fig_call
+
+    factory = F.fake_factory()
+    assert _label(synth, "--figures", "multimodal", "--force", factory=factory) in (0, 1)
+    client = factory.clients[-1]
+    doc = _doc(synth)
+    assert doc["provenance"]["figures_mode"] == "multimodal"
+    assert doc["provenance"]["figure_images_sent"] >= 1 and client.image_calls == [doc["provenance"]["figure_images_sent"]]
+    fig_call = next(c for c in doc["calls"] if c["task"] == "figures")
+    assert fig_call["images_sent"] == doc["provenance"]["figure_images_sent"] and fig_call["status"] == "ok"
+    multimodal_prompt = next(p for p in client.prompts if "Task: for every figure" in p)
+    assert "attached image of the figure area" in multimodal_prompt and "fig-p002-00" in multimodal_prompt
+
+
+def test_render_figure_crops_returns_png_per_figure_and_none_without_a_bbox(synth):
+    from evals.binary.labeling.parse import parse_pdf, render_figure_crops
+
+    pdf = synth.papers / "synthetic.pdf"
+    parsed = parse_pdf(pdf)
+    assert parsed.figures and parsed.figures[0]["bbox"] is not None
+    crops = render_figure_crops(pdf, parsed.figures)
+    assert len(crops) == len(parsed.figures) and crops[0][:8] == b"\x89PNG\r\n\x1a\n"
+    assert render_figure_crops(pdf, [dict(parsed.figures[0], bbox=None), dict(parsed.figures[0], page=99)]) == [None, None]
+    small = render_figure_crops(pdf, parsed.figures, max_side=64)
+    assert len(small[0]) < len(crops[0])
+
+
+def test_multimodal_mode_needs_one_image_slot_per_figure_and_rejects_unknown_modes(synth):
+    from evals.binary.labeling.labeler import label_version
+    from evals.binary.labeling.parse import parse_pdf
+
+    pdf = synth.papers / "synthetic.pdf"
+    parsed = parse_pdf(pdf)
+    paper = P.PILOT_PAPERS["A"]
+    with pytest.raises(ValueError, match="figures_mode"):
+        label_version(paper, paper.versions[0], parsed, F.FakeClient(), figures_mode="pictures")
+    with pytest.raises(ValueError, match="one entry per parsed figure"):
+        label_version(paper, paper.versions[0], parsed, F.FakeClient(), figures_mode="multimodal", figure_images=[])
+    client = F.FakeClient()
+    doc = label_version(paper, paper.versions[0], parsed, client, figures_mode="multimodal",
+                        figure_images=[None] * len(parsed.figures))
+    assert client.image_calls == [] and doc["provenance"]["figure_images_sent"] == 0  # nothing to see: text call
+    assert "listed as visible: none" in next(p for p in client.prompts if "Task: for every figure" in p)
 
 
 def test_failed_and_unparsable_calls_are_recorded_missing(synth):

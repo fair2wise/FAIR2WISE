@@ -14,15 +14,15 @@ never written to disk or to a report; only their SHA-256 is recorded.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from evals.binary.model import sha256_text
 from evals.binary.labeling.pilot import TASK_CONTEXT, TASK_FIGURES, TASK_VALUES, VALUE_TAGS, PilotPaper, PilotVersion
 
-GUIDE_VERSION = "f2w-pilot-label-guide/1"
+GUIDE_VERSION = "f2w-pilot-label-guide/2"
 #: SHA-256 of :func:`template_text` for this version. A test pins it: editing the guide, the
 #: schemas or the task text without bumping :data:`GUIDE_VERSION` and this value fails.
-GUIDE_TEMPLATE_SHA256 = "f400575465334ba3d5771da2999e7c4863b07169413fd1b916cf9fba6bc06d07"
+GUIDE_TEMPLATE_SHA256 = "d65a940ced8d65a4d501808f538c72ef1c7cc8314f10dd71a90d755bad917a5d"
 
 GUIDE = """\
 # FAIR2WISE pilot labelling guide (version 1)
@@ -149,6 +149,15 @@ TASK_INSTRUCTIONS = {
         " Mark uncertain readings ambiguous with a reason instead of giving a number. Give the panel and curve"
         " counts per figure."
     ),
+    TASK_FIGURES + ":multimodal": (
+        "Task: for every figure below, read the caption, the text found inside the figure area AND the attached"
+        " image of the figure area (images are attached in the order of the figures listed as visible: {seen})."
+        " List the panels, axes (quantity, unit, scale), scale bars, colour bars and any readable peak or curve"
+        " positions. A reading taken from the image alone is allowed only when the image shows it clearly;"
+        " quote the caption or in-figure text nearest to it and set needs_visual_check true when a person should"
+        " confirm it against the picture. Mark uncertain readings ambiguous with a reason instead of giving a"
+        " number. Give the panel and curve counts per figure."
+    ),
     TASK_CONTEXT: (
         "Task: (1) list quantities a reader would expect that this PDF does not state (check the list below and"
         " add others you notice); (2) {questions}; (3) give the Work/version identity of this PDF."
@@ -199,13 +208,21 @@ def render_figures(figures: Sequence[Dict[str, Any]]) -> str:
 
 
 def build_prompt(task: str, paper: PilotPaper, version: PilotVersion, *, pages: Sequence[Dict[str, Any]] = (),
-                 figures: Sequence[Dict[str, Any]] = (), page_range: str = "") -> str:
-    """The full prompt for one call (contains private paper text: never persisted)."""
+                 figures: Sequence[Dict[str, Any]] = (), page_range: str = "",
+                 figures_seen: Optional[Sequence[str]] = None) -> str:
+    """The full prompt for one call (contains private paper text: never persisted).
+
+    ``figures_seen`` (D1.7 multimodal figure call) names the figures whose image is attached; the
+    instruction then tells the model which figures it can see.
+    """
     instruction = TASK_INSTRUCTIONS[task]
     if task == TASK_VALUES:
         instruction = instruction.format(pages=page_range)
         body = render_pages(pages)
     elif task == TASK_FIGURES:
+        if figures_seen is not None:
+            instruction = TASK_INSTRUCTIONS[TASK_FIGURES + ":multimodal"].format(
+                seen=", ".join(figures_seen) or "none")
         body = render_figures(figures)
     else:
         instruction = instruction.format(questions=QUESTIONS_ON if version.gold_questions else QUESTIONS_OFF)

@@ -29,13 +29,16 @@ from typing import Callable, Dict, List, Optional, Sequence
 
 from evals.binary.labeling import pilot as P
 from evals.binary.labeling.labeler import (
-    DEFAULT_PAGES_PER_CALL,
     CborgLabelClient,
+    DEFAULT_PAGES_PER_CALL,
+    FIGURES_MODES,
+    FIGURES_MULTIMODAL,
+    FIGURES_TEXT,
     LabelClient,
     calls_for,
     label_version,
 )
-from evals.binary.labeling.parse import ParsedPaper, file_sha256, parse_pdf
+from evals.binary.labeling.parse import ParsedPaper, file_sha256, parse_pdf, render_figure_crops
 from evals.binary.labeling.review import (
     PromotionError,
     promote,
@@ -155,8 +158,10 @@ def cmd_label(args: argparse.Namespace, client_factory: Optional[ClientFactory] 
             pdf = _pdf(Path(args.papers_root), version)
             parsed = parse_pdf(pdf)
             store.write_json(store.parse_cache(parsed.source_sha256), parsed.to_cache())
+            figures_mode = getattr(args, "figures", FIGURES_TEXT)
+            crops = render_figure_crops(pdf, parsed.figures) if figures_mode == FIGURES_MULTIMODAL else None
             doc = label_version(paper, version, parsed, client, pages_per_call=args.pages_per_call,
-                                source_file=version.path)
+                                source_file=version.path, figures_mode=figures_mode, figure_images=crops)
             doc["provenance"]["judge_model_at_labeling"] = judge
             doc["provenance"]["judge_model_source"] = judge_source
             doc["provenance"]["model_under_test"] = args.model_under_test
@@ -223,6 +228,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="F2W workdir whose validation/judge_model.json names the judge")
     p.add_argument("--model-under-test", default=None, help="model under test the labeller must differ from")
     p.add_argument("--force", action="store_true", help="relabel a paper that already has review decisions")
+    p.add_argument("--figures", choices=list(FIGURES_MODES), default=FIGURES_TEXT,
+                   help="figure call mode (owner decision D1.7): 'text' (default) sends captions and the text layer"
+                        " only; 'multimodal' also attaches PNG crops of the figure areas, so --model must be a"
+                        " vision-capable CBORG model")
     return p
 
 
