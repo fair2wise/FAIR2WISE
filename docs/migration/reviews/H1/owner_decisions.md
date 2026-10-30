@@ -229,3 +229,15 @@ frozen-UI pin is updated in that change (as O-U1).
 - **RT-20 `add_annotation`:** exception approved; record-level annotations stay in FORGE.
 - **A-01 `openalex_supplement.json`:** retire once L-17 citation links are regenerated
   (T29). **RT-47 `table_csv`:** stays an internal agent helper, not a user route.
+
+## Register walk-through, batch 4: Tiled editing plan Q1-Q4 (2026-10-30, O-E1 part 1)
+
+- **Q1:** "One graph id per version" (option a), i.e. `rsoxs_v4`, `rsoxs_v5` stay separate
+  Tiled graphs. Pending confirmation of the consequence (batch 5): unchanged records get
+  new Tiled ids each version, so cross-version identity and citation redirection go
+  through the IdentityLedger rather than shared Tiled ids.
+- **Q2:** import staged, switch the live marker, retire N (hidden, revivable).
+- **Q3:** purge is a separate admin-approved step; never for a record with foreign links;
+  keep at least one previous version by default.
+- **Q4:** report foreign links before approval, keep the retired record alive; propose
+  stable anchor entities to Alex and the Tiled team.
