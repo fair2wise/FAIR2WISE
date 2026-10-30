@@ -85,19 +85,34 @@ def test_agent_factory_argument_rules():
     assert isinstance(agent, public.LiteratureAgent)
 
 
-@pytest.mark.parametrize("method,args,task", [
-    ("search_literature", ("q",), "T05"), ("resolve_work", ("doi",), "T05"), ("read_paper", ("w",), "T05"),
-    ("read_section", ("w", "s"), "T05"), ("get_evidence", (["e"],), "T06"), ("query_knowledge", ("q",), "T08"),
-    ("trace_provenance", ("r",), "T08"), ("publish_plan", ({}, {}), "T08B"),
+@pytest.mark.parametrize("method,args,backing", [
+    ("query_knowledge", ("q",), "kg_find_entities"), ("trace_provenance", ("r",), "kg_get_lineage"),
 ])
-def test_unimplemented_methods_name_their_task(method, args, task):
+def test_unimplemented_methods_name_their_missing_backing(method, args, backing):
+    """T15: the two pending methods name the unported K-12 tools, not a merged task."""
     client = _client()
-    with pytest.raises(NotImplementedError, match=task):
+    with pytest.raises(NotImplementedError, match=backing) as err:
         getattr(client, method)(client.context_for(), *args)
+    assert "T05" not in str(err.value) and "T08" not in str(err.value).replace("T08 did not port", "")
+
+
+@pytest.mark.parametrize("method,args", [
+    ("search_literature", ("q",)), ("resolve_work", ("10.1/x",)), ("read_paper", ("10.1/x",)),
+    ("read_section", ("10.1/x", "results")), ("get_evidence", (["e"],)), ("evidence_bundle", ("w",)),
+])
+def test_literature_and_evidence_methods_without_wiring_are_unsupported(method, args):
+    """T15: no LiteratureToolset / evidence source given -> UNSUPPORTED_CAPABILITY, never a silent empty."""
+    from app.modules.contracts.errors import ContractError, ErrorCode
+
+    client = _client()
+    with pytest.raises(ContractError) as err:
+        getattr(client, method)(client.context_for(), *args)
+    assert err.value.code is ErrorCode.UNSUPPORTED_CAPABILITY
 
 
 @pytest.mark.parametrize("method,args", [
     ("submit_ingest", ({},)), ("get_job", ("j",)), ("cancel_job", ("j",)), ("plan_publication", ("s", "t")),
+    ("publish_plan", (object(), object())),
     ("graph_statistics", ("g",)), ("compare_graphs", (["a", "b"],)), ("paper_subgraph", ("g", "paper.pdf")),
     ("recent_entities", ("g",)), ("audit_corpus", ("c",)), ("run_knowledge_operation", ("kg_compute_statistics", {})),
     ("submit_knowledge_operation", ("kg_compute_statistics", {})), ("knowledge_job_result", ("j",)),

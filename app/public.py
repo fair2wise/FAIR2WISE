@@ -18,10 +18,27 @@ the methods that exist today are implemented:
   :meth:`~F2WClient.audit_corpus`, :meth:`~F2WClient.run_knowledge_operation`,
   :meth:`~F2WClient.submit_knowledge_operation` and :meth:`~F2WClient.knowledge_job_result`
   (T19E): the five T19C Knowledge Operations, forwarded unchanged to the same
-  ``F2WOperations`` (``/v1/operations/...``); the typed result is the agent Tool's.
+  ``F2WOperations`` (``/v1/operations/...``); the typed result is the agent Tool's;
+- :meth:`F2WClient.search_literature`, :meth:`~F2WClient.resolve_work`,
+  :meth:`~F2WClient.read_paper` and :meth:`~F2WClient.read_section` (T15 over T05): the
+  ``lit_*`` tools of the application's ``LiteratureToolset`` run through the same
+  authorizing executor the supervisor uses (capability, schema and deadline checks first;
+  refusals come back as failed ``ToolResult``). They need ``literature=`` at construction;
+- :meth:`F2WClient.get_evidence` and :meth:`~F2WClient.evidence_bundle` (T15 over T06): candidate
+  evidence records of the application's evidence source, read with the T19C read capability
+  (``chat.ask``); the bundle is the read-only :class:`~app.modules.evidence.bundle.LiteratureEvidenceBundle`.
+  They need ``evidence=`` at construction;
+- :meth:`F2WClient.publish_plan` (T15 over T10): hands an existing approval to the publication job
+  (``F2WOperations.apply_approval``); the import runs in the job and its receipt is read from
+  ``job_view``.
 
-The other methods of the specification raise ``NotImplementedError`` naming the
-task that implements them.
+Results of the literature and evidence methods are agent-private typed results (D19): a
+consumer showing them to a person first passes them through :meth:`F2WClient.disclose`, the
+same ``project_api_response`` projection the ``/v1`` routes apply.
+
+``query_knowledge`` and ``trace_provenance`` raise ``NotImplementedError``: their backing
+(the K-12 ``kg_find_entities`` / ``kg_get_lineage`` literature tools of plan section 10) is
+not ported and no addenda task schedules it yet (docs/migration/public_api_spec.md section 4).
 
 Importing this module reads no environment or ``.env`` file, builds no
 registry, model or client, and imports no torch, FAISS, PyMuPDF, OpenAI or
@@ -41,9 +58,16 @@ if TYPE_CHECKING:  # the operations service is imported only by callers that pas
 __all__ = ("F2WClient", "LiteratureAgent", "create_literature_agent")
 
 
-def _pending(method: str, task: str) -> NotImplementedError:
-    return NotImplementedError(f"F2WClient.{method} is not implemented yet; it arrives with {task} "
-                               "(docs/migration/public_api_spec.md)")
+def _pending(method: str, backing: str) -> NotImplementedError:
+    return NotImplementedError(f"F2WClient.{method} is not implemented yet; it needs {backing} "
+                               "(docs/migration/public_api_spec.md section 4)")
+
+
+#: Plan section 10 skills whose donor tools (K-12) no merged task ported; no addenda task schedules them.
+_K12_QUERY = ("the K-12 query_knowledge_graph tools (kg_find_entities, kg_get_summary, kg_read_paper), "
+              "which T08 did not port and no plan_addenda task (A6/A7) schedules")
+_K12_TRACE = ("the K-12 trace_provenance tools (kg_get_lineage, kg_get_connections) plus an execution-provenance "
+              "lookup by provenance_id, which no merged or scheduled task (plan_addenda A6/A7) delivers")
 
 
 class F2WClient:
@@ -55,7 +79,9 @@ class F2WClient:
 
     ``operations`` is the deployment's shared :class:`~app.api.operations.F2WOperations`
     (the object the ``/v1`` routes call). The job and publication methods forward to it;
-    without it they raise ``ContractError(UNSUPPORTED_CAPABILITY)``.
+    without it they raise ``ContractError(UNSUPPORTED_CAPABILITY)``. Likewise the literature
+    methods need the application's ``literature`` toolset and the evidence methods its
+    ``evidence`` source (``F2WClient.from_settings(..., literature=..., evidence=...)``).
     """
 
     def __init__(self, application: F2WApplication, *, owns_application: bool = False,
@@ -68,6 +94,7 @@ class F2WClient:
         self._owns = owns_application
         self._ops = operations
         self._summary: Optional[Any] = None  # (executor, tool), built on first use
+        self._projector: Optional[Any] = None  # DisclosureProjector, built on first use
 
     @classmethod
     def from_settings(
@@ -88,7 +115,8 @@ class F2WClient:
             chat_model: Optional LangChain chat model for delegated tasks.
             checkpointer: Optional LangGraph checkpointer for delegated threads.
             operations: Optional shared ``F2WOperations`` for the job and publication methods.
-            **options: Further ``F2WApplication`` keyword arguments (limits, admission, ...).
+            **options: Further ``F2WApplication`` keyword arguments (``literature``, ``evidence``,
+                ``knowledge``, limits, admission, ...).
         """
         app = F2WApplication(settings=settings, retrieval=retrieval, chat_model=chat_model,
                              checkpointer=checkpointer, **options)
@@ -275,31 +303,191 @@ class F2WClient:
         """Handle and bounded report of a ``knowledge_operation`` job (``GET /v1/operations/jobs/{id}``)."""
         return self._operations("knowledge_job_result").knowledge_job_result(ctx, job_id)
 
-    # -- specified, not implemented yet ------------------------------------------------------
+    # -- literature (T15 over the T05 lit_* tools, through the application's executor) ----------------
 
-    def search_literature(self, ctx: RequestContext, query: str, limit: int = 20) -> ToolResult:
-        raise _pending("search_literature", "T05")
+    def _literature_tool(self, method: str, name: str) -> str:
+        if self._app.literature is None or name not in self._app.registry:
+            from .modules.contracts.errors import ContractError, ErrorCode
+
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                f"F2WClient.{method} needs the deployment's LiteratureToolset "
+                                "(F2WClient.from_settings(..., literature=...))")
+        return name
+
+    def _run_tool(self, ctx: RequestContext, name: str, args: Mapping[str, Any]) -> ToolResult:
+        """Run one registered tool through this application's authorizing executor (blocking)."""
+        return self._app.executor.execute(ctx, name, dict(args))
+
+    def search_literature(self, ctx: RequestContext, query: str, limit: int = 20, *, technique: str = "",
+                          material: str = "", year_from: Optional[int] = None, year_to: Optional[int] = None,
+                          ) -> ToolResult:
+        """``lit_search_papers``: external candidates (DOIs), never ingested Works, never evidence.
+
+        ``limit`` above the tool's bound (25) is refused as ``INVALID``; ``EMPTY`` means the provider
+        answered with nothing, ``UNAVAILABLE`` that it could not answer (``retryable``).
+        """
+        name = self._literature_tool("search_literature", "lit_search_papers")
+        args: dict = {"query": query, "max_results": limit}
+        if technique:
+            args["technique"] = technique
+        if material:
+            args["material"] = material
+        if year_from is not None:
+            args["year_from"] = year_from
+        if year_to is not None:
+            args["year_to"] = year_to
+        return self._run_tool(ctx, name, args)
 
     def resolve_work(self, ctx: RequestContext, identifier: str) -> ToolResult:
-        raise _pending("resolve_work", "T05")
+        """Resolve a DOI or arXiv identifier to its OpenAlex work record (``lit_get_papers_by_doi``).
+
+        ``identifier`` may be a bare DOI, a ``doi:``/``https://doi.org/`` form, ``arXiv:<id>`` or an
+        arXiv URL (resolved through its DataCite DOI ``10.48550/arXiv.<id>``). ``EMPTY`` means the
+        provider knows no such work; ``INVALID`` an unrecognised identifier. OpenAlex ``W`` ids and
+        titles are not resolvable through the ``lit_*`` tools (use :meth:`search_literature`).
+        """
+        from .modules.literature.identifiers import UnrecognisedIdentifier, classify_identifier
+        from .modules.literature.legacy import doi_key, doi_only
+
+        name = self._literature_tool("resolve_work", "lit_get_papers_by_doi")
+        if doi_key(identifier):  # the reader's DOI rule (``10.<prefix>/<suffix>``, URL or ``doi:`` forms)
+            parsed = {"kind": "doi", "value": doi_only(identifier)}
+        else:
+            try:
+                parsed = classify_identifier(identifier)
+            except UnrecognisedIdentifier:
+                parsed = {"kind": "unknown", "value": identifier}
+        if parsed["kind"] == "doi":
+            doi = parsed["value"]
+        elif parsed["kind"] == "arxiv":
+            doi = f"10.48550/arXiv.{parsed['value']}"
+        else:
+            from .modules.contracts.errors import ErrorCode
+            from .modules.contracts.tools import ToolStatus
+
+            reason = ("OpenAlex work ids are not resolvable through the lit_* tools"
+                      if parsed["kind"] == "openalex" else "not a DOI or arXiv identifier")
+            return ToolResult(tool=name, status=ToolStatus.INVALID, error_code=ErrorCode.INVALID_INPUT,
+                              warnings=(f"{reason}; pass a DOI or use search_literature",))
+        return self._run_tool(ctx, name, {"dois": doi})
 
     def read_paper(self, ctx: RequestContext, work_id: str) -> ToolResult:
-        raise _pending("read_paper", "T05")
+        """``lit_read_paper``: section names and counts of a paper by DOI, never text.
+
+        The read needs the toolset's trusted source-access scope (``DENIED`` without one) and
+        acquisition needs ``ingest.acquire``. The result is agent-private (D19): pass it through
+        :meth:`disclose` before showing it to a person.
+        """
+        return self._run_tool(ctx, self._literature_tool("read_paper", "lit_read_paper"), {"doi": work_id})
 
     def read_section(self, ctx: RequestContext, work_id: str, section: str) -> ToolResult:
-        raise _pending("read_section", "T05")
+        """``lit_read_paper_section``: one bounded section with its page and ``source_version`` locator.
+
+        ``NOT_FOUND`` carries ``available_sections``. Agent-private (D19), as :meth:`read_paper`.
+        """
+        return self._run_tool(ctx, self._literature_tool("read_section", "lit_read_paper_section"),
+                              {"doi": work_id, "section": section})
+
+    # -- evidence (T15 over the T06 candidate records) ------------------------------------------------
+
+    def _evidence_source(self, method: str) -> Any:
+        source = self._app.evidence
+        if source is None or not hasattr(source, "evidence") or not hasattr(source, "quantities"):
+            from .modules.contracts.errors import ContractError, ErrorCode
+
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                f"F2WClient.{method} needs the deployment's candidate evidence source "
+                                "(F2WClient.from_settings(..., evidence=InMemoryEvidenceSink-like))")
+        return source
 
     def get_evidence(self, ctx: RequestContext, evidence_ids: Sequence[str]) -> ToolResult:
-        raise _pending("get_evidence", "T06")
+        """The ``EvidenceRef`` of each candidate evidence id (T19C read capability ``chat.ask``).
 
-    def query_knowledge(self, ctx: RequestContext, question: str, graphs: Sequence[str] = ()) -> ToolResult:
-        raise _pending("query_knowledge", "T08")
+        ``OK`` when every id is known, ``PARTIAL`` when some are missing (named in ``warnings`` and
+        ``data["missing"]``), ``EMPTY`` when none is. ``evidence`` holds the refs in request order;
+        ``data["records"]`` the full candidate records. Quotes inside are agent-private (D19).
+        """
+        from .modules.contracts.tools import ToolStatus
+        from .modules.security.authorization import require
 
-    def trace_provenance(self, ctx: RequestContext, record_id: str) -> ToolResult:
-        raise _pending("trace_provenance", "T08")
+        source = self._evidence_source("get_evidence")
+        require(ctx, "chat.ask")
+        wanted = [str(e) for e in evidence_ids]
+        found = [source.evidence[e] for e in wanted if e in source.evidence]
+        missing = [e for e in wanted if e not in source.evidence]
+        tool = "evidence_lookup"
+        if not found:
+            return ToolResult(tool=tool, status=ToolStatus.EMPTY,
+                              warnings=tuple(f"unknown evidence id {e}" for e in missing))
+        return ToolResult(
+            tool=tool, status=ToolStatus.PARTIAL if missing else ToolStatus.OK,
+            data={"requested": len(wanted), "found": len(found), "missing": missing,
+                  "records": [r.to_dict() for r in found], "status": "candidate"},
+            evidence=tuple(r.ref for r in found),
+            warnings=tuple(f"unknown evidence id {e}" for e in missing),
+        )
+
+    def evidence_bundle(self, ctx: RequestContext, work_id: str, *, include_quotes: bool = False) -> Any:
+        """The read-only literature-evidence bundle of one Work (T15).
+
+        Returns a :class:`~app.modules.evidence.bundle.LiteratureEvidenceBundle` (JSON through
+        ``to_json``/``from_json``): source version and checksum, reported quantities with raw and
+        normalized units, evidence ids with locators, and caveats. Quotes are included only with
+        ``include_quotes=True`` and stay agent-private (D19). An unknown Work gives an empty bundle
+        (``bundle.empty``), never an error: absence of candidates is a fact about the records.
+        """
+        from .modules.evidence.bundle import build_bundle
+        from .modules.security.authorization import require
+
+        source = self._evidence_source("evidence_bundle")
+        require(ctx, "chat.ask")
+        return build_bundle(work_id, source.evidence, source.quantities, include_quotes=include_quotes)
+
+    # -- disclosure (D19) ------------------------------------------------------------------------------
+
+    def disclose(self, payload: Any) -> Any:
+        """Project a result for a person the way the ``/v1`` routes do (``project_api_response``).
+
+        ``payload`` may be a ``ToolResult``, a bundle or any JSON-ready value; Pydantic models are
+        dumped first. Private keys (source text, snippets, paths, secrets) are dropped, absolute
+        paths become opaque ids and strings are clipped to the B10 bound. No quote is confirmed
+        verbatim here (that needs the turn's retrieved regions, which the SDK does not hold).
+        """
+        if self._projector is None:
+            from .modules.security.disclosure import DisclosureProjector
+
+            self._projector = DisclosureProjector()
+        body = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else payload
+        return self._projector.project_api_response(body)
+
+    # -- publication: apply an existing approval -------------------------------------------------------
 
     def publish_plan(self, ctx: RequestContext, plan: Any, approval: Any) -> Any:
-        raise _pending("publish_plan", "T08B")
+        """Hand ``approval`` (a ``create_approval`` record naming the job) to the publication job.
+
+        Forwards to ``F2WOperations.apply_approval``: ``approval.authorizes(plan)`` is checked, then the
+        job re-checks the human caller, ``curation.approve``, scope and staleness and is re-queued. The
+        graph write happens in the job; read its ``ImportReceipt`` id from
+        ``client.operations.job_view(ctx, handle.job_id)`` once the job has succeeded.
+        """
+        return self._operations("publish_plan").apply_approval(ctx, plan, approval)
+
+    # -- specified, not implemented yet ------------------------------------------------------
+
+    def query_knowledge(self, ctx: RequestContext, question: str, graphs: Sequence[str] = ()) -> ToolResult:
+        """Direct graph retrieval without a planning model: pending (see :data:`_K12_QUERY`).
+
+        ``answer_from_knowledge`` is the existing direct read (it runs the QA judge model);
+        the T19C operations (:meth:`paper_subgraph`, ...) are the graph reads available today.
+        """
+        raise _pending("query_knowledge", _K12_QUERY)
+
+    def trace_provenance(self, ctx: RequestContext, record_id: str) -> ToolResult:
+        """Evidence versus execution provenance of one record: pending (see :data:`_K12_TRACE`).
+
+        :meth:`get_evidence` answers the evidence side for candidate evidence ids today.
+        """
+        raise _pending("trace_provenance", _K12_TRACE)
 
 
 class LiteratureAgent:

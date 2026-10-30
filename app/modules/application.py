@@ -135,6 +135,13 @@ class F2WApplication:
         ledger_size: Bound on retained legacy payloads.
         knowledge: Optional ``operations.knowledge.KnowledgeOperations`` (T19E): registers the five
             T19C read Tools and their skills beside ``answer_from_knowledge``.
+        literature: Optional ``literature.tools.LiteratureToolset`` (T05): registers the six ``lit_*``
+            tools beside ``answer_from_knowledge`` (the SDK literature methods run them through this
+            instance's executor; T15).
+        evidence: Optional candidate evidence source for the SDK evidence methods (T15): any object
+            with ``evidence`` (``evidence_id -> EvidenceRecord``) and ``quantities``
+            (``quantity_id -> QuantityRecord``) mappings, such as ``evidence.InMemoryEvidenceSink``.
+            Candidates only; nothing here is a published graph.
     """
 
     def __init__(
@@ -154,6 +161,8 @@ class F2WApplication:
         name: str = "f2w",
         ledger_size: int = 256,
         knowledge: Any = None,
+        literature: Any = None,
+        evidence: Any = None,
     ) -> None:
         from .agent_runtime.executor import RuntimeLimits, ToolExecutor
         from .agent_runtime.policies import InMemoryEventSink
@@ -179,8 +188,10 @@ class F2WApplication:
         self.ledger = LegacyResultLedger(ledger_size)
         # Pass-through except inside answer_via_supervisor, which pins the caller's arguments.
         self.knowledge = knowledge
+        self.literature = literature
+        self.evidence = evidence
         self.registry = build_read_registry(PinnedArgsService(retrieval), self.ledger, name=name,
-                                            knowledge=knowledge)
+                                            knowledge=knowledge, literature=literature)
         self.skills = build_read_skills(self.registry)
         self.executor = ToolExecutor(self.registry, event_sink=self.event_sink, admission=self.admission,
                                      limits=self.limits, clock=clock)
