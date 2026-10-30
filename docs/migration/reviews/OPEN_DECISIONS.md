@@ -200,10 +200,10 @@ Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
 
 | # | Decision | Proposal |
 |---|---|---|
-| D2.1 | Events per channel: do `:local`/`:als-dev` follow `forge_merge` pushes? | No: manual dispatch only |
-| D2.2 | Reviewers for `ghcr-publish` and `ghcr-als-prod`; block self-review? | Owner plus one; block self-review on prod |
-| D2.3 | Condition for promotion to `:als-prod` | Same digest already on `:als-dev` |
-| D2.4 | Registry name, owner and package visibility | `ghcr.io/fair2wise/fair2wise`, private |
+| D2.1 | Events per channel: do `:local`/`:als-dev` follow `forge_merge` pushes? | No: manual dispatch only | **Decided 2026-10-30 (O-O6): publish on PR merge to main (channels confirmed in batch 17).**
+| D2.2 | Reviewers for `ghcr-publish` and `ghcr-als-prod`; block self-review? | Owner plus one; block self-review on prod | **Decided 2026-10-30 (O-O6): owner alone, self-approval allowed.**
+| D2.3 | Condition for promotion to `:als-prod` | Same digest already on `:als-dev` | **Decided 2026-10-30 (O-O6): any tested digest.**
+| D2.4 | Registry name, owner and package visibility | `ghcr.io/fair2wise/fair2wise`, private | **Decided 2026-10-30 (O-O6): ghcr.io/fair2wise/fair2wise, public (snippet exposure confirmed in batch 17).**
 | D2.5 | Tag forms (full or short commit) | Full commit |
 | D2.6 | Stop publishing the legacy `agent` image | Yes |
 | D2.7 | Retention | Images 30 days, manifests 90 |

@@ -368,3 +368,16 @@ frozen-UI pin is updated in that change (as O-U1).
   (O-D2 stands).
 - **D3.4 / PC-5:** the owner runs `python -m evals.binary.approve --gate H3 ...` and commits
   `evals/binary/approvals.json` and `evals/binary/cases/` personally.
+
+## Register walk-through, batch 16: D2.1-D2.4 (2026-10-30, O-O6 part 1; O06 tag rules)
+
+- **D2.1:** owner's words: "it should be published when PRs are merged into main". Images
+  are published on push to `main` (PR merge), not by manual dispatch only. Which channels
+  that covers (`:local`/`:als-dev` only, or `:als-prod` too) is confirmed in batch 17.
+- **D2.2:** "You alone, self-approval allowed": the owner is the sole reviewer of both
+  publish environments and may approve their own runs.
+- **D2.3:** "Any tested digest" may be promoted to `:als-prod`; running on `:als-dev` first
+  is not required.
+- **D2.4:** `ghcr.io/fair2wise/fair2wise`, **public**. Pending the batch-17 confirmation
+  that, combined with D3.1 (terminology snippets shipped in the image), the ~141k paper
+  snippets become publicly downloadable.
