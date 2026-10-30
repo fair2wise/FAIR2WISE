@@ -288,16 +288,20 @@ class ScanControl:
             (``StageContext.guard``), so cancellation lands between pages.
         deadline: Absolute deadline; reaching it stops the scan as ``partial``.
         every: Checkpoint interval.
+        job: The scan runs inside a ``knowledge_operation`` job, so inline-only size limits
+            (for example the corpus audit's near-duplicate title check above
+            ``NEAR_DUPLICATE_INLINE_LIMIT`` keys, owner decision D1.10) do not apply.
     """
 
     def __init__(self, max_records: int = 200_000, *, checkpoint: Optional[Callable[[int], None]] = None,
                  deadline: Optional[datetime] = None, every: int = 1000,
-                 clock: Callable[[], datetime] = utcnow) -> None:
+                 clock: Callable[[], datetime] = utcnow, job: bool = False) -> None:
         if max_records < 1 or every < 1:
             raise ContractError(ErrorCode.INVALID_INPUT, "max_records and every must be >= 1")
         self.max_records = max_records
         self.checkpoint = checkpoint
         self.deadline = deadline
+        self.job = job
         self.every = every
         self.clock = clock
         self.count = 0
@@ -368,7 +372,7 @@ def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], 
         def checkpoint(count: int) -> None:
             stage_ctx.progress(records_scanned=count)
 
-        control = ScanControl(max_records, checkpoint=checkpoint, deadline=req_ctx.deadline)
+        control = ScanControl(max_records, checkpoint=checkpoint, deadline=req_ctx.deadline, job=True)
         report = run(req_ctx, operation, args, control)
         ref = stage_ctx.run_effect(f"artifact:{operation}",
                                    lambda: {"ref": store_report_artifact(artifact_store, req_ctx, report)})["ref"]

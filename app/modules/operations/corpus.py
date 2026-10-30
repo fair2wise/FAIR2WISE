@@ -32,7 +32,12 @@ tests; on a population without hashes the two methods agree.
 sections over one extracted-terms file, read-only:
 
 =========================  ==================================================================
-§1 duplicate_works         legacy filename-key figures **plus** distinct Works (K1)
+§1 duplicate_works         legacy filename-key figures **plus** distinct Works (K1); the
+                           arXiv x journal near-duplicate title check runs inline only up to
+                           :data:`NEAR_DUPLICATE_INLINE_LIMIT` paper keys (owner decision
+                           D1.10, O-S4) and otherwise inside a ``knowledge_operation`` job
+                           (``ScanControl(job=True)``); an inline audit of a larger corpus
+                           reports ``arxiv_journal_near_dupes: null`` with a warning
 §2 stubs                   unchanged (term entries)
 §4 numeric_values          unchanged (per-term relation dicts)
 §6 aliases                 unchanged; the under-merge figure compares *adjacent* sorted
@@ -496,6 +501,11 @@ def _levenshtein_within(a: str, b: str, limit: int) -> Optional[int]:
     return prev[n] if prev[n] <= limit else None
 
 
+#: Paper keys above which the §1 near-duplicate title check is deferred to a job (D1.10, O-S4).
+NEAR_DUPLICATE_INLINE_LIMIT = 2_000
+NEAR_DUPLICATE_DEFERRED = ("duplicate_works.legacy.arxiv_journal_near_dupes not computed inline: the corpus has "
+                           "{keys} paper keys (inline limit {limit}); submit curate_audit_corpus as a "
+                           "knowledge_operation job for the near-duplicate title check")
 #: corpus_qa §1: a title pair is near-duplicate when its 100-character prefixes are fewer than 10 edits apart.
 _NEAR_LEV = 10
 _NEAR_PREFIX = 100
@@ -581,8 +591,13 @@ def _rels(t: Mapping[str, Any]) -> List[Mapping[str, Any]]:
     return [r for r in (t.get("relations") or []) if isinstance(r, dict)]
 
 
-def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex) -> Tuple[Dict, Dict]:
-    """§1: legacy filename-key figures (corpus_qa ``audit_duplicate_works``) plus distinct Works."""
+def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex, *,
+                            near_duplicates: bool = True) -> Tuple[Dict, Dict]:
+    """§1: legacy filename-key figures (corpus_qa ``audit_duplicate_works``) plus distinct Works.
+
+    ``near_duplicates=False`` skips the arXiv x journal title check (D1.10: deferred to a job);
+    its count is then ``None`` and its preview list absent.
+    """
     doi_to_terms: Dict[str, int] = defaultdict(int)
     doi_to_title: Dict[str, str] = {}
     internal: List[Tuple[str, str]] = []
@@ -606,11 +621,11 @@ def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex
                 doi_to_title[doi] = meta.get("paper_title") or ""
     arxiv = {d: ti for d, ti in doi_to_title.items() if _is_arxiv(d)}
     journal = {d: ti for d, ti in doi_to_title.items() if not _is_arxiv(d)}
-    near = _near_duplicate_pairs(arxiv, journal)
+    near = _near_duplicate_pairs(arxiv, journal) if near_duplicates else None
     metrics = {
         "legacy": {"unique_doi_keys": len(doi_to_terms), "internal_dup_count": len(internal),
                    "arxiv_papers": len(arxiv), "journal_papers": len(journal),
-                   "arxiv_journal_near_dupes": len(near)},
+                   "arxiv_journal_near_dupes": len(near) if near is not None else None},
         "paper_keys": len(works.records),
         "distinct_works": len(works),
         "works_with_multiple_keys": works.multi_version_works(),
@@ -619,9 +634,10 @@ def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex
     preview = {
         "top_cited_works": [[w, n] for w, n in top_items(work_terms, EXAMPLES)],
         "internal_duplicates": [[_label(tn), d] for tn, d in internal[:EXAMPLES]],
-        "near_duplicate_key_pairs": [[a, j, round(s, 2)] for a, j, s in sorted(near, key=lambda x: -x[2])[:EXAMPLES]],
         "multi_key_works": [[w, keys] for w, keys in sorted(works.members.items()) if len(keys) > 1][:EXAMPLES],
     }
+    if near is not None:
+        preview["near_duplicate_key_pairs"] = [[a, j, round(s, 2)] for a, j, s in sorted(near, key=lambda x: -x[2])[:EXAMPLES]]
     return metrics, preview
 
 
@@ -887,7 +903,7 @@ def load_terms(source: CorpusSource) -> Tuple[List[Dict[str, Any]], str, Optiona
 
 
 _SECTION_FUNCS = {
-    "duplicate_works": lambda terms, works: section_duplicate_works(terms, works),
+    "duplicate_works": lambda terms, works, **kw: section_duplicate_works(terms, works, **kw),
     "stubs": lambda terms, works: section_stubs(terms),
     "numeric_values": lambda terms, works: section_numeric_values(terms),
     "aliases": lambda terms, works: section_aliases(terms),
@@ -897,11 +913,15 @@ _SECTION_FUNCS = {
 
 
 def audit_corpus(source: CorpusSource, *, sections: Sequence[str] = CORPUS_SECTIONS,
-                 control: Optional[ScanControl] = None) -> OperationReport:
+                 control: Optional[ScanControl] = None,
+                 near_duplicate_limit: Optional[int] = NEAR_DUPLICATE_INLINE_LIMIT) -> OperationReport:
     """Run the audit over ``source`` (read-only) and return a typed report.
 
     The terms list is scanned in full unless ``control`` stops it; a stopped scan audits
     the scanned prefix only and is ``partial`` (never presented as the corpus total).
+    The §1 near-duplicate title check runs when the corpus has at most ``near_duplicate_limit``
+    paper keys or the scan runs in a job (``control.job``); otherwise it is deferred with a
+    warning (D1.10). ``near_duplicate_limit=None`` always runs it.
     """
     started = utcnow()
     control = control or ScanControl()
@@ -918,15 +938,20 @@ def audit_corpus(source: CorpusSource, *, sections: Sequence[str] = CORPUS_SECTI
     reasons = [] if complete else [control.stopped_reason or "scan stopped",
                                    f"{len(scanned)} of {len(terms)} term entries audited"]
     works = work_index_for_terms(scanned)
+    deferred = (near_duplicate_limit is not None and not control.job and len(works.records) > near_duplicate_limit
+                and "duplicate_works" in sections)
     metrics: Dict[str, Any] = {}
     preview: Dict[str, Any] = {}
     for name in sections:
-        m, p = _SECTION_FUNCS[name](scanned, works)
+        kw = {"near_duplicates": not deferred} if name == "duplicate_works" else {}
+        m, p = _SECTION_FUNCS[name](scanned, works, **kw)
         metrics[name] = m
         if p:
             preview[name] = p
     units = {k: v for k, v in SECTION_UNITS.items() if k.split(".")[0] in sections}
     warnings = []
+    if deferred:
+        warnings.append(NEAR_DUPLICATE_DEFERRED.format(keys=len(works.records), limit=near_duplicate_limit))
     if "aliases" in sections:
         warnings.append("aliases.under_merged_candidates compares adjacent sorted labels only; it is a heuristic "
                         "sample, not an all-pairs duplicate check")
@@ -1071,8 +1096,8 @@ class CorpusAuditTool:
 
 __all__: Tuple[str, ...] = (
     "AUDIT_LITERATURE_CORPUS_SKILL", "AUDIT_METHOD", "CORPUS_SECTIONS", "CURATE_AUDIT_CORPUS", "CorpusAuditTool",
-    "CorpusResolver", "CorpusSource", "EXCLUDED_SECTIONS", "PaperRecord", "TOOL_AUDIT", "WORK_IDENTITY_METHOD",
-    "WORK_IDENTITY_METHOD_V1", "content_hash_key",
+    "CorpusResolver", "CorpusSource", "EXCLUDED_SECTIONS", "NEAR_DUPLICATE_INLINE_LIMIT", "PaperRecord", "TOOL_AUDIT",
+    "WORK_IDENTITY_METHOD", "WORK_IDENTITY_METHOD_V1", "content_hash_key",
     "WorkIndex", "audit_corpus", "doi_key", "identifiers_from_key", "load_terms", "mapping_corpus_resolver",
     "paper_key", "record_for", "same_work", "title_tokens", "titles_near_duplicate", "work_index_for_terms",
 )

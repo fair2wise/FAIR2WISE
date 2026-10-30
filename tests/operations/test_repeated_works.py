@@ -215,3 +215,36 @@ def test_repeated_reference_population_at_scale_counts_each_work_once(big_graph,
     assert dup["distinct_works"] == ct.distinct_works < dup["paper_keys"] == ct.paper_keys
     assert dup["legacy"]["unique_doi_keys"] == ct.legacy_total_papers > ct.paper_keys  # path copies stay legacy keys
     assert dup["works_with_multiple_keys"] == ct.works_with_multiple_keys
+
+
+# -- D1.10: near-duplicate title check inline or as a job -----------------------------------------
+
+def test_near_duplicate_title_check_is_deferred_inline_above_the_key_limit_and_runs_in_a_job(tmp_path):
+    """D1.10 (O-S4): above NEAR_DUPLICATE_INLINE_LIMIT paper keys the inline audit skips the arXiv x journal
+    title check (count None, warning, no preview list); the same audit inside a job (ScanControl(job=True)) or
+    with the limit lifted computes it. Below the limit it runs inline as before."""
+    from app.modules.operations.corpus import NEAR_DUPLICATE_DEFERRED, NEAR_DUPLICATE_INLINE_LIMIT
+
+    assert NEAR_DUPLICATE_INLINE_LIMIT == 2_000
+    names = ["arXiv_2306.00077v1.pdf", "10.1021_syn.77.pdf", "10.1021_syn.78.pdf"]
+    metas = [{"paper_title": TITLE, "publication_year": 2023}, {"paper_title": TITLE, "publication_year": 2023},
+             {"paper_title": "An unrelated title about detectors", "publication_year": 2023}]
+    terms = [_term(i, [n], {n: m}) for i, (n, m) in enumerate(zip(names, metas))]
+    path = sp.write_json(tmp_path / "c.json", {"terms": terms})
+    source = CorpusSource("c", str(path))
+
+    inline = audit_corpus(source, near_duplicate_limit=2)  # 3 keys > 2: deferred
+    dup = inline.metrics["duplicate_works"]
+    assert dup["legacy"]["arxiv_journal_near_dupes"] is None and "near_duplicate_key_pairs" not in inline.preview["duplicate_works"]
+    assert dup["paper_keys"] == 3 and dup["distinct_works"] == 2  # the rest of §1 is unaffected
+    assert NEAR_DUPLICATE_DEFERRED.format(keys=3, limit=2) in inline.warnings
+    assert inline.completeness == "complete"
+
+    job = audit_corpus(source, near_duplicate_limit=2, control=ScanControl(10_000, job=True))
+    lifted = audit_corpus(source, near_duplicate_limit=None)
+    small = audit_corpus(source)  # 3 keys <= 2000
+    for report in (job, lifted, small):
+        assert report.metrics["duplicate_works"]["legacy"]["arxiv_journal_near_dupes"] == 1
+        assert report.preview["duplicate_works"]["near_duplicate_key_pairs"][0][:2] == ["10.48550/arxiv.2306.00077", "10.1021/syn.77"] or \
+            len(report.preview["duplicate_works"]["near_duplicate_key_pairs"]) == 1
+        assert not any("not computed inline" in w for w in report.warnings)
