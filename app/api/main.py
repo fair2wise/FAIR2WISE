@@ -228,17 +228,31 @@ def run_api(cfg: Any, *, host: str, port: int, cors_origins: Optional[List[str]]
     The model-compatible API is mounted (``model_api=True``, owner decision B7) and advertises
     ``PublicLayout.model_api_root_path`` from the same ``F2W_PUBLIC_PREFIX`` setting, whatever
     ``root_path`` says (``/fair2wise/model-api`` in the images, ``/model-api`` unprefixed).
+
+    Deployment settings come from the process environment (``F2W_DEPLOYMENT_PROFILE`` and the
+    other trusted startup values, profile ``local`` when unset). On an ALS profile the Tiled
+    identity port and the server-side session store are built here with
+    :func:`app.api.sessions.als_identity_wiring` (cookie ``Path`` = the public prefix), so the
+    ``api`` service of the ALS images starts with sign-in wired (register D3.21).
     """
     import uvicorn
 
     from ..modules.deployment.gateway import uvicorn_options
+    from .legacy_ui import deployment_settings_from
 
     layout = layout_from_env(os.environ)
     if root_path is None:
         options = uvicorn_options(layout)
     else:
         options = {"root_path": root_path} if root_path else {}
-    app = create_api_app(cfg, cors_origins=cors_origins, model_api=True,
+    settings = deployment_settings_from(os.environ)
+    identity_port = credential_store = None
+    if not settings.is_local:
+        from .sessions import als_identity_wiring
+
+        identity_port, credential_store = als_identity_wiring(settings, cookie_path=layout.prefix or "/")
+    app = create_api_app(cfg, cors_origins=cors_origins, deployment=settings, identity_port=identity_port,
+                         credential_store=credential_store, model_api=True,
                          model_api_root_path=layout.model_api_root_path)
     warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
     uvicorn.run(app, host=host, port=port, **options)

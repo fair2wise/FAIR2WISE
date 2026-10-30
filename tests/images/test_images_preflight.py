@@ -232,10 +232,46 @@ def test_jobs_api_run_api_applies_root_path_from_the_public_prefix(monkeypatch):
                       {"host": "127.0.0.1", "port": 8090, "root_path": "/x/api"},
                       {"host": "127.0.0.1", "port": 8090}]
     # B7: the image mounts the model API, whose public root follows the same trusted prefix setting.
-    assert built == [{"model_api": True, "model_api_root_path": "/fair2wise/model-api"},
-                     {"model_api": True, "model_api_root_path": "/model-api"},
-                     {"model_api": True, "model_api_root_path": "/model-api"},
-                     {"model_api": True, "model_api_root_path": "/fair2wise/model-api"}]
+    assert [(kw["model_api"], kw["model_api_root_path"]) for kw in built] == [
+        (True, "/fair2wise/model-api"), (True, "/model-api"), (True, "/model-api"), (True, "/fair2wise/model-api")]
+    # D3.21: no profile in the environment means :local, which has no identity port or session store.
+    assert all(kw["deployment"].is_local and kw["identity_port"] is None and kw["credential_store"] is None
+               for kw in built)
+
+
+def test_jobs_api_run_api_wires_als_identity_from_the_environment(monkeypatch):
+    """D3.21: on an ALS profile ``run_api`` builds the Tiled identity port and the session store itself
+    (``als_identity_wiring``, cookie Path = the public prefix) and hands both to ``create_api_app``; before
+    this the ALS ``api`` service refused to start (``build_guard`` needs both)."""
+    import uvicorn
+
+    from app.api import main as api_main
+    from app.api import sessions
+
+    served, built, wired = [], [], []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: served.append(kw))
+    monkeypatch.setattr(api_main, "create_api_app", lambda cfg, cors_origins=None, **kw: built.append(kw) or "app")
+
+    def fake_wiring(settings, http_client=None, *, timeout=5.0, **store_kwargs):
+        wired.append((settings.profile.value, store_kwargs))
+        return "port", "store"
+
+    monkeypatch.setattr(sessions, "als_identity_wiring", fake_wiring)
+    for key in ("F2W_DEPLOYMENT_PROFILE", "F2W_TILED_WRITER_IDENTITY", "F2W_PUBLIC_PREFIX"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("F2W_DEPLOYMENT_PROFILE", "als-dev")
+    monkeypatch.setenv("F2W_TILED_WRITER_IDENTITY", "f2w-writer")
+    monkeypatch.setenv("F2W_PUBLIC_PREFIX", "/fair2wise")
+    api_main.run_api(object(), host="127.0.0.1", port=8090)
+    assert wired == [("als-dev", {"cookie_path": "/fair2wise"})]
+    (kw,) = built
+    assert kw["deployment"].profile.value == "als-dev" and not kw["deployment"].is_local
+    assert (kw["identity_port"], kw["credential_store"]) == ("port", "store")
+    assert served == [{"host": "127.0.0.1", "port": 8090, "root_path": "/fair2wise/api"}]
+    # unprefixed: the cookie covers the whole origin
+    monkeypatch.delenv("F2W_PUBLIC_PREFIX")
+    api_main.run_api(object(), host="127.0.0.1", port=8090)
+    assert wired[-1] == ("als-dev", {"cookie_path": "/"})
 
 
 @pytest.mark.parametrize("port,ok", [("8080", True), ("9000", True), ("8090", False), ("8765", False),
