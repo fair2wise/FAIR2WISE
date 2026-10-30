@@ -58,8 +58,18 @@ from ..modules.security.tiled_identity import TiledCredential, TiledIdentityPort
 
 Clock = Callable[[], datetime]
 
-#: Default lifetime of a publication approval made through this interface.
-DEFAULT_APPROVAL_TTL = timedelta(hours=1)
+#: Lifetime of a publication approval made through this interface on ALS (owner decision
+#: O-T2, 2026-10-30: 24 h on ALS, no expiry on ``:local``; chat approvals never expire, H2 Q8).
+ALS_APPROVAL_TTL = timedelta(hours=24)
+#: Kept for callers that import the old name; equals the ALS lifetime.
+DEFAULT_APPROVAL_TTL = ALS_APPROVAL_TTL
+#: Sentinel: resolve the approval lifetime from the deployment profile.
+PROFILE_APPROVAL_TTL: Any = ...
+
+
+def default_approval_ttl(settings: DeploymentSettings) -> Optional[timedelta]:
+    """Approval lifetime for ``settings``: ``None`` (never expires) on ``:local``, 24 h on ALS."""
+    return None if settings.is_local else ALS_APPROVAL_TTL
 H5_MESSAGE = ("publication to {target} is gated at H5: only approved rehearsal targets (fixture or disposable "
               "Tiled) are enabled on this deployment")
 
@@ -127,7 +137,8 @@ class F2WOperations:
         identity_port: ALS identity port (fresh role check when an approval is recorded).
         publication_gate: H5 gate; the default allows no target.
         clock: Current UTC time (approval times and expiries).
-        approval_ttl: Lifetime of publication approvals created here.
+        approval_ttl: Lifetime of publication approvals created here; by default resolved from
+            the profile (``None`` = never expires on ``:local``, 24 h on ALS, O-T2).
         knowledge: The deployment's ``KnowledgeOperations`` (T19E), or ``None`` when no graph
             port is configured (the knowledge methods then raise ``UNSUPPORTED_CAPABILITY``).
     """
@@ -135,7 +146,7 @@ class F2WOperations:
     def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Any = None,
                  curation: Any = None, audit: Any = None, identity_port: Optional[TiledIdentityPort] = None,
                  publication_gate: Optional[PublicationGate] = None, clock: Clock = _utcnow,
-                 approval_ttl: timedelta = DEFAULT_APPROVAL_TTL, knowledge: Any = None) -> None:
+                 approval_ttl: Optional[timedelta] = PROFILE_APPROVAL_TTL, knowledge: Any = None) -> None:
         if publication is not None and publication.jobs is not jobs:
             raise ValueError("publication must be registered on the same JobService")
         self.settings = settings
@@ -146,7 +157,8 @@ class F2WOperations:
         self.identity_port = identity_port
         self.gate = publication_gate or PublicationGate()
         self.clock = clock
-        self.approval_ttl = approval_ttl
+        self.approval_ttl: Optional[timedelta] = (default_approval_ttl(settings) if approval_ttl is PROFILE_APPROVAL_TTL
+                                                  else approval_ttl)
         self.knowledge = knowledge
 
     # --- contexts ---------------------------------------------------------------------
@@ -370,7 +382,7 @@ class F2WOperations:
         approval: ApprovalRecord = create_approval(
             ctx, plan, self.settings, approval_id="appr-" + uuid.uuid4().hex, clock=self.clock,
             identity_port=self.identity_port, approver_credential=approver_credential, operation_id=job_id,
-            expires_at=expires_at or now + self.approval_ttl,
+            expires_at=expires_at or (now + self.approval_ttl if self.approval_ttl is not None else None),
         )
         handle = pub.submit_approval(ctx, job_id, approval)
         return {"approval": _json(approval), "job": _json(handle)}
@@ -562,4 +574,5 @@ def job_event_json(event: JobEvent) -> Dict[str, Any]:
     return event.model_dump(mode="json")
 
 
-__all__ = ("DEFAULT_APPROVAL_TTL", "F2WOperations", "PublicationGate", "build_operations", "job_event_json")
+__all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "PROFILE_APPROVAL_TTL", "F2WOperations", "PublicationGate",
+           "build_operations", "default_approval_ttl", "job_event_json")

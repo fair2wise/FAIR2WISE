@@ -8,6 +8,8 @@ same refusals hold when the shared operations are called directly (SDK) and in t
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 
 from _v1_support import ALS_TILED, CORPUS, ingest_inputs
@@ -102,7 +104,10 @@ def test_admin_publishes_to_the_rehearsal_target_with_an_als_approval(als):
     assert approval["approved_by"] == "uuid-admin" and approval["approver_is_admin"] is True
     assert approval["approver_issuer"] == ALS_TILED and approval["executed_as"] == "f2w-writer"
     assert approval["role_check_evidence"]["method"] == "tiled_whoami"
-    assert approval["expires_at"] is not None
+    assert approval["expires_at"] is not None  # ALS approvals expire after 24 h (O-T2)
+    expires = datetime.fromisoformat(approval["expires_at"].replace("Z", "+00:00"))
+    approved = datetime.fromisoformat(approval["approved_at"].replace("Z", "+00:00"))
+    assert expires - approved == timedelta(hours=24)
     assert len(als.port.calls) >= before + 2  # fresh role check at entry and inside create_approval
     assert "token-admin" not in ok.text and "cookie-admin" not in ok.text
     assert admin.get(f"/v1/jobs/{job_id}/view").json()["ui_state"] == "approved"

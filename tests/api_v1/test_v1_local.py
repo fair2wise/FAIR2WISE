@@ -211,6 +211,7 @@ def test_publication_staged_approved_published_and_rollback(local):
     assert approval["plan_sha256"] == plan["plan_sha256"] and approval["target"] == local.target
     assert approval["requested_by"] == approval["approved_by"] == "local-operator"
     assert approval["executed_as"] == "f2w-writer" and approval["approver_issuer"] is None
+    assert approval["expires_at"] is None  # :local approvals never expire (O-T2, D3.5/D3.8)
     assert ok.json()["job"]["state"] == "queued"
     assert local.work() == (job_id, JobState.SUCCEEDED)
     view = c.get(f"/v1/jobs/{job_id}/view").json()
