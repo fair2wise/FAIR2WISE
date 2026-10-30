@@ -979,11 +979,11 @@ def promote_rsoxs_snapshot(
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
-    digest = sha256_file(tmp)
+    # No "sha256" here (T26A Q4, owner decision O-R1, 2026-10-30): a file cannot contain its own
+    # hash, so the embedded value was never correct; release hashes are computed externally.
     snap = {
         "name": dest.name.replace(".json", ""),
         "written_at": utc_now(),
-        "sha256": digest,
         "nodes": len(graph["things"]),
         "edges": len(graph["associations"]),
         "path": _rel_to_repo(dest),

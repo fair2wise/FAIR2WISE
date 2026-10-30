@@ -559,3 +559,23 @@ def test_cli_failure_exits_1_and_writes_nothing(tmp_path):
 def test_manifest_copy_is_independent_of_the_result_object(make):
     result = make()
     assert copy.deepcopy(result.manifest) == result.manifest
+
+
+def test_promoted_payload_carries_no_embedded_self_hash(make):
+    """T26A Q4 (owner decision O-R1, 2026-10-30): T23B payloads never embed ``metadata.graph_snapshot``
+    (a file cannot hold its own hash); the manifest and descriptor carry the externally computed hash."""
+    result = make()
+    graph = json.loads(result.graph_path.read_bytes())
+    assert "graph_snapshot" not in (graph.get("metadata") or {})
+    assert result.manifest.graph.sha256 == result.graph_sha256
+
+
+def test_legacy_promoter_no_longer_writes_the_wrong_self_hash(tmp_path):
+    from app.modules.tiled_sim import promote_rsoxs_snapshot
+
+    terms = tmp_path / "extracted_terms_rsoxs_v1_copy.json"
+    terms.write_text(json.dumps({"metadata": {"version": "t"}, "terms": [{"term": "P3HT"}]}), encoding="utf-8")
+    dest = tmp_path / "matkg_rsoxs_v2.json"
+    promote_rsoxs_snapshot(terms_snapshot=terms, output_kg=dest, kg_dir=tmp_path)
+    snap = json.loads(dest.read_text())["metadata"]["graph_snapshot"]
+    assert "sha256" not in snap and snap["term_count"] == 1

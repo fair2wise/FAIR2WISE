@@ -1,0 +1,7 @@
+# T26A Q3 (owner decision O-R1, 2026-10-30): KG release artifacts are hashed over their exact
+# stored bytes (docs/migration/data_releases/release_contract.md section 3). No text conversion,
+# EOL normalisation or diff filter may change them on checkout, on any OS.
+storage/kg/** -text
+storage/kg/*.json -text
+storage/terminology/*.json -text
+docs/migration/data_releases/releases/** -text
