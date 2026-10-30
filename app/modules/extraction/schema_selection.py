@@ -19,8 +19,9 @@ from typing import Any, Dict, Sequence, Tuple
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
 
-#: Schema sets this module can map onto (explicit selection only).
-SELECTABLE_SCHEMA_SETS = ("0.3.0",)
+#: Schema sets this module can map onto (explicit selection only). 0.3.1 (T22D) also fills the
+#: normalized-value slots on QuantityValue from ``normalize_quantity`` (D1.4).
+SELECTABLE_SCHEMA_SETS = ("0.3.0", "0.3.1")
 #: Overlay used when a caller selects a set without naming the schema.
 DEFAULT_MAPPING_SCHEMA = "rsoxs_schema"
 
