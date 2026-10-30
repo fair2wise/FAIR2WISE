@@ -19,6 +19,15 @@ admission, traced as ``supervisor-plan``, tool arguments pinned to the UI's);
 The retrieval service reads the pipeline's *current* agent on every call
 (``pipeline.retrieval`` is rebuilt on settings changes) and its current Tiled URI.
 
+Knowledge Operations (T19E). The application also registers the five T19C read Tools
+(``kg_compute_statistics``, ``kg_compare_snapshots``, ``kg_paper_subgraph``,
+``kg_recent_entities``, ``curate_audit_corpus``) over the pipeline's *current* JSON graph
+selection (:func:`active_json_graph_files`: the active runtime's graph files, which T25D
+sets per user for the turn) and the ``storage/terminology`` corpora. The supervisor may
+choose them for a delegated task; the legacy UI QA turn keeps its contract (the
+``answer_from_knowledge`` verdict is the answer, with the documented fallback when the
+planner called no read tool), so no UI DTO changes here.
+
 Context. The legacy UI API has no per-request identity wiring yet (that is
 T18B). This adapter therefore runs only on the ``:local`` profile, where every
 caller is the local-operator (D34), which is the legacy server's existing trust
@@ -32,6 +41,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from ..contracts import ActorKind, RequestContext
@@ -112,6 +122,36 @@ class LegacyReadPath:
 planning_model_provider: Callable[[Any], Callable[[], Any]] = pipeline_planning_model
 
 
+def active_json_graph_files(pipeline: Any) -> List[str]:
+    """The JSON graph files of ``pipeline``'s active runtime (T25D per-user selection), existing ones only.
+
+    Empty when the active graph source is not ``json`` (Splash/Tiled mode has no JSON snapshot
+    to scan) or when the pipeline exposes no runtime.
+    """
+    runtime = getattr(pipeline, "runtime", None)
+    if runtime is None or str(getattr(runtime, "graph_source", "json") or "json") != "json":
+        return []
+    paths_fn = getattr(pipeline, "_runtime_json_paths", None)
+    raw = list(paths_fn() if callable(paths_fn) else (getattr(runtime, "json_graph_paths", None) or []))
+    out: List[str] = []
+    for path in raw:
+        candidate = Path(str(path))
+        if not candidate.is_absolute():
+            candidate = (Path.cwd() / candidate).resolve()
+        if candidate.is_file() and str(candidate) not in out:
+            out.append(str(candidate))
+    return out
+
+
+def build_knowledge_operations(pipeline: Any) -> Any:
+    """``KnowledgeOperations`` following ``pipeline``'s active graph selection and ``storage/terminology``."""
+    from ..operations.corpus import CorpusAuditTool
+    from ..operations.knowledge import KnowledgeOperations, directory_corpus_resolver
+
+    corpus = CorpusAuditTool(directory_corpus_resolver(Path.cwd() / "storage" / "terminology"))
+    return KnowledgeOperations.from_graph_files(lambda: active_json_graph_files(pipeline), corpus=corpus)
+
+
 def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> LegacyReadPath:
     """Build the langgraph-mode read path for one ``AgentPipelineService`` instance.
 
@@ -134,7 +174,8 @@ def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] =
     # One planning call per turn: the tool verdict is the answer, so no relay call is made.
     limits = RuntimeLimits(max_retries=0, max_model_calls=1)
     application = F2WApplication(settings=settings, retrieval=service, chat_model=chat_model, limits=limits,
-                                 provider=backend, name="f2w-legacy-ui")
+                                 provider=backend, name="f2w-legacy-ui",
+                                 knowledge=build_knowledge_operations(pipeline))
 
     def context() -> RequestContext:
         key = str(getattr(pipeline, "_active_session_key", "") or "")
@@ -145,4 +186,5 @@ def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] =
     return LegacyReadPath(application, context_factory=context, route=route)
 
 
-__all__ = ("DEFAULT_WRITER_IDENTITY", "LegacyReadPath", "build_legacy_read_path", "legacy_deployment_settings")
+__all__ = ("DEFAULT_WRITER_IDENTITY", "LegacyReadPath", "active_json_graph_files", "build_knowledge_operations",
+           "build_legacy_read_path", "legacy_deployment_settings")

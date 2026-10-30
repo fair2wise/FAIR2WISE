@@ -98,6 +98,9 @@ def test_unimplemented_methods_name_their_task(method, args, task):
 
 @pytest.mark.parametrize("method,args", [
     ("submit_ingest", ({},)), ("get_job", ("j",)), ("cancel_job", ("j",)), ("plan_publication", ("s", "t")),
+    ("graph_statistics", ("g",)), ("compare_graphs", (["a", "b"],)), ("paper_subgraph", ("g", "paper.pdf")),
+    ("recent_entities", ("g",)), ("audit_corpus", ("c",)), ("run_knowledge_operation", ("kg_compute_statistics", {})),
+    ("submit_knowledge_operation", ("kg_compute_statistics", {})), ("knowledge_job_result", ("j",)),
 ])
 def test_job_methods_without_operations_are_unsupported(method, args):
     """C2: these forward to F2WOperations (tests/api_v1/test_v1_sdk_client.py); none given here."""

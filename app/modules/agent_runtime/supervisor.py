@@ -254,13 +254,14 @@ def build_literature_supervisor(
             stop = _stop(ErrorCode.BUDGET_EXHAUSTED, "the model-call budget for this turn is used up.")
         prompt = system_prompt
         if skills is not None:
-            section = skills.render_prompt_section(rc.request, scope=rc.scope)
+            section = skills.render_prompt_section(rc.request, scope=rc.scope, tools=rc.tools)
             if section:
                 prompt = f"{prompt}\n\n{section}"
         messages = list(for_model)
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=prompt), *messages]
-        tools = [tool_definition(e.spec) for e in registry.visible_to(rc.request, scope=rc.scope)]
+        tools = [tool_definition(e.spec) for e in registry.visible_to(rc.request, scope=rc.scope)
+                 if rc.tools is None or e.name in rc.tools]
         bound = chat_model.bind_tools(tools) if tools else chat_model
         update["messages"] = list(repairs)
         return update, bound, messages, stop

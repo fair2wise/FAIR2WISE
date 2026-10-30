@@ -8,7 +8,8 @@ deterministic ``summarize_extracted_terms`` unchanged. T19C adds the graph
 operations (:mod:`.graph`: ``kg_compute_statistics``, ``kg_compare_snapshots``,
 ``kg_paper_subgraph``, ``kg_recent_entities``), the corpus audit and Work identity
 (:mod:`.corpus`: ``curate_audit_corpus``) and the shared report contract and job
-wrapper (:mod:`.reports`).
+wrapper (:mod:`.reports`). T19E bundles them for every surface (:mod:`.knowledge`:
+agent registry, ``F2WOperations``, ``/v1/operations``, SDK, CLI, jobs).
 
 Importing this package has no side effects: no environment or file reads, no
 registry or model construction, and no import of the F2W agent modules (they
@@ -40,6 +41,9 @@ _EXPORTS: Dict[str, Tuple[str, str]] = {
     "WorkIndex": ("corpus", "WorkIndex"),
     "mapping_corpus_resolver": ("corpus", "mapping_corpus_resolver"),
     "OperationReport": ("reports", "OperationReport"),
+    "KnowledgeOperations": ("knowledge", "KnowledgeOperations"),
+    "DynamicJsonGraphs": ("knowledge", "DynamicJsonGraphs"),
+    "knowledge_job_context": ("knowledge", "knowledge_job_context"),
     "operation_dispatch": ("reports", "operation_dispatch"),
     "register_operation_jobs": ("reports", "register_operation_jobs"),
 }

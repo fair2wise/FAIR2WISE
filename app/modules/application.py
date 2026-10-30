@@ -133,6 +133,8 @@ class F2WApplication:
         clock: Aware-UTC clock.
         name: Registry label.
         ledger_size: Bound on retained legacy payloads.
+        knowledge: Optional ``operations.knowledge.KnowledgeOperations`` (T19E): registers the five
+            T19C read Tools and their skills beside ``answer_from_knowledge``.
     """
 
     def __init__(
@@ -151,6 +153,7 @@ class F2WApplication:
         clock: Callable[[], datetime] = _utcnow,
         name: str = "f2w",
         ledger_size: int = 256,
+        knowledge: Any = None,
     ) -> None:
         from .agent_runtime.executor import RuntimeLimits, ToolExecutor
         from .agent_runtime.policies import InMemoryEventSink
@@ -175,7 +178,9 @@ class F2WApplication:
         self.event_sink = event_sink if event_sink is not None else InMemoryEventSink()
         self.ledger = LegacyResultLedger(ledger_size)
         # Pass-through except inside answer_via_supervisor, which pins the caller's arguments.
-        self.registry = build_read_registry(PinnedArgsService(retrieval), self.ledger, name=name)
+        self.knowledge = knowledge
+        self.registry = build_read_registry(PinnedArgsService(retrieval), self.ledger, name=name,
+                                            knowledge=knowledge)
         self.skills = build_read_skills(self.registry)
         self.executor = ToolExecutor(self.registry, event_sink=self.event_sink, admission=self.admission,
                                      limits=self.limits, clock=clock)
@@ -320,12 +325,14 @@ class F2WApplication:
 
     async def delegate(
         self, ctx: RequestContext, task: str, *, thread_id: str, scope: Optional[FrozenSet[str]] = None,
+        tools: Optional[FrozenSet[str]] = None,
     ) -> DelegatedOutcome:
         """Run one delegated literature task through the supervisor on ``thread_id``.
 
-        The supervisor sees only tools ``ctx`` may use and calls the same
-        ``answer_from_knowledge`` tool (and so the same retrieval service) as the
-        direct call. Threads are namespaced by principal/session, persist in the
+        The supervisor sees only tools ``ctx`` may use (narrowed further to ``tools`` when
+        given, never widened) and calls the same ``answer_from_knowledge`` tool (and so the
+        same retrieval service) as the direct call; with ``knowledge`` registered it may also
+        choose the T19C operations. Threads are namespaced by principal/session, persist in the
         checkpointer and survive a new application instance built over the same
         saver. Cancelling the awaiting task cancels the run.
         """
@@ -338,7 +345,7 @@ class F2WApplication:
         scoped = config["configurable"]["thread_id"]
         with self._run_scope(scoped):
             state = await graph.ainvoke({"messages": [HumanMessage(content=task)]}, config,
-                                        context=RunContext(request=ctx, scope=scope))
+                                        context=RunContext(request=ctx, scope=scope, tools=tools))
         return self._delegated_outcome(scoped, state)
 
     def _delegated_outcome(self, scoped: str, state: Mapping[str, Any]) -> DelegatedOutcome:
@@ -389,11 +396,14 @@ class F2WApplication:
         The supervisor plans the turn and calls ``answer_from_knowledge``; the tool
         arguments are pinned to this call's (question verbatim, history, flags), so the
         existing QA path receives exactly what :meth:`answer_from_knowledge` would pass.
+        Only that tool is offered to the planner (the UI QA contract is the read verdict; the
+        T19C operations stay available to :meth:`delegate`).
         The first read of the turn is returned. If the planner raises or calls no tool,
         the direct call answers instead (``fallback`` says why). The one-turn thread is
         deleted afterwards unless ``keep_thread``.
         """
         from .runtime_bridge.qa_route import pin_args, unpin_args
+        from .runtime_bridge.qa_tool import TOOL_NAME as READ_TOOL
 
         self._require_supervisor()
         args = self._read_args(question, history, source_rag, use_live_tiled)
@@ -402,7 +412,7 @@ class F2WApplication:
         delegated: Optional[DelegatedOutcome] = None
         fallback: Optional[str] = None
         try:
-            delegated = await self.delegate(ctx, question, thread_id=tid)
+            delegated = await self.delegate(ctx, question, thread_id=tid, tools=frozenset({READ_TOOL}))
         except ContractError:
             raise
         except Exception as exc:  # noqa: BLE001 - planner/provider failure: the direct call answers

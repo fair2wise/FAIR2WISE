@@ -9,6 +9,11 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
   :class:`~app.api.operations.F2WOperations` that SDK, CLI and worker callers use directly;
 * the ``/v1/validation/judge-model`` routes behind the settings panel's judge dropdown
   (owner O-U2; :mod:`app.modules.validation_settings`);
+* the ``/v1/operations`` routes (T19E) over the deployment's
+  :class:`~app.modules.operations.knowledge.KnowledgeOperations` (default: the JSON graphs
+  under ``storage/kg`` and the corpora under ``storage/terminology`` of the working
+  directory, as the legacy UI lists them), plus the ``knowledge_operation`` job kind
+  (``ops.run``) registered on the shared operations when no trusted wiring did so;
 * the browser-origin gate (:mod:`app.api.origin_gate`) and the request-body cap
   (:mod:`app.api.upload_limits`) on ``/v1/`` and ``/auth/`` (``create_app`` itself gates the
   legacy routes and caps their bodies at 128 MiB, AUD-04);
@@ -61,6 +66,7 @@ def create_api_app(
     sse_poll_seconds: float = 0.5,
     sse_max_seconds: float = 300.0,
     judge_settings: Optional[Any] = None,
+    knowledge_operations: Optional[Any] = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -78,13 +84,17 @@ def create_api_app(
         judge_settings: Validation judge-model service (O-U2); default a
             :class:`~app.modules.validation_settings.JudgeModelService` over
             ``<workdir>/validation/judge_model.json`` and the live CBORG model list.
+        knowledge_operations: ``KnowledgeOperations`` for ``/v1/operations`` (T19E); default
+            ``KnowledgeOperations.from_storage(Path.cwd())`` unless ``operations`` already carries one.
 
     Raises:
-        StartupConfigError: As ``create_app``, or ``operations`` bound to other settings.
+        StartupConfigError: As ``create_app``, ``operations`` bound to other settings, or
+            ``knowledge_operations`` given beside ``operations`` that already carry one.
     """
     from ..modules.f2w_agent.api import create_app, effective_cors_origins
-    from . import routes_jobs as jobs, routes_publications as publications, routes_review as review
-    from . import routes_status as status, routes_validation as validation
+    from . import routes_jobs as jobs, routes_operations as knowledge_routes, routes_publications as publications
+    from . import routes_review as review, routes_status as status, routes_validation as validation
+    from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
     app = create_app(cfg, cors_origins=cors_origins, deployment=deployment, startup_config=startup_config,
@@ -100,6 +110,15 @@ def create_api_app(
         raise StartupConfigError("config_rejected: operations are bound to another deployment profile or target")
     if operations.identity_port is None:
         operations.identity_port = identity_port
+    if knowledge_operations is not None and operations.knowledge is not None:
+        raise StartupConfigError("config_rejected: knowledge_operations given but operations already carry one")
+    if operations.knowledge is None:
+        operations.knowledge = knowledge_operations or KnowledgeOperations.from_storage(Path.cwd())
+    if not operations.jobs.has_kind(OPERATION_JOB_KIND):
+        # The worker re-resolves the initiating subject with the same lookup the job authority uses (AUD-01).
+        lookup = runtime.credential_lookup() or getattr(operations.jobs.authority, "credential_lookup", None)
+        operations.register_knowledge_jobs(knowledge_job_context(
+            settings, identity_port=operations.identity_port, credential_lookup=lookup, clock=clock or _utcnow))
     app.state.f2w_operations = operations
     runtime.on_scope_change(operations.notify_scope_change)
 
@@ -111,6 +130,7 @@ def create_api_app(
         judge_settings = JudgeModelService(JudgeModelStore(judge_settings_path(Path(cfg.workdir))))
     app.state.f2w_judge_settings = judge_settings
     validation.install(app)
+    knowledge_routes.install(app)
 
     allowed = effective_cors_origins(cors_origins, is_local=settings.is_local)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes, path_prefixes=GUARDED_PREFIXES)

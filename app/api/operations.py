@@ -13,7 +13,10 @@ first and forwards to the T10 services, so the same authorization runs on every 
 * publication: :class:`~app.modules.jobs.publication.Publication`, with approvals created by
   :func:`~app.modules.security.authorization.create_approval` for the exact ``plan_sha256``
   the reviewer was shown;
-* audit: :meth:`~app.modules.provenance.recorder.AuditRecorder.status`.
+* audit: :meth:`~app.modules.provenance.recorder.AuditRecorder.status`;
+* Knowledge Operations (T19E): :class:`~app.modules.operations.knowledge.KnowledgeOperations`
+  (the five T19C read Tools) for direct bounded results and for the ``knowledge_operation``
+  job kind (``register_knowledge_jobs``; ``ops.run``).
 
 Nothing here parses HTTP, and no route holds an algorithm of its own. The only logic added
 here is the H5 publication gate (:class:`PublicationGate`) and the read-only UI mapping of a
@@ -35,12 +38,13 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Union
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Union
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan
 from ..modules.contracts.context import LOCAL_OPERATOR, ActorKind, RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.contracts.jobs import JobEvent, JobHandle, JobState
+from ..modules.contracts.tools import ToolResult
 from ..modules.jobs.keys import OperationInputs
 from ..modules.jobs.service import JobService
 from ..modules.security.authorization import (
@@ -124,12 +128,14 @@ class F2WOperations:
         publication_gate: H5 gate; the default allows no target.
         clock: Current UTC time (approval times and expiries).
         approval_ttl: Lifetime of publication approvals created here.
+        knowledge: The deployment's ``KnowledgeOperations`` (T19E), or ``None`` when no graph
+            port is configured (the knowledge methods then raise ``UNSUPPORTED_CAPABILITY``).
     """
 
     def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Any = None,
                  curation: Any = None, audit: Any = None, identity_port: Optional[TiledIdentityPort] = None,
                  publication_gate: Optional[PublicationGate] = None, clock: Clock = _utcnow,
-                 approval_ttl: timedelta = DEFAULT_APPROVAL_TTL) -> None:
+                 approval_ttl: timedelta = DEFAULT_APPROVAL_TTL, knowledge: Any = None) -> None:
         if publication is not None and publication.jobs is not jobs:
             raise ValueError("publication must be registered on the same JobService")
         self.settings = settings
@@ -141,6 +147,7 @@ class F2WOperations:
         self.gate = publication_gate or PublicationGate()
         self.clock = clock
         self.approval_ttl = approval_ttl
+        self.knowledge = knowledge
 
     # --- contexts ---------------------------------------------------------------------
 
@@ -384,6 +391,106 @@ class F2WOperations:
         pointer = pub.rollback(ctx, target, reason=reason)
         return {"target": pointer.name, "version": pointer.version, **pointer.as_dict()}
 
+    # --- knowledge operations (T19E over the T19C suites) ------------------------------------------
+
+    def _knowledge(self) -> Any:
+        if self.knowledge is None:
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                "knowledge operations are not configured on this deployment")
+        return self.knowledge
+
+    def run_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any]) -> ToolResult:
+        """Run one T19C operation inline and return the bounded typed result the agent Tool returns.
+
+        ``status`` is ``OK`` for a complete scan and ``PARTIAL`` when the inline bound or the
+        request deadline stopped it (never ``OK``). Reads need ``chat.ask``; the scope rule is the
+        T19C one (a graph outside a non-empty ``ctx.corpus_scope`` is ``DENIED``).
+        """
+        return self._knowledge().result(ctx, operation, args)
+
+    def graph_statistics(self, ctx: RequestContext, graph_id: str) -> ToolResult:
+        """``kg_compute_statistics`` of one graph."""
+        return self.run_knowledge_operation(ctx, "kg_compute_statistics", {"graph_id": graph_id})
+
+    def compare_graphs(self, ctx: RequestContext, graph_ids: Sequence[str]) -> ToolResult:
+        """``kg_compare_snapshots`` over 2-12 graphs in the given order."""
+        return self.run_knowledge_operation(ctx, "kg_compare_snapshots", {"graph_ids": list(graph_ids)})
+
+    def paper_subgraph(self, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: Optional[int] = None,
+                       max_edges: Optional[int] = None) -> ToolResult:
+        """``kg_paper_subgraph``: what one graph holds about one Work."""
+        args: Dict[str, Any] = {"graph_id": graph_id, "paper": paper}
+        if max_nodes is not None:
+            args["max_nodes"] = max_nodes
+        if max_edges is not None:
+            args["max_edges"] = max_edges
+        return self.run_knowledge_operation(ctx, "kg_paper_subgraph", args)
+
+    def recent_entities(self, ctx: RequestContext, graph_id: str, *, since: Optional[str] = None,
+                        limit: Optional[int] = None) -> ToolResult:
+        """``kg_recent_entities`` of a live (Tiled) graph; JSON snapshots are ``UNSUPPORTED_CAPABILITY``."""
+        args: Dict[str, Any] = {"graph_id": graph_id}
+        if since:
+            args["since"] = since
+        if limit is not None:
+            args["limit"] = limit
+        return self.run_knowledge_operation(ctx, "kg_recent_entities", args)
+
+    def audit_corpus(self, ctx: RequestContext, corpus: str, *, sections: Optional[Sequence[str]] = None
+                     ) -> ToolResult:
+        """``curate_audit_corpus`` of one configured extracted-terms corpus."""
+        args: Dict[str, Any] = {"corpus": corpus}
+        if sections:
+            args["sections"] = list(sections)
+        return self.run_knowledge_operation(ctx, "curate_audit_corpus", args)
+
+    def submit_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
+                                   corpus_scope: Optional[Sequence[str]] = None) -> JobHandle:
+        """Submit one operation as a ``knowledge_operation`` job (``ops.run``; whole population, no inline bound).
+
+        The arguments are schema-checked first. ``corpus_scope`` defaults to the graph ids /
+        corpus the arguments name (``knowledge.job_scope``); ``JobService`` checks it against
+        the caller's scope. Returns the ``JobHandle``; read the bounded report with
+        :meth:`knowledge_job_result` once the job succeeded.
+        """
+        from ..modules.operations.knowledge import OPERATION_JOB_KIND, job_params, job_scope
+
+        knowledge = self._knowledge()
+        knowledge.validate(operation, args)
+        if not self.jobs.has_kind(OPERATION_JOB_KIND):
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                "knowledge operation jobs are not registered on this deployment")
+        scope = tuple(corpus_scope) if corpus_scope is not None else job_scope(args)
+        inputs = OperationInputs(corpus_scope=scope, params=job_params(operation, dict(args)))
+        return self.jobs.submit(ctx, OPERATION_JOB_KIND, inputs)
+
+    def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> Dict[str, Any]:
+        """The handle of a ``knowledge_operation`` job and, once computed, its bounded report.
+
+        ``result`` is the stage's bounded ``OperationReport`` (``coverage.completeness`` says
+        whether the whole population was read) or ``None`` while the job has not completed;
+        ``artifact_refs`` names the private full report when an artifact store is configured.
+        """
+        from ..modules.operations.knowledge import OPERATION_JOB_KIND
+
+        handle = self.jobs.get(ctx, job_id)
+        if handle.kind != OPERATION_JOB_KIND:
+            raise ContractError(ErrorCode.INVALID_INPUT, f"job {job_id} is not a {OPERATION_JOB_KIND} job")
+        stage = self.jobs.store.stage(job_id, "compute")
+        result = dict(stage.result) if stage is not None and stage.result else None
+        refs = list(stage.artifact_refs) if stage is not None else []
+        return {"job": _json(handle), "result": result, "artifact_refs": refs}
+
+    def register_knowledge_jobs(self, context_for_job: Callable[[Any], RequestContext], *,
+                                artifact_store: Any = None, **kwargs: Any) -> Any:
+        """Register the ``knowledge_operation`` job kind over this deployment's operations (trusted wiring)."""
+        from ..modules.operations.reports import register_operation_jobs
+
+        knowledge = self._knowledge()
+        return register_operation_jobs(self.jobs, knowledge.dispatch, context_for_job,
+                                       artifact_store=artifact_store if artifact_store is not None
+                                       else knowledge.artifact_store, **kwargs)
+
     # --- status ----------------------------------------------------------------------------------
 
     def audit_status(self, ctx: RequestContext) -> Dict[str, Any]:
@@ -420,11 +527,14 @@ def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
                      identity_port: Optional[TiledIdentityPort] = None, epoch: Callable[[], float] = time.time,
                      clock: Clock = _utcnow, owner: str = "api",
                      publication_gate: Optional[PublicationGate] = None,
-                     credential_lookup: Optional[Callable[[str], Any]] = None) -> F2WOperations:
+                     credential_lookup: Optional[Callable[[str], Any]] = None,
+                     knowledge: Any = None) -> F2WOperations:
     """Build the default operations over SQLite stores under ``root`` (created if missing).
 
     Registers **no** job kind and no publication: real pipeline handlers need H3 and real
-    publication needs H5. Trusted wiring registers kinds on ``ops.jobs`` (and builds a
+    publication needs H5. ``knowledge`` (T19E) binds the Knowledge Operations; the
+    ``knowledge_operation`` kind is registered by ``F2WOperations.register_knowledge_jobs``.
+    Trusted wiring registers kinds on ``ops.jobs`` (and builds a
     :class:`~app.modules.jobs.publication.Publication` on it) when those gates allow. Every
     kind registered there gets the service's default
     :class:`~app.modules.security.authorization.JobAuthority` (``settings``, ``identity_port``,
@@ -444,7 +554,7 @@ def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
     curation = CurationStore(base / "curation.sqlite3", clock=epoch)
     audit = AuditRecorder(AuditLog(base / "audit.sqlite3", clock=epoch))
     return F2WOperations(settings, jobs, curation=curation, audit=audit, identity_port=identity_port,
-                         publication_gate=publication_gate, clock=clock)
+                         publication_gate=publication_gate, clock=clock, knowledge=knowledge)
 
 
 def job_event_json(event: JobEvent) -> Dict[str, Any]:

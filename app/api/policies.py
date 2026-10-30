@@ -1,4 +1,4 @@
-"""Declared access policy for the versioned ``/v1`` routes of ``app/api/main.py`` (task T14).
+"""Declared access policy for the versioned ``/v1`` routes of ``app/api/main.py`` (tasks T14, T19E).
 
 The 34 inventoried routes and the ALS sign-in handlers keep their policies in
 :mod:`app.modules.security.authorization`. This module adds the T14 routes with the same
@@ -80,6 +80,16 @@ API_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
        note="deployment judge model plus the provider's live model list; no binary verdict is read"),
     _v("V24", "PUT", "/validation/judge-model", "settings.global",
        note="set or clear the judge; must be in the live model list" + _FRESH),
+    # knowledge operations (T19E over the T19C suites): reads for any signed-in user, jobs for ops.run
+    _v("V25", "GET", "/operations/statistics", "chat.ask",
+       note="kg_compute_statistics; T19C scope rule (graph outside a non-empty corpus scope is denied)"),
+    _v("V26", "GET", "/operations/compare", "chat.ask", note="kg_compare_snapshots; same scope rule"),
+    _v("V27", "GET", "/operations/paper-subgraph", "chat.ask", note="kg_paper_subgraph; same scope rule"),
+    _v("V28", "GET", "/operations/recent", "chat.ask", note="kg_recent_entities (Tiled only); same scope rule"),
+    _v("V29", "GET", "/operations/corpus-audit", "chat.ask", note="curate_audit_corpus over a configured corpus"),
+    _v("V30", "POST", "/operations/jobs", "ops.run",
+       note="submit a knowledge_operation job (whole population, no inline bound)" + _FRESH),
+    _v("V31", "GET", "/operations/jobs/{job_id}", note=_OBJ + "; bounded report of a knowledge_operation job"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.
