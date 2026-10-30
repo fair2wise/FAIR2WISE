@@ -1,0 +1,63 @@
+{
+  "artifact_type": "f2w.kg_snapshot",
+  "corpus": "deepseek-r1_70b_50_20250926_144206",
+  "corpus_revision": {
+    "id": "legacy-unknown",
+    "source_count": 0,
+    "sources_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "created": {
+    "at": "2026-10-30T00:00:00Z",
+    "code_commit": "a1d65702679e05eb2b45aa05b95de78b72948976",
+    "json2kg_sha256": "81dba522cff892cda7d5bf1e98a67b10cb7ccb990972d0b995c76b65e755527f",
+    "profile": "local",
+    "run_id": "T26A-adopt",
+    "tool": "app.modules.graph.adoption.adopt_legacy_flat_file (legacy graph adopted byte for byte, not rebuilt; json2kg_sha256 is the adopting revision's)"
+  },
+  "disclosure": {
+    "check_version": "1",
+    "report_sha256": "1442cda9b6df34fb9de1158f48b0bb132e6338b73c8cec43e34674ed7cc17753",
+    "status": "pass"
+  },
+  "extraction": {
+    "revisions": [
+      {
+        "extractor": "unknown",
+        "unknown": true,
+        "version": "unknown"
+      }
+    ]
+  },
+  "graph": {
+    "codesnippet_count": 0,
+    "edge_count": 344,
+    "format": "f2w.json2kg.things_associations.v1",
+    "node_count": 490,
+    "path": "graph.json",
+    "serialization": "json.dumps(indent=2, ensure_ascii=False); utf-8; no trailing newline",
+    "sha256": "0e8e0454a6972369ee199e281d49d6cd1e02469ed7e098e649acbd2b04585cfc",
+    "size_bytes": 343402
+  },
+  "graph_id": "deepseek-r1_70b_50_20250926_144206",
+  "inputs": [],
+  "manifest_version": "1",
+  "parent": {
+    "graph_sha256": "0e8e0454a6972369ee199e281d49d6cd1e02469ed7e098e649acbd2b04585cfc",
+    "relation": "legacy_adoption",
+    "snapshot_id": "matkg_deepseek-r1_70b_50_20250926_144206"
+  },
+  "schema": {
+    "import_fingerprint": "8ec418bb4291d3b8b1166f78d8b59d7a179e637e711c4cb727dba7bc4c462016",
+    "name": "matkg_schema",
+    "path": "storage/schema/matkg_schema.yaml",
+    "sha256": "0c1a0dad380f7aa1d07adc0c049bc5b039d3f1bde8358b310b5ea2f99d3443e1",
+    "version": "0.2.0"
+  },
+  "snapshot_id": "v1",
+  "validation": {
+    "report_ref": "storage/kg/deepseek-r1_70b_50_20250926_144206/v1/validation.json",
+    "report_sha256": "c6e116d8340bcfc8fd27367e21fafb9fe0d12541467aa46aca694a5586834504",
+    "status": "pass",
+    "suite": "schema.validation.validate_graph/1"
+  }
+}
