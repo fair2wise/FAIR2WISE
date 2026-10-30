@@ -515,6 +515,7 @@ changes the deployment contract).
 | T24E container check finding: model-API mount wrote under the read-only app root | this record | `MissingNodeTracker` now writes under the workdir and disables itself on a read-only directory |
 | B30 (O-P5) T15 F2W-side surface for FORGE | `875fbfd` | open gaps: no `/v1/literature` or `/v1/evidence` routes; K-12 kg tools unported (query_knowledge, trace_provenance pending); no durable evidence store before T08C/T10B; FORGE-side changes wait for the owner and Alex (`forge_spec.md`) |
 | D3.17 (O-X4) default Tiled graph backend for the operations on every profile | `adb1c9e` | read-only; JSON wins an id collision; Tiled-discovery warnings are logged, not yet surfaced in `/v1/operations` |
+| T26A Q2 adoption of legacy KG files (O-R1) | `aa78a21` | tool + 6 adopted releases; 53 files skipped on R1/R2/R3/R4/R7 or empty (D3.22-D3.24); no descriptor committed (Q6 open) |
 | B7 (O-A9) model API on ALS for signed-in users | `bad6c39` | mounted in the API process; D-T8 (non-browser sign-in) still open; worker found `run_api` wires no identity port on ALS (see A7 note) |
 
 ## Order after H2
