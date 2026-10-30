@@ -67,3 +67,13 @@ docker run -d --name f2w-edge --network f2w-edge -p 127.0.0.1:18443:443 -v $PWD/
 curl -k -H 'X-Forwarded-Proto: http' https://127.0.0.1:18443/fair2wise/api/docs -o /dev/null -w '%{http_code}\n'   # 200; openapi URL must be https
 curl -k -N https://127.0.0.1:18443/fair2wise/api/chat/stream -H 'Content-Type: application/json' -d '{"message":"ping"}'
 ```
+
+### Container checks run (2026-10-30, D3.11 approved)
+
+The seven checks of `test_deploy_container_required.py` pass against `:local` and `:als-dev` images built from
+`forge_merge` (CPU torch, 8.7 GB and 7.1 GB): UI and assets through the gateway, SSE through nginx, restart with
+named volumes and ordered stop, backup/restore with the host tool, and the three ALS startup refusals. The first run
+found a real defect (the model-API mount created `storage/knowledge_gaps` under the read-only `/app`, so the `api`
+service died), fixed by writing under the workdir and disabling the tracker on a read-only directory. On Colima set
+`F2W_CONTAINER_SHARED_DIR` to a directory under `$HOME`, because the VM cannot bind-mount the macOS temp directory.
+Still owner-run: the staging sign-in check and the Ansible plays.

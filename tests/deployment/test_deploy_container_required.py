@@ -14,6 +14,7 @@ Required environment when enabled::
     F2W_IMAGE_LOCAL=ghcr.io/fair2wise/fair2wise:local       # or a local build tag
     F2W_IMAGE_ALS_DEV=ghcr.io/fair2wise/fair2wise:als-dev
     F2W_CONTAINER_PORT=18080                                 # free loopback port to publish on
+    F2W_CONTAINER_SHARED_DIR=$HOME/.cache/f2w-container-tests  # optional: a directory the Docker VM can bind-mount
 """
 
 from __future__ import annotations
@@ -195,7 +196,12 @@ def test_als_image_refuses_to_start_without_state_mount_and_cors_origins() -> No
 
 
 def test_als_image_refuses_a_group_readable_writer_secret(tmp_path, volumes) -> None:
-    secret = tmp_path / "writer.secret"
+    # A bind mount only works from a directory the Docker VM can see. Colima shares $HOME and /tmp/colima,
+    # not the macOS temp dir, so F2W_CONTAINER_SHARED_DIR (a directory under $HOME) overrides tmp_path.
+    shared = os.environ.get("F2W_CONTAINER_SHARED_DIR")
+    base = Path(shared) / f"secret-{os.getpid()}" if shared else tmp_path
+    base.mkdir(parents=True, exist_ok=True)
+    secret = base / "writer.secret"
     secret.write_text("not-a-real-secret\n", encoding="utf-8")
     secret.chmod(0o640)
     proc = docker("run", "--rm", "-v", f"{volumes['state']}:/var/lib/fair2wise/state",
