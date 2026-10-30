@@ -409,3 +409,18 @@ rewritten as the approved rules and the publish workflow updated: publish all th
 on merge to `main`, owner sole reviewer with self-approval, any tested digest may reach prod,
 public `ghcr.io/fair2wise/fair2wise`, full-commit tags, no `agent` image, no expiry, amd64,
 tags with recorded digests, report recorded not gating. `O06_APPROVED` may then be set.
+
+## Register walk-through, batch 19: D3.16-D3.18, Docker disk (2026-10-30, O-X4)
+
+- **D3.16:** "Yes: let the UI turn offer the operation tools": the supervisor may call the
+  five knowledge operations for the web chat; results render as text in the existing answer
+  DTO; no frozen-UI file changes (no new O-U approval). Work item (T19E frontend step).
+- **D3.17:** "Build it on all profiles including `:local`": `create_api_app` builds a default
+  Tiled graph backend for the operations from the deployment's Tiled target (read-only reads
+  on `:local` against the bundled Tiled too). Work item.
+- **D3.18:** accept file stems as corpus names for now; a configured corpus map may come with
+  T29.
+- **Docker disk (D3.11 extension):** "Also remove the old f2w:local (13.2 GB CUDA image)": the
+  integrator may prune dangling images and build cache and delete the 2026-10-29 `f2w:local`
+  image and the exited `f2w-local` container to make room for the T24E container checks; the
+  other tagged images and volumes stay.
