@@ -1,0 +1,28 @@
+---
+# Restore a verified state archive onto a (new, disposable) host, then start the recorded
+# digest. Refuses a tampered archive, a manifest from another profile and a non-empty state
+# directory unless told otherwise. The container that reads the restored state is the
+# approved digest passed here (normally the one in the archive's manifest).
+#
+#   ansible-playbook -i inventory.yml deploy/playbooks/restore.yml -l als_dev \
+#       -e fair2wise_restore_archive=/srv/fair2wise/als-dev/backups/state-als-dev-<stamp>.tar.gz \
+#       -e fair2wise_image_digest=sha256:<digest recorded in the archive manifest>
+#   add -e fair2wise_restore_replace=true to clear a non-empty state directory first.
+- name: Restore the FAIR2WISE state mount from an archive
+  hosts: fair2wise
+  become: true
+  gather_facts: true
+  vars:
+    fair2wise_restore_replace: false
+    fair2wise_restore_allow_profile_change: false
+    fair2wise_backup_before_rollout: false
+    fair2wise_rollout_reason: "restore from {{ fair2wise_restore_archive | default('') | basename }}"
+  tasks:
+    - name: Verify and restore
+      ansible.builtin.import_role:
+        name: fair2wise
+        tasks_from: restore
+
+    - name: Start the approved digest on the restored state
+      ansible.builtin.import_role:
+        name: fair2wise

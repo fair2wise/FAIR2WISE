@@ -1,0 +1,25 @@
+---
+# Re-point the container to the previously recorded digest. Mounts are kept; the state tree
+# is backed up first (the role does that); JSON/Tiled graph rollback is a separate, versioned
+# operation and is NOT performed here (D31, DEP-21).
+#
+#   ansible-playbook -i inventory.yml deploy/playbooks/rollback.yml -l als_dev
+#   ansible-playbook ... -e fair2wise_rollback_to=sha256:<a digest recorded on the host>
+- name: Roll FAIR2WISE back to the previous digest
+  hosts: fair2wise
+  become: true
+  gather_facts: true
+  vars:
+    fair2wise_record_rollout: false
+    fair2wise_backup_note: pre-rollback
+    fair2wise_rollout_reason: "ansible rollback"
+    fair2wise_rollback_reason: "ansible rollback"
+  tasks:
+    - name: Choose the previous digest (the record keeps both digests)
+      ansible.builtin.import_role:
+        name: fair2wise
+        tasks_from: rollback_choice
+
+    - name: Deploy the previous digest
+      ansible.builtin.import_role:
+        name: fair2wise

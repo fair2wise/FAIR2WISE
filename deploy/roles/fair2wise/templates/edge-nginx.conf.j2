@@ -1,0 +1,64 @@
+# {{ ansible_managed | default('Managed by Ansible (fair2wise role)') }}
+# FAIR2WISE edge for {{ fair2wise_fqdn }} ({{ fair2wise_profile }}).
+#
+# Contract (DEPLOYMENT_STRATEGY.md section 3, docker/profiles/README.md "Edge proxy
+# requirement"): TLS terminates here; {{ fair2wise_base_path }} is forwarded UNCHANGED to the
+# container gateway on {{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }} (the gateway is
+# the only prefix-stripping boundary); X-Forwarded-Proto is OVERWRITTEN with the scheme the
+# browser used, never passed through from the client; SSE is proxied unbuffered with a long
+# read timeout; nothing outside the prefix is forwarded.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ fair2wise_fqdn }};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name {{ fair2wise_fqdn }};
+
+    ssl_certificate     {{ fair2wise_tls_certificate_path }};
+    ssl_certificate_key {{ fair2wise_tls_key_path }};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    server_tokens off;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # Only the application prefix exists on this host name.
+    location = / {
+        return 302 {{ fair2wise_base_path }}/;
+    }
+
+    location {{ fair2wise_base_path }} {
+        # No URI part on proxy_pass: the request path reaches the gateway byte for byte.
+        proxy_pass http://{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }};
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Overwritten, never relayed: the gateway and uvicorn trust this value.
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host "";
+        proxy_set_header X-Forwarded-Port "";
+        proxy_set_header X-Forwarded-Prefix "";
+        proxy_redirect off;
+
+        # SSE: no buffering or caching, one terminal event, long agent streams allowed.
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_request_buffering on;
+        gzip off;
+        proxy_read_timeout {{ fair2wise_edge_stream_timeout }};
+        proxy_send_timeout {{ fair2wise_edge_stream_timeout }};
+        client_max_body_size {{ fair2wise_edge_client_max_body_size }};
+    }
+
+    location / {
+        return 404;
+    }
+}

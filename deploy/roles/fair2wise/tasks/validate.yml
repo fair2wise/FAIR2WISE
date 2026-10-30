@@ -1,0 +1,46 @@
+---
+- name: Profile is one the images provide
+  ansible.builtin.assert:
+    that:
+      - fair2wise_profile in ['als-dev', 'als-prod', 'local']
+    fail_msg: "fair2wise_profile must be als-dev, als-prod or local"
+
+- name: Image reference is an immutable digest, never a tag
+  ansible.builtin.assert:
+    that:
+      - fair2wise_image_digest is match('^sha256:[0-9a-f]{64}$')
+      - "':' not in (fair2wise_image_repository | basename)"
+      - "'@' not in fair2wise_image_repository"
+    fail_msg: "fair2wise_image_digest must be sha256:<64 hex> (the tested digest from the release publication); tags are not deployed"
+
+- name: Base path is the compiled prefix
+  ansible.builtin.assert:
+    that:
+      - fair2wise_base_path == '/fair2wise'
+    fail_msg: "the frontend is built for /fair2wise; a different base path needs a rebuilt image (D26)"
+
+- name: ALS inputs are present (FQDN, CORS origins, writer secret, TLS)
+  ansible.builtin.assert:
+    that:
+      - fair2wise_fqdn is defined and fair2wise_fqdn | length > 0
+      - fair2wise_cors_origins is defined
+      - fair2wise_cors_origins is match('^https://[^/,\s]+(,https://[^/,\s]+)*$')
+      - fair2wise_tiled_writer_secret is defined
+      - fair2wise_tls_certificate_path is defined
+      - fair2wise_tls_key_path is defined
+    fail_msg: "ALS profiles need fair2wise_fqdn, fair2wise_cors_origins (https origins, no paths), fair2wise_tiled_writer_secret (from your secret backend) and TLS file paths"
+    quiet: true
+  when: fair2wise_profile != 'local'
+
+- name: Origins list the deployed UI host
+  ansible.builtin.assert:
+    that:
+      - ('https://' ~ fair2wise_fqdn) in (fair2wise_cors_origins.split(','))
+    fail_msg: "F2W_CORS_ORIGINS must include https://{{ fair2wise_fqdn }} (origins are scheme/host/port, not paths)"
+  when: fair2wise_profile != 'local'
+
+- name: Stop timeout covers the supervisor's ordered drain
+  ansible.builtin.assert:
+    that:
+      - fair2wise_stop_timeout | int >= 120
+    fail_msg: "docker/profiles/README.md requires --stop-timeout 120 so the worker can requeue running jobs"

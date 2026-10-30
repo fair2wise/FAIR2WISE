@@ -100,9 +100,12 @@ jobs:
     # This job gives them the same isolated tiled[server]==0.2.18 environment as the
     # :local image (Dockerfile tiled-server-build): the wheel is downloaded with --no-deps
     # and checked against the owner pin (O-T1, PINNED_TILED_WHEEL_SHA256 in
-    # app/modules/deployment/tiled_config.py), installed into its own venv under the
-    # server constraints, never into the app environment. Servers are disposable
-    # 127.0.0.1 instances on ephemeral ports; no central Tiled, no credentials (T28B, AUD-09).
+    # app/modules/deployment/tiled_config.py), then installed into its own venv exactly as
+    # the Dockerfile does: --require-hashes from the hash-locked
+    # docker/profiles/tiled-server/constraints.lock.txt with the checked wheel offered via
+    # --find-links (T24E, D3.14: CI and image parity). Never into the app environment. Servers
+    # are disposable 127.0.0.1 instances on ephemeral ports; no central Tiled, no credentials
+    # (T28B, AUD-09).
     name: Tiled-backed suites (disposable 0.2.18 servers)
     needs: guard
     runs-on: ubuntu-latest
@@ -123,9 +126,9 @@ jobs:
             | sha256sum -c -
           python -m venv "$RUNNER_TEMP/venv-tiled"
           "$RUNNER_TEMP/venv-tiled/bin/python" -m pip install --upgrade pip
-          "$RUNNER_TEMP/venv-tiled/bin/python" -m pip install \
-            --constraint docker/profiles/tiled-server/constraints.txt \
-            "$RUNNER_TEMP/tiled-wheel/tiled-0.2.18-py3-none-any.whl[server]"
+          "$RUNNER_TEMP/venv-tiled/bin/python" -m pip install --require-hashes \
+            --find-links "$RUNNER_TEMP/tiled-wheel" \
+            -r docker/profiles/tiled-server/constraints.lock.txt
           "$RUNNER_TEMP/venv-tiled/bin/python" -m pip check
           "$RUNNER_TEMP/venv-tiled/bin/python" -I -c "import sys, tiled; sys.exit(tiled.__version__ != '0.2.18')"
       - name: Tiled-backed suites

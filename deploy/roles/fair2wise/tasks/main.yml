@@ -1,0 +1,29 @@
+---
+# Deployment sequence (ANSIBLE_HANDOFF.md): validate profile/digest/base path and mounts;
+# resolve the secret without logging it; back up state; stop the old container within its
+# drain timeout; start the approved digest; wait for liveness and the prefixed health paths;
+# record the digest. Production data imports are a separate approved operation; nothing
+# here contacts central Tiled or runs an import.
+- name: Validate inputs
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Prepare host directories, tools and the writer secret
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: Back up the mounted state before changing the container
+  ansible.builtin.import_tasks: backup.yml
+  when: fair2wise_backup_before_rollout | bool
+
+- name: Pull and (re)create the container from the digest
+  ansible.builtin.import_tasks: container.yml
+
+- name: Configure the edge proxy
+  ansible.builtin.import_tasks: proxy.yml
+  when: fair2wise_manage_edge | bool
+
+- name: Health checks
+  ansible.builtin.import_tasks: health.yml
+
+- name: Record the digest in service
+  ansible.builtin.import_tasks: record.yml
+  when: fair2wise_record_rollout | bool

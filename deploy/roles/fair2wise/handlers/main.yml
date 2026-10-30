@@ -1,0 +1,11 @@
+---
+- name: Validate and reload the edge nginx
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  notify: Reload nginx
+  listen: fair2wise edge changed
+
+- name: Reload nginx
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded

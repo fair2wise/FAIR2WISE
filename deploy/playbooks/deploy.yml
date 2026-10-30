@@ -1,0 +1,14 @@
+---
+# Roll out one approved image digest to the hosts of one profile group.
+#
+#   ansible-playbook -i inventory.yml deploy/playbooks/deploy.yml -l als_dev \
+#       -e fair2wise_image_digest=sha256:<the tested digest from release-publication.json>
+#
+# The digest comes from the publish workflow's receipt (scripts/ci/release_manifest.py,
+# "reference": "<repository>@sha256:..."), never from a tag lookup at deploy time.
+- name: Deploy FAIR2WISE by digest
+  hosts: fair2wise
+  become: true
+  gather_facts: true
+  roles:
+    - role: fair2wise

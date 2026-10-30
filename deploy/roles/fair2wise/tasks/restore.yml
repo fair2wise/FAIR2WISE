@@ -1,0 +1,41 @@
+---
+# Verified restore of a state archive (playbooks/restore.yml). Writes nothing unless the
+# sidecar, manifest and every member match; refuses another profile's archive and a
+# non-empty destination unless told otherwise.
+- name: An archive path was given
+  ansible.builtin.assert:
+    that:
+      - fair2wise_restore_archive is defined
+    fail_msg: "pass -e fair2wise_restore_archive=<path on the host> (its .sha256 sidecar beside it)"
+
+- name: Install the tools and directories on a fresh host
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: The container is not running while its state is replaced
+  community.docker.docker_container:
+    name: "{{ fair2wise_container_name }}"
+    state: stopped
+    stop_timeout: "{{ fair2wise_stop_timeout }}"
+
+- name: Verify and restore the archive
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ fair2wise_tools_dir }}/f2w_state_archive.py"
+      - restore
+      - --archive
+      - "{{ fair2wise_restore_archive }}"
+      - --destination
+      - "{{ fair2wise_state_host_path }}"
+      - --expected-profile
+      - "{{ fair2wise_profile }}"
+      - --owner
+      - "{{ fair2wise_container_uid }}:{{ fair2wise_container_gid }}"
+      - "{{ '--replace' if fair2wise_restore_replace | bool else omit }}"
+      - "{{ '--allow-profile-change' if fair2wise_restore_allow_profile_change | bool else omit }}"
+  register: fair2wise_restore_result
+  changed_when: true
+
+- name: Restore receipt
+  ansible.builtin.debug:
+    msg: "{{ fair2wise_restore_result.stdout | from_json }}"

@@ -1,0 +1,47 @@
+---
+# Liveness (gateway) is distinct from capability readiness: the UI and JSON-only operations
+# work while central Tiled is unavailable; no health check publishes to Tiled or calls a model.
+- name: Gateway liveness on the host port
+  ansible.builtin.uri:
+    url: "http://{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }}{{ fair2wise_health_path }}"
+    status_code: 200
+  register: fair2wise_gateway_health
+  until: fair2wise_gateway_health.status == 200
+  retries: "{{ fair2wise_health_retries }}"
+  delay: "{{ fair2wise_health_delay }}"
+
+- name: API readiness behind the gateway
+  ansible.builtin.uri:
+    url: "http://{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }}{{ fair2wise_api_health_path }}"
+    status_code: 200
+  register: fair2wise_api_health
+  until: fair2wise_api_health.status == 200
+  retries: "{{ fair2wise_health_retries }}"
+  delay: "{{ fair2wise_health_delay }}"
+
+- name: Supervisor status reports every required service running
+  community.docker.docker_container_exec:
+    container: "{{ fair2wise_container_name }}"
+    argv: [cat, /run/fair2wise/supervisor.json]
+  register: fair2wise_supervisor
+  changed_when: false
+
+- name: Required services are up
+  ansible.builtin.assert:
+    that:
+      - (fair2wise_supervisor.stdout | from_json).phase in ['ready', 'degraded']
+      - >-
+        (fair2wise_supervisor.stdout | from_json).services
+        | dict2items
+        | selectattr('value.required', 'equalto', true)
+        | rejectattr('value.state', 'equalto', 'running')
+        | list | length == 0
+    fail_msg: "a required supervised service is not running; see docker logs {{ fair2wise_container_name }}"
+
+- name: Public HTTPS path through the edge
+  ansible.builtin.uri:
+    url: "https://{{ fair2wise_fqdn }}{{ fair2wise_health_path }}"
+    status_code: 200
+  delegate_to: localhost
+  become: false
+  when: fair2wise_manage_edge | bool and fair2wise_profile != 'local'

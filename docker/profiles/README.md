@@ -67,7 +67,10 @@ client sent. The gateway passes on only the literal values `http`/`https` it rec
 (`docker/nginx.conf`, `$f2w_forwarded_proto`) and uvicorn believes it only from the loopback
 gateway, so a client-supplied header that the edge lets through would reach the API's URL and
 same-origin decisions. Recorded in `docs/migration/plan_addenda.md` ("Deployment notes for T24E",
-OPEN_DECISIONS C8).
+OPEN_DECISIONS C8). The Ansible handoff under `deploy/` (role `fair2wise`, template
+`edge-nginx.conf.j2`) implements it: `proxy_set_header X-Forwarded-Proto $scheme;`, `/fair2wise`
+forwarded unchanged to `127.0.0.1:8080`, digest-only image, state + read-only writer-secret mounts,
+`--stop-timeout 120`; `tests/deployment/` checks it statically (`deploy/README.md`).
 
 ## Mounts
 
