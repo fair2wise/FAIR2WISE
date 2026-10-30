@@ -298,8 +298,11 @@ against the code myself.
 | AUD-15 secret file mode/owner; startup route assertion | `12156d1` (T28A) | |
 | AUD-02 dotenv entry points; stale `scripts/app` no longer shipped | T28C merge | hashed locks `runtime.lock.txt`/`constraints.lock.txt` with `--require-hashes`; `shipped_untracked_files` manifest warning (flips to refusal on PC-1) |
 | AUD-10/11/12/14 docs, ADRs, plan notes, task status overlay | `e10e1b3` (T28D) | register D3.8-D3.12 added |
+| AUD-06 full D19 projection on every `/v1` body and SSE event | sweep merge | 600-char clip, private keys and paths dropped |
+| AUD-16 `:local` raw-trace warning when bound beyond loopback; docs | sweep merge | policy unchanged (owner-decided) |
+| AUD-18 stale `TODO(T03)`; 4 pyflakes items | sweep merge | pyflakes 32 -> 28; two genuine NameErrors in legacy paths noted for T17B (`f2w_agent/api.py:4974` `history`, `term_extractor/monitored_agent.py:53` `UserAgent`) |
 
-Still open from A5: A5-1/PC-1 (terminology files in the image, owner decision), AUD-02 (import-time dotenv in two legacy entry points and the stale `scripts/app/` copy), AUD-11/AUD-12 docs and ADRs (T28D), AUD-05/06/10/14/16 and the notes. Full suite after T28A+T28B: 4,585 passed, 1 known failure.
+Still open from A5: A5-1/PC-1 (terminology files in the image, owner decision), AUD-05 (cross-turn D19 budget, PC-2), AUD-10 (TTL, D3.5/D3.8), AUD-14 process notes, D1.5 tolerance (D3.12), and the two legacy NameErrors (T17B). Full suite after T28A+T28B: 4,585 passed, 1 known failure.
 
 Dependencies: T28A and T28B block H4. T28C and T28D block H6 and may run in
 parallel with T12 and the Tiled editing tasks. All four take the existing
