@@ -15,7 +15,8 @@ nav:
   - Tutorials:
       - End-to-end workflows: tutorials.md
   - Architecture:
-      - System architecture: architecture.md
+      - Current architecture: current-architecture.md
+      - System architecture (legacy stack): architecture.md
       - LinkML schemas: schemas.md
       - Core data model: core_model.md
       - Data provenance: provenance.md

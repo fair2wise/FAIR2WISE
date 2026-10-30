@@ -199,3 +199,7 @@ AGENT/
 
 # T11B pilot labels: private paper quotes and parsed text (H3 B4); default dir is outside the repo
 .pilot_labels/
+
+# graphify output (local analysis only; already excluded from the image build context)
+graphify-out/
+**/graphify-out/

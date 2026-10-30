@@ -1,6 +1,7 @@
 # ADR: Schema ownership, loading, validation and versioning
 
-- **Status:** Proposed (T22A, gate H1). Not approved; no implementation in this change.
+- **Status:** Accepted at H1 (2026-10-12) (T22A; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline). Implemented by T22B (`85b7e7c`).
+- **Superseded/amended by:** H3 F5/F6 (2026-10-15/16; `plan_addenda.md` A4; T22C `2a80557`): the owner overrode the section 2.1 rule "Do not add measurement-instance classes" in its additive form. Schema set 0.3.0 adds `Sample`, `MeasurementRun` (with `RunCondition`) and `Instrument` as new classes; `RSoXSMeasurement is_a ExperimentalTechnique` keeps its technique meaning and no existing class, slot or node changes meaning. The 0.3.0 approval for builds and publishing, and the `MeasurementRun` name, are pending owner decision (OPEN_DECISIONS D1.1, D1.2). H3 S4: every schema licence line is LBNL BSD-style (Q4 below). Q1-Q3 and Q5 remain open.
 - **Baseline:** `222b1e7b130567dbf4a3242697ac2b465794a38d` (clean export, inspected with linkml_runtime 1.11.1 / PyYAML 6.0.3 under `env -i`; no network, LLM or Tiled).
 - **Inputs:** `docs/migration/schema_inventory.json` (asset hashes, callsites, findings F1-F9), `companion/SCHEMA_ARCHITECTURE.md`, `companion/DECISIONS.md` D20/D21, `plan.md` 4.9.
 - **Owner:** project owner (D06). Shared LinkML changes are owned by the integration lead (plan.md task table).
@@ -21,7 +22,7 @@ F2W already has a working schema stack. It has no explicit registry, and no arti
 ### 2.1 Preserve current semantics (D20)
 
 - Keep every asset byte-identical, including the broken `rsoxs_schema_extract.yaml` (F1). Keep the current classes, inheritance, slot meanings, alias tables, fuzzy cutoff (80) and fallbacks. Keep the json2kg field mappings and the `rel:` predicate form (D21).
-- **No measurement/technique split.** Do not add a rule that RSoXSMeasurement must not inherit ExperimentalTechnique. Do not add measurement-instance classes. The existing `corpus_qa.py` section 3 "reclassification candidates" and section 5 "zero-measurement papers" outputs are historical diagnostics. They are not acceptance criteria and must not trigger reclassification (see `operations_inventory.md`).
+- **No measurement/technique split.** Do not add a rule that RSoXSMeasurement must not inherit ExperimentalTechnique. Do not add measurement-instance classes. *Amended by H3 F5/F6 (A4, T22C): measurement-instance classes (`Sample`, `MeasurementRun`, `Instrument`) are added additively in schema set 0.3.0; the rule against reclassifying existing nodes and against changing `RSoXSMeasurement` still stands.* The existing `corpus_qa.py` section 3 "reclassification candidates" and section 5 "zero-measurement papers" outputs are historical diagnostics. They are not acceptance criteria and must not trigger reclassification (see `operations_inventory.md`).
 - Behavior that differs by entrypoint (F3, F4) is preserved as observed. Each path records which schema and which normalizer implementation it used, so the difference becomes visible rather than being silently unified. Any unification is a separate, reviewed behavior change.
 
 ### 2.2 Module layout: thin, and reusing what exists

@@ -1,7 +1,8 @@
 # ADR: Capability-aware graph ports; JSON-first creation; no fake transactions
 
-Status: Proposed (T01, gate H1)
+Status: Accepted at H1 (2026-10-12) (T01; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline)
 Date: 2026-10-12
+Superseded/amended by: item 3 (the exact edit projection) is still undecided. The legacy Splash-to-Tiled STOP-1..6 (H1 `decision.json` blocking_later_tasks; OPEN_DECISIONS A4) and the Tiled graph editing plan's Q1-Q16 (`docs/migration/ui_contracts/tiled_graph_editing_plan.md`) are pending owner decision (OPEN_DECISIONS A4). T18C F1: the Tiled-backed edit path is not built; a Save without Splash fails safely with the legacy 502 and writes nothing. T08A/T08B implemented the read adapter and the JSON-to-Tiled import on Tiled 0.2.18 (O-T1), not 0.2.19rc2 as inspected here.
 
 ## Context
 

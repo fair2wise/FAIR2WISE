@@ -8,6 +8,9 @@ Working records for the migration onto the `forge_merge` branch.
 | `auth_spec.md`, `forge_spec.md`, `git_kg_spec.md` | Short-form specs supplied with the plan |
 | `companion/` | Companion handoff bundle v8, committed verbatim |
 | `reviews/Hx/` | Gate evidence and review packets, one directory per human gate |
+| `reviews/OPEN_DECISIONS.md` | Register of owner decisions still pending (A/B/C/D groups) |
+| `plan_addenda.md` | Owner-approved additions to the plan (A1-A5) and the integrator record |
+| `task_status.json` | Task status overlay for the frozen `companion/task_graph.json` (see below) |
 
 ## Companion bundle
 
@@ -34,6 +37,17 @@ git archive 222b1e7 | tar -x -C /tmp/f2w-baseline
 python3 -I docs/migration/companion/scripts/verify_handoff.py \
     --f2w-root /tmp/f2w-baseline --forge-root /path/to/forge_rsoxs_analysis-main
 ```
+
+## Task status overlay
+
+`companion/task_graph.json` is frozen (every task still reads `not_started`), so
+progress is recorded in `task_status.json`: one entry per task id of the graph
+plus the `plan_addenda.md` tasks, each with `status` (`merged`, `open` or
+`blocked_on_owner`), the first-parent merge commit on `forge_merge`
+(`git log --first-parent 222b1e7..HEAD`) and the gate it belongs to.
+`tests/docs/test_task_status.py` checks that every task-graph id is present and
+that every `merged` entry names a commit on that log. Update the file in the
+integration commit that merges a task; it is not generated at build time.
 
 ## Third-party notice
 

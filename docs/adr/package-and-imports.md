@@ -1,7 +1,8 @@
 # ADR: Installable `f2w` namespace over the physical `app/` tree
 
-Status: Proposed (T01, gate H1)
+Status: Accepted at H1 (2026-10-12) (T01; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline)
 Date: 2026-10-12
+Superseded/amended by: approved verbatim as H1-2 ("install as fair2wise, import as f2w, with no files moved"); implemented by T04 (`ff4beac`). O-P1 (2026-10-14): the installed CLI reads `.env` only from the current directory; remaining import-time settings move to startup in one later cleanup task (T17B). AUD-02: import-time `load_dotenv()` still remains in `app/run_pipeline_cborg.py`, `scripts/run.py` and the stale `scripts/app/modules/kg_rag_api.py` copy (T17B/T28C).
 Decision owner: project owner. Implemented by T04 after H2.
 
 ## Context

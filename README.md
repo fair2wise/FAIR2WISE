@@ -6,18 +6,63 @@ This repository builds materials-science knowledge graphs from research papers (
 
 1. Collect PDFs in the unified `papers/` input folder
 2. Extract schema-aligned terminology + publication metadata with an LLM → `storage/terminology/`
-3. Convert extracted terms JSON into a MatKG graph JSON → `storage/kg/`
-4. Import the MatKG JSON into `splash_links`
-5. Query the database-backed graph via KG-RAG chat (CLI or Open WebUI)
+3. Convert extracted terms JSON into a versioned MatKG graph JSON → `storage/kg/` (the JSON KG is the default graph source)
+4. Optionally publish an approved JSON snapshot into Tiled Graph through the gated `/v1/publications` path (H5-gated; the legacy `splash_links` import is kept only as the legacy editable mode, see [Step 4](#step-4--legacy-import-into-splash_links))
+5. Query the graph via KG-RAG chat (web UI, CLI or Open WebUI)
 
 **Optional — automated agent pipeline:** [`app.modules.launchers.f2w_agent`](app/modules/launchers/f2w_agent.py) launches the Academy workflow that answers from the KG when evidence suffices and otherwise searches for papers, requests approval, extracts terms, rebuilds the KG, and re-queries. See **[3-Agent KG-RAG Pipeline](#3-agent-kg-rag-pipeline)**.
 
 ---
 
-## Recommended: run with Docker Compose
+## Current architecture (`forge_merge`)
 
-Docker Compose is the preferred way to run FAIR2WISE. One command starts the
-agent API and UI. Secrets stay in a gitignored host `.env` and are injected at
+This branch carries the FORGE-to-F2W migration (`docs/migration/plan.md`,
+`docs/migration/plan_addenda.md`). What runs today:
+
+| Topic | Current state |
+|---|---|
+| Graph source | **JSON KG by default.** Every supported launch path sets `KG_RAG_GRAPH_SOURCE=json` / `F2W_KG_MODE=json` (`compose.yaml`, `scripts/start_agent_backend.sh`, `scripts/start_rsoxs_stack.sh`, the three images). Only the bare `kg_rag_api.py` CLI still falls back to `config.yml`'s legacy `splash` default. Tiled Graph is the experiment-identity source and the publication target; Splash is legacy (D03/D16). |
+| Images | Three targets from the root `Dockerfile`: `:local` bundles a managed **Tiled 0.2.18** server (owner exception O-T1 to the plan's 0.2.19 pin), the UI, MkDocs and the API/worker; `:als-dev` and `:als-prod` carry no Tiled and use the central servers (`https://tiled-staging.als.lbl.gov`, `https://tiled.als.lbl.gov`). The legacy `agent` compose target still exists and is not one of the three images. |
+| Ingress | One gateway (nginx, unprivileged uid 10001) on **port 8080** (`F2W_GATEWAY_PORT`), serving the UI, MkDocs and the same-origin API under **`/fair2wise`** (`/fair2wise/api`, `/fair2wise/healthz`). The API binds `127.0.0.1:8090` inside the container and is not published by the images. |
+| Runtime | `F2W_RUNTIME=legacy` (default) keeps the existing F2W read path; `F2W_RUNTIME=langgraph` enables the scoped LangGraph runtime, where `F2W_QA_ROUTE=supervisor` (default) routes UI QA turns through the planning supervisor and `F2W_QA_ROUTE=direct` calls `answer_from_knowledge` directly (owner H2 Q1, O-R1 fallback). |
+| APIs | `python -m app.modules.f2w_agent.cli api` serves the 19 frozen UI routes; `api --jobs-api` serves the same routes plus the 24 `/v1` jobs, review, publication, status and validation routes (`docs/migration/api/README.md`). The images run the jobs API. Publication to any Tiled target stays gated at H5. |
+| Judge model | The validation judge for the binary suite is a deployment-wide setting chosen in the settings panel from the provider's live model list (`GET/PUT /v1/validation/judge-model`, owner O-U2); it never runs inside chat. |
+| Access | `:local`: trusted local operator, no sign-in (D34). ALS images: Tiled sign-in; only verified Tiled admins may ingest, approve, publish or edit (D30). |
+| Splash | The legacy editable mode (`F2W_KG_MODE=splash`, `compose.splash.yaml`, `splash_links/`). It stays until its approved retirement gate (T16B/H7 or H8, `plan_addenda.md` A2). Tiled-backed editing is not built: on a Tiled-only deployment a graph Save fails safely with the legacy 502 and writes nothing (T18C F1); the edit design is pending owner decision (OPEN_DECISIONS A4, Q1-Q16 of `docs/migration/ui_contracts/tiled_graph_editing_plan.md`). |
+
+### Running the images
+
+[`docker/profiles/README.md`](docker/profiles/README.md) is the authority for
+image build, check and run commands, mounts and profile environment; do not
+copy its run commands elsewhere. Build targets:
+
+```sh
+docker build --target local    -t ghcr.io/fair2wise/fair2wise:local .
+docker build --target als-dev  -t ghcr.io/fair2wise/fair2wise:als-dev .
+docker build --target als-prod -t ghcr.io/fair2wise/fair2wise:als-prod .
+```
+
+A running `:local` image answers at `http://127.0.0.1:8080/fair2wise/` with
+the API health at `http://127.0.0.1:8080/fair2wise/api/health`. Images are
+built by `.github/workflows/build-app.yml`; publishing (`publish-image.yml`)
+is manual and gated by the O06 tag rules (OPEN_DECISIONS D2). As of
+2026-10-29 only `:local` has been built and run, by the owner's machine.
+
+### Running from source
+
+The sections below describe the developer paths: the Compose developer stack
+(`compose.yaml`, agent + gateway with the JSON KG), the host scripts
+(`scripts/start_rsoxs_stack.sh`, `scripts/start_agent_backend.sh`,
+`scripts/start_agent_frontend.sh`) and the individual CLIs. Sections marked
+**legacy** describe the Splash mode.
+
+---
+
+## Developer stack: Docker Compose
+
+`compose.yaml` builds the `agent` and `frontend` targets of the root
+`Dockerfile` and starts the agent API and the `/fair2wise` gateway with the
+JSON KG. Secrets stay in a gitignored host `.env` and are injected at
 **runtime** (`env_file:`). They are never copied into the image.
 
 ```bash
@@ -27,9 +72,11 @@ cp .env.example .env   # set CBORG_API_KEY; leave CBORG_IPV6_BIND unset
 docker compose up
 ```
 
-Open `http://127.0.0.1:5175`. The browser talks to the agent at
-`http://127.0.0.1:8090`. **Never bind host port 5174** (SSH). 5173 is CORS-allowed
-if you override `F2W_UI_PORT`.
+Open `http://127.0.0.1:5175/fair2wise/` (`http://127.0.0.1:5175/` redirects
+there; the gateway container listens on 8080). The UI calls the same-origin
+`/fair2wise/api`; the agent is also published at `http://127.0.0.1:8090` for
+development tools. **Never bind host port 5174** (SSH). 5173 is CORS-allowed
+if you override `F2W_UI_PORT` (OPEN_DECISIONS B20).
 
 Defaults: CBORG (`lbl/cborg-chat`), JSON KG
 `storage/kg/matkg_rsoxs_v1.json`, schema `storage/schema/rsoxs_schema.yaml`.
@@ -41,8 +88,9 @@ authorized IPv6. Use `./scripts/start_rsoxs_stack.sh` for CBorg on Darwin, or
 Linux Docker with IPv6 enabled. Optional Linux host-network overlay:
 `docker compose -f compose.yaml -f compose.hostnet.yaml up`.
 
-The Splash database stack remains available as
-`docker compose -f compose.splash.yaml up` (UI on 5173, `/api` gateway).
+**Legacy:** the Splash database stack remains available as
+`docker compose -f compose.splash.yaml up` (UI on 5173, `/fair2wise` gateway,
+Splash and agent ports private).
 
 See [Docker operation](#docker) for lifecycle details. The MkDocs
 [fresh-machine deployment](mkdocs/docs/deployment.md) runbook covers `.env`
@@ -70,7 +118,7 @@ For local development without Docker:
 
 - Python 3.12
 - Node.js 20+ (including npm); npm installs the pinned local Vite 6 toolchain from `ui/package.json`
-- [Pixi](https://pixi.sh/latest/installation/) for the vendored `splash_links` database server
+- **Legacy only:** [Pixi](https://pixi.sh/latest/installation/) for the vendored `splash_links` database server (`F2W_KG_MODE=splash`)
 - A [CBORG](https://cborg.lbl.gov/) API key (default LLM backend). CBORG requires LBLnet/VPN or an authorized IP — see [CBORG IP authorization](https://api.cborg.lbl.gov/key/manage).
 - Optional: [Ollama](https://ollama.com/) running locally for offline inference
 - For the 3-agent pipeline: `academy-py`, `langgraph`, `langchain-core`, `langchain-openai` (included in `requirements.txt`)
@@ -114,7 +162,7 @@ npm ci
 cd ..
 ```
 
-Install Pixi and initialize the `splash_links` environment once:
+**Legacy (Splash mode only):** install Pixi and initialize the `splash_links` environment once:
 
 ```bash
 ./scripts/install_pixi.sh
@@ -144,10 +192,11 @@ MP_API_KEY=your-materials-project-key
 # KG-RAG chat settings
 KG_RAG_BACKEND=cborg
 KG_RAG_CBORG_MODEL=lbl/cborg-chat
-KG_RAG_GRAPH_SOURCE=splash
+KG_RAG_GRAPH_SOURCE=json
+KG_RAG_GRAPH=storage/kg/matkg_xray_papers_cborg_chat.json
+# Legacy Splash mode only (KG_RAG_GRAPH_SOURCE=splash):
 KG_RAG_SPLASH_URI=splash://localhost:8081
 KG_RAG_SPLASH_PAGE_SIZE=1000
-KG_RAG_GRAPH=storage/kg/matkg_xray_papers_cborg_chat.json
 KG_RAG_RETRIEVAL_BACKEND=lexical
 KG_RAG_LLM_TIMEOUT=120
 KG_RAG_CTX_CHARS=6000
@@ -157,12 +206,17 @@ PYSTOW_HOME=.cache/pystow
 # Optional — OpenAlex polite pool (download agent)
 OPENALEX_EMAIL=you@example.com
 
-# Optional — splash_links repo path (3-agent splash mode)
+# Optional — splash_links repo path (legacy 3-agent splash mode)
 SPLASH_LINKS_REPO=splash_links
 SPLASH_LINKS_DB=links.sqlite
+
+# Optional — runtime selection (defaults: legacy; supervisor)
+# F2W_RUNTIME=langgraph
+# F2W_QA_ROUTE=supervisor
 ```
 
 > **Note:** runtime environment variables and CLI flags override `.env`; `.env` overrides `config.yml` defaults.
+> Inside the images the supervisor loads `F2W_DOTENV=<file>` once and the profile locks the deployment variables (`docker/profiles/README.md`); the installed CLI reads `.env` only from the current directory (O-P1).
 
 ---
 
@@ -354,9 +408,15 @@ python3 app/modules/json2kg.py \
 
 ---
 
-## Step 4 — Import into splash_links
+## Step 4 — (Legacy) Import into splash_links
 
-KG-RAG loads from the `splash_links` graph database by default (`KG_RAG_GRAPH_SOURCE=splash`). **After every KG JSON rebuild or metadata fix, you must re-import into splash_links and restart KG-RAG.** The splash DB is not updated automatically when `storage/kg/*.json` changes.
+> **Legacy.** Splash is deprecated and replaced by Tiled Graph (D03/D16). This
+> section is kept because `F2W_KG_MODE=splash` is still the only editable
+> graph mode until the Tiled edit path exists (T18C F1; pending owner decision,
+> OPEN_DECISIONS A4) and until the Splash retirement gate (T16B/H7 or H8).
+> Every supported launch path runs the JSON KG; the images contain no Splash.
+
+In Splash mode (`KG_RAG_GRAPH_SOURCE=splash`, the bare `kg_rag_api.py` CLI's `config.yml` default) KG-RAG loads from the `splash_links` graph database. **After every KG JSON rebuild or metadata fix, you must re-import into splash_links and restart KG-RAG.** The splash DB is not updated automatically when `storage/kg/*.json` changes.
 
 The vendored [`splash_links`](splash_links/) service is the graph persistence
 layer used by FAIR2WISE. It stores nodes as entities and relationships as
@@ -502,7 +562,7 @@ requires typed confirmation before deleting it.
 
 Defaults used by `start_agent_backend.sh`:
 
-- `F2W_KG_MODE=splash`
+- `F2W_KG_MODE=json` (`splash` is the legacy mode; the script checks the Splash health endpoint only then)
 - `F2W_MAX_PAPERS=1`
 - `F2W_WORKERS=1`
 - `F2W_DOWNLOAD_DELAY=0`
@@ -516,9 +576,9 @@ Override them for heavier runs:
 F2W_MAX_PAPERS=3 F2W_WORKERS=8 ./scripts/start_agent_backend.sh
 ```
 
-### JSON fallback (no splash server)
+### JSON mode (default for every supported launcher)
 
-To bypass the database and load a local JSON file directly:
+To load a local JSON file directly, which is what `compose.yaml`, the start scripts and the images do:
 
 ```env
 KG_RAG_GRAPH_SOURCE=json
@@ -660,7 +720,7 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 
 | Argument | Default | Description |
 |---|---|---|
-| `--graph-source` | `splash` | KG source (`splash` database or `json` file) |
+| `--graph-source` | `splash` (legacy `config.yml` default; every supported launcher passes `json`) | KG source (`json` file, or the legacy `splash` database) |
 | `--splash-uri` | `splash://localhost:8081` | `splash_links` service URI |
 | `--splash-page-size` | `1000` | GraphQL page size for database graph loading |
 | `--graph` | `KG_RAG_GRAPH` env | Path to KG JSON file when `--graph-source json` |
@@ -682,10 +742,13 @@ Runs the full question set from `storage/competency_questions/thomas_f.txt`. Res
 | `KG_RAG_BACKEND` | `cborg` | LLM backend (`cborg` or `ollama`) |
 | `KG_RAG_CBORG_MODEL` | `lbl/cborg-chat` | CBORG model name |
 | `KG_RAG_OLLAMA_MODEL` | `deepseek-r1:70b` | Ollama model name |
-| `KG_RAG_GRAPH_SOURCE` | `splash` | KG source (`splash`, `splash_links`, `splash-links`, or `json`) |
+| `KG_RAG_GRAPH_SOURCE` | `splash` in `config.yml` (legacy); `json` in `compose.yaml`, the start scripts and the three images | KG source (`json`, or the legacy `splash`, `splash_links`, `splash-links`) |
 | `KG_RAG_SPLASH_URI` | `splash://localhost:8081` | `splash_links` service URI |
 | `KG_RAG_SPLASH_PAGE_SIZE` | `1000` | GraphQL page size for database graph loading |
-| `KG_RAG_GRAPH` | `storage/kg/matkg_xray_papers_cborg_chat.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` (also splash fallback path) |
+| `KG_RAG_GRAPH` | `storage/kg/matkg_xray_papers_cborg_chat.json` | KG file to load when `KG_RAG_GRAPH_SOURCE=json` (also the legacy splash fallback path) |
+| `F2W_RUNTIME` | `legacy` | `legacy` or `langgraph` (scoped LangGraph runtime, T02) |
+| `F2W_QA_ROUTE` | `supervisor` | In `langgraph` mode: `supervisor` (planning supervisor, T03B) or `direct` |
+| `F2W_DEPLOYMENT_PROFILE` | `local` | `local`, `als-dev` or `als-prod`; fixed by the image profile (`docker/profiles/`) |
 | `KG_RAG_RETRIEVAL_BACKEND` | `lexical` | Retrieval method (`lexical` or `semantic`; semantic packages ship in the default install) |
 | `KG_RAG_CTX_CHARS` | `16000` | Max chars of KG context per prompt |
 | `KG_RAG_LLM_TIMEOUT` | `120` | LLM request timeout in seconds |
@@ -793,7 +856,7 @@ python3 -m app.modules.launchers.f2w_agent ask --help   # global flags go before
 | `--model` | env default | Model name |
 | `--graph` | — | Initial KG JSON for retrieval |
 | `--seed-terms` | — | Cumulative extracted-terms JSON (merged on each extract pass) |
-| `--kg-mode` | `splash` | `splash` = use/re-import splash-links; `json` = rebuild + in-process reload only |
+| `--kg-mode` | `json` | `json` = rebuild + in-process reload only (default); `splash` = legacy: use/re-import splash-links |
 | `--workdir` | `runs/session` | Session dir: `pdfs/`, `terms.json`, `kg.json` |
 | `--max-rounds` | `3` | Max download→extract→reload cycles per question |
 | `--max-papers` | `3` | PDFs to download per round |
@@ -808,13 +871,13 @@ python3 -m app.modules.launchers.f2w_agent ask --help   # global flags go before
 
 ### KG update modes
 
-**JSON mode (explicit local fallback):**
+**JSON mode (`--kg-mode json`, the default):**
 
 - After each extraction pass, `json2kg.py` rebuilds `workdir/kg.json`.
 - `RetrievalAgent.reload_kg()` reloads the graph in-process.
-- Pass `--kg-mode json` when you want to skip splash-links.
+- Publication of an approved snapshot into Tiled is a separate, gated job (`/v1/publications`, H5), never an automatic side effect of extraction (H1-5).
 
-**Splash mode (`--kg-mode splash`):**
+**Legacy Splash mode (`--kg-mode splash`):**
 
 - Same JSON rebuild, then wipes/re-imports into `splash_links` via `scripts/import_kg.py` (see **Step 4**).
 - Requires a running splash-links server and a local `splash_links` checkout (`SPLASH_LINKS_REPO`).
@@ -935,14 +998,14 @@ Open the UI at `http://localhost:8080`. First startup may take a minute to downl
 
 ### 3. Start the KG-RAG API server
 
-In a separate terminal (outside the Open WebUI venv). Ensure splash-links is running (see **Step 4**) if using the default `splash` graph source:
+In a separate terminal (outside the Open WebUI venv). Pass `--graph-source json` (the bare CLI's `config.yml` default is still the legacy `splash`, which needs a running splash-links server, see **Step 4**):
 
 ```bash
 cd /path/to/FAIRtoWISE-FORUM-AI
-python3 app/modules/kg_rag_api.py --api --graph-source splash
+python3 app/modules/kg_rag_api.py --api --graph-source json --graph storage/kg/matkg_rsoxs_v1.json
 ```
 
-This starts FastAPI on `http://127.0.0.1:11435` (loopback only; set `KG_RAG_API_HOST=0.0.0.0` or pass `--api-host 0.0.0.0` to serve the network). Verify it is running:
+This starts FastAPI on `http://127.0.0.1:11435` (loopback only; set `KG_RAG_API_HOST=0.0.0.0` or pass `--api-host 0.0.0.0` to serve the network). Since T28A the two chat routes of this model-compatible API apply the same disclosure projection as the UI routes (AUD-03, OPEN_DECISIONS B6); the API is not exposed under `/fair2wise` on ALS (B7). Verify it is running:
 
 ```bash
 curl http://localhost:11435/api/tags
@@ -986,35 +1049,44 @@ curl -X POST http://localhost:11435/api/chat \
 
 ## Docker
 
-The root [`compose.yaml`](compose.yaml) is the product stack: **agent + UI**
-with the RSoXS JSON knowledge graph. `docker compose up` publishes loopback
-ports **5175** (UI) and **8090** (agent). Secrets come from host `.env` via
-`env_file:` and are never baked into the image.
+Two different things run in Docker:
 
-The Splash database stack is optional:
+1. **The three release images** `:local`, `:als-dev`, `:als-prod` (root
+   `Dockerfile` targets `local`, `als-dev`, `als-prod`): one container, one
+   supervisor, gateway on 8080 under `/fair2wise`. Commands, mounts and checks
+   are in [`docker/profiles/README.md`](docker/profiles/README.md) (see
+   [Current architecture](#current-architecture-forge_merge)).
+2. **The developer Compose stack** below (`compose.yaml`): the legacy `agent`
+   target plus the standalone `frontend` gateway image with the RSoXS JSON
+   knowledge graph. `docker compose up` publishes loopback ports **5175**
+   (gateway, UI at `/fair2wise/`) and **8090** (agent). Secrets come from host
+   `.env` via `env_file:` and are never baked into the image.
+
+**Legacy:** the Splash database stack is optional:
 
 ```bash
 docker compose -f compose.splash.yaml up
 ```
 
 
-### How images work on another computer
+### How the Compose images work on another computer
 
 Docker images are machine-local build artifacts and are not committed to Git.
 After someone clones this repository, Compose reads the checked-in build files
 and creates equivalent images for that computer:
 
-| Service | Image source | Persistent state |
-|---|---|---|
-| `frontend` | Root `Dockerfile`, `frontend` target | None |
-| `agent` | Root `Dockerfile`, `agent` target | `agent-runs`, `agent-cache` |
-| `splash` | `splash_links/Containerfile` | `splash-data` |
-| `splash-db-init` | `splash_links/Containerfile` | Initializes `splash-data`, then exits |
+| Service | Compose file | Image source | Persistent state |
+|---|---|---|---|
+| `frontend` | `compose.yaml`, `compose.splash.yaml` | Root `Dockerfile`, `frontend` target (nginx gateway, container port 8080) | None |
+| `agent` | `compose.yaml`, `compose.splash.yaml` | Root `Dockerfile`, `agent` target (legacy API-only target, root, no supervisor) | `agent-runs`, `agent-cache` |
+| `splash` (legacy) | `compose.splash.yaml` | `splash_links/Containerfile` | `splash-data` |
+| `splash-db-init` (legacy) | `compose.splash.yaml` | `splash_links/Containerfile` | Initializes `splash-data`, then exits |
 
-The tracked `splash_links/links.sqlite` file is essential to fresh-clone
-startup because it is the immutable database seed. It is mounted read-only by
-the initializer and copied into the writable `splash-data` volume; the running
-Splash service never modifies the repository copy.
+**Legacy:** the tracked `splash_links/links.sqlite` file is the immutable
+database seed of the Splash stack. It is mounted read-only by the initializer
+and copied into the writable `splash-data` volume; the running Splash service
+never modifies the repository copy. The three release images contain no
+Splash, no catalog database and no `.env`.
 
 Builds use the container platform supported by the installed Docker runtime,
 so a developer does not need an image exported from another machine.
@@ -1042,14 +1114,16 @@ Stop the stack without deleting its databases and session data with:
 docker compose down
 ```
 
-Only `127.0.0.1:5175` (UI) and `127.0.0.1:8090` (agent) are published. Never
-bind host **5174** (SSH). Override the UI with `F2W_UI_PORT` (5173 is CORS-allowed).
+Only `127.0.0.1:5175` (gateway; UI at `/fair2wise/`) and `127.0.0.1:8090`
+(agent) are published. Never bind host **5174** (SSH). Override the UI port with
+`F2W_UI_PORT` (5173 is CORS-allowed).
 
 
 ### Health and diagnostics
 
 ```bash
 curl -fsS http://127.0.0.1:5175/healthz
+curl -fsS http://127.0.0.1:5175/fair2wise/api/health
 curl -fsS http://127.0.0.1:8090/health
 docker compose logs agent
 docker compose logs frontend
@@ -1063,8 +1137,8 @@ docker compose logs frontend
 | `agent-runs` | Session files and workflow state |
 | `agent-cache` | Application and model caches |
 
-To deliberately erase all Compose-managed state and initialize a clean copy of
-the tracked database seed on the next startup:
+To deliberately erase all Compose-managed state (and, in the legacy Splash
+stack, re-initialize the tracked database seed) on the next startup:
 
 ```bash
 docker compose down --volumes
@@ -1234,13 +1308,19 @@ that validate ID generation, field retention, and CLI behavior.
 
 ## Features
 
-### GitHub Actions `.github/workflows/build-app.yml`
+### GitHub Actions
 
-Automates linting, pytest, and MkDocs build on push.
+`.github/workflows/build-app.yml` runs the legacy test suite and builds and
+checks the `local`, `als-dev` and `als-prod` image candidates (T24D), writing a
+release manifest; it never logs in to a registry. `publish-image.yml` publishes
+only on manual dispatch under the O06 tag rules (pending owner decision,
+OPEN_DECISIONS D2). `forge-merge-ci.yml` runs the migration test suite,
+including the Tiled 0.2.18 suites. See [`mkdocs/docs/release.md`](mkdocs/docs/release.md).
 
 ### MkDocs
 
-Documentation at `mkdocs/`. Deploy with:
+Documentation at `mkdocs/`. The site is also built into all three images and
+served by the gateway under `/fair2wise/docs/` (owner O-A7). Deploy with:
 
 ```bash
 cd mkdocs

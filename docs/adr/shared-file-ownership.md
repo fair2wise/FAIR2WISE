@@ -1,7 +1,8 @@
 # ADR: One owner per shared file
 
-Status: Proposed (T01, gate H1)
+Status: Accepted at H1 (2026-10-12) (T01; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline)
 Date: 2026-10-12
+Superseded/amended by: O-U1 and O-U2 (2026-10-16) approved the only two `ui/` changes so far (the `/fair2wise` base in `App.tsx`; the judge-model dropdown) and the matching `FROZEN_UI_TREE` re-pins. AUD-14 records that T11B, T25C and T22C merges touched paths outside their `exclusive_path_ownership`; all were merged by the integration lead as this ADR permits. Machine-readable task status: `docs/migration/task_status.json`.
 
 ## Decision
 

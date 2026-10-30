@@ -1,0 +1,561 @@
+{
+  "version": 1,
+  "kind": "f2w_task_status_overlay",
+  "generated_on": "2026-10-29",
+  "generated_by": "T28D (AUD-14)",
+  "note": "Status overlay for docs/migration/companion/task_graph.json, which stays byte-for-byte as supplied (every task there still reads not_started). merge_commit is the first-parent commit on forge_merge (git log --first-parent 222b1e7..HEAD) that brought the task in; two tasks may share a commit when they were merged together. gate is stop_before from the task graph, else the human gate that lists the task as evidence, else the gate after the task's gate dependency. status values: merged | open | blocked_on_owner. Gate approvals: H0-H3 approved (H3 on 2026-10-16); H4-H8 open. tests/docs/test_task_status.py checks that every task_graph id is present and every merged commit is on the first-parent log.",
+  "baseline_commit": "222b1e7b130567dbf4a3242697ac2b465794a38d",
+  "gates": {
+    "H0": "approved",
+    "H1": "approved",
+    "H2": "approved",
+    "H3": "approved",
+    "H4": "open",
+    "H5": "open",
+    "H6": "open",
+    "H7": "open",
+    "H8": "open"
+  },
+  "tasks": [
+    {
+      "id": "T00",
+      "title": "Verify uploaded source in real Git; prepare forge_merge; execute baseline",
+      "source": "companion/task_graph.json",
+      "gate": "H0",
+      "status": "merged",
+      "merge_commit": "2569a4f286386f51af6eba92a3f5e7a67f4879a4",
+      "merge_commit_subject": "docs(migration): T00 LLM/QA baseline, parity inventory, audit and H0 packet"
+    },
+    {
+      "id": "T01",
+      "title": "Shared architecture contracts",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "cbb99fef6c78b76b517bdab9d1d06f4e5c603758",
+      "merge_commit_subject": "docs(adr): T01 architecture ADRs and public interface spec"
+    },
+    {
+      "id": "T02",
+      "title": "Scoped LangGraph runtime and policy hooks",
+      "source": "companion/task_graph.json",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "029bba037f7350cf9cd7ac4e2da22941815549ae",
+      "merge_commit_subject": "Merge T02 scoped LangGraph runtime and policy hooks into forge_merge"
+    },
+    {
+      "id": "T03",
+      "title": "Existing F2W read path as a Tool and Skill",
+      "source": "companion/task_graph.json",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "e782456ad0cd0b9c561a04fc7e095b45aa00d7ed",
+      "merge_commit_subject": "Merge T03 existing F2W read path as a Tool and Skill into forge_merge"
+    },
+    {
+      "id": "T04",
+      "title": "Importable app/modules package, SDK and agent factory",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "ff4beac7b0441835f8adfa15ccb3e66f2545f469",
+      "merge_commit_subject": "Merge T04 packaging: fair2wise distribution, f2w namespace, no files moved"
+    },
+    {
+      "id": "T05",
+      "title": "Literature providers, parser and staging",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "e27cb3e79bfe3e0501ac3c83b1538218181b7a6c",
+      "merge_commit_subject": "Merge T05 literature providers, intake, parsing and staged assets"
+    },
+    {
+      "id": "T06A",
+      "title": "Lossless scientific contract mapping under preserved F2W schema",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "763c0c72e8ec06536da7368d3455dd4c4dbf37f4",
+      "merge_commit_subject": "Merge T06 extraction and evidence bridge (pre-H3)"
+    },
+    {
+      "id": "T06B",
+      "title": "Extraction strategies and validated evidence",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "ab3c7d1002cf3812f0c66d61deb38ff882125b75",
+      "merge_commit_subject": "Merge T06B evidence-source tagging, F8 gates, validation stage and strategy comparison"
+    },
+    {
+      "id": "T07A",
+      "title": "Canonicalization proposal and campaign services",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "f21bdbab49951819ddaf91c10aef5d096f68c574",
+      "merge_commit_subject": "Merge T07 canonicalization, conservative merging and campaigns (pre-H3)"
+    },
+    {
+      "id": "T07B",
+      "title": "Canonicalization apply adapters",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "blocked_on_owner",
+      "merge_commit": null,
+      "note": "apply adapters wait for the C4 paid real-model rerun (H3 decision: still_gated, owner go)"
+    },
+    {
+      "id": "T08A",
+      "title": "Required Tiled Graph read adapter and retrieval parity",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "02cf223aad818282b541ce00777030db5883a0ce",
+      "merge_commit_subject": "Merge T08A graph ports: JSON backend, Tiled 0.2.18 read adapter, identity adapter"
+    },
+    {
+      "id": "T08B",
+      "title": "Import versioned F2W JSON into Tiled 0.2.19; ownership, receipts and provenance",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "4c531fa9ed9d1d6759ff5fe58b23fc9bcea5a9d9",
+      "merge_commit_subject": "Merge T08B JSON-to-Tiled import adapter"
+    },
+    {
+      "id": "T09",
+      "title": "Required paper figures, panels, tables, axes and scale evidence",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "67bc7c176610539c655ea60655494130f2db54a6",
+      "merge_commit_subject": "Merge T09 paper figures, panels, tables and image evidence"
+    },
+    {
+      "id": "T10",
+      "title": "Durable jobs and curation",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "16e4a3729640fe95079722d0f287db164a5af7f5",
+      "merge_commit_subject": "Merge T10 durable jobs, curation and controlled publication"
+    },
+    {
+      "id": "T11A",
+      "title": "Required binary case specification, approved references and baseline fixtures",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "1f231c47346b84916be10615c79b42788b2ab41d",
+      "merge_commit_subject": "Merge T11A binary evaluation runner, 108-case manifest and pre-H3 report"
+    },
+    {
+      "id": "T11B",
+      "title": "Required binary extraction/chat and integrated evaluation runner",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "d992ce4bcfa28fbef6a6ee1999753914236c61a3",
+      "merge_commit_subject": "Merge T11B pilot labelling tool, judge-model picker (O-U2), provisional-label runner support"
+    },
+    {
+      "id": "T12",
+      "title": "Integrated staging-only pilot",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "blocked_on_owner",
+      "merge_commit": null,
+      "note": "pilot needs the owner-run CBORG labelling of pilot papers A-C and human review of provisional labels (H3 B4, still_gated)"
+    },
+    {
+      "id": "T13",
+      "title": "Publication and rollback rehearsal",
+      "source": "companion/task_graph.json",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "publication and rollback rehearsal; after H4"
+    },
+    {
+      "id": "T14",
+      "title": "Required FastAPI plus F2W CLI/UI compatibility",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "merged",
+      "merge_commit": "4821b8be58b4c4dd37abab1257266d8f893cbdd4",
+      "merge_commit_subject": "Merge T14 FastAPI factory, /v1 jobs/review/publication API, CLI/UI compatibility"
+    },
+    {
+      "id": "T15",
+      "title": "FORGE imports F2W agents and consumes equivalent FastAPI behavior",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "blocked_on_owner",
+      "merge_commit": null,
+      "note": "FORGE-side changes coordinated with Alex (OPEN_DECISIONS B30)"
+    },
+    {
+      "id": "T16A",
+      "title": "Canary and soak",
+      "source": "companion/task_graph.json",
+      "gate": "H7",
+      "status": "open",
+      "merge_commit": null,
+      "note": "canary and soak; after H6"
+    },
+    {
+      "id": "T16B",
+      "title": "Production cutover and approved retirement",
+      "source": "companion/task_graph.json",
+      "gate": "H8",
+      "status": "open",
+      "merge_commit": null,
+      "note": "production cutover and approved retirement (Splash retirement gate: T16B/H7 or H8)"
+    },
+    {
+      "id": "T17",
+      "title": "All paper infrastructure, routes, operators and asset coverage closure",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "merged",
+      "merge_commit": "03affed320cc9e9f6c8f96a7c836528d5d044f7c",
+      "merge_commit_subject": "Merge T17 paper scope inventory, route ledger and H6 closure report"
+    },
+    {
+      "id": "T18A",
+      "title": "Freeze current F2W frontend API, SSE and persistence contracts",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "a27942db17c383e66218d3e4e5cbe5b5228b9385",
+      "merge_commit_subject": "test(contracts): T18A freeze the legacy UI API, SSE and persistence contracts"
+    },
+    {
+      "id": "T18B",
+      "title": "Frozen frontend against first migrated runtime/API read slice",
+      "source": "companion/task_graph.json",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "d47825a11b50caeb5b16083263aa6b09f86cb26c",
+      "merge_commit_subject": "Merge T18B part 2: frozen UI against the real backend"
+    },
+    {
+      "id": "T18C",
+      "title": "Full frozen-frontend parity on actual Tiled; recovery and old-client closure",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "merged",
+      "merge_commit": "fae8abb7799339706fcc9041ef14cfb123f42d49",
+      "merge_commit_subject": "Merge T18C frozen-frontend closure suite on disposable Tiled, UI01-UI28 matrix"
+    },
+    {
+      "id": "T19A",
+      "title": "Knowledge Operations inventory and population semantics",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "a96f67eb5eb50f8f3d8aab29d1f7135233290568",
+      "merge_commit_subject": "docs(migration): T22A schema inventory and T19A operations inventory"
+    },
+    {
+      "id": "T19B",
+      "title": "Unchanged deterministic paper-summary Tool and UI demonstration",
+      "source": "companion/task_graph.json",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "5708350378c802e4061bca0922f4413a2787fdfb",
+      "merge_commit_subject": "Merge T19B unchanged deterministic paper-summary Tool into forge_merge"
+    },
+    {
+      "id": "T19C",
+      "title": "Graph and corpus computational operations",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "166591968f0e6c103f73d4ec21b7b7a60f3336f8",
+      "merge_commit_subject": "Merge T19C graph and corpus operations (distinct-Work counting, partial scans, read-only audits)"
+    },
+    {
+      "id": "T19D",
+      "title": "Binary correctness and scale tests for Knowledge Operations",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "22607326d57ed119a15cc7d92304c3b527b801b3",
+      "merge_commit_subject": "Merge T19D Knowledge Operations correctness and scale tests, OPS-01..04 selectors"
+    },
+    {
+      "id": "T19E",
+      "title": "Operation CLI, agent, SDK, API and frontend closure",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "operation CLI/agent/SDK/API/frontend closure; depends on T15"
+    },
+    {
+      "id": "T20A",
+      "title": "Managed and central Tiled deployment contracts",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "c46b2ec38fb5da414cb607a015ee440b0a2924d0",
+      "merge_commit_subject": "docs(migration): T20A Tiled deployment ADR and T24A deployment contracts"
+    },
+    {
+      "id": "T20B",
+      "title": "Application-managed Tiled lifecycle and disposable fixture",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "3fba36b35a04ae22af259cbfa7b858208cac6489",
+      "merge_commit_subject": "Merge T20B Tiled 0.2.18 managed lifecycle and disposable test server"
+    },
+    {
+      "id": "T21A",
+      "title": "Private source/public disclosure contract and route classification",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "d3ae41417b3b29a81f97adfeb8db9ef56ee5917b",
+      "merge_commit_subject": "docs(migration): T21A disclosure contract and T25A access contracts"
+    },
+    {
+      "id": "T21B",
+      "title": "Source access controls and user-safe projection",
+      "source": "companion/task_graph.json",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "5e2a80a4fb68b8754d09671b81fe429b016a2cc1",
+      "merge_commit_subject": "Merge T21B source access controls and user-safe projection into forge_merge"
+    },
+    {
+      "id": "T22A",
+      "title": "Existing schema assets and architectural contract inventory",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "a96f67eb5eb50f8f3d8aab29d1f7135233290568",
+      "merge_commit_subject": "docs(migration): T22A schema inventory and T19A operations inventory"
+    },
+    {
+      "id": "T22B",
+      "title": "Schema registry, validation reuse and revision binding",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "85b7e7c6c12ea94f227909d3af1d02dc8c00db22",
+      "merge_commit_subject": "Merge T22B schema registry and T23B versioned JSON snapshots"
+    },
+    {
+      "id": "T23A",
+      "title": "Versioned JSON KG creation/import/edit contract",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "bd508f243d6e3bb4fc6761ddf35f7f5b043099e3",
+      "merge_commit_subject": "test(contracts): T23A json2kg contract and T26A Git KG release contract"
+    },
+    {
+      "id": "T23B",
+      "title": "Preserve json2kg and implement immutable JSON snapshot service",
+      "source": "companion/task_graph.json",
+      "gate": "H3",
+      "status": "merged",
+      "merge_commit": "85b7e7c6c12ea94f227909d3af1d02dc8c00db22",
+      "merge_commit_subject": "Merge T22B schema registry and T23B versioned JSON snapshots"
+    },
+    {
+      "id": "T24A",
+      "title": "Three-image deployment, prefix, admin and mounted-storage contracts",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "c46b2ec38fb5da414cb607a015ee440b0a2924d0",
+      "merge_commit_subject": "docs(migration): T20A Tiled deployment ADR and T24A deployment contracts"
+    },
+    {
+      "id": "T24B",
+      "title": "Build shared runtime and three supervised image finals",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "aafffb00ad23b97f8d93e2714b970950ad10b1af",
+      "merge_commit_subject": "Merge T24B shared runtime base, three supervised image targets (unbuilt)"
+    },
+    {
+      "id": "T24C",
+      "title": "Prefix-correct gateway and existing UI/API deployment",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "9c282e5be175f64e8c4764d2df923e4e4ae86439",
+      "merge_commit_subject": "Merge T24C /fair2wise prefix gateway, prefixed UI build and MkDocs"
+    },
+    {
+      "id": "T24D",
+      "title": "GitHub Actions build/test/publication and protected tag promotion",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "merged",
+      "merge_commit": "49d1e8ac3409623f43f5daac50a0df59c35da536",
+      "merge_commit_subject": "Merge T24D three-variant image build, release manifest, O06-gated publish and promotion workflows"
+    },
+    {
+      "id": "T24E",
+      "title": "Three-profile container, Ansible and restore integration",
+      "source": "companion/task_graph.json",
+      "gate": "H6",
+      "status": "blocked_on_owner",
+      "merge_commit": null,
+      "note": "container-level tests need repeated local docker build/run (OPEN_DECISIONS D3.11); ALS edge proxy requirement C8"
+    },
+    {
+      "id": "T25A",
+      "title": "Freeze trusted-local and Tiled-authenticated ALS access contracts",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "d3ae41417b3b29a81f97adfeb8db9ef56ee5917b",
+      "merge_commit_subject": "docs(migration): T21A disclosure contract and T25A access contracts"
+    },
+    {
+      "id": "T25B",
+      "title": "Implement profile-specific access context and shared effect guards",
+      "source": "companion/task_graph.json",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "5c563f648d7a0d93ac834c989eaf1c9b88c8507f",
+      "merge_commit_subject": "Merge T25B access context and effect guards into forge_merge"
+    },
+    {
+      "id": "T25C",
+      "title": "Verify no-login local workflows and real ALS Tiled role enforcement",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "93fb0e8cbe81294ac2e5f91799ab3cb89c63dc63",
+      "merge_commit_subject": "Merge T25C real ALS roles against disposable Tiled, session store, target override"
+    },
+    {
+      "id": "T26A",
+      "title": "Freeze Git JSON release and promotion contract",
+      "source": "companion/task_graph.json",
+      "gate": "H1",
+      "status": "merged",
+      "merge_commit": "bd508f243d6e3bb4fc6761ddf35f7f5b043099e3",
+      "merge_commit_subject": "test(contracts): T23A json2kg contract and T26A Git KG release contract"
+    },
+    {
+      "id": "T26B",
+      "title": "Implement committed artifact validation and export",
+      "source": "companion/task_graph.json",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "3426fd03e56723c7dc6356ae92da49476ff60f96",
+      "merge_commit_subject": "Merge T26B committed KG release validation, tested-release record and export"
+    },
+    {
+      "id": "T26C",
+      "title": "Rehearse exact Git snapshot promotion and rollback",
+      "source": "companion/task_graph.json",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "second-target promotion rehearsal; after H4 and T13"
+    },
+    {
+      "id": "T25D",
+      "title": "Per-user settings",
+      "source": "plan_addenda.md A1",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "58e59b549b0961b3c085652910d8d02fa3205214",
+      "merge_commit_subject": "Merge T25D per-user settings into forge_merge (owner H2 Q4)"
+    },
+    {
+      "id": "T03B",
+      "title": "Route UI QA turns through the planning supervisor",
+      "source": "plan_addenda.md A1",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "d728f90c4cd1b410a3e55febbe48dfbe67b1ee6f",
+      "merge_commit_subject": "Merge T03B route UI QA turns through the planning supervisor (owner H2 Q1)"
+    },
+    {
+      "id": "T02B",
+      "title": "Pending approvals survive new chat messages",
+      "source": "plan_addenda.md A1",
+      "gate": "H2",
+      "status": "merged",
+      "merge_commit": "8f2aa2e19d249cc48986b4dfd283d32c59981ebe",
+      "merge_commit_subject": "Merge T02B pending approvals survive new chat messages (owner Q8 b)"
+    },
+    {
+      "id": "T17B",
+      "title": "Audit, port and consolidate pre-framework F2W code",
+      "source": "plan_addenda.md A2",
+      "gate": "H8",
+      "status": "open",
+      "merge_commit": null,
+      "note": "legacy audit and porting toward H8 (plan_addenda A2)"
+    },
+    {
+      "id": "T27",
+      "title": "Docstring, typing and test-coverage closure",
+      "source": "plan_addenda.md A3",
+      "gate": "H7",
+      "status": "open",
+      "merge_commit": null,
+      "note": "docstring, typing and coverage closure before H7 (plan_addenda A3)"
+    },
+    {
+      "id": "T22C",
+      "title": "Versioned additive schema change (Sample, MeasurementRun, Instrument)",
+      "source": "plan_addenda.md A4",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "2a8055764f81f498126f7896f7af17b7e1a7991e",
+      "merge_commit_subject": "Merge T22C schema set 0.3.0 (Sample, MeasurementRun, Instrument, evidence slots) and LBNL BSD-style licence"
+    },
+    {
+      "id": "T28A",
+      "title": "Authorization and surface hardening",
+      "source": "plan_addenda.md A5",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "12156d169dfade7564aa5b7857bfc0012e76ef0c",
+      "merge_commit_subject": "Merge T28A authorization and surface hardening (AUD-01, AUD-03, AUD-04, AUD-15)"
+    },
+    {
+      "id": "T28B",
+      "title": "Binary suite reconciliation and CI",
+      "source": "plan_addenda.md A5",
+      "gate": "H4",
+      "status": "merged",
+      "merge_commit": "f4f4746eeda68b581635a298ba489ff0723c939c",
+      "merge_commit_subject": "Merge T28B binary suite rebinding (86 PASS/22 blocked), owner approval recorder, Tiled CI job, known failures to one"
+    },
+    {
+      "id": "T28C",
+      "title": "Image diet and reproducibility",
+      "source": "plan_addenda.md A5",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "image diet and reproducibility (plan_addenda A5); in progress in parallel with T28D"
+    },
+    {
+      "id": "T28D",
+      "title": "Documentation and register sync",
+      "source": "plan_addenda.md A5",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "this overlay; becomes merged when its branch is merged to forge_merge"
+    }
+  ]
+}

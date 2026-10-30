@@ -4,15 +4,31 @@ For initial installation, complete `.env` setup, CBORG address authorization,
 and upgrade/rollback procedures, use [Fresh-machine deployment](deployment.md).
 This page covers routine operation after installation.
 
-## Local launcher
+!!! note "Images"
+
+    Routine operation of the `:local`, `:als-dev` and `:als-prod` images
+    (start, stop with `--stop-timeout 120`, supervisor status in
+    `/run/fair2wise/supervisor.json`, exit codes, mounts) is documented in
+    `docker/profiles/README.md`. This page covers running from source.
+
+## Local launchers
+
+JSON KG (default):
+
+```bash
+./scripts/start_rsoxs_stack.sh        # daemonized agent + UI, 8090 / 5175
+./scripts/start_agent_backend.sh      # agent only, F2W_KG_MODE=json
+```
+
+**Legacy** Splash launcher:
 
 ```bash
 ./scripts/start_all.sh
 ```
 
-Startup order matters: Splash Links must be ready before the agent API loads
-the graph, and the API must be ready before the browser sends its settings
-bootstrap.
+Startup order matters in Splash mode: Splash Links must be ready before the
+agent API loads the graph, and the API must be ready before the browser sends
+its settings bootstrap.
 
 Managed PID files are written under `.run/`. On startup, the launcher stops
 stale managed processes, refuses occupied ports, and waits for HTTP readiness.

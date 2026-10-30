@@ -57,7 +57,10 @@ directory by the standard launcher.
 | `CBORG_IP_FAMILY` | `ipv6` in Compose | CBORG transport family (`ipv6`, `ipv4`, or `auto`) |
 | `CBORG_FORCE_IPV6` | `1` in Compose | Pin the HTTP client to IPv6 |
 | `CBORG_IPV6_BIND` | unset (probe) | Optional source address; ignored if not assigned on the host |
-| `F2W_KG_MODE` | `splash` | Editable Splash graph or JSON snapshot |
+| `F2W_KG_MODE` | `json` | `json` (default of the CLI, the start scripts, Compose and the images) or the legacy editable Splash graph (`splash`) |
+| `F2W_RUNTIME` | `legacy` | `legacy` or `langgraph` (scoped LangGraph runtime); any other value is a startup error |
+| `F2W_QA_ROUTE` | `supervisor` | In `langgraph` mode: `supervisor` (planning supervisor) or `direct` |
+| `F2W_DEPLOYMENT_PROFILE` | `local` | `local`, `als-dev`, `als-prod`; fixed by the image profile (`docker/profiles/*.json`) |
 | `F2W_GRAPH` | `storage/kg/matkg_with_code.json` | Comma-separated JSON graphs. Local `start_rsoxs_stack.sh` defaults to highest `matkg_rsoxs_vN.json` + highest `matkg_bl1101_vN.json`. Compose pins its own pair. |
 | `F2W_SEED_TERMS` | empty | Cumulative terms seed |
 | `F2W_MAX_ROUNDS` | `3` | Evidence-growth rounds |
@@ -73,7 +76,7 @@ directory by the standard launcher.
 
 | Variable | Default/typical | Meaning |
 |---|---:|---|
-| `KG_RAG_GRAPH_SOURCE` | `splash` | `splash` or `json` |
+| `KG_RAG_GRAPH_SOURCE` | `json` in Compose, the start scripts and the images; `config.yml` keeps the legacy `splash` default for the bare `kg_rag_api.py` CLI | `json` or the legacy `splash` |
 | `TILED_URI` | `http://127.0.0.1:8000` | Live Tiled catalog base (no `/api/graphql` suffix). ALS/11.0.1.2 uses the beamline Tiled host. |
 | `TILED_API_KEY` | unset | Tiled `Authorization: Apikey …` (or `TILED_API_KEY_SCHEME`). Never commit. Unsigned GraphQL returns empty lists. |
 | `F2W_LIVE_TILED` | unset (on if `TILED_URI` is set) | Chat ESAF/proposal/sample/scan lookup via Tiled GraphQL. JSON sim is fallback. |
@@ -110,7 +113,15 @@ dispatcher. Results report whether the active backend is `semantic` or
 | `EXTRACT_TERMS_BACKEND` | Extraction backend |
 | `EXTRACT_TERMS_MODEL` | Extraction model |
 
-## Frontend and ports
+## Images: gateway port and profile
+
+The three images expose one port, `F2W_GATEWAY_PORT` (default `8080`), and
+serve everything under `/fair2wise`. The profile fixes
+`F2W_DEPLOYMENT_PROFILE`, `F2W_AUTHORIZATION_MODE`, `F2W_TILED_MODE` and the
+Tiled settings; a conflicting environment exits 78. `F2W_CORS_ORIGINS` is
+required on the ALS images. The full table is in `docker/profiles/README.md`.
+
+## Frontend and ports (source and Compose developer stack)
 
 | Variable | Default | Meaning |
 |---|---:|---|

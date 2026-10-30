@@ -71,17 +71,21 @@ and `prov_vocabulary.yaml` usage are documented in [LinkML schemas](schemas.md)
 and `storage/schema/README.md`. Graphs stay separate; see
 [system architecture](architecture.md#multi-kg-layout).
 
-## JSON and Splash modes
+## JSON (default) and Splash (legacy) modes
 
 | Mode | Reads | Edits | Persistence |
 |---|---|---|---|
-| `json` | A selected `storage/kg/*.json` file | Read-only through the current UI | File |
-| `splash` | Entities and links from Splash | Node fields, publications, snippets, relationships | SQL database |
+| `json` (default everywhere except the bare `kg_rag_api.py` CLI) | The selected `storage/kg/*.json` files | Read-only through the current UI; publication into Tiled is a gated `/v1` job | Versioned files in Git |
+| `splash` (legacy) | Entities and links from Splash | Node fields, publications, snippets, relationships | SQL database; kept until the Splash retirement gate |
+
+Tiled-backed editing is not built (T18C F1): on a Tiled-only deployment a Save
+fails safely with the legacy 502 and writes nothing; the design is pending
+owner decision (OPEN_DECISIONS A4).
 
 When Splash is unreachable, `KnowledgeGraph` can fall back to the configured
 JSON file and reports `graph_source_used = "json_fallback"`.
 
-## Import to Splash Links
+## Import to Splash Links (legacy)
 
 `splash_links/scripts/import_kg.py` imports in two phases:
 

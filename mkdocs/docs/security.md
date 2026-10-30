@@ -1,9 +1,19 @@
 # Security model
 
-FAIR2WISE is currently a trusted, single-operator workstation application.
-Its safe default comes primarily from binding the sole published port to
-loopback, not from application-level authentication. Do not expose the default
-stack directly to an untrusted network.
+!!! note "Images"
+
+    The three images have profile-fixed access modes: `:local` is a trusted
+    local operator with no sign-in (D34); `:als-dev`/`:als-prod` require Tiled
+    sign-in and allow privileged work only to verified Tiled admins (D30).
+    Their one ingress is the gateway on port 8080 under `/fair2wise`. The
+    access contract is `docs/migration/authentication/access_contract.md`; the
+    route policies are in `docs/migration/api/README.md`. The text below
+    describes the source / Compose developer stack.
+
+Run from source, FAIR2WISE is a trusted, single-operator workstation
+application. Its safe default comes primarily from binding the published
+ports to loopback, not from application-level authentication. Do not expose
+the developer stack directly to an untrusted network.
 
 ## Trust boundaries
 
@@ -17,18 +27,18 @@ flowchart LR
     S --> D[(Splash volume)]
 ```
 
-Compose publishes loopback ports **5175** (UI) and **8090** (agent). Never
-bind host **5174** (SSH). The browser calls `http://127.0.0.1:8090` even when
-the UI is served from the same Compose project.
+Compose publishes loopback ports **5175** (gateway; UI at `/fair2wise/`) and
+**8090** (agent). Never bind host **5174** (SSH). The UI calls the same-origin
+`/fair2wise/api`; the direct 8090 port is for development tools.
 
 The optional Splash stack (`compose.splash.yaml`) publishes only:
 
 ```text
-127.0.0.1:${F2W_UI_PORT:-5173} -> frontend:80
+127.0.0.1:${F2W_UI_PORT:-5173} -> frontend:8080
 ```
 
 Agent and Splash ports are not host-published. This reduces direct exposure,
-but Nginx proxies `/api/` to the agent. Therefore any process or user that can
+but Nginx proxies `/fair2wise/api/` to the agent. Therefore any process or user that can
 reach the frontend can also call chat, settings, upload, session, and graph
 mutation endpoints through the same port.
 
