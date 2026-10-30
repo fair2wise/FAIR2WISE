@@ -9,3 +9,6 @@ isort>=7
 pytest-cov>=7
 types-PyYAML
 types-requests
+types-jsonschema
+types-psutil
+lxml-stubs

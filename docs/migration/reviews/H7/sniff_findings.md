@@ -135,3 +135,36 @@ approximate (the "silent handler" count in particular includes legitimate fallba
   `build-app.yml` no longer overrides line length (115 from `.flake8`). `E`/`W` style codes stay ungated.
 - Not run: tests needing `linkml_runtime`, `langgraph`, `academy`, `aiohttp`, `fitz` do not collect in the
   survey environment; the first `python-quality` / baseline CI run is the real check.
+
+### 2026-10-30 (evening): UP rewrite, isort and typing pass
+
+- F1.3 closed (commit `9bf262c`): `ruff --fix` for UP006/UP045/UP037/UP017, the `typing`/`datetime.timezone`
+  imports those rewrites left unused removed, then isort (ALS order). 249 files. Full suite from a clean export:
+  4,780 passed / 1 failed (known Splash) before; 4,779 / 2 after, the new failure being
+  `test_entry_script_is_stdlib_only_at_import`, which pinned the old import order of `_tiled_entry.py`
+  (expected list updated, `98645ce`). isort also reorders function-local imports (not behaviour-relevant).
+- F1.1, F1.2, F1.6 mostly closed (commit `d3b002f`): mypy `--strict` with runtime packages visible went from
+  642 to 91 errors; no-untyped-def 87 -> 6 (FastAPI routes, left on purpose), type-arg 122 -> 0. Annotation,
+  import, `typing.cast` and helper-type changes only (AST check against HEAD; expected differences: a
+  `Protocol` in `campaign/rounds.py`, `TypeVar`s in `extract_terms.py` and `provenance/recorder.py`, a PEP 695
+  generic in `graph/identity_adapter.py` (needs Python >= 3.12, already required), an `OpenAlexNoData(dict)`
+  base). 26 `# type: ignore[...]` in `app/`, each with a code; 9 new ones carry a reason.
+- Reviewer decisions:
+  - About 19 `cast(<ResponseModel>, guard.project_*(...))` in `f2w_agent/api.py` describe a dict as the
+    declared FastAPI response model (FastAPI still validates it). Cleaner: type `legacy_ui.project_*` to return
+    the model types.
+  - `api/routes_common.py:71` `project(...) -> Any` causes 22 `no-any-return` errors in the route modules;
+    narrowing it needs a check that no caller passes a non-dict payload.
+  - Many `cast(T, optional_value)` assert invariants the code guarantees elsewhere (listed per file in the
+    commit's diff); a runtime guard would be the strict alternative.
+- Errors left (91): `no-any-return` 22 (mostly the `project()` case), `import-untyped` 14 (stubs added to
+  `requirements/quality.in`: types-jsonschema, types-psutil, lxml-stubs; pynvml and rdkit have none),
+  `assignment` 14, `arg-type` 9, `union-attr` 7, `no-untyped-def` 6, `index` 6, `import-not-found` 6.
+  About 35 need a logic change (Optional narrowing, variable names reused with a different type), e.g.
+  `jobs/publication.py` (`current_plan()` is `PlanRecord | None`), `graph/backends/tiled.py:215-221`,
+  `graph/imports/tiled_json.py:685,690`, `agent_runtime/skills.py:182,184`, `api/sessions.py:280,403,404`,
+  `operations/corpus.py:336-343`, `graph/snapshot.py:237`, `security/authorization.py:808`, and the reused
+  names in `f2w_agent/api.py` (1671, 1691, 3869-4026, 7232, 7338, 6902).
+- Pyflakes baseline now 18 entries. `f2w_agent/api.py:4987` `history` (F821) is still open: `history` is not
+  defined in that scope; the `try/except TypeError` around `retrieval.query(question, history=history)` would
+  not catch the resulting `NameError`. Owner decision needed.
