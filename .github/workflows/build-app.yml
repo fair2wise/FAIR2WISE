@@ -1,27 +1,40 @@
-# Build, check and record the three FAIR2WISE image candidates (T24D).
+# Build, check and record the three FAIR2WISE image candidates (T24D; O06 rules approved
+# 2026-10-30, owner decisions O-O6 D2.1-D2.10).
 #
 # One commit -> :local, :als-dev, :als-prod candidates -> tests/images static checks and the
 # docker/profiles/README.md post-build checks on every built image -> release-manifest.json
-# (commit, per-variant image id and layers, lock hashes, Tiled wheel hash, FROZEN_UI_TREE).
+# (commit, per-variant image id and layers, lock hashes, Tiled wheel hash, FROZEN_UI_TREE,
+# resolved base-image digests (D2.9) and the newest binary report reference (D2.10, never
+# gating)). Only linux/amd64 is built (D2.8).
 #
 # Nothing here publishes, logs in to a registry or deploys. Candidates are handed to
-# publish-image.yml only as workflow artifacts of trusted (non pull_request) runs; that
-# workflow re-verifies them and is gated by the owner's O06 approval and a GitHub environment.
+# publish-image.yml only as workflow artifacts of trusted (non pull_request) runs. On a push
+# to main or a v* tag, publish-image.yml calls this workflow (workflow_call, input
+# publish_candidate=true) and publishes the artifacts of that same run inside its GitHub
+# environments; the standalone run for a push to main therefore only runs the legacy test
+# and docs jobs, so each main commit is built once. forge_merge pushes and pull requests build
+# and check candidates without publishing anything.
 # No secret is referenced: candidates never receive CBORG, Tiled or any runtime credential, and
 # every check container runs with --network none.
 #
 # The legacy main-branch test job keeps its behaviour; the MkDocs gh-deploy and README tree
 # steps moved into docs-deploy, the only job with a write permission, which runs only on a
-# push to main and never for a pull request.
+# standalone push to main and never for a pull request or inside the publish workflow.
 name: Build and check image candidates
 
 on:
   push:
     branches: [ main, forge_merge ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main, forge_merge ]
   workflow_dispatch: {}
+  workflow_call:
+    inputs:
+      publish_candidate:
+        description: "set by publish-image.yml: build and save the candidates of this main/v* commit for publication"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -39,7 +52,8 @@ env:
 jobs:
   test:
     name: Legacy test suite (main)
-    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    # Not inside the publish workflow's call: the standalone push-to-main run owns it.
+    if: (github.ref == 'refs/heads/main' || github.base_ref == 'main') && !inputs.publish_candidate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
@@ -74,7 +88,7 @@ jobs:
   docs-deploy:
     name: Deploy MkDocs to GitHub Pages (push to main only)
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !inputs.publish_candidate
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -91,6 +105,9 @@ jobs:
 
   image-static-tests:
     name: Image static tests (tests/images, tests/ci)
+    # A push to main (or a v* tag) builds its candidates once, inside publish-image.yml's call
+    # of this workflow (publish_candidate=true); the standalone main run skips the image jobs.
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main' || inputs.publish_candidate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -126,7 +143,7 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
-      - name: Resolve base images once (same bytes for all three variants)
+      - name: Resolve base images once (same bytes for all three variants; D2.9 records the digests)
         id: base
         run: |
           set -euo pipefail
@@ -162,7 +179,7 @@ jobs:
               --out "candidate/manifest/checks-$variant.json" || status=1
           done
           exit "$status"
-      - name: Release manifest
+      - name: Release manifest (base-image digests D2.9; newest binary report referenced, never gating, D2.10)
         if: always()
         env:
           PYTHON_REF: ${{ steps.base.outputs.python }}
@@ -178,11 +195,12 @@ jobs:
             --checks candidate/manifest/checks-local.json candidate/manifest/checks-als-dev.json \
                      candidate/manifest/checks-als-prod.json \
             --base-image "$BASE_PYTHON_IMAGE=$PYTHON_REF" --base-image "$BASE_NODE_IMAGE=$NODE_REF" \
+            --binary-report latest \
             --out candidate/manifest/release-manifest.json
           {
             echo "### Release manifest ($GITHUB_SHA)"
             echo '```json'
-            python -c 'import json,sys; m=json.load(open(sys.argv[1])); print(json.dumps({"candidate_ok": m["candidate_ok"], "problems": m["problems"], "variants": {k: v["image_id"] for k, v in m["variants"].items()}}, indent=2))' candidate/manifest/release-manifest.json
+            python -c 'import json,sys; m=json.load(open(sys.argv[1])); print(json.dumps({"candidate_ok": m["candidate_ok"], "problems": m["problems"], "variants": {k: v["image_id"] for k, v in m["variants"].items()}, "base_image_digests": m["base_image_digests"], "binary_report": (m["binary_report"] or {}).get("path")}, indent=2))' candidate/manifest/release-manifest.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
@@ -204,6 +222,8 @@ jobs:
         with:
           name: release-images
           path: candidate/images/
-          retention-days: 30
+          # D2.7 (keep everything): 90 days is the longest GitHub allows for a workflow artifact;
+          # the published images themselves never expire (no GHCR retention policy).
+          retention-days: 90
           compression-level: 0
           if-no-files-found: error

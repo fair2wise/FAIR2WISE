@@ -12,8 +12,11 @@ Used only by ``.github/workflows/publish-image.yml`` (job ``publish``) after
 3. for a release tag ``vX.Y.Z`` adds ``vX.Y.Z-<variant>`` by a registry-side re-tag of that
    digest (no rebuild, no second push); an existing semver tag must already equal the digest.
 
-Channel tags (``:local``, ``:als-dev``, ``:als-prod``) are never written here; they move only
-through ``promote_channel.py``. Writes the publication record (``release_manifest.py``).
+Channel tags (``:local``, ``:als-dev``, ``:als-prod``) are never written here; the publish
+workflow moves them afterwards through ``promote_channel.py`` (all three on a push to ``main``,
+owner decision O-O6 D2.1). Writes the publication record (``release_manifest.py``); its binary
+report reference comes from the manifest unless ``--binary-report`` names another (D2.10,
+information only).
 """
 
 from __future__ import annotations
@@ -112,7 +115,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--run-url", required=True)
     parser.add_argument("--actor", required=True)
     parser.add_argument("--root", type=Path, default=Path("."))
-    parser.add_argument("--binary-report", default="")
+    parser.add_argument("--binary-report", default="", help="override the manifest's report reference (information only)")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     try:

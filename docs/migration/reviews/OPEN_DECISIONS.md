@@ -196,7 +196,9 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 
 ### D2. O06 image tag rules (T24D, `reviews/H6/o06_tag_rules_proposal.md`)
 
-Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
+All ten decided 2026-10-30 (O-O6, `H1/owner_decisions.md` batches 16-18); `o06_tag_rules_proposal.md` is
+rewritten as the approved rules and the workflows implement them. Publishing still fails closed until the
+owner sets `O06_APPROVED=true` after creating the two environments (a switch, not a pending decision).
 
 | # | Decision | Proposal |
 |---|---|---|
