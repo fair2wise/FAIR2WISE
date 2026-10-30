@@ -1,0 +1,76 @@
+{
+  "categories": {
+    "contract_error": {
+      "count": 0,
+      "examples": [],
+      "unit": "items"
+    },
+    "incomplete_extraction": {
+      "count": 117,
+      "rule": "description is N/A or empty",
+      "unit": "nodes"
+    },
+    "legacy_warning": {
+      "artifact_without_schema_fingerprint": true,
+      "categories_outside_closure": {
+        "Catalyst": 2,
+        "Material Class": 1,
+        "Molecule": 1,
+        "Monomer": 2,
+        "SoftwareTool": 2,
+        "Unknown": 117
+      },
+      "count": 290,
+      "edges_failing_domain_range": 87,
+      "edges_with_missing_endpoint_node": 0,
+      "edges_with_predicate_outside_closure": 77,
+      "nodes_with_category_outside_closure": 125,
+      "predicates_outside_closure": {
+        "rel:DeviceContainsMaterial": 9,
+        "rel:MaterialHasProperty": 4,
+        "rel:MaterialProcessedBy": 3,
+        "rel:PropertyMeasuredBy": 1,
+        "rel:absorbance_enhancement_factor": 2,
+        "rel:application": 1,
+        "rel:band_gap_renormalization": 1,
+        "rel:band_gap_widening": 1,
+        "rel:contains_material": 4,
+        "rel:develops_methods_for": 1,
+        "rel:effective_conjugation_length": 1,
+        "rel:enhances_property": 2,
+        "rel:has_affiliation": 2,
+        "rel:has_application": 16,
+        "rel:influenced_by": 3,
+        "rel:interface_with": 2,
+        "rel:measured_by": 2,
+        "rel:optimized_band_gaps": 2,
+        "rel:used_in_synthesis_of": 2,
+        "rel:used_to_synthesize": 2
+      },
+      "unit": "mixed; see the per-kind counts"
+    },
+    "unknown_source_data": {
+      "count": 117,
+      "rule": "non-snippet node without source_papers",
+      "unit": "nodes"
+    }
+  },
+  "counts": {
+    "codesnippet_nodes": 0,
+    "edges": 165,
+    "nodes": 247
+  },
+  "fingerprint_status": "legacy_unverified",
+  "normalizer": "term_extractor.schema.SchemaHelper",
+  "registry_version": "1",
+  "report_version": "1",
+  "schema": {
+    "import_fingerprint": "8ec418bb4291d3b8b1166f78d8b59d7a179e637e711c4cb727dba7bc4c462016",
+    "name": "matkg_schema",
+    "path": "storage/schema/matkg_schema.yaml",
+    "sha256": "0c1a0dad380f7aa1d07adc0c049bc5b039d3f1bde8358b310b5ea2f99d3443e1",
+    "version": "0.2.0"
+  },
+  "selection_source": "default",
+  "status": "pass"
+}
