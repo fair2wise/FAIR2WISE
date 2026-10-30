@@ -122,6 +122,24 @@ docker stop f2w-local; docker logs f2w-local | grep f2w-supervisor             #
 docker start f2w-local                                                           # catalog and writer key persist
 ```
 
+IPv6 preference for CBORG (local dev only, opt-in). Docker on Colima has no IPv6 by default,
+so a container reaches CBORG over the host's IPv4 address, which CBORG's allowlist refuses.
+After enabling IPv6 for the VM and the Docker daemon (Colima: `network.address: true`, daemon
+`"ipv6": true` with a `fd00::/80`-style `fixed-cidr-v6`), glibc still sorts the IPv4 destination
+first because the container's only IPv6 address is a ULA (RFC 6724 label mismatch). `docker/gai.conf`
+is glibc's default table with `fc00::/7` given label 1 so IPv6 wins; mount it read-only (the runtime
+user is uid 10001 and cannot write `/etc`, so the image does not bake or copy it, and nothing
+changes without the mount):
+
+```sh
+mkdir -p ~/.config/fair2wise && cp docker/gai.conf ~/.config/fair2wise/gai.conf
+docker run -d --name f2w-local -p 127.0.0.1:8080:8080 --stop-timeout 120 \
+  -v f2w-state:/var/lib/fair2wise/state -v f2w-tiled:/var/lib/fair2wise/tiled \
+  -v ~/.config/fair2wise/gai.conf:/etc/gai.conf:ro \
+  -e CBORG_API_KEY ghcr.io/fair2wise/fair2wise:local
+docker exec f2w-local getent ahosts api.cborg.lbl.gov | head -1                  # an IPv6 address first
+```
+
 Run an ALS image (disposable host; central Tiled is contacted only by app features):
 
 ```sh
