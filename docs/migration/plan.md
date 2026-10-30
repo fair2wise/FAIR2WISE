@@ -1,5 +1,11 @@
 FORGE to F2W: literature-only migration handoff
 Addenda: owner-approved additions (T25D per-user settings, T03B supervisor routing, T02B pending approvals) are in docs/migration/plan_addenda.md and take precedence in ordering.
+Owner exceptions applied (annotation added 2026-10-29 by T28D; the plan text below is unchanged and the bullets record where owner decisions override it; details in docs/migration/reviews/H1/owner_decisions.md, reviews/*/decision.json and plan_addenda.md):
+- 2026-10-12 O-T1 (H1-1): Tiled is pinned to 0.2.18 (tiled-0.2.18-py3-none-any.whl, sha256 416079d4...) as an interim exception to D22, D24 and D33 and to every other "0.2.19" mention in this plan, until a final 0.2.19 release exists; changing the pin invalidates H1. The central servers are still reported to run 0.2.19 (D33); external-mode checks must fail clearly on a version mismatch.
+- 2026-10-12 O-D1 / O-G1: tracked storage/kg JSON keeps its verbatim snippets in Git and in the images (serving still goes through the D19 projection); beamline ops documents and all KGs are tracked, research papers stay gitignored. Overrides the plan 4.14 / D31 reading that stored KG JSON must be projected before commit.
+- 2026-10-16 O-U1 / O-U2: two approved ui/ changes to the frozen UI (D11, T18A): the /fair2wise base in App.tsx (T24C) and the judge-model dropdown in the settings panel (T11B, H3 B7); the CI FROZEN_UI_TREE pin was re-pinned for each.
+- 2026-10-15/16 H3 F5/F6 (plan_addenda.md A4, T22C): overrides the D20 rule against measurement-instance classes in its additive form; schema set 0.3.0 adds Sample, MeasurementRun and Instrument, RSoXSMeasurement is_a ExperimentalTechnique and all existing nodes keep their meaning.
+
 Draft v8.0 | 9 October 2026 | Trusted full-access local mode; Tiled-authenticated ALS deployments
 Objective: adopt literature-scoped LangGraph orchestration in F2W; capture the full paper-related capability set from FORGE; preserve F2W's existing LLM paths/classes and QA constraints; make FORGE consume F2W agents and published literature knowledge through Python import and FastAPI. FORGE continues to own experimental analysis/simulation. F2W is the authority for literature KG curation.
 0. Approved scope and remaining implementation gates
