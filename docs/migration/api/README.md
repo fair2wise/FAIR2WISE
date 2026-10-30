@@ -9,9 +9,9 @@
 | Entrypoint | Behaviour |
 | --- | --- |
 | `app.modules.f2w_agent.api.create_app(cfg, *, cors_origins, deployment, startup_config, identity_port, credential_store, clock)` | Unchanged signature and routes: the 19 UI routes, ALS sign-in handlers, access control and disclosure projection. The frozen UI and T18A/T18B contract tests use it as before. |
-| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 24 `/v1` routes, the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`. |
+| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 31 `/v1` routes, the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E). |
 | `python -m app.modules.f2w_agent.cli api` | Unchanged (legacy app). `api --jobs-api` serves `create_api_app`. |
-| `python -m app.api.cli --root DIR jobs|cases|audit|ops ...` | Calls `F2WOperations` directly with a `cli` context (local profile only). |
+| `python -m app.api.cli --root DIR jobs|cases|audit|ops ...` | Calls `F2WOperations` directly with a `cli` context (local profile only). `ops statistics|compare|paper-subgraph|recent|corpus-audit|submit|result` are the T19E Knowledge Operation wrappers (graphs from `--project-root/storage/kg` or `--graph-file`, corpora from `storage/terminology`). |
 | `F2WOperations` | Direct Python use (SDK, notebooks, FORGE). Same methods the routes call. |
 
 With no `operations` argument the factory builds `build_operations(settings, <workdir>/operations)`: SQLite job, curation and audit stores, **no job kind and no publication** (real pipeline handlers need H3, real publication needs H5). Trusted wiring registers kinds on `ops.jobs` and builds a `Publication` on it.
@@ -26,6 +26,7 @@ Every method takes the server-resolved `RequestContext` first and forwards to th
 | Review | `curation_summary`, `list_cases`, `get_case`, `review_case`, `create_cost_approval`, `revoke_cost_approval` | `curation.reviewer.review_case`, `curation.approval.create_cost_approval` (human, `curation.approve`, case revision) |
 | Publication | `submit_publication`, `current_plan`, `approve_publication`, `publication_pointer`, `rollback_publication` | `Publication` + `security.authorization.create_approval` / `verify_approval`, plus the H5 gate |
 | Status | `audit_status`, `ops_status` | `jobs.admin` |
+| Knowledge operations (T19E) | `run_knowledge_operation`, `graph_statistics`, `compare_graphs`, `paper_subgraph`, `recent_entities`, `audit_corpus`, `submit_knowledge_operation`, `knowledge_job_result`, `register_knowledge_jobs` | `operations.knowledge.KnowledgeOperations` (`chat.ask`; T19C scope rule per graph/corpus), `JobService` for the `knowledge_operation` kind (`ops.run`) |
 | Scope | `notify_scope_change` | `JobService.notify_scope_change` (invalidates dependent approvals) |
 
 The worker path uses the same rules: job stages call `StageContext.require`, which deployments wire to `security.authorization.WorkerAuthority.check` (fresh whoami with the initiator's credential on ALS). Tests: `test_v1_als.py::test_sdk_calls_apply_the_same_policy_as_http`, `::test_worker_reauthorizes_and_stops_when_the_initiator_lost_admin`, and the live `::test_real_role_downgrade_stops_the_worker_before_the_effect`.
@@ -50,7 +51,7 @@ Legacy SSE framing (`event:`/`data:` LF blocks, as `/chat/stream`) with `JobEven
 
 ## 3. Route policies (`app/api/policies.py`, DEP-19)
 
-All 24 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
+All 31 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
 
 - A route whose effect needs one fixed capability declares it, so the dependency refuses the caller first and, for an admin capability, re-runs the ALS role check.
 - Routes whose capability depends on the job kind or on ownership declare no entry capability (signed-in on ALS) and rely on `JobService`; their mutating handlers re-run the ALS role check (`fresh_request_context`).
@@ -75,6 +76,9 @@ All 24 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V22 | GET /v1/ops/status | `jobs.admin` | O-07 monitor DTO |
 | V23 | GET /v1/validation/judge-model | `settings.global` | deployment-wide validation judge (owner O-U2) plus the provider's live model list; added by T11B |
 | V24 | PUT /v1/validation/judge-model | `settings.global` | set or clear the judge; refused unless the model is in the current live list; fresh role check (T11B) |
+| V25-V29 | GET /v1/operations/statistics, /compare, /paper-subgraph, /recent, /corpus-audit | `chat.ask` | T19E: the five T19C operations inline (bounded result, `status` `ok` or `partial`); a graph or corpus outside a non-empty corpus scope is 403 (T19C rule); `/recent` on a JSON snapshot is 501 |
+| V30 | POST /v1/operations/jobs | `ops.run` | submit a `knowledge_operation` job (whole population, no inline bound); fresh role check |
+| V31 | GET /v1/operations/jobs/{id} | signed in | job visibility; the bounded report once computed |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
 

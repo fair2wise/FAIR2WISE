@@ -26,13 +26,14 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "2f1130c36f2d61f4806f1c7d3f0af6b0427ee823af9926416aae651f7cc2feb5",
-        "config_sha256": "5dc3d7aac5e9e44b66bf41a8fe984dc92e55cd2f0a1d782d399674ab9fa059c8",
+        "case_sha256": "a953464090424d27dfe9277d65634e76e838d1ce03291739fd5b9479b0a993f3",
+        "config_sha256": "f7ef0f581d5965deb2709f035a692cba6534df47a4eda545936443d7cec8e44e",
         "model_sha256": null,
-        "oracle_source_sha256": "b6a056d5d74bf40d9c020ee39ff203b5689468393de347b5d253434eaac4353e",
+        "oracle_source_sha256": "2b5c1998ce98403b6428ae78dba992e2fc75d4e236e8ad08d361c8a95979da87",
         "schema_sha256": null
       },
       "input_fixture_refs": [
+        "tests/api_v1/_v1_support.py",
         "tests/graph/graph_samples.py",
         "tests/operations/fixtures/",
         "tests/operations/scale_population.py",
@@ -40,7 +41,7 @@
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations; T19D: every operation's totals equal independently computed ground truth on synthetic populations 2-12x a 1M-token context (60k entities / 191k edges, 60k term entries, 120k session records; 15k live Tiled entities in parity with frozen JSON), computed by code with no model within measured time and memory bounds; figure/table-derived (T09) records count exactly once; no output carries source material (D19); the operations never generate, compile or run code (static AST, runtime tripwires, read-only specs)",
+        "covers": "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations; T19D: every operation's totals equal independently computed ground truth on synthetic populations 2-12x a 1M-token context (60k entities / 191k edges, 60k term entries, 120k session records; 15k live Tiled entities in parity with frozen JSON), computed by code with no model within measured time and memory bounds; figure/table-derived (T09) records count exactly once; no output carries source material (D19); the operations never generate, compile or run code (static AST, runtime tripwires, read-only specs); T19E: the same counts come back unchanged through the agent Tool, the supervisor route, /v1/operations, the SDK and the CLI, on JSON and on live Tiled, with no source material on any surface",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -75,7 +76,16 @@
           "tests/operations/test_no_code_generation.py::test_specs_are_read_only_and_take_no_code",
           "tests/operations/test_no_code_generation.py::test_no_code_runner_tool_exists_in_the_application",
           "tests/operations/test_no_code_generation.py::test_job_dispatch_runs_only_reviewed_operations",
-          "tests/operations/test_figure_evidence.py::test_no_source_material_in_any_output_or_artifact"
+          "tests/operations/test_figure_evidence.py::test_no_source_material_in_any_output_or_artifact",
+          "tests/operations/test_knowledge_surfaces.py::test_supervisor_route_matches_direct_call_on_every_question",
+          "tests/operations/test_knowledge_surfaces.py::test_no_source_material_leaves_any_agent_surface",
+          "tests/api_v1/test_v1_operations.py::test_reads_return_the_agent_tools_bounded_result",
+          "tests/api_v1/test_v1_operations.py::test_statistics_counts_match_the_t19c_units",
+          "tests/api_v1/test_v1_operations.py::test_sdk_methods_forward_to_the_same_operations",
+          "tests/api_v1/test_v1_operations.py::test_cli_ops_subcommands_print_the_same_bounded_results",
+          "tests/api_v1/test_v1_operations.py::test_no_source_material_leaves_the_routes",
+          "tests/graph/test_knowledge_surfaces_tiled.py::test_statistics_and_recent_through_the_routes_match_the_direct_computation",
+          "tests/graph/test_knowledge_surfaces_tiled.py::test_sdk_agent_and_supervisor_agree_with_the_routes_on_tiled"
         ],
         "supporting_selectors": [],
         "uncovered": "Known complete-population count on an owner-approved real population (H3 oracle)"
@@ -201,13 +211,14 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "81074a97689c28195625d0a4d41ccb2c70a5c2b1f8eef2a9ddaab86f2530df62",
-        "config_sha256": "fb6835c8596a8c0b51484ba2cba25b1c50337e33a224e459045ddbaa1354ba01",
+        "case_sha256": "3d1f2472809a337db9fdd8fa8efe259b13d826fa68a086d8b87b50db09a51554",
+        "config_sha256": "28d40dad366e0ed19564396cd1c62532b510815a593990178a4c33a4e423ec61",
         "model_sha256": null,
-        "oracle_source_sha256": "32b6b9a9592fd19f994c6416befa1d6faa3ac735158f09efafbe174d25330e99",
+        "oracle_source_sha256": "6ecbccdbda4bfa95f263aa285d189e912e418cb71e737dbbcd0b76543d0dbb13",
         "schema_sha256": null
       },
       "input_fixture_refs": [
+        "tests/api_v1/_v1_support.py",
         "tests/fixtures/tiled_server.py",
         "tests/graph/graph_samples.py",
         "tests/operations/fixtures/",
@@ -215,7 +226,7 @@
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete; T19D: record bounds and deadlines below a 60k-entity population give partial/PARTIAL with the exact count read and the reason, also on live Tiled, and the same operation as a job covers the whole population",
+        "covers": "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete; T19D: record bounds and deadlines below a 60k-entity population give partial/PARTIAL with the exact count read and the reason, also on live Tiled, and the same operation as a job covers the whole population; T19E: PARTIAL survives the supervisor route, /v1/operations, the SDK and the CLI while the knowledge_operation job of the same call is complete",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -232,6 +243,9 @@
           "tests/operations/test_graph_operations.py::test_unknown_paper_is_not_found_but_a_partial_scan_is_unknown",
           "tests/operations/test_graph_operations.py::test_tool_partial_scope_unknown_and_invalid",
           "tests/graph/test_graph_operations_tiled.py::test_capped_tiled_scan_is_partial_not_complete",
+          "tests/operations/test_knowledge_surfaces.py::test_partial_scan_stays_partial_through_direct_service_and_supervisor",
+          "tests/api_v1/test_v1_operations.py::test_partial_inline_result_versus_complete_job",
+          "tests/graph/test_knowledge_surfaces_tiled.py::test_capped_live_scan_is_partial_on_the_routes_and_complete_as_a_job",
           "tests/operations/test_scale_completeness.py::test_inline_bound_below_the_population_is_partial",
           "tests/operations/test_scale_completeness.py::test_bound_equal_to_the_population_is_complete",
           "tests/operations/test_scale_completeness.py::test_inline_tool_bound_is_partial_never_ok",
@@ -287,20 +301,22 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "3fc85152a958c5c11ca7a013ad35c895dcf9c7924c23878efce3270bb6fd3aba",
-        "config_sha256": "9c754a16c81e8171112e235e2b171b7b2fd5128bbbc2a751c0dd37cb4a957180",
+        "case_sha256": "c754184036923e382b6595d742f629ed2a7475bf5961326490d6d8d0c6c2ac8c",
+        "config_sha256": "6b26edd9ff4fde5cfcedc7f15eb7bec223bedf807922df1029e9069cac42d365",
         "model_sha256": null,
-        "oracle_source_sha256": "f822fd262c83abc41ace0895354ecdc7342d2f856edd9df418c9982d8f609165",
+        "oracle_source_sha256": "967b67dbdf2e268aaea1b1d671f2f0d5930651bf2736aa1e0c436df4607ea3c9",
         "schema_sha256": null
       },
       "input_fixture_refs": [
+        "tests/api_v1/_v1_support.py",
+        "tests/graph/graph_samples.py",
         "tests/operations/fixtures/",
         "tests/operations/scale_population.py",
         "tests/operations/summary_fakes.py"
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Display bounding keeps the same output as the baseline and never changes totals or completeness; T19D: on 60k-entity populations and live Tiled, result bounds, node caps and max_terms shorten previews only, metrics/coverage/completeness are unchanged, previews are not totals, and the user projection keeps every total",
+        "covers": "Display bounding keeps the same output as the baseline and never changes totals or completeness; T19D: on 60k-entity populations and live Tiled, result bounds, node caps and max_terms shorten previews only, metrics/coverage/completeness are unchanged, previews are not totals, and the user projection keeps every total; T19E: the bounded result (display_truncated, full totals) is what /v1/operations, the SDK and the agent Tool return, on live Tiled too",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -320,7 +336,9 @@
           "tests/operations/test_scale_population.py::test_paper_summary_tool_result_is_bounded",
           "tests/operations/test_scale_tiled.py::test_recent_entities_count_every_live_entity_while_the_preview_is_cut",
           "tests/operations/test_scale_tiled.py::test_live_tool_result_is_bounded_and_marked_unisolated",
-          "tests/operations/test_figure_evidence.py::test_disclosure_projection_keeps_every_total"
+          "tests/operations/test_figure_evidence.py::test_disclosure_projection_keeps_every_total",
+          "tests/graph/test_knowledge_surfaces_tiled.py::test_statistics_and_recent_through_the_routes_match_the_direct_computation",
+          "tests/api_v1/test_v1_operations.py::test_reads_return_the_agent_tools_bounded_result"
         ],
         "supporting_selectors": [],
         "uncovered": "Totals unchanged under truncation on a gold population (H3 oracle)"

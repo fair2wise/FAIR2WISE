@@ -118,6 +118,10 @@ V1A = "tests/api_v1/test_v1_als.py"  # T14
 V1C = "tests/api_v1/test_v1_cli_units.py"  # T14
 V1L = "tests/api_v1/test_v1_local.py"  # T14
 V1T = "tests/api_v1_live/test_v1_live_tiled.py"  # T14
+# T19E operation surfaces (agent Tool, supervisor route, /v1/operations, SDK, CLI, Tiled):
+OKS = "tests/operations/test_knowledge_surfaces.py"  # T19E
+V1O = "tests/api_v1/test_v1_operations.py"  # T19E
+GKT = "tests/graph/test_knowledge_surfaces_tiled.py"  # T19E
 SCF = "tests/schema/test_schema_fingerprint.py"  # T22B
 SCR = "tests/schema/test_schema_registry.py"  # T22B
 CLA = "tests/contracts/legacy_ui/closure/test_closure_api.py"  # T18C
@@ -482,7 +486,14 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_no_code_runner_tool_exists_in_the_application",
             "test_job_dispatch_runs_only_reviewed_operations",
         )
-        + n(OFE, "test_no_source_material_in_any_output_or_artifact"),
+        + n(OFE, "test_no_source_material_in_any_output_or_artifact")
+        + n(OKS, "test_supervisor_route_matches_direct_call_on_every_question",
+            "test_no_source_material_leaves_any_agent_surface")
+        + n(V1O, "test_reads_return_the_agent_tools_bounded_result", "test_statistics_counts_match_the_t19c_units",
+            "test_sdk_methods_forward_to_the_same_operations", "test_cli_ops_subcommands_print_the_same_bounded_results",
+            "test_no_source_material_leaves_the_routes")
+        + n(GKT, "test_statistics_and_recent_through_the_routes_match_the_direct_computation",
+            "test_sdk_agent_and_supervisor_agree_with_the_routes_on_tiled"),
         "partial",
         "Population counts of the baseline summary function, the corpus audit (corpus_qa parity) and graph"
         " statistics (analyze_kgs parity, JSON and Tiled) on synthetic and committed populations; T19D: every"
@@ -490,7 +501,9 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         " context (60k entities / 191k edges, 60k term entries, 120k session records; 15k live Tiled entities in"
         " parity with frozen JSON), computed by code with no model within measured time and memory bounds;"
         " figure/table-derived (T09) records count exactly once; no output carries source material (D19); the"
-        " operations never generate, compile or run code (static AST, runtime tripwires, read-only specs)",
+        " operations never generate, compile or run code (static AST, runtime tripwires, read-only specs); T19E: the"
+        " same counts come back unchanged through the agent Tool, the supervisor route, /v1/operations, the SDK and"
+        " the CLI, on JSON and on live Tiled, with no source material on any surface",
         "Known complete-population count on an owner-approved real population (H3 oracle)",
         fixtures=["tests/operations/fixtures/", "tests/operations/scale_population.py"],
     ),
@@ -545,6 +558,9 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_tool_partial_scope_unknown_and_invalid",
         )
         + n(GO, "test_capped_tiled_scan_is_partial_not_complete")
+        + n(OKS, "test_partial_scan_stays_partial_through_direct_service_and_supervisor")
+        + n(V1O, "test_partial_inline_result_versus_complete_job")
+        + n(GKT, "test_capped_live_scan_is_partial_on_the_routes_and_complete_as_a_job")
         + n(
             OSC,
             "test_inline_bound_below_the_population_is_partial",
@@ -559,7 +575,9 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "full",
         "A capped or partial scan is flagged partial/non-exhaustive, never reported as complete; T19D: record"
         " bounds and deadlines below a 60k-entity population give partial/PARTIAL with the exact count read and"
-        " the reason, also on live Tiled, and the same operation as a job covers the whole population",
+        " the reason, also on live Tiled, and the same operation as a job covers the whole population; T19E: PARTIAL"
+        " survives the supervisor route, /v1/operations, the SDK and the CLI while the knowledge_operation job of the"
+        " same call is complete",
     ),
     "OPS-04": oracle(
         n(
@@ -587,12 +605,15 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         )
         + n(OST, "test_recent_entities_count_every_live_entity_while_the_preview_is_cut",
             "test_live_tool_result_is_bounded_and_marked_unisolated")
-        + n(OFE, "test_disclosure_projection_keeps_every_total"),
+        + n(OFE, "test_disclosure_projection_keeps_every_total")
+        + n(GKT, "test_statistics_and_recent_through_the_routes_match_the_direct_computation")
+        + n(V1O, "test_reads_return_the_agent_tools_bounded_result"),
         "partial",
         "Display bounding keeps the same output as the baseline and never changes totals or completeness; T19D:"
         " on 60k-entity populations and live Tiled, result bounds, node caps and max_terms shorten previews only,"
         " metrics/coverage/completeness are unchanged, previews are not totals, and the user projection keeps"
-        " every total",
+        " every total; T19E: the bounded result (display_truncated, full totals) is what /v1/operations, the SDK"
+        " and the agent Tool return, on live Tiled too",
         "Totals unchanged under truncation on a gold population (H3 oracle)",
         fixtures=["tests/operations/scale_population.py"],
     ),
