@@ -936,6 +936,11 @@ class JobAuthority:
         self._lookup = credential_lookup
         self._clock: Clock = clock or (lambda: datetime.now(timezone.utc))
 
+    @property
+    def credential_lookup(self) -> Optional[CredentialLookup]:
+        """The ``subject -> current credential`` lookup this authority re-verifies with (``None`` on local)."""
+        return self._lookup
+
     def for_job(self, job: Any) -> Callable[[Any, Sequence[str]], RequestContext]:
         """The authority of one run of ``job`` (a stopped run never resumes effects)."""
         return _JobRunAuthority(self, job)

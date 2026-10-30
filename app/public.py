@@ -12,7 +12,13 @@ the methods that exist today are implemented:
 - :meth:`F2WClient.submit_ingest`, :meth:`~F2WClient.get_job`, :meth:`~F2WClient.cancel_job`,
   :meth:`~F2WClient.plan_publication` and :meth:`~F2WClient.approve_plan`: forwarded unchanged
   to the shared :class:`~app.api.operations.F2WOperations` service the ``/v1`` routes call, so
-  the same authorization applies as over HTTP (C2). They need ``operations=`` at construction.
+  the same authorization applies as over HTTP (C2). They need ``operations=`` at construction;
+- :meth:`F2WClient.graph_statistics`, :meth:`~F2WClient.compare_graphs`,
+  :meth:`~F2WClient.paper_subgraph`, :meth:`~F2WClient.recent_entities`,
+  :meth:`~F2WClient.audit_corpus`, :meth:`~F2WClient.run_knowledge_operation`,
+  :meth:`~F2WClient.submit_knowledge_operation` and :meth:`~F2WClient.knowledge_job_result`
+  (T19E): the five T19C Knowledge Operations, forwarded unchanged to the same
+  ``F2WOperations`` (``/v1/operations/...``); the typed result is the agent Tool's.
 
 The other methods of the specification raise ``NotImplementedError`` naming the
 task that implements them.
@@ -224,6 +230,50 @@ class F2WClient:
         plan_sha256 = plan if isinstance(plan, str) else plan.plan_sha256
         return self._operations("approve_plan").approve_publication(
             ctx, job_id, plan_sha256, approver_credential=approver_credential, expires_at=expires_at)
+
+    # -- knowledge operations (T19E): forwarded to the shared F2WOperations (same policy as /v1) -----
+
+    def run_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any]) -> ToolResult:
+        """Run one T19C operation by Tool name (``F2WOperations.run_knowledge_operation``).
+
+        Returns the bounded ``ToolResult`` the agent Tool returns: ``status`` ``ok`` for a complete
+        scan, ``partial`` for a stopped one; refusals raise ``ContractError``.
+        """
+        return self._operations("run_knowledge_operation").run_knowledge_operation(ctx, operation, args)
+
+    def graph_statistics(self, ctx: RequestContext, graph_id: str) -> ToolResult:
+        """``kg_compute_statistics`` (``GET /v1/operations/statistics``)."""
+        return self._operations("graph_statistics").graph_statistics(ctx, graph_id)
+
+    def compare_graphs(self, ctx: RequestContext, graph_ids: Sequence[str]) -> ToolResult:
+        """``kg_compare_snapshots`` (``GET /v1/operations/compare``)."""
+        return self._operations("compare_graphs").compare_graphs(ctx, graph_ids)
+
+    def paper_subgraph(self, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: Optional[int] = None,
+                       max_edges: Optional[int] = None) -> ToolResult:
+        """``kg_paper_subgraph`` (``GET /v1/operations/paper-subgraph``)."""
+        return self._operations("paper_subgraph").paper_subgraph(ctx, graph_id, paper, max_nodes=max_nodes,
+                                                                 max_edges=max_edges)
+
+    def recent_entities(self, ctx: RequestContext, graph_id: str, *, since: Optional[str] = None,
+                        limit: Optional[int] = None) -> ToolResult:
+        """``kg_recent_entities`` (``GET /v1/operations/recent``; Tiled graphs only)."""
+        return self._operations("recent_entities").recent_entities(ctx, graph_id, since=since, limit=limit)
+
+    def audit_corpus(self, ctx: RequestContext, corpus: str, *, sections: Optional[Sequence[str]] = None
+                     ) -> ToolResult:
+        """``curate_audit_corpus`` (``GET /v1/operations/corpus-audit``)."""
+        return self._operations("audit_corpus").audit_corpus(ctx, corpus, sections=sections)
+
+    def submit_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
+                                   corpus_scope: Optional[Sequence[str]] = None) -> Any:
+        """Submit a ``knowledge_operation`` job (``POST /v1/operations/jobs``; ``ops.run``). Returns the handle."""
+        return self._operations("submit_knowledge_operation").submit_knowledge_operation(
+            ctx, operation, args, corpus_scope=corpus_scope)
+
+    def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> Any:
+        """Handle and bounded report of a ``knowledge_operation`` job (``GET /v1/operations/jobs/{id}``)."""
+        return self._operations("knowledge_job_result").knowledge_job_result(ctx, job_id)
 
     # -- specified, not implemented yet ------------------------------------------------------
 

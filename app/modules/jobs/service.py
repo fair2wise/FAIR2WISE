@@ -138,6 +138,10 @@ class JobService:
         self._kinds[kind] = entry
         return entry
 
+    def has_kind(self, name: str) -> bool:
+        """Whether ``name`` is a registered job kind."""
+        return name in self._kinds
+
     def kind(self, name: str) -> RegisteredKind:
         """A registered kind, or ``INVALID_INPUT``."""
         try:
