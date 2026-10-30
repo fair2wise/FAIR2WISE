@@ -544,9 +544,10 @@
       "title": "Image diet and reproducibility",
       "source": "plan_addenda.md A5",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "image diet and reproducibility (plan_addenda A5); in progress in parallel with T28D"
+      "status": "merged",
+      "merge_commit": "229f10091fdfbc31b3de75d4dfe8823e5d378179",
+      "note": "image diet and reproducibility (plan_addenda A5); in progress in parallel with T28D",
+      "merge_commit_subject": "Merge T28C image hygiene: F2W_DOTENV entry points, hashed locks, shipped-untracked check, probes in suite"
     },
     {
       "id": "T28D",

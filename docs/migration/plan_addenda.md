@@ -296,6 +296,8 @@ against the code myself.
 | AUD-03 model API projection and loopback bind | `12156d1` (T28A) | T18C F3 expected failure now passes |
 | AUD-04 legacy origin gate, 128 MiB cap, no ALS CORS fallback | `12156d1` (T28A) | B8/B9 applied as part of T28A |
 | AUD-15 secret file mode/owner; startup route assertion | `12156d1` (T28A) | |
+| AUD-02 dotenv entry points; stale `scripts/app` no longer shipped | T28C merge | hashed locks `runtime.lock.txt`/`constraints.lock.txt` with `--require-hashes`; `shipped_untracked_files` manifest warning (flips to refusal on PC-1) |
+| AUD-10/11/12/14 docs, ADRs, plan notes, task status overlay | `e10e1b3` (T28D) | register D3.8-D3.12 added |
 
 Still open from A5: A5-1/PC-1 (terminology files in the image, owner decision), AUD-02 (import-time dotenv in two legacy entry points and the stale `scripts/app/` copy), AUD-11/AUD-12 docs and ADRs (T28D), AUD-05/06/10/14/16 and the notes. Full suite after T28A+T28B: 4,585 passed, 1 known failure.
 
