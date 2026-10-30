@@ -180,6 +180,8 @@ def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: Optional[
 
     require_scope(ctx, graph_id)
     control = control or ScanControl()
+    if hasattr(port, "resolve") and callable(getattr(port, "resolve")):  # CompositeGraphPort: route by graph id
+        return scan_graph(port.resolve(graph_id), ctx, graph_id, control)
     if hasattr(port, "snapshot") and callable(getattr(port, "snapshot")):
         return _scan_json(port, ctx, graph_id, control)
     if hasattr(port, "client") and port.capabilities().backend == "tiled":
@@ -672,7 +674,8 @@ class GraphOperationsTool:
     """The four graph Tools bound to one GraphPort.
 
     Args:
-        port: ``JsonGraphBackend``, ``TiledGraphBackend`` or another GraphPort that can
+        port: ``JsonGraphBackend``, ``TiledGraphBackend``, a ``knowledge.CompositeGraphPort``
+            (routes each graph id to the backend holding it) or another GraphPort that can
             iterate a graph.
         graph_ids: Graph ids this deployment exposes (``None``: whatever the port and the
             request scope allow). An id outside it is ``NOT_FOUND``.

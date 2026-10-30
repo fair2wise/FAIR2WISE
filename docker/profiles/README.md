@@ -30,6 +30,18 @@ Tracked `storage/kg` and `storage/terminology` JSON are included (owner O-D1, H0
 | 3 | `worker` (`python -m app.modules.workers`) | yes | yes | none | alive 3 s | yes |
 | 4 | `gateway` (nginx with `docker/nginx.conf`) | yes | yes | 0.0.0.0:8080 (`F2W_GATEWAY_PORT`) | `/fair2wise/healthz` | yes |
 
+The `api` service's Knowledge Operations (`/v1/operations/*`, T19E) read the profile's Tiled
+graphs by default on every profile, `:local` included (owner decision D3.17, O-X4, 2026-10-30):
+`create_api_app` builds `KnowledgeOperations.from_deployment`, a composite graph port over the
+JSON graphs in `storage/kg` **and** the Tiled target of the profile. On `:local` the managed
+`tiled` service is located through its manifest under `F2W_TILED_DATA_DIR` and read with the
+writer key from `secrets/writer.key` (read per request, never held or logged); on ALS the
+fixed `F2W_TILED_URL` is read with `F2W_TILED_WRITER_SECRET_FILE`. Reads only: no mutation is
+reachable through the operations. Graph ids in Tiled are discovered from the `f2w_graph_id`
+markers (cached 60 s; a JSON graph of the same id shadows the Tiled copy); a Tiled that is not
+running or unreachable leaves the JSON graphs served and records one warning. Override with
+`create_api_app(knowledge_operations=...)`.
+
 The gateway is the one container ingress. It listens on `F2W_GATEWAY_PORT` (profile default
 `8080`, the T24A contract; overridable at run time, refused if it equals the API or Tiled port).
 The port is unprivileged, so the uid-10001 nginx needs no `setcap`/`cap_net_bind_service`.

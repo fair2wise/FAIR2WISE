@@ -26,14 +26,36 @@ selection (T25D: the legacy UI passes the active runtime's JSON graph files) and
 follows the deployment's ``storage/kg`` directory. A graph outside the current list is
 ``NOT_FOUND``; graphs are never merged.
 
+**Tiled graphs on every profile (owner decision D3.17, O-X4, 2026-10-30).**
+:class:`CompositeGraphPort` serves the JSON graphs *and* the deployment's Tiled graph
+backend behind one GraphPort: ``graph_ids()`` lists the JSON ids followed by the graph ids
+discovered in Tiled (the ``f2w_graph_id`` marker of owned literature entities, see
+:mod:`app.modules.graph.identity_adapter`), each id is routed to the backend that holds it,
+and ``capabilities(graph_id)`` is the routed backend's. Discovery is a paged GraphQL scan
+cached for :data:`TILED_DISCOVERY_TTL` seconds and refreshed by ``reload()``. On a
+collision the JSON graph wins and the Tiled copy is shadowed (a warning names it): T08B
+publishes a JSON graph to Tiled under the same graph id, so a collision is the same graph
+in two backends and the snapshot-isolated JSON file is the exact one; no prefix scheme is
+introduced. An unreachable or unconfigured Tiled never breaks the JSON graphs: its ids are
+absent, and the reason is recorded once (:attr:`CompositeGraphPort.warnings`, plus one log
+line). :meth:`KnowledgeOperations.from_deployment` builds this bundle from the trusted
+startup settings: the managed loopback server on ``:local`` (writer key read from its
+secret file per request, never held or logged) or the fixed external target on ALS
+(writer secret file per request). Reads only: no mutation is reachable through the
+operations (the Tiled adapter refuses every write).
+
 Importing this module has no side effects.
 """
 
 from __future__ import annotations
 
+import logging
+import os
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from urllib.parse import urlsplit
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolSpec
 from ..security.authorization import require
@@ -51,8 +73,18 @@ from .reports import (
 
 #: Capability every Knowledge Operation read needs (T19C contract).
 READ_CAPABILITY = "chat.ask"
+#: Seconds a Tiled graph-id discovery stays valid before the next ``graph_ids()`` re-scans.
+TILED_DISCOVERY_TTL = 60.0
+#: Entities one discovery scan reads at most; beyond it the listing is partial (warned once).
+TILED_DISCOVERY_MAX_SCAN = 100_000
+
+_LOG = logging.getLogger(__name__)
+#: Discovery reads only what ``literature_entity_key`` needs (owner marker, graph id, URI).
+_DISCOVER_Q = "query($l: Int!, $o: Int!) { entities(limit: $l, offset: $o) { uri properties } }"
 
 GraphFilesProvider = Callable[[], Sequence[Union[str, Path]]]
+#: Returns the Tiled GraphPort to read, or ``None`` when no server is reachable right now.
+TiledBackendFactory = Callable[[], Optional[Any]]
 
 
 class DynamicJsonGraphs:
@@ -98,6 +130,248 @@ class DynamicJsonGraphs:
         with self._lock:
             self._backend = None
             self._files = ()
+
+
+class CompositeGraphPort:
+    """One GraphPort over the JSON graphs and the deployment's Tiled graph backend (D3.17).
+
+    Args:
+        json_port: The JSON GraphPort (:class:`DynamicJsonGraphs` or a ``JsonGraphBackend``).
+        tiled: A Tiled GraphPort (``TiledGraphBackend``), a :data:`TiledBackendFactory` that
+            resolves one on demand (``None`` while no server is reachable), or ``None`` for a
+            JSON-only bundle. A factory is re-run after a failed read and after
+            :meth:`reload`, so a managed server started later is picked up.
+        ttl: Seconds the discovered Tiled graph ids stay cached.
+        max_scan: Entities one discovery scan reads at most.
+        clock: Monotonic clock (tests inject one).
+
+    Routing: a graph id in the JSON list is read from JSON; otherwise one discovered in
+    Tiled is read from Tiled; anything else is ``NOT_FOUND``. A Tiled id equal to a JSON id
+    is shadowed by the JSON graph (warned once; see the module docstring).
+    """
+
+    def __init__(self, json_port: Any, tiled: Union[Any, TiledBackendFactory, None] = None, *,
+                 ttl: float = TILED_DISCOVERY_TTL, max_scan: int = TILED_DISCOVERY_MAX_SCAN,
+                 clock: Callable[[], float] = time.monotonic) -> None:
+        self._json = json_port
+        if tiled is None:
+            self._factory: Optional[TiledBackendFactory] = None
+        elif callable(tiled) and not hasattr(tiled, "capabilities"):
+            self._factory = tiled
+        else:
+            fixed = tiled
+            self._factory = lambda: fixed
+        self._ttl = float(ttl)
+        self._max_scan = max(1, int(max_scan))
+        self._clock = clock
+        self._lock = threading.RLock()
+        self._backend: Any = None
+        self._ids: Tuple[str, ...] = ()
+        self._expires: Optional[float] = None
+        self._warnings: List[str] = []
+
+    # -- diagnostics ----------------------------------------------------------------------------
+
+    @property
+    def warnings(self) -> Tuple[str, ...]:
+        """Reasons recorded (once each) for Tiled graphs being absent or partially listed."""
+        return tuple(self._warnings)
+
+    @property
+    def json_port(self) -> Any:
+        """The JSON GraphPort."""
+        return self._json
+
+    def record_warning(self, message: str) -> None:
+        """Record ``message`` once (and log it once); repeats are dropped."""
+        with self._lock:
+            if message in self._warnings:
+                return
+            self._warnings.append(message)
+        _LOG.warning("knowledge operations: %s", message)
+
+    # -- Tiled side -------------------------------------------------------------------------------
+
+    def tiled_backend(self) -> Optional[Any]:
+        """The Tiled GraphPort, resolving it through the factory when needed (``None`` if absent)."""
+        with self._lock:
+            if self._backend is not None or self._factory is None:
+                return self._backend
+            try:
+                backend = self._factory()
+            except Exception as exc:  # noqa: BLE001 - a Tiled problem never breaks the JSON graphs
+                from ..agent_runtime.executor import is_control_flow
+
+                if is_control_flow(exc):
+                    raise
+                self.record_warning(f"Tiled graph backend unavailable ({type(exc).__name__}): {exc}")
+                return None
+            if backend is None:
+                self.record_warning("no Tiled graph server is reachable; Tiled graphs are not listed")
+            self._backend = backend
+            return backend
+
+    def _discover(self) -> List[str]:
+        backend = self.tiled_backend()
+        if backend is None:
+            return []
+        from ..graph.identity_adapter import literature_entity_key
+
+        page = max(1, int(getattr(backend, "page_size", 500)))
+        found: List[str] = []
+        offset = 0
+        try:
+            while True:
+                limit = min(page, self._max_scan - offset)
+                if limit <= 0:
+                    self.record_warning(f"Tiled graph discovery stopped after {self._max_scan} entities; "
+                                        "graphs beyond that point are not listed")
+                    break
+                rows = backend.client.query(_DISCOVER_Q, {"l": limit, "o": offset}).get("entities") or []
+                for row in rows:
+                    key = literature_entity_key(row)
+                    if key is not None and key[0] not in found:
+                        found.append(key[0])
+                if len(rows) < limit:
+                    break
+                offset += len(rows)
+        except ContractError as exc:
+            self.record_warning(f"Tiled graphs are not listed ({exc.code.value}): {exc}")
+            self._backend = None  # re-resolve next time (a managed server may have moved)
+            return []
+        return sorted(found)
+
+    def tiled_graph_ids(self) -> List[str]:
+        """Graph ids discovered in Tiled (cached for ``ttl`` seconds; empty when Tiled is absent)."""
+        with self._lock:
+            now = self._clock()
+            if self._expires is None or now >= self._expires:
+                self._ids = tuple(self._discover())
+                self._expires = now + self._ttl
+            return list(self._ids)
+
+    # -- GraphPort ---------------------------------------------------------------------------------
+
+    def graph_ids(self) -> List[str]:
+        """JSON graph ids, then the Tiled graph ids not shadowed by a JSON graph."""
+        json_ids = list(self._json.graph_ids())
+        tiled_ids = self.tiled_graph_ids()
+        shadowed = [g for g in tiled_ids if g in json_ids]
+        if shadowed:
+            self.record_warning(f"Tiled graphs {shadowed} are shadowed by JSON graphs of the same id "
+                                "(JSON is read; the Tiled copy is not listed)")
+        return json_ids + [g for g in tiled_ids if g not in json_ids]
+
+    def resolve(self, graph_id: str) -> Any:
+        """The backend holding ``graph_id`` (JSON first).
+
+        Raises:
+            ContractError: ``NOT_FOUND`` when neither backend lists the graph.
+        """
+        if graph_id in self._json.graph_ids():
+            return self._json
+        if graph_id in self.tiled_graph_ids():
+            backend = self.tiled_backend()
+            if backend is not None:
+                return backend
+        raise ContractError(ErrorCode.NOT_FOUND, f"graph {graph_id!r} is not configured")
+
+    def capabilities(self, graph_id: Optional[str] = None) -> Any:
+        """Capabilities of the backend serving ``graph_id`` (the JSON backend's when no id is given)."""
+        if graph_id is None:
+            return self._json.capabilities()
+        return self.resolve(graph_id).capabilities()
+
+    def reload(self) -> None:
+        """Drop loaded JSON snapshots, the cached Tiled ids and backend, and the recorded warnings."""
+        with self._lock:
+            if hasattr(self._json, "reload"):
+                self._json.reload()
+            self._backend = None
+            self._ids = ()
+            self._expires = None
+            self._warnings = []
+
+
+def _same_target(url: str, target: Optional[str]) -> bool:
+    if not target:
+        return False
+    a, b = urlsplit(url), urlsplit(target)
+    return (a.scheme.lower(), (a.hostname or "").lower(), a.port, a.path.rstrip("/")) == \
+        (b.scheme.lower(), (b.hostname or "").lower(), b.port, b.path.rstrip("/"))
+
+
+def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBackendFactory:
+    """A :data:`TiledBackendFactory` for the deployment's Tiled target (read-only adapter).
+
+    * ``managed`` (``:local`` and test fixtures): :func:`~app.modules.deployment.tiled_lifecycle.find_managed`
+      locates the running server by its manifest each time the factory runs; the writer key
+      is read from the managed secret file per request by ``TiledGraphClient.from_managed``.
+      No running server: ``None`` (the composite lists JSON graphs only until the next refresh).
+    * ``external`` (ALS): ``TiledGraphClient.from_external`` reads the writer secret file per request.
+
+    Credentials never pass through this module and are never logged.
+    """
+    from ..graph.backends.tiled import TiledGraphBackend
+    from ..graph.backends.tiled_client import TiledGraphClient
+
+    if tiled_settings.mode == "external":
+        external = tiled_settings.external
+
+        def from_external() -> Optional[Any]:
+            return TiledGraphBackend(TiledGraphClient.from_external(external), **backend_kw)
+
+        return from_external
+    managed = tiled_settings.managed
+
+    def from_managed() -> Optional[Any]:
+        from ..deployment.tiled_lifecycle import find_managed
+
+        server = find_managed(managed)
+        if server is None:
+            return None
+        return TiledGraphBackend(TiledGraphClient.from_managed(server), **backend_kw)
+
+    return from_managed
+
+
+def resolve_tiled_settings(settings: Any, environ: Any = None) -> Tuple[Optional[Any], Optional[str]]:
+    """``(TiledSettings, None)`` for the deployment, or ``(None, reason)`` when Tiled is not usable.
+
+    Args:
+        settings: The ``DeploymentSettings`` (its profile is authoritative).
+        environ: The trusted startup environment (``os.environ`` when ``None``), or a
+            ready ``TiledSettings``.
+
+    An external target that is not the deployment's ``tiled_target`` (for example a
+    disposable loopback rehearsal target on an ALS test profile) is refused, so the
+    operations never contact a Tiled host the deployment is not bound to. A configuration
+    error is a reason, not an exception: the deployment preflight already fails closed on
+    it, and the operations keep serving the JSON graphs.
+    """
+    from ..deployment.tiled_config import TiledConfigError, TiledSettings, load_tiled_settings
+
+    profile = getattr(getattr(settings, "profile", None), "value", None) or str(getattr(settings, "profile", ""))
+    if isinstance(environ, TiledSettings):
+        tiled = environ
+        if tiled.profile != profile:
+            return None, f"Tiled settings are for profile {tiled.profile!r}, the deployment runs {profile!r}"
+    else:
+        env: Dict[str, str] = {k: str(v) for k, v in (os.environ if environ is None else environ).items()}
+        env["F2W_DEPLOYMENT_PROFILE"] = profile
+        try:
+            tiled = load_tiled_settings(env)
+        except TiledConfigError as exc:
+            return None, f"Tiled is not configured for the operations: {exc}"
+    if tiled.mode == "external":
+        if tiled.external is None:
+            return None, "external Tiled mode without a target"
+        if not _same_target(tiled.external.url, getattr(settings, "tiled_target", None)):
+            return None, (f"Tiled target {tiled.external.url} is not the deployment's "
+                          f"{getattr(settings, 'tiled_target', None)}; Tiled graphs are not listed")
+    elif tiled.managed is None:
+        return None, "managed Tiled mode without a server configuration"
+    return tiled, None
 
 
 def storage_graph_files(root: Union[str, Path]) -> List[str]:
@@ -175,10 +449,49 @@ class KnowledgeOperations:
         return cls(graph, corpus, artifact_store=artifact_store)
 
     @classmethod
+    def from_deployment(cls, settings: Any, environ: Any = None, root: Union[str, Path, None] = None, *,
+                        artifact_store: Any = None, graph_max_records: int = 500_000,
+                        discovery_ttl: float = TILED_DISCOVERY_TTL) -> "KnowledgeOperations":
+        """Operations over ``<root>/storage/kg`` *and* the deployment's Tiled graphs (D3.17).
+
+        Args:
+            settings: The ``DeploymentSettings`` of the process (profile, Tiled target).
+            environ: The trusted startup environment (``os.environ`` when ``None``) read once
+                here through :func:`~app.modules.deployment.tiled_config.load_tiled_settings`,
+                or a ready ``TiledSettings``.
+            root: Project root (``Path.cwd()`` when ``None``) for ``storage/kg`` and ``storage/terminology``.
+            discovery_ttl: Seconds the discovered Tiled graph ids stay cached.
+
+        On ``:local`` the managed loopback server is located by its manifest and read with the
+        writer key from its secret file (per request); on ALS the fixed external target is read
+        with the writer secret file. When Tiled is not configured, not running or bound to
+        another target, the bundle serves the JSON graphs and records the reason once
+        (``operations.graph.port.warnings``). Nothing is contacted at construction time.
+        """
+        root = Path(root) if root is not None else Path.cwd()
+        tiled, reason = resolve_tiled_settings(settings, environ)
+        port = CompositeGraphPort(DynamicJsonGraphs(lambda: storage_graph_files(root)),
+                                  tiled_backend_factory(tiled) if tiled is not None else None, ttl=discovery_ttl)
+        if reason:
+            port.record_warning(reason)
+        graph = GraphOperationsTool(port, max_records=graph_max_records)
+        corpus = CorpusAuditTool(directory_corpus_resolver(root / "storage" / "terminology"))
+        return cls(graph, corpus, artifact_store=artifact_store)
+
+    @classmethod
     def from_graph_files(cls, provider: GraphFilesProvider, *, corpus: Optional[CorpusAuditTool] = None,
-                         artifact_store: Any = None, graph_max_records: int = 500_000) -> "KnowledgeOperations":
-        """Operations following a caller-supplied graph selection (T25D: the active runtime's files)."""
-        graph = GraphOperationsTool(DynamicJsonGraphs(provider), max_records=graph_max_records)
+                         artifact_store: Any = None, graph_max_records: int = 500_000,
+                         tiled: Union[Any, TiledBackendFactory, None] = None,
+                         discovery_ttl: float = TILED_DISCOVERY_TTL) -> "KnowledgeOperations":
+        """Operations following a caller-supplied graph selection (T25D: the active runtime's files).
+
+        ``tiled`` (a Tiled GraphPort or a :data:`TiledBackendFactory`) adds the deployment's Tiled
+        graphs beside the selection through a :class:`CompositeGraphPort`; ``None`` keeps JSON only.
+        """
+        port: Any = DynamicJsonGraphs(provider)
+        if tiled is not None:
+            port = CompositeGraphPort(port, tiled, ttl=discovery_ttl)
+        graph = GraphOperationsTool(port, max_records=graph_max_records)
         return cls(graph, corpus, artifact_store=artifact_store)
 
     # -- agent runtime -------------------------------------------------------------------------
@@ -307,6 +620,8 @@ def job_scope(args: Mapping[str, Any]) -> Tuple[str, ...]:
 
 
 __all__: Tuple[str, ...] = (
-    "DynamicJsonGraphs", "KnowledgeOperations", "OPERATION_JOB_KIND", "READ_CAPABILITY",
-    "directory_corpus_resolver", "job_params", "job_scope", "knowledge_job_context", "storage_graph_files",
+    "CompositeGraphPort", "DynamicJsonGraphs", "KnowledgeOperations", "OPERATION_JOB_KIND", "READ_CAPABILITY",
+    "TILED_DISCOVERY_MAX_SCAN", "TILED_DISCOVERY_TTL", "TiledBackendFactory", "directory_corpus_resolver",
+    "job_params", "job_scope", "knowledge_job_context", "resolve_tiled_settings", "storage_graph_files",
+    "tiled_backend_factory",
 )
