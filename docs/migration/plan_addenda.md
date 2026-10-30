@@ -308,6 +308,191 @@ Dependencies: T28A and T28B block H4. T28C and T28D block H6 and may run in
 parallel with T12 and the Tiled editing tasks. All four take the existing
 gate and branch rules; none needs a schema or UI change.
 
+## A6 (2026-10-30, owner decisions O-E1 Q1-Q16, O-U3): Tiled graph editing
+
+Source: `docs/migration/ui_contracts/tiled_graph_editing_plan.md` (sections 1-5, decision
+table in section 6) and the owner's answers recorded verbatim in
+`docs/migration/reviews/H1/owner_decisions.md` (batches 4-8). The seven tasks below are the
+section-5 proposals, changed where an answer differs from the recommendation:
+
+- **Q1 (revised):** one stable Tiled graph per corpus; the live version is named in a
+  release marker; unchanged records keep their Tiled ids across versions.
+- **Q7 (STOP-1): multi-write per Save**, not journal-and-defer. Every Save performs its
+  recreate-links sequence on Tiled immediately, journaled and resumable, with a recovery
+  job for half-moved links. Hence **Q12:** a Save is acknowledged only after the journal
+  write *and* the Tiled effect; a partial failure returns the existing 502, marks the
+  journal entry failed and leaves reconciliation to the recovery job. Q8 and Q14 apply to
+  every Save.
+- **Q13 (STOP-6): capability read.** The frozen UI reads the caller's capabilities and
+  hides Save/edit controls for ALS non-admins (**O-U3, granted in principle**); the server
+  403 stays as the backstop; the CI `FROZEN_UI_TREE` pin moves in the implementing change.
+- **Q14: ignore and continue.** A foreign record that changes under a run never stops the
+  run; the pre/post fingerprint report records the change in the receipt.
+- Q2-Q6, Q8-Q11, Q15, Q16 as recommended (staged/switch/retire; purge as a separate
+  admin-approved step, never for records with foreign links, one previous version kept;
+  foreign links reported before approval; release marker written; ledger-pinned F2W reads
+  during a switch; Save during a switch refused with 502; only F2W-owned links removed;
+  implicit snippet unlink kept with a 409 stale-revision check; `:local` publishes
+  automatically after extraction when the plan is safe, ALS waits for admin review;
+  rollback below a carried-forward edit needs a reviewed resolution; one verified admin
+  approves als-prod replacement or purge, revisited before the first production purge).
+
+All tasks run only against disposable or managed `:local` Tiled servers until H5. Binary
+cases TIL-08..TIL-21 are as listed in the editing plan; T18D adds a capability-read case
+(TIL-22) for Q13.
+
+### T20C: Pin edit-relevant Tiled 0.2.18 facts
+- **Depends on:** T20B. **Blocks:** T08C, T08D.
+- **Scope:** probes P1-P9 as `tests/tiled/test_tiled_edit_facts_0218.py`; section 4.2 notes
+  into `capabilities_0.2.18.md`; capability flags `delete_cascades_foreign_links` and
+  `blob_update_effective`.
+- **Acceptance:** one test per fact; a server where a fact changes fails exactly that test.
+- **Binary cases:** TIL-08.
+
+### T08C: Corpus-scoped replacement import (stage, switch, retire, revive)
+- **Depends on:** T20C, T08B, T10. **Blocks:** T18D, T18E, T10B.
+- **Scope:** scope key = corpus (Q1), graph-id mapping for JSON unchanged, one-time adoption
+  plan for the existing `:local` per-version imports; release marker (Q5); `f2w:Staged` /
+  `f2w:Retired` types; two-phase stage and switch (Q2); revive-from-retired; boundary-link
+  report in the plan hash (Q4); I7 read probes; ledger history per scope; ledger-pinned
+  reader during a switch (Q6); abandon-plan.
+- **Acceptance:** v4 to v5 on a seeded server with FORGE links leaves every foreign record
+  byte-identical; unchanged nodes keep their Tiled UUIDs; boundary links are listed and
+  require approval; a crash at every stage/switch point resumes without duplicates; F2W
+  readers never see a mixed graph; type-filtered listings never return staged or retired
+  F2W records.
+- **Binary cases:** TIL-09..TIL-14.
+
+### T08D: Guarded purge, corpus removal and the Save recovery job
+- **Depends on:** T08C.
+- **Scope:** purge plan with its own approval (Q3); per-record link check; owned links
+  first; re-read before delete; corpus retire-all with typed scope confirmation; pointer to
+  none. **Added by Q7:** the recovery job that finishes or reverts a Save whose multi-write
+  sequence stopped half-way (journal entry `failed`), idempotent and resumable.
+- **Acceptance:** a retired record with any foreign link is skipped and reported, never
+  deleted; other scopes untouched; committed JSON untouched; re-import from Git restores the
+  corpus; a Save interrupted after any Tiled write is reconciled by the recovery job to
+  either the full effect or the pre-Save state, with the journal saying which.
+- **Binary cases:** TIL-15, TIL-16, TIL-18 (extend: recovery).
+
+### T23C: Edit reconciliation and rollback protection (F4/B26, Q15)
+- **Depends on:** T23B, T08B. **Blocks:** T18D, T10B.
+- **Scope:** full-lineage check; `reconciled` edits protect imports whose lineage lacks their
+  snapshot; journal replay onto rebuilds with conflicts; content-derived edit ids for
+  idempotent Save retries.
+- **Acceptance:** rollback below a reconciliation snapshot is refused without a
+  `ConflictResolution`; a rebuild keeps every edit or records a conflict; the T18C F4 pin
+  flips.
+- **Binary cases:** TIL-17, JSON-10 (extend).
+
+### T18D: Legacy Save as journaled multi-write, plus the capability read (O-U3)
+- **Depends on:** T23C, T08C, T25C. **Needs:** O-U3 (granted in principle; the UI diff is
+  reviewed by the owner before merge).
+- **Scope:** `update_graph_node` with no Splash calls; authorization first; the Save
+  sequence (journal entry, Tiled writes, readback) executes immediately (Q7) and returns
+  only after the Tiled effect (Q12); Q9 restriction to F2W-owned links; Q10 implicit unlink
+  with the 409 revision check; Q8 refusal (502) during a switch; `/graph`, search and
+  retrieval read the active graph plus any in-flight journal entries; "Publish edits" is
+  no longer needed for Tiled effect but the journal still feeds `v<N+1>` snapshots.
+  **UI (O-U3):** a capability read (`GET /v1/capabilities` or the existing session DTO)
+  that hides Save/edit controls for ALS non-admins; `FROZEN_UI_TREE` updated in the same
+  change; the server 403 remains (Q13).
+- **Acceptance:** UI04, UI15, UI16, UI17 pass on Tiled in `tests/e2e/live_backend/full`;
+  same id read back after Save; old citations resolve; a crash after the fsync but before
+  the Tiled effect is answered on retry with the same readback once the recovery job has
+  run; an ALS non-admin sees no Save control and gets a 403 with no journal entry if the
+  request is forged.
+- **Binary cases:** TIL-05 (extend), TIL-18, TIL-19, TIL-22 (new: non-admin UI shows no
+  edit controls; server still 403).
+
+### T18E: Post-extraction publication replaces `splash_reimport` (Q11)
+- **Depends on:** T18D, T08C, T10.
+- **Scope:** remove the wipe path and `--allow-splash-wipe` from the images; freeze
+  `v<N+1>`, plan, then apply under the `:local` auto-approval policy only when the plan is
+  safe; on ALS stop at review; keep the SSE phase names.
+- **Acceptance:** UI12 Tiled stage passes; no delete outside the plan; ALS never
+  auto-approves; an unsafe plan on `:local` waits for review; the last binary known
+  failure (splash wipe) is retired.
+- **Binary cases:** TIL-20.
+
+### T10B: Rollback, replacement, job kinds and auto re-plan in the publication job
+- **Depends on:** T08C, T23C. Absorbs owner decisions B5 (job kinds), B27, B28, D1.10.
+- **Scope:** rollback = a replacement plan to the chosen version through revive, pointer
+  history kept in step with the release marker (TIL-14); **Q14** foreign-change report in
+  the receipt without failing the run; **B27** the runner re-plans automatically after a
+  stale approval and waits for approval of the new plan; **B28** the two-pointer rollback
+  toggle documented; **B5** job kinds for enrichment, topic sweep and PDF parse (J-11,
+  RT-27..RT-32) on the `/v1/jobs` lifecycle with `jobs.admin`/`curation.approve`; **D1.10**
+  the near-duplicate title check as a `knowledge_operation` job above 2,000 keys (inline
+  below).
+- **Acceptance:** v5 to v4 to v5 restores the same Tiled UUIDs; marker and pointer agree
+  after every step; a foreign change during a run appears in the receipt and the run
+  completes; a stale approval produces a new plan awaiting approval without a manual
+  re-submit; each new job kind has a fake handler test and a route policy row.
+- **Binary cases:** TIL-06 (extend), TIL-21.
+
+## A7 (2026-10-30, owner decisions O-P2..O-P5, O-S2..O-S4, O-X3): parsing, schema follow-ups and small tasks
+
+Work items the register walk-through produced that fit no existing task. Each cites its
+decision in `docs/migration/reviews/H1/owner_decisions.md`.
+
+### T29: Parsing, intake metadata and literature tooling
+- **Depends on:** T05, T06. **Blocks:** H5 publication (B2), the pilot default parser.
+- **Scope:**
+  1. **B1:** Docling behind the pluggable parser interface; default once parity tests pass
+     on the pilot papers; PyMuPDF stays available and default until then.
+  2. **B2:** licensing / open-access metadata at intake (OpenAlex/Crossref fields plus the
+     PDF's own notice) on the paper record; required before any H5 publication.
+  3. **B5:** L-14 reference parsing, L-15 section projection, L-16 paper context, L-17
+     citation links, as provenance-tagged statements (plan L-14/L-20 rule).
+  4. **B3:** R-08 Langfuse tracer as an opt-in exporter behind a setting, off by default,
+     with a disclosure review (traces hold source text); X-05 `seed_synthetic_kg.py` and
+     X-07 `bench_kg.py` ported into `scripts/` as developer tools; A-01
+     `openalex_supplement.json` retired once L-17 regenerates the citation links.
+  5. **B29:** the legacy `DownloadAgent` switched to the hardened T05 downloader behind a
+     parity test on the existing download fixtures.
+- **Acceptance:** parser parity report on the pilot papers (Docling vs PyMuPDF; text,
+  sections, tables); every intake record carries licence fields or an explicit `unknown`;
+  Langfuse export is impossible without the setting and passes the disclosure projector;
+  download parity test green; no live network in tests.
+
+### T22D: Schema 0.3.1 and the bl1101 reconciliation (O-S2, O-S3)
+- **Depends on:** T22C. **Blocks:** the pilot extraction (T12).
+- **Scope:** **D1.4** normalized-value slot (converted value, unit, factor, conversion
+  profile as provenance) as versioned additive change 0.3.1; **D1.3** bl1101 v3 mapping
+  `Sample`, `Detector`, `Endstation` onto 0.3.0 `Sample`/`Instrument` (reviewed diff);
+  **D1.5/D3.12** `RECIPROCAL_DERIVATION_REL_TOL = 0.02`; **D1.6** cited wins over derived
+  with the derivation recorded; **D1.9** content-hash step in the K1 distinct-Work rule as
+  a versioned rule change with parity tests; **D1.7** opt-in `--figures multimodal` flag on
+  the labelling tool (figure crops to a vision-capable CBORG model), off by default.
+- **Acceptance:** all tracked KGs validate under 0.3.1; bl1101 v3 round-trips; tolerance and
+  precedence covered by unit tests; K1 parity tests pass with and without the hash step;
+  the multimodal flag makes no network call unless given.
+
+### T30: OCR engine for figures (V-05)
+- **Depends on:** T09. **Scope:** a real OCR backend behind the existing figure-OCR
+  interface, offline-capable in the images (model files baked like MiniLM or an opt-in
+  extra), used by the scale and axis readers. **Acceptance:** fixture figures read within
+  the FIG tolerances; images without the extra degrade to the current behaviour.
+
+### T31: Missing `/v1` routes (B5)
+- **Depends on:** T10, T19C. **Scope:** cost control, bulk review, vocabulary quality and
+  figure-scale records as `/v1` routes with policies, DTO projection and SDK/CLI parity.
+  **Acceptance:** route-policy table rows, `undeclared_routes` assertion unchanged,
+  contract tests on both profiles.
+
+### T32: `:local`-only folder routes (B4)
+- **Scope:** folder browse/index routes on `:local` only, root directories fixed in
+  configuration, disabled (404) on ALS images. **Acceptance:** path traversal tests;
+  ALS gateway tests show 404.
+
+### Applied directly on `forge_merge` (2026-10-30, integrator record)
+
+| Decision | Commit | Note |
+|---|---|---|
+| PC-1 / D3.1 (O-D3) terminology files tracked and shipped | `7e3876a` | `.gitignore` rule dropped, nine files (163 MB) committed, `REFUSE_SHIPPED_UNTRACKED_FILES=True` |
+| D3.5 / D3.8 / B14 (O-T2) approval TTL none on `:local`, 24 h on ALS | `120ef06` | `default_approval_ttl(settings)` |
+
 ## Order after H2
 
 T25D, T03B and T02B first (they can run in parallel), then the plan's

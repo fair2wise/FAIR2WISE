@@ -558,6 +558,114 @@
       "merge_commit": "e10e1b36fd06a87bb422ef87641f3f95dd723945",
       "note": "this overlay; becomes merged when its branch is merged to forge_merge",
       "merge_commit_subject": "Merge T28D documentation, ADR and register sync (AUD-10/11/12/14)"
+    },
+    {
+      "id": "T20C",
+      "title": "Pin edit-relevant Tiled 0.2.18 facts",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T08C",
+      "title": "Corpus-scoped replacement import (stage, switch, retire, revive)",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T08D",
+      "title": "Guarded purge, corpus removal and the Save recovery job",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T23C",
+      "title": "Edit reconciliation and rollback protection (F4/B26, Q15)",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T18D",
+      "title": "Legacy Save as journaled multi-write, plus the capability read (O-U3)",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T18E",
+      "title": "Post-extraction publication replaces splash_reimport (Q11)",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T10B",
+      "title": "Rollback, replacement, job kinds and auto re-plan in the publication job",
+      "source": "plan_addenda.md A6",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T29",
+      "title": "Parsing, intake metadata and literature tooling",
+      "source": "plan_addenda.md A7",
+      "gate": "H5",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T22D",
+      "title": "Schema 0.3.1 and the bl1101 reconciliation",
+      "source": "plan_addenda.md A7",
+      "gate": "H4",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T30",
+      "title": "OCR engine for figures (V-05)",
+      "source": "plan_addenda.md A7",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T31",
+      "title": "Missing /v1 routes (B5)",
+      "source": "plan_addenda.md A7",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+    },
+    {
+      "id": "T32",
+      "title": ":local-only folder routes (B4)",
+      "source": "plan_addenda.md A7",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through)"
     }
   ]
 }
