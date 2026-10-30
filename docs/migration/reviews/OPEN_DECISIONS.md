@@ -124,7 +124,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | B11 | **CSRF token for sign-out** | Sign-in and sign-out refuse cross-site requests, and the cookie is `SameSite=Strict`. A session-bound token is deferred because the frozen UI has no sign-in page to send one. | Accept the current protection until a sign-in page exists |
 | B12 | **In-memory ALS sessions** | A restart signs everyone out. | Accept until T24E (persistent store with the deployment) |
 | B13 | **Tiled 0.2.18 revocation window** | After a revocation or role downgrade, a Tiled token held outside F2W keeps working until it expires (up to 15 min). F2W sign-out is immediate, and F2W re-checks roles at each protected step (max age 60 s). | Accept for the interim pin; revisit with 0.2.19 |
-| B14 | **Approval expiry (TTL)** | The baseline never expires pending approvals, and the UI relies on them surviving reloads. Your H2 Q8 decision keeps them open across new messages. The access contract proposes a short TTL for ALS approvals. *Correction (T28D, AUD-10):* the code applies a 1 h TTL on every profile (`DEFAULT_APPROVAL_TTL = timedelta(hours=1)`, `app/api/operations.py:58`), not a 24 h placeholder; see D3.8. | `:local`: no expiry, as today. ALS: 24 h |
+| B14 | **Approval expiry (TTL)** | The baseline never expires pending approvals, and the UI relies on them surviving reloads. Your H2 Q8 decision keeps them open across new messages. The access contract proposes a short TTL for ALS approvals. *Correction (T28D, AUD-10):* the code applies a 1 h TTL on every profile (`DEFAULT_APPROVAL_TTL = timedelta(hours=1)`, `app/api/operations.py:58`), not a 24 h placeholder; see D3.8. | `:local`: no expiry, as today. ALS: 24 h | **Decided 2026-10-30 (O-T2): none on :local, 24 h on ALS.**
 
 ### Tiled (`docs/adr/evidence/tiled/capabilities_0.2.18.md`)
 
@@ -182,8 +182,8 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 
 | # | Decision | Context | Recommendation |
 |---|---|---|---|
-| D1.1 | Approve schema set 0.3.0 (`reviews/H3/schema_diff_T22C.md`) | Until approved, builds and publishing refuse 0.3.0; the pilot cannot extract samples or runs | Approve |
-| D1.2 | Class name `MeasurementRun` (and `RunCondition`) | `Measurement` already exists (123 nodes in the rsoxs graphs) and keeps its meaning | Accept |
+| D1.1 | Approve schema set 0.3.0 (`reviews/H3/schema_diff_T22C.md`) | Until approved, builds and publishing refuse 0.3.0; the pilot cannot extract samples or runs | Approve | **Decided 2026-10-30 (O-S1): approved.**
+| D1.2 | Class name `MeasurementRun` (and `RunCondition`) | `Measurement` already exists (123 nodes in the rsoxs graphs) and keeps its meaning | Accept | **Decided 2026-10-30 (O-S1): MeasurementRun accepted.**
 | D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change |
 | D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release |
 | D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% |
@@ -215,11 +215,11 @@ Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D3.1 | PC-1: paper snippets in images (`storage/terminology/*.json`, gitignored, 321 MB, ~141k snippets) | Exclude from images; keep gitignored |
+| D3.1 | PC-1: paper snippets in images (`storage/terminology/*.json`, gitignored, 321 MB, ~141k snippets) | Exclude from images; keep gitignored | **Decided 2026-10-30 (O-D3): track in Git and ship.**
 | D3.2 | PC-2: cumulative D19 budget per paper per session | Add a cap; number to be chosen |
 | D3.3 | PC-3: make T28A (authority wiring) a hard precondition of H4 | Yes (T28A merged `12156d1`; the precondition is now met) |
 | D3.4 | PC-5: owner records the H3 approval in the binary manifest (T28B) | Yes |
-| D3.5 | PC-6: approval TTL (code: 1 h everywhere; B14 said 24 h placeholder) | None on `:local`, 24 h on ALS |
+| D3.5 | PC-6: approval TTL (code: 1 h everywhere; B14 said 24 h placeholder) | None on `:local`, 24 h on ALS | **Decided 2026-10-30 (O-T2): none on :local, 24 h on ALS.**
 | D3.6 | Approve tasks T28A-T28D as proposed in A5 | Approve (T28A and T28B already merged as fixes; T28C/T28D pending) |
 | D3.7 | T26A release-contract questions Q2-Q6 (never recorded; see `docs/migration/companion` T26A notes) | Carried into this register by T28D as D3.9 |
 
@@ -229,10 +229,10 @@ Recorded for the owner; nothing below is answered here.
 
 | # | Decision | Context |
 |---|---|---|
-| D3.8 | **Approval TTL: code and register disagree** | `app/api/operations.py:58` sets `DEFAULT_APPROVAL_TTL = timedelta(hours=1)` and applies it on every profile, including `:local`. B14 described the code as a "24 h placeholder" (corrected above) and recommends no expiry on `:local` and 24 h on ALS; D3.5 repeats that recommendation. Until the owner answers, a `:local` publication approval becomes `STALE_APPROVAL` after one hour, which is not the baseline behaviour B14 promises to keep. Pending owner decision (OPEN_DECISIONS D3.5); the code is not changed by T28D. |
+| D3.8 | **Approval TTL: code and register disagree** | `app/api/operations.py:58` sets `DEFAULT_APPROVAL_TTL = timedelta(hours=1)` and applies it on every profile, including `:local`. B14 described the code as a "24 h placeholder" (corrected above) and recommends no expiry on `:local` and 24 h on ALS; D3.5 repeats that recommendation. Until the owner answers, a `:local` publication approval becomes `STALE_APPROVAL` after one hour, which is not the baseline behaviour B14 promises to keep. Pending owner decision (OPEN_DECISIONS D3.5); the code is not changed by T28D. | **Decided 2026-10-30 (O-T2).**
 | D3.9 | **T26A release-contract questions Q2-Q6** | Copied verbatim from `docs/migration/data_releases/release_contract.md` section 10 (Q1 was resolved by O-D1). Each is pending owner decision (OPEN_DECISIONS D3.9). |
 | D3.10 | **B25 lock change still pending** | `pip check` fails in the app environment (huggingface-hub vs click, `requirements/semantic.in` unpinned). B25 asks for a reviewed lock change (pin `huggingface-hub` below 1.33 or raise click in the lock). Not applied; T28C owns the requirements files. Pending owner decision (OPEN_DECISIONS B25). |
-| D3.11 | **May the integrator run `docker build` / `docker run` locally for the T24E container tests?** | B19 authorized the owner to build or to approve a local build (no push). `:local` was built and run once on 2026-10-29 (A5 section 1). T24E's container-level tests (supervisor, preflight, gateway on a real image) need repeated local builds and runs on the integrator's machine. No image is pushed and no registry login happens. Pending owner decision (OPEN_DECISIONS D3.11). |
+| D3.11 | **May the integrator run `docker build` / `docker run` locally for the T24E container tests?** | B19 authorized the owner to build or to approve a local build (no push). `:local` was built and run once on 2026-10-29 (A5 section 1). T24E's container-level tests (supervisor, preflight, gateway on a real image) need repeated local builds and runs on the integrator's machine. No image is pushed and no registry login happens. Pending owner decision (OPEN_DECISIONS D3.11). | **Decided 2026-10-30 (O-X1): yes, build and run locally.**
 | D3.12 | **D1.5 derived-value tolerance is still 1% in code** | `app/modules/evidence/units.py:381` `RECIPROCAL_DERIVATION_REL_TOL = 0.01`; D1.5 recommends 2% (paper A, 1.7% mismatch) and `extraction_field_mapping.md` says "1 % tolerance". The constant and the doc change together once D1.5 is decided (AUD-17; owner T06B). Pending owner decision (OPEN_DECISIONS D1.5). |
 
 **D3.9 verbatim text** (`release_contract.md` section 10, items 2-6):

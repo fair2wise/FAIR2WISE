@@ -191,3 +191,19 @@ backend currently lists (no hardcoded model). The choice is a setting read by
 the separate validation runner (binary suite, non-blocking for the app per H3
 B); each report records the judge model used. Implemented with T11B; the CI
 frozen-UI pin is updated in that change (as O-U1).
+
+## Register walk-through, batch 1 (2026-10-30)
+
+- **D3.1 / PC-1 (O-D3).** "Track in Git and ship": the `storage/terminology/*.json`
+  harvest files are committed and stay in every image. Consequences: remove the
+  `.gitignore` rule at line 185, commit the 9 files (321 MB), the release-manifest
+  `shipped_untracked_files` check becomes a refusal, O-D1's "stays in Git" is now true.
+- **D3.11 (O-X1).** "Yes, build and run locally": the integrator may run `docker build`
+  and `docker run` on this machine for the T24E container checks. Local images and
+  containers only, random loopback ports (never 8080 while the owner's container is
+  up), no push, no registry login, everything stopped and removed afterwards.
+- **D3.5 / D3.8 / B14 (O-T2).** Approval TTL: none on `:local`, 24 h on ALS. Chat
+  approvals keep never expiring (H2 Q8).
+- **D1.1 / D1.2 (O-S1).** Schema set 0.3.0 approved; name `MeasurementRun` (and
+  `RunCondition`) accepted. 0.3.0 becomes selectable for extraction and builds; the
+  default schema stays as is until the pilot.
