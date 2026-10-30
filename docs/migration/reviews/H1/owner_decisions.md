@@ -241,3 +241,17 @@ frozen-UI pin is updated in that change (as O-U1).
   keep at least one previous version by default.
 - **Q4:** report foreign links before approval, keep the retired record alive; propose
   stable anchor entities to Alex and the Tiled team.
+
+## Register walk-through, batch 5: Tiled editing plan Q1 (revised), Q5-Q7 (2026-10-30, O-E1 part 2)
+
+- **Q1 (revised after the consequence check):** one stable Tiled graph per corpus (option b);
+  the live version is named in the release marker. Unchanged records keep their Tiled ids
+  across versions; only changed records get new ones. Supersedes the batch-4 Q1 answer.
+- **Q5:** yes, write a release-marker record (corpus, version, snapshot hash, receipt).
+- **Q6:** F2W reads stay pinned through the ledger during a switch; accept the short mixed
+  window for other readers; ask the Tiled team about transactions.
+- **Q7 (STOP-1):** "Multi-write per Save" (option a), not the recommended journal-and-defer.
+  Each Save performs the recreate-links sequence on Tiled immediately, journaled and
+  resumable, with a recovery job for crashes that leave links half-moved. Consequences:
+  Q12 acknowledgment must wait for the Tiled effect, not only the journal; Q8/Q14 apply
+  to every Save; implementation task T08D grows accordingly.
