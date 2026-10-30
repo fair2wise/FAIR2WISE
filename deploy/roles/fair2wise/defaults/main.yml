@@ -64,11 +64,14 @@ fair2wise_env: >-
   {{ (fair2wise_env_local if fair2wise_profile == 'local' else fair2wise_env_als)
      | combine(fair2wise_extra_env) }}
 
-# Edge proxy (nginx) in front of the gateway: TLS termination, /fair2wise forwarded
-# unchanged, X-Forwarded-Proto overwritten with the real scheme.
+# Edge proxy (Traefik, owner decision D3.19) in front of the gateway: TLS termination, /fair2wise
+# forwarded unchanged, X-Forwarded-Proto overwritten with https. The file lands in Traefik's
+# file-provider directory (static setting providers.file.watch: true). The 128 MiB request cap is
+# enforced by the container gateway, not the edge.
 fair2wise_manage_edge: true
-fair2wise_edge_conf_path: /etc/nginx/conf.d/fair2wise.conf
-fair2wise_edge_client_max_body_size: 128m
+fair2wise_edge_conf_path: /etc/traefik/dynamic/fair2wise.yml
+fair2wise_edge_entrypoint_web: web
+fair2wise_edge_entrypoint_websecure: websecure
 fair2wise_edge_stream_timeout: 900s
 
 # Health checks after start (seconds between tries x tries).

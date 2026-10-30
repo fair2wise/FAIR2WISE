@@ -1,0 +1,86 @@
+# {{ ansible_managed | default('Managed by Ansible (fair2wise role)') }}
+# FAIR2WISE edge for {{ fair2wise_fqdn }} ({{ fair2wise_profile }}): Traefik file-provider dynamic configuration
+# (owner decision D3.19, 2026-10-30: the ALS edge proxy is Traefik).
+#
+# Contract (docker/profiles/README.md "Edge proxy requirement"): TLS terminates here;
+# {{ fair2wise_base_path }} is forwarded UNCHANGED to the container gateway on
+# {{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }} (the gateway is the only prefix-stripping
+# boundary); X-Forwarded-Proto is OVERWRITTEN with "https" (this host only serves the prefix over TLS),
+# never passed through from the client; X-Forwarded-Host/-Port/-Prefix are cleared; SSE is streamed with
+# an immediate flush; nothing outside the prefix is forwarded. The 128 MiB request cap is enforced by the
+# container gateway (nginx client_max_body_size): no Traefik buffering middleware is used because it would
+# buffer the streamed responses. Static configuration (not managed here) must define the entry points
+# "{{ fair2wise_edge_entrypoint_web }}" (:80) and "{{ fair2wise_edge_entrypoint_websecure }}" (:443) and
+# enable providers.file.directory with watch: true for the directory holding this file.
+http:
+  routers:
+    fair2wise-redirect:
+      rule: "Host(`{{ fair2wise_fqdn }}`)"
+      entryPoints:
+        - {{ fair2wise_edge_entrypoint_web }}
+      middlewares:
+        - fair2wise-https
+      service: noop@internal
+    fair2wise-root:
+      rule: "Host(`{{ fair2wise_fqdn }}`) && Path(`/`)"
+      entryPoints:
+        - {{ fair2wise_edge_entrypoint_websecure }}
+      tls: {}
+      middlewares:
+        - fair2wise-root-redirect
+      service: noop@internal
+    fair2wise-app:
+      rule: "Host(`{{ fair2wise_fqdn }}`) && (Path(`{{ fair2wise_base_path }}`) || PathPrefix(`{{ fair2wise_base_path }}/`))"
+      entryPoints:
+        - {{ fair2wise_edge_entrypoint_websecure }}
+      tls: {}
+      middlewares:
+        - fair2wise-headers
+      service: fair2wise-gateway
+
+  middlewares:
+    fair2wise-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    fair2wise-root-redirect:
+      redirectRegex:
+        regex: "^https://([^/]+)/?$"
+        replacement: "https://${1}{{ fair2wise_base_path }}/"
+        permanent: false
+    fair2wise-headers:
+      headers:
+        customRequestHeaders:
+          # Overwritten, never relayed: the gateway and uvicorn trust this value.
+          X-Forwarded-Proto: "https"
+          X-Forwarded-Host: ""
+          X-Forwarded-Port: ""
+          X-Forwarded-Prefix: ""
+        customResponseHeaders:
+          Strict-Transport-Security: "max-age=31536000"
+          Server: ""
+
+  services:
+    fair2wise-gateway:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: fair2wise-transport
+        responseForwarding:
+          flushInterval: "-1ms"
+        servers:
+          # No path in the URL: the request path reaches the gateway byte for byte.
+          - url: "http://{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }}"
+
+  serversTransports:
+    fair2wise-transport:
+      forwardingTimeouts:
+        responseHeaderTimeout: "{{ fair2wise_edge_stream_timeout }}"
+        idleConnTimeout: "90s"
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+  certificates:
+    - certFile: "{{ fair2wise_tls_certificate_path }}"
+      keyFile: "{{ fair2wise_tls_key_path }}"

@@ -2,7 +2,7 @@
 galaxy_info:
   role_name: fair2wise
   author: FAIR2WISE migration (T24E handoff)
-  description: Run one FAIR2WISE image variant by digest behind an nginx edge, with mounted state
+  description: Run one FAIR2WISE image variant by digest behind a Traefik edge, with mounted state
   license: BSD-3-Clause
   min_ansible_version: "2.15"
   platforms:

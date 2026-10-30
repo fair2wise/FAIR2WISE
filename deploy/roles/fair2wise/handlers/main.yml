@@ -1,11 +1,13 @@
 ---
-- name: Validate and reload the edge nginx
-  ansible.builtin.command: nginx -t
+# Traefik watches its file-provider directory (static setting providers.file.watch: true), so a changed
+# file is picked up without a reload; this handler only refuses a file that is not valid YAML before the
+# run continues, so a broken edge file fails the play instead of silently dropping the routes.
+- name: Check the edge Traefik file is valid YAML
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - "import sys, yaml; yaml.safe_load(open(sys.argv[1]))"
+      - "{{ fair2wise_edge_conf_path }}"
   changed_when: false
-  notify: Reload nginx
   listen: fair2wise edge changed
-
-- name: Reload nginx
-  ansible.builtin.service:
-    name: nginx
-    state: reloaded

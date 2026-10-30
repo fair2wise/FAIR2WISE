@@ -17,7 +17,7 @@ the operator in a copy of `inventory.example.yml` kept outside this repository.
 | `playbooks/backup.yml` | Consistent archive of the state mount with a manifest and a `.sha256` sidecar |
 | `playbooks/restore.yml` | Verified restore onto a (new, disposable) host, then start the approved digest |
 | `roles/fair2wise/` | Validate inputs, prepare directories and the writer secret file, back up, pull by digest, stop within the drain timeout, start, edge proxy, health, record |
-| `roles/fair2wise/templates/edge-nginx.conf.j2` | TLS edge: forwards `/fair2wise` unchanged to the gateway on `127.0.0.1:8080` and **overwrites `X-Forwarded-Proto` with `$scheme`** |
+| `roles/fair2wise/templates/edge-traefik.yml.j2` | Traefik TLS edge (D3.19): forwards `/fair2wise` unchanged to the gateway on `127.0.0.1:8080` and **overwrites `X-Forwarded-Proto` with `https`** |
 | `scripts/f2w_state_archive.py` | Host tool: `backup` / `verify` / `restore` (stdlib only) |
 | `scripts/f2w_release_record.py` | Host tool: per-host digest history for rollout and rollback receipts |
 | `inventory.example.yml` | Placeholders only (`.example.invalid`, all-zero digest, `vault_*` references) |
@@ -48,9 +48,12 @@ or hostnames, proxy header, mounts, `--stop-timeout 120`, health URL).
   reference into the operator's secret backend, never a literal.
 - **Stop**: `--stop-timeout 120` on every stop/recreate (the supervisor's ordered drain
   returns running jobs to `queued`); `validate.yml` refuses a smaller value.
-- **Edge**: TLS at the edge, `/fair2wise` forwarded byte for byte (no URI on `proxy_pass`),
-  `X-Forwarded-Proto $scheme` overwritten, `X-Forwarded-Host`/`-Prefix` cleared, SSE
-  unbuffered with a 900 s read timeout, 128 MiB body limit, everything else 404.
+- **Edge (Traefik, D3.19)**: TLS at the edge, `/fair2wise` forwarded byte for byte (no path in
+  the service URL), `X-Forwarded-Proto: https` overwritten, `X-Forwarded-Host`/`-Port`/`-Prefix`
+  cleared, SSE flushed immediately with a 900 s response-header timeout, everything else 404. The
+  128 MiB request cap stays in the container gateway (a Traefik buffering middleware would buffer
+  the SSE responses). The Traefik static configuration, which this role does not manage, needs
+  entry points `web` and `websecure` and `providers.file.directory` with `watch: true`.
 - **Health**: `GET /fair2wise/healthz` and `/fair2wise/api/health` on the host port, the
   supervisor status (`/run/fair2wise/supervisor.json`: every required service `running`),
   then `https://<fqdn>/fair2wise/healthz` through the edge. No health check imports or infers.

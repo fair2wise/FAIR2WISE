@@ -26,7 +26,7 @@ DEPLOY = REPO / "deploy"
 ROLE = DEPLOY / "roles" / "fair2wise"
 PLAYBOOKS = sorted((DEPLOY / "playbooks").glob("*.yml"))
 TASK_FILES = sorted((ROLE / "tasks").glob("*.yml"))
-TEMPLATE = ROLE / "templates" / "edge-nginx.conf.j2"
+TEMPLATE = ROLE / "templates" / "edge-traefik.yml.j2"
 INVENTORY = DEPLOY / "inventory.example.yml"
 TEXT_FILES = sorted(p for p in DEPLOY.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
 CONFIG_FILES = [p for p in TEXT_FILES if p.suffix in (".yml", ".j2", ".cfg")]
@@ -245,42 +245,64 @@ def test_example_inventory_uses_placeholders_and_vault_references_only() -> None
     assert "supplied by the operator" in text and "ANSIBLE_HANDOFF.md" in text
 
 
-# ---- edge proxy ----------------------------------------------------------------------------
+# ---- edge proxy (Traefik, owner decision D3.19) -------------------------------------------------
+def _rendered_edge(als_dev: Dict[str, Any]) -> Dict[str, Any]:
+    text = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(
+        TEMPLATE.read_text(encoding="utf-8")).render(**als_dev, ansible_managed="test")
+    assert "{{" not in text and "}}" not in text
+    return yaml.safe_load(text)
+
+
 def test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged() -> None:
     text = TEMPLATE.read_text(encoding="utf-8")
-    assert "proxy_set_header X-Forwarded-Proto $scheme;" in text
-    assert "$http_x_forwarded_proto" not in text, "the client's header is never relayed"
-    assert "proxy_pass http://{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }};" in text, \
-        "proxy_pass without a URI part keeps /fair2wise intact; the gateway strips it once"
-    assert "location {{ fair2wise_base_path }} {" in text
-    assert "proxy_buffering off;" in text and "proxy_cache off;" in text
-    assert "proxy_read_timeout {{ fair2wise_edge_stream_timeout }};" in text
-    assert "listen 443 ssl http2;" in text and "return 301 https://$host$request_uri;" in text
-    assert 'proxy_set_header X-Forwarded-Host "";' in text
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    assert 'X-Forwarded-Proto: "https"' in code
+    assert "X-Forwarded-Proto" not in code.replace('X-Forwarded-Proto: "https"', ""), \
+        "the client's header is never relayed; the only mention in the configuration is the overwrite"
+    assert "http://{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }}" in text, \
+        "no path in the service URL keeps /fair2wise intact; the gateway strips it once"
+    assert "buffering:" not in text, "a Traefik buffering middleware would buffer the SSE responses"
 
 
 def test_edge_template_renders_for_the_example_inventory(als_dev: Dict[str, Any]) -> None:
-    rendered = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(
-        TEMPLATE.read_text(encoding="utf-8")).render(**als_dev, ansible_managed="test")
-    assert "{{" not in rendered and "}}" not in rendered
-    assert "server_name f2w-dev.example.invalid;" in rendered
-    assert "location /fair2wise {" in rendered
-    assert "proxy_pass http://127.0.0.1:8080;" in rendered
-    assert "proxy_set_header X-Forwarded-Proto $scheme;" in rendered
-    assert "proxy_read_timeout 900s;" in rendered and "client_max_body_size 128m;" in rendered
-    assert "ssl_certificate     /etc/pki/tls/certs/f2w-dev.example.invalid.crt;" in rendered
-    # Nothing outside the prefix is forwarded.
-    assert "location / {\n        return 404;" in rendered
+    edge = _rendered_edge(als_dev)
+    http = edge["http"]
+    app = http["routers"]["fair2wise-app"]
+    assert app["rule"] == ("Host(`f2w-dev.example.invalid`) && (Path(`/fair2wise`) || "
+                           "PathPrefix(`/fair2wise/`))")
+    assert app["entryPoints"] == ["websecure"] and app["tls"] == {} and app["service"] == "fair2wise-gateway"
+    headers = http["middlewares"]["fair2wise-headers"]["headers"]["customRequestHeaders"]
+    assert headers["X-Forwarded-Proto"] == "https"
+    assert headers["X-Forwarded-Host"] == headers["X-Forwarded-Port"] == headers["X-Forwarded-Prefix"] == ""
+    lb = http["services"]["fair2wise-gateway"]["loadBalancer"]
+    assert lb["servers"] == [{"url": "http://127.0.0.1:8080"}] and lb["passHostHeader"] is True
+    assert lb["responseForwarding"]["flushInterval"] == "-1ms"
+    transport = http["serversTransports"]["fair2wise-transport"]["forwardingTimeouts"]
+    assert transport["responseHeaderTimeout"] == "900s"
+    redirect = http["routers"]["fair2wise-redirect"]
+    assert redirect["entryPoints"] == ["web"] and redirect["middlewares"] == ["fair2wise-https"]
+    assert http["middlewares"]["fair2wise-https"]["redirectScheme"] == {"scheme": "https", "permanent": True}
+    root = http["routers"]["fair2wise-root"]
+    assert root["rule"] == "Host(`f2w-dev.example.invalid`) && Path(`/`)"
+    assert http["middlewares"]["fair2wise-root-redirect"]["redirectRegex"]["replacement"] == \
+        "https://${1}/fair2wise/"
+    cert = edge["tls"]["certificates"][0]
+    assert cert["certFile"] == "/etc/pki/tls/certs/f2w-dev.example.invalid.crt"
+    assert edge["tls"]["options"]["default"]["minVersion"] == "VersionTLS12"
+    # Nothing outside the prefix or the root is routed: every router is bound to this host name.
+    assert all("Host(`f2w-dev.example.invalid`)" in r["rule"] for r in http["routers"].values())
 
 
-def test_proxy_task_templates_the_edge_and_reloads_through_nginx_t(als_dev: Dict[str, Any]) -> None:
+def test_proxy_task_templates_the_edge_and_checks_the_file(als_dev: Dict[str, Any]) -> None:
     tasks = {t["name"]: t for t in load_yaml(ROLE / "tasks" / "proxy.yml")}
-    tpl = tasks["Edge nginx site for {{ fair2wise_fqdn }}"]["ansible.builtin.template"]
-    assert tpl["src"] == "edge-nginx.conf.j2" and tpl["dest"] == "{{ fair2wise_edge_conf_path }}"
-    assert tasks["Edge nginx site for {{ fair2wise_fqdn }}"]["notify"] == "fair2wise edge changed"
+    task = tasks["Edge Traefik dynamic configuration for {{ fair2wise_fqdn }}"]
+    assert task["ansible.builtin.template"]["src"] == "edge-traefik.yml.j2"
+    assert task["ansible.builtin.template"]["dest"] == "{{ fair2wise_edge_conf_path }}"
+    assert task["notify"] == "fair2wise edge changed"
     handlers = {h["name"]: h for h in load_yaml(ROLE / "handlers" / "main.yml")}
-    assert handlers["Validate and reload the edge nginx"]["ansible.builtin.command"] == "nginx -t"
-    assert als_dev["fair2wise_edge_conf_path"] == "/etc/nginx/conf.d/fair2wise.conf"
+    check = handlers["Check the edge Traefik file is valid YAML"]
+    assert check["listen"] == "fair2wise edge changed" and "yaml.safe_load" in " ".join(check["ansible.builtin.command"]["argv"])
+    assert als_dev["fair2wise_edge_conf_path"] == "/etc/traefik/dynamic/fair2wise.yml"
 
 
 # ---- mounts, environment, stop timeout, health -----------------------------------------------
