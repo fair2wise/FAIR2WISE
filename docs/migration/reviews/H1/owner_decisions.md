@@ -381,3 +381,18 @@ frozen-UI pin is updated in that change (as O-U1).
 - **D2.4:** `ghcr.io/fair2wise/fair2wise`, **public**. Pending the batch-17 confirmation
   that, combined with D3.1 (terminology snippets shipped in the image), the ~141k paper
   snippets become publicly downloadable.
+
+## Register walk-through, batch 17: D2.1 channels, D2.4 confirmation, D2.5, D2.6 (2026-10-30, O-O6 part 2)
+
+- **D2.1 (confirmed):** "All three on merge to main": a PR merge into `main` publishes
+  `:local`, `:als-dev` and `:als-prod` to the new tested digest. No manual promotion step
+  for production. The publish workflow's manual-dispatch-only design and the dev-before-prod
+  rule are replaced accordingly (T24D follow-up); the O06 `O06_APPROVED` switch is set when
+  the workflow is updated.
+- **D2.4 (confirmed):** public registry accepted knowing the images carry the tracked KG
+  JSON and the terminology snippets (D3.1); the owner considers the snippets short quotes
+  already accepted under O-D1.
+- **D2.5:** full 40-character commit in tags (`sha-<40 hex>-<variant>`, plus
+  `vX.Y.Z-<variant>` on release tags).
+- **D2.6:** stop publishing the legacy `agent` image; `compose.splash.yaml` may still build
+  it locally.
