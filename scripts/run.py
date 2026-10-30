@@ -14,9 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def parse_args() -> argparse.Namespace:
@@ -127,9 +125,8 @@ def main() -> None:
         return
 
     # --- Run ---
-    repo_root = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(repo_root))
-    sys.path.insert(0, str(repo_root / "app"))
+    sys.path.insert(0, str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT / "app"))
     from modules.term_extractor import run_extraction
 
     result = run_extraction(
@@ -161,4 +158,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Entry point only (AUD-02): the checkout .env, or the file named by F2W_DOTENV, is
+    # loaded here before main() reads CBORG_API_KEY; importing this module loads nothing.
+    sys.path.insert(0, str(REPO_ROOT))
+    from app.modules.dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
     main()

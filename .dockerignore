@@ -44,6 +44,9 @@ storage/artifacts
 storage/parsed
 storage/crops
 storage/state
+# Stale developer copy of app/modules/kg_rag_api.py (ROUTE_POLICIES R26-R31: "not packaged";
+# AUD-02). It is retired under T17B; until then the images' COPY scripts/ must not ship it.
+scripts/app
 
 # graphify output and caches (local analysis only)
 **/graphify-out

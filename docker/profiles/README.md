@@ -7,7 +7,7 @@ Status: candidate for H4. Built and run only by the owner; nothing here has been
 | Stage | From | Content |
 | --- | --- | --- |
 | `frontend-build`, `docs-build`, `frontend` | node / python / nginx | T24C: Vite bundle for `/fair2wise`, MkDocs site, standalone gateway image (compose) |
-| `tiled-server-build` | `${PYTHON_IMAGE}` | `/opt/tiled/venv`: `tiled[server]` from the `tiled-0.2.18-py3-none-any.whl` checked against `PINNED_TILED_WHEEL_SHA256`, constrained by `tiled-server/constraints.txt`, `pip check`, version assert |
+| `tiled-server-build` | `${PYTHON_IMAGE}` | `/opt/tiled/venv`: `tiled[server]` from the `tiled-0.2.18-py3-none-any.whl` checked against `PINNED_TILED_WHEEL_SHA256`, installed `--require-hashes` from `tiled-server/constraints.lock.txt`, `pip check`, version assert |
 | `runtime-base` | `${PYTHON_IMAGE}` | app lock (`requirements.txt`), allowlisted code/schemas/tracked KG JSON, UI + docs, gateway template, `docker/entrypoint/`, tini, nginx, uid 10001; no profile |
 | `local` | `runtime-base` | + `/opt/tiled/venv`, `profiles/local.json`, `/var/lib/fair2wise/tiled` mount point |
 | `als-dev` | `runtime-base` | + `profiles/als-dev.json` (`https://tiled-staging.als.lbl.gov`) |
@@ -122,6 +122,24 @@ docker stop f2w-local; docker logs f2w-local | grep f2w-supervisor             #
 docker start f2w-local                                                           # catalog and writer key persist
 ```
 
+IPv6 preference for CBORG (local dev only, opt-in). Docker on Colima has no IPv6 by default,
+so a container reaches CBORG over the host's IPv4 address, which CBORG's allowlist refuses.
+After enabling IPv6 for the VM and the Docker daemon (Colima: `network.address: true`, daemon
+`"ipv6": true` with a `fd00::/80`-style `fixed-cidr-v6`), glibc still sorts the IPv4 destination
+first because the container's only IPv6 address is a ULA (RFC 6724 label mismatch). `docker/gai.conf`
+is glibc's default table with `fc00::/7` given label 1 so IPv6 wins; mount it read-only (the runtime
+user is uid 10001 and cannot write `/etc`, so the image does not bake or copy it, and nothing
+changes without the mount):
+
+```sh
+mkdir -p ~/.config/fair2wise && cp docker/gai.conf ~/.config/fair2wise/gai.conf
+docker run -d --name f2w-local -p 127.0.0.1:8080:8080 --stop-timeout 120 \
+  -v f2w-state:/var/lib/fair2wise/state -v f2w-tiled:/var/lib/fair2wise/tiled \
+  -v ~/.config/fair2wise/gai.conf:/etc/gai.conf:ro \
+  -e CBORG_API_KEY ghcr.io/fair2wise/fair2wise:local
+docker exec f2w-local getent ahosts api.cborg.lbl.gov | head -1                  # an IPv6 address first
+```
+
 Run an ALS image (disposable host; central Tiled is contacted only by app features):
 
 ```sh
@@ -132,15 +150,24 @@ docker run -d --name f2w-als-dev -p 127.0.0.1:8081:8080 --stop-timeout 120 \
   ghcr.io/fair2wise/fair2wise:als-dev
 ```
 
-Fully hash-pinned Tiled server lock (needs network; replaces the constraints install):
+Hash-locked installs (T28C / AUD-08). Both pip installs that decide image content run with
+`--require-hashes`: `runtime-base` from `requirements/runtime.lock.txt` (the pins of
+`requirements/runtime.txt` plus every wheel/sdist sha256) and `tiled-server-build` from
+`docker/profiles/tiled-server/constraints.lock.txt` (the pins of `constraints.txt`, plus
+`tiled[server]==0.2.18` whose hashes include `PINNED_TILED_WHEEL_SHA256`). The plain version
+lists stay for developers and CI, because `pip install -r requirements.txt -r requirements/dev.txt`
+chains the unpinned `requirements/semantic.in`, and pip puts a whole install into hash-checking
+mode once any line carries a hash. `tests/packaging/test_requirements_locks.py` keeps each pair
+in step. Still unhashed: CPU torch (PyTorch index, not PyPI) and `semantic.in`. Regenerate
+(PyPI network only; keep each file's header; bump versions in the plain list first):
 
 ```sh
+uv pip compile requirements/runtime.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 \
+  --generate-hashes --strip-extras -c requirements/runtime.txt -o requirements/runtime.lock.txt
 echo 'tiled[server]==0.2.18' > /tmp/tiled.in
 uv pip compile /tmp/tiled.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 \
-  --generate-hashes -c docker/profiles/tiled-server/constraints.txt \
-  -o docker/profiles/tiled-server/requirements.lock
-# then in tiled-server-build: pip install --require-hashes --no-deps -r requirements.lock
-# (keep the wheel sha256 check; confirm the tiled hash equals PINNED_TILED_WHEEL_SHA256)
+  --generate-hashes --no-strip-extras -c docker/profiles/tiled-server/constraints.txt \
+  -o docker/profiles/tiled-server/constraints.lock.txt
 ```
 
 ## Tests

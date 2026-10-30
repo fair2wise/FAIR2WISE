@@ -66,9 +66,11 @@ def test_tiled_server_pin_is_the_owner_pin_and_hash_checked():
     assert f'"tiled=={version}"' in run and "--no-deps" in run and "--only-binary=:all:" in run
     assert f"{tiled_config.PINNED_TILED_WHEEL_SHA256}  /tmp/tiled/wheel/{tiled_config.PINNED_TILED_WHEEL}" in run
     assert "sha256sum -c -" in run
-    # The verified wheel file is what gets installed, never a re-resolved name.
-    assert f'"/tmp/tiled/wheel/{tiled_config.PINNED_TILED_WHEEL}[server]"' in run
-    assert "--constraint /tmp/tiled/constraints.txt" in run and "pip check" in run
+    # The verified wheel is what gets installed: pip runs in --require-hashes mode from the
+    # lock, whose tiled entry carries the same sha256, and the checked file is offered first
+    # through --find-links (T28C; the hash-lock test below checks the lock itself).
+    assert "--require-hashes --find-links /tmp/tiled/wheel -r /tmp/tiled/constraints.lock.txt" in run
+    assert "pip check" in run
     assert f"tiled.__version__ != '{version}'" in run
     assert run.index("sha256sum -c -") < run.index("python -m venv")
     constraints = (REPO / "docker/profiles/tiled-server/constraints.txt").read_text(encoding="utf-8")
@@ -206,7 +208,8 @@ def _runtime_base_runs() -> str:
 def test_semantic_deps_install_cpu_torch_and_refuse_cuda_builds():
     """A5/AUD-08: the default index gives CUDA torch (~7 GB); images must take the CPU build."""
     run = _runtime_base_runs()
-    assert "requirements/runtime.txt" in run and "requirements/semantic.in" in run
+    assert "--require-hashes -r requirements/runtime.lock.txt" in run and "requirements/semantic.in" in run
+    assert "pip install -r requirements/runtime.txt" not in run  # the hashed lock, not the version list
     assert "--index-url https://download.pytorch.org/whl/cpu" in run
     assert "torch.version.cuda is None" in run
     assert "pip install -r requirements.txt" not in run  # semantic.in is installed separately, after CPU torch
@@ -225,3 +228,20 @@ def test_embedding_models_are_baked_at_pinned_revisions_and_match_code_defaults(
     assert "chmod -R a+rX /opt/fair2wise/hf" in run  # readable by uid 10001; no chown -R (mount-point test)
     for name in FINALS:
         assert DF.effective_env(name).get("HF_HUB_OFFLINE", json.load(open(REPO / f"docker/profiles/{name}.json"))["env"].get("HF_HUB_OFFLINE")) == "1", name
+
+
+def test_tiled_server_venv_installs_from_the_hash_lock():
+    """AUD-08/B24: the Tiled venv is built with --require-hashes from constraints.lock.txt; the
+    wheel sha256sum check stays, and the checked wheel is the one pip installs (--find-links)."""
+    run = " ".join(i.args for i in DF.stage("tiled-server-build").of("RUN"))
+    assert "--require-hashes" in run and "-r /tmp/tiled/constraints.lock.txt" in run
+    assert "--find-links /tmp/tiled/wheel" in run
+    assert "sha256sum -c" in run and run.index("sha256sum -c") < run.index("pip install")
+    assert "--constraint /tmp/tiled/constraints.txt" not in run
+    copies = [p for _, srcs, _ in DF.stage("tiled-server-build").copies() for p in srcs]
+    assert copies == ["docker/profiles/tiled-server/constraints.lock.txt"]
+    lock = (REPO / "docker/profiles/tiled-server/constraints.lock.txt").read_text(encoding="utf-8")
+    tiled_block = re.search(r"^tiled\[server\]==%s((?:\s*\\\n\s*--hash=\S+)+)" % re.escape(tiled_config.PINNED_TILED_VERSION),
+                            lock, re.M)
+    assert tiled_block, "the lock pins tiled[server] with hashes"
+    assert f"--hash=sha256:{tiled_config.PINNED_TILED_WHEEL_SHA256}" in tiled_block.group(1)

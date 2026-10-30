@@ -43,10 +43,12 @@ PRIVATE = [
     "ui/.env",
     "ui/node_modules/x/index.js",
     "tests/results/out.json",
+    "scripts/app/modules/kg_rag_api.py",  # stale developer copy, "not packaged" (AUD-02)
 ]
 FORBIDDEN = re.compile(
     r"(^|/)(papers|runs|logs|source_index|node_modules)(/|$)|\.pdf$|\.sqlite3?$|\.db(-\w+)?$|(^|/)\.env$"
     r"|(^|/)\.env\.(?!example$)|^\.cache/|^tests/|^evals/|^docs/|^mkdocs/|^ui/|^splash_links/|^\.github/"
+    r"|^scripts/app/"
 )
 
 
@@ -112,3 +114,15 @@ def test_final_images_keep_code_schemas_and_tracked_kg_json(name):
     other = {"local", "als-dev", "als-prod"} - {name}
     assert not [p for p in shipped if any(p == f"docker/profiles/{o}.json" for o in other)]
     assert "docker/profiles/tiled-server/constraints.txt" not in shipped  # build stage only
+    assert "docker/profiles/tiled-server/constraints.lock.txt" not in shipped
+
+
+@pytest.mark.parametrize("name", FINALS)
+def test_final_images_do_not_ship_the_stale_scripts_app_copy(name):
+    """AUD-02: ``scripts/app/modules/kg_rag_api.py`` is a stale duplicate of the module that still
+    calls ``load_dotenv()`` at import; ``COPY scripts/`` must not carry it (T17B retires it)."""
+    tracked = [p for p in CONTEXT if p.startswith("scripts/app/")]
+    assert "scripts/app/modules/kg_rag_api.py" in tracked  # the planted path is in the simulated context
+    shipped = image_paths(DF, name, CONTEXT, IGNORE)
+    assert not [p for p in shipped if p.startswith("scripts/app/")]
+    assert "scripts/tiled_server.py" in shipped  # the rest of scripts/ still ships
