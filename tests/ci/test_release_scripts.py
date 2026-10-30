@@ -250,6 +250,98 @@ def test_verify_manifest_refuses(tmp_path: Path, mutate) -> None:
         rm.verify_manifest(m, commit=commit)
 
 
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True,
+                          env={"PATH": "/usr/bin:/bin", "HOME": str(repo), "GIT_CONFIG_NOSYSTEM": "1",
+                               "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t",
+                               "GIT_COMMITTER_EMAIL": "t@x"}).stdout.strip()
+
+
+def test_shipped_untracked_files_are_the_copied_files_missing_from_the_commit(tmp_path: Path) -> None:
+    """A5-1: files under the Dockerfile's context COPY sources that the commit does not hold,
+    minus what .dockerignore drops; files outside the COPY sources never count."""
+    repo = tmp_path / "repo"
+    (repo / "storage" / "kg").mkdir(parents=True)
+    (repo / "app").mkdir()
+    (repo / "docs").mkdir()
+    (repo / "Dockerfile").write_text(
+        "FROM python:3.12-slim AS other\nRUN true\n"
+        "FROM python:3.12-slim AS runtime-base\n"
+        "COPY app/ ./app/\n"
+        "COPY storage/kg/ \\\n    ./storage/kg/\n"
+        "COPY --from=other /x /y\n"
+        "FROM runtime-base AS local\nCOPY docker/profiles/local.json /etc/p.json\n"
+        "FROM runtime-base AS als-dev\nFROM runtime-base AS als-prod\n", encoding="utf-8")
+    (repo / ".dockerignore").write_text("**/__pycache__\n**/*.sqlite\n", encoding="utf-8")
+    (repo / "app" / "a.py").write_text("x = 1\n")
+    (repo / "storage" / "kg" / "tracked.json").write_text("{}")
+    _git(repo, "init", "-q")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    head = _git(repo, "rev-parse", "HEAD")
+    assert rm.shipped_untracked_files(repo, head) == []
+    (repo / "storage" / "kg" / "harvest.json").write_text("{}")  # untracked, shipped
+    (repo / "storage" / "kg" / "cache.sqlite").write_text("")  # untracked, dockerignored
+    (repo / "app" / "__pycache__").mkdir()
+    (repo / "app" / "__pycache__" / "a.pyc").write_bytes(b"\x00")  # dockerignored
+    (repo / "app" / "b.py").write_text("y = 2\n")  # untracked, shipped
+    (repo / "docs" / "note.md").write_text("outside the COPY sources")
+    (repo / "docker" / "profiles").mkdir(parents=True)
+    (repo / "docker" / "profiles" / "local.json").write_text("{}")  # untracked single-file COPY
+    assert rm.shipped_untracked_files(repo, head) == ["app/b.py", "docker/profiles/local.json",
+                                                      "storage/kg/harvest.json"]
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "track them")
+    assert rm.shipped_untracked_files(repo, _git(repo, "rev-parse", "HEAD")) == []
+    assert rm.shipped_untracked_files(repo, head)  # the older commit still lacks them
+
+
+def test_context_copy_sources_follow_the_final_lineages_of_the_real_dockerfile() -> None:
+    sources = rm.context_copy_sources((REPO / "Dockerfile").read_text(encoding="utf-8"))
+    assert {"app", "scripts", "storage/kg", "storage/terminology", "storage/schema",
+            "docker/entrypoint", "docker/profiles/local.json", "docker/profiles/als-prod.json"} <= set(sources)
+    assert not any(s.startswith("/build/") for s in sources)  # --from copies are not context copies
+    assert "ui" not in sources and "splash_links" not in sources  # built in other stages / agent only
+
+
+@needs_git
+def test_shipped_untracked_files_warn_until_pc1_then_refuse(tmp_path: Path, monkeypatch) -> None:
+    """Recorded in the manifest and as a WARNING in problems; the candidate still passes.
+    PC-1 (REFUSE_SHIPPED_UNTRACKED_FILES / refuse_shipped_untracked) turns it into a refusal."""
+    planted = ["storage/terminology/extracted_terms_private.json", "storage/terminology/other.json"]
+    monkeypatch.setattr(rm, "shipped_untracked_files", lambda root, commit: planted)
+    m = _manifest(tmp_path)
+    assert m["shipped_untracked_files"] == planted
+    warnings = [p for p in m["problems"] if p.startswith(rm.WARNING_PREFIX)]
+    assert len(warnings) == 1 and "2 file(s)" in warnings[0] and planted[0] in warnings[0]
+    assert rm.refusals(m["problems"]) == [p for p in m["problems"] if not p.startswith(rm.WARNING_PREFIX)]
+    if m["frozen_ui_tree"]["matches"]:
+        assert m["candidate_ok"] is True
+        rm.verify_manifest(m, commit=m["commit"])  # a warning alone never refuses
+    head = m["commit"]
+    checks = rm.load_checks(_checks(tmp_path))
+    for entry in checks.values():
+        entry["identity"]["labels"]["org.opencontainers.image.revision"] = head
+    strict = rm.build_manifest(root=REPO, commit=head, ref="refs/heads/main", event="push",
+                               repository="fair2wise/fair2wise", image_repository=REPO_IMG, run_id="42",
+                               run_attempt="1", server_url="https://github.com", checks=checks,
+                               base_images={}, refuse_shipped_untracked=True)
+    assert strict["candidate_ok"] is False
+    assert any("not tracked" in p and not p.startswith(rm.WARNING_PREFIX) for p in strict["problems"])
+    with pytest.raises(rm.ManifestError, match="did not pass"):
+        rm.verify_manifest(strict, commit=head)
+    assert rm.REFUSE_SHIPPED_UNTRACKED_FILES is False  # PC-1 pending: flip when the owner decides
+
+
+def test_manifest_without_untracked_files_records_an_empty_list(tmp_path: Path, monkeypatch) -> None:
+    if not _in_git_work_tree():
+        pytest.skip("release manifest needs a git checkout")
+    monkeypatch.setattr(rm, "shipped_untracked_files", lambda root, commit: [])
+    m = _manifest(tmp_path)
+    assert m["shipped_untracked_files"] == []
+    assert not any(p.startswith(rm.WARNING_PREFIX) for p in m["problems"])
+
+
 @needs_git
 def test_verify_images_needs_the_tested_ids_and_layers(tmp_path: Path) -> None:
     m = _manifest(tmp_path)

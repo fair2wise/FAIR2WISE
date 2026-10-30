@@ -15,6 +15,11 @@ pushed: per variant the registry manifest digest and the tags written. It may re
 binary evaluation report and its verdict for information; a verdict never gates
 a build or a publication (owner decision H3 B).
 
+``shipped_untracked_files`` (T28C, A5-1) lists files the Dockerfile ships from the build
+context that are not in the commit's tree, so the images would depend on the builder's disk.
+It is recorded and reported as a ``WARNING: `` entry in ``problems`` until owner decision PC-1;
+flipping :data:`REFUSE_SHIPPED_UNTRACKED_FILES` makes it a refusal.
+
 Standard library only; never imports the application (no ``load_dotenv`` side effects).
 """
 
@@ -63,6 +68,15 @@ TILED_CONFIG = "app/modules/deployment/tiled_config.py"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
+# Problems that start with this prefix are recorded but do not stop a candidate (T28C).
+WARNING_PREFIX = "WARNING: "
+# A5-1 / PC-1 (owner decision pending): files the Dockerfile COPY lines ship from the build
+# context that are not tracked at the commit (today: the gitignored storage/terminology/*.json
+# harvest files on a developer's disk) make the image depend on the builder's disk. Until the
+# owner decides PC-1 this is a WARNING in ``problems``; the decision flips it to a refusal by
+# setting this to True (``verify`` then refuses the candidate like any other problem).
+REFUSE_SHIPPED_UNTRACKED_FILES = False
+
 
 class ManifestError(Exception):
     """The manifest or the images do not satisfy the release contract."""
@@ -105,6 +119,141 @@ def tiled_pins(root: Path) -> Dict[str, Any]:
     }
 
 
+# ------------------------------------------------------------------ shipped files vs git ----
+# A light reading of the Dockerfile and .dockerignore (the test-side model is
+# tests/images/dockerfile_model.py; this script must not import test code).
+
+
+def _dockerfile_lines(text: str) -> List[str]:
+    """Logical instructions: comments dropped, ``\\`` continuations joined."""
+    out: List[str] = []
+    buffer = ""
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.endswith("\\"):
+            buffer += stripped[:-1].rstrip() + " "
+            continue
+        out.append(buffer + stripped)
+        buffer = ""
+    return out
+
+
+def context_copy_sources(dockerfile_text: str, targets: Sequence[str] = VARIANTS) -> List[str]:
+    """Build-context paths that ``COPY``/``ADD`` lines place into ``targets`` (through their ``FROM`` lineage).
+
+    ``COPY --from=<stage>`` lines are not context copies and are skipped. Sources are returned
+    without a trailing slash, in Dockerfile order, deduplicated.
+    """
+    stages: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    current: Optional[str] = None
+    for line in _dockerfile_lines(dockerfile_text):
+        keyword, _, args = line.partition(" ")
+        keyword = keyword.upper()
+        if keyword == "FROM":
+            words = args.split()
+            name = words[2] if len(words) >= 3 and words[1].upper() == "AS" else f"stage{len(order)}"
+            stages[name] = {"base": words[0], "sources": []}
+            order.append(name)
+            current = name
+        elif keyword in ("COPY", "ADD") and current is not None:
+            words = [w for w in args.split() if w]
+            if any(w.startswith("--from=") for w in words):
+                continue
+            plain = [w for w in words if not w.startswith("--")]
+            stages[current]["sources"].extend(plain[:-1])
+    found: List[str] = []
+    for target in targets:
+        name: Optional[str] = target
+        while name in stages:
+            for src in stages[name]["sources"]:
+                src = src.rstrip("/")
+                if src not in found:
+                    found.append(src)
+            name = stages[name]["base"]
+    return found
+
+
+def _ignore_regex(pattern: str) -> "re.Pattern[str]":
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif pattern[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return re.compile(f"^{out}(?:/.*)?$")
+
+
+def dockerignore_rules(text: str) -> List[Any]:
+    rules = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        negate = line.startswith("!")
+        if negate:
+            line = line[1:].strip()
+        rules.append((negate, _ignore_regex(line.lstrip("/").rstrip("/"))))
+    return rules
+
+
+def dockerignored(path: str, rules: Sequence[Any]) -> bool:
+    result = False
+    for negate, regex in rules:
+        if regex.match(path):
+            result = not negate
+    return result
+
+
+def shipped_untracked_files(root: Path, commit: str, *, dockerfile_text: Optional[str] = None,
+                            dockerignore_text: Optional[str] = None) -> List[str]:
+    """Files on disk under the Dockerfile's context COPY sources, not .dockerignored, not in ``commit``'s tree.
+
+    These are what a build from this checkout puts into the images although a build from the
+    commit alone cannot (A5-1). Paths are repository-relative, sorted. Only files under the COPY
+    sources are considered, so a dirty tree elsewhere does not count.
+    """
+    if dockerfile_text is None:
+        dockerfile_text = (root / "Dockerfile").read_text(encoding="utf-8")
+    if dockerignore_text is None:
+        ignore_path = root / ".dockerignore"
+        dockerignore_text = ignore_path.read_text(encoding="utf-8") if ignore_path.exists() else ""
+    rules = dockerignore_rules(dockerignore_text)
+    sources = context_copy_sources(dockerfile_text)
+    tracked = set(git(root, "ls-tree", "-r", "--name-only", "--full-tree", commit).splitlines())
+    untracked: List[str] = []
+    for src in sources:
+        base = root / src
+        if base.is_file():
+            candidates = [src]
+        elif base.is_dir():
+            candidates = [p.relative_to(root).as_posix() for p in sorted(base.rglob("*")) if p.is_file()]
+        else:
+            continue
+        for rel in candidates:
+            if rel in tracked or dockerignored(rel, rules):
+                continue
+            untracked.append(rel)
+    return sorted(set(untracked))
+
+
+def is_warning(problem: str) -> bool:
+    return problem.startswith(WARNING_PREFIX)
+
+
+def refusals(problems: Sequence[str]) -> List[str]:
+    """The problems that stop a candidate (everything that is not a WARNING)."""
+    return [p for p in problems if not is_warning(p)]
+
+
 def load_checks(paths: Sequence[Path]) -> Dict[str, Dict[str, Any]]:
     out: Dict[str, Dict[str, Any]] = {}
     for path in paths:
@@ -120,11 +269,23 @@ def load_checks(paths: Sequence[Path]) -> Dict[str, Dict[str, Any]]:
 
 def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository: str, image_repository: str,
                    run_id: str, run_attempt: str, server_url: str, checks: Mapping[str, Mapping[str, Any]],
-                   base_images: Mapping[str, str]) -> Dict[str, Any]:
-    """Assemble the manifest; ``candidate_ok`` says whether it may ever be published."""
+                   base_images: Mapping[str, str],
+                   refuse_shipped_untracked: bool = REFUSE_SHIPPED_UNTRACKED_FILES) -> Dict[str, Any]:
+    """Assemble the manifest; ``candidate_ok`` says whether it may ever be published.
+
+    ``problems`` holds refusals and, prefixed :data:`WARNING_PREFIX`, warnings that are recorded
+    without stopping the candidate. Today's only warning is ``shipped_untracked_files`` (A5-1);
+    ``refuse_shipped_untracked`` (PC-1) turns it into a refusal.
+    """
     if not COMMIT_RE.match(commit):
         raise ManifestError(f"commit must be a full 40-hex object id, got {commit!r}")
     problems: List[str] = []
+    untracked = shipped_untracked_files(root, commit)
+    if untracked:
+        text = (f"{len(untracked)} file(s) the Dockerfile ships from the build context are not tracked at "
+                f"{commit[:12]} (image content depends on the builder's disk, A5-1): "
+                + ", ".join(untracked[:5]) + (" ..." if len(untracked) > 5 else ""))
+        problems.append(text if refuse_shipped_untracked else WARNING_PREFIX + text)
     pinned_ui = frozen_ui_pin(root)
     actual_ui = git(root, "rev-parse", f"{commit}:ui")
     if actual_ui != pinned_ui:
@@ -177,6 +338,7 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
         },
         "frozen_ui_tree": {"pinned": pinned_ui, "actual": actual_ui, "matches": actual_ui == pinned_ui},
         "locks": {name: sha256_file(root / name) for name in LOCK_FILES if (root / name).exists()},
+        "shipped_untracked_files": untracked,
         "tiled": tiled,
         "base_images": dict(sorted(base_images.items())),
         "platforms_tested": platforms,
@@ -186,7 +348,7 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
             "Image identity only. Graph snapshots and their binary reports are released separately (D31, T26B).",
             "No corpus, credential or Tiled catalog is part of any variant (checked per variant above).",
         ],
-        "candidate_ok": not problems,
+        "candidate_ok": not refusals(problems),
         "problems": problems,
     }
 
@@ -199,7 +361,7 @@ def verify_manifest(manifest: Mapping[str, Any], *, commit: str) -> None:
         raise ManifestError(f"manifest commit {manifest.get('commit')!r} is not {commit!r}")
     if manifest.get("event") == "pull_request":
         raise ManifestError("a pull_request candidate is never published")
-    if not manifest.get("candidate_ok") or manifest.get("problems"):
+    if not manifest.get("candidate_ok") or refusals(list(manifest.get("problems") or [])):
         raise ManifestError(f"candidate did not pass: {manifest.get('problems')}")
     if not (manifest.get("frozen_ui_tree") or {}).get("matches"):
         raise ManifestError("ui tree does not match FROZEN_UI_TREE")
@@ -328,6 +490,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             args.out.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             for problem in manifest["problems"]:
                 print(f"release manifest: {problem}", file=sys.stderr)
+            if manifest["shipped_untracked_files"]:
+                print(f"release manifest: shipped_untracked_files={len(manifest['shipped_untracked_files'])} "
+                      "(see the manifest; PC-1 decides whether this refuses a candidate)", file=sys.stderr)
             return 0 if manifest["candidate_ok"] else 1
         if args.command == "verify":
             manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
