@@ -553,9 +553,10 @@
       "title": "Documentation and register sync",
       "source": "plan_addenda.md A5",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "this overlay; becomes merged when its branch is merged to forge_merge"
+      "status": "merged",
+      "merge_commit": "e10e1b36fd06a87bb422ef87641f3f95dd723945",
+      "note": "this overlay; becomes merged when its branch is merged to forge_merge",
+      "merge_commit_subject": "Merge T28D documentation, ADR and register sync (AUD-10/11/12/14)"
     }
   ]
 }
