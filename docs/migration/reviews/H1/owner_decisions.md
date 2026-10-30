@@ -296,3 +296,13 @@ frozen-UI pin is updated in that change (as O-U1).
 - **B7 (O-A9):** "Expose on ALS for signed-in users": route `/fair2wise/model-api`
   through the gateway with sign-in and the D19 projection (applied by T28A). Reverses
   the T18C/T24C default (404 on ALS). Work item for the gateway and route policies.
+
+## Register walk-through, batch 9: B10-B13 (2026-10-30, O-A10)
+
+- **B10:** reviewer excerpt stays 600 characters.
+- **B11:** accept origin check + `SameSite=Strict` as the CSRF protection until a sign-in
+  page exists.
+- **B12:** in-memory ALS sessions accepted until T24E delivers a persistent store
+  (single-process ALS images until then).
+- **B13:** the 0.2.18 revocation window (up to 15 min for tokens held outside F2W) is
+  accepted for the interim pin; revisit at 0.2.19.
