@@ -259,6 +259,13 @@ Recorded for the owner; nothing below is answered here.
 | D3.17 | Should `create_api_app` build a default Tiled graph backend for the operations from `settings.tiled_target` + the writer credential, or stay JSON-only unless injected? | Build it on ALS profiles, JSON-only on `:local` by default |
 | D3.18 | Corpus names for `/v1/operations/corpus-audit` and the CLI default to file stems under `storage/terminology` (e.g. `extracted_terms_xray_papers_cborg_chat`) | Accept for now; a configured corpus map with PC-1 |
 
+### D3 additions by T24E (2026-10-29)
+
+| # | Decision | Recommendation |
+|---|---|---|
+| D3.19 | Deployment handoff choices (O07 inputs): role variable prefix `fair2wise_`, host layout `/srv/fair2wise/<profile>/{state,secrets,backups,releases.json}`, state-schema label `f2w.state/v1`, nginx as the edge proxy (not Traefik), papers and KG volumes not mounted on ALS for now | Accept as the T24E baseline |
+| D3.20 | ALS reader/admin sessions against the real staging Tiled from inside the `:als-dev` image are owner-run only (ALS images lock `F2W_TILED_URL`); when, and with which test account? | Schedule after D3.11 and the first CI image build |
+
 ---
 
 ## Already settled (for reference)

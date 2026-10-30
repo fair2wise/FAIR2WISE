@@ -411,7 +411,7 @@
       "gate": "H6",
       "status": "blocked_on_owner",
       "merge_commit": null,
-      "note": "container-level tests need repeated local docker build/run (OPEN_DECISIONS D3.11); ALS edge proxy requirement C8"
+      "note": "container-free part merged at d292c46204779e282a7d70a85edaf462dcaad7f7 (2026-10-29): deploy/ handoff, archive/release tools, static tests; container-level checks wait on D3.11"
     },
     {
       "id": "T25A",
