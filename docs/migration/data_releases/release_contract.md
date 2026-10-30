@@ -605,10 +605,72 @@ The full schema texts follow, copied verbatim from the files at time of writing.
 
 ## 10. Open questions for the owner
 
+Owner decision O-R1 (2026-10-30, `docs/migration/reviews/H1/owner_decisions.md` batch 20) answered the T26A questions
+as follows.
+
 1. (Resolved by O-D1: snippets may be stored.) Do `DocumentChunk` ops-document descriptions in `bl1101_v7`–`v9`
-   count as "full parsed bodies" under R7, or as permitted stored evidence?
-2. Are the existing flat files adopted, archived, or left as unpromotable legacy?
-3. Approval of the `.gitignore` negation and `-text` attributes for KG paths.
-4. Whether T23B stops writing `metadata.graph_snapshot` in promoted payloads.
-5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3.
+   count as "full parsed bodies" under R7, or as permitted stored evidence? Still open for `bl1101_v7`, which the
+   R7 check flags for review (below).
+2. **Q2: adopt.** The existing flat files are adopted: each becomes `storage/kg/<corpus>/v<N>/` with
+   `parent.relation: legacy_adoption`, after passing section 4. Done by `scripts/adopt_legacy_kg.py` (below).
+3. **Q3: approved and applied** through `.gitattributes` (`storage/kg/** -text`, `storage/kg/*.json -text`,
+   `storage/terminology/*.json -text`, `docs/migration/data_releases/releases/** -text`).
+4. **Q4: applied** (owner decision O-R1).
+5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3. Still an integrator action.
 6. Where descriptors live: the release system, or a later commit under `docs/migration/data_releases/releases/`.
+   **Still pending.** `scripts/adopt_legacy_kg.py descriptor` only prints to stdout or to a path outside the
+   repository, so the answer decides where the output goes and nothing else. No real descriptor is committed.
+
+### Adoption results [OBSERVED, 2026-10-30]
+
+Tool: `app/modules/graph/adoption.py`, CLI `scripts/adopt_legacy_kg.py`. Run on `forge_merge` with
+`--code-commit a1d65702679e05eb2b45aa05b95de78b72948976` (the adopting revision: an existing commit, the same rule as
+`create_snapshot`). A file is adopted only if all of these pass; nothing is allowlisted and nothing is rewritten.
+
+- R1: a regular (non-symlink) `matkg_*.json` file; nested paths are on the allowlist.
+- R2: `things`/`associations` family, bytes equal `json.dumps(indent=2, ensure_ascii=False)` with no trailing
+  newline (what the manifest's `serialization` asserts), a non-empty graph, and a passing schema validation.
+- R3, R4, R5, R7 via `releases.check_disclosure`. R6 stays informational (O-D1).
+
+Adopted files get `graph.json` (a byte copy: same sha256, not a symlink, flat file untouched), `manifest.json`
+(`legacy_adoption`, one `unknown` extraction revision, no inputs, empty source set, schema `matkg_schema`, no invented
+hash) and `validation.json`. A name that is not `matkg_<corpus>_v<N>.json` becomes corpus `<name stem>`, snapshot `v1`
+and has no `compat_paths` entry, because the R1 flat allowlist admits only `matkg_<corpus>_v<N>.json`; its flat file is
+named in a descriptor with role `legacy_flat_graph`.
+
+**Adopted (6):**
+
+| Flat file | Nested release | Nodes / edges |
+|---|---|---|
+| `matkg_deepseek-r1_70b_100_20250929_004942.json` | `deepseek-r1_70b_100_20250929_004942/v1` | 725 / 533 |
+| `matkg_deepseek-r1_70b_25_20250925_103657.json` | `deepseek-r1_70b_25_20250925_103657/v1` | 247 / 165 |
+| `matkg_deepseek-r1_70b_50_20250926_144206.json` | `deepseek-r1_70b_50_20250926_144206/v1` | 490 / 344 |
+| `matkg_deepseek-r1_70b_75_20250927_214641.json` | `deepseek-r1_70b_75_20250927_214641/v1` | 639 / 467 |
+| `matkg_google_gemini-flash-lite_25_20251008_185312.json` | `google_gemini-flash-lite_25_20251008_185312/v1` | 1915 / 227 |
+| `matkg_gpt-oss_20b_25_20250930_172105.json` | `gpt-oss_20b_25_20250930_172105/v1` | 992 / 1003 |
+
+**Skipped (53 of 59 top-level entries), by exact rule:**
+
+| Rule | Count | Files |
+|---|---|---|
+| R1 | 2 | `view_kg.html`, `matkg_xray_papers_cborg_chat.json.bak` (not `matkg_*.json`) |
+| placeholder (R2: empty graph) | 5 | the 40-byte files: `matkg_google_gemini-flash-lite_{25,50,75,100}_20260603_182319.json`, `matkg_resources_saxs_algorithms_20260603_181120.json` |
+| R2 format | 3 | `matkg_rsoxs_v3.json` (`nodes`/`edges` family, not things/associations); `matkg_bl1101_v8.json` (trailing newline) and `matkg_bl1101_v9.json` (not json2kg serialization) |
+| R3 | 36 | 858 "high-entropy token" findings, all in node `id`, edge `subject`/`object` and `source_file_url` strings (no `sk-`, `AKIA`, `ghp_` or bearer match): deepseek-r1 14b x4 and 32b x4, gemini-flash-lite x3 (`100_20251008`, `50_20251008`, `75_20251008`), gpt-oss 120b x4 and 20b x3 (`100`, `50`, `75`), lbl_cborg-chat x4, qwen3_235b x10, `matkg_rsoxs_v1.json`, `matkg_rsoxs_v2.json`, `matkg_with_code.json`, `matkg_xray_papers_cborg_chat.json` |
+| R3 + R4 | 6 | `matkg_bl1101_v1`–`v6.json`: R3 x304 and R4 x12 in total (v1–v4: 32 + 2 each; v5, v6: 88 + 2 each) |
+| R3 + R4 + R7 | 1 | `matkg_bl1101_v7.json`: R3 x88, R4 x2, R7 x10 (`DocumentChunk` review flags) |
+
+The earlier inventory counted 0 R3 hits on the tracked files and so predicted these files would pass. It used a
+different heuristic. The entropy rule in `releases.check_disclosure` flags long chemical-name slugs used as ids. They
+look like false positives but they are not judged here. `matkg_bl1101_v1`–`v9` and `matkg_rsoxs_v1`–`v3` are tracked on
+`forge_merge` (commit `0d3d294`), so they are in the 59 entries, not in a separate untracked set.
+
+Open items for the owner: (a) a reviewed allowlist (keyed by `allowlist_key`) for the R3 entropy hits, and for the
+bl1101 R3/R4 hits and the R7 `DocumentChunk` flags, before those files can be adopted; (b) whether `matkg_rsoxs_v3`
+(nodes/edges, an `ingest_rsoxs_v3` product) gets a manifest `format` value of its own, or is adopted after a rebuild;
+(c) whether bl1101 v8/v9 are rebuilt in json2kg serialization (that is a new version, never an edit); (d) Q6 above.
+
+**Images.** The nested `graph.json` copies are excluded from the build context by `.dockerignore`
+(`storage/kg/*/v*/graph.json`); manifests and validation reports ship. The flat copies stay the byte source in
+images (section 7), and a descriptor still selects data by commit, path and hash.
+
