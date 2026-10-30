@@ -187,10 +187,10 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 | D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change | **Decided 2026-10-30 (O-S2): reconcile now (bl1101 v3).**
 | D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release | **Decided 2026-10-30 (O-S2): add the slot (0.3.1).**
 | D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% | **Decided 2026-10-30 (O-S2): 2%.**
-| D1.6 | A value both derived and in an attributing sentence | Tagged cited today | Keep cited |
-| D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag |
-| D1.8 | LOCAL-02 counts as gold with one reviewed paper | It needs a real run, not labels | Accept |
-| D1.9 | Content-hash step in Work counting (K1) | A renamed copy with no DOI, arXiv id or title counts separately | Add it, as a versioned rule change |
+| D1.6 | A value both derived and in an attributing sentence | Tagged cited today | Keep cited | **Decided 2026-10-30 (O-S3): cited wins.**
+| D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag | **Decided 2026-10-30 (O-S3): opt-in multimodal flag.**
+| D1.8 | LOCAL-02 counts as gold with one reviewed paper | It needs a real run, not labels | Accept | **Decided 2026-10-30 (O-S3): accept.**
+| D1.9 | Content-hash step in Work counting (K1) | A renamed copy with no DOI, arXiv id or title counts separately | Add it, as a versioned rule change | **Decided 2026-10-30 (O-S3): add the hash step.**
 | D1.10 | Near-duplicate title check | About 4.5 min at 10k keys | Run it as a job above a size limit |
 | D1.11 | Tiled scan that reaches the end of its listing | Reported complete, marked as a live read | Keep, with the warning |
 

@@ -348,3 +348,12 @@ frozen-UI pin is updated in that change (as O-U1).
 - **D1.4 (O-S2):** add a normalized-value slot to 0.3.0 (converted value, unit, factor and
   conversion profile as provenance). Versioned additive change to 0.3.0 (becomes 0.3.1).
 - **D1.5 / D3.12 (O-S2):** derived-value tolerance 2% (`RECIPROCAL_DERIVATION_REL_TOL`).
+
+## Register walk-through, batch 14: D1.6-D1.9 (2026-10-30, O-S3)
+
+- **D1.6:** cited wins over derived; the derivation stays recorded on the record.
+- **D1.7:** add an opt-in `--figures multimodal` flag to the labelling tool (figure crops to
+  a vision-capable CBORG model for FIG-01..03); off by default.
+- **D1.8:** LOCAL-02 counts as covered once one reviewed pilot paper exists.
+- **D1.9:** add a content-hash step to the K1 distinct-Work rule (byte-identical files count
+  once) as a versioned rule change with parity tests.
