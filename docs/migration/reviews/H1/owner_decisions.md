@@ -264,3 +264,18 @@ frozen-UI pin is updated in that change (as O-U1).
   a Save from an out-of-date copy).
 - **Q11 (STOP-4):** scoped publication after extraction runs automatically on `:local`
   when the plan is safe; on ALS it waits for admin review.
+
+## Register walk-through, batch 7: Tiled editing plan Q12-Q15 (2026-10-30, O-E1 part 4)
+
+- **Q12 (STOP-5):** a Save is acknowledged only after the journal write AND the Tiled
+  effect complete; a partial failure returns the existing 502, the journal entry is
+  marked failed, the recovery job reconciles it.
+- **Q13 (STOP-6):** "Hide controls via a capability read". This is a frozen-UI change:
+  recorded as **O-U3 (granted in principle)**: the UI reads the caller's capabilities and
+  hides Save/edit controls for ALS non-admins; the server still returns 403 as the
+  backstop. The CI `FROZEN_UI_TREE` pin is updated in the implementing change (T18D).
+- **Q14:** "Ignore and continue": a foreign record that changes under a run does not
+  stop the run. The pre/post fingerprint report still records the change in the receipt
+  for the admin; the run does not fail closed on it.
+- **Q15 (F4/B26):** rollback below a carried-forward edit requires a reviewed conflict
+  resolution.
