@@ -75,13 +75,16 @@ ENV PIP_NO_CACHE_DIR=1 \
 # Pin: owner decision O-T1 = PINNED_TILED_VERSION / PINNED_TILED_WHEEL_SHA256 in
 # app/modules/deployment/tiled_config.py (tests/images check they agree). The server gets
 # its own environment: tiled needs pydantic-settings<2.12, the app lock pins 2.14.2.
-COPY docker/profiles/tiled-server/constraints.txt /tmp/tiled/constraints.txt
+# T28C/AUD-08: constraints.lock.txt is the hash-locked form of constraints.txt (same versions,
+# every wheel/sdist sha256); --require-hashes refuses any other bytes. The checked wheel is
+# offered through --find-links so pip installs that file for tiled (its hash is in the lock).
+COPY docker/profiles/tiled-server/constraints.lock.txt /tmp/tiled/constraints.lock.txt
 RUN python -m pip download --no-deps --only-binary=:all: --dest /tmp/tiled/wheel "tiled==0.2.18" && \
     echo "416079d4b5c9acc5498197d48c05a951ee8f7c699ac3b07920ae907a8da7fa06  /tmp/tiled/wheel/tiled-0.2.18-py3-none-any.whl" \
         | sha256sum -c - && \
     python -m venv /opt/tiled/venv && \
-    /opt/tiled/venv/bin/python -m pip install --constraint /tmp/tiled/constraints.txt \
-        "/tmp/tiled/wheel/tiled-0.2.18-py3-none-any.whl[server]" && \
+    /opt/tiled/venv/bin/python -m pip install --require-hashes --find-links /tmp/tiled/wheel \
+        -r /tmp/tiled/constraints.lock.txt && \
     /opt/tiled/venv/bin/python -m pip check && \
     /opt/tiled/venv/bin/python -I -c "import sys, tiled; sys.exit(tiled.__version__ != '0.2.18')" && \
     rm -rf /tmp/tiled
@@ -116,13 +119,17 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY requirements.txt ./
-COPY requirements/runtime.txt requirements/semantic.in ./requirements/
+COPY requirements/runtime.txt requirements/runtime.lock.txt requirements/semantic.in ./requirements/
+# The application lock is installed with --require-hashes from requirements/runtime.lock.txt
+# (T28C/AUD-08: the pins of requirements/runtime.txt plus every wheel/sdist sha256).
 # Semantic retrieval (QA path and the term-merge shortlist) stays in every image. torch is
 # installed first from the PyTorch CPU index: on the default index Linux resolves CUDA
 # builds (+cu13x plus ~3 GB of nvidia-* wheels) that no image can use (no GPU,
-# KG_RAG_FORCE_CPU=1). The build fails if a CUDA build slips in.
+# KG_RAG_FORCE_CPU=1). The build fails if a CUDA build slips in. torch and semantic.in stay
+# unhashed: CPU torch comes from the PyTorch index (not PyPI) and semantic.in is unpinned by
+# design (platform-specific wheels; requirements/semantic.in).
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements/runtime.txt && \
+    python -m pip install --require-hashes -r requirements/runtime.lock.txt && \
     python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.12.0" && \
     python -m pip install -r requirements/semantic.in && \
     python -I -c "import sys, torch; sys.exit(0 if torch.version.cuda is None else 1)"

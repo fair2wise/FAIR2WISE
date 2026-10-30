@@ -47,9 +47,11 @@ GATEWAY_PORT = 8080
 LOCK_FILES = (
     "requirements.txt",
     "requirements/runtime.txt",
+    "requirements/runtime.lock.txt",
     "requirements/semantic.in",
     "ui/package-lock.json",
     "docker/profiles/tiled-server/constraints.txt",
+    "docker/profiles/tiled-server/constraints.lock.txt",
     "docker/profiles/local.json",
     "docker/profiles/als-dev.json",
     "docker/profiles/als-prod.json",

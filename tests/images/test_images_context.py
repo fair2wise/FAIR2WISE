@@ -114,6 +114,7 @@ def test_final_images_keep_code_schemas_and_tracked_kg_json(name):
     other = {"local", "als-dev", "als-prod"} - {name}
     assert not [p for p in shipped if any(p == f"docker/profiles/{o}.json" for o in other)]
     assert "docker/profiles/tiled-server/constraints.txt" not in shipped  # build stage only
+    assert "docker/profiles/tiled-server/constraints.lock.txt" not in shipped
 
 
 @pytest.mark.parametrize("name", FINALS)
