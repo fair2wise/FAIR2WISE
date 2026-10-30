@@ -21,16 +21,16 @@ artifact: only the frozen layout passes ``releases.verify_*``.
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import json
 import logging
 import os
+from pathlib import Path
 import shutil
 import threading
+from typing import Any, Iterable, Mapping, Sequence
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence
 
 from app.modules import json2kg
 from app.modules.contracts.changes import SnapshotManifest
@@ -52,8 +52,8 @@ from .snapshot_manifest import (
     PARENT_RELATIONS,
     SNAPSHOT_ID_RE,
     CompatPath,
-    Created,
     CorpusRevision,
+    Created,
     DisclosureBlock,
     ExtractionBlock,
     ExtractionRevision,
@@ -71,7 +71,7 @@ from .snapshots import graph_id_for_snapshot
 
 logger = logging.getLogger(__name__)
 
-_HELPERS: Dict[str, Any] = {}
+_HELPERS: dict[str, Any] = {}
 _HELPERS_LOCK = threading.Lock()
 
 TOOL = "app.modules.json2kg.convert_terms_to_graph"
@@ -92,10 +92,10 @@ class SnapshotBuildError(SnapshotError):
 
 
 def build_graph_isolated(
-    raw_terms: Iterable[Dict[str, Any]],
-    code_snippets: Optional[List[Dict[str, Any]]] = None,
+    raw_terms: Iterable[dict[str, Any]],
+    code_snippets: list[dict[str, Any]] | None = None,
     **kwargs: Any,
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """``json2kg.build_graph`` on deep copies of the inputs.
 
     ``build_graph`` aliases the caller's list fields into the graph and its merge appends to the first
@@ -135,23 +135,23 @@ class SnapshotRequest:
 
     corpus: str
     terms_path: Path
-    storage_kg: Optional[Path] = None
-    schema_id: Optional[str] = None
-    snapshot_id: Optional[str] = None
-    parent_snapshot_id: Optional[str] = None
+    storage_kg: Path | None = None
+    schema_id: str | None = None
+    snapshot_id: str | None = None
+    parent_snapshot_id: str | None = None
     parent_relation: str = "rebuild"
-    parent_data_commit: Optional[str] = None
+    parent_data_commit: str | None = None
     extraction_revisions: Sequence[Mapping[str, Any]] = ()
     source_sha256: Sequence[str] = ()
-    corpus_revision_id: Optional[str] = None
-    terms_ref: Optional[str] = None
-    code_commit: Optional[str] = None
-    run_id: Optional[str] = None
-    profile: Optional[str] = "local"
-    now: Optional[datetime] = None
-    owner_waiver_ref: Optional[str] = None
-    disclosure_allowlist: FrozenSet[str] = frozenset()
-    registry: Optional[SchemaRegistry] = None
+    corpus_revision_id: str | None = None
+    terms_ref: str | None = None
+    code_commit: str | None = None
+    run_id: str | None = None
+    profile: str | None = "local"
+    now: datetime | None = None
+    owner_waiver_ref: str | None = None
+    disclosure_allowlist: frozenset[str] = frozenset()
+    registry: SchemaRegistry | None = None
     allow_pending_review_schema: bool = False
 
 
@@ -171,7 +171,7 @@ class SnapshotResult:
     graph_sha256: str
     validation_status: str
     disclosure: DisclosureReport
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def commit_ready(self) -> bool:
@@ -179,7 +179,7 @@ class SnapshotResult:
         return self.disclosure.commit_ready
 
 
-def _git_head(repo: Path) -> Optional[str]:
+def _git_head(repo: Path) -> str | None:
     """Current commit of ``repo`` read from ``.git`` files (no Git process)."""
     dot_git = repo / ".git"
     try:
@@ -218,8 +218,8 @@ def _write_synced(path: Path, data: bytes) -> None:
         os.fsync(handle.fileno())
 
 
-def _existing_numbers(corpus_dir: Path, storage_kg: Path, corpus: str) -> List[int]:
-    numbers: List[int] = []
+def _existing_numbers(corpus_dir: Path, storage_kg: Path, corpus: str) -> list[int]:
+    numbers: list[int] = []
     if corpus_dir.is_dir():
         numbers += [int(p.name[1:]) for p in corpus_dir.iterdir() if SNAPSHOT_ID_RE.match(p.name)]
     prefix = f"matkg_{corpus}_v"
@@ -246,7 +246,7 @@ def _choose_schema(request: SnapshotRequest, registry: SchemaRegistry):
     return entry, source
 
 
-def _extraction(request: SnapshotRequest, warnings: List[str]) -> ExtractionBlock:
+def _extraction(request: SnapshotRequest, warnings: list[str]) -> ExtractionBlock:
     if request.extraction_revisions:
         return ExtractionBlock(revisions=[ExtractionRevision(**dict(r)) for r in request.extraction_revisions])
     warnings.append("no extraction revisions supplied: recorded as one unknown revision")
@@ -281,7 +281,7 @@ def _helper_for(entry: Any, fingerprint: str) -> Any:
         return helper
 
 
-def _graph_stats(blob: bytes) -> Dict[str, int]:
+def _graph_stats(blob: bytes) -> dict[str, int]:
     data = json.loads(blob.decode("utf-8"))
     nodes = data.get("things") or []
     return {
@@ -291,7 +291,7 @@ def _graph_stats(blob: bytes) -> Dict[str, int]:
     }
 
 
-def _verified_parent(corpus_dir: Path, request: SnapshotRequest) -> Optional[Parent]:
+def _verified_parent(corpus_dir: Path, request: SnapshotRequest) -> Parent | None:
     if not request.parent_snapshot_id:
         return None
     if request.parent_relation not in PARENT_RELATIONS:
@@ -332,10 +332,10 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
         raise SnapshotError("code_commit could not be determined; pass code_commit")
     registry = request.registry or SchemaRegistry.discover()
     entry, selection_source = _choose_schema(request, registry)
-    warnings: List[str] = []
+    warnings: list[str] = []
     extraction = _extraction(request, warnings)
     terms_ref = _terms_ref(request)
-    now = request.now or datetime.now(timezone.utc)
+    now = request.now or datetime.now(UTC)
 
     storage_kg = storage_kg.resolve()
     corpus_dir = storage_kg / request.corpus
@@ -343,7 +343,7 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
     corpus_dir.mkdir(parents=True, exist_ok=True)
     staging = corpus_dir / f".staging-{uuid.uuid4().hex}"
     flat_tmp = storage_kg / f".flat-{uuid.uuid4().hex}.tmp"
-    claimed_flat: Optional[Path] = None
+    claimed_flat: Path | None = None
     try:
         staging.mkdir()
         terms_bytes = terms_path.read_bytes()  # the only access to the caller's file

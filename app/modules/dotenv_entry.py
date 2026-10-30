@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from .resources import is_checkout
 
@@ -31,7 +31,7 @@ DOTENV_VAR = "F2W_DOTENV"
 _DISABLED = {"", "0", "none", "off", "false"}
 
 
-def find_entrypoint_dotenv(anchor: Union[str, Path]) -> Optional[Path]:
+def find_entrypoint_dotenv(anchor: Union[str, Path]) -> Path | None:
     """Return the ``.env`` an entry point at ``anchor`` should load, or ``None``."""
     explicit = os.environ.get(DOTENV_VAR)
     if explicit is not None:
@@ -54,7 +54,7 @@ def find_entrypoint_dotenv(anchor: Union[str, Path]) -> Optional[Path]:
     return None
 
 
-def load_entrypoint_dotenv(anchor: Union[str, Path]) -> Optional[Path]:
+def load_entrypoint_dotenv(anchor: Union[str, Path]) -> Path | None:
     """Load the entry point's ``.env`` without overriding the process environment; return its path."""
     path = find_entrypoint_dotenv(anchor)
     if path is None:

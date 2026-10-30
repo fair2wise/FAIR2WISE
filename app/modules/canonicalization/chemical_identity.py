@@ -14,16 +14,15 @@ plain_inorganic_name, structure_identifies (need RDKit; deferred to H3 material 
 
 from __future__ import annotations
 
+from functools import lru_cache
 import hashlib
 import re
-from functools import lru_cache
-from typing import Optional
 
 from .merge_safety import MergeVerdict
 
 
 @lru_cache(maxsize=4096)
-def canonical_smiles(smiles: str) -> Optional[str]:
+def canonical_smiles(smiles: str) -> str | None:
     """Normalize atom order keeping isotopes, stereochemistry and salts; ``None`` if unresolved.
 
     Wildcard/polymer structures, extended SMILES and a missing RDKit are all unresolved.
@@ -46,7 +45,7 @@ def canonical_smiles(smiles: str) -> Optional[str]:
     return Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
 
 
-def structure_slug(smiles: str) -> Optional[str]:
+def structure_slug(smiles: str) -> str | None:
     """A molecular-graph key (hash of canonical SMILES), not a name or similarity key."""
     normalized = canonical_smiles(smiles)
     return "molecule_" + hashlib.sha256(normalized.encode()).hexdigest() if normalized else None
@@ -57,13 +56,13 @@ _FORMULA_TOKEN = re.compile(r"(?:[A-Z][a-z]?\d*(?:\.\d+)?|\([A-Za-z0-9.]+\)\d*)+
 _QUALIFIER = re.compile(r"\[[0-9\-\s]+\]|\([0-9\-\s]{2,5}\)|\b(?:alpha|beta|gamma|delta)\b[-\s]*", re.IGNORECASE)
 
 
-def formula_counts(text: str) -> Optional[dict]:
+def formula_counts(text: str) -> dict | None:
     """Element counts of a written formula (``PbI2``, ``(NH4)2SO4``), or ``None``."""
     text = text.strip()
     if not re.fullmatch(r"[A-Za-z0-9()]+", text) or not re.match(r"[A-Z(]", text):
         return None
 
-    def expand(match: "re.Match[str]") -> str:
+    def expand(match: re.Match[str]) -> str:
         return match.group(1) * int(match.group(2) or 1)
 
     flat = text
@@ -92,7 +91,7 @@ def _split(text: str) -> tuple:
     return core, qualifier
 
 
-def chemical_verdict(canonical: str, alias: str) -> Optional[MergeVerdict]:
+def chemical_verdict(canonical: str, alias: str) -> MergeVerdict | None:
     """A verdict when either side is a written formula, else ``None`` (no chemical opinion).
 
     Two formula-like forms merge only when their element counts and crystallographic

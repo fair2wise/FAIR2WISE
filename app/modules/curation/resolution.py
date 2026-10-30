@@ -26,20 +26,20 @@ configuration or model defaults, no direct HTTP transport, no auto-acceptance of
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import hashlib
 import json
 import threading
+from typing import Any, Callable, Iterable, Protocol
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Optional, Protocol
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..provenance.events import GraphWriteEvent
 from ..provenance.recorder import AuditRecorder
 from .approval import CostApproval, check_cost_approval
-from .cost_ledger import CallOutcome, parse_cost_header, settle_outcome
 from .control import ResolverSettings
+from .cost_ledger import CallOutcome, parse_cost_header, settle_outcome
 from .model_port import ModelCallError, ModelPort, ModelRef
 from .models import CaseState, ResolutionAttempt, Route
 from .review_schema import ReviewParseError, parse_review_response, validate_resolution
@@ -57,7 +57,7 @@ PROMPT = (
 class OutboundPolicy(Protocol):
     """Decides whether a case's source text may leave the deployment for a remote model."""
 
-    def refusal(self, case: Dict[str, Any], ref: ModelRef) -> Optional[str]:
+    def refusal(self, case: dict[str, Any], ref: ModelRef) -> str | None:
         """Return a reason to refuse, or ``None`` to allow."""
         ...
 
@@ -69,7 +69,7 @@ class AllowListOutboundPolicy:
     corpora: frozenset
     max_chars: int = 4000
 
-    def refusal(self, case: Dict[str, Any], ref: ModelRef) -> Optional[str]:
+    def refusal(self, case: dict[str, Any], ref: ModelRef) -> str | None:
         """Return a reason to refuse unless the corpus is listed and the evidence fits `max_chars`."""
         if case["corpus"] not in self.corpora:
             return "corpus not approved for outbound content"
@@ -92,11 +92,11 @@ class RunResult:
     invalid: int = 0
     failed: int = 0
     refused: int = 0
-    paused: Optional[str] = None
-    reservations: List[str] = field(default_factory=list)
+    paused: str | None = None
+    reservations: list[str] = field(default_factory=list)
 
 
-def build_prompt(case: Dict[str, Any]) -> str:
+def build_prompt(case: dict[str, Any]) -> str:
     """Prompt for one case (surface, category and evidence only; no identifiers beyond the case id)."""
     payload = case["payload"]
     body = {
@@ -136,11 +136,11 @@ class ModelResolver:
         ref: ModelRef,
         settings: ResolverSettings,
         admission: Any,
-        approval: Optional[CostApproval] = None,
-        outbound_policy: Optional[OutboundPolicy] = None,
-        recorder: Optional[AuditRecorder] = None,
-        stop: Optional[threading.Event] = None,
-        now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+        approval: CostApproval | None = None,
+        outbound_policy: OutboundPolicy | None = None,
+        recorder: AuditRecorder | None = None,
+        stop: threading.Event | None = None,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         if route not in (Route.LOCAL_MODEL, Route.REMOTE_MODEL):
             raise ValueError("route must be a model route")
@@ -167,7 +167,7 @@ class ModelResolver:
         """Whether the route sends cases to a remote model."""
         return self.route is Route.REMOTE_MODEL
 
-    def run_once(self, case_limit: Optional[int] = None) -> RunResult:
+    def run_once(self, case_limit: int | None = None) -> RunResult:
         """Claim up to ``case_limit`` (default ``settings.batch_size``) cases and resolve them in order."""
         result = RunResult()
         if self.remote and not self.settings.remote_enabled:
@@ -185,15 +185,15 @@ class ModelResolver:
             self._resolve(case, result)
         return result
 
-    def _give_back(self, case: Dict[str, Any], state: CaseState = CaseState.PENDING, reason: str = "") -> None:
+    def _give_back(self, case: dict[str, Any], state: CaseState = CaseState.PENDING, reason: str = "") -> None:
         self.store.release(case["id"], case["lease_token"], state=state, reason=reason)
 
-    def _resolve(self, case: Dict[str, Any], result: RunResult) -> None:
+    def _resolve(self, case: dict[str, Any], result: RunResult) -> None:
         token = case["lease_token"]
         if self.store.attempt_count(case["id"]) >= self.settings.max_attempts:
             self._give_back(case, CaseState.NEEDS_REVIEW, "attempt limit reached")
             return
-        reservation: Optional[str] = None
+        reservation: str | None = None
         if self.remote:
             refusal = self.policy.refusal(case, self.ref) if self.policy is not None else "no outbound policy"
             if refusal:
@@ -231,7 +231,7 @@ class ModelResolver:
         prompt = build_prompt(case)
         fingerprint = hashlib.sha256(f"{self.ref.provider}|{self.ref.model}|{prompt}".encode()).hexdigest()
         reply = None
-        error: Optional[ModelCallError] = None
+        error: ModelCallError | None = None
         try:
             with self.admission.slot(self.ref.provider):
                 reply = self.port.complete(prompt, ref=self.ref, timeout=self.settings.timeout_seconds)
@@ -259,9 +259,9 @@ class ModelResolver:
             return
         self._record(case, token, reply, fingerprint, result)
 
-    def _record(self, case: Dict[str, Any], token: str, reply: Any, fingerprint: str, result: RunResult) -> None:
+    def _record(self, case: dict[str, Any], token: str, reply: Any, fingerprint: str, result: RunResult) -> None:
         cost = 0.0 if self.ref.local else reply.cost_usd  # only a local model is known to be free
-        base: Dict[str, Any] = dict(
+        base: dict[str, Any] = dict(
             case_id=case["id"],
             provider=self.ref.provider,
             requested_model=self.ref.model,
@@ -305,7 +305,7 @@ class ModelResolver:
         )
 
     def _note(
-        self, case: Dict[str, Any], reply: Any, error: Optional[ModelCallError], reservation: Optional[str]
+        self, case: dict[str, Any], reply: Any, error: ModelCallError | None, reservation: str | None
     ) -> None:
         if self.recorder is None:
             return

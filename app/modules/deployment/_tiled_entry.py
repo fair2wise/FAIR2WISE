@@ -18,8 +18,8 @@ Exit codes: 3 = installed tiled is not the expected version; 4 = configuration r
 
 import argparse
 import json
-import sys
 from pathlib import Path
+import sys
 
 EXIT_UNSUPPORTED_VERSION = 3
 EXIT_CONFIG = 4
@@ -75,9 +75,9 @@ def main(argv=None):
         print(f"F2W_TILED_ERROR config_invalid {type(exc).__name__}", file=sys.stderr, flush=True)
         return EXIT_CONFIG
 
-    import uvicorn
     from tiled.commandline._serve import _setup_log_config
     from tiled.server.app import build_app_from_config
+    import uvicorn
 
     host = config.uvicorn.get("host", "127.0.0.1")
     port = int(config.uvicorn.get("port", 8765))

@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Protocol
 
 from .events import GraphWriteEvent
 from .recorder import AuditLog
@@ -52,11 +52,11 @@ class QueuedRecorder:
         self._clock = clock
         self._wake = threading.Event()
         self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._failures = 0
         self._drain_lock = threading.Lock()
 
-    def start(self) -> "QueuedRecorder":
+    def start(self) -> QueuedRecorder:
         """Start the worker (idempotent)."""
         if self._thread is None or not self._thread.is_alive():
             self._stop.clear()
@@ -117,7 +117,7 @@ class QueuedRecorder:
                 return not self._log.pending_projection()
         return True
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Backlog, failures and the last error, never hidden."""
         row = self._log.db.one("SELECT COUNT(*) FROM projection_outbox WHERE error != ''")
         return {

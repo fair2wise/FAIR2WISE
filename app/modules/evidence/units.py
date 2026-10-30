@@ -23,9 +23,8 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/unit
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Optional
+import math
 
 __all__ = [
     "ANGLE_TO_DEG",
@@ -356,7 +355,7 @@ def base_quantity_name(name: str) -> str:
     return (name or "").split("[", 1)[0].strip()
 
 
-def expected_dimension(name: str) -> Optional[str]:
+def expected_dimension(name: str) -> str | None:
     """What a quantity name measures (donor names, peak names, instrument settings), or ``None``."""
     base = base_quantity_name(name)
     return QUANTITY_DIMENSION.get(base) or _PEAK_DIMENSION.get(base) or INSTRUMENT_QUANTITY_DIMENSION.get(base)
@@ -383,7 +382,7 @@ def quantity_unit_mismatch(name: str, unit: str) -> str:
 RECIPROCAL_DERIVATION_REL_TOL = 0.02
 
 
-def reciprocal_derivation(value: float, unit: str, partner_value: float, partner_unit: str) -> Optional[dict]:
+def reciprocal_derivation(value: float, unit: str, partner_value: float, partner_unit: str) -> dict | None:
     """Provenance when ``value unit`` equals ``2*pi / (partner_value partner_unit)``, else ``None``.
 
     Covers d-spacing from q and q from d. Both sides are converted through the
@@ -437,9 +436,9 @@ class NormalizedQuantity:
     raw_value: float
     raw_unit: str
     dimension: str
-    value: Optional[float]
+    value: float | None
     unit: str
-    factor: Optional[float]
+    factor: float | None
     profile: str = CONVERSION_PROFILE
     reason: str = ""
 
@@ -472,7 +471,7 @@ def normalize_quantity(raw_value: float, raw_unit: str) -> NormalizedQuantity:
     if not math.isfinite(raw_value):
         return NormalizedQuantity(raw_value, raw_unit, dimension, None, "", None, reason="value is not finite")
     folded = canonical_unit(raw_unit)
-    factor: Optional[float] = None
+    factor: float | None = None
     if dimension == "length":
         factor = LENGTH_TO_NM[LENGTH_UNIT_SPELLINGS[folded]]
     elif dimension == "reciprocal":

@@ -13,14 +13,14 @@ Features:
   - Full utilization of extracted term fields: formula, formula_validation, properties
   - Pytest test suite included below
 """
-import json
 import argparse
 import hashlib
+import json
 import logging
+from pathlib import Path
 import re
 import sys
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Set, Tuple
+from typing import Any, Iterable
 
 # Precompile regex pattern for performance
 _CLEAN_PATTERN = re.compile(r"[^A-Za-z0-9\-]")
@@ -59,7 +59,7 @@ _TERM_INPUT_ONLY = {
 _KNOWN_ID_PREFIXES = ("matkg:", "beamline:")
 
 
-def copy_passthrough_slots(term: Dict[str, Any], node: Dict[str, Any]) -> None:
+def copy_passthrough_slots(term: dict[str, Any], node: dict[str, Any]) -> None:
     """Copy overlay/extra term fields onto a node without overwriting core keys."""
     for key in _PASSTHROUGH_SLOTS:
         if key in node:
@@ -74,7 +74,7 @@ def copy_passthrough_slots(term: Dict[str, Any], node: Dict[str, Any]) -> None:
             node[key] = value
 
 
-def split_curie(value: str) -> Tuple[str, str] | None:
+def split_curie(value: str) -> tuple[str, str] | None:
     """Return (prefix, local) if value already uses a known graph prefix."""
     text = (value or "").strip()
     for curie in _KNOWN_ID_PREFIXES:
@@ -100,7 +100,7 @@ def make_id(term: str, prefix: str = "matkg") -> str:
     return f"{prefix}:{cleaned}"
 
 
-def ensure_list(val: Any) -> List[Any]:
+def ensure_list(val: Any) -> list[Any]:
     """Guarantee that the return is a list.
 
     - None     → []
@@ -112,9 +112,9 @@ def ensure_list(val: Any) -> List[Any]:
     return val if isinstance(val, list) else [val]
 
 
-def normalize_domain_features(features: Any) -> List[Dict[str, Any]]:
+def normalize_domain_features(features: Any) -> list[dict[str, Any]]:
     """Normalize schema-driven CodeSnippet domain feature entries."""
-    normalized: List[Dict[str, Any]] = []
+    normalized: list[dict[str, Any]] = []
     for feature in ensure_list(features):
         if not isinstance(feature, dict):
             continue
@@ -131,7 +131,7 @@ def normalize_domain_features(features: Any) -> List[Dict[str, Any]]:
     return normalized
 
 
-def normalize_publications(record: Dict[str, Any]) -> List[Dict[str, Any]]:
+def normalize_publications(record: dict[str, Any]) -> list[dict[str, Any]]:
     """Build embedded publication records without smearing scalar metadata."""
     explicit = record.get("publications")
     if isinstance(explicit, list):
@@ -181,7 +181,7 @@ def normalize_publications(record: Dict[str, Any]) -> List[Dict[str, Any]]:
     return []
 
 
-def _accept_code_snippet(snip: Dict[str, Any], code_body: str, strict: bool) -> bool:
+def _accept_code_snippet(snip: dict[str, Any], code_body: str, strict: bool) -> bool:
     """Return True when a code snippet should become a graph node."""
     if not code_body:
         return False
@@ -201,7 +201,7 @@ def _accept_code_snippet(snip: Dict[str, Any], code_body: str, strict: bool) -> 
     )
 
 
-def make_code_snippet_node(snip: Dict[str, Any], prefix: str = "matkg") -> Dict[str, Any]:
+def make_code_snippet_node(snip: dict[str, Any], prefix: str = "matkg") -> dict[str, Any]:
     """Build a CodeSnippet node from a code_snippets entry.
 
     Node ID includes MD5 hash of code body to prevent collisions.
@@ -260,12 +260,12 @@ def make_code_snippet_node(snip: Dict[str, Any], prefix: str = "matkg") -> Dict[
 
 
 def build_graph(
-    raw_terms: Iterable[Dict[str, Any]],
-    code_snippets: List[Dict[str, Any]] | None = None,
+    raw_terms: Iterable[dict[str, Any]],
+    code_snippets: list[dict[str, Any]] | None = None,
     *,
     default_id_prefix: str = "matkg",
     strict_snippets: bool = True,
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """Build a MatKG-compatible graph from raw term records.
 
     Optionally also consumes code_snippets produced by the code snippet
@@ -275,13 +275,13 @@ def build_graph(
       - "things": list of node dicts
       - "associations": list of edge dicts
     """
-    nodes: Dict[str, Dict[str, Any]] = {}
-    edges: List[Dict[str, Any]] = []
-    seen: Set[Tuple[str, str, str]] = set()
+    nodes: dict[str, dict[str, Any]] = {}
+    edges: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
 
     # Add CodeSnippet nodes from code snippet extraction
     # Track snippet nodes by (source_paper, page) for wiring to term nodes later
-    snippets_by_paper_page: Dict[Tuple[str, int], List[str]] = {}
+    snippets_by_paper_page: dict[tuple[str, int], list[str]] = {}
     for snip in (code_snippets or []):
         code_body = (snip.get("code_snippet") or "").strip()
         if not _accept_code_snippet(snip, code_body, strict_snippets):
@@ -416,7 +416,7 @@ def build_graph(
     # Wire has_code_snippet edges: any term node from same paper gets linked
     # to CodeSnippet nodes from that paper. Prefer same-page match, fall back
     # to same-paper.
-    wired_snippets: Set[str] = set()
+    wired_snippets: set[str] = set()
     for nid, node in nodes.items():
         if node.get("category") == "CodeSnippet":
             continue
@@ -454,7 +454,7 @@ def build_graph(
     return {"things": list(nodes.values()), "associations": edges}
 
 
-def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any]:
+def convert_terms_to_graph(input_json: Path, output_json: Path) -> dict[str, Any]:
     """Convert extracted_terms JSON into MatKG graph JSON.
 
     Args:

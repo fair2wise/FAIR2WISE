@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
+from typing import Any, Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -27,9 +27,9 @@ CONFIDENCE_FLOOR = 0.8
 DISPOSITIONS = ("resolved", "needs_review", "abstain")
 
 
-def answer_schema(grouped: bool) -> Dict[str, Any]:
+def answer_schema(grouped: bool) -> dict[str, Any]:
     """JSON Schema each verdict must satisfy (``grouped``: one verdict per ``case_id`` in ``resolutions``)."""
-    properties: Dict[str, Any] = {
+    properties: dict[str, Any] = {
         "disposition": {"type": "string", "enum": list(DISPOSITIONS)},
         "canonical_label": {"type": ["string", "null"]},
         "category": {"type": ["string", "null"]},
@@ -40,7 +40,7 @@ def answer_schema(grouped: bool) -> Dict[str, Any]:
     }
     if grouped:
         properties["case_id"] = {"type": "string"}
-    answer: Dict[str, Any] = {
+    answer: dict[str, Any] = {
         "type": "object",
         "properties": properties,
         "required": list(properties),
@@ -62,13 +62,13 @@ class ReviewAnswer(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     disposition: Literal["resolved", "needs_review", "abstain"]
-    canonical_label: Optional[str] = None
-    category: Optional[str] = None
-    aliases: List[str] = Field(default_factory=list)
+    canonical_label: str | None = None
+    category: str | None = None
+    aliases: list[str] = Field(default_factory=list)
     evidence_quote: str = ""
     confidence: float = Field(ge=0.0, le=1.0)
     reason: str = ""
-    case_id: Optional[str] = None
+    case_id: str | None = None
 
 
 class ReviewParseError(ValueError):
@@ -78,7 +78,7 @@ class ReviewParseError(ValueError):
 _FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.S)
 
 
-def parse_review_response(text: str, *, grouped: bool = False) -> List[ReviewAnswer]:
+def parse_review_response(text: str, *, grouped: bool = False) -> list[ReviewAnswer]:
     """Strictly parse a reply into verdicts; anything else raises :class:`ReviewParseError`."""
     body = text.strip()
     fenced = _FENCE.match(body)
@@ -118,9 +118,9 @@ def source_quote(evidence: str, surface: str) -> str:
     return match.group(0) if match else ""
 
 
-def validate_resolution(case: Mapping[str, Any], answer: ReviewAnswer) -> Dict[str, Any]:
+def validate_resolution(case: Mapping[str, Any], answer: ReviewAnswer) -> dict[str, Any]:
     """Deterministic gates for a proposal. ``accepted`` means *eligible for reviewer decision*, not applied."""
-    errors: List[str] = []
+    errors: list[str] = []
     evidence = str(case.get("evidence", ""))
     expected = str((case.get("payload") or {}).get("category") or "")
     if answer.disposition == "resolved":
@@ -142,11 +142,11 @@ def validate_resolution(case: Mapping[str, Any], answer: ReviewAnswer) -> Dict[s
 
 
 def grouped_answers_by_case(
-    answers: List[ReviewAnswer], case_ids: List[str]
-) -> Tuple[Dict[str, ReviewAnswer], List[str]]:
+    answers: list[ReviewAnswer], case_ids: list[str]
+) -> tuple[dict[str, ReviewAnswer], list[str]]:
     """Map grouped verdicts to cases; returns ``(by_case, problems)`` (missing, duplicate or foreign ids)."""
-    by_case: Dict[str, ReviewAnswer] = {}
-    problems: List[str] = []
+    by_case: dict[str, ReviewAnswer] = {}
+    problems: list[str] = []
     for answer in answers:
         if answer.case_id not in case_ids:
             problems.append(f"unknown case_id {answer.case_id!r}")

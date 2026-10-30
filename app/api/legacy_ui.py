@@ -39,14 +39,14 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import datetime
 import json
 import logging
 import os
-import threading
-from dataclasses import replace
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Tuple
+import threading
+from typing import Any, Callable, Iterable, Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
@@ -72,8 +72,6 @@ from ..modules.security.disclosure import (
     new_correlation_id,
 )
 from ..modules.security.tiled_identity import TiledIdentityPort
-
-from .source_text import TurnSources
 from .auth import (
     AccessRuntime,
     CredentialStore,
@@ -82,6 +80,7 @@ from .auth import (
     optional_request_context,
     request_context,
 )
+from .source_text import TurnSources
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +98,7 @@ _PENDING_PHASES = frozenset({"awaiting_download_decision", "awaiting_extraction_
 SETTING_WARNING_HEADER = "X-F2W-Warning"
 
 
-def deployment_settings_from(environ: Optional[Mapping[str, str]] = None) -> DeploymentSettings:
+def deployment_settings_from(environ: Mapping[str, str] | None = None) -> DeploymentSettings:
     """Build startup settings from trusted startup configuration (``os.environ`` when ``None``).
 
     ``F2W_DEPLOYMENT_PROFILE`` defaults to ``local`` and ``F2W_TILED_WRITER_IDENTITY``
@@ -109,7 +108,7 @@ def deployment_settings_from(environ: Optional[Mapping[str, str]] = None) -> Dep
         StartupConfigError: On any value ``DeploymentSettings`` rejects.
     """
     env = os.environ if environ is None else environ
-    values: Dict[str, str] = {k: str(env.get(k) or "") for k in STARTUP_KEYS}
+    values: dict[str, str] = {k: str(env.get(k) or "") for k in STARTUP_KEYS}
     values["F2W_DEPLOYMENT_PROFILE"] = values["F2W_DEPLOYMENT_PROFILE"].strip() or "local"
     values["F2W_TILED_WRITER_IDENTITY"] = values["F2W_TILED_WRITER_IDENTITY"].strip() or DEFAULT_WRITER_IDENTITY
     return DeploymentSettings.from_mapping(values)
@@ -127,8 +126,8 @@ class OpaquePaths:
 
     def __init__(self, **roots: Any) -> None:
         """Register the roots; empty values are skipped and relative paths resolve against the cwd."""
-        self._roots: Dict[str, Path] = {}
-        pairs: List[Tuple[str, str]] = []
+        self._roots: dict[str, Path] = {}
+        pairs: list[tuple[str, str]] = []
         for label, raw in roots.items():
             if not raw:
                 continue
@@ -170,7 +169,7 @@ class OpaquePaths:
             raise ValueError("Unknown graph reference")
         return str(target)
 
-    def decode_all(self, values: Optional[Iterable[Any]]) -> Optional[List[Any]]:
+    def decode_all(self, values: Iterable[Any] | None) -> list[Any] | None:
         """Decode every item of ``values`` (``None`` stays ``None``)."""
         if values is None:
             return None
@@ -187,11 +186,11 @@ class OwnerRegistry:
         path: JSON file to persist to, or ``None`` for memory only.
     """
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         """Load the persisted owners if ``path`` exists; an unreadable file is logged and ignored."""
         self._path = path
         self._lock = threading.Lock()
-        self._data: Dict[str, Dict[str, str]] = {"sessions": {}, "turns": {}}
+        self._data: dict[str, dict[str, str]] = {"sessions": {}, "turns": {}}
         if path is not None and path.exists():
             try:
                 loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -200,12 +199,12 @@ class OwnerRegistry:
             except (OSError, ValueError, AttributeError):
                 logger.warning("owner registry unreadable; every resource counts as unowned")
 
-    def owner(self, kind: str, key: Optional[str]) -> Optional[str]:
+    def owner(self, kind: str, key: str | None) -> str | None:
         """Return the owner of ``key`` (``sessions`` or ``turns``)."""
         with self._lock:
             return self._data[kind].get(str(key)) if key else None
 
-    def claim(self, kind: str, key: Optional[str], subject: str) -> None:
+    def claim(self, kind: str, key: str | None, subject: str) -> None:
         """Record ``subject`` as the owner of an unowned ``key``."""
         if not key:
             return
@@ -241,11 +240,11 @@ class PersonalSettingsStore:
         path: JSON file to persist to, or ``None`` for memory only.
     """
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         """Load the persisted settings if ``path`` exists; an unreadable file is logged and starts empty."""
         self._path = path
         self._lock = threading.Lock()
-        self._data: Dict[str, Dict[str, Any]] = {}
+        self._data: dict[str, dict[str, Any]] = {}
         if path is not None and path.exists():
             try:
                 loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -254,7 +253,7 @@ class PersonalSettingsStore:
             except (OSError, ValueError, AttributeError) as exc:
                 logger.warning("personal settings store unreadable, starting empty: %s", exc)
 
-    def get(self, key: str) -> Dict[str, Any]:
+    def get(self, key: str) -> dict[str, Any]:
         """Return a copy of ``key``'s saved personal fields (empty when never saved)."""
         with self._lock:
             return json.loads(json.dumps(self._data.get(key) or {}))
@@ -283,7 +282,7 @@ async def ui_context(request: Request) -> RequestContext:
     return ctx
 
 
-async def ui_optional_context(request: Request) -> Optional[RequestContext]:
+async def ui_optional_context(request: Request) -> RequestContext | None:
     """Route dependency for the public ``GET /health``: ``None`` for a signed-out ALS caller."""
     ctx = await optional_request_context(request)
     request.state.f2w_ctx = ctx
@@ -305,9 +304,9 @@ class LegacyUiGuard:
     """
 
     def __init__(self, runtime: AccessRuntime, projector: DisclosureProjector, paths: OpaquePaths,
-                 owners: OwnerRegistry, session_key: Callable[[Optional[str]], str],
-                 source_authority: Optional[SourceAccessAuthority] = None,
-                 personal_settings: Optional[PersonalSettingsStore] = None) -> None:
+                 owners: OwnerRegistry, session_key: Callable[[str | None], str],
+                 source_authority: SourceAccessAuthority | None = None,
+                 personal_settings: PersonalSettingsStore | None = None) -> None:
         """Bind the collaborators; without ``source_authority`` a new ``SourceAccessAuthority`` is created."""
         self.runtime = runtime
         self.projector = projector
@@ -356,8 +355,8 @@ class LegacyUiGuard:
 
     # ------------------------------------------------------------------ viewers and checks
 
-    def viewer(self, ctx: RequestContext, *, session_id: Optional[str] = None,
-               correlation_id: Optional[str] = None) -> Viewer:
+    def viewer(self, ctx: RequestContext, *, session_id: str | None = None,
+               correlation_id: str | None = None) -> Viewer:
         """Projection recipient; the turn id is the correlation id inside a chat turn."""
         base = Viewer.from_context(ctx)
         return replace(base, session=session_id or base.session,
@@ -378,7 +377,7 @@ class LegacyUiGuard:
             request.state.f2w_ctx = ctx
         return require(ctx, *caps)
 
-    def _require_owner(self, request: Request, ctx: RequestContext, owner: Optional[str], own: str,
+    def _require_owner(self, request: Request, ctx: RequestContext, owner: str | None, own: str,
                        any_: str) -> RequestContext:
         """Own resource: ``own``; anyone else's (or unowned on ALS): ``any_`` (as ``require_owner_or``)."""
         if not self.is_local and owner != ctx.principal.subject:
@@ -387,7 +386,7 @@ class LegacyUiGuard:
 
     # ------------------------------------------------------------------ sessions and turns
 
-    def session_access(self, request: Request, ctx: RequestContext, session_id: Optional[str], *,
+    def session_access(self, request: Request, ctx: RequestContext, session_id: str | None, *,
                        claim: bool) -> RequestContext:
         """Check R04/R05 (and chat's session binding) before the session is touched.
 
@@ -412,7 +411,7 @@ class LegacyUiGuard:
         if not self.is_local:
             self.owners.forget("sessions", session_id.strip())
 
-    def turn_access(self, request: Request, ctx: RequestContext, turn_id: Optional[str]) -> None:
+    def turn_access(self, request: Request, ctx: RequestContext, turn_id: str | None) -> None:
         """Refuse reusing another principal's turn id (it would overwrite their trace)."""
         if self.is_local or not turn_id:
             return
@@ -420,20 +419,20 @@ class LegacyUiGuard:
         if owner is not None and owner != ctx.principal.subject:
             self.require(request, ctx, "trace.read_any")
 
-    def claim_turn(self, ctx: RequestContext, turn_id: Optional[str]) -> None:
+    def claim_turn(self, ctx: RequestContext, turn_id: str | None) -> None:
         """Bind a new turn to the caller (ALS)."""
         if not self.is_local:
             self.owners.claim("turns", turn_id, ctx.principal.subject)
 
-    def chat_entry(self, request: Request, ctx: RequestContext, session_id: Optional[str],
-                   turn_id: Optional[str]) -> RequestContext:
+    def chat_entry(self, request: Request, ctx: RequestContext, session_id: str | None,
+                   turn_id: str | None) -> RequestContext:
         """R12/R15: session binding and turn id, before any model call."""
         ctx = self.session_access(request, ctx, session_id, claim=True)
         self.turn_access(request, ctx, turn_id)
         return ctx
 
-    def chat_action_entry(self, request: Request, ctx: RequestContext, decision: str, kind: Optional[str],
-                          session_id: Optional[str], turn_id: Optional[str]) -> RequestContext:
+    def chat_action_entry(self, request: Request, ctx: RequestContext, decision: str, kind: str | None,
+                          session_id: str | None, turn_id: str | None) -> RequestContext:
         """R13/R16: ``yes`` needs ``chat_action_capabilities`` (fresh role check) before any effect."""
         ctx = self.require(request, ctx, *chat_action_capabilities(decision, kind))
         ctx = self.session_access(request, ctx, session_id, claim=True)
@@ -442,7 +441,7 @@ class LegacyUiGuard:
 
     # ------------------------------------------------------------------ settings
 
-    def settings_key(self, ctx: RequestContext) -> Optional[str]:
+    def settings_key(self, ctx: RequestContext) -> str | None:
         """T25D: personal-settings key for the caller, or ``None`` for the server's own settings.
 
         ``None`` on ``:local`` (the single local operator's settings are the server's);
@@ -453,7 +452,7 @@ class LegacyUiGuard:
         issuer = ctx.principal.issuer or self.settings.tiled_target or ""
         return f"{issuer}|{ctx.principal.subject}"
 
-    def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> Tuple[Any, FrozenSet[str]]:
+    def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> tuple[Any, frozenset[str]]:
         """R03: check the fields' capabilities; drop ignored fields; decode opaque paths (T25D plan).
 
         On ALS a non-admin's deployment-wide fields are ignored (warning), not refused, so the
@@ -466,7 +465,7 @@ class LegacyUiGuard:
         plan = settings_update_plan(fields, local=self.is_local, admin=ctx.has("settings.global"))
         self.require(request, ctx, *plan.capabilities)
         ignored = plan.ignored
-        changes: Dict[str, Any] = {name: None for name in ignored}
+        changes: dict[str, Any] = {name: None for name in ignored}
         if not self.is_local and not ctx.has("settings.global") and update.selected_graph_ids:
             # Paths are hidden from non-admins (project_settings), so the UI echoes placeholders;
             # their graph selection is by graph id.
@@ -482,12 +481,12 @@ class LegacyUiGuard:
         return update.model_copy(update=changes), ignored
 
     @staticmethod
-    def setting_warning_headers(ignored: Iterable[str]) -> Dict[str, str]:
+    def setting_warning_headers(ignored: Iterable[str]) -> dict[str, str]:
         """Typed ``setting_not_writable`` warning for ignored fields (header; the body schema is frozen)."""
         names = sorted(ignored)
         return {SETTING_WARNING_HEADER: "setting_not_writable=" + ",".join(names)} if names else {}
 
-    def project_settings(self, ctx: RequestContext, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def project_settings(self, ctx: RequestContext, payload: dict[str, Any]) -> dict[str, Any]:
         """R02/R03 response: projected; paths, ``tiled_uri`` and ``tiled_error`` need ``settings.global``."""
         out = self.projector.project_settings(payload, self.viewer(ctx))
         if not ctx.has("settings.global"):
@@ -499,7 +498,7 @@ class LegacyUiGuard:
 
     # ------------------------------------------------------------------ projections
 
-    def project_health(self, ctx: Optional[RequestContext], payload: Dict[str, Any]) -> Dict[str, Any]:
+    def project_health(self, ctx: RequestContext | None, payload: dict[str, Any]) -> dict[str, Any]:
         """R01: full (paths opaque) for ``settings.global``, else status only."""
         if health_projection(ctx) == "full":
             out = self.projector.project_paths_only(payload)
@@ -517,7 +516,7 @@ class LegacyUiGuard:
         """Graph, search, upload and publication bodies through ``project_route_response``."""
         return self.projector.project_route_response(method, path, 200, payload, self.viewer(ctx))
 
-    def withhold_ingestion(self, ctx: RequestContext, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def withhold_ingestion(self, ctx: RequestContext, payload: dict[str, Any]) -> dict[str, Any]:
         """AUTH-03: no download/extraction offer for callers without both ingest capabilities."""
         if chat_offers_ingestion(ctx) or not payload.get("pending"):
             return payload
@@ -528,7 +527,7 @@ class LegacyUiGuard:
         return chat_offers_ingestion(ctx)
 
     def turn_projector(self, ctx: RequestContext,
-                       sources: Optional[TurnSources]) -> Tuple[DisclosureProjector, List[SourceRef], Any]:
+                       sources: TurnSources | None) -> tuple[DisclosureProjector, list[SourceRef], Any]:
         """Projector, source regions and grant for one turn's answer.
 
         Without captured PDF regions this is the app's projector with no sources (the
@@ -553,8 +552,8 @@ class LegacyUiGuard:
                                         roots=base.roots, citation_resolver=base.citation_resolver)
         return projector, refs, grant
 
-    def _with_turn(self, ctx: RequestContext, sources: Optional[TurnSources],
-                   project: Callable[[DisclosureProjector, List[SourceRef]], Any]) -> Any:
+    def _with_turn(self, ctx: RequestContext, sources: TurnSources | None,
+                   project: Callable[[DisclosureProjector, list[SourceRef]], Any]) -> Any:
         projector, refs, grant = self.turn_projector(ctx, sources)
         try:
             return project(projector, refs)
@@ -562,16 +561,16 @@ class LegacyUiGuard:
             if grant is not None:
                 self._source_authority.revoke(grant)
 
-    def project_chat(self, ctx: RequestContext, payload: Dict[str, Any], *, session_id: Optional[str],
-                     turn_id: Optional[str], sources: Optional[TurnSources] = None) -> Dict[str, Any]:
+    def project_chat(self, ctx: RequestContext, payload: dict[str, Any], *, session_id: str | None,
+                     turn_id: str | None, sources: TurnSources | None = None) -> dict[str, Any]:
         """R12/R13 body; ``sources`` are the turn's retrieved regions for quote verification."""
         viewer = self.viewer(ctx, session_id=session_id, correlation_id=turn_id)
         body = self.withhold_ingestion(ctx, payload)
         return self._with_turn(ctx, sources, lambda projector, refs: projector.project_chat_response(
             body, viewer, sources=refs))
 
-    def project_sse(self, ctx: RequestContext, event: str, data: Dict[str, Any], *, session_id: Optional[str],
-                    turn_id: Optional[str], sources: Optional[TurnSources] = None) -> Optional[Dict[str, Any]]:
+    def project_sse(self, ctx: RequestContext, event: str, data: dict[str, Any], *, session_id: str | None,
+                    turn_id: str | None, sources: TurnSources | None = None) -> dict[str, Any] | None:
         """R15/R16 event data; ``None`` drops the event (pending prompts for non-ingesting callers)."""
         viewer = self.viewer(ctx, session_id=session_id, correlation_id=turn_id)
         if event == "progress":
@@ -604,26 +603,26 @@ class LegacyUiGuard:
         """R17 body: raw for ``trace.read_any``, projected otherwise (``project_trace_for``)."""
         return self.projector.project_trace_for(record, ctx)
 
-    def annotation(self, request: Request, ctx: RequestContext, record: Dict[str, Any]) -> Dict[str, Any]:
+    def annotation(self, request: Request, ctx: RequestContext, record: dict[str, Any]) -> dict[str, Any]:
         """R19 (O-A1): own turns for any signed-in user, any turn for admins; annotator is the verified actor."""
         owner = self.owners.owner("turns", record.get("turn_id")) if not self.is_local else None
         self._require_owner(request, ctx, owner, "annotation.write", "trace.read_any")
         return dict(record, annotator=ctx.principal.subject)
 
     @staticmethod
-    def telemetry_events(ctx: RequestContext, events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def telemetry_events(ctx: RequestContext, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """R18: the actor is recorded from the context, never the payload."""
         return [dict(e, actor=ctx.principal.subject) for e in events]
 
 
-def build_guard(workdir: Any, *, session_key: Callable[[Optional[str]], str],
-                deployment: Optional[DeploymentSettings] = None,
-                startup_config: Optional[Mapping[str, str]] = None,
-                identity_port: Optional[TiledIdentityPort] = None,
-                credential_store: Optional[CredentialStore] = None,
-                clock: Optional[Callable[[], datetime]] = None,
-                project_root: Optional[Path] = None,
-                projector: Optional[DisclosureProjector] = None) -> LegacyUiGuard:
+def build_guard(workdir: Any, *, session_key: Callable[[str | None], str],
+                deployment: DeploymentSettings | None = None,
+                startup_config: Mapping[str, str] | None = None,
+                identity_port: TiledIdentityPort | None = None,
+                credential_store: CredentialStore | None = None,
+                clock: Callable[[], datetime] | None = None,
+                project_root: Path | None = None,
+                projector: DisclosureProjector | None = None) -> LegacyUiGuard:
     """Build the guard from trusted startup configuration.
 
     Args:
@@ -648,7 +647,7 @@ def build_guard(workdir: Any, *, session_key: Callable[[Optional[str]], str],
                                      "a server-side session store; refusing to start unprotected")
         if getattr(identity_port, "tiled_target", None) != settings.tiled_target:
             raise StartupConfigError(f"config_rejected: identity port is not bound to {settings.tiled_target}")
-    runtime_kw: Dict[str, Any] = {"identity_port": identity_port, "credential_store": credential_store}
+    runtime_kw: dict[str, Any] = {"identity_port": identity_port, "credential_store": credential_store}
     if clock is not None:
         runtime_kw["clock"] = clock
     runtime = AccessRuntime(settings, **runtime_kw)

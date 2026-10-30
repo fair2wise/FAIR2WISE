@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Look up chemical entities in a local ChEBI OBO file by label or synonym."""
-import obonet
 import sys
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any
+
+import obonet
+
 
 def load_chebi_obo(obo_path: str):
     """Load the ChEBI OBO into a networkx graph using obonet.
@@ -25,7 +27,7 @@ class ChebiOboLookup:
         self.graph = load_chebi_obo(obo_path)
 
         # Build a lookup index from lowercase name + synonyms → node ID
-        self.name_index: Dict[str, str] = {}
+        self.name_index: dict[str, str] = {}
         for node_id, attrs in self.graph.nodes(data=True):
             # 1) Index the primary label
             name = attrs.get("name")
@@ -39,7 +41,7 @@ class ChebiOboLookup:
                     syn_text = parts[1].strip().lower()
                     self.name_index[syn_text] = node_id
 
-    def lookup(self, query: str) -> Optional[Dict[str, Any]]:
+    def lookup(self, query: str) -> dict[str, Any] | None:
         """Look up a chemical by exact label or synonym (case-insensitive).
 
         Returns all metadata if found, else None.
@@ -50,7 +52,7 @@ class ChebiOboLookup:
             return None
         return self._extract(node_id)
 
-    def _extract(self, node_id: str) -> Dict[str, Any]:
+    def _extract(self, node_id: str) -> dict[str, Any]:
         """Extract metadata for a ChEBI OBO ID (e.g. 'CHEBI:15377').
 
         The returned dict contains:
@@ -66,10 +68,10 @@ class ChebiOboLookup:
         """
         attrs = self.graph.nodes[node_id]
 
-        def first_or_none(lst: List[str]) -> Optional[str]:
+        def first_or_none(lst: list[str]) -> str | None:
             return lst[0] if lst else None
 
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         data["chebi_id"] = node_id
         data["name"] = attrs.get("name", "—")
 
@@ -82,7 +84,7 @@ class ChebiOboLookup:
             data["definition"] = raw_def or "—"
 
         # ── parse synonyms ──
-        syns: List[str] = []
+        syns: list[str] = []
         for syn in attrs.get("synonym", []):
             parts = syn.split('"')
             if len(parts) >= 2:
@@ -91,7 +93,7 @@ class ChebiOboLookup:
 
         # ── parse property_value triples ──
         # ChEBI uses PURLs like http://purl.obolibrary.org/obo/chebi/formula, /mass, /charge, /inchi, /inchikey, /smiles, /monoisotopicmass, etc.
-        prop_map: Dict[str, str] = {
+        prop_map: dict[str, str] = {
             "formula": None,
             "mass": None,
             "charge": None,
@@ -129,7 +131,7 @@ class ChebiOboLookup:
         data["smiles"]   = prop_map["smiles"]
 
         # ── roles (outgoing edge labeled 'has_role') ──
-        roles: List[str] = []
+        roles: list[str] = []
         for _, v, key, _ in self.graph.out_edges(node_id, data=True, keys=True):
             if key == "has_role":
                 roles.append(v)
@@ -140,7 +142,7 @@ class ChebiOboLookup:
         data["parents"] = parents or []
 
         # ── other relationships (edges excluding is_a and has_role) ──
-        all_rels: Dict[str, List[str]] = {}
+        all_rels: dict[str, list[str]] = {}
         for _, v, key, _ in self.graph.out_edges(node_id, data=True, keys=True):
             if key in ("is_a", "has_role"):
                 continue
@@ -148,7 +150,7 @@ class ChebiOboLookup:
         data["relationships"] = all_rels
 
         # ── xrefs ──
-        xref_dict: Dict[str, List[str]] = {}
+        xref_dict: dict[str, list[str]] = {}
         for x in attrs.get("xref", []):
             if ":" in x:
                 db, db_id = x.split(":", 1)

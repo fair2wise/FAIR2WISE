@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -62,7 +61,7 @@ class JobHandle(BaseModel):
     kind: str
     state: JobState
     submitted_at: datetime
-    settings_revision: Optional[str] = None
+    settings_revision: str | None = None
 
 
 class JobEvent(BaseModel):
@@ -90,8 +89,8 @@ class JobEvent(BaseModel):
     stage: str
     stage_outcome: StageOutcome
     state: JobState
-    progress: Dict[str, int] = Field(default_factory=dict)
-    error_code: Optional[ErrorCode] = None
+    progress: dict[str, int] = Field(default_factory=dict)
+    error_code: ErrorCode | None = None
     retry_count: int = Field(default=0, ge=0)
-    artifact_refs: Tuple[str, ...] = ()
+    artifact_refs: tuple[str, ...] = ()
     at: datetime

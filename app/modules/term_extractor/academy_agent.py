@@ -4,13 +4,13 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from academy.agent import Agent, action
 from academy.handle import Handle
 
-from .orchestrator import Orchestrator
 from .monitored_agent import MonitoredAgent
+from .orchestrator import Orchestrator
 from .user_agent import UserAgent
 
 logger = logging.getLogger(__name__)
@@ -34,10 +34,10 @@ class TermExtractorAgent(MonitoredAgent):
         temperature: float = 0.0,
         context_length: int = 50,
         max_workers: int = 2,
-        cborg_base: Optional[str] = None,
-        cborg_api_key: Optional[str] = None,
-        chebi_obo_path: Optional[str] = None,
-        log_file: Optional[str] = None,
+        cborg_base: str | None = None,
+        cborg_api_key: str | None = None,
+        chebi_obo_path: str | None = None,
+        log_file: str | None = None,
     ) -> None:
         super().__init__(user_agent_handle=user_agent_handle)
         # These are serialized and sent to the remote executor.
@@ -53,7 +53,7 @@ class TermExtractorAgent(MonitoredAgent):
         self._cborg_api_key = cborg_api_key or os.environ.get("CBORG_API_KEY")
         self._chebi_obo_path = chebi_obo_path
         self._log_file = log_file
-        self._orchestrator: Optional[Orchestrator] = None
+        self._orchestrator: Orchestrator | None = None
 
     async def agent_on_startup(self) -> None:
         """Called once on the remote executor after the agent is launched."""
@@ -92,7 +92,7 @@ class TermExtractorAgent(MonitoredAgent):
         return await loop.run_in_executor(None, self._orchestrator.process_pdf, pdf_path)
 
     @action
-    async def process_directory(self, data_dir: str) -> Dict[str, Any]:
+    async def process_directory(self, data_dir: str) -> dict[str, Any]:
         """Process all PDFs in data_dir and return extraction summary."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._orchestrator.process_directory, data_dir)
@@ -111,6 +111,6 @@ class TermExtractorAgent(MonitoredAgent):
         return len(self._orchestrator.store)
 
     @action
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Return current extraction metadata/progress."""
         return dict(self._orchestrator.store.metadata)

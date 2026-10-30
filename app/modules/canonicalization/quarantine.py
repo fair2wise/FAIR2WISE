@@ -11,7 +11,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_quarantine.py (BSD-3-Clau
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping
 
 from .growth import definitions
 from .vocabulary import CATEGORIES, Vocabulary
@@ -61,7 +61,7 @@ def _fold_all(values: Iterable[str]) -> set:
 
 def classify_surface(
     surface: str, vocab: Vocabulary, *, software_extra: Iterable[str] = (), generic_stoplist: Iterable[str] = ()
-) -> Optional[str]:
+) -> str | None:
     """The quarantine class of ``surface`` or ``None`` when it should go on to a judge. Never raises.
 
     Order: fragment, sentence, software, property_or_result, procedure, generic. A surface the
@@ -86,7 +86,7 @@ def classify_surface(
     return None
 
 
-def check_context_row(row: Any) -> Optional[Dict[str, str]]:
+def check_context_row(row: Any) -> dict[str, str] | None:
     """Structural quarantine for an input row: ``{"code", "detail"}`` or ``None`` when well formed."""
     if not isinstance(row, Mapping):
         return {"code": "malformed:not_a_mapping", "detail": type(row).__name__}

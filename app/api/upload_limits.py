@@ -19,7 +19,7 @@ adding path prefixes, the PDF check and the storage-path check.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, List, Optional, Sequence
+from typing import Any, Sequence
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
@@ -52,7 +52,7 @@ async def read_upload_limited(file: Any, max_bytes: int = DEFAULT_MAX_BODY_BYTES
     size = getattr(file, "size", None)
     if size is not None and size > max_bytes:
         raise _too_large(max_bytes)
-    chunks: List[bytes] = []
+    chunks: list[bytes] = []
     total = 0
     while True:
         chunk = await file.read(_CHUNK_BYTES)
@@ -121,7 +121,7 @@ class MaxBodySizeMiddleware:
         for name, value in scope.get("headers", ()):
             if name == b"content-length":
                 try:
-                    declared: Optional[int] = int(value)
+                    declared: int | None = int(value)
                 except ValueError:
                     declared = None
                 if declared is not None and declared > limit:

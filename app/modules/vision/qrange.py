@@ -19,9 +19,9 @@ admission rule, ``record_figure_qrange`` needs_review) (BSD-3-Clause); axis fit 
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Sequence
+import re
+from typing import Any, Mapping, Sequence
 
 from .kernels.qaxis import read_q_axis
 from .kernels.types import PanelBox, QAxisReading, TextSpan
@@ -41,7 +41,7 @@ class QRangeFinding:
     withheld_reason: str = ""
     axis_identified_by: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form; the numeric range appears under ``value`` only when reported."""
         r = self.reading.to_dict()
         return {
@@ -70,11 +70,11 @@ def read_qranges(
     spans_by_panel: Mapping[int, Sequence[TextSpan]],
     *,
     blocked: str = "",
-) -> List[QRangeFinding]:
+) -> list[QRangeFinding]:
     """Read every panel's q range; see the module docstring for the reporting rules."""
     units = caption_inverse_units(caption)
     cap_unit = caption_inverse_unit(caption)
-    out: List[QRangeFinding] = []
+    out: list[QRangeFinding] = []
     for i in range(len(panels)):
         spans = list(spans_by_panel.get(i, ()))
         reading = read_q_axis(spans, caption_unit=cap_unit)

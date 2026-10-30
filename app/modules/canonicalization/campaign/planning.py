@@ -10,7 +10,7 @@ Model-callable code never receives application authority: nothing here accepts o
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional, Sequence
+from typing import Sequence
 
 from ..migration import PlanDraft, plan_migration
 from ..vocabulary import Vocabulary
@@ -25,7 +25,7 @@ def record_review_decision(
     *,
     term_key: str,
     action: str,
-    target_slug: Optional[str],
+    target_slug: str | None,
     reviewer: str,
     decided_at: datetime,
     vocab: Vocabulary,
@@ -52,12 +52,12 @@ def record_review_decision(
     return record
 
 
-def effective_decisions(run: CampaignRun) -> List[Decision]:
+def effective_decisions(run: CampaignRun) -> list[Decision]:
     """Proposed decisions after human review: the latest review per term wins; rejects remove a proposal."""
-    latest: Dict[str, ReviewDecision] = {}
+    latest: dict[str, ReviewDecision] = {}
     for review in run.reviews:
         latest[review.term_key] = review
-    out: Dict[str, Decision] = dict(run.decisions)
+    out: dict[str, Decision] = dict(run.decisions)
     for key, review in latest.items():
         if review.action in ("reject", "quarantine"):
             out.pop(key, None)

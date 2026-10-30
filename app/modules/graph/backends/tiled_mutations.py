@@ -17,7 +17,7 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/kg/mutations.py (BSD-3
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping
+from typing import Any, Mapping
 
 import requests
 
@@ -48,7 +48,7 @@ class TiledMutationClient(TiledGraphClient):
     nothing here accepts a user token.
     """
 
-    def mutate(self, document: str, variables: Mapping[str, Any]) -> Dict[str, Any]:
+    def mutate(self, document: str, variables: Mapping[str, Any]) -> dict[str, Any]:
         """POST one mutation; never retried (a retry could duplicate a create)."""
         try:
             resp = self._session.post(self.endpoint, json={"query": document, "variables": dict(variables)},
@@ -77,8 +77,8 @@ class TiledMutationClient(TiledGraphClient):
         return data
 
     # -- complete reads -------------------------------------------------------------------
-    def _scan(self, document: str, key: str, page_size: int, max_rows: int) -> List[Dict[str, Any]]:
-        rows: List[Dict[str, Any]] = []
+    def _scan(self, document: str, key: str, page_size: int, max_rows: int) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
         seen: set = set()
         while True:
             limit = min(page_size, max_rows - len(rows))
@@ -93,11 +93,11 @@ class TiledMutationClient(TiledGraphClient):
                 break
         return rows
 
-    def scan_entities(self, *, page_size: int = 500, max_rows: int = 200_000) -> List[Dict[str, Any]]:
+    def scan_entities(self, *, page_size: int = 500, max_rows: int = 200_000) -> list[dict[str, Any]]:
         """Every entity (all owners); ``TruncatedGraphRead`` rather than a partial list."""
         return self._scan(_ENTITY_PAGE, "entities", page_size, max_rows)
 
-    def scan_links(self, *, page_size: int = 500, max_rows: int = 500_000) -> List[Dict[str, Any]]:
+    def scan_links(self, *, page_size: int = 500, max_rows: int = 500_000) -> list[dict[str, Any]]:
         """Every link (all owners), with ``accessBlob``."""
         return self._scan(_LINK_PAGE, "links", page_size, max_rows)
 

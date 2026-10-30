@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import math
 import time
+from typing import Any, Callable
 import uuid
-from typing import Any, Callable, Dict, Optional
 
 from ..jobs.sqlite import OperationalDB
 
@@ -50,14 +50,14 @@ class BudgetLedger:
         self,
         *,
         corpus: str,
-        case_id: Optional[str],
+        case_id: str | None,
         model: str,
         amount_usd: float,
-        cap_usd: Optional[float],
+        cap_usd: float | None,
         scope: str = "default",
-        scope_cap_usd: Optional[float] = None,
+        scope_cap_usd: float | None = None,
         owner: str = "",
-    ) -> Optional[str]:
+    ) -> str | None:
         """Atomically reserve ``amount_usd``; ``None`` when a cap would be exceeded.
 
         Args:
@@ -153,12 +153,12 @@ class BudgetLedger:
             )
             return cur.rowcount
 
-    def state_of(self, reservation: str) -> Optional[str]:
+    def state_of(self, reservation: str) -> str | None:
         """Ledger state of one reservation."""
         row = self.db.one("SELECT state FROM budget_ledger WHERE id=?", (reservation,))
         return row[0] if row else None
 
-    def summary(self, *, cap_usd: Optional[float] = None) -> Dict[str, Any]:
+    def summary(self, *, cap_usd: float | None = None) -> dict[str, Any]:
         """Spend figures that keep known, reserved and unknown apart.
 
         ``charged_usd`` counts unknown-cost calls at their reservation (a conservative bound);

@@ -44,13 +44,13 @@ Standard library only, so the image build can run this file directly
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import ipaddress
 import json
+from pathlib import Path
 import re
 import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Mapping, Sequence
 
 #: Trusted startup setting naming the public prefix. Unset or empty: unprefixed (developer).
 PREFIX_ENV = "F2W_PUBLIC_PREFIX"
@@ -80,7 +80,7 @@ class PrefixConfigError(ValueError):
     """An invalid prefix/upstream setting, or build/gateway/runtime prefix disagreement."""
 
 
-def normalize_prefix(raw: Optional[str]) -> str:
+def normalize_prefix(raw: str | None) -> str:
     """Return the canonical prefix (``""`` or ``/a/b`` without a trailing slash).
 
     Raises:
@@ -146,7 +146,7 @@ class PublicLayout:
         """Public path of the health endpoint under the prefix."""
         return f"{self.prefix}/healthz"
 
-    def as_manifest(self) -> Dict[str, str]:
+    def as_manifest(self) -> dict[str, str]:
         """The values the UI build records in :data:`BUILD_MANIFEST_NAME`."""
         return {"public_prefix": self.prefix, "ui_base": self.ui_base,
                 "api_base": self.api_root_path, "docs_url": self.docs_url}
@@ -157,7 +157,7 @@ def layout_from_env(env: Mapping[str, str]) -> PublicLayout:
     return PublicLayout(normalize_prefix(env.get(PREFIX_ENV)))
 
 
-def uvicorn_options(layout: PublicLayout) -> Dict[str, Any]:
+def uvicorn_options(layout: PublicLayout) -> dict[str, Any]:
     """Extra ``uvicorn.run`` keyword arguments for the UI API.
 
     Only ``root_path``. Forwarded headers stay at uvicorn's default trust
@@ -243,7 +243,7 @@ def render_nginx_conf(template: str, *, upstream: str = DEFAULT_API_UPSTREAM,
             .replace("${" + GATEWAY_PORT_ENV + "}", str(port)))
 
 
-def read_build_manifest(path: Path) -> Dict[str, str]:
+def read_build_manifest(path: Path) -> dict[str, str]:
     """Load the UI build's :data:`BUILD_MANIFEST_NAME`."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict):
@@ -282,7 +282,7 @@ def mkdocs_image_config(source: str) -> str:
     return re.sub(r"^watch:[ \t]*\n(?:[ \t]+-.*\n?)*", "", patched, flags=re.M)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run the gateway CLI (``render-nginx``, ``check-build``, ``mkdocs-config``).
 
     Args:

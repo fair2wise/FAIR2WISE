@@ -13,7 +13,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/classification_units.py
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Mapping, NamedTuple, Optional, Set, Tuple
+from typing import Any, Iterable, Mapping, NamedTuple
 
 
 class Unit(NamedTuple):
@@ -22,7 +22,7 @@ class Unit(NamedTuple):
     subject_id: str
     subject_type: str            # "figure_panel" | "paper_figure"
     parent_figure_id: str
-    verdict: Dict[str, Any]
+    verdict: dict[str, Any]
 
     @property
     def is_panel(self) -> bool:
@@ -35,7 +35,7 @@ class Unit(NamedTuple):
         return self.parent_figure_id or self.subject_id
 
 
-def verdict_classes(verdict: Mapping[str, Any]) -> Set[str]:
+def verdict_classes(verdict: Mapping[str, Any]) -> set[str]:
     """Every class a verdict asserts: the primary plus any ``also``."""
     classes = {str(verdict.get("class") or "")}
     classes.update(str(x) for x in (verdict.get("also") or []))
@@ -43,7 +43,7 @@ def verdict_classes(verdict: Mapping[str, Any]) -> Set[str]:
     return classes
 
 
-def panel_parents(pairs: Iterable[Tuple[str, str]]) -> Dict[str, str]:
+def panel_parents(pairs: Iterable[tuple[str, str]]) -> dict[str, str]:
     """``{panel id: parent figure id}`` from ``(panel_id, figure_id)`` pairs (rewritten: no graph client)."""
     return {panel: figure for panel, figure in pairs if panel and figure}
 
@@ -53,10 +53,10 @@ def resolve_units(
     parents: Mapping[str, str],
     *,
     include_superseded: bool = False,
-    panel_order: Optional[Mapping[str, int]] = None,
-) -> List[Unit]:
+    panel_order: Mapping[str, int] | None = None,
+) -> list[Unit]:
     """Reduce a subject->verdict map to the units a consumer should act on (stable order)."""
-    superseded: Set[str] = set()
+    superseded: set[str] = set()
     if not include_superseded:
         superseded = {parents[p] for p in verdicts if parents.get(p)}
     units = [
@@ -68,9 +68,9 @@ def resolve_units(
     return units
 
 
-def panel_order_map(panels: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
+def panel_order_map(panels: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     """``{panel id: index}`` read from panel records (not from verdicts); bad index -> 0."""
-    order: Dict[str, int] = {}
+    order: dict[str, int] = {}
     for panel in panels:
         pid = str(panel.get("id") or panel.get("panel_id") or "")
         if not pid:

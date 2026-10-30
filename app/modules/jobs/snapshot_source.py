@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List, Sequence
+from typing import Sequence
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..graph.releases import ReleaseVerificationError, verify_snapshot_dir
@@ -50,7 +50,7 @@ def staged_packages_check(root: Path):
     """A ``PackageCheck`` over staged packages: every ``package_keys`` entry must be a complete ``paper.json``."""
 
     def check(snapshot: FrozenSnapshot) -> Sequence[PackageProblem]:
-        problems: List[PackageProblem] = []
+        problems: list[PackageProblem] = []
         for key in snapshot.package_keys:
             path = Path(root) / key / "paper.json"
             try:

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import logging
+from pathlib import Path
 import pickle
 import time
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from academy.exchange.cloud.client import HttpExchangeFactory
 from academy.exchange.cloud.login import get_token_storage

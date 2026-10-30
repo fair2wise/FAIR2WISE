@@ -10,9 +10,9 @@ everything is built explicitly by the application (see
 from __future__ import annotations
 
 import importlib
-from typing import Any, Dict, Tuple
+from typing import Any
 
-_EXPORTS: Dict[str, Tuple[str, str]] = {
+_EXPORTS: dict[str, tuple[str, str]] = {
     "Admission": ("admission", "Admission"),
     "NoOpAdmission": ("admission", "NoOpAdmission"),
     "RegisteredTool": ("registry", "RegisteredTool"),

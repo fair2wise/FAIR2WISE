@@ -36,13 +36,13 @@ has no side effects.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import re
 import threading
 import time
+from typing import Any, Callable, Iterable, Mapping, Sequence
 import uuid
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -105,12 +105,12 @@ class DisclosureBudget:
         status: Approval status of these numbers.
     """
 
-    max_quote_chars: Optional[int] = 600
+    max_quote_chars: int | None = 600
     quote_min_words: int = 6
-    max_quotes_per_response: Optional[int] = 5
-    max_quoted_chars_per_work_per_response: Optional[int] = 1500
-    max_session_quoted_chars_per_work: Optional[int] = 3000
-    max_actor_quoted_chars_per_work: Optional[int] = 6000
+    max_quotes_per_response: int | None = 5
+    max_quoted_chars_per_work_per_response: int | None = 1500
+    max_session_quoted_chars_per_work: int | None = 3000
+    max_actor_quoted_chars_per_work: int | None = 6000
     window_seconds: int = 7 * 24 * 3600
     echo_min_chars: int = 200
     echo_shingle_words: int = 8
@@ -121,7 +121,7 @@ class DisclosureBudget:
     max_code_snippet_chars: int = 8000
     max_progress_text_chars: int = 600
     max_error_chars: int = 300
-    max_region_fraction: Optional[float] = None
+    max_region_fraction: float | None = None
     status: str = BUDGET_STATUS
 
 
@@ -217,12 +217,12 @@ def source_route_denied(path: str) -> bool:
     return bool(SOURCE_SERVING_PATH_RE.match(str(path or "")))
 
 
-def citation_tokens(text: str) -> List[str]:
+def citation_tokens(text: str) -> list[str]:
     """Return the visible citation tokens in ``text`` in order."""
     return CITATION_RE.findall(str(text or ""))
 
 
-def _digest(value: Any) -> Optional[Dict[str, Any]]:
+def _digest(value: Any) -> dict[str, Any] | None:
     """SHA-256 and length of ``value`` (joined if a list of messages); ``None`` stays ``None``."""
     if value is None:
         return None
@@ -238,7 +238,7 @@ def _basename(path: Any) -> str:
     return re.split(r"[/\\]", str(path))[-1]
 
 
-def _clip(text: str, limit: Optional[int]) -> str:
+def _clip(text: str, limit: int | None) -> str:
     """Cut ``text`` to ``limit`` chars at a word boundary and mark the omission (``None``: no cut)."""
     if limit is None or len(text) <= limit:
         return text
@@ -276,10 +276,10 @@ class QuoteVerification:
 
     verified: bool
     match_type: MatchType
-    normalization_profile: Optional[str]
+    normalization_profile: str | None
     locator: SourceLocator
     region: str
-    spans: Tuple[Tuple[int, int], ...] = ()
+    spans: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -296,7 +296,7 @@ class SourceRef:
     work_id: str
     source_version: str
     locator: SourceLocator
-    citation: Optional[str] = None
+    citation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -307,11 +307,11 @@ class EchoMatch:
     end: int
     source: SourceRef
     region: str
-    spans: Tuple[Tuple[int, int], ...]
+    spans: tuple[tuple[int, int], ...]
 
 
 #: Hook that returns retained source text at ``(source_version, locator)``, or ``None``.
-SourceTextReader = Callable[[str, SourceLocator], Optional[str]]
+SourceTextReader = Callable[[str, SourceLocator], str | None]
 
 
 def _region(work_id: str, source_version: str, locator: SourceLocator) -> str:
@@ -320,9 +320,9 @@ def _region(work_id: str, source_version: str, locator: SourceLocator) -> str:
                      "" if locator.char_span is None else f"{locator.char_span[0]}-{locator.char_span[1]}"))
 
 
-def _find_segments(segments: Sequence[str], haystack: str) -> Optional[List[Tuple[int, int]]]:
+def _find_segments(segments: Sequence[str], haystack: str) -> list[tuple[int, int]] | None:
     """Find ``segments`` in order, non-overlapping; return their spans or ``None``."""
-    spans: List[Tuple[int, int]] = []
+    spans: list[tuple[int, int]] = []
     pos = 0
     for segment in segments:
         index = haystack.find(segment, pos)
@@ -350,13 +350,13 @@ class QuoteVerifier:
             raise TypeError("QuoteVerifier requires a SourceAccessScope")
         self._reader = reader
         self._scope = scope
-        self._region_lengths: Dict[str, int] = {}
+        self._region_lengths: dict[str, int] = {}
 
-    def region_length(self, region: str) -> Optional[int]:
+    def region_length(self, region: str) -> int | None:
         """Length of a region's retained text, if it has been read in this verifier."""
         return self._region_lengths.get(region)
 
-    def _text(self, work_id: str, source_version: str, locator: SourceLocator) -> Optional[str]:
+    def _text(self, work_id: str, source_version: str, locator: SourceLocator) -> str | None:
         text = self._scope.read(SourceKind.PARSED_TEXT, lambda: self._reader(source_version, locator),
                                 work_id=work_id)
         if not (isinstance(text, str) and text):
@@ -387,9 +387,9 @@ class QuoteVerifier:
 
     @staticmethod
     def _source_spans(indices: Sequence[int],
-                      src_words: Sequence[Tuple[int, int, str]]) -> Tuple[Tuple[int, int], ...]:
+                      src_words: Sequence[tuple[int, int, str]]) -> tuple[tuple[int, int], ...]:
         """Merge consecutive source word indices into char intervals (spaces between them included)."""
-        spans: List[Tuple[int, int]] = []
+        spans: list[tuple[int, int]] = []
         prev = None
         for idx in indices:
             start, end = src_words[idx][0], src_words[idx][1]
@@ -401,7 +401,7 @@ class QuoteVerifier:
         return tuple(spans)
 
     def find_echoes(self, text: str, sources: Sequence[SourceRef], *, min_chars: int, shingle_words: int,
-                    exclude: Sequence[Tuple[int, int]] = ()) -> List[EchoMatch]:
+                    exclude: Sequence[tuple[int, int]] = ()) -> list[EchoMatch]:
         """Find verbatim runs of any ``sources`` text inside ``text``.
 
         Args:
@@ -417,18 +417,18 @@ class QuoteVerifier:
         excluded = [False] * len(words)
         for i, (start, end, _w) in enumerate(words):
             excluded[i] = any(start < e and end > s for s, e in exclude)
-        out: List[EchoMatch] = []
+        out: list[EchoMatch] = []
         for ref in sources:
             source = self._text(ref.work_id, ref.source_version, ref.locator)
             if source is None:
                 continue
             norm = normalize_for_match(source)
             src_words = [(m.start(), m.end(), m.group(0)) for m in re.finditer(r"\S+", norm)]
-            index: Dict[Tuple[str, ...], List[int]] = {}
+            index: dict[tuple[str, ...], list[int]] = {}
             for j in range(len(src_words) - shingle_words + 1):
                 key = tuple(w for _s, _e, w in src_words[j:j + shingle_words])
                 index.setdefault(key, []).append(j)
-            covered: Dict[int, int] = {}
+            covered: dict[int, int] = {}
             for i in range(len(words) - shingle_words + 1):
                 if any(excluded[i:i + shingle_words]):
                     continue
@@ -438,7 +438,7 @@ class QuoteVerifier:
                     for k in range(shingle_words):
                         covered.setdefault(i + k, hits[0] + k)
             region = _region(ref.work_id, ref.source_version, ref.locator)
-            run: List[int] = []
+            run: list[int] = []
             for i in sorted(covered) + [None]:  # type: ignore[list-item]
                 if run and (i is None or i != run[-1] + 1):
                     start, end = words[run[0]][0], words[run[-1]][1]
@@ -449,7 +449,7 @@ class QuoteVerifier:
                 if i is not None:
                     run.append(i)
         out.sort(key=lambda m: m.start)
-        merged: List[EchoMatch] = []
+        merged: list[EchoMatch] = []
         for match in out:
             if merged and match.start < merged[-1].end:
                 continue
@@ -471,11 +471,11 @@ class Viewer:
     """
 
     actor: str
-    session: Optional[str]
+    session: str | None
     correlation_id: str
 
     @classmethod
-    def from_context(cls, context: RequestContext) -> "Viewer":
+    def from_context(cls, context: RequestContext) -> Viewer:
         """Build a viewer from ``context``; capabilities are deliberately ignored."""
         if not isinstance(context, RequestContext):
             raise TypeError("Viewer requires a server-built RequestContext")
@@ -483,7 +483,7 @@ class Viewer:
         return cls(actor=f"{principal.issuer or 'local'}:{principal.subject}", session=context.session_id,
                    correlation_id=context.request_id)
 
-    def ledger_keys(self) -> List[Tuple[str, str]]:
+    def ledger_keys(self) -> list[tuple[str, str]]:
         """Return ``(scope, key)`` pairs the ledger enforces for this viewer."""
         keys = [("actor", self.actor)]
         if self.session:
@@ -491,7 +491,7 @@ class Viewer:
         return keys
 
 
-def _union_length(intervals: Iterable[Tuple[int, int]]) -> int:
+def _union_length(intervals: Iterable[tuple[int, int]]) -> int:
     total, cur_s, cur_e = 0, None, None
     for s, e in sorted(intervals):
         if cur_e is None or s > cur_e:
@@ -520,33 +520,33 @@ class DisclosureLedger:
         self._budget = budget
         self._clock = clock
         self._lock = threading.Lock()
-        self._entries: Dict[Tuple[str, str, str], List[Tuple[float, str, int, int]]] = {}
+        self._entries: dict[tuple[str, str, str], list[tuple[float, str, int, int]]] = {}
 
-    def _limit(self, scope: str) -> Optional[int]:
+    def _limit(self, scope: str) -> int | None:
         return (self._budget.max_session_quoted_chars_per_work if scope == "session"
                 else self._budget.max_actor_quoted_chars_per_work)
 
-    def _live(self, key: Tuple[str, str, str], now: float) -> List[Tuple[float, str, int, int]]:
+    def _live(self, key: tuple[str, str, str], now: float) -> list[tuple[float, str, int, int]]:
         cutoff = now - self._budget.window_seconds
         live = [e for e in self._entries.get(key, []) if e[0] >= cutoff]
         self._entries[key] = live
         return live
 
     @staticmethod
-    def _distinct(entries: Iterable[Tuple[float, str, int, int]]) -> int:
-        by_region: Dict[str, List[Tuple[int, int]]] = {}
+    def _distinct(entries: Iterable[tuple[float, str, int, int]]) -> int:
+        by_region: dict[str, list[tuple[int, int]]] = {}
         for _t, region, s, e in entries:
             by_region.setdefault(region, []).append((s, e))
         return sum(_union_length(v) for v in by_region.values())
 
-    def used(self, viewer: Viewer, work_id: str) -> Dict[str, int]:
+    def used(self, viewer: Viewer, work_id: str) -> dict[str, int]:
         """Return distinct chars used per scope for ``work_id``."""
         now = self._clock()
         with self._lock:
             return {scope: self._distinct(self._live((scope, key, work_id), now))
                     for scope, key in viewer.ledger_keys()}
 
-    def try_consume(self, viewer: Viewer, work_id: str, region: str, spans: Sequence[Tuple[int, int]]) -> bool:
+    def try_consume(self, viewer: Viewer, work_id: str, region: str, spans: Sequence[tuple[int, int]]) -> bool:
         """Record ``spans`` if every scope stays within its limit; else record nothing."""
         now = self._clock()
         new = [(now, region, int(s), int(e)) for s, e in spans if e > s]
@@ -574,10 +574,10 @@ class PathRoots:
     ``/srv/f2w/run/uploads/g.json`` into ``f2w://workdir/uploads/g.json``.
     """
 
-    roots: Tuple[Tuple[str, str], ...] = ()
+    roots: tuple[tuple[str, str], ...] = ()
 
     @classmethod
-    def of(cls, **labels: str) -> "PathRoots":
+    def of(cls, **labels: str) -> PathRoots:
         """Build roots from ``label=absolute_path`` pairs."""
         pairs = [(str(path).rstrip("/\\"), label) for label, path in labels.items() if path]
         pairs.sort(key=lambda item: len(item[0]), reverse=True)
@@ -600,9 +600,9 @@ class PathRoots:
 @dataclass
 class _ResponseState:
     quotes: int = 0
-    per_work: Dict[str, int] = field(default_factory=dict)
-    per_region: Dict[str, List[Tuple[int, int]]] = field(default_factory=dict)
-    decisions: List[Dict[str, Any]] = field(default_factory=list)
+    per_work: dict[str, int] = field(default_factory=dict)
+    per_region: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
+    decisions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -612,7 +612,7 @@ class _QuoteCandidate:
     inner_start: int
     inner_end: int
     kind: str  # "quote" or "block"
-    citation: Optional[str]
+    citation: str | None
 
 
 class DisclosureProjector:
@@ -631,10 +631,10 @@ class DisclosureProjector:
         self,
         *,
         budget: DisclosureBudget = DEFAULT_BUDGET,
-        verifier: Optional[QuoteVerifier] = None,
-        ledger: Optional[DisclosureLedger] = None,
+        verifier: QuoteVerifier | None = None,
+        ledger: DisclosureLedger | None = None,
         roots: PathRoots = PathRoots(),
-        citation_resolver: Optional[Callable[[str], Optional[SourceRef]]] = None,
+        citation_resolver: Callable[[str], SourceRef | None] | None = None,
     ) -> None:
         self.budget = budget
         self.verifier = verifier
@@ -650,7 +650,7 @@ class DisclosureProjector:
             return text
         return _ABS_PATH_RE.sub(lambda m: self.roots.redact(m.group(0)), text)
 
-    def _safe_str(self, value: Any, limit: Optional[int] = None) -> Any:
+    def _safe_str(self, value: Any, limit: int | None = None) -> Any:
         if not isinstance(value, str):
             return value
         text = _SECRET_RE.sub("[redacted]", self.redact_paths(value))
@@ -672,7 +672,7 @@ class DisclosureProjector:
             return self._typed(code, viewer)
         return self.redact_paths(text)
 
-    def project_exception(self, exc: BaseException, viewer: Viewer) -> Tuple[ErrorCode, str]:
+    def project_exception(self, exc: BaseException, viewer: Viewer) -> tuple[ErrorCode, str]:
         """Map an exception to ``(code, user message)``; raw ``str(exc)`` never leaks.
 
         ``ContractError`` messages are safe by contract; ``ValueError`` messages
@@ -708,12 +708,12 @@ class DisclosureProjector:
     def _artifact_value(self, value: Any) -> bool:
         return isinstance(value, str) and bool(_ARTIFACT_VALUE_RE.search(value.strip()))
 
-    def _scrub(self, value: Any, *, depth: int, limit: Optional[int] = None) -> Any:
+    def _scrub(self, value: Any, *, depth: int, limit: int | None = None) -> Any:
         """Drop private keys and artifact values, redact paths, clip strings (unknown data)."""
         if depth > 8:
             return None
         if isinstance(value, Mapping):
-            out: Dict[str, Any] = {}
+            out: dict[str, Any] = {}
             for key, item in value.items():
                 if _PRIVATE_KEY_RE.match(str(key)) or self._artifact_value(item):
                     continue
@@ -729,7 +729,7 @@ class DisclosureProjector:
     # ------------------------------------------------------------------ quotes
 
     def _consume(self, viewer: Viewer, state: _ResponseState, work_id: str, region: str,
-                 spans: Sequence[Tuple[int, int]], chars: int, *, counts_as_quote: bool) -> bool:
+                 spans: Sequence[tuple[int, int]], chars: int, *, counts_as_quote: bool) -> bool:
         max_quotes = self.budget.max_quotes_per_response
         if counts_as_quote and max_quotes is not None and state.quotes >= max_quotes:
             return False
@@ -753,8 +753,8 @@ class DisclosureProjector:
             state.quotes += 1
         return True
 
-    def _decide_quote(self, text: str, target: Optional[SourceRef], claimed: MatchType, viewer: Viewer,
-                      state: _ResponseState, *, clip_unverified: bool = True) -> Dict[str, Any]:
+    def _decide_quote(self, text: str, target: SourceRef | None, claimed: MatchType, viewer: Viewer,
+                      state: _ResponseState, *, clip_unverified: bool = True) -> dict[str, Any]:
         """Core Q1-Q5 decision for one quote. Returns a public decision record.
 
         A verified quote is shown verbatim (clipped to ``max_quote_chars`` with
@@ -765,13 +765,13 @@ class DisclosureProjector:
         """
         clean = str(text or "").strip()
         clipped = _clip(clean, self.budget.max_quote_chars)
-        decision: Dict[str, Any] = {
+        decision: dict[str, Any] = {
             "text": clipped, "verbatim": False, "match_type": MatchType.PARAPHRASE.value,
             "normalization_profile": None, "citation": target.citation if target else None,
             "locator": self._public_locator(target), "omitted": False, "omission_reason": None,
         }
 
-        def unverified(match_type: MatchType = MatchType.PARAPHRASE) -> Dict[str, Any]:
+        def unverified(match_type: MatchType = MatchType.PARAPHRASE) -> dict[str, Any]:
             shown = clipped if clip_unverified else clean
             decision.update(text=shown, match_type=match_type.value, omitted=shown != clean,
                             omission_reason="too_long" if shown != clean else None)
@@ -798,12 +798,12 @@ class DisclosureProjector:
         return decision
 
     @staticmethod
-    def _public_locator(target: Optional[SourceRef]) -> Optional[Dict[str, Any]]:
+    def _public_locator(target: SourceRef | None) -> dict[str, Any] | None:
         """Q2 locator: work, version, page/section/figure/offsets; no paths or access hashes."""
         if target is None:
             return None
         loc = target.locator
-        out: Dict[str, Any] = {"work_id": target.work_id, "source_version": target.source_version}
+        out: dict[str, Any] = {"work_id": target.work_id, "source_version": target.source_version}
         for name in ("page", "section", "figure", "panel"):
             value = getattr(loc, name)
             if value is not None:
@@ -812,8 +812,8 @@ class DisclosureProjector:
             out["char_span"] = list(loc.char_span)
         return out
 
-    def project_quotes(self, evidence: Sequence[Tuple[EvidenceRef, Optional[str]]], viewer: Viewer,
-                       *, state: Optional[_ResponseState] = None) -> List[Dict[str, Any]]:
+    def project_quotes(self, evidence: Sequence[tuple[EvidenceRef, str | None]], viewer: Viewer,
+                       *, state: _ResponseState | None = None) -> list[dict[str, Any]]:
         """Project structured evidence quotes ``[(EvidenceRef, citation_token)]``."""
         state = state or _ResponseState()
         out = []
@@ -825,15 +825,15 @@ class DisclosureProjector:
         state.decisions.extend(out)
         return out
 
-    def _quote_candidates(self, text: str) -> List[_QuoteCandidate]:
-        found: List[_QuoteCandidate] = []
+    def _quote_candidates(self, text: str) -> list[_QuoteCandidate]:
+        found: list[_QuoteCandidate] = []
         for pattern in (re.compile(r'"([^"\n]+)"'), re.compile(r"“([^”]+)”")):
             for m in pattern.finditer(text):
                 found.append(_QuoteCandidate(m.start(), m.end(), m.start(1), m.end(1), "quote", None))
         for m in re.finditer(r"(?m)(?:^>[ \t]?[^\n]*(?:\n|$))+", text):
             found.append(_QuoteCandidate(m.start(), m.end(), m.start(), m.end(), "block", None))
         found.sort(key=lambda c: c.start)
-        out: List[_QuoteCandidate] = []
+        out: list[_QuoteCandidate] = []
         for cand in found:
             if out and cand.start < out[-1].end:
                 continue
@@ -853,9 +853,9 @@ class DisclosureProjector:
     def _block_inner(block: str) -> str:
         return "\n".join(re.sub(r"^>[ \t]?", "", line) for line in block.rstrip("\n").split("\n"))
 
-    def _target_for(self, inner: str, citation: Optional[str],
-                    evidence: Sequence[Tuple[EvidenceRef, Optional[str]]],
-                    sources: Sequence[SourceRef]) -> Tuple[Optional[SourceRef], MatchType]:
+    def _target_for(self, inner: str, citation: str | None,
+                    evidence: Sequence[tuple[EvidenceRef, str | None]],
+                    sources: Sequence[SourceRef]) -> tuple[SourceRef | None, MatchType]:
         norm = normalize_for_match(CITATION_RE.sub("", inner))
         for ref, token in evidence:
             if ref.quote and normalize_for_match(ref.quote) == norm:
@@ -875,9 +875,9 @@ class DisclosureProjector:
         text: Any,
         viewer: Viewer,
         *,
-        evidence: Sequence[Tuple[EvidenceRef, Optional[str]]] = (),
+        evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
         sources: Sequence[SourceRef] = (),
-        state: Optional[_ResponseState] = None,
+        state: _ResponseState | None = None,
     ) -> Any:
         """Project answer-like text: verify quotes, bound them, clip source echo.
 
@@ -894,8 +894,8 @@ class DisclosureProjector:
         if not isinstance(text, str) or not text:
             return text
         state = state if state is not None else _ResponseState()
-        pieces: List[str] = []
-        kept: List[Tuple[int, int]] = []
+        pieces: list[str] = []
+        kept: list[tuple[int, int]] = []
         pos = 0
         length = 0
         for cand in self._quote_candidates(text):
@@ -934,14 +934,14 @@ class DisclosureProjector:
         return self._clip_echoes(projected, viewer, sources, kept, state)
 
     def _clip_echoes(self, text: str, viewer: Viewer, sources: Sequence[SourceRef],
-                     kept: Sequence[Tuple[int, int]], state: _ResponseState) -> str:
+                     kept: Sequence[tuple[int, int]], state: _ResponseState) -> str:
         if self.verifier is None or not sources:
             return text
         echoes = self.verifier.find_echoes(text, sources, min_chars=self.budget.echo_min_chars,
                                            shingle_words=self.budget.echo_shingle_words, exclude=kept)
         if not echoes:
             return text
-        out: List[str] = []
+        out: list[str] = []
         pos = 0
         for echo in echoes:
             out.append(text[pos:echo.start])
@@ -966,7 +966,7 @@ class DisclosureProjector:
         """Bibliographic record: drop private keys, cut ``abstract_text``, redact paths."""
         if not isinstance(pub, Mapping):
             return pub
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in pub.items():
             if _PRIVATE_KEY_RE.match(str(key)) or self._artifact_value(value):
                 continue
@@ -1016,7 +1016,7 @@ class DisclosureProjector:
         """Project a ``LinkedCodeSnippet`` dict."""
         if not isinstance(snippet, Mapping):
             return snippet
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in snippet.items():
             if key == "code_snippet":
                 out[key] = self._project_code(value)
@@ -1031,13 +1031,13 @@ class DisclosureProjector:
         return out
 
     def project_graph_node(self, node: Any, viewer: Viewer, *,
-                           evidence: Sequence[Tuple[EvidenceRef, Optional[str]]] = (),
-                           sources: Sequence[SourceRef] = (), state: Optional[_ResponseState] = None) -> Any:
+                           evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
+                           sources: Sequence[SourceRef] = (), state: _ResponseState | None = None) -> Any:
         """Project a ``GraphNode`` dict, keeping its key order and wire shape."""
         if not isinstance(node, Mapping):
             return node
         state = state if state is not None else _ResponseState()
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in node.items():
             if key == "description" and isinstance(value, str):
                 text = self.project_text(value, viewer, evidence=evidence, sources=sources, state=state)
@@ -1060,12 +1060,12 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1)
         return out
 
-    def project_graph_payload(self, payload: Any, viewer: Viewer, *, state: Optional[_ResponseState] = None,
+    def project_graph_payload(self, payload: Any, viewer: Viewer, *, state: _ResponseState | None = None,
                               sources: Sequence[SourceRef] = ()) -> Any:
         """Project ``GraphPayload`` (or the SSE ``{nodes, edges}`` graph)."""
         if not isinstance(payload, Mapping):
             return payload
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in payload.items():
             if key == "nodes" and isinstance(value, list):
                 out[key] = [self.project_graph_node(n, viewer, state=state, sources=sources) for n in value]
@@ -1091,7 +1091,7 @@ class DisclosureProjector:
         """Project the pending download/extraction card (``ChatResponse.pending``)."""
         if not isinstance(pending, Mapping):
             return pending
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in pending.items():
             if key == "papers" and isinstance(value, list):
                 out[key] = [self._pending_paper(p) for p in value]
@@ -1106,7 +1106,7 @@ class DisclosureProjector:
     def _pending_paper(self, paper: Any) -> Any:
         if not isinstance(paper, Mapping):
             return paper
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in paper.items():
             if key == "abstract" and isinstance(value, str):
                 out[key] = value[:self.budget.max_pending_abstract_chars]
@@ -1124,7 +1124,7 @@ class DisclosureProjector:
     def _project_verdict(self, verdict: Any) -> Any:
         if not isinstance(verdict, Mapping):
             return None
-        out: Dict[str, Any] = {k: verdict[k] for k in self._VERDICT_KEYS if k in verdict}
+        out: dict[str, Any] = {k: verdict[k] for k in self._VERDICT_KEYS if k in verdict}
         if "selected" in verdict:
             out["selected"] = [str(s) for s in verdict.get("selected") or [] if isinstance(s, (str, int))]
         if "missing_topics" in verdict:
@@ -1144,7 +1144,7 @@ class DisclosureProjector:
         """``rounds[]`` summary (ADR 4.2): counts, ids, statuses, typed errors."""
         if not isinstance(rnd, Mapping):
             return None
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in rnd.items():
             if key == "round":
                 out[key] = value
@@ -1205,7 +1205,7 @@ class DisclosureProjector:
         payload: Any,
         viewer: Viewer,
         *,
-        evidence: Sequence[Tuple[EvidenceRef, Optional[str]]] = (),
+        evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
         sources: Sequence[SourceRef] = (),
     ) -> Any:
         """Project a ``ChatResponse`` dict (``/chat``, ``/chat/action``, SSE ``complete``/``error``)."""
@@ -1213,7 +1213,7 @@ class DisclosureProjector:
             return payload
         state = _ResponseState()
         status = str(payload.get("status") or "")
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in payload.items():
             if key not in self._CHAT_KEYS:
                 continue
@@ -1250,7 +1250,7 @@ class DisclosureProjector:
         """Project SSE ``progress`` data (also used for trace ``progress[].data``)."""
         if not isinstance(data, Mapping):
             return data
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in data.items():
             if key == "graph":
                 out[key] = self.project_graph_payload(value, viewer)
@@ -1267,7 +1267,7 @@ class DisclosureProjector:
         return out
 
     def project_sse_event(self, event: str, data: Any, viewer: Viewer, *,
-                          evidence: Sequence[Tuple[EvidenceRef, Optional[str]]] = (),
+                          evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
                           sources: Sequence[SourceRef] = ()) -> Any:
         """Project one SSE event's data, keeping the event name and key order."""
         if event == "progress":
@@ -1303,7 +1303,7 @@ class DisclosureProjector:
         """
         if not isinstance(record, Mapping):
             return record
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in record.items():
             if key in ("schema_version", "turn_id", "session_id", "parent_turn_id", "started_at", "finished_at"):
                 out[key] = value
@@ -1332,8 +1332,8 @@ class DisclosureProjector:
                             for e in value if isinstance(e, Mapping)]
         return out
 
-    def _project_trace_request(self, req: Mapping[str, Any]) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+    def _project_trace_request(self, req: Mapping[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         for key, value in req.items():
             if key == "history" and isinstance(value, list):
                 out[key] = [{"role": m.get("role"), "content": self._safe_str(str(m.get("content") or ""), 4000)}
@@ -1345,8 +1345,8 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1)
         return out
 
-    def _project_trace_progress(self, item: Mapping[str, Any], viewer: Viewer) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+    def _project_trace_progress(self, item: Mapping[str, Any], viewer: Viewer) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         for key, value in item.items():
             if key == "data":
                 out[key] = self.project_progress(value, viewer)
@@ -1356,14 +1356,14 @@ class DisclosureProjector:
                 out[key] = self._safe_str(value)
         return out
 
-    def _project_trace_retrieval(self, ret: Mapping[str, Any]) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+    def _project_trace_retrieval(self, ret: Mapping[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         for key, value in ret.items():
             if key in ("merged_context", "raw_judge_output", "leeway_system_prompt"):
                 out[key] = _digest(value)
             elif key == "parsed_verdict":
                 if isinstance(value, Mapping):
-                    verdict: Dict[str, Any] = {k: value.get(k) for k in ("sufficient",) if k in value}
+                    verdict: dict[str, Any] = {k: value.get(k) for k in ("sufficient",) if k in value}
                     if "missing_topics" in value:
                         verdict["missing_topics"] = [self._safe_str(str(t), 200)
                                                      for t in value.get("missing_topics") or []]
@@ -1387,8 +1387,8 @@ class DisclosureProjector:
                 out[key] = None
         return out
 
-    def _project_llm_call(self, call: Mapping[str, Any]) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+    def _project_llm_call(self, call: Mapping[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         for key, value in call.items():
             if key in ("label", "model", "latency_ms", "timeout", "system_prompt_sha256"):
                 out[key] = value
@@ -1403,8 +1403,8 @@ class DisclosureProjector:
         return out
 
     def _project_trace_response(self, resp: Mapping[str, Any], viewer: Viewer,
-                                sources: Sequence[SourceRef] = ()) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+                                sources: Sequence[SourceRef] = ()) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         status = str(resp.get("status") or "")
         for key, value in resp.items():
             if key == "answer":
@@ -1436,7 +1436,7 @@ class DisclosureProjector:
         """Project ``AgentSettingsResponse``: opaque paths, scrubbed Tiled error, no URI credentials."""
         if not isinstance(payload, Mapping):
             return payload
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for key, value in payload.items():
             if key == "tiled_error":
                 out[key] = None if value is None else self.project_error_message(value, viewer,
@@ -1488,7 +1488,7 @@ class DisclosureProjector:
         if depth > 16:
             return None
         if isinstance(value, Mapping):
-            out: Dict[str, Any] = {}
+            out: dict[str, Any] = {}
             for key, item in value.items():
                 name = str(key)
                 if _PRIVATE_KEY_RE.match(name) and not self._api_section_names(name, item):
@@ -1529,7 +1529,7 @@ class DisclosureProjector:
 
     def project_route_response(self, method: str, path: str, status_code: int, body: Any,
                                viewer: Viewer, *, sources: Sequence[SourceRef] = (),
-                               evidence: Sequence[Tuple[EvidenceRef, Optional[str]]] = ()) -> Any:
+                               evidence: Sequence[tuple[EvidenceRef, str | None]] = ()) -> Any:
         """Dispatch a legacy route response body to its projection.
 
         Args:
@@ -1579,7 +1579,7 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ exports
 
-    def split_graph_export(self, kg: Mapping[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    def split_graph_export(self, kg: Mapping[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Split a MatKG JSON into a public part and private evidence (ADR section 5).
 
         ``context_snippets`` and edge ``has_evidence`` text move to the private
@@ -1587,9 +1587,9 @@ class DisclosureProjector:
         snippet replaced by ``{evidence_ref, source_paper, page}``. The private
         list must go to a controlled store, never to a user surface.
         """
-        private: List[Dict[str, Any]] = []
+        private: list[dict[str, Any]] = []
 
-        def refs(owner: str, items: Any) -> List[Dict[str, Any]]:
+        def refs(owner: str, items: Any) -> list[dict[str, Any]]:
             out = []
             for idx, item in enumerate(items if isinstance(items, list) else []):
                 item = item if isinstance(item, Mapping) else {"text": str(item)}
@@ -1600,7 +1600,7 @@ class DisclosureProjector:
                             "page": item.get("page")})
             return out
 
-        public: Dict[str, Any] = {}
+        public: dict[str, Any] = {}
         for key, value in kg.items():
             if key == "things" and isinstance(value, list):
                 public[key] = [

@@ -15,10 +15,8 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
-from typing import List, Tuple
 
 from .units import INVERSE_UNIT_TO_NM_INV, LENGTH_UNIT_SPELLINGS, canonical_unit, unit_dimension
-
 
 #: Closed set of verdicts returned by :func:`source_support`.
 SUPPORT_VERDICTS = (
@@ -96,7 +94,7 @@ def source_support(
     return "value_unit_not_supported"
 
 
-def printed_quantities(quote: str) -> List[Tuple[float, str]]:
+def printed_quantities(quote: str) -> list[tuple[float, str]]:
     """Every ``(number, unit)`` pair printed in ``quote`` whose unit has a known dimension (F2W, T06B).
 
     The unit is the shortest token after the number (past a stated uncertainty)
@@ -105,7 +103,7 @@ def printed_quantities(quote: str) -> List[Tuple[float, str]]:
     unit is not listed. Used to check that a derived value's inputs are printed.
     """
     text = normalize(quote or "")
-    found: List[Tuple[float, str]] = []
+    found: list[tuple[float, str]] = []
     for match in _NUMBER.finditer(text):
         tail = _UNCERTAINTY_GAP.sub("", text[match.end():].lstrip(" $\\"), count=1)
         for end in range(1, min(24, len(tail)) + 1):

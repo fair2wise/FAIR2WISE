@@ -7,12 +7,12 @@ loading the runtime: in the default legacy mode nothing beyond
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping
 
 from .mode import RuntimeMode, runtime_mode
 
 
-def attach_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> Optional[Any]:
+def attach_read_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> Any | None:
     """Return the langgraph-mode read path for ``pipeline``, or ``None`` in legacy mode.
 
     Called once from ``AgentPipelineService.__init__``; ``F2W_RUNTIME`` and, in langgraph
@@ -30,7 +30,7 @@ def attach_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None)
     return build_legacy_read_path(pipeline, environ)
 
 
-def attach_summary_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> Optional[Any]:
+def attach_summary_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> Any | None:
     """Return the langgraph-mode ``LegacySummaryPath`` for ``pipeline``, or ``None`` in legacy mode (H2).
 
     Called once from ``AgentPipelineService.__init__`` beside :func:`attach_read_path`. The

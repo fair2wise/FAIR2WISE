@@ -25,13 +25,13 @@ is outside top-k), prompt sizes, judge calls, and the no-index path.
 
 from __future__ import annotations
 
-import json
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
+import json
 from pathlib import Path
+import re
 from statistics import mean
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Sequence
 
 from ..term_extractor.merge_index import TermMergeIndex, build_merge_prompt, clean_term
 from .adjudication import Judge
@@ -45,7 +45,7 @@ from .vocabulary import VocabularyApproval
 HARNESS_VERSION = "t07-measure-1"
 
 
-def _pick(term: str, labels: Sequence[str], mode: str) -> Optional[str]:
+def _pick(term: str, labels: Sequence[str], mode: str) -> str | None:
     """Deterministic stand-in decision: the label the 'model' would merge ``term`` into, or ``None``."""
     best, best_score = None, 0.0
     for label in labels:
@@ -65,7 +65,7 @@ def _pick(term: str, labels: Sequence[str], mode: str) -> Optional[str]:
     return best if best_score >= threshold else None
 
 
-def make_judges(mode: str) -> Dict[str, Callable[[str], str]]:
+def make_judges(mode: str) -> dict[str, Callable[[str], str]]:
     """Two prompt-format adapters over one decision rule: legacy (bare name) and JSON (entity_id)."""
 
     def legacy(prompt: str) -> str:
@@ -83,7 +83,7 @@ def make_judges(mode: str) -> Dict[str, Callable[[str], str]]:
     return {"legacy": legacy, "modern": modern}
 
 
-def _summarise(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     true_rows = [r for r in rows if r["kind"] == "true_merge"]
     bad = [r for r in rows if r["outcome"] == "false_merge"]
     splits = [r for r in rows if r["outcome"] in ("false_split_no_match", "false_split_held")]
@@ -108,7 +108,7 @@ def _summarise(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def _classify(m: FixtureMention, merged_to: Optional[str], held: bool) -> str:
+def _classify(m: FixtureMention, merged_to: str | None, held: bool) -> str:
     if merged_to is not None:
         return "correct_merge" if m.expected == merged_to else "false_merge"
     if m.expected is None:
@@ -116,7 +116,7 @@ def _classify(m: FixtureMention, merged_to: Optional[str], held: bool) -> str:
     return "false_split_held" if held else "false_split_no_match"
 
 
-def run_baseline(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntity], judge: Judge) -> List[Dict]:
+def run_baseline(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntity], judge: Judge) -> list[dict]:
     """Full-list prompt over every display name (the 222b1e7 behaviour)."""
     names = [clean_term(e.label) for e in ents]
     by_label = {clean_term(e.label): e.entity_id for e in ents}
@@ -146,7 +146,7 @@ def run_shortlist(
     *,
     top_k: int,
     with_index: bool = True,
-) -> List[Dict]:
+) -> list[dict]:
     """The pre-migration FAISS shortlist (real ``TermMergeIndex``); no index -> ``no_match``, no judge call."""
     names = [clean_term(e.label) for e in ents]
     by_label = {clean_term(e.label): e.entity_id for e in ents}
@@ -184,7 +184,7 @@ def run_candidate_search(
     token_budget: int,
     with_index: bool = True,
     use_vocabulary: bool = True,
-) -> List[Dict]:
+) -> list[dict]:
     """This package's online path; the vocabulary is approved in memory for the measurement only."""
     search = CandidateSearch(
         ents,
@@ -197,7 +197,7 @@ def run_candidate_search(
     if use_vocabulary:
         candidate = approved_alias_vocabulary()
         vocab = candidate.approve(
-            VocabularyApproval("measurement-only", candidate.revision, "harness", datetime.now(timezone.utc))
+            VocabularyApproval("measurement-only", candidate.revision, "harness", datetime.now(UTC))
         )
     rows = []
     for m in mentions:
@@ -227,10 +227,10 @@ def run_candidate_search(
 
 def run_measurement(
     *, top_k: int = 5, default_top_k: int = 12, max_candidates: int = 8, token_budget: int = 400
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run every strategy x judge x index availability and return the machine-readable report."""
     ents = entities()
-    report: Dict[str, Any] = {
+    report: dict[str, Any] = {
         "harness_version": HARNESS_VERSION,
         "fixture": {
             "entities": len(ents),
@@ -257,7 +257,7 @@ def run_measurement(
     }
     for mode in ("permissive", "conservative"):
         judges = make_judges(mode)
-        block: Dict[str, Any] = {}
+        block: dict[str, Any] = {}
         block["baseline_full_list"] = _summarise(run_baseline(MENTIONS, ents, judges["legacy"]))
         for k in sorted({top_k, default_top_k}):
             block[f"faiss_shortlist_k{k}"] = _summarise(run_shortlist(MENTIONS, ents, judges["legacy"], top_k=k))
@@ -286,7 +286,7 @@ def run_measurement(
     return report
 
 
-def render_markdown(report: Dict[str, Any]) -> str:
+def render_markdown(report: dict[str, Any]) -> str:
     """Human-readable report; states what was measured and leaves the decision to H3."""
     lines = [
         "# T07 measurement report (decision reserved for H3)",
@@ -308,7 +308,7 @@ def render_markdown(report: Dict[str, Any]) -> str:
         "prompt_tokens_max",
     ]
 
-    def table(block: Dict[str, Any]) -> List[str]:
+    def table(block: dict[str, Any]) -> list[str]:
         out = ["| strategy | " + " | ".join(cols) + " |", "|---|" + "---|" * len(cols)]
         for name, s in block.items():
             if name == "no_index":
@@ -329,7 +329,7 @@ def render_markdown(report: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_report(directory: Path, report: Optional[Dict[str, Any]] = None) -> List[Path]:
+def write_report(directory: Path, report: dict[str, Any] | None = None) -> list[Path]:
     """Write ``measurement_report.json`` and ``.md`` into ``directory`` (created if needed)."""
     report = report or run_measurement()
     directory.mkdir(parents=True, exist_ok=True)

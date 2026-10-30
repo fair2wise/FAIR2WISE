@@ -10,9 +10,9 @@ Adapted from als-computing/forge_rsoxs_analysis src/als_knowledge_agent/graph/kg
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Optional
+import json
+from typing import Any, Mapping
 from urllib.parse import quote
 
 from . import identity_adapter as ida
@@ -34,7 +34,7 @@ class EntitySpec:
     entity_type: str
     name: str
     uri: str
-    properties: Dict[str, Any]
+    properties: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class LinkSpec:
     subject: str
     predicate: str
     object: str
-    properties: Dict[str, Any]
+    properties: dict[str, Any]
 
 
 def entity_spec(graph_id: str, node: Mapping[str, Any]) -> EntitySpec:
@@ -73,7 +73,7 @@ def state_uri(graph_id: str, node_id: str, state: str, plan_tag: str) -> str:
     return f"{ida.URI_PREFIX}{quote(graph_id, safe='')}/{state}/{quote(node_id, safe='')}/{plan_tag}"
 
 
-def classify_entity(row: Mapping[str, Any], graph_id: str) -> Optional[str]:
+def classify_entity(row: Mapping[str, Any], graph_id: str) -> str | None:
     """``final``/``pending``/``retired`` for an entity this graph owns, ``None`` for anything else.
 
     Raises:
@@ -93,7 +93,7 @@ def classify_entity(row: Mapping[str, Any], graph_id: str) -> Optional[str]:
     raise ValueError(f"entity {row.get('id')} claims graph {graph_id!r} with an unrecognized uri")
 
 
-def link_owned(row: Mapping[str, Any], graph_id: str) -> Optional[str]:
+def link_owned(row: Mapping[str, Any], graph_id: str) -> str | None:
     """The edge id of an owned link of ``graph_id``, else ``None``."""
     key = ida.literature_link_key(row)
     return key[1] if key is not None and key[0] == graph_id else None

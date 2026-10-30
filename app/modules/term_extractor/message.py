@@ -5,8 +5,7 @@ These messages will be sent from the MonitoredAgent to the UserAgent.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
 
 

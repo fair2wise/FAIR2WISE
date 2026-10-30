@@ -6,14 +6,14 @@ approval unless the CLI configuration enables ``auto_approve``.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+import hashlib
 import json
 import logging
-import shutil
-import hashlib
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+import shutil
+from typing import Any
 
 from . import kg_update
 from .debate_agent import EvidenceDebateAgent
@@ -69,21 +69,21 @@ class CoordinatorConfig:
     """CLI/session knobs for workers, KG mode, extraction, and approvals."""
 
     backend: str = "cborg"
-    model: Optional[str] = None
-    graph: Optional[str] = None
-    graphs: List[str] = field(default_factory=list)
+    model: str | None = None
+    graph: str | None = None
+    graphs: list[str] = field(default_factory=list)
     kg_query_max_nodes: int = 1000
     kg_query_hops: int = 20
-    seed_terms: Optional[str] = None
+    seed_terms: str | None = None
     kg_mode: str = "json"  # "json" | "splash"
     workdir: Path = field(default_factory=lambda: Path("runs/session"))
     schema_path: str = "storage/schema/matkg_schema.yaml"
-    chebi_obo_path: Optional[str] = None
+    chebi_obo_path: str | None = None
     max_rounds: int = 3
     max_papers: int = 3
     candidate_pool: int = 25
     workers: int = field(default_factory=default_workers)
-    splash_repo: Optional[str] = None
+    splash_repo: str | None = None
     download_delay_seconds: float = 1.0
     validate_downloads: bool = True
     allow_splash_wipe: bool = False
@@ -136,7 +136,7 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _load_extraction_manifest(path: Path) -> Dict[str, Any]:
+def _load_extraction_manifest(path: Path) -> dict[str, Any]:
     """Load the extraction manifest, or ``{"papers": {}}`` if missing or invalid."""
     if not path.exists():
         return {"papers": {}}
@@ -153,7 +153,7 @@ def _load_extraction_manifest(path: Path) -> Dict[str, Any]:
     return data
 
 
-def _save_extraction_manifest(path: Path, manifest: Dict[str, Any]) -> None:
+def _save_extraction_manifest(path: Path, manifest: dict[str, Any]) -> None:
     """Write the extraction manifest JSON to ``path``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -214,7 +214,7 @@ class Coordinator:
                 _empty_kg(self.session_kg)
             self.initial_graph = str(self.session_kg)
 
-    async def run(self, questions: List[str]) -> None:
+    async def run(self, questions: list[str]) -> None:
         """Answer questions through the same persistent orchestrator used by HTTP."""
         # Lazy import avoids an import cycle: the service reuses Coordinator's
         # staging and extraction-manifest helpers.
@@ -541,8 +541,8 @@ class Coordinator:
     def _stage_unprocessed_pdfs(
         self,
         round_no: int,
-        source_pdfs: Optional[List[Path]] = None,
-    ) -> tuple[Path, List[Path]]:
+        source_pdfs: list[Path] | None = None,
+    ) -> tuple[Path, list[Path]]:
         """Copy unprocessed PDFs into a round directory; return that dir and paths."""
         processed = _load_processed_pdfs(self.processed_pdfs_manifest)
         candidates = (
@@ -567,17 +567,17 @@ class Coordinator:
             shutil.copy2(pdf, round_dir / pdf.name)
         return round_dir, pending
 
-    def _mark_processed_pdfs(self, pdfs: List[Path]) -> None:
+    def _mark_processed_pdfs(self, pdfs: list[Path]) -> None:
         """Record PDF names as fully processed in the session manifest."""
         processed = _load_processed_pdfs(self.processed_pdfs_manifest)
         processed.update(pdf.name for pdf in pdfs)
         _save_processed_pdfs(self.processed_pdfs_manifest, processed)
 
-    def _record_full_extraction(self, pdfs: List[Path], result: Dict[str, Any]) -> None:
+    def _record_full_extraction(self, pdfs: list[Path], result: dict[str, Any]) -> None:
         """Mark listed PDFs as fully extracted in the extraction manifest."""
         manifest = _load_extraction_manifest(self.extraction_manifest)
         papers = manifest.setdefault("papers", {})
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         for pdf in pdfs:
             entry = dict(papers.get(pdf.name) or {})
             entry.update(
@@ -604,14 +604,14 @@ class Coordinator:
         self,
         *,
         query: str,
-        missing_topics: List[str],
-        pdfs: List[Path],
-        result: Dict[str, Any],
+        missing_topics: list[str],
+        pdfs: list[Path],
+        result: dict[str, Any],
     ) -> None:
         """Append a targeted-extraction record for each PDF in the manifest."""
         manifest = _load_extraction_manifest(self.extraction_manifest)
         papers = manifest.setdefault("papers", {})
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         by_name = {
             str(item.get("filename") or ""): item
             for item in result.get("pdf_results") or []

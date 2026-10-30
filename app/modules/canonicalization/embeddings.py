@@ -15,11 +15,11 @@ in-memory bounded cache with JSON export. Retries/timeouts belong to the real F2
 
 from __future__ import annotations
 
-import hashlib
-import re
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+import hashlib
+import re
+from typing import Callable, Sequence
 
 import numpy as np
 
@@ -37,7 +37,7 @@ class EmbeddingUnavailable(RuntimeError):
 class EmbeddingBatch:
     """Vectors for the requested texts, positionally aligned, plus cache accounting."""
 
-    vectors: "np.ndarray"
+    vectors: np.ndarray
     model: str
     revision: str
     cache_hits: int
@@ -49,21 +49,21 @@ class EmbeddingCache:
 
     def __init__(self, max_entries: int = 50000) -> None:
         self.max_entries = max(1, int(max_entries))
-        self._data: "OrderedDict[Tuple[str, str, str], np.ndarray]" = OrderedDict()
+        self._data: OrderedDict[tuple[str, str, str], np.ndarray] = OrderedDict()
 
     @staticmethod
-    def _key(model: str, revision: str, text: str) -> Tuple[str, str, str]:
+    def _key(model: str, revision: str, text: str) -> tuple[str, str, str]:
         return model, revision, hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def __len__(self) -> int:
         return len(self._data)
 
-    def get_many(self, model: str, revision: str, texts: Sequence[str]) -> Dict[int, "np.ndarray"]:
+    def get_many(self, model: str, revision: str, texts: Sequence[str]) -> dict[int, np.ndarray]:
         """Return cached vectors keyed by index into ``texts``, omitting misses.
 
         Hits are marked most recently used.
         """
-        found: Dict[int, np.ndarray] = {}
+        found: dict[int, np.ndarray] = {}
         for i, text in enumerate(texts):
             key = self._key(model, revision, text)
             if key in self._data:
@@ -71,7 +71,7 @@ class EmbeddingCache:
                 found[i] = self._data[key]
         return found
 
-    def put_many(self, model: str, revision: str, items: Sequence[Tuple[str, "np.ndarray"]]) -> None:
+    def put_many(self, model: str, revision: str, items: Sequence[tuple[str, np.ndarray]]) -> None:
         """Store ``(text, vector)`` pairs, evicting least recently used entries beyond ``max_entries``."""
         for text, vec in items:
             self._data[self._key(model, revision, text)] = vec
@@ -85,7 +85,7 @@ def embed_texts_cached(
     *,
     model: str,
     revision: str = "",
-    cache: Optional[EmbeddingCache] = None,
+    cache: EmbeddingCache | None = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
     max_texts: int = DEFAULT_MAX_TEXTS,
 ) -> EmbeddingBatch:
@@ -101,7 +101,7 @@ def embed_texts_cached(
     cache = cache if cache is not None else EmbeddingCache()
     found = cache.get_many(model, revision, texts)
     missing = [i for i in range(len(texts)) if i not in found]
-    computed: Dict[int, np.ndarray] = {}
+    computed: dict[int, np.ndarray] = {}
     step = max(1, int(batch_size))
     for start in range(0, len(missing), step):
         stop = start + step
@@ -115,7 +115,7 @@ def embed_texts_cached(
             raise EmbeddingUnavailable(f"encoder returned shape {raw.shape} for {len(batch)} texts")
         cache.put_many(model, revision, list(zip(batch, raw)))
         computed.update(zip(idx, raw))
-    rows: List[np.ndarray] = [found[i] if i in found else computed[i] for i in range(len(texts))]
+    rows: list[np.ndarray] = [found[i] if i in found else computed[i] for i in range(len(texts))]
     matrix = np.vstack(rows) if rows else np.zeros((0, 0), dtype=np.float32)
     return EmbeddingBatch(matrix, model, revision, cache_hits=len(found), computed=len(computed))
 
@@ -129,11 +129,11 @@ class DeterministicEncoder:
 
     name = "deterministic-char-ngram-v1"
 
-    def __init__(self, dim: int = 256, ngram: Tuple[int, ...] = (2, 3)) -> None:
+    def __init__(self, dim: int = 256, ngram: tuple[int, ...] = (2, 3)) -> None:
         self.dim = dim
         self.ngram = ngram
 
-    def __call__(self, texts: Sequence[str]) -> "np.ndarray":
+    def __call__(self, texts: Sequence[str]) -> np.ndarray:
         """Return an L2-normalized ``(len(texts), dim)`` float32 matrix of hashed n-gram counts."""
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for row, text in enumerate(texts):

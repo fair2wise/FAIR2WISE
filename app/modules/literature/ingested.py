@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 import re
 import threading
-from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional, Protocol, Set, Tuple
+from typing import Any, Iterable, Mapping, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ _COMPLETE = re.compile(r'"complete"\s*:\s*(true|false)')
 class IngestedLookup(Protocol):
     """What a folder intake needs: ask before ingesting, record after."""
 
-    def reason(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> Optional[str]:
+    def reason(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> str | None:
         """Return why this paper should be skipped, or ``None`` to ingest it."""
         ...
 
@@ -64,14 +64,14 @@ def doi_key(value: str) -> str:
     return fold_key(text)
 
 
-def _publication_keys(publication: Mapping[str, Any]) -> Set[str]:
+def _publication_keys(publication: Mapping[str, Any]) -> set[str]:
     keys = {doi_key(str(publication.get(name) or "")) for name in ("doi", "openalex_id", "id", "publication_id")}
     keys.discard("")
     return keys
 
 
 def graph_ingested_keys(sections: Iterable[Mapping[str, Any]],
-                        publications: Iterable[Mapping[str, Any]]) -> Set[str]:
+                        publications: Iterable[Mapping[str, Any]]) -> set[str]:
     """Folded DOI keys of every publication whose *content* (a section) is in the graph."""
     section_keys = {doi_key(str(s.get("publication_id") or "")) for s in sections}
     section_keys.discard("")
@@ -84,7 +84,7 @@ def graph_ingested_keys(sections: Iterable[Mapping[str, Any]],
     return keys
 
 
-def _package_doi(path: Path) -> Tuple[bool, str]:
+def _package_doi(path: Path) -> tuple[bool, str]:
     with path.open("rb") as stream:
         head = stream.read(_PACKAGE_HEAD_BYTES).decode("utf-8", "replace")
     complete, doi = _COMPLETE.search(head), _WORK_DOI.search(head)
@@ -94,9 +94,9 @@ def _package_doi(path: Path) -> Tuple[bool, str]:
     return payload.get("complete") is True, str((payload.get("work") or {}).get("doi") or "")
 
 
-def staged_keys(root: Optional[Path]) -> Set[str]:
+def staged_keys(root: Path | None) -> set[str]:
     """Folded DOI keys of every complete package in a staging directory (``*/paper.json``)."""
-    keys: Set[str] = set()
+    keys: set[str] = set()
     if root is None or not Path(root).is_dir():
         return keys
     for path in Path(root).glob("*/paper.json"):
@@ -124,15 +124,15 @@ class IngestedPapers:
     """
 
     def __init__(self, in_graph: Iterable[str] = (), staged: Iterable[str] = (),
-                 completed: Iterable[Tuple[str, str]] = (), *, doi_only: bool = True) -> None:
+                 completed: Iterable[tuple[str, str]] = (), *, doi_only: bool = True) -> None:
         self._graph = set(in_graph)
         self._staged = set(staged)
         self._completed = set(completed)
-        self._this_run: Set[str] = set()
+        self._this_run: set[str] = set()
         self.doi_only = doi_only
         self._lock = threading.Lock()
 
-    def reason(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> Optional[str]:
+    def reason(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> str | None:
         """Why this paper should be skipped, or ``None`` to ingest it."""
         key = doi_key(doi)
         with self._lock:

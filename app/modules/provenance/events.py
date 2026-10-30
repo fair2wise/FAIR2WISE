@@ -12,12 +12,12 @@ durable local sink with the graph projection as an optional, lagging consumer.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import hashlib
 import json
 import re
+from typing import Any, Mapping
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,7 +34,7 @@ def redact(value: Any, *, _depth: int = 0) -> Any:
     if _depth > MAX_DEPTH:
         return "[truncated]"
     if isinstance(value, Mapping):
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for index, (name, item) in enumerate(value.items()):
             if index >= MAX_ITEMS:
                 out["_truncated_items"] = len(value) - MAX_ITEMS
@@ -85,16 +85,16 @@ class GraphWriteEvent(BaseModel):
     phase: str = "note"
     operation_id: str
     actor: str
-    run_id: Optional[str] = None
+    run_id: str | None = None
     target: str = ""
     critical: bool = False
     status: str = "ok"
-    payload: Dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
     payload_sha256: str = ""
-    at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
-    def build(cls, *, payload: Optional[Mapping[str, Any]] = None, **fields: Any) -> "GraphWriteEvent":
+    def build(cls, *, payload: Mapping[str, Any] | None = None, **fields: Any) -> GraphWriteEvent:
         """Construct with the payload redacted and digested."""
         body = dict(payload or {})
         safe = redact(body)

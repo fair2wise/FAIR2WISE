@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncIterator
 
 from fastapi import Body, Depends, FastAPI, Query, Request
 from fastapi.responses import StreamingResponse
@@ -42,8 +42,8 @@ class JobSubmitRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: str = Field(min_length=1, max_length=100)
-    inputs: Dict[str, Any]
-    settings_revision: Optional[str] = Field(default=None, max_length=200)
+    inputs: dict[str, Any]
+    settings_revision: str | None = Field(default=None, max_length=200)
 
 
 class JobResumeRequest(BaseModel):
@@ -51,10 +51,10 @@ class JobResumeRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    expected_revision: Optional[int] = Field(default=None, ge=0)
+    expected_revision: int | None = Field(default=None, ge=0)
 
 
-def _sse(event: str, data: Dict[str, Any], *, event_id: Optional[int] = None) -> str:
+def _sse(event: str, data: dict[str, Any], *, event_id: int | None = None) -> str:
     """One Server-Sent Event in the legacy framing."""
     head = f"id: {event_id}\n" if event_id is not None else ""
     return f"{head}event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
@@ -66,57 +66,57 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
 
     @router.post("")
     def submit_job(request: Request, body: JobSubmitRequest,
-                   ctx: RequestContext = Depends(fresh_context)) -> Dict[str, Any]:
+                   ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Submit a job of a registered kind (idempotent for identical inputs)."""
         handle = operations(request).submit_job(ctx, body.kind, body.inputs,
                                                 settings_revision=body.settings_revision)
         return project(request, dump(handle))
 
     @router.get("")
-    def list_jobs(request: Request, state: Optional[str] = Query(default=None, max_length=40),
-                  kind: Optional[str] = Query(default=None, max_length=100),
+    def list_jobs(request: Request, state: str | None = Query(default=None, max_length=40),
+                  kind: str | None = Query(default=None, max_length=100),
                   limit: int = Query(default=100, ge=1, le=1000),
-                  ctx: RequestContext = Depends(context)) -> Dict[str, Any]:
+                  ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Jobs the caller may see, most recently updated first."""
         jobs = operations(request).list_jobs(ctx, state=state, kind=kind, limit=limit)
         return project(request, {"jobs": [dump(j) for j in jobs]})
 
     @router.get("/{job_id}")
-    def get_job(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> Dict[str, Any]:
+    def get_job(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The job handle."""
         return project(request, dump(operations(request).get_job(ctx, job_id)))
 
     @router.get("/{job_id}/events")
     def job_events(request: Request, job_id: str, after: int = Query(default=-1, ge=-1),
-                   ctx: RequestContext = Depends(context)) -> Dict[str, Any]:
+                   ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Durable events after sequence ``after`` (polling)."""
         events = operations(request).job_events(ctx, job_id, after=after)
         return project(request, {"job_id": job_id, "events": [job_event_json(e) for e in events]})
 
     @router.get("/{job_id}/progress")
-    def job_progress(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> Dict[str, Any]:
+    def job_progress(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Per-phase progress."""
         return project(request, operations(request).job_progress(ctx, job_id))
 
     @router.get("/{job_id}/view")
-    def job_view(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> Dict[str, Any]:
+    def job_view(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Job status view: staged versus approved versus published (``F2WOperations.job_view``)."""
         return project(request, operations(request).job_view(ctx, job_id))
 
     @router.post("/{job_id}/cancel")
-    def cancel_job(request: Request, job_id: str, ctx: RequestContext = Depends(fresh_context)) -> Dict[str, Any]:
+    def cancel_job(request: Request, job_id: str, ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Cancel now, or stop at the next boundary when a worker holds the job."""
         return project(request, dump(operations(request).cancel_job(ctx, job_id)))
 
     @router.post("/{job_id}/resume")
-    def resume_job(request: Request, job_id: str, body: Optional[JobResumeRequest] = Body(default=None),
-                   ctx: RequestContext = Depends(fresh_context)) -> Dict[str, Any]:
+    def resume_job(request: Request, job_id: str, body: JobResumeRequest | None = Body(default=None),
+                   ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Re-queue a paused, review-resolved or failed job."""
         expected = body.expected_revision if body is not None else None
         return project(request, dump(operations(request).resume_job(ctx, job_id, expected_revision=expected)))
 
     @router.get("/{job_id}/stream")
-    async def stream_job(request: Request, job_id: str, after: Optional[int] = Query(default=None, ge=-1),
+    async def stream_job(request: Request, job_id: str, after: int | None = Query(default=None, ge=-1),
                          ctx: RequestContext = Depends(context)) -> StreamingResponse:
         """Server-Sent Events for one job (see the module docstring)."""
         ops = operations(request)

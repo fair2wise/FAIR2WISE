@@ -66,16 +66,16 @@ Corpus selection: the Tool takes a corpus *name*; an injected :data:`CorpusResol
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 import hashlib
 import json
 import math
+from pathlib import Path, PurePosixPath
 import re
+from typing import Any, Callable, Iterable, Mapping, Sequence
 import unicodedata
 import uuid
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from ..agent_runtime.executor import is_control_flow
 from ..agent_runtime.skills import Skill
@@ -135,7 +135,7 @@ def arxiv_key(value: Any) -> str:
     return re.sub(r"v\d+$", "", str(value).strip().lower())
 
 
-def identifiers_from_key(key: str) -> Tuple[str, str]:
+def identifiers_from_key(key: str) -> tuple[str, str]:
     """``(doi, arxiv_id)`` implied by a paper key (F2W DOI stem or arXiv filename)."""
     stem = key[:-4] if key.lower().endswith(".pdf") else key
     match = _F2W_DOI_STEM.match(stem)
@@ -156,7 +156,7 @@ def _normalize_title(text: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", (text or "").lower()))
 
 
-def title_tokens(title: str) -> Set[str]:
+def title_tokens(title: str) -> set[str]:
     """Normalized title tokens minus the stopword list (``harvest_rsoxs._title_tokens``)."""
     return set(_normalize_title(title).split()) - _STOPWORDS
 
@@ -193,7 +193,7 @@ class PaperRecord:
     arxiv_id: str = ""
     title: str = ""
     first_author: str = ""
-    years: Tuple[int, ...] = ()
+    years: tuple[int, ...] = ()
     content_sha256: str = ""
 
     @property
@@ -231,7 +231,7 @@ def same_work(left: PaperRecord, right: PaperRecord, *, use_content_hash: bool =
     return True
 
 
-def _valid_year(value: Any) -> Optional[int]:
+def _valid_year(value: Any) -> int | None:
     try:
         year = int(value)
     except (TypeError, ValueError):
@@ -247,7 +247,7 @@ def record_for(key: str, metadata: Iterable[Mapping[str, Any]] = ()) -> PaperRec
     key = paper_key(key)
     doi, arxiv = identifiers_from_key(key)
     title = author = digest = ""
-    years: List[int] = []
+    years: list[int] = []
     for meta in metadata:
         if not isinstance(meta, Mapping):
             continue
@@ -298,25 +298,25 @@ class WorkIndex:
         members: ``work_id -> sorted keys``.
     """
 
-    records: Dict[str, PaperRecord]
-    work_of: Dict[str, str] = field(default_factory=dict)
-    members: Dict[str, List[str]] = field(default_factory=dict)
+    records: dict[str, PaperRecord]
+    work_of: dict[str, str] = field(default_factory=dict)
+    members: dict[str, list[str]] = field(default_factory=dict)
 
     @classmethod
     def build(cls, records: Iterable[PaperRecord], *, threshold: float = TITLE_THRESHOLD,
-              use_content_hash: bool = True) -> "WorkIndex":
+              use_content_hash: bool = True) -> WorkIndex:
         """Group ``records`` (one per key; later duplicates of a key are ignored).
 
         ``use_content_hash=False`` applies ``work-identity/1`` (no step 0) for parity tests.
         """
-        recs: Dict[str, PaperRecord] = {}
+        recs: dict[str, PaperRecord] = {}
         for rec in records:
             if rec.key and rec.key not in recs:
                 recs[rec.key] = rec
         uf = _UnionFind(recs)
-        by_hash: Dict[str, str] = {}
-        by_doi: Dict[str, str] = {}
-        by_arxiv: Dict[str, str] = {}
+        by_hash: dict[str, str] = {}
+        by_doi: dict[str, str] = {}
+        by_arxiv: dict[str, str] = {}
         for key, rec in recs.items():
             idents = ((by_doi, rec.doi), (by_arxiv, rec.arxiv_id))
             if use_content_hash:
@@ -330,7 +330,7 @@ class WorkIndex:
         for a, b in _title_candidates(recs, threshold):
             if uf.find(a) != uf.find(b) and same_work(recs[a], recs[b], use_content_hash=use_content_hash):
                 uf.union(a, b)
-        groups: Dict[str, List[str]] = defaultdict(list)
+        groups: dict[str, list[str]] = defaultdict(list)
         for key in recs:
             groups[uf.find(key)].append(key)
         index = cls(records=recs)
@@ -345,7 +345,7 @@ class WorkIndex:
     def __len__(self) -> int:
         return len(self.members)
 
-    def year_of(self, work_id: str) -> Tuple[Optional[int], bool]:
+    def year_of(self, work_id: str) -> tuple[int | None, bool]:
         """``(year, conflicting)``: the most frequent recorded year (ties: earliest) over the Work's keys."""
         counts: Counter = Counter()
         for key in self.members.get(work_id, ()):
@@ -363,7 +363,7 @@ class WorkIndex:
         """Works grouping more than one paper key (for example an arXiv preprint and its journal version)."""
         return sum(1 for keys in self.members.values() if len(keys) > 1)
 
-    def resolve(self, ref: str) -> Optional[str]:
+    def resolve(self, ref: str) -> str | None:
         """The Work a caller's reference names: a paper key, DOI, arXiv id or work id; ``None`` if unknown."""
         ref = (ref or "").strip()
         if not ref:
@@ -396,12 +396,12 @@ def _work_id(records: Sequence[PaperRecord], *, use_content_hash: bool = True) -
     return f"key:{sorted(r.key for r in records)[0]}"
 
 
-def _title_candidates(recs: Mapping[str, PaperRecord], threshold: float) -> Iterable[Tuple[str, str]]:
+def _title_candidates(recs: Mapping[str, PaperRecord], threshold: float) -> Iterable[tuple[str, str]]:
     """Pairs of keys whose title token sets *may* reach Jaccard ``threshold`` (exact prefix filter)."""
     tokens = {k: title_tokens(r.title) for k, r in recs.items()}
     freq: Counter = Counter(t for toks in tokens.values() for t in toks)
-    index: Dict[str, List[str]] = defaultdict(list)
-    seen: Set[Tuple[str, str]] = set()
+    index: dict[str, list[str]] = defaultdict(list)
+    seen: set[tuple[str, str]] = set()
     for key in sorted(tokens, key=lambda k: (len(tokens[k]), k)):
         toks = sorted(tokens[key], key=lambda t: (freq[t], t))
         if not toks:
@@ -462,7 +462,7 @@ def _title_overlap(a: str, b: str) -> float:
     return _set_overlap(wa, wb)
 
 
-def _set_overlap(wa: Set[str], wb: Set[str]) -> float:
+def _set_overlap(wa: set[str], wb: set[str]) -> float:
     if not wa or not wb:
         return 0.0
     return len(wa & wb) / len(wa | wb)
@@ -473,7 +473,7 @@ def _bag_distance(ca: Counter, cb: Counter) -> int:
     return max(sum((ca - cb).values()), sum((cb - ca).values()))
 
 
-def _levenshtein_within(a: str, b: str, limit: int) -> Optional[int]:
+def _levenshtein_within(a: str, b: str, limit: int) -> int | None:
     """``_levenshtein(a, b)`` when it is at most ``limit``, else ``None`` (banded DP with early exit).
 
     Cells farther than ``limit`` from the diagonal cannot be within ``limit``, and every alignment
@@ -514,7 +514,7 @@ _NEAR_LEV = 10
 _NEAR_PREFIX = 100
 
 
-def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) -> List[Tuple[str, str, float]]:
+def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) -> list[tuple[str, str, float]]:
     """The corpus_qa §1 arXiv x journal near-duplicate list, in the same order and with the same scores.
 
     Same rule as ``corpus_qa.audit_duplicate_works`` (word Jaccard >= 0.80, else both titles longer
@@ -524,10 +524,10 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
     the pair loop at corpus scale (the plain loop costs about 0.5 ms per pair). The edit distance
     itself is banded (:func:`_levenshtein_within`): only distances below 10 matter.
     """
-    words: Dict[int, Set[str]] = {}
-    bags: Dict[int, Counter] = {}
+    words: dict[int, set[str]] = {}
+    bags: dict[int, Counter] = {}
 
-    def word_set(title: Any) -> Set[str]:
+    def word_set(title: Any) -> set[str]:
         key = id(title)
         if key not in words:
             words[key] = set(_normalise(title).split())
@@ -539,7 +539,7 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
             bags[key] = Counter(prefix)
         return bags[key]
 
-    prefixes: Dict[int, str] = {}
+    prefixes: dict[int, str] = {}
 
     def prefix_of(title: str) -> str:
         key = id(title)
@@ -547,7 +547,7 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
             prefixes[key] = title[:_NEAR_PREFIX]
         return prefixes[key]
 
-    near: List[Tuple[str, str, float]] = []
+    near: list[tuple[str, str, float]] = []
     for adoi, atitle in arxiv.items():
         if not atitle:
             continue
@@ -575,7 +575,7 @@ def _is_arxiv(key: str) -> bool:
     return "arxiv" in key.lower() or key.startswith("10.48550")
 
 
-def _try_float(value: Any) -> Optional[float]:
+def _try_float(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
@@ -590,24 +590,24 @@ def _label(value: Any) -> str:
     return text if len(text) <= _LABEL_CHARS else text[:_LABEL_CHARS - 1] + "…"
 
 
-def _rels(t: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+def _rels(t: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [r for r in (t.get("relations") or []) if isinstance(r, dict)]
 
 
 def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex, *,
-                            near_duplicates: bool = True) -> Tuple[Dict, Dict]:
+                            near_duplicates: bool = True) -> tuple[dict, dict]:
     """§1: legacy filename-key figures (corpus_qa ``audit_duplicate_works``) plus distinct Works.
 
     ``near_duplicates=False`` skips the arXiv x journal title check (D1.10: deferred to a job);
     its count is then ``None`` and its preview list absent.
     """
-    doi_to_terms: Dict[str, int] = defaultdict(int)
-    doi_to_title: Dict[str, str] = {}
-    internal: List[Tuple[str, str]] = []
-    work_terms: Dict[str, int] = defaultdict(int)
+    doi_to_terms: dict[str, int] = defaultdict(int)
+    doi_to_title: dict[str, str] = {}
+    internal: list[tuple[str, str]] = []
+    work_terms: dict[str, int] = defaultdict(int)
     for t in terms:
-        seen: Set[str] = set()
-        seen_works: Set[str] = set()
+        seen: set[str] = set()
+        seen_works: set[str] = set()
         for fn in t.get("source_papers") or []:
             doi = _doi_from_filename(str(fn))
             doi_to_terms[doi] += 1
@@ -644,11 +644,11 @@ def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex
     return metrics, preview
 
 
-def section_stubs(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
+def section_stubs(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     """§2 (corpus_qa ``audit_stubs``): term entries with stub signals."""
-    stubs: List[Tuple[str, List[str]]] = []
+    stubs: list[tuple[str, list[str]]] = []
     for t in terms:
-        reasons: List[str] = []
+        reasons: list[str] = []
         cat = t.get("category")
         if not (t.get("source_papers") or []):
             reasons.append("no_source_papers")
@@ -667,10 +667,10 @@ def section_stubs(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
     return metrics, preview
 
 
-def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
+def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     """§4 (corpus_qa ``audit_numeric_values``): photon-energy slots and absorption-edge heuristics."""
-    suspicious: List[List[Any]] = []
-    strings: List[List[Any]] = []
+    suspicious: list[list[Any]] = []
+    strings: list[list[Any]] = []
     for t in terms:
         name = str(t.get("term", ""))
         for r in _rels(t):
@@ -686,7 +686,7 @@ def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Di
                 suspicious.append([_label(name), rel, fval])
     edge_re = re.compile(r"carbon\s*k|c\s*k[-\s]?edge", re.IGNORECASE)
     carbon_re = re.compile(r"[Cc](?:[^a-z]|$)")
-    mismatches: List[List[Any]] = []
+    mismatches: list[list[Any]] = []
     for t in terms:
         formula = t.get("formula") or ""
         for r in _rels(t):
@@ -702,9 +702,9 @@ def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Di
     return metrics, preview
 
 
-def section_aliases(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
+def section_aliases(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     """§6 (corpus_qa ``audit_aliases``); the under-merge figure compares adjacent sorted labels only."""
-    counts: List[Tuple[str, int]] = []
+    counts: list[tuple[str, int]] = []
     total = 0
     for t in terms:
         aliases = t.get("aliases") or t.get("alternate_labels") or []
@@ -715,7 +715,7 @@ def section_aliases(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
             counts.append((str(t.get("term", "")), len(aliases)))
     over = [(n, c) for n, c in counts if c > 10]
     norm = sorted(((str(t.get("term", "")), _normalise(str(t.get("term", "")))) for t in terms), key=lambda x: x[1])
-    pairs: List[Tuple[str, str]] = []
+    pairs: list[tuple[str, str]] = []
     for i in range(len(norm) - 1):
         (a_raw, a), (b_raw, b) = norm[i], norm[i + 1]
         if a == b:
@@ -729,11 +729,11 @@ def section_aliases(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
     return metrics, preview
 
 
-def section_relations(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
+def section_relations(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     """§7 (corpus_qa ``audit_relations``): per-term relation dicts (not deduplicated KG edges)."""
     total = 0
-    self_refs: List[List[str]] = []
-    bad: List[List[str]] = []
+    self_refs: list[list[str]] = []
+    bad: list[list[str]] = []
     for t in terms:
         name = str(t.get("term", "") or "")
         low = _normalise(name)
@@ -747,7 +747,7 @@ def section_relations(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
             for pat in KNOWN_BAD_PATTERNS:
                 if pat["subject_contains"] in low and rel == pat["relation"] and pat["object_contains"] in obj_low:
                     bad.append([pat["description"], _label(name), str(rel), _label(obj)])
-    cross: List[List[str]] = []
+    cross: list[list[str]] = []
     for t in terms:
         if t.get("category", "") != "ExperimentalTechnique":
             continue
@@ -762,10 +762,10 @@ def section_relations(terms: Sequence[Mapping[str, Any]]) -> Tuple[Dict, Dict]:
     return metrics, preview
 
 
-def section_summary(terms: Sequence[Mapping[str, Any]], works: WorkIndex) -> Tuple[Dict, Dict]:
+def section_summary(terms: Sequence[Mapping[str, Any]], works: WorkIndex) -> tuple[dict, dict]:
     """§8: legacy figures (corpus_qa ``audit_summary_stats``) plus the distinct-Work histogram (K2)."""
     cats: Counter = Counter()
-    keys: Set[str] = set()
+    keys: set[str] = set()
     edges = 0
     legacy_years: Counter = Counter()
     unparseable = 0
@@ -832,8 +832,8 @@ AUDIT_METHOD = "corpus-audit/1"
 
 def work_index_for_terms(terms: Sequence[Mapping[str, Any]]) -> WorkIndex:
     """Paper records for every key cited by ``source_papers`` or ``source_metadata``, grouped into Works."""
-    meta: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
-    order: List[str] = []
+    meta: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    order: list[str] = []
     for t in terms:
         for fn in t.get("source_papers") or []:
             key = paper_key(fn)
@@ -865,7 +865,7 @@ class CorpusSource:
 
 
 #: ``(ctx, corpus_name) -> CorpusSource`` or ``None`` when unknown / not visible.
-CorpusResolver = Callable[[RequestContext, str], Optional[CorpusSource]]
+CorpusResolver = Callable[[RequestContext, str], CorpusSource | None]
 MAX_TERMS_BYTES = 512 * 1024 * 1024
 
 
@@ -873,7 +873,7 @@ def mapping_corpus_resolver(corpora: Mapping[str, str]) -> CorpusResolver:
     """Resolver over a fixed ``{corpus_id: terms_path}`` map, honouring a non-empty ``corpus_scope``."""
     fixed = {str(k): str(v) for k, v in corpora.items()}
 
-    def resolve(ctx: RequestContext, name: str) -> Optional[CorpusSource]:
+    def resolve(ctx: RequestContext, name: str) -> CorpusSource | None:
         if name not in fixed:
             return None
         if ctx.corpus_scope and name not in ctx.corpus_scope:
@@ -883,7 +883,7 @@ def mapping_corpus_resolver(corpora: Mapping[str, str]) -> CorpusResolver:
     return resolve
 
 
-def load_terms(source: CorpusSource) -> Tuple[List[Dict[str, Any]], str, Optional[int]]:
+def load_terms(source: CorpusSource) -> tuple[list[dict[str, Any]], str, int | None]:
     """``(terms, sha256, file_size)`` of a terms file; ``NOT_FOUND``/``UNAVAILABLE`` without a server path."""
     path = Path(source.terms_path)
     try:
@@ -916,8 +916,8 @@ _SECTION_FUNCS = {
 
 
 def audit_corpus(source: CorpusSource, *, sections: Sequence[str] = CORPUS_SECTIONS,
-                 control: Optional[ScanControl] = None,
-                 near_duplicate_limit: Optional[int] = NEAR_DUPLICATE_INLINE_LIMIT) -> OperationReport:
+                 control: ScanControl | None = None,
+                 near_duplicate_limit: int | None = NEAR_DUPLICATE_INLINE_LIMIT) -> OperationReport:
     """Run the audit over ``source`` (read-only) and return a typed report.
 
     The terms list is scanned in full unless ``control`` stops it; a stopped scan audits
@@ -932,7 +932,7 @@ def audit_corpus(source: CorpusSource, *, sections: Sequence[str] = CORPUS_SECTI
     if unknown:
         raise ContractError(ErrorCode.INVALID_INPUT, f"unknown sections {unknown}")
     terms, sha, _size = load_terms(source)
-    scanned: List[Dict[str, Any]] = []
+    scanned: list[dict[str, Any]] = []
     for t in terms:
         if not control.tick():
             break
@@ -943,8 +943,8 @@ def audit_corpus(source: CorpusSource, *, sections: Sequence[str] = CORPUS_SECTI
     works = work_index_for_terms(scanned)
     deferred = (near_duplicate_limit is not None and not control.job and len(works.records) > near_duplicate_limit
                 and "duplicate_works" in sections)
-    metrics: Dict[str, Any] = {}
-    preview: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
+    preview: dict[str, Any] = {}
     for name in sections:
         kw = {"near_duplicates": not deferred} if name == "duplicate_works" else {}
         m, p = _SECTION_FUNCS[name](scanned, works, **kw)
@@ -1054,22 +1054,22 @@ class CorpusAuditTool:
         self._store = artifact_store
         self._max = max_records
 
-    def registration(self) -> Tuple[ToolSpec, Callable[[Any], ToolResult]]:
+    def registration(self) -> tuple[ToolSpec, Callable[[Any], ToolResult]]:
         """``(spec, fn)`` for ``build_registry(extra=...)``."""
         return self.spec, self.run
 
-    def operation_names(self) -> Tuple[str, ...]:
+    def operation_names(self) -> tuple[str, ...]:
         """Operations this suite runs (job dispatch)."""
         return (TOOL_AUDIT,)
 
     def compute_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any],
-                          control: Optional[ScanControl] = None) -> OperationReport:
+                          control: ScanControl | None = None) -> OperationReport:
         """Job entry point."""
         if operation != TOOL_AUDIT:
             raise ContractError(ErrorCode.INVALID_INPUT, f"unknown corpus operation {operation!r}")
         return self.compute(ctx, args, control)
 
-    def compute(self, ctx: RequestContext, args: Mapping[str, Any], control: Optional[ScanControl] = None
+    def compute(self, ctx: RequestContext, args: Mapping[str, Any], control: ScanControl | None = None
                 ) -> OperationReport:
         """Resolve the corpus and audit it (raises ``ContractError``)."""
         name = str(args.get("corpus") or "")
@@ -1097,7 +1097,7 @@ class CorpusAuditTool:
         return report_to_result(TOOL_AUDIT, report, provenance_id=provenance_id, artifact_refs=(ref,) if ref else ())
 
 
-__all__: Tuple[str, ...] = (
+__all__: tuple[str, ...] = (
     "AUDIT_LITERATURE_CORPUS_SKILL", "AUDIT_METHOD", "CORPUS_SECTIONS", "CURATE_AUDIT_CORPUS", "CorpusAuditTool",
     "CorpusResolver", "CorpusSource", "EXCLUDED_SECTIONS", "NEAR_DUPLICATE_INLINE_LIMIT", "PaperRecord", "TOOL_AUDIT",
     "WORK_IDENTITY_METHOD", "WORK_IDENTITY_METHOD_V1", "content_hash_key",

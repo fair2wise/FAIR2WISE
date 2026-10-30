@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Iterable, List, Optional, Set
+from typing import Iterable
 
 from .evidence import Evidence, evidence_from_chunk
 from .index_store import SourceIndex
@@ -17,8 +17,8 @@ class PaperRetriever:
     def __init__(
         self,
         *,
-        literature: Optional[SourceIndex] = None,
-        ops: Optional[SourceIndex] = None,
+        literature: SourceIndex | None = None,
+        ops: SourceIndex | None = None,
     ) -> None:
         self.literature = literature
         self.ops = ops
@@ -26,9 +26,9 @@ class PaperRetriever:
     @classmethod
     def from_roots(
         cls,
-        literature_root: Optional[Path] = None,
-        ops_root: Optional[Path] = None,
-    ) -> "PaperRetriever":
+        literature_root: Path | None = None,
+        ops_root: Path | None = None,
+    ) -> PaperRetriever:
         """Build a retriever from optional literature and ops index roots; a missing root means no index."""
         lit = SourceIndex(Path(literature_root)) if literature_root else None
         ops = SourceIndex(Path(ops_root)) if ops_root else None
@@ -41,11 +41,11 @@ class PaperRetriever:
         k: int = 12,
         include_literature: bool = True,
         include_ops: bool = True,
-        kg_work_ids: Optional[Iterable[str]] = None,
-        kg_entity_ids: Optional[Iterable[str]] = None,
-    ) -> List[Evidence]:
+        kg_work_ids: Iterable[str] | None = None,
+        kg_entity_ids: Iterable[str] | None = None,
+    ) -> list[Evidence]:
         """Search each index independently. Missing indexes return no hits."""
-        hits: List[Evidence] = []
+        hits: list[Evidence] = []
         work_ids = {str(w) for w in (kg_work_ids or []) if str(w).strip()}
         entity_ids = {str(e) for e in (kg_entity_ids or []) if str(e).strip()}
         if include_literature:
@@ -58,13 +58,13 @@ class PaperRetriever:
 
     def _search_one(
         self,
-        index: Optional[SourceIndex],
+        index: SourceIndex | None,
         query: str,
         *,
         k: int,
-        work_ids: Set[str],
-        entity_ids: Set[str],
-    ) -> List[Evidence]:
+        work_ids: set[str],
+        entity_ids: set[str],
+    ) -> list[Evidence]:
         if index is None or not index.available:
             return []
         try:
@@ -72,7 +72,7 @@ class PaperRetriever:
         except Exception as exc:
             logger.warning("Source index search failed at %s: %s", index.root, exc)
             return []
-        out: List[Evidence] = []
+        out: list[Evidence] = []
         for chunk, score, method in raw:
             if work_ids and (
                 str(chunk.get("work_id") or "") in work_ids

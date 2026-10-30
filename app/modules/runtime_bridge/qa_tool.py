@@ -43,12 +43,12 @@ though ``ToolResult.data`` is bounded by the executor.
 
 from __future__ import annotations
 
-import re
-import threading
-import uuid
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+import re
+import threading
+from typing import Any, Awaitable, Callable, Mapping, Sequence
+import uuid
 
 from ..agent_runtime.executor import is_control_flow
 from ..contracts import (
@@ -157,7 +157,7 @@ class LegacyEntry:
     """
 
     verdict: Any = _MISSING
-    error: Optional[BaseException] = None
+    error: BaseException | None = None
 
 
 class LegacyResultLedger:
@@ -171,7 +171,7 @@ class LegacyResultLedger:
         if max_entries < 1:
             raise ValueError("max_entries must be >= 1")
         self._max = max_entries
-        self._entries: "OrderedDict[str, LegacyEntry]" = OrderedDict()
+        self._entries: OrderedDict[str, LegacyEntry] = OrderedDict()
         self._lock = threading.Lock()
 
     @staticmethod
@@ -187,7 +187,7 @@ class LegacyResultLedger:
             while len(self._entries) > self._max:
                 self._entries.popitem(last=False)
 
-    def get(self, provenance_id: Optional[str], *, pop: bool = False) -> Optional[LegacyEntry]:
+    def get(self, provenance_id: str | None, *, pop: bool = False) -> LegacyEntry | None:
         """Return (and optionally remove) the entry for ``provenance_id``."""
         if not provenance_id:
             return None
@@ -212,7 +212,7 @@ class ReadOutcome:
 
     result: ToolResult
     legacy_verdict: Any = _MISSING
-    legacy_error: Optional[BaseException] = None
+    legacy_error: BaseException | None = None
 
     @property
     def ran(self) -> bool:
@@ -220,7 +220,7 @@ class ReadOutcome:
         return self.legacy_verdict is not _MISSING or self.legacy_error is not None
 
     @property
-    def evidence_ids(self) -> List[str]:
+    def evidence_ids(self) -> list[str]:
         """Evidence IDs in retrieval order."""
         return self.result.evidence_ids
 
@@ -251,7 +251,7 @@ def outcome_from_ledger(result: ToolResult, ledger: LegacyResultLedger, *, pop: 
 
 # -- mapping ----------------------------------------------------------------------
 
-def _strs(value: Any) -> List[str]:
+def _strs(value: Any) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [str(v) for v in value if v is not None and str(v).strip()]
     if isinstance(value, str) and value.strip():
@@ -259,15 +259,15 @@ def _strs(value: Any) -> List[str]:
     return []
 
 
-def _unique(values: Sequence[str]) -> List[str]:
-    out: List[str] = []
+def _unique(values: Sequence[str]) -> list[str]:
+    out: list[str] = []
     for value in values:
         if value and value not in out:
             out.append(value)
     return out
 
 
-def selected_pairs(verdict: Mapping[str, Any]) -> List[Tuple[str, str]]:
+def selected_pairs(verdict: Mapping[str, Any]) -> list[tuple[str, str]]:
     """``(graph_id, node_id)`` for each selected node, in retrieval order.
 
     Uses ``selected_hits`` (graph-scoped) when present; otherwise ``selected`` with the
@@ -291,7 +291,7 @@ def evidence_id(graph_id: str, node_id: str) -> str:
     return f"kg:{graph_id}:{node_id}" if graph_id else f"kg:{node_id}"
 
 
-def kg_evidence(pairs: Sequence[Tuple[str, str]]) -> Tuple[EvidenceRef, ...]:
+def kg_evidence(pairs: Sequence[tuple[str, str]]) -> tuple[EvidenceRef, ...]:
     """EvidenceRefs for selected KG nodes (pointers, not quotes)."""
     refs = []
     seen = set()
@@ -308,20 +308,20 @@ def kg_evidence(pairs: Sequence[Tuple[str, str]]) -> Tuple[EvidenceRef, ...]:
     return tuple(refs)
 
 
-def citation_tokens(answer: Any) -> List[str]:
+def citation_tokens(answer: Any) -> list[str]:
     """Citation tokens in ``answer``, verbatim, in order of first appearance."""
     if not isinstance(answer, str):
         return []
     return _unique([m.group(0) for m in CITATION_TOKEN_RE.finditer(answer)])
 
 
-def _fail(code: ErrorCode, message: str, *, provenance_id: Optional[str], retryable: bool = False,
+def _fail(code: ErrorCode, message: str, *, provenance_id: str | None, retryable: bool = False,
           status: ToolStatus = ToolStatus.ERROR) -> ToolResult:
     return ToolResult(tool=TOOL_NAME, status=status, error_code=code, retryable=retryable,
                       warnings=(message[:300],), provenance_id=provenance_id)
 
 
-def verdict_to_result(verdict: Any, *, provenance_id: Optional[str] = None) -> ToolResult:
+def verdict_to_result(verdict: Any, *, provenance_id: str | None = None) -> ToolResult:
     """Map a legacy ``RetrievalAgent.query`` verdict to a ``ToolResult`` (see module table)."""
     if not isinstance(verdict, Mapping):
         return _fail(ErrorCode.INTERNAL, f"retrieval returned a malformed verdict ({type(verdict).__name__})",
@@ -341,7 +341,7 @@ def verdict_to_result(verdict: Any, *, provenance_id: Optional[str] = None) -> T
     pairs = selected_pairs(verdict)
     sufficient = bool(verdict.get("sufficient"))
     answer = verdict.get("answer") if sufficient else None
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "outcome": "answered" if sufficient else "insufficient",
         "sufficient": sufficient,
         "answer": answer if isinstance(answer, str) else (None if answer is None else str(answer)),
@@ -357,7 +357,7 @@ def verdict_to_result(verdict: Any, *, provenance_id: Optional[str] = None) -> T
                       evidence=kg_evidence(pairs), provenance_id=provenance_id)
 
 
-def exception_to_result(exc: BaseException, *, provenance_id: Optional[str] = None) -> ToolResult:
+def exception_to_result(exc: BaseException, *, provenance_id: str | None = None) -> ToolResult:
     """Map an exception raised by the legacy query (see module table)."""
     if isinstance(exc, (TimeoutError, ConnectionError)):
         return _fail(ErrorCode.UNAVAILABLE, f"retrieval dependency unavailable ({type(exc).__name__})",

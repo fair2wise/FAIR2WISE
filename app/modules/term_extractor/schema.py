@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Union
 
 from linkml_runtime.utils.schemaview import SchemaView
 from rapidfuzz import fuzz, process
@@ -14,7 +14,7 @@ def _label_key(label: str) -> str:
     return re.sub(r"[^a-z0-9]", "", label.lower())
 
 
-GENERAL_CATEGORY_ALIASES: Dict[str, str] = {
+GENERAL_CATEGORY_ALIASES: dict[str, str] = {
     "anode": "Component",
     "batteryperformance": "Property",
     "chemicalelement": "Element",
@@ -68,7 +68,7 @@ GENERAL_CATEGORY_ALIASES: Dict[str, str] = {
 }
 
 
-GENERAL_RELATION_ALIASES: Dict[str, str] = {
+GENERAL_RELATION_ALIASES: dict[str, str] = {
     "affects": "affects",
     "appliedto": "applied_to",
     "belongsto": "belongs_to",
@@ -126,14 +126,14 @@ class SchemaHelper:
         self._build_fuzzy_indexes()
 
     def _load_classes_and_slots(self) -> None:
-        self.classes: Dict[str, Dict[str, Any]] = {}
-        self.class_parents: Dict[str, Optional[str]] = {}
+        self.classes: dict[str, dict[str, Any]] = {}
+        self.class_parents: dict[str, str | None] = {}
         for name, cls in self.schema_view.all_classes().items():
             desc = cls.description or f"A {name} entity"
             self.classes[name] = {"description": desc, "slots": []}
             self.class_parents[name] = cls.is_a or None
 
-        self.slots: Dict[str, Dict[str, Any]] = {}
+        self.slots: dict[str, dict[str, Any]] = {}
         for slot_name, slot_def in self.schema_view.all_slots().items():
             desc = slot_def.description or f"Relationship: {slot_name}"
             domain = slot_def.domain or None
@@ -158,7 +158,7 @@ class SchemaHelper:
 
     def get_schema_context_for_llm(self) -> str:
         """Render the schema classes and relations as prompt text for the LLM."""
-        lines: List[str] = ["=== KNOWLEDGE SCHEMA ===\n", "ENTITY TYPES (use exactly these names):"]
+        lines: list[str] = ["=== KNOWLEDGE SCHEMA ===\n", "ENTITY TYPES (use exactly these names):"]
         for cls in sorted(self.classes):
             desc = self.classes[cls]["description"]
             parent = self.class_parents[cls]
@@ -198,7 +198,7 @@ class SchemaHelper:
             "keywords",
             "has_code_snippet",
         }
-        feature_slots: List[str] = []
+        feature_slots: list[str] = []
         for slot_name, slot_def in self.schema_view.all_slots().items():
             annotation = (slot_def.annotations or {}).get("code_domain_feature")
             annotation_value = getattr(annotation, "value", annotation)
@@ -216,14 +216,14 @@ class SchemaHelper:
                     if slot_name not in excluded and slot_name in self.slots:
                         feature_slots.append(slot_name)
 
-        lines: List[str] = []
+        lines: list[str] = []
         for slot_name in sorted(set(feature_slots)):
             info = self.slots[slot_name]
             mv = "multiple values allowed" if info["multivalued"] else "single value"
             lines.append(f"- {slot_name}: {info['description']} ({mv})")
         return "\n".join(lines) or "- None"
 
-    def _find_closest_class(self, target: str) -> Optional[str]:
+    def _find_closest_class(self, target: str) -> str | None:
         if not target:
             return None
         tl = target.strip().lower()
@@ -235,7 +235,7 @@ class SchemaHelper:
             return self._class_map_lower.get(found_lower)
         return None
 
-    def _find_closest_slot(self, target: str) -> Optional[str]:
+    def _find_closest_slot(self, target: str) -> str | None:
         if not target:
             return None
         tl = target.strip().lower()
@@ -247,15 +247,15 @@ class SchemaHelper:
             return self._slot_map_lower.get(found_lower)
         return None
 
-    def _general_category_for(self, category: str) -> Optional[str]:
+    def _general_category_for(self, category: str) -> str | None:
         broad = GENERAL_CATEGORY_ALIASES.get(_label_key(category))
         return broad if broad in self.classes else None
 
-    def _general_relation_for(self, relation: str) -> Optional[str]:
+    def _general_relation_for(self, relation: str) -> str | None:
         broad = GENERAL_RELATION_ALIASES.get(_label_key(relation))
         return broad if broad in self.slots else None
 
-    def validate_and_fix_term(self, term_data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_and_fix_term(self, term_data: dict[str, Any]) -> dict[str, Any]:
         """Coerce a raw term dict onto schema classes and relations, in place.
 
         Unknown categories and predicates are mapped via alias tables, then fuzzy
@@ -297,7 +297,7 @@ class SchemaHelper:
             logger.warning("Dropping non-list relations for term '%s'", term_data.get("term", ""))
             raw_rels = []
 
-        cleaned_rels: List[Dict[str, Union[str, bool]]] = []
+        cleaned_rels: list[dict[str, Union[str, bool]]] = []
         for rel in raw_rels:
             if not isinstance(rel, dict):
                 logger.debug("Dropping malformed relation for term '%s': %r", term_data.get("term", ""), rel)
@@ -327,7 +327,7 @@ class SchemaHelper:
                     })
                 else:
                     fallback_slot = "related_to" if "related_to" in self.slots else pred
-                    rel_out: Dict[str, Union[str, bool]] = {
+                    rel_out: dict[str, Union[str, bool]] = {
                         "relation": fallback_slot,
                         "related_term": obj,
                         "verified": fallback_slot != pred,

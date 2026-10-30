@@ -6,12 +6,10 @@ without importing HTTP clients (tests/read_path import-side-effect check).
 
 from __future__ import annotations
 
-from typing import Tuple
-
 from ..agent_runtime.skills import Skill
 
 #: The six verified donor tool names (L-01), in preferred order.
-LIT_TOOL_NAMES: Tuple[str, ...] = (
+LIT_TOOL_NAMES: tuple[str, ...] = (
     "lit_search_papers", "lit_get_papers_by_doi", "lit_find_citing_papers", "lit_find_related_papers",
     "lit_read_paper", "lit_read_paper_section",
 )

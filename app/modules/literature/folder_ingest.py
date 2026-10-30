@@ -21,11 +21,11 @@ als_knowledge_agent/src/als_knowledge_agent/graph/folder_ingest.py (``FileVerdic
 
 from __future__ import annotations
 
-import hashlib
-import time
 from dataclasses import asdict, dataclass, field
+import hashlib
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence
+import time
+from typing import Any, Callable, Iterator, Sequence
 
 from .ingested import IngestedLookup
 from .intake import INGESTABLE, RETRYABLE, IntakeReport
@@ -48,7 +48,7 @@ class FileVerdict:
     package: str = ""
     resumed: bool = False
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
@@ -59,18 +59,18 @@ class FolderReport:
 
     folder: str
     applied: bool
-    verdicts: List[FileVerdict] = field(default_factory=list)
+    verdicts: list[FileVerdict] = field(default_factory=list)
     stopped_reason: str = ""
 
     @property
-    def counts(self) -> Dict[str, int]:
+    def counts(self) -> dict[str, int]:
         """Verdicts tallied by status."""
-        tally: Dict[str, int] = {}
+        tally: dict[str, int] = {}
         for verdict in self.verdicts:
             tally[verdict.status] = tally.get(verdict.status, 0) + 1
         return tally
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {
             "folder": Path(self.folder).name,
@@ -81,7 +81,7 @@ class FolderReport:
         }
 
 
-def list_pdfs(folder: Path, *, glob: str = "*.pdf", limit: int = 0) -> List[Path]:
+def list_pdfs(folder: Path, *, glob: str = "*.pdf", limit: int = 0) -> list[Path]:
     """Regular files under ``folder`` matching ``glob``, sorted, capped by ``limit``."""
     files = sorted(p for p in Path(folder).rglob(glob) if p.is_file() and not p.is_symlink())
     return files[:limit] if limit else files
@@ -93,13 +93,13 @@ def ingest_folder(
     policy: LocalIntakePolicy,
     intake: Callable[[Path], IntakeReport],
     apply: bool = False,
-    ingest_one: Optional[Callable[[IntakeReport], Dict[str, Any]]] = None,
-    files: Optional[Sequence[Path]] = None,
+    ingest_one: Callable[[IntakeReport], dict[str, Any]] | None = None,
+    files: Sequence[Path] | None = None,
     glob: str = "*.pdf",
     limit: int = 0,
     journal: Any = None,
     job_id: str = "",
-    already_ingested: Optional[IngestedLookup] = None,
+    already_ingested: IngestedLookup | None = None,
     pipeline: str = "",
     force: bool = False,
 ) -> Iterator[FolderReport]:
@@ -154,10 +154,10 @@ def _process(
     policy: LocalIntakePolicy,
     intake: Callable[[Path], IntakeReport],
     apply: bool,
-    ingest_one: Optional[Callable[[IntakeReport], Dict[str, Any]]],
+    ingest_one: Callable[[IntakeReport], dict[str, Any]] | None,
     journal: Any,
     job_id: str,
-    already_ingested: Optional[IngestedLookup],
+    already_ingested: IngestedLookup | None,
     pipeline: str,
     force: bool,
 ) -> FileVerdict:

@@ -12,9 +12,9 @@ if __name__ == "__main__" and not __package__:
     # relative imports resolve under one name. sys.path[0] is the script's own
     # directory (app/modules); replace it with the repo root instead of adding
     # app/ or app/modules to sys.path.
+    from pathlib import Path as _Path
     import runpy as _runpy
     import sys as _sys
-    from pathlib import Path as _Path
 
     _sys.path[0] = str(_Path(__file__).resolve().parents[2])
     _runpy.run_module("app.modules.extract_terms", run_name="__main__", alter_sys=True)
@@ -29,17 +29,17 @@ import logging
 import os
 from pathlib import Path
 import re
-import requests
 import sys
 import threading
-from typing import Dict, Any, Optional, List, Union, Tuple
+from typing import Any, Union
 
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz  # this is exactly the same as PyMuPDF
 from linkml_runtime.utils.schemaview import SchemaView
 import openai
-from rapidfuzz import process, fuzz  # still used by SchemaHelper for class/slot matching
+from rapidfuzz import fuzz, process  # still used by SchemaHelper for class/slot matching
+import requests
 
 from .agents.chebi import ChebiOboLookup
 from .agents.chem_checker import ChemicalFormulaValidator
@@ -52,6 +52,7 @@ from .term_extractor.merge_index import (
     build_merge_prompt,
     clean_term,
 )
+
 # extract tables and images in an agentic way
 # GEMMA 3 27b
 # Llama 3.2 Vision
@@ -102,7 +103,7 @@ class CBorgChatClient(ChatClient):
     Use model names like: "lbl/cborg-chat", "lbl/cborg-deepthought", etc.
     Env: CBORG_API_KEY, CBORG_BASE_URL (defaults to https://api.cborg.lbl.gov)
     """
-    def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
+    def __init__(self, model: str, api_key: str | None = None, base_url: str | None = None):
         """Initialize with CBORG model, API key, and base URL."""
         self.model = model
         self.client = openai.OpenAI(
@@ -140,8 +141,8 @@ def make_chat_client(
     model: str,
     *,
     ollama_url: str = "http://localhost:11434",
-    cborg_base: Optional[str] = None,
-    cborg_api_key: Optional[str] = None,
+    cborg_base: str | None = None,
+    cborg_api_key: str | None = None,
 ) -> ChatClient:
     """Instantiate the appropriate synchronous chat client for the given backend."""
     b = (backend or "ollama").lower()
@@ -194,7 +195,7 @@ def _schema_label_key(label: str) -> str:
     return re.sub(r"[^a-z0-9]", "", label.lower())
 
 
-GENERAL_CATEGORY_ALIASES: Dict[str, str] = {
+GENERAL_CATEGORY_ALIASES: dict[str, str] = {
     "anode": "Component",
     "batteryperformance": "Property",
     "chemicalelement": "Element",
@@ -225,7 +226,7 @@ GENERAL_CATEGORY_ALIASES: Dict[str, str] = {
 }
 
 
-GENERAL_RELATION_ALIASES: Dict[str, str] = {
+GENERAL_RELATION_ALIASES: dict[str, str] = {
     "affects": "affects",
     "appliedto": "applied_to",
     "belongsto": "belongs_to",
@@ -264,7 +265,7 @@ if not logger.handlers:
 
 
 def retry_on_exception(
-    exceptions: Union[Tuple[type, ...], type],
+    exceptions: Union[tuple[type, ...], type],
     retries: int = 2,
     delay_seconds: float = 1.0,
 ) -> Any:
@@ -327,15 +328,15 @@ class SchemaHelper:
 
     def _load_classes_and_slots(self) -> None:
         """Load classes and slots from LinkML schema."""
-        self.classes: Dict[str, Dict[str, Any]] = {}
-        self.class_parents: Dict[str, Optional[str]] = {}
+        self.classes: dict[str, dict[str, Any]] = {}
+        self.class_parents: dict[str, str | None] = {}
         for name, cls in self.schema_view.all_classes().items():
             desc = cls.description or f"A {name} entity"
             parent = cls.is_a or None
             self.classes[name] = {"description": desc, "slots": []}
             self.class_parents[name] = parent
 
-        self.slots: Dict[str, Dict[str, Any]] = {}
+        self.slots: dict[str, dict[str, Any]] = {}
         for slot_name, slot_def in self.schema_view.all_slots().items():
             desc = slot_def.description or f"Relationship: {slot_name}"
             domain = slot_def.domain or None
@@ -361,7 +362,7 @@ class SchemaHelper:
 
     def get_schema_context_for_llm(self) -> str:
         """Generate schema context string for LLM."""
-        lines: List[str] = ["=== KNOWLEDGE SCHEMA ===\n", "ENTITY TYPES (use exactly these names):"]
+        lines: list[str] = ["=== KNOWLEDGE SCHEMA ===\n", "ENTITY TYPES (use exactly these names):"]
         for cls in sorted(self.classes):
             desc = self.classes[cls]["description"]
             parent = self.class_parents[cls]
@@ -401,7 +402,7 @@ class SchemaHelper:
             "keywords",
             "has_code_snippet",
         }
-        feature_slots: List[str] = []
+        feature_slots: list[str] = []
         for slot_name, slot_def in self.schema_view.all_slots().items():
             annotation = (slot_def.annotations or {}).get("code_domain_feature")
             annotation_value = getattr(annotation, "value", annotation)
@@ -415,14 +416,14 @@ class SchemaHelper:
                     if slot_name not in excluded and slot_name in self.slots:
                         feature_slots.append(slot_name)
 
-        lines: List[str] = []
+        lines: list[str] = []
         for slot_name in sorted(set(feature_slots)):
             info = self.slots[slot_name]
             mv = "multiple values allowed" if info["multivalued"] else "single value"
             lines.append(f"- {slot_name}: {info['description']} ({mv})")
         return "\n".join(lines) or "- None"
 
-    def _find_closest_class(self, target: str) -> Optional[str]:
+    def _find_closest_class(self, target: str) -> str | None:
         """Return exact or fuzzy-matched class, or None."""
         if not target:
             return None
@@ -435,7 +436,7 @@ class SchemaHelper:
             return self._class_map_lower.get(found_lower)
         return None
 
-    def _find_closest_slot(self, target: str) -> Optional[str]:
+    def _find_closest_slot(self, target: str) -> str | None:
         """Return exact or fuzzy-matched slot, or None."""
         if not target:
             return None
@@ -448,15 +449,15 @@ class SchemaHelper:
             return self._slot_map_lower.get(found_lower)
         return None
 
-    def _general_category_for(self, category: str) -> Optional[str]:
+    def _general_category_for(self, category: str) -> str | None:
         broad = GENERAL_CATEGORY_ALIASES.get(_schema_label_key(category))
         return broad if broad in self.classes else None
 
-    def _general_relation_for(self, relation: str) -> Optional[str]:
+    def _general_relation_for(self, relation: str) -> str | None:
         broad = GENERAL_RELATION_ALIASES.get(_schema_label_key(relation))
         return broad if broad in self.slots else None
 
-    def validate_and_fix_term(self, term_data: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_and_fix_term(self, term_data: dict[str, Any]) -> dict[str, Any]:
         """Ensure 'category' is valid (fuzzy-fix if needed).
 
         Filter out any relations named 'description' or 'category'.
@@ -494,7 +495,7 @@ class SchemaHelper:
             logger.warning("Dropping non-list relations for term '%s'", term_data.get("term", ""))
             raw_rels = []
 
-        cleaned_rels: List[Dict[str, Union[str, bool]]] = []
+        cleaned_rels: list[dict[str, Union[str, bool]]] = []
         for rel in raw_rels:
             if not isinstance(rel, dict):
                 logger.debug("Dropping malformed relation for term '%s': %r", term_data.get("term", ""), rel)
@@ -525,7 +526,7 @@ class SchemaHelper:
                     })
                 else:
                     fallback_slot = "related_to" if "related_to" in self.slots else pred
-                    rel_out: Dict[str, Union[str, bool]] = {
+                    rel_out: dict[str, Union[str, bool]] = {
                         "relation": fallback_slot,
                         "related_term": obj,
                         "verified": fallback_slot != pred,
@@ -631,9 +632,9 @@ class LLMTermExtractor:
         self.formula_checker = ChemicalFormulaValidator(api_key=mp_api_key)
 
         self.schema_helper = SchemaHelper(schema_path=schema_path)
-        self.terms_dict: Dict[str, Dict[str, Any]] = {}
-        self._bk_terms: Dict[str, str] = {}  # display_text → key
-        self.code_snippets: List[Dict[str, Any]] = []
+        self.terms_dict: dict[str, dict[str, Any]] = {}
+        self._bk_terms: dict[str, str] = {}  # display_text → key
+        self.code_snippets: list[dict[str, Any]] = []
         self._snippet_seen: set = set()  # dedup keys for code snippets
 
         # If no chat_client provided, use OllamaChatClient by default
@@ -654,7 +655,7 @@ class LLMTermExtractor:
             self.chebi_lookup = None
 
         # Metadata
-        self.metadata: Dict[str, Any] = {
+        self.metadata: dict[str, Any] = {
             "extraction_date": datetime.datetime.utcnow().isoformat() + "Z",
             "processed_files": 0,
             "processed_pages_total": 0,
@@ -708,7 +709,7 @@ class LLMTermExtractor:
     #     return resp.json().get("message", {}).get("content", "") or ""
 
     @retry_on_exception((Exception,), retries=2, delay_seconds=1.0)
-    def extract_json_from_text(self, text: str) -> Dict[str, Any]:
+    def extract_json_from_text(self, text: str) -> dict[str, Any]:
         """Extract largest JSON object containing "terms". Return {"terms": []} if none."""
         pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
         matches = list(re.finditer(pattern, text))
@@ -724,7 +725,7 @@ class LLMTermExtractor:
         return {"terms": []}
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
-    def _extract_snippets_json_from_text(self, text: str) -> Dict[str, Any]:
+    def _extract_snippets_json_from_text(self, text: str) -> dict[str, Any]:
         """Extract largest JSON object containing "snippets". Return {"snippets": []} if none."""
         pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
         matches = list(re.finditer(pattern, text))
@@ -740,7 +741,7 @@ class LLMTermExtractor:
         return {"snippets": []}
 
     @staticmethod
-    def _snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
+    def _snippet_key(snip: dict[str, Any]) -> tuple[str, str, str]:
         """Dedup key for a code snippet (source_paper, page, code body)."""
         return (
             str(snip.get("source_paper", "")),
@@ -752,7 +753,7 @@ class LLMTermExtractor:
         """Heuristic: uppercase‐lowercase blocks + digits → formula."""
         return bool(re.search(r"[A-Z][a-z]?[\d]", s or ""))
 
-    def _postprocess_term(self, term: Dict[str, Any], context: str) -> Dict[str, Any]:
+    def _postprocess_term(self, term: dict[str, Any], context: str) -> dict[str, Any]:
         """Ensure every ChemicalEntity has 'formula_validation'.
 
         If formula string exists and looks like a formula → validate/repair.
@@ -800,7 +801,7 @@ class LLMTermExtractor:
         """Lowercase + strip whitespace."""
         return term.strip().lower()
 
-    def fuzzy_merge(self, term: str) -> Optional[str]:
+    def fuzzy_merge(self, term: str) -> str | None:
         """Retrieve top-k similar existing terms, then ask the LLM to verify a merge.
 
         Returns the existing canonical key, or None to register a new term.
@@ -843,7 +844,7 @@ class LLMTermExtractor:
 
     def get_context_snippet(
         self, full_text: str, term: str, filename: str, page_num: int
-    ) -> Dict[str, Union[str, int]]:
+    ) -> dict[str, Union[str, int]]:
         """Extract ~context_length tokens around `term`. Return snippet + source/page."""
         sentences = re.split(r"(?<=[\.\!\?])\s+", full_text)
         low = term.lower()
@@ -1052,14 +1053,14 @@ Output JSON:
         self,
         features: Any,
         schema_helper: SchemaHelper,
-    ) -> List[Dict[str, Optional[str]]]:
+    ) -> list[dict[str, str | None]]:
         """Keep only schema-allowed CodeSnippet domain features."""
         allowed = {
             line.split(":", 1)[0].lstrip("- ").strip()
             for line in schema_helper.get_code_domain_feature_context().splitlines()
             if line.startswith("- ") and line != "- None"
         }
-        normalized: List[Dict[str, Optional[str]]] = []
+        normalized: list[dict[str, str | None]] = []
         feature_items = features if isinstance(features, list) else [features]
         for feature in feature_items:
             if not isinstance(feature, dict):
@@ -1084,7 +1085,7 @@ Output JSON:
         *,
         source_paper: str = "",
         page: int = 0,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Extract code snippets from a page.
 
         Strategy:
@@ -1107,7 +1108,7 @@ Output JSON:
             re.MULTILINE,
         )
 
-        regex_results: List[Dict] = []
+        regex_results: list[dict] = []
         seen_fn_names: set = set()
         seen_bodies: set = set()
 
@@ -1137,7 +1138,7 @@ Output JSON:
 
         # ── Step 2: LLM extracts schema-driven domain context (no code bodies)
         prompt = self._prepare_code_snippet_prompt(page_text, schema_helper)
-        llm_context: Dict[str, Dict] = {}  # function_name.lower() → context dict
+        llm_context: dict[str, dict] = {}  # function_name.lower() → context dict
         try:
             response = client.chat(prompt, temperature=self.temperature, timeout=120)
             data = self._extract_snippets_json_from_text(response)
@@ -1154,7 +1155,7 @@ Output JSON:
             logger.warning(f"LLM context extraction failed ({source_paper} p.{page}): {e} — using regex only")
 
         # ── Step 3: Merge regex code + LLM context ────────────────────────────
-        results: List[Dict] = []
+        results: list[dict] = []
         for r in regex_results:
             fn_key = (r["function_name"] or "").lower()
             ctx = llm_context.get(fn_key) or llm_context.get("__anonymous__") or {}
@@ -1177,7 +1178,7 @@ Output JSON:
         page_text: str,
         filename: str,
         page_num: int,
-        pub_meta: Optional[Dict[str, Any]] = None,
+        pub_meta: dict[str, Any] | None = None,
     ) -> bool:
         """Run code-snippet extraction for one page and save new snippets.
 
@@ -1225,9 +1226,9 @@ Output JSON:
         return updated
 
     @staticmethod
-    def _clean_pub_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _clean_pub_meta(meta: dict[str, Any] | None) -> dict[str, Any]:
         """Drop empty metadata fields before storing source-scoped provenance."""
-        cleaned: Dict[str, Any] = {}
+        cleaned: dict[str, Any] = {}
         for key in (
             "publication_year",
             "paper_title",
@@ -1253,9 +1254,9 @@ Output JSON:
 
     def _merge_source_metadata(
         self,
-        record: Dict[str, Any],
+        record: dict[str, Any],
         source_paper: str,
-        meta: Optional[Dict[str, Any]],
+        meta: dict[str, Any] | None,
     ) -> bool:
         """Attach metadata to one source paper without overwriting other sources."""
         cleaned = self._clean_pub_meta(meta)
@@ -1273,7 +1274,7 @@ Output JSON:
         return True
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
-    def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int, pub_year: Optional[int] = None, pub_meta: Optional[Dict[str, Any]] = None) -> bool:
+    def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int, pub_year: int | None = None, pub_meta: dict[str, Any] | None = None) -> bool:
         """Process one page.
 
         Steps:
@@ -1340,7 +1341,7 @@ Output JSON:
             pub_year = pub_meta.get("publication_year")
 
         added_or_updated = False
-        page_terms: List[str] = []
+        page_terms: list[str] = []
 
         for raw_term in data["terms"]:
             name = raw_term.get("term", "").strip()
@@ -1379,7 +1380,7 @@ Output JSON:
             existing_key = self.fuzzy_merge(name)
 
             # Helper to compare relation tuples
-            def relation_tuple(rel: Dict[str, Any]) -> Tuple[str, str]:
+            def relation_tuple(rel: dict[str, Any]) -> tuple[str, str]:
                 """Return (predicate, object) tuple for deduplication."""
                 return (rel["relation"], rel["related_term"])
 
@@ -1451,7 +1452,7 @@ Output JSON:
             else:
                 new_key = self._register_new_term(name)
                 _pm = pub_meta or {}
-                entry: Dict[str, Any] = {
+                entry: dict[str, Any] = {
                     "term": name,
                     "definition": validated_term.get("definition", ""),
                     "category": validated_term.get("category", "Thing"),
@@ -1558,7 +1559,7 @@ Output JSON:
 
         return updated
 
-    def _extract_year_from_pdf(self, doc: fitz.Document, pdf_path: str) -> Optional[int]:
+    def _extract_year_from_pdf(self, doc: fitz.Document, pdf_path: str) -> int | None:
         """Attempt to extract publication year from PDF metadata or first-page text.
 
         Delegates to _extract_pub_metadata for the full date-aware logic.
@@ -1567,7 +1568,7 @@ Output JSON:
         meta = self._extract_pub_metadata(doc, pdf_path)
         return meta.get("publication_year")
 
-    def _extract_pub_metadata(self, doc: fitz.Document, pdf_path: str) -> Dict[str, Any]:
+    def _extract_pub_metadata(self, doc: fitz.Document, pdf_path: str) -> dict[str, Any]:
         """Extract publication metadata from PDF metadata fields and first-page text.
 
         Returns a dict with keys: publication_year, paper_title, authors,
@@ -1582,7 +1583,7 @@ Output JSON:
         """
         pdf_meta = doc.metadata or {}
         filename = os.path.basename(pdf_path)
-        current_year = datetime.datetime.now(datetime.timezone.utc).year
+        current_year = datetime.datetime.now(datetime.UTC).year
 
         # Month names for date pattern matching
         _MONTHS = (
@@ -1594,7 +1595,7 @@ Output JSON:
         first_text = doc.load_page(0).get_text() if doc.page_count > 0 else ""
 
         # --- publication year ---
-        publication_year: Optional[int] = None
+        publication_year: int | None = None
 
         # Priority 1: explicit pub/accepted/received/revised date on first page
         # Patterns: "Received 14 March 2023", "Accepted: 2023-07-01",
@@ -1668,7 +1669,7 @@ Output JSON:
             logger.debug(f"Could not determine publication year for {filename}")
 
         # --- title ---
-        paper_title: Optional[str] = (pdf_meta.get("title") or "").strip() or None
+        paper_title: str | None = (pdf_meta.get("title") or "").strip() or None
         if not paper_title and doc.page_count > 0:
             first_lines = [ln.strip() for ln in first_text.splitlines() if ln.strip()]
             # Find first substantive line (10–200 chars, not a URL/DOI/journal header)
@@ -1690,14 +1691,14 @@ Output JSON:
                     break
 
         # --- authors ---
-        authors: List[str] = []
+        authors: list[str] = []
         raw_author = (pdf_meta.get("author") or "").strip()
         if raw_author:
             parts = re.split(r";| and ", raw_author)
             authors = [p.strip() for p in parts if p.strip()]
 
         # --- DOI ---
-        doi: Optional[str] = None
+        doi: str | None = None
         for key in ("subject", "keywords", "identifier"):
             val = pdf_meta.get(key, "") or ""
             m = re.search(r"10\.\d{4,}/\S+", val)
@@ -1713,18 +1714,18 @@ Output JSON:
                     break
 
         # --- keywords from metadata ---
-        keywords: List[str] = []
+        keywords: list[str] = []
         raw_kw = (pdf_meta.get("keywords") or "").strip()
         if raw_kw:
             kw_parts = re.split(r"[;,]", raw_kw)
             keywords = [k.strip() for k in kw_parts if k.strip()]
 
         # --- journal / volume / issue / pages_range / abstract ---
-        journal: Optional[str] = None
-        volume: Optional[str] = None
-        issue: Optional[str] = None
-        pages_range: Optional[str] = None
-        abstract_text: Optional[str] = None
+        journal: str | None = None
+        volume: str | None = None
+        issue: str | None = None
+        pages_range: str | None = None
+        abstract_text: str | None = None
 
         if first_text:
             jrnl_m = re.search(
@@ -1821,7 +1822,7 @@ Output JSON:
         # those term fields may have been hallucinated by the LLM or loaded from
         # old generated output.
         filename = os.path.basename(pdf_path)
-        best_meta: Dict[str, Any] = dict(pub_meta or {})
+        best_meta: dict[str, Any] = dict(pub_meta or {})
         scalar_fields = ("paper_title", "doi", "journal", "volume", "issue",
                          "pages_range", "abstract_text", "publication_year")
         list_fields = ("authors", "institutions", "keywords")
@@ -1860,7 +1861,7 @@ Output JSON:
         )
         return pages_with_terms
 
-    def process_directory(self) -> Dict[str, Any]:
+    def process_directory(self) -> dict[str, Any]:
         """Walk data_dir for all PDFs, process them, then compute final importance metrics.
 
         Saves output JSON one final time.
@@ -1923,8 +1924,8 @@ def run_extraction(
     model: str,
     backend: str = "ollama",
     ollama_url: str = "http://localhost:11434",
-    cborg_base: Optional[str] = None,
-    cborg_api_key: Optional[str] = None,
+    cborg_base: str | None = None,
+    cborg_api_key: str | None = None,
     schema_path: Path | str = "storage/schema/matkg_schema.yaml",
     chebi_obo_path: Path | str | None = None,
     temperature: float = 0.0,

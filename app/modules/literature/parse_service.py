@@ -23,15 +23,15 @@ parse stage, immutable version namespace, atomic manifest) (BSD-3-Clause).
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field, replace
 import json
 import logging
 import os
+from pathlib import Path
 import shutil
 import tempfile
 import time
-from dataclasses import asdict, dataclass, field, replace
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Sequence
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -61,15 +61,15 @@ class ParseRecord:
     parser: str
     parser_version: str
     document_ref: str
-    asset_refs: List[str] = field(default_factory=list)
+    asset_refs: list[str] = field(default_factory=list)
     completed_at: float = 0.0
     stage: str = "parsed"
     schema_version: int = PARSE_RECORD_VERSION
     cache_hit: bool = False
     recovered_from_interruption: bool = False
-    failures: List[str] = field(default_factory=list)
+    failures: list[str] = field(default_factory=list)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form (refs only, no paths)."""
         return asdict(self)
 
@@ -92,9 +92,9 @@ class ParseService:
     def __init__(
         self,
         store: FileDocumentStore,
-        parsers: Optional[Sequence[PublicationParser]] = None,
+        parsers: Sequence[PublicationParser] | None = None,
         *,
-        state_dir: Optional[Path] = None,
+        state_dir: Path | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self.store = store
@@ -109,11 +109,11 @@ class ParseService:
 
     # -- status ---------------------------------------------------------------------------------
 
-    def status(self, ctx: RequestContext, source_ref: str) -> Dict[str, str]:
+    def status(self, ctx: RequestContext, source_ref: str) -> dict[str, str]:
         """``{parser_key: "parsed" | "interrupted" | "failed:<reason>"}`` for every known attempt."""
         self.store.describe(ctx, source_ref)
         base = self.state_dir / parse_ref(source_ref)
-        out: Dict[str, str] = {}
+        out: dict[str, str] = {}
         if not base.is_dir():
             return out
         for path in sorted(base.glob("*.json")):
@@ -128,7 +128,7 @@ class ParseService:
                 out[path.stem] = "parsed"
         return out
 
-    def _read_record(self, path: Path) -> Optional[ParseRecord]:
+    def _read_record(self, path: Path) -> ParseRecord | None:
         data = _read_json(path)
         if not data or data.get("schema_version") != PARSE_RECORD_VERSION:
             return None
@@ -141,7 +141,7 @@ class ParseService:
     def _verified(self, ctx: RequestContext, record: ParseRecord) -> bool:
         return all(self.store.verify(ctx, ref) for ref in [record.document_ref, *record.asset_refs])
 
-    def latest(self, ctx: RequestContext, source_ref: str) -> Optional[ParseRecord]:
+    def latest(self, ctx: RequestContext, source_ref: str) -> ParseRecord | None:
         """The first configured parser's verified record for ``source_ref``, else ``None``."""
         for parser in self.parsers:
             record_path, _ = self._paths(source_ref, parser_key(parser))
@@ -164,7 +164,7 @@ class ParseService:
         with pdf_path.open("rb") as handle:
             if handle.read(5) != b"%PDF-":
                 raise ParseFailed(ErrorCode.INVALID_INPUT, "source is not a PDF")
-        failures: List[str] = []
+        failures: list[str] = []
         for parser in self.parsers:
             key = parser_key(parser)
             record_path, state_path = self._paths(source_ref, key)
@@ -196,8 +196,8 @@ class ParseService:
         pdf_path: Path,
         record_path: Path,
         state_path: Path,
-        failures: List[str],
-    ) -> Optional[ParseRecord]:
+        failures: list[str],
+    ) -> ParseRecord | None:
         state_path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_json(
             state_path, {"stage": "parsing", "parser_key": key, "started_at": self._clock(), "pid": os.getpid()}
@@ -245,10 +245,10 @@ class ParseService:
             shutil.rmtree(work_dir, ignore_errors=True)
 
     def _store_assets(self, ctx: RequestContext, parsed: ParsedDocument, key: str) -> tuple:
-        refs: List[str] = []
+        refs: list[str] = []
         base = {"source_ref": parsed.source_ref, "parser_key": key}
 
-        def put(path: Optional[Path], kind: AssetKind, media_type: str, ident: str) -> str:
+        def put(path: Path | None, kind: AssetKind, media_type: str, ident: str) -> str:
             if path is None:
                 return ""
             asset = self.store.put_file(
@@ -284,7 +284,7 @@ class ParseService:
         return document_from_dict(data)
 
 
-def _read_json(path: Path) -> Optional[Dict[str, Any]]:
+def _read_json(path: Path) -> dict[str, Any] | None:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):

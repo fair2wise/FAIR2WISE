@@ -13,7 +13,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign.py (BSD-3-Clause
 from __future__ import annotations
 
 from collections import Counter
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Sequence
 
 from ..quarantine import check_context_row, classify_surface
 from ..vocabulary import Vocabulary
@@ -25,8 +25,8 @@ _ESCALATION_FRAMINGS = frozenset({"max_escalation", "cborg"})
 
 
 def decide(
-    votes: Sequence[Vote], *, pubs: int, min_pubs_review: int, min_pubs_paid: Optional[int] = None
-) -> Tuple[str, Optional[str], Optional[str]]:
+    votes: Sequence[Vote], *, pubs: int, min_pubs_review: int, min_pubs_paid: int | None = None
+) -> tuple[str, str | None, str | None]:
     """The agreement matrix: ``(action, target_slug, quarantine_class)``.
 
     action is ``plan_merge | review | park | escalate | quarantine``; the first matching rule wins:
@@ -47,7 +47,7 @@ def decide(
     slugs = Counter(v.target_slug for v in map_votes)
     escalated = any(v.framing in _ESCALATION_FRAMINGS for v in votes)
 
-    def contested() -> Tuple[str, Optional[str], Optional[str]]:
+    def contested() -> tuple[str, str | None, str | None]:
         if not escalated:
             return ("escalate", None, None)
         return ("review" if pubs >= min_pubs_review else "park", None, None)
@@ -121,7 +121,7 @@ def run_route(
     generic_stoplist: Sequence[str] = (),
 ) -> None:
     """Quarantine surfaces that are not terms (software, procedures, sentences...). Reported, never dropped."""
-    keep: List[str] = []
+    keep: list[str] = []
     before = len(run.quarantine)
     for key in run.pending:
         ev = run.evidence[key]
@@ -197,7 +197,7 @@ def run_round(run: CampaignRun, resolver, number: int) -> RoundRecord:
     return record
 
 
-def run_park(run: CampaignRun) -> Dict[str, int]:
+def run_park(run: CampaignRun) -> dict[str, int]:
     """Whatever is still pending is parked with a reason and its votes. Nothing silently disappears."""
     parked_now = 0
     done = {p.term_key for p in run.parked}
@@ -223,6 +223,6 @@ def run_park(run: CampaignRun) -> Dict[str, int]:
     return {"parked": parked_now}
 
 
-def fresh_votes(run: CampaignRun) -> Dict[str, int]:
+def fresh_votes(run: CampaignRun) -> dict[str, int]:
     """Vote counts per term, for reports."""
     return {k: len(v) for k, v in run.votes.items()}

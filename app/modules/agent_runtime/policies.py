@@ -12,15 +12,15 @@ the executor can block a write it cannot audit (plan section 11.3).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from enum import Enum
 import hashlib
 import json
 import os
-import threading
-import uuid
-from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
-from typing import Any, List, Mapping, Optional, Protocol, Tuple, Union, runtime_checkable
+import threading
+from typing import Any, Mapping, Protocol, Union, runtime_checkable
+import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -86,19 +86,19 @@ class AuditEvent(BaseModel):
     kind: AuditKind
     at: datetime
     request_id: str
-    run_id: Optional[str] = None
-    thread_id: Optional[str] = None
+    run_id: str | None = None
+    thread_id: str | None = None
     subject: str
     profile: str
-    tool: Optional[str] = None
-    tool_call_id: Optional[str] = None
-    effects: Tuple[str, ...] = ()
-    args_sha256: Optional[str] = None
-    plan_id: Optional[str] = None
-    plan_sha256: Optional[str] = None
-    approval_id: Optional[str] = None
-    approved_by: Optional[str] = None
-    error_code: Optional[ErrorCode] = None
+    tool: str | None = None
+    tool_call_id: str | None = None
+    effects: tuple[str, ...] = ()
+    args_sha256: str | None = None
+    plan_id: str | None = None
+    plan_sha256: str | None = None
+    approval_id: str | None = None
+    approved_by: str | None = None
+    error_code: ErrorCode | None = None
     detail: str = Field(default="", max_length=500)
 
 
@@ -113,15 +113,15 @@ def make_event(
     ctx: RequestContext,
     *,
     at: datetime,
-    spec: Optional[ToolSpec] = None,
+    spec: ToolSpec | None = None,
     args: Any = None,
-    plan: Optional[ChangePlan] = None,
-    approval: Optional[ApprovalRecord] = None,
-    error_code: Optional[ErrorCode] = None,
+    plan: ChangePlan | None = None,
+    approval: ApprovalRecord | None = None,
+    error_code: ErrorCode | None = None,
     detail: str = "",
-    thread_id: Optional[str] = None,
-    tool_call_id: Optional[str] = None,
-    event_id: Optional[str] = None,
+    thread_id: str | None = None,
+    tool_call_id: str | None = None,
+    event_id: str | None = None,
 ) -> AuditEvent:
     """Build an :class:`AuditEvent` from runtime objects."""
     fields = dict(
@@ -153,7 +153,7 @@ class InMemoryEventSink:
     """Event sink for tests: keeps events in a list."""
 
     def __init__(self) -> None:
-        self.events: List[AuditEvent] = []
+        self.events: list[AuditEvent] = []
         self._lock = threading.Lock()
 
     def emit(self, event: AuditEvent) -> None:
@@ -161,7 +161,7 @@ class InMemoryEventSink:
         with self._lock:
             self.events.append(event)
 
-    def kinds(self) -> List[AuditKind]:
+    def kinds(self) -> list[AuditKind]:
         """Event kinds in emission order."""
         return [e.kind for e in self.events]
 
@@ -220,7 +220,7 @@ class ApprovalDecision(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     allowed: bool
-    error_code: Optional[ErrorCode] = None
+    error_code: ErrorCode | None = None
     reason: str = ""
 
 
@@ -237,8 +237,8 @@ class ApprovalCheck(Protocol):
         spec: ToolSpec,
         args: Mapping[str, Any],
         *,
-        plan: Optional[ChangePlan],
-        approval: Optional[ApprovalRecord],
+        plan: ChangePlan | None,
+        approval: ApprovalRecord | None,
         now: datetime,
     ) -> ApprovalDecision:
         """Return an :class:`ApprovalDecision`."""
@@ -265,8 +265,8 @@ class PlanApprovalCheck:
         spec: ToolSpec,
         args: Mapping[str, Any],
         *,
-        plan: Optional[ChangePlan],
-        approval: Optional[ApprovalRecord],
+        plan: ChangePlan | None,
+        approval: ApprovalRecord | None,
         now: datetime,
     ) -> ApprovalDecision:
         """Apply the rules above."""
@@ -305,4 +305,4 @@ def is_write(spec: ToolSpec) -> bool:
 
 def utcnow() -> datetime:
     """Timezone-aware current UTC time (the default clock)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

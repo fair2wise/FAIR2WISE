@@ -12,11 +12,11 @@ the commit that contains it (``data_commit`` is rejected, ``extra="forbid"``); r
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
-from typing import List, Literal, Optional, Sequence
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -70,7 +70,7 @@ class GraphBlock(_Strict):
         "json.dumps(indent=2, ensure_ascii=False); utf-8; no trailing newline"] = SERIALIZATION
     node_count: int = Field(ge=0)
     edge_count: int = Field(ge=0)
-    codesnippet_count: Optional[int] = Field(default=None, ge=0)
+    codesnippet_count: int | None = Field(default=None, ge=0)
 
     _v = field_validator("sha256")(_sha)
 
@@ -90,14 +90,14 @@ class Parent(_Strict):
 
     snapshot_id: str
     graph_sha256: str
-    data_commit: Optional[str] = None
+    data_commit: str | None = None
     relation: Literal["rebuild", "edit_reconciliation", "repair", "disclosure_split", "legacy_adoption"]
 
     _s = field_validator("graph_sha256")(_sha)
 
     @field_validator("data_commit")
     @classmethod
-    def _commit(cls, value: Optional[str]) -> Optional[str]:
+    def _commit(cls, value: str | None) -> str | None:
         if value is not None and not _GIT_SHA.match(value):
             raise ValueError("must be a full Git object id")
         return value
@@ -110,8 +110,8 @@ class Created(_Strict):
     tool: str
     code_commit: str
     json2kg_sha256: str
-    run_id: Optional[str] = None
-    profile: Optional[Literal["local", "als-dev", "als-prod", "ci"]] = None
+    run_id: str | None = None
+    profile: Literal["local", "als-dev", "als-prod", "ci"] | None = None
 
     _s = field_validator("json2kg_sha256")(_sha)
 
@@ -135,15 +135,15 @@ class SchemaBlock(_Strict):
     name: str
     path: str
     sha256: str
-    version: Optional[str] = None
-    import_fingerprint: Optional[str] = None
+    version: str | None = None
+    import_fingerprint: str | None = None
 
     _p = field_validator("path")(_repo_path)
     _s = field_validator("sha256")(_sha)
 
     @field_validator("import_fingerprint")
     @classmethod
-    def _fp(cls, value: Optional[str]) -> Optional[str]:
+    def _fp(cls, value: str | None) -> str | None:
         return value if value is None else _sha(value)
 
 
@@ -152,16 +152,16 @@ class ExtractionRevision(_Strict):
 
     extractor: str
     version: str
-    settings_revision: Optional[str] = None
-    model: Optional[str] = None
-    run_ids: Optional[List[str]] = None
-    unknown: Optional[bool] = None
+    settings_revision: str | None = None
+    model: str | None = None
+    run_ids: list[str] | None = None
+    unknown: bool | None = None
 
 
 class ExtractionBlock(_Strict):
     """Every contributing extraction revision (never one invented model)."""
 
-    revisions: List[ExtractionRevision] = Field(min_length=1)
+    revisions: list[ExtractionRevision] = Field(min_length=1)
 
 
 class CorpusRevision(_Strict):
@@ -170,13 +170,13 @@ class CorpusRevision(_Strict):
     id: str
     source_count: int = Field(ge=0)
     sources_checksum: str
-    source_list_ref: Optional[str] = None
+    source_list_ref: str | None = None
 
     _s = field_validator("sources_checksum")(_sha)
 
     @field_validator("source_list_ref")
     @classmethod
-    def _r(cls, value: Optional[str]) -> Optional[str]:
+    def _r(cls, value: str | None) -> str | None:
         return value if value is None else _ref(value)
 
 
@@ -196,14 +196,14 @@ class ValidationBlock(_Strict):
 
     status: Literal["pass", "fail"]
     report_sha256: str
-    report_ref: Optional[str] = None
-    suite: Optional[str] = None
+    report_ref: str | None = None
+    suite: str | None = None
 
     _s = field_validator("report_sha256")(_sha)
 
     @field_validator("report_ref")
     @classmethod
-    def _r(cls, value: Optional[str]) -> Optional[str]:
+    def _r(cls, value: str | None) -> str | None:
         return value if value is None else _ref(value)
 
 
@@ -213,7 +213,7 @@ class DisclosureBlock(_Strict):
     check_version: str
     status: Literal["pass", "fail", "owner_waiver"]
     report_sha256: str
-    waiver_ref: Optional[str] = None
+    waiver_ref: str | None = None
 
     _s = field_validator("report_sha256")(_sha)
 
@@ -227,13 +227,13 @@ class KGManifest(_Strict):
     snapshot_id: str
     graph_id: str = Field(min_length=1)
     graph: GraphBlock
-    compat_paths: Optional[List[CompatPath]] = None
-    parent: Optional[Parent] = None
+    compat_paths: list[CompatPath] | None = None
+    parent: Parent | None = None
     created: Created
     schema_block: SchemaBlock = Field(alias="schema")
     extraction: ExtractionBlock
     corpus_revision: CorpusRevision
-    inputs: List[InputRef]
+    inputs: list[InputRef]
     validation: ValidationBlock
     disclosure: DisclosureBlock
 
@@ -272,7 +272,7 @@ def parse_manifest(data: bytes) -> KGManifest:
 
 def utc_iso(moment: datetime) -> str:
     """UTC ISO-8601 with a ``Z`` suffix, whole seconds."""
-    return moment.astimezone(timezone.utc).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return moment.astimezone(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def extraction_fingerprint(revisions: Sequence[ExtractionRevision]) -> str:

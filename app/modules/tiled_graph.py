@@ -20,12 +20,12 @@ Never log API keys. Missing auth typically returns empty lists, not HTTP 401.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import logging
 import os
 import re
-from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Iterable, Sequence
 from urllib.parse import urlparse, urlunparse
 
 import requests
@@ -124,7 +124,7 @@ def _env(name: str, default: str = "") -> str:
     return str(raw).strip()
 
 
-def _truthy(raw: Optional[str]) -> Optional[bool]:
+def _truthy(raw: str | None) -> bool | None:
     """Parse a truthy/falsy env string; empty or unknown values return None."""
     if raw is None:
         return None
@@ -138,7 +138,7 @@ def _truthy(raw: Optional[str]) -> Optional[bool]:
     return None
 
 
-def normalize_tiled_uri(value: Optional[str], *, default: str = DEFAULT_TILED_URI) -> str:
+def normalize_tiled_uri(value: str | None, *, default: str = DEFAULT_TILED_URI) -> str:
     """Strip a trailing GraphQL path and return a scheme+host Tiled base URI."""
     raw = str(value or "").strip() or default
     parsed = urlparse(raw)
@@ -150,7 +150,7 @@ def normalize_tiled_uri(value: Optional[str], *, default: str = DEFAULT_TILED_UR
     return urlunparse((parsed.scheme, parsed.netloc, path, "", "", "")).rstrip("/")
 
 
-def is_als_production_tiled_host(host: Optional[str]) -> bool:
+def is_als_production_tiled_host(host: str | None) -> bool:
     """True when *host* is als.lbl.gov or a subdomain (never used as chat Tiled)."""
     hostname = (host or "").strip().lower().rstrip(".")
     if not hostname:
@@ -159,7 +159,7 @@ def is_als_production_tiled_host(host: Optional[str]) -> bool:
 
 
 def coerce_local_tiled_uri(
-    value: Optional[str],
+    value: str | None,
     *,
     default: str = DEFAULT_TILED_URI,
 ) -> str:
@@ -180,7 +180,7 @@ def graphql_url(base_uri: str) -> str:
     return f"{normalize_tiled_uri(base_uri)}{GRAPHQL_PATH}"
 
 
-def auth_headers(api_key: Optional[str] = None) -> Dict[str, str]:
+def auth_headers(api_key: str | None = None) -> dict[str, str]:
     """JSON headers plus optional Tiled ``Authorization`` from *api_key* or env."""
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     key = (api_key if api_key is not None else _env("TILED_API_KEY")).strip()
@@ -197,9 +197,9 @@ def tiled_api_key_set() -> bool:
 
 def load_tiled_config(
     *,
-    uri: Optional[str] = None,
-    enabled: Optional[bool] = None,
-) -> "TiledGraphConfig":
+    uri: str | None = None,
+    enabled: bool | None = None,
+) -> TiledGraphConfig:
     """Resolve enabled flag and local URI from arguments and environment."""
     env_enabled = _truthy(_env("F2W_LIVE_TILED") or _env("TILED_GRAPH_ENABLED"))
     if enabled is None:
@@ -224,10 +224,10 @@ def load_tiled_config(
 
 def probe_tiled_status(
     *,
-    uri: Optional[str] = None,
-    enabled: Optional[bool] = None,
+    uri: str | None = None,
+    enabled: bool | None = None,
     timeout: float = PROBE_TIMEOUT,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Live GraphQL probe for Settings: ok / unsigned / unreachable / disabled."""
     cfg = load_tiled_config(uri=uri, enabled=enabled)
     snap = cfg.snapshot()
@@ -286,9 +286,9 @@ class TiledGraphConfig:
     enabled: bool
     uri: str
     api_key_set: bool
-    uri_error: Optional[str] = None
+    uri_error: str | None = None
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """JSON-serializable status dict for Settings and retrieval metadata."""
         status = "disabled"
         error = self.uri_error
@@ -312,15 +312,15 @@ class TiledGraphConfig:
 class TiledLookupResult:
     """Hits and overlay graph from a live Tiled identity lookup."""
 
-    hits: List[ScoredHit] = field(default_factory=list)
-    graph: Optional["TiledLookupGraph"] = None
+    hits: list[ScoredHit] = field(default_factory=list)
+    graph: TiledLookupGraph | None = None
     status: str = "disabled"
-    error: Optional[str] = None
+    error: str | None = None
     fallback: str = "json_kg"
-    entity_counts: Dict[str, int] = field(default_factory=dict)
+    entity_counts: dict[str, int] = field(default_factory=dict)
     source: str = "none"
 
-    def meta(self) -> Dict[str, Any]:
+    def meta(self) -> dict[str, Any]:
         """Compact lookup metadata attached to agent responses."""
         return {
             "enabled": self.status not in {"disabled"},
@@ -345,12 +345,12 @@ class TiledLookupGraph:
     graph_source_used = "tiled"
     retrieval_backend = "graphql"
 
-    def __init__(self, nodes: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+    def __init__(self, nodes: dict[str, dict[str, Any]] | None = None) -> None:
         """Store *nodes* by id; outgoing edges start empty."""
-        self.nodes: Dict[str, Dict[str, Any]] = dict(nodes or {})
-        self.out_edges: Dict[str, List[Dict[str, Any]]] = {}
+        self.nodes: dict[str, dict[str, Any]] = dict(nodes or {})
+        self.out_edges: dict[str, list[dict[str, Any]]] = {}
 
-    def add_node(self, node: Dict[str, Any]) -> None:
+    def add_node(self, node: dict[str, Any]) -> None:
         """Index *node* by its ``id``; ignore records without an id."""
         nid = str(node.get("id") or "")
         if not nid:
@@ -363,10 +363,10 @@ class TiledLookupGraph:
             {"subject": subject, "predicate": predicate, "object": obj, "has_evidence": True}
         )
 
-    def semantic_search(self, q: str, topk: int = 12) -> List[Any]:
+    def semantic_search(self, q: str, topk: int = 12) -> list[Any]:
         """Rank Tiled nodes by lexical match to *q*; return ``(id, score)`` namespaces."""
         tokens = _query_tokens(q)
-        scored: List[Tuple[float, str]] = []
+        scored: list[tuple[float, str]] = []
         for nid, node in self.nodes.items():
             score = _match_score(q, node, tokens)
             if score > 0:
@@ -383,7 +383,7 @@ class TiledLookupGraph:
         include_pdf_snippets: bool = False,
     ) -> str:
         """Render selected Tiled nodes (and optional triples) into judge context."""
-        parts: List[str] = [
+        parts: list[str] = [
             "Live Tiled GraphQL identity nodes (ESAF, Proposal, Sample, BlueskyRun). "
             "Cite the entity name, for example [KG:tiled: ESAF 2026-00043]. "
             "Do not cite cookbook query names."
@@ -391,7 +391,7 @@ class TiledLookupGraph:
         chars = len(parts[0])
         rendered = {str(getattr(ni, "id", "")) for ni in nodes}
         if include_structured:
-            triples: List[str] = []
+            triples: list[str] = []
             for ni in nodes:
                 nid = str(getattr(ni, "id", "") or "")
                 for edge in self.out_edges.get(nid, []):
@@ -452,10 +452,10 @@ def _stem(token: str) -> str:
     return token
 
 
-def requested_entity_types(question: str) -> List[str]:
+def requested_entity_types(question: str) -> list[str]:
     """Entity types named in *question*, or all cookbook types if none match."""
     tokens = {_stem(tok) for tok in _query_tokens(question)}
-    matched: List[str] = []
+    matched: list[str] = []
     for entity_type, aliases in _TYPE_ALIASES.items():
         if any(_stem(alias) in tokens for alias in aliases):
             matched.append(entity_type)
@@ -484,7 +484,7 @@ def _normalize_identity(value: Any) -> str:
     return re.sub(r"[\s_\-:]+", " ", str(value or "").strip().lower())
 
 
-def tiled_node_aliases(nid: str, node: Dict[str, Any]) -> set[str]:
+def tiled_node_aliases(nid: str, node: dict[str, Any]) -> set[str]:
     """Match GraphQL cites like ESAF-2026-00043 onto uri / name / identity props."""
     props = node.get("properties") if isinstance(node.get("properties"), dict) else {}
     aliases: set[str] = set()
@@ -518,13 +518,13 @@ def tiled_node_aliases(nid: str, node: Dict[str, Any]) -> set[str]:
     return aliases
 
 
-def tiled_lookup_candidates(node_id: str) -> List[str]:
+def tiled_lookup_candidates(node_id: str) -> list[str]:
     """Undo query-overlay prefixes like ``tiled:beamline:ESAF-2026-00043``."""
     raw = str(node_id or "").strip()
     if not raw:
         return []
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for candidate in (raw,):
         if candidate and candidate not in seen:
             seen.add(candidate)
@@ -547,7 +547,7 @@ def tiled_lookup_candidates(node_id: str) -> List[str]:
     return out
 
 
-def resolve_tiled_node_id(kg: Any, node_id: str) -> Optional[str]:
+def resolve_tiled_node_id(kg: Any, node_id: str) -> str | None:
     """Map a citation or overlay id onto a node key in *kg*, if one exists."""
     nodes = getattr(kg, "nodes", {}) or {}
     if not isinstance(nodes, dict) or not node_id:
@@ -562,7 +562,7 @@ def resolve_tiled_node_id(kg: Any, node_id: str) -> Optional[str]:
         needle = _normalize_identity(raw_id)
         if len(needle) < 4:
             continue
-        matches: List[str] = []
+        matches: list[str] = []
         for nid, node in nodes.items():
             if not isinstance(node, dict):
                 continue
@@ -584,12 +584,12 @@ def tiled_neighborhood_ids(
     kg: Any,
     seeds: Sequence[str],
     hops: int = CITE_FOCUS_HOPS,
-) -> List[str]:
+) -> list[str]:
     """Undirected BFS so cite-click can show ESAF → proposal → sample/scan."""
     nodes = getattr(kg, "nodes", {}) or {}
     if not isinstance(nodes, dict):
         return []
-    resolved: List[str] = []
+    resolved: list[str] = []
     seen_seeds: set[str] = set()
     for seed in seeds:
         nid = resolve_tiled_node_id(kg, str(seed))
@@ -600,7 +600,7 @@ def tiled_neighborhood_ids(
     if not resolved:
         return []
 
-    adj: Dict[str, set[str]] = {}
+    adj: dict[str, set[str]] = {}
     for source, outgoing in (getattr(kg, "out_edges", {}) or {}).items():
         if not isinstance(outgoing, list):
             continue
@@ -617,7 +617,7 @@ def tiled_neighborhood_ids(
     frontier = list(resolved)
     depth = max(0, int(hops))
     for _ in range(depth):
-        nxt: List[str] = []
+        nxt: list[str] = []
         for current in frontier:
             for neighbor in adj.get(current, ()):
                 if neighbor in seen or neighbor not in nodes:
@@ -634,7 +634,7 @@ def tiled_neighborhood_ids(
     return ordered
 
 
-def entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
+def entity_to_node(entity: dict[str, Any]) -> dict[str, Any]:
     """Convert a Tiled GraphQL entity dict to the canonical KG node dict format."""
     props = dict(entity.get("properties") or {}) if isinstance(entity.get("properties"), dict) else {}
     entity_type = str(entity.get("entityType") or props.get("category") or "Thing")
@@ -654,7 +654,7 @@ def entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
         f"scientist {props['scientist']}" if props.get("scientist") else "",
     ]
     description = "; ".join(bit for bit in bits if bit) or name
-    node: Dict[str, Any] = {
+    node: dict[str, Any] = {
         "id": nid,
         "name": name,
         "category": entity_type,
@@ -684,7 +684,7 @@ def entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
     return node
 
 
-def _match_score(question: str, node: Dict[str, Any], tokens: Iterable[str]) -> float:
+def _match_score(question: str, node: dict[str, Any], tokens: Iterable[str]) -> float:
     """Return a float relevance score for *node* against *question* and pre-tokenised *tokens*."""
     hay = str(node.get("haystack") or f"{node.get('name', '')} {node.get('description', '')}").lower()
     name = str(node.get("name") or "").lower()
@@ -747,10 +747,10 @@ class TiledGraphQLError(RuntimeError):
 
 def tiled_graphql(
     query: str,
-    variables: Optional[dict] = None,
+    variables: dict | None = None,
     *,
-    uri: Optional[str] = None,
-    api_key: Optional[str] = None,
+    uri: str | None = None,
+    api_key: str | None = None,
     timeout: float = REQUEST_TIMEOUT,
 ) -> dict:
     """POST *query* to Tiled GraphQL and return ``data``, or raise :class:`TiledGraphQLError`."""
@@ -772,12 +772,12 @@ def _page_entities(
     entity_type: str,
     *,
     uri: str,
-    api_key: Optional[str],
+    api_key: str | None,
     page_size: int = PAGE_SIZE,
     max_pages: int = MAX_PAGES,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Page all GraphQL entities of *entity_type*, falling back if ``nodeId`` is unsupported."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     query = _PAGE_QUERY
     offset = 0
     for _ in range(max_pages):
@@ -809,7 +809,7 @@ def _page_entities(
     return rows
 
 
-def _count_node(entity_type: str, count: int, source: str) -> Dict[str, Any]:
+def _count_node(entity_type: str, count: int, source: str) -> dict[str, Any]:
     """Synthetic inventory node so “how many ESAFs” questions have a match."""
     return {
         "id": f"tiled:count:{entity_type}",
@@ -824,10 +824,10 @@ def _count_node(entity_type: str, count: int, source: str) -> Dict[str, Any]:
     }
 
 
-def _hits_from_graph(question: str, graph: TiledLookupGraph, *, limit: int = 40) -> List[ScoredHit]:
+def _hits_from_graph(question: str, graph: TiledLookupGraph, *, limit: int = 40) -> list[ScoredHit]:
     """Score *graph* nodes against *question* and return the top *limit* hits."""
     tokens = _query_tokens(question)
-    raw: List[ScoredHit] = []
+    raw: list[ScoredHit] = []
     for nid, node in graph.nodes.items():
         score = _match_score(question, node, tokens)
         if score <= 0 and not str(nid).startswith("tiled:count:"):
@@ -856,9 +856,9 @@ def _hits_from_graph(question: str, graph: TiledLookupGraph, *, limit: int = 40)
     return raw[:limit]
 
 
-def _ingest_entities(graph: TiledLookupGraph, entities: Sequence[Dict[str, Any]]) -> None:
+def _ingest_entities(graph: TiledLookupGraph, entities: Sequence[dict[str, Any]]) -> None:
     """Add GraphQL entities and their outgoing-link targets to *graph*."""
-    pending_edges: List[Tuple[str, str, Dict[str, Any]]] = []
+    pending_edges: list[tuple[str, str, dict[str, Any]]] = []
     for entity in entities:
         node = entity_to_node(entity)
         graph.add_node(node)
@@ -879,15 +879,15 @@ def _catalog_runs(
     question: str,
     *,
     uri: str,
-    api_key: Optional[str],
+    api_key: str | None,
     limit: int = 8,
-) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+) -> tuple[list[dict[str, Any]], str | None]:
     """Walk the Tiled catalog tree for BlueskyRun entries when GraphQL returns none."""
     try:
         from tiled.client import from_uri as tiled_from_uri  # type: ignore
     except Exception:
         return [], "tiled.client not installed; GraphQL-only lookup"
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     key = (api_key if api_key is not None else _env("TILED_API_KEY")).strip()
     if key:
         kwargs["api_key"] = key
@@ -895,10 +895,10 @@ def _catalog_runs(
         root = tiled_from_uri(uri, **kwargs)
     except Exception as exc:
         return [], f"catalog unreachable ({_safe_error(exc)})"
-    runs: List[Dict[str, Any]] = []
-    error: Optional[str] = None
+    runs: list[dict[str, Any]] = []
+    error: str | None = None
 
-    def _as_run(node: Any, path: List[str]) -> Optional[Dict[str, Any]]:
+    def _as_run(node: Any, path: list[str]) -> dict[str, Any] | None:
         """Build a BlueskyRun-shaped dict from a catalog node, or None if not a run."""
         try:
             meta = dict(getattr(node, "metadata", None) or {})
@@ -931,7 +931,7 @@ def _catalog_runs(
             },
         }
 
-    def walk(node: Any, path: List[str], depth: int) -> None:
+    def walk(node: Any, path: list[str], depth: int) -> None:
         """DFS the catalog tree, collecting up to *limit* BlueskyRun entries."""
         if len(runs) >= limit or depth > 3:
             return
@@ -962,9 +962,9 @@ def _catalog_runs(
 def lookup_experiment_identity(
     question: str,
     *,
-    uri: Optional[str] = None,
-    api_key: Optional[str] = None,
-    enabled: Optional[bool] = None,
+    uri: str | None = None,
+    api_key: str | None = None,
+    enabled: bool | None = None,
     include_catalog: bool = True,
 ) -> TiledLookupResult:
     """Page live Tiled GraphQL for experiment-identity questions."""
@@ -978,7 +978,7 @@ def lookup_experiment_identity(
 
     types = list(ENTITY_TYPES)
     graph = TiledLookupGraph()
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     key = api_key if api_key is not None else _env("TILED_API_KEY") or None
     source = "graphql"
     try:

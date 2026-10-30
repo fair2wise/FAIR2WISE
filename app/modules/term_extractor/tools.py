@@ -1,11 +1,11 @@
 """LangChain tools the term-extraction agent calls to look up, validate and register terms."""
 
+from dataclasses import dataclass, field
 import json
 import logging
 import re
 import threading
-from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable
 
 from langchain_core.tools import tool
 
@@ -29,9 +29,9 @@ class ToolState:
     store: TermStore
     schema: SchemaHelper
     services: Services
-    llm_invoke: Optional[Callable[[str], str]] = field(default=None, repr=False)
-    merge_index: Optional[TermMergeIndex] = field(default=None, repr=False)
-    current_source_paper: Optional[str] = None
+    llm_invoke: Callable[[str], str] | None = field(default=None, repr=False)
+    merge_index: TermMergeIndex | None = field(default=None, repr=False)
+    current_source_paper: str | None = None
     _tls: threading.local = field(default_factory=threading.local, repr=False)
 
     def set_page_context(self, source_paper: str, page: int) -> None:
@@ -50,7 +50,7 @@ class ToolState:
         self._tls.source_paper = None
         self._tls.page = None
 
-    def page_context(self) -> Tuple[Optional[str], Optional[int]]:
+    def page_context(self) -> tuple[str | None, int | None]:
         """Return ``(source_paper, page)`` for the current thread.
 
         The paper falls back to the shared ``current_source_paper`` when this
@@ -206,11 +206,11 @@ def build_tools(state: ToolState) -> list:
         term: str,
         definition: str,
         category: str,
-        formula: Optional[str] = None,
-        relations: Optional[List[Dict[str, str]]] = None,
-        source_paper: Optional[str] = None,
-        page: Optional[int] = None,
-        context: Optional[str] = None,
+        formula: str | None = None,
+        relations: list[dict[str, str]] | None = None,
+        source_paper: str | None = None,
+        page: int | None = None,
+        context: str | None = None,
     ) -> str:
         """Register or update an extracted materials-science term.
 

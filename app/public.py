@@ -46,7 +46,7 @@ LangGraph code. Construction opens no network connection.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, FrozenSet, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult
@@ -85,7 +85,7 @@ class F2WClient:
     """
 
     def __init__(self, application: F2WApplication, *, owns_application: bool = False,
-                 operations: Optional["F2WOperations"] = None) -> None:
+                 operations: F2WOperations | None = None) -> None:
         """Wrap ``application``; ``owns_application`` makes :meth:`close` close it.
 
         Raises:
@@ -99,8 +99,8 @@ class F2WClient:
         self._app = application
         self._owns = owns_application
         self._ops = operations
-        self._summary: Optional[Any] = None  # (executor, tool), built on first use
-        self._projector: Optional[Any] = None  # DisclosureProjector, built on first use
+        self._summary: Any | None = None  # (executor, tool), built on first use
+        self._projector: Any | None = None  # DisclosureProjector, built on first use
 
     @classmethod
     def from_settings(
@@ -110,9 +110,9 @@ class F2WClient:
         retrieval: Any,
         chat_model: Any = None,
         checkpointer: Any = None,
-        operations: Optional["F2WOperations"] = None,
+        operations: F2WOperations | None = None,
         **options: Any,
-    ) -> "F2WClient":
+    ) -> F2WClient:
         """Build a client from explicit settings (no ``.env`` or environment read).
 
         Args:
@@ -134,11 +134,11 @@ class F2WClient:
         return self._app
 
     @property
-    def operations(self) -> Optional["F2WOperations"]:
+    def operations(self) -> F2WOperations | None:
         """The shared operations service, or ``None`` when none was given."""
         return self._ops
 
-    def _operations(self, method: str) -> "F2WOperations":
+    def _operations(self, method: str) -> F2WOperations:
         if self._ops is None:
             from .modules.contracts.errors import ContractError, ErrorCode
 
@@ -154,7 +154,7 @@ class F2WClient:
         if self._owns:
             self._app.close()
 
-    def __enter__(self) -> "F2WClient":
+    def __enter__(self) -> F2WClient:
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -196,10 +196,10 @@ class F2WClient:
         ctx: RequestContext,
         scope: Any,
         *,
-        max_terms: Optional[int] = None,
+        max_terms: int | None = None,
         query: str = "",
-        missing_topics: Optional[Sequence[str]] = None,
-        relevant_node_names: Optional[Sequence[str]] = None,
+        missing_topics: Sequence[str] | None = None,
+        relevant_node_names: Sequence[str] | None = None,
     ) -> ToolResult:
         """Deterministic summary of one extracted paper (T19B ``lit_summarize_extracted_terms``).
 
@@ -283,24 +283,24 @@ class F2WClient:
         """``kg_compare_snapshots`` (``GET /v1/operations/compare``)."""
         return self._operations("compare_graphs").compare_graphs(ctx, graph_ids)
 
-    def paper_subgraph(self, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: Optional[int] = None,
-                       max_edges: Optional[int] = None) -> ToolResult:
+    def paper_subgraph(self, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int | None = None,
+                       max_edges: int | None = None) -> ToolResult:
         """``kg_paper_subgraph`` (``GET /v1/operations/paper-subgraph``)."""
         return self._operations("paper_subgraph").paper_subgraph(ctx, graph_id, paper, max_nodes=max_nodes,
                                                                  max_edges=max_edges)
 
-    def recent_entities(self, ctx: RequestContext, graph_id: str, *, since: Optional[str] = None,
-                        limit: Optional[int] = None) -> ToolResult:
+    def recent_entities(self, ctx: RequestContext, graph_id: str, *, since: str | None = None,
+                        limit: int | None = None) -> ToolResult:
         """``kg_recent_entities`` (``GET /v1/operations/recent``; Tiled graphs only)."""
         return self._operations("recent_entities").recent_entities(ctx, graph_id, since=since, limit=limit)
 
-    def audit_corpus(self, ctx: RequestContext, corpus: str, *, sections: Optional[Sequence[str]] = None
+    def audit_corpus(self, ctx: RequestContext, corpus: str, *, sections: Sequence[str] | None = None
                      ) -> ToolResult:
         """``curate_audit_corpus`` (``GET /v1/operations/corpus-audit``)."""
         return self._operations("audit_corpus").audit_corpus(ctx, corpus, sections=sections)
 
     def submit_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
-                                   corpus_scope: Optional[Sequence[str]] = None) -> Any:
+                                   corpus_scope: Sequence[str] | None = None) -> Any:
         """Submit a ``knowledge_operation`` job (``POST /v1/operations/jobs``; ``ops.run``). Returns the handle."""
         return self._operations("submit_knowledge_operation").submit_knowledge_operation(
             ctx, operation, args, corpus_scope=corpus_scope)
@@ -325,7 +325,7 @@ class F2WClient:
         return self._app.executor.execute(ctx, name, dict(args))
 
     def search_literature(self, ctx: RequestContext, query: str, limit: int = 20, *, technique: str = "",
-                          material: str = "", year_from: Optional[int] = None, year_to: Optional[int] = None,
+                          material: str = "", year_from: int | None = None, year_to: int | None = None,
                           ) -> ToolResult:
         """``lit_search_papers``: external candidates (DOIs), never ingested Works, never evidence.
 
@@ -515,14 +515,14 @@ class LiteratureAgent:
         if self._owns:
             self.client.close()
 
-    def __enter__(self) -> "LiteratureAgent":
+    def __enter__(self) -> LiteratureAgent:
         return self
 
     def __exit__(self, *exc: Any) -> None:
         self.close()
 
     async def delegate(
-        self, ctx: RequestContext, task: str, *, thread_id: str, scope: Optional[FrozenSet[str]] = None,
+        self, ctx: RequestContext, task: str, *, thread_id: str, scope: frozenset[str] | None = None,
     ) -> DelegatedOutcome:
         """Run one delegated task on ``thread_id`` (``F2WApplication.delegate``)."""
         return await self.client.application.delegate(ctx, task, thread_id=thread_id, scope=scope)
@@ -530,8 +530,8 @@ class LiteratureAgent:
 
 def create_literature_agent(
     *,
-    client: Optional[F2WClient] = None,
-    settings: Optional[DeploymentSettings] = None,
+    client: F2WClient | None = None,
+    settings: DeploymentSettings | None = None,
     retrieval: Any = None,
     chat_model: Any = None,
     checkpointer: Any = None,

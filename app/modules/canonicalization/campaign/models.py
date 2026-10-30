@@ -11,9 +11,9 @@ Changes: no provider-specific tiers (paid/CLI escalation is not ported), ``metho
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Optional, Tuple
+import hashlib
+from typing import Any
 
 MODELS_VERSION = "t07-campaign-1"
 
@@ -43,7 +43,7 @@ class MenuEntry:
     slug: str
     display_name: str
     category: str
-    aliases: Tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -54,14 +54,14 @@ class TermEvidence:
     category: str
     surface: str
     folded: str
-    variants: Tuple[str, ...]
-    node_ids: Tuple[str, ...]
-    snippets: Tuple[Snippet, ...]
+    variants: tuple[str, ...]
+    node_ids: tuple[str, ...]
+    snippets: tuple[Snippet, ...]
     distinct_publications: int
     sections: int
     edges: int
-    menu: Tuple[MenuEntry, ...] = ()
-    cluster_neighbours: Tuple[str, ...] = ()
+    menu: tuple[MenuEntry, ...] = ()
+    cluster_neighbours: tuple[str, ...] = ()
 
     def evidence_text(self) -> str:
         """The text a quote must be found in: snippets joined by newlines."""
@@ -76,21 +76,21 @@ class TermVerdict:
     round_key: str
     framing: str
     verdict: str
-    target_slug: Optional[str]
-    reject_kind: Optional[str]
+    target_slug: str | None
+    reject_kind: str | None
     evidence_quote: str
     confidence: float
     reason: str
     accepted: bool
-    errors: Tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
     request_sha: str = ""
     model: str = ""
     #: ``None`` means unknown (never zero) when the provider reports no cost.
-    cost_usd: Optional[float] = None
+    cost_usd: float | None = None
     input_tokens: int = 0
     output_tokens: int = 0
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the record as a plain dict."""
         return asdict(self)
 
@@ -101,20 +101,20 @@ class Decision:
 
     term_key: str
     category: str
-    node_ids: Tuple[str, ...]
+    node_ids: tuple[str, ...]
     target_slug: str
     method: str
     confidence: float
-    votes: Tuple[str, ...]
+    votes: tuple[str, ...]
     plan_id: str = ""
     reviewer: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the decision as a plain dict."""
         return asdict(self)
 
     @staticmethod
-    def from_dict(row: Dict[str, Any]) -> "Decision":
+    def from_dict(row: dict[str, Any]) -> Decision:
         """Build a decision from a dict, converting list fields to tuples.
 
         Raises:
@@ -133,10 +133,10 @@ class RoundRecord:
     stage: str
     tier: str
     model: str = ""
-    counts: Dict[str, int] = field(default_factory=dict)
+    counts: dict[str, int] = field(default_factory=dict)
     input_tokens: int = 0
     output_tokens: int = 0
-    cost_usd: Optional[float] = None
+    cost_usd: float | None = None
 
 
 @dataclass(frozen=True)
@@ -145,8 +145,8 @@ class Vote:
 
     framing: str
     verdict: str
-    target_slug: Optional[str]
-    reject_kind: Optional[str]
+    target_slug: str | None
+    reject_kind: str | None
     accepted: bool
 
 
@@ -159,7 +159,7 @@ class QuarantineRecord:
     category: str
     reason_code: str
     detail: str = ""
-    node_ids: Tuple[str, ...] = ()
+    node_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -170,8 +170,8 @@ class ParkedTerm:
     surface: str
     category: str
     reason: str
-    votes: Tuple[str, ...] = ()
-    node_ids: Tuple[str, ...] = ()
+    votes: tuple[str, ...] = ()
+    node_ids: tuple[str, ...] = ()
     distinct_publications: int = 0
 
 
@@ -181,7 +181,7 @@ class ReviewDecision:
 
     term_key: str
     action: str  # approve | reject | retarget | quarantine
-    target_slug: Optional[str]
+    target_slug: str | None
     reviewer: str
     decided_at: str
     note: str = ""

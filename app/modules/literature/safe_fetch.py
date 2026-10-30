@@ -20,13 +20,13 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/simulation/net_guard.p
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field
 import ipaddress
 import logging
+from pathlib import Path
 import socket
 import time
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -44,7 +44,7 @@ _SHARED_ADDRESS_SPACE = ipaddress.ip_network("100.64.0.0/10")
 Resolver = Callable[[str], Sequence[str]]
 
 
-def system_resolver(host: str) -> List[str]:
+def system_resolver(host: str) -> list[str]:
     """Resolve ``host`` with ``getaddrinfo`` (all families)."""
     return sorted({str(info[4][0]).split("%", 1)[0] for info in socket.getaddrinfo(host, None)})
 
@@ -86,8 +86,8 @@ class NetworkPolicy:
         resolver: DNS resolver (injectable; tests never use the network).
     """
 
-    allowed_schemes: FrozenSet[str] = frozenset({"http", "https"})
-    allowed_ports: FrozenSet[int] = frozenset({80, 443})
+    allowed_schemes: frozenset[str] = frozenset({"http", "https"})
+    allowed_ports: frozenset[int] = frozenset({80, 443})
     max_redirects: int = 5
     max_bytes: int = 100 * 1024 * 1024
     connect_timeout: float = 10.0
@@ -127,7 +127,7 @@ class NetworkPolicy:
         return str(url).strip()
 
 
-def assert_public_http_url(url: str, policy: Optional[NetworkPolicy] = None) -> None:
+def assert_public_http_url(url: str, policy: NetworkPolicy | None = None) -> None:
     """Donor-compatible guard: raise ``ValueError`` unless ``url`` passes :class:`NetworkPolicy`."""
     try:
         (policy or NetworkPolicy()).check_url(url)
@@ -149,7 +149,7 @@ class FetchResult:
     status: str
     ref: str = ""
     final_url: str = ""
-    redirects: List[str] = field(default_factory=list)
+    redirects: list[str] = field(default_factory=list)
     bytes: int = 0
 
     @property
@@ -157,7 +157,7 @@ class FetchResult:
         """Whether bytes were stored."""
         return self.status == "stored"
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form (URLs are third-party locations, not store paths)."""
         return asdict(self)
 
@@ -175,7 +175,7 @@ class SafeFetcher:
         clock: Monotonic clock for the total deadline.
     """
 
-    def __init__(self, http: httpx.Client, policy: Optional[NetworkPolicy] = None,
+    def __init__(self, http: httpx.Client, policy: NetworkPolicy | None = None,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self.http = http
         self.policy = policy or NetworkPolicy()
@@ -194,7 +194,7 @@ class SafeFetcher:
         return is_public_address(str(peer[0]))
 
     def fetch_pdf(self, ctx: RequestContext, url: str, store: FileDocumentStore, *,
-                  metadata: Optional[Mapping[str, str]] = None) -> FetchResult:
+                  metadata: Mapping[str, str] | None = None) -> FetchResult:
         """Fetch ``url`` (following validated redirects) and store it if it is a PDF within limits."""
         result = FetchResult(url=url, status="failed:network")
         policy = self.policy
@@ -276,14 +276,14 @@ class LocalIntakePolicy:
     is refused even when it points inside a root.
     """
 
-    allowed_roots: Tuple[Path, ...]
+    allowed_roots: tuple[Path, ...]
     max_bytes: int = 256 * 1024 * 1024
     allow_symlinks: bool = False
 
     @classmethod
-    def from_paths(cls, roots: Iterable[Any], **kw: Any) -> "LocalIntakePolicy":
+    def from_paths(cls, roots: Iterable[Any], **kw: Any) -> LocalIntakePolicy:
         """Build from configured root paths (resolved once)."""
-        resolved: List[Path] = []
+        resolved: list[Path] = []
         for root in roots:
             path = Path(root).expanduser().resolve()
             if path not in resolved:

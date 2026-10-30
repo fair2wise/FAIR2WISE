@@ -46,11 +46,11 @@ snippets or source text (D19).
 
 from __future__ import annotations
 
-import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
+from datetime import UTC, datetime
+from typing import Any, Callable, Iterable, Mapping, Sequence
+import uuid
 
 from ..agent_runtime.executor import is_control_flow
 from ..agent_runtime.skills import Skill
@@ -117,9 +117,9 @@ class EntityRow:
     id: str
     name: str
     category: str
-    citations: Tuple[str, ...] = ()
-    publication_dois: Tuple[Tuple[str, str], ...] = ()  # (paper key, doi)
-    created_at: Optional[str] = None
+    citations: tuple[str, ...] = ()
+    publication_dois: tuple[tuple[str, str], ...] = ()  # (paper key, doi)
+    created_at: str | None = None
 
 
 @dataclass
@@ -130,10 +130,10 @@ class GraphScan:
     backend: str
     revision: str
     exactness: str
-    entities: Dict[str, EntityRow] = field(default_factory=dict)
-    edges: List[Tuple[str, Any, Any, Any]] = field(default_factory=list)
+    entities: dict[str, EntityRow] = field(default_factory=dict)
+    edges: list[tuple[str, Any, Any, Any]] = field(default_factory=list)
     scan_complete: bool = True
-    reasons: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
     records_scanned: int = 0
     unresolved_link_endpoints: int = 0
 
@@ -145,8 +145,8 @@ class GraphScan:
 
 
 def _row_from_data(node_id: str, name: str, category: str, data: Mapping[str, Any],
-                   created_at: Optional[str] = None) -> EntityRow:
-    cites: List[str] = []
+                   created_at: str | None = None) -> EntityRow:
+    cites: list[str] = []
     for key in ("source_papers", "papers"):
         value = data.get(key)
         values = value if isinstance(value, list) else [value] if isinstance(value, str) and value else []
@@ -156,7 +156,7 @@ def _row_from_data(node_id: str, name: str, category: str, data: Mapping[str, An
                 cites.append(k)
         if values:
             break
-    pubs: List[Tuple[str, str]] = []
+    pubs: list[tuple[str, str]] = []
     for pub in data.get("publications") or []:
         if isinstance(pub, Mapping):
             k, d = paper_key(pub.get("source_paper")), doi_key(pub.get("doi"))
@@ -168,7 +168,7 @@ def _row_from_data(node_id: str, name: str, category: str, data: Mapping[str, An
                      publication_dois=tuple(pubs), created_at=created_at)
 
 
-def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: Optional[ScanControl] = None) -> GraphScan:
+def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl | None = None) -> GraphScan:
     """Read every entity and edge of ``graph_id`` through ``port`` within ``control``'s bounds.
 
     Raises:
@@ -235,7 +235,7 @@ def _stopped(scan: GraphScan, control: ScanControl, phase: str) -> GraphScan:
 
 
 def _pages(client: Any, query: str, field_name: str, page_size: int, control: ScanControl
-           ) -> Iterable[Optional[Dict[str, Any]]]:
+           ) -> Iterable[dict[str, Any] | None]:
     """Yield rows of one listing; yields ``None`` once when ``control`` stops the scan."""
     offset = 0
     while True:
@@ -256,7 +256,7 @@ def _scan_tiled(port: Any, graph_id: str, control: ScanControl) -> GraphScan:
     started = utcnow().isoformat()
     scan = GraphScan(graph_id=graph_id, backend="tiled", revision=f"tiled-live:{graph_id}@{started}",
                      exactness="live_unisolated")
-    by_tiled: Dict[str, str] = {}
+    by_tiled: dict[str, str] = {}
     page = max(1, int(getattr(port, "page_size", 500)))
     for row in _pages(port.client, _ENT_Q, "entities", page, control):
         if row is None:
@@ -293,14 +293,14 @@ def _scan_tiled(port: Any, graph_id: str, control: ScanControl) -> GraphScan:
 # metrics
 # =====================================================================================
 
-def legacy_structural_metrics(entities: Set[str], relations: Set[Tuple[Any, Any, Any]]) -> Dict[str, Any]:
+def legacy_structural_metrics(entities: set[str], relations: set[tuple[Any, Any, Any]]) -> dict[str, Any]:
     """``analyze_kgs.calculate_structural_metrics``, unchanged."""
     if not entities:
         return {"entity_relation_ratio": 0, "entities_with_relations_pct": 0, "avg_relations_per_entity": 0,
                 "unique_predicates": 0}
-    in_rel: Set[Any] = set()
-    predicates: Set[Any] = set()
-    counts: Dict[Any, int] = defaultdict(int)
+    in_rel: set[Any] = set()
+    predicates: set[Any] = set()
+    counts: dict[Any, int] = defaultdict(int)
     for subj, pred, obj in relations:
         in_rel.add(subj)
         in_rel.add(obj)
@@ -316,8 +316,8 @@ def legacy_structural_metrics(entities: Set[str], relations: Set[Tuple[Any, Any,
     }
 
 
-def legacy_growth_metrics(cur_e: Set[str], cur_r: Set[Tuple[Any, Any, Any]], prev_e: Set[str],
-                          prev_r: Set[Tuple[Any, Any, Any]], cur_papers: int, prev_papers: int) -> Dict[str, Any]:
+def legacy_growth_metrics(cur_e: set[str], cur_r: set[tuple[Any, Any, Any]], prev_e: set[str],
+                          prev_r: set[tuple[Any, Any, Any]], cur_papers: int, prev_papers: int) -> dict[str, Any]:
     """``analyze_kgs.calculate_growth_metrics``, unchanged (paper counts supplied by the caller)."""
     if not prev_e:
         return {"entity_retention": None, "relation_retention": None,
@@ -335,7 +335,7 @@ def legacy_growth_metrics(cur_e: Set[str], cur_r: Set[Tuple[Any, Any, Any]], pre
     }
 
 
-def triples(scan: GraphScan) -> Tuple[Set[Tuple[Any, Any, Any]], int]:
+def triples(scan: GraphScan) -> tuple[set[tuple[Any, Any, Any]], int]:
     """``(distinct complete triples, complete record count)``."""
     complete = [(s, p, o) for _eid, s, p, o in scan.edges if s and p and o]
     return set(complete), len(complete)
@@ -343,7 +343,7 @@ def triples(scan: GraphScan) -> Tuple[Set[Tuple[Any, Any, Any]], int]:
 
 def work_index(scans: Sequence[GraphScan]) -> WorkIndex:
     """One Work index over every paper key the scans cite (so Work ids agree across graphs)."""
-    meta: Dict[str, List[Dict[str, Any]]] = {}
+    meta: dict[str, list[dict[str, Any]]] = {}
     for scan in scans:
         for row in scan.entities.values():
             for key in row.citations:
@@ -353,12 +353,12 @@ def work_index(scans: Sequence[GraphScan]) -> WorkIndex:
     return WorkIndex.build(record_for(k, v) for k, v in meta.items())
 
 
-def works_cited(scan: GraphScan, works: WorkIndex) -> Set[str]:
+def works_cited(scan: GraphScan, works: WorkIndex) -> set[str]:
     """Distinct Work ids cited by entities of ``scan``."""
     return {works.work_of[k] for row in scan.entities.values() for k in row.citations if k in works.work_of}
 
 
-def graph_statistics(scan: GraphScan, works: Optional[WorkIndex] = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def graph_statistics(scan: GraphScan, works: WorkIndex | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     """``(metrics, preview)`` for one scanned graph."""
     works = works or work_index([scan])
     ids = set(scan.entities)
@@ -398,7 +398,7 @@ def graph_statistics(scan: GraphScan, works: Optional[WorkIndex] = None) -> Tupl
 # operations
 # =====================================================================================
 
-def _scope_and_revisions(scans: Sequence[GraphScan]) -> Tuple[Dict[str, Any], Dict[str, str]]:
+def _scope_and_revisions(scans: Sequence[GraphScan]) -> tuple[dict[str, Any], dict[str, str]]:
     return ({"graph_ids": [s.graph_id for s in scans], "backends": sorted({s.backend for s in scans})},
             {s.graph_id: s.revision for s in scans})
 
@@ -411,7 +411,7 @@ def _combined_coverage(scans: Sequence[GraphScan]) -> Coverage:
                        exactness=exact, reasons=reasons)
 
 
-def _identity_warnings(scans: Sequence[GraphScan]) -> List[str]:
+def _identity_warnings(scans: Sequence[GraphScan]) -> list[str]:
     out = []
     for s in scans:
         if s.unresolved_link_endpoints:
@@ -421,7 +421,7 @@ def _identity_warnings(scans: Sequence[GraphScan]) -> List[str]:
 
 
 def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,
-                       control: Optional[ScanControl] = None) -> OperationReport:
+                       control: ScanControl | None = None) -> OperationReport:
     """``kg_compute_statistics`` over one graph."""
     started = utcnow()
     scan = scan_graph(port, ctx, graph_id, control)
@@ -442,26 +442,26 @@ def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,
 
 
 def compare_snapshots(port: Any, ctx: RequestContext, graph_ids: Sequence[str],
-                      control: Optional[ScanControl] = None) -> OperationReport:
+                      control: ScanControl | None = None) -> OperationReport:
     """``kg_compare_snapshots``: growth between consecutive graphs, in the given order."""
     started = utcnow()
     if not 2 <= len(graph_ids) <= MAX_COMPARE_GRAPHS or len(set(graph_ids)) != len(graph_ids):
         raise ContractError(ErrorCode.INVALID_INPUT, f"give 2-{MAX_COMPARE_GRAPHS} distinct graph ids in order")
     control = control or ScanControl()
-    scans: List[GraphScan] = []
+    scans: list[GraphScan] = []
     for gid in graph_ids:
         scans.append(scan_graph(port, ctx, gid, control))
         if not scans[-1].scan_complete:
             break
     works = work_index(scans)
-    steps: List[Dict[str, Any]] = []
-    prev: Optional[Tuple[Set[str], Set[Tuple[Any, Any, Any]], Set[str]]] = None
+    steps: list[dict[str, Any]] = []
+    prev: tuple[set[str], set[tuple[Any, Any, Any]], set[str]] | None = None
     warnings = _identity_warnings(scans)
     for scan in scans:
         ids = set(scan.entities)
         rel, _n = triples(scan)
         cited = works_cited(scan, works)
-        row: Dict[str, Any] = {"graph_id": scan.graph_id, "entities": len(ids), "relations": len(rel),
+        row: dict[str, Any] = {"graph_id": scan.graph_id, "entities": len(ids), "relations": len(rel),
                                "distinct_works": len(cited), "complete": scan.scan_complete}
         if prev is None:
             row["legacy_growth"] = legacy_growth_metrics(ids, rel, set(), set(), len(cited), 0)
@@ -501,7 +501,7 @@ def compare_snapshots(port: Any, ctx: RequestContext, graph_ids: Sequence[str],
 
 
 def paper_subgraph(port: Any, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int = 50,
-                   max_edges: int = 100, control: Optional[ScanControl] = None) -> OperationReport:
+                   max_edges: int = 100, control: ScanControl | None = None) -> OperationReport:
     """``kg_paper_subgraph``: entities citing one Work and the relations among them."""
     started = utcnow()
     scan = scan_graph(port, ctx, graph_id, control)
@@ -556,11 +556,11 @@ def _parse_time(value: str) -> datetime:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         raise ContractError(ErrorCode.INVALID_INPUT, "since must be an ISO 8601 timestamp") from None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def recent_entities(port: Any, ctx: RequestContext, graph_id: str, *, since: str = "", limit: int = 25,
-                    control: Optional[ScanControl] = None) -> OperationReport:
+                    control: ScanControl | None = None) -> OperationReport:
     """``kg_recent_entities``: entities created after ``since`` (all when empty), newest first."""
     started = utcnow()
     floor = _parse_time(since) if since else None
@@ -608,7 +608,7 @@ _OUT = {"type": "object",
         "required": ["operation", "method", "coverage", "metrics", "counting_units"]}
 
 
-def _spec(name: str, description: str, when: str, schema: Dict[str, Any]) -> ToolSpec:
+def _spec(name: str, description: str, when: str, schema: dict[str, Any]) -> ToolSpec:
     return ToolSpec(name=name, version=OPERATION_VERSION, domain="operations", description=description,
                     when_to_use=when, when_not_to_use=_COMMON_WHEN_NOT, input_schema=schema, output_schema=_OUT,
                     effects=frozenset({Effect.READ_CORPUS}), cost_class=CostClass.CHEAP,
@@ -686,14 +686,14 @@ class GraphOperationsTool:
     specs = GRAPH_SPECS
     skill = ANALYZE_KNOWLEDGE_GRAPH_SKILL
 
-    def __init__(self, port: Any, *, graph_ids: Optional[Sequence[str]] = None, artifact_store: Any = None,
+    def __init__(self, port: Any, *, graph_ids: Sequence[str] | None = None, artifact_store: Any = None,
                  max_records: int = 500_000) -> None:
         self.port = port
         self._graph_ids = None if graph_ids is None else tuple(graph_ids)
         self._store = artifact_store
         self._max = max_records
 
-    def registrations(self) -> List[Tuple[ToolSpec, Callable[[Any], ToolResult]]]:
+    def registrations(self) -> list[tuple[ToolSpec, Callable[[Any], ToolResult]]]:
         """``(spec, fn)`` pairs for ``build_registry(extra=...)``."""
         return [(spec, self._runner(spec.name)) for spec in self.specs]
 
@@ -704,17 +704,17 @@ class GraphOperationsTool:
         if known is not None and graph_id not in known:
             raise ContractError(ErrorCode.NOT_FOUND, f"graph {graph_id!r} is not configured")
 
-    def operation_names(self) -> Tuple[str, ...]:
+    def operation_names(self) -> tuple[str, ...]:
         """Operations this suite runs (job dispatch)."""
         return tuple(spec.name for spec in self.specs)
 
     def compute_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any],
-                          control: Optional[ScanControl] = None) -> OperationReport:
+                          control: ScanControl | None = None) -> OperationReport:
         """Job entry point (same as :meth:`compute`)."""
         return self.compute(ctx, operation, args, control)
 
     def compute(self, ctx: RequestContext, operation: str, args: Mapping[str, Any],
-                control: Optional[ScanControl] = None) -> OperationReport:
+                control: ScanControl | None = None) -> OperationReport:
         """Run one graph operation by Tool name (also the job entry point)."""
         control = control or ScanControl(self._max, deadline=ctx.deadline)
         if operation == TOOL_COMPARE:
@@ -755,7 +755,7 @@ class GraphOperationsTool:
         return run
 
 
-__all__: Tuple[str, ...] = (
+__all__: tuple[str, ...] = (
     "ANALYZE_KNOWLEDGE_GRAPH_SKILL", "GRAPH_SPECS", "GraphOperationsTool", "GraphScan", "KG_COMPARE_SNAPSHOTS",
     "KG_COMPUTE_STATISTICS", "KG_PAPER_SUBGRAPH", "KG_RECENT_ENTITIES", "TOOL_COMPARE", "TOOL_RECENT",
     "TOOL_STATS", "TOOL_SUBGRAPH", "compare_snapshots", "compute_statistics", "graph_statistics",

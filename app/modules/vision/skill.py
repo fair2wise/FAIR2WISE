@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 from ..agent_runtime.skills import Skill
 
-VISION_TOOL_NAMES: Tuple[str, ...] = (
+VISION_TOOL_NAMES: tuple[str, ...] = (
     "vision_extract_figures", "vision_classify_figure", "vision_read_scale", "vision_read_qrange",
     "vision_read_orientation", "vision_extract_tables",
 )
-SCIENCE_TOOL_NAMES: Tuple[str, ...] = (
+SCIENCE_TOOL_NAMES: tuple[str, ...] = (
     "science_normalize_quantity", "science_q_to_spacing", "science_spacing_to_q",
 )
 

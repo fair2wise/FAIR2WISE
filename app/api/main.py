@@ -40,10 +40,10 @@ has no side effects.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import os
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -60,7 +60,7 @@ GUARDED_PREFIXES = ("/v1/", "/auth/")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class PublicRootPath:
@@ -110,22 +110,22 @@ class PublicRootPath:
 def create_api_app(
     cfg: Any,
     *,
-    cors_origins: Optional[List[str]] = None,
-    deployment: Optional[Any] = None,
-    startup_config: Optional[Dict[str, str]] = None,
-    identity_port: Optional[Any] = None,
-    credential_store: Optional[Any] = None,
-    clock: Optional[Callable[[], datetime]] = None,
-    operations: Optional[F2WOperations] = None,
-    operations_root: Optional[Path] = None,
-    publication_gate: Optional[PublicationGate] = None,
+    cors_origins: list[str] | None = None,
+    deployment: Any | None = None,
+    startup_config: dict[str, str] | None = None,
+    identity_port: Any | None = None,
+    credential_store: Any | None = None,
+    clock: Callable[[], datetime] | None = None,
+    operations: F2WOperations | None = None,
+    operations_root: Path | None = None,
+    publication_gate: PublicationGate | None = None,
     max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     sse_poll_seconds: float = 0.5,
     sse_max_seconds: float = 300.0,
-    judge_settings: Optional[Any] = None,
-    knowledge_operations: Optional[Any] = None,
+    judge_settings: Any | None = None,
+    knowledge_operations: Any | None = None,
     model_api: bool = False,
-    model_api_root_path: Optional[str] = None,
+    model_api_root_path: str | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -168,9 +168,13 @@ def create_api_app(
             ``knowledge_operations`` given beside ``operations`` that already carry one, or
             ``model_api`` without a JSON graph in ``cfg.graph``.
     """
+    from . import routes_jobs as jobs
+    from . import routes_operations as knowledge_routes
+    from . import routes_publications as publications
+    from . import routes_review as review
+    from . import routes_status as status
+    from . import routes_validation as validation
     from ..modules.f2w_agent.api import create_app, effective_cors_origins
-    from . import routes_jobs as jobs, routes_operations as knowledge_routes, routes_publications as publications
-    from . import routes_review as review, routes_status as status, routes_validation as validation
     from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
@@ -237,8 +241,8 @@ def create_api_app(
     return app
 
 
-def run_api(cfg: Any, *, host: str, port: int, cors_origins: Optional[List[str]] = None,
-            root_path: Optional[str] = None) -> None:
+def run_api(cfg: Any, *, host: str, port: int, cors_origins: list[str] | None = None,
+            root_path: str | None = None) -> None:
     """Serve :func:`create_api_app` with uvicorn (``cli api --jobs-api``).
 
     ``root_path`` is the ASGI root path behind the ``/fair2wise`` gateway (T24C, C6). ``None``

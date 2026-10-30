@@ -25,9 +25,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+import sys
+from typing import Any
 
 from ..modules.contracts.errors import ContractError, ErrorCode
 from .legacy_ui import deployment_settings_from
@@ -146,7 +146,7 @@ def run(ops: F2WOperations, args: argparse.Namespace) -> Any:
         return _dump(ops.audit_corpus(ctx, args.corpus, sections=args.sections))
     if action == "submit":
         try:
-            tool_args: Dict[str, Any] = json.loads(args.args)
+            tool_args: dict[str, Any] = json.loads(args.args)
         except ValueError:
             raise ContractError(ErrorCode.INVALID_INPUT, "--args must be a JSON object") from None
         if not isinstance(tool_args, dict):
@@ -155,7 +155,7 @@ def run(ops: F2WOperations, args: argparse.Namespace) -> Any:
     return ops.knowledge_job_result(ctx, args.job_id)
 
 
-def build_knowledge(project_root: str, graph_files: Optional[List[str]] = None) -> Any:
+def build_knowledge(project_root: str, graph_files: list[str] | None = None) -> Any:
     """Build the CLI's ``KnowledgeOperations``.
 
     Reads ``storage/kg`` or the explicit graph files, plus the ``storage/terminology`` corpora.
@@ -171,7 +171,7 @@ def build_knowledge(project_root: str, graph_files: Optional[List[str]] = None) 
     return KnowledgeOperations.from_graph_files(lambda: files, corpus=corpus)
 
 
-def main(argv: Optional[List[str]] = None, *, environ: Optional[Any] = None) -> int:
+def main(argv: list[str] | None = None, *, environ: Any | None = None) -> int:
     """Entry point; prints JSON and returns ``0``, or ``2`` with ``{"code", "message"}`` on a refusal."""
     args = build_parser().parse_args(argv)
     try:

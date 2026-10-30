@@ -26,15 +26,15 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``read_manif
 from __future__ import annotations
 
 import contextlib
+from dataclasses import asdict, dataclass, field
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import threading
 import time
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import Any, Dict, Iterator, List, Mapping, Optional
+from typing import Any, Iterator, Mapping
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ErrorCode
@@ -86,11 +86,11 @@ def legacy_stem(doi: str) -> str:
     return doi_only(doi).replace("/", "_").replace(".", "_")
 
 
-def legacy_filenames(doi: str) -> List[str]:
+def legacy_filenames(doi: str) -> list[str]:
     """Every PDF filename a legacy cache may have used for ``doi``, lowercased, best first."""
     if not doi_key(doi):
         return []
-    names: List[str] = []
+    names: list[str] = []
     for stem in (f2w_stem(doi), safe_stem(doi), legacy_stem(doi)):
         name = f"{stem}.pdf".lower()
         if name not in names:
@@ -136,17 +136,17 @@ class AdoptReport:
 
     root_id: str
     mode: str
-    adopted: List[str] = field(default_factory=list)
-    already_indexed: List[str] = field(default_factory=list)
-    duplicates: Dict[str, List[str]] = field(default_factory=dict)
-    not_pdf: List[str] = field(default_factory=list)
-    unreadable: List[str] = field(default_factory=list)
-    skipped_symlinks: List[str] = field(default_factory=list)
-    checksum_mismatch: List[str] = field(default_factory=list)
-    missing: List[str] = field(default_factory=list)
+    adopted: list[str] = field(default_factory=list)
+    already_indexed: list[str] = field(default_factory=list)
+    duplicates: dict[str, list[str]] = field(default_factory=dict)
+    not_pdf: list[str] = field(default_factory=list)
+    unreadable: list[str] = field(default_factory=list)
+    skipped_symlinks: list[str] = field(default_factory=list)
+    checksum_mismatch: list[str] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)
     dois_recorded: int = 0
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
@@ -159,17 +159,17 @@ class LegacyIndex:
         path: Index file; defaults to ``<store root>/legacy/index.json``.
     """
 
-    def __init__(self, store: FileDocumentStore, *, path: Optional[Path] = None) -> None:
+    def __init__(self, store: FileDocumentStore, *, path: Path | None = None) -> None:
         self.store = store
         self.path = Path(path) if path is not None else store.root / "legacy" / "index.json"
         self._lock = threading.Lock()
 
     # -- persistence ----------------------------------------------------------------------------
 
-    def _empty(self) -> Dict[str, Any]:
+    def _empty(self) -> dict[str, Any]:
         return {"schema_version": LEGACY_SCHEMA_VERSION, "roots": {}, "files": {}, "dois": {}}
 
-    def read(self) -> Dict[str, Any]:
+    def read(self) -> dict[str, Any]:
         """The index, or an empty one when absent. A corrupt index raises; it is never guessed."""
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -184,7 +184,7 @@ class LegacyIndex:
         return data
 
     @contextlib.contextmanager
-    def _editing(self) -> Iterator[Dict[str, Any]]:
+    def _editing(self) -> Iterator[dict[str, Any]]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._lock, open(self.path.with_suffix(".lock"), "a") as lock_file:
             if fcntl is not None:
@@ -216,7 +216,7 @@ class LegacyIndex:
             data["roots"][root_id] = str(Path(root_path).resolve())
 
     def record(self, root_id: str, relpath: str, asset: StoredAsset, *, doi: str = "",
-               source_url: str = "") -> List[str]:
+               source_url: str = "") -> list[str]:
         """Record one legacy file. Returns other legacy names already holding the same bytes.
 
         Duplicate bytes under another name are recorded, not refused: the same paper
@@ -228,10 +228,10 @@ class LegacyIndex:
             return self._record_into(data, key, asset, doi=doi, source_url=source_url)
 
     @staticmethod
-    def _record_into(data: Dict[str, Any], key: str, asset: StoredAsset, *, doi: str = "",
-                     source_url: str = "") -> List[str]:
+    def _record_into(data: dict[str, Any], key: str, asset: StoredAsset, *, doi: str = "",
+                     source_url: str = "") -> list[str]:
         duplicates = sorted(k for k, row in data["files"].items() if row.get("ref") == asset.ref and k != key)
-        row: Dict[str, Any] = {"ref": asset.ref, "bytes": asset.size, "mode": asset.mode,
+        row: dict[str, Any] = {"ref": asset.ref, "bytes": asset.size, "mode": asset.mode,
                                "recorded_at": time.time()}
         if source_url:
             row["source_url"] = source_url
@@ -262,7 +262,7 @@ class LegacyIndex:
 
     # -- lookup ---------------------------------------------------------------------------------
 
-    def lookup_path(self, root_id: str, relpath: str) -> Optional[str]:
+    def lookup_path(self, root_id: str, relpath: str) -> str | None:
         """Ref recorded for a legacy path (exact, then case-insensitive), else ``None``."""
         key = self.key(root_id, relpath)
         files = self.read()["files"]
@@ -274,11 +274,11 @@ class LegacyIndex:
                 return row["ref"]
         return None
 
-    def refs_for_doi(self, doi: str) -> List[str]:
+    def refs_for_doi(self, doi: str) -> list[str]:
         """Refs recorded for ``doi`` as an alias, in recording order."""
         return list(self.read()["dois"].get(doi_key(doi), []))
 
-    def find_by_doi(self, doi: str) -> Optional[str]:
+    def find_by_doi(self, doi: str) -> str | None:
         """A stored source for ``doi``: a recorded alias, else a legacy filename match.
 
         Tolerates the three historical stem conventions and case (donor
@@ -295,11 +295,11 @@ class LegacyIndex:
                 return row["ref"]
         return None
 
-    def names_for(self, ref: str) -> List[str]:
+    def names_for(self, ref: str) -> list[str]:
         """Every legacy key holding ``ref`` (donor ``duplicate_stems``)."""
         return sorted(k for k, row in self.read()["files"].items() if row.get("ref") == ref)
 
-    def export(self) -> Dict[str, Any]:
+    def export(self) -> dict[str, Any]:
         """The whole reversible mapping, for review or a later approved move."""
         return self.read()
 
@@ -325,7 +325,7 @@ class LegacyIndex:
         self.register_root(root_id, root)
         report = AdoptReport(root_id=root_id, mode=mode)
         indexed = self.read()["files"]
-        pending: List[tuple] = []
+        pending: list[tuple] = []
         for path in sorted(root.rglob(pattern)):
             rel = path.relative_to(root).as_posix()
             key = self.key(root_id, rel)
@@ -372,7 +372,7 @@ class LegacyIndex:
         self.register_root(root_id, root)
         report = AdoptReport(root_id=root_id, mode=mode)
         manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
-        rows: List[Mapping[str, Any]] = []
+        rows: list[Mapping[str, Any]] = []
         for paper in manifest.get("papers") or []:
             rows.append(paper)
             rows.extend(v for v in (paper.get("versions") or []) if isinstance(v, Mapping))
@@ -420,7 +420,7 @@ class LegacyIndex:
 
     # -- reversal -------------------------------------------------------------------------------
 
-    def restore(self, ctx: RequestContext, key: str, *, dest_root: Optional[Path] = None,
+    def restore(self, ctx: RequestContext, key: str, *, dest_root: Path | None = None,
                 overwrite_mismatch: bool = False) -> Path:
         """Write the stored bytes back to the legacy path ``key`` names.
 
@@ -452,10 +452,10 @@ class LegacyIndex:
                 raise StoreError(ErrorCode.CONFLICT, f"{key} holds different bytes", retryable=False)
         return self.store.copy_out(ctx, row["ref"], target, overwrite=True)
 
-    def restore_all(self, ctx: RequestContext, *, dest_root: Optional[Path] = None,
-                    root_id: Optional[str] = None) -> Dict[str, str]:
+    def restore_all(self, ctx: RequestContext, *, dest_root: Path | None = None,
+                    root_id: str | None = None) -> dict[str, str]:
         """Restore every entry (optionally of one root); returns ``key -> outcome``."""
-        outcomes: Dict[str, str] = {}
+        outcomes: dict[str, str] = {}
         for key in sorted(self.read()["files"]):
             if root_id is not None and not key.startswith(f"{root_id}/"):
                 continue

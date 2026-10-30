@@ -20,10 +20,10 @@ checks this), so a central outage can never start a local server.
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Mapping
 
 from .tiled_config import (
     PINNED_TILED_VERSION,
@@ -44,7 +44,7 @@ REQUIRED_MUTATIONS = ("createEntity", "createLink", "updateEntity", "deleteEntit
 REQUIRED_QUERIES = ("entity", "entities", "link", "links")
 
 #: Behaviour of the pinned build that introspection cannot reveal (observed in T20B).
-KNOWN_QUIRKS: Dict[str, Tuple[str, ...]] = {
+KNOWN_QUIRKS: dict[str, tuple[str, ...]] = {
     "0.2.18": (
         # schema.py passes strawberry's UNSET to the store, which checks its own sentinel:
         # updateEntity/updateLink without accessBlob fail with "Type is not JSON
@@ -113,27 +113,27 @@ class CapabilityReport:
     library_version: str
     api_version: Any
     authentication_required: bool
-    providers: Tuple[str, ...]
-    mutations: Tuple[str, ...]
-    queries: Tuple[str, ...]
-    update_entity_fields: Tuple[str, ...]
-    update_link_fields: Tuple[str, ...]
+    providers: tuple[str, ...]
+    mutations: tuple[str, ...]
+    queries: tuple[str, ...]
+    update_entity_fields: tuple[str, ...]
+    update_link_fields: tuple[str, ...]
     entity_properties_updatable: bool
     link_properties_updatable: bool
     writer_checked: bool = False
-    writer_principal: Optional[str] = None
-    writer_roles: Tuple[str, ...] = ()
+    writer_principal: str | None = None
+    writer_roles: tuple[str, ...] = ()
     read_probe: str = "unsigned"
-    quirks: Tuple[str, ...] = ()
+    quirks: tuple[str, ...] = ()
     capability_hash: str = ""
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form (contains no credential)."""
         return asdict(self)
 
 
-def _auth_header(credential: Optional[str], scheme: str) -> Dict[str, str]:
+def _auth_header(credential: str | None, scheme: str) -> dict[str, str]:
     return {"Authorization": f"{scheme} {credential}"} if credential else {}
 
 
@@ -169,8 +169,8 @@ class _Http:
             )
         return resp
 
-    def graphql(self, query: str, variables: Optional[Mapping[str, Any]] = None,
-                headers: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    def graphql(self, query: str, variables: Mapping[str, Any] | None = None,
+                headers: Mapping[str, str] | None = None) -> dict[str, Any]:
         resp = self.request("POST", GRAPHQL_PATH, json={"query": query, "variables": dict(variables or {})},
                             headers=dict(headers or {}))
         if resp.status_code == 404:
@@ -189,7 +189,7 @@ class _Http:
 _INTROSPECT = """query($n: String!) { __type(name: $n) { fields { name } inputFields { name } } }"""
 
 
-def _type_names(http: _Http, name: str, headers: Mapping[str, str]) -> Tuple[str, ...]:
+def _type_names(http: _Http, name: str, headers: Mapping[str, str]) -> tuple[str, ...]:
     body = http.graphql(_INTROSPECT, {"n": name}, headers)
     node = (body.get("data") or {}).get("__type") or {}
     rows = node.get("fields") or node.get("inputFields") or []
@@ -213,9 +213,9 @@ def check_capabilities(
     base_url: str,
     *,
     expected_version: str = PINNED_TILED_VERSION,
-    credential: Optional[str] = None,
+    credential: str | None = None,
     scheme: str = "Apikey",
-    require_writer_role: Optional[str] = None,
+    require_writer_role: str | None = None,
     session: Any = None,
     timeout: float = 10.0,
     verify: Any = True,
@@ -282,8 +282,8 @@ def check_capabilities(
     update_entity = _type_names(http, "UpdateEntityInput", {})
     update_link = _type_names(http, "UpdateLinkInput", {})
 
-    writer_principal: Optional[str] = None
-    writer_roles: Tuple[str, ...] = ()
+    writer_principal: str | None = None
+    writer_roles: tuple[str, ...] = ()
     if credential:
         writer_principal, writer_roles = _check_writer(http, headers, providers, require_writer_role)
 
@@ -323,8 +323,8 @@ def check_capabilities(
     )
 
 
-def _check_writer(http: _Http, headers: Mapping[str, str], providers: Tuple[str, ...],
-                  require_role: Optional[str]) -> Tuple[str, Tuple[str, ...]]:
+def _check_writer(http: _Http, headers: Mapping[str, str], providers: tuple[str, ...],
+                  require_role: str | None) -> tuple[str, tuple[str, ...]]:
     if not providers:
         # Single-user API key mode: tiled 0.2.18 mounts no /auth routes (whoami is 404).
         resp = http.request("GET", METADATA_ROOT_PATH, headers=dict(headers))

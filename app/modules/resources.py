@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 RESOURCE_ROOT_VAR = "F2W_RESOURCE_ROOT"
 _PACKAGE_DIR = Path(__file__).resolve().parents[1]  # app/ in a checkout, site-packages/f2w when installed
@@ -35,7 +35,7 @@ def is_checkout() -> bool:
     return _PACKAGE_DIR.name == "app"
 
 
-def resource_root() -> Optional[Path]:
+def resource_root() -> Path | None:
     """Return the configured resource root, the checkout root, or ``None``."""
     explicit = os.environ.get(RESOURCE_ROOT_VAR, "").strip()
     if explicit:

@@ -12,9 +12,9 @@ Rewritten for F2W (no donor equivalent); the origin/units rules follow the donor
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+import hashlib
+from typing import Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.evidence import EvidenceRef, MatchType, SourceLocator
@@ -23,7 +23,7 @@ ORIGIN = "top-left"
 UNITS = "pt"
 EXTRACTION_VERSION = "t09-figures-1"
 
-Box = Tuple[float, float, float, float]
+Box = tuple[float, float, float, float]
 
 #: Uncertainty codes that make every value of the affected figure/panel withheld.
 BLOCKING = frozenset({
@@ -49,22 +49,22 @@ class Uncertainty:
 
     code: str
     detail: str = ""
-    panel: Optional[str] = None
+    panel: str | None = None
     blocking: bool = False
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {"code": self.code, "detail": self.detail, "panel": self.panel, "blocking": self.blocking}
 
 
-def box4(value: Tuple[float, ...]) -> Box:
+def box4(value: tuple[float, ...]) -> Box:
     """Normalise to ``(x0, y0, x1, y1)`` with ``x0 <= x1`` and ``y0 <= y1``, rounded to 0.01 pt."""
     x0, y0, x1, y1 = (float(v) for v in value)
     return (round(min(x0, x1), 2), round(min(y0, y1), 2), round(max(x0, x1), 2), round(max(y0, y1), 2))
 
 
-def locator(page: Optional[int], figure: Optional[str] = None, panel: Optional[str] = None,
-            bbox: Optional[Box] = None, section: Optional[str] = None) -> SourceLocator:
+def locator(page: int | None, figure: str | None = None, panel: str | None = None,
+            bbox: Box | None = None, section: str | None = None) -> SourceLocator:
     """A :class:`SourceLocator` in the pipeline's fixed frame (units ``pt``, origin ``top-left``)."""
     return SourceLocator(
         page=page, section=section, figure=figure, panel=panel,

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -26,10 +26,10 @@ class RelationRecord:
     relation: str
     related_term: str
     verified: bool = False
-    raw_predicate: Optional[str] = None
+    raw_predicate: str | None = None
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> RelationRecord:
+    def from_dict(cls, d: dict[str, Any]) -> RelationRecord:
         """Construct from a plain dict, defaulting ``verified`` to ``False``."""
         return cls(
             relation=d["relation"],
@@ -54,7 +54,7 @@ class ContextSnippet:
     page: int
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> ContextSnippet:
+    def from_dict(cls, d: dict[str, Any]) -> ContextSnippet:
         """Construct from a plain dict."""
         return cls(text=d["text"], source_paper=d["source_paper"], page=d["page"])
 
@@ -76,11 +76,11 @@ class PropertyRecord:
     value: Any
     unit: str
     context: str
-    uncertainty: Optional[float] = None
+    uncertainty: float | None = None
     verified: bool = True
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> PropertyRecord:
+    def from_dict(cls, d: dict[str, Any]) -> PropertyRecord:
         """Construct from a plain dict, defaulting ``verified`` to ``True``."""
         return cls(
             property=d["property"],
@@ -125,30 +125,30 @@ class TermRecord:
     term: str
     definition: str
     category: str
-    raw_category: Optional[str] = None
-    formula: Optional[str] = None
-    formula_validation: Optional[Dict[str, Any]] = None
-    relations: List[RelationRecord] = field(default_factory=list)
-    pages: List[int] = field(default_factory=list)
-    source_papers: List[str] = field(default_factory=list)
-    context_snippets: List[ContextSnippet] = field(default_factory=list)
-    properties: List[PropertyRecord] = field(default_factory=list)
-    source_metadata: Dict[str, Any] = field(default_factory=dict)
-    publications: List[Dict[str, Any]] = field(default_factory=list)
-    chebi: Optional[Dict[str, Any]] = None
-    smiles: Optional[str] = None
-    charge: Optional[Any] = None
-    inchi: Optional[str] = None
-    inchikey: Optional[str] = None
-    mass: Optional[Any] = None
-    importance: Optional[str] = None  # "high" | "medium" | "low"
+    raw_category: str | None = None
+    formula: str | None = None
+    formula_validation: dict[str, Any] | None = None
+    relations: list[RelationRecord] = field(default_factory=list)
+    pages: list[int] = field(default_factory=list)
+    source_papers: list[str] = field(default_factory=list)
+    context_snippets: list[ContextSnippet] = field(default_factory=list)
+    properties: list[PropertyRecord] = field(default_factory=list)
+    source_metadata: dict[str, Any] = field(default_factory=dict)
+    publications: list[dict[str, Any]] = field(default_factory=list)
+    chebi: dict[str, Any] | None = None
+    smiles: str | None = None
+    charge: Any | None = None
+    inchi: str | None = None
+    inchikey: str | None = None
+    mass: Any | None = None
+    importance: str | None = None  # "high" | "medium" | "low"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain nested dict (via ``dataclasses.asdict``)."""
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> TermRecord:
+    def from_dict(cls, d: dict[str, Any]) -> TermRecord:
         """Build a record from a dict, with defaults for absent optional fields.
 
         Raises:

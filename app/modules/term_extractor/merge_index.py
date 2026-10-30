@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import threading
-from typing import Callable, List, Optional, Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 
@@ -110,7 +110,7 @@ class TermMergeIndex:
         *,
         model_name: str = DEFAULT_EMBED_MODEL,
         top_k: int = DEFAULT_MERGE_TOP_K,
-        encoder: Optional[Encoder] = None,
+        encoder: Encoder | None = None,
         embed_model: object = None,
     ) -> None:
         self.model_name = model_name
@@ -118,10 +118,10 @@ class TermMergeIndex:
         self._encoder = encoder
         self._embed_model = embed_model
         self._lock = threading.Lock()
-        self._names: List[str] = []
+        self._names: list[str] = []
         self._seen: set[str] = set()
         self._index = None
-        self._dim: Optional[int] = None
+        self._dim: int | None = None
 
     @property
     def ntotal(self) -> int:
@@ -172,7 +172,7 @@ class TermMergeIndex:
             self._names.append(cleaned)
             self._seen.add(cleaned)
 
-    def query(self, term: str, k: Optional[int] = None) -> List[str]:
+    def query(self, term: str, k: int | None = None) -> list[str]:
         """Return up to *k* nearest existing display names (not the full vocabulary)."""
         cleaned = clean_term(term)
         if not cleaned:
@@ -184,7 +184,7 @@ class TermMergeIndex:
             snapshot = list(self._names)
             vecs = self._encode_unlocked([cleaned])
             _scores, indices = self._index.search(vecs, min(take, len(snapshot)))
-        out: List[str] = []
+        out: list[str] = []
         seen: set[str] = set()
         for idx in indices[0].tolist():
             if idx < 0 or idx >= len(snapshot):

@@ -13,11 +13,11 @@ als_knowledge_agent/src/als_knowledge_agent/graph/cborg_control.py (``read_contr
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import math
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..jobs.process_support import write_text_atomic
 
@@ -35,9 +35,9 @@ class ResolverSettings:
     """
 
     remote_enabled: bool = False
-    budget_cap_usd: Optional[float] = None
-    local_model: Optional[tuple] = None
-    remote_model: Optional[tuple] = None
+    budget_cap_usd: float | None = None
+    local_model: tuple | None = None
+    remote_model: tuple | None = None
     reserve_usd_per_call: float = 0.05
     timeout_seconds: float = 180.0
     max_attempts: int = 3
@@ -52,16 +52,16 @@ class ResolverSettings:
             raise ValueError("reserve_usd_per_call must be finite and non-negative")
 
     @classmethod
-    def from_control(cls, control: Dict[str, Any], **overrides: Any) -> "ResolverSettings":
+    def from_control(cls, control: dict[str, Any], **overrides: Any) -> ResolverSettings:
         """Build from a control mapping (see :func:`read_control`)."""
         return cls(
             remote_enabled=bool(control.get("enabled")), budget_cap_usd=control.get("budget_cap_usd"), **overrides
         )
 
 
-def read_control(path: Path, *, default_cap: Optional[float] = None) -> Dict[str, Any]:
+def read_control(path: Path, *, default_cap: float | None = None) -> dict[str, Any]:
     """Read saved controls, failing closed (disabled) when the file is missing-valued or invalid."""
-    defaults: Dict[str, Any] = {"enabled": False, "budget_cap_usd": default_cap}
+    defaults: dict[str, Any] = {"enabled": False, "budget_cap_usd": default_cap}
     target = Path(path)
     if not target.exists():
         return defaults
@@ -80,7 +80,7 @@ def read_control(path: Path, *, default_cap: Optional[float] = None) -> Dict[str
         return defaults
 
 
-def write_control(path: Path, *, enabled: bool, budget_cap_usd: Optional[float]) -> None:
+def write_control(path: Path, *, enabled: bool, budget_cap_usd: float | None) -> None:
     """Atomically save a switch or cap change (validate first; the API layer authorizes the caller)."""
     if budget_cap_usd is not None and (not math.isfinite(budget_cap_usd) or budget_cap_usd <= 0):
         raise ValueError("budget_cap_usd must be a positive finite number or None")

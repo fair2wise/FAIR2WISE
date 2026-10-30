@@ -13,7 +13,7 @@ New for F2W (donor ``figure_extraction`` has no table-geometry equivalent); uses
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 from ..contracts.evidence import EvidenceRef, SourceLocator
 from ..literature.parsed_document import ParsedDocument, ParsedTable
@@ -33,7 +33,7 @@ class TableCell:
     text: str
     bbox: Box
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {"row": self.row, "col": self.col, "text": self.text[:MAX_CELL_CHARS], "bbox": list(self.bbox)}
 
@@ -43,18 +43,18 @@ class TableResult:
     """One table with locator, cells and uncertainties."""
 
     table_id: str
-    page: Optional[int]
+    page: int | None
     caption: str
     n_rows: int
     n_cols: int
-    parsed_shape: Tuple[int, int]
+    parsed_shape: tuple[int, int]
     locator: SourceLocator
-    cells: Tuple[TableCell, ...] = ()
+    cells: tuple[TableCell, ...] = ()
     truncated: bool = False
-    uncertainties: Tuple[Uncertainty, ...] = ()
-    evidence: Tuple[EvidenceRef, ...] = field(default_factory=tuple)
+    uncertainties: tuple[Uncertainty, ...] = ()
+    evidence: tuple[EvidenceRef, ...] = field(default_factory=tuple)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form (no CSV asset refs or paths)."""
         return {
             "table_id": self.table_id, "page": self.page, "caption": self.caption[:400],
@@ -70,9 +70,9 @@ def table_id_of(table: ParsedTable, ordinal: int) -> str:
     return table.table_id or f"tbl-p{(table.page or 0):03d}-{ordinal:02d}"
 
 
-def _cells(found: Any) -> Tuple[List[TableCell], int, int]:
+def _cells(found: Any) -> tuple[list[TableCell], int, int]:
     grid = found.extract()
-    cells: List[TableCell] = []
+    cells: list[TableCell] = []
     for r, row in enumerate(found.rows):
         for c, bb in enumerate(row.cells):
             if bb is None:
@@ -88,11 +88,11 @@ def extract_tables(
     *,
     work_id: str = "",
     table_ids: Sequence[str] = (),
-    page: Optional[int] = None,
-) -> List[TableResult]:
+    page: int | None = None,
+) -> list[TableResult]:
     """Cells and locators for the selected tables (all when no selector)."""
     doc = open_pdf(pdf_bytes)
-    out: List[TableResult] = []
+    out: list[TableResult] = []
     sha = document.file_sha256
     try:
         infos = {p.number: p for p in document.pages}
@@ -100,7 +100,7 @@ def extract_tables(
             tid = table_id_of(table, ordinal)
             if (table_ids and tid not in table_ids) or (page is not None and table.page != page):
                 continue
-            unc: List[Uncertainty] = []
+            unc: list[Uncertainty] = []
             shape = (table.n_rows, table.n_cols)
             if table.page is None or not 1 <= table.page <= len(doc):
                 out.append(TableResult(tid, table.page, table.caption, 0, 0, shape,
@@ -119,7 +119,7 @@ def extract_tables(
             if region is None:
                 unc.append(Uncertainty("table_region_unlocated", "no usable table bbox", blocking=True))
             loc = locator(table.page, tid, None, region)
-            cells: List[TableCell] = []
+            cells: list[TableCell] = []
             n_rows = n_cols = 0
             if region is not None and not geo.rotation:
                 import fitz

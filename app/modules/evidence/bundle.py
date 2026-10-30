@@ -32,7 +32,7 @@ back (:meth:`LiteratureEvidenceBundle.from_json`). Importing this module has no 
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Iterable, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -53,7 +53,7 @@ class BundledUncertainty(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    value: Optional[float] = None
+    value: float | None = None
     kind: str = "unknown"
 
 
@@ -81,24 +81,24 @@ class BundledQuantity(BaseModel):
 
     quantity_id: str
     name: str
-    raw_value: Optional[float] = None
+    raw_value: float | None = None
     raw_unit: str = ""
-    value: Optional[float] = None
-    unit: Optional[str] = None
-    dimension: Optional[str] = None
-    conversion_profile: Optional[str] = None
-    conversion_refused: Optional[str] = None
+    value: float | None = None
+    unit: str | None = None
+    dimension: str | None = None
+    conversion_profile: str | None = None
+    conversion_refused: str | None = None
     evidence_source: str
     presented_as: str
     paper_measurement: bool
     uncertainty: BundledUncertainty = Field(default_factory=BundledUncertainty)
-    extraction_confidence: Optional[float] = None
-    evidence_ids: Tuple[str, ...] = ()
+    extraction_confidence: float | None = None
+    evidence_ids: tuple[str, ...] = ()
     sample_id: str = ""
     processing_state: str = ""
     qualitative_value: str = ""
-    derivation: Optional[Dict[str, Any]] = None
-    caveats: Tuple[str, ...] = ()
+    derivation: dict[str, Any] | None = None
+    caveats: tuple[str, ...] = ()
     status: str = "candidate"
 
 
@@ -123,18 +123,18 @@ class BundledEvidence(BaseModel):
 
     evidence_id: str
     source_version: str
-    source_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    page: Optional[int] = None
-    section: Optional[str] = None
-    char_span: Optional[Tuple[int, int]] = None
+    source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    page: int | None = None
+    section: str | None = None
+    char_span: tuple[int, int] | None = None
     section_label: str = ""
     located_by: str = "none"
     match_type: str = MatchType.NONE.value
     verified_quote_match: bool = False
-    quote: Optional[str] = None
-    parser_revision: Optional[str] = None
+    quote: str | None = None
+    parser_revision: str | None = None
     strategy: str = ""
-    caveats: Tuple[str, ...] = ()
+    caveats: tuple[str, ...] = ()
     status: str = "candidate"
 
 
@@ -159,17 +159,17 @@ class LiteratureEvidenceBundle(BaseModel):
 
     bundle_version: int = BUNDLE_VERSION
     work_id: str
-    source_version: Optional[str] = None
-    source_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    source_versions: Tuple[str, ...] = ()
-    parser: Dict[str, Any] = Field(default_factory=dict)
-    quantities: Tuple[BundledQuantity, ...] = ()
-    evidence: Dict[str, BundledEvidence] = Field(default_factory=dict)
-    caveats: Tuple[str, ...] = ()
+    source_version: str | None = None
+    source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    source_versions: tuple[str, ...] = ()
+    parser: dict[str, Any] = Field(default_factory=dict)
+    quantities: tuple[BundledQuantity, ...] = ()
+    evidence: dict[str, BundledEvidence] = Field(default_factory=dict)
+    caveats: tuple[str, ...] = ()
     status: str = "candidate"
 
     @property
-    def evidence_ids(self) -> List[str]:
+    def evidence_ids(self) -> list[str]:
         """Evidence ids in sorted order (stable across SDK and JSON)."""
         return sorted(self.evidence)
 
@@ -178,7 +178,7 @@ class LiteratureEvidenceBundle(BaseModel):
         """No quantity and no evidence for the Work."""
         return not self.quantities and not self.evidence
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return self.model_dump(mode="json")
 
@@ -188,18 +188,18 @@ class LiteratureEvidenceBundle(BaseModel):
         return json.dumps(self.to_dict(), **kw)
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "LiteratureEvidenceBundle":
+    def from_dict(cls, data: Mapping[str, Any]) -> LiteratureEvidenceBundle:
         """Validate a bundle from its JSON-ready form."""
         return cls.model_validate(dict(data))
 
     @classmethod
-    def from_json(cls, text: str) -> "LiteratureEvidenceBundle":
+    def from_json(cls, text: str) -> LiteratureEvidenceBundle:
         """Validate a bundle from JSON text."""
         return cls.model_validate_json(text)
 
 
 def _quantity(record: QuantityRecord) -> BundledQuantity:
-    caveats: List[str] = [m.value for m in record.missing]
+    caveats: list[str] = [m.value for m in record.missing]
     caveats.extend(f"tag_reason:{r}" for r in record.tag_reasons)
     proposed = record.proposed_evidence_source
     if proposed is not None and proposed is not record.evidence_source:
@@ -225,7 +225,7 @@ def _quantity(record: QuantityRecord) -> BundledQuantity:
 
 def _evidence(record: EvidenceRecord, *, include_quotes: bool) -> BundledEvidence:
     ref = record.ref
-    caveats: List[str] = [m.value for m in record.missing]
+    caveats: list[str] = [m.value for m in record.missing]
     if record.caveat:
         caveats.append(record.caveat)
     if ref.match_type is MatchType.PARAPHRASE:
@@ -256,14 +256,14 @@ def build_bundle(
                               key=lambda q: q.quantity_id)
     evidence_records = {eid: rec for eid, rec in evidence.items() if rec.ref.work_id == work_id}
     versions = sorted({rec.ref.source_version for rec in evidence_records.values()})
-    caveats: List[str] = [_CANDIDATE_CAVEAT, _QUOTES_PRIVATE_CAVEAT if include_quotes else _QUOTES_OMITTED_CAVEAT]
+    caveats: list[str] = [_CANDIDATE_CAVEAT, _QUOTES_PRIVATE_CAVEAT if include_quotes else _QUOTES_OMITTED_CAVEAT]
     source_version = versions[0] if len(versions) == 1 else None
     if len(versions) > 1:
         caveats.append(f"evidence spans {len(versions)} source versions; records are listed, not merged")
     digests = sorted({rec.ref.source_sha256 for rec in evidence_records.values() if rec.ref.source_sha256})
     source_sha256 = digests[0] if len(digests) == 1 else None
     parsers = [rec.parser for rec in evidence_records.values() if rec.parser]
-    parser: Dict[str, Any] = dict(parsers[0]) if parsers and all(p == parsers[0] for p in parsers) else {}
+    parser: dict[str, Any] = dict(parsers[0]) if parsers and all(p == parsers[0] for p in parsers) else {}
     dangling = sorted({eid for q in quantity_records for eid in q.evidence_ids if eid not in evidence_records})
     if dangling:
         caveats.append(f"{len(dangling)} cited evidence id(s) not in the source: {', '.join(dangling[:5])}")
@@ -277,7 +277,7 @@ def build_bundle(
     )
 
 
-def bundle_work_ids(evidence: Mapping[str, EvidenceRecord], quantities: Mapping[str, QuantityRecord]) -> List[str]:
+def bundle_work_ids(evidence: Mapping[str, EvidenceRecord], quantities: Mapping[str, QuantityRecord]) -> list[str]:
     """Work ids present in the records, sorted."""
     ids: Iterable[str] = (*(r.ref.work_id for r in evidence.values()), *(q.work_id for q in quantities.values()))
     return sorted(set(ids))

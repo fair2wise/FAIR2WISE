@@ -26,7 +26,11 @@ from types import MappingProxyType
 from typing import Mapping
 
 from .contract import (
-    EXTRACTION_CONTRACT_VERSION, ChunkCoverage, ExtractedMention, ExtractionResult, ExtractionSource,
+    EXTRACTION_CONTRACT_VERSION,
+    ChunkCoverage,
+    ExtractedMention,
+    ExtractionResult,
+    ExtractionSource,
     compare_results,
 )
 from .strategies import DEFAULT_STRATEGY, OPTIONAL_STRATEGIES, run_strategies, strategy_class

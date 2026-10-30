@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Sequence
 
 from ..evidence.records import ReportedQuantity
 from ..literature.parsed_document import ParsedDocument
@@ -45,16 +45,16 @@ class ExtractionSource:
     """
 
     work_id: str
-    document: Optional[ParsedDocument] = None
-    pdf_path: Optional[str] = None
-    page_texts: Tuple[str, ...] = ()
+    document: ParsedDocument | None = None
+    pdf_path: str | None = None
+    page_texts: tuple[str, ...] = ()
     filename: str = ""
     pub_meta: Mapping[str, Any] = field(default_factory=dict)
     title: str = ""
 
-    def sections(self) -> Dict[str, str]:
+    def sections(self) -> dict[str, str]:
         """``{section name: stored text}`` in document order (names de-duplicated)."""
-        out: Dict[str, str] = {}
+        out: dict[str, str] = {}
         for index, section in enumerate(self.document.sections if self.document else ()):
             name = section.name or f"section-{index:05d}"
             if name in out:
@@ -79,13 +79,13 @@ class ChunkCoverage:
     """
 
     chunk_id: str
-    section: Optional[str]
-    start: Optional[int]
-    end: Optional[int]
-    ok: Optional[bool]
+    section: str | None
+    start: int | None
+    end: int | None
+    ok: bool | None
     extracted_by: str
-    error: Optional[str] = None
-    reason: Optional[str] = None
+    error: str | None = None
+    reason: str | None = None
     settings: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -109,9 +109,9 @@ class ExtractedMention:
     category: str
     canonical: bool = False
     slug: str = ""
-    section: Optional[str] = None
-    page: Optional[int] = None
-    chunk_id: Optional[str] = None
+    section: str | None = None
+    page: int | None = None
+    chunk_id: str | None = None
     quote: str = ""
     extracted_by: str = ""
     attributes: Mapping[str, Any] = field(default_factory=dict)
@@ -124,25 +124,25 @@ class ExtractionResult:
     strategy: str
     strategy_version: str
     work_id: str
-    source_version: Optional[str]
-    parser_revision: Optional[str]
+    source_version: str | None
+    parser_revision: str | None
     complete: bool
-    mentions: Tuple[ExtractedMention, ...] = ()
-    observations: Tuple[ReportedQuantity, ...] = ()
-    coverage: Tuple[ChunkCoverage, ...] = ()
+    mentions: tuple[ExtractedMention, ...] = ()
+    observations: tuple[ReportedQuantity, ...] = ()
+    coverage: tuple[ChunkCoverage, ...] = ()
     side_outputs: Mapping[str, Any] = field(default_factory=dict)
     unmapped: Mapping[str, Any] = field(default_factory=dict)
     inference: Mapping[str, Any] = field(default_factory=dict)
     contract_version: str = EXTRACTION_CONTRACT_VERSION
 
     @property
-    def incomplete_chunks(self) -> Tuple[str, ...]:
+    def incomplete_chunks(self) -> tuple[str, ...]:
         """Chunk ids that failed and need a retry (for staging ``incomplete_chunks``)."""
         return tuple(c.chunk_id for c in self.coverage if c.ok is False)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Small comparison summary (counts by category, completeness)."""
-        by_category: Dict[str, int] = {}
+        by_category: dict[str, int] = {}
         for mention in self.mentions:
             by_category[mention.category] = by_category.get(mention.category, 0) + 1
         return {
@@ -158,7 +158,7 @@ def frozen_copy(value: Any) -> Any:
     return copy.deepcopy(value)
 
 
-def compare_results(results: Sequence[ExtractionResult]) -> Dict[str, Any]:
+def compare_results(results: Sequence[ExtractionResult]) -> dict[str, Any]:
     """Side-by-side comparison of strategies run on the same source.
 
     Reports surfaces per strategy and their overlap (case-folded). It is a review

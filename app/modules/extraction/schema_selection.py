@@ -15,7 +15,7 @@ free of schema loading.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Sequence
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
 
@@ -31,7 +31,7 @@ def _record_id(index: int, name: str) -> str:
 
 
 def validation_from_quantities(
-    accepted: Sequence[Tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
+    accepted: Sequence[tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
 ) -> Any:
     """A :class:`~.record_validation.DocumentValidation` of observations for accepted quantities.
 
@@ -74,7 +74,7 @@ def map_to_schema_set(
     schema_id: str = DEFAULT_MAPPING_SCHEMA,
     allow_pending_review: bool = False,
     registry: Any = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Map accepted records onto ``schema_id@schema_set`` (explicit selection only).
 
     Raises:

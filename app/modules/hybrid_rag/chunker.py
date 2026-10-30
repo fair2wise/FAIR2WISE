@@ -1,10 +1,10 @@
 """Page-aware PDF chunks and heading-aware ops-doc chunks."""
 from __future__ import annotations
 
-import re
 from html import unescape
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+import re
+from typing import Any, Iterable
 
 CHUNKER_VERSION = "1.0.0"
 WINDOW_CHARS = 1200
@@ -15,13 +15,13 @@ _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"[ \t]+\n")
 
 
-def _windows(text: str, size: int = WINDOW_CHARS, overlap: int = WINDOW_OVERLAP) -> List[str]:
+def _windows(text: str, size: int = WINDOW_CHARS, overlap: int = WINDOW_OVERLAP) -> list[str]:
     cleaned = re.sub(r"\s+", " ", (text or "").strip())
     if not cleaned:
         return []
     if len(cleaned) <= size:
         return [cleaned]
-    out: List[str] = []
+    out: list[str] = []
     start = 0
     step = max(1, size - overlap)
     while start < len(cleaned):
@@ -42,8 +42,8 @@ def chunk_pdf(
     work_id: str,
     doc_id: str,
     corpus: str = "literature",
-    extra: Optional[Dict[str, Any]] = None,
-) -> List[Dict[str, Any]]:
+    extra: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Split one PDF into page-aware windows. Missing/unreadable files yield []."""
     extra = extra or {}
     try:
@@ -59,7 +59,7 @@ def chunk_pdf(
         doc = fitz.open(str(pdf))
     except Exception:
         return []
-    chunks: List[Dict[str, Any]] = []
+    chunks: list[dict[str, Any]] = []
     try:
         for page_no, page in enumerate(doc, start=1):
             try:
@@ -92,8 +92,8 @@ def chunk_text_document(
     doc_id: str,
     corpus: str = "bl1101",
     url: str = "",
-    extra: Optional[Dict[str, Any]] = None,
-) -> List[Dict[str, Any]]:
+    extra: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Heading-aware chunks for HTML/Markdown/plain ops docs."""
     extra = dict(extra or {})
     if url:
@@ -112,7 +112,7 @@ def chunk_text_document(
         sections = _markdown_sections(raw)
     else:
         sections = [("", raw)]
-    chunks: List[Dict[str, Any]] = []
+    chunks: list[dict[str, Any]] = []
     line_cursor = 1
     for heading, body in sections:
         body_text = body.strip()
@@ -144,16 +144,16 @@ def chunk_text_document(
 def _chunk_record(
     *,
     corpus: str,
-    work_id: Optional[str],
+    work_id: str | None,
     doc_id: str,
     path: str,
-    page: Optional[int],
+    page: int | None,
     locator: str,
     heading: str,
     text: str,
     chunk_index: int,
-    extra: Dict[str, Any],
-) -> Dict[str, Any]:
+    extra: dict[str, Any],
+) -> dict[str, Any]:
     page_part = f"p{page}" if page is not None else "doc"
     slug_heading = re.sub(r"[^a-z0-9]+", "-", (heading or "body").lower()).strip("-") or "body"
     chunk_id = f"{corpus}:{doc_id}:{page_part}:{slug_heading}:c{chunk_index}"
@@ -179,11 +179,11 @@ def _chunk_record(
     return rec
 
 
-def _markdown_sections(raw: str) -> List[tuple[str, str]]:
+def _markdown_sections(raw: str) -> list[tuple[str, str]]:
     matches = list(_HEADING_RE.finditer(raw or ""))
     if not matches:
         return [("", raw or "")]
-    sections: List[tuple[str, str]] = []
+    sections: list[tuple[str, str]] = []
     if matches[0].start() > 0:
         preamble = raw[: matches[0].start()].strip()
         if preamble:
@@ -196,7 +196,7 @@ def _markdown_sections(raw: str) -> List[tuple[str, str]]:
     return sections or [("", raw or "")]
 
 
-def _html_sections(raw: str) -> List[tuple[str, str]]:
+def _html_sections(raw: str) -> list[tuple[str, str]]:
     try:
         from lxml import html as lhtml
     except Exception:
@@ -205,9 +205,9 @@ def _html_sections(raw: str) -> List[tuple[str, str]]:
         tree = lhtml.fromstring(raw.encode("utf-8", errors="replace"))
     except Exception:
         return [("", _strip_html(raw))]
-    sections: List[tuple[str, str]] = []
+    sections: list[tuple[str, str]] = []
     current_heading = ""
-    buf: List[str] = []
+    buf: list[str] = []
 
     def flush() -> None:
         text = " ".join(part.strip() for part in buf if part and part.strip())
@@ -231,6 +231,6 @@ def _html_sections(raw: str) -> List[tuple[str, str]]:
     return sections or [("", _strip_html(raw))]
 
 
-def iter_nonempty(chunks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def iter_nonempty(chunks: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return the chunks whose ``text`` is non-blank, as a list."""
     return [chunk for chunk in chunks if str(chunk.get("text") or "").strip()]

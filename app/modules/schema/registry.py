@@ -25,10 +25,10 @@ bound to a pre-S4 fingerprint is still recognised (``closure_fingerprint(entry, 
 """
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
+import hashlib
 from pathlib import Path
-from typing import Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Iterator, Mapping, Sequence
 
 import yaml
 
@@ -66,7 +66,7 @@ _SELECTABLE = {
     "xray_schema_extract": ("extraction",),
 }
 
-KNOWN_ISSUES: Dict[str, Tuple[str, ...]] = {
+KNOWN_ISSUES: dict[str, tuple[str, ...]] = {
     "rsoxs_schema_extract": (
         "F1: redeclares RSoXSMeasurement with slots photon_energy_eV/absorption_edge/polarization that are "
         "undefined in its closure; SchemaView.class_induced_slots('RSoXSMeasurement') raises ValueError "
@@ -99,7 +99,7 @@ LICENCE_BLOCK = (
 )
 
 
-def pre_s4_bytes(data: bytes) -> Optional[bytes]:
+def pre_s4_bytes(data: bytes) -> bytes | None:
     """The bytes ``data`` had before the S4 licence change, or ``None`` if it never had that line.
 
     Exactly one :data:`LICENCE_BLOCK` must be present; it is replaced by :data:`PRE_S4_LICENCE_LINE`.
@@ -123,7 +123,7 @@ class SchemaSet:
 
     version: str
     directory: str
-    members: Tuple[str, ...]
+    members: tuple[str, ...]
     review_status: str
     review_doc: str
 
@@ -137,7 +137,7 @@ class SchemaSet:
 #: T22D (owner decisions D1.3/D1.4, O-S2 2026-10-30): 0.3.0 plus ``normalized_value``/``normalized_unit``/
 #: ``conversion_factor``/``conversion_profile`` on QuantityValue, and bl1101_v3 (mapping table onto Sample/Instrument).
 #: Additive over 0.3.0; pending the owner's review of its diff. The xray schemas stay on the base set.
-SCHEMA_SETS: Tuple[SchemaSet, ...] = (
+SCHEMA_SETS: tuple[SchemaSet, ...] = (
     SchemaSet(version="0.3.0", directory="v0.3.0", members=("matkg_schema", "rsoxs_schema"),
               review_status=REVIEW_PENDING, review_doc="docs/migration/reviews/H3/schema_diff_T22C.md"),
     SchemaSet(version="0.3.1", directory="v0.3.1", members=("matkg_schema", "rsoxs_schema", "bl1101_schema"),
@@ -166,7 +166,7 @@ class EntrypointDefault:
     normalizer: str
 
 
-ENTRYPOINT_DEFAULTS: Tuple[EntrypointDefault, ...] = (
+ENTRYPOINT_DEFAULTS: tuple[EntrypointDefault, ...] = (
     EntrypointDefault("compose-stack", "compose.yaml", "F2W_SCHEMA: storage/schema/rsoxs_schema.yaml",
                       "rsoxs_schema", "env", NORMALIZER_TERM_EXTRACTOR),
     EntrypointDefault("rsoxs-stack-script", "scripts/start_rsoxs_stack.sh",
@@ -208,7 +208,7 @@ class RegistryKey:
     """Identity of one registered asset version."""
 
     schema_id: str
-    version: Optional[str]
+    version: str | None
     content_fingerprint: str
 
 
@@ -240,18 +240,18 @@ class SchemaEntry:
     path: str
     abs_path: Path
     classification: str
-    version: Optional[str]
-    linkml_name: Optional[str]
-    linkml_id: Optional[str]
-    declared_imports: Tuple[str, ...]
+    version: str | None
+    linkml_name: str | None
+    linkml_id: str | None
+    declared_imports: tuple[str, ...]
     sha256: str
     size_bytes: int
-    selectable_for: Tuple[str, ...] = ()
-    known_issues: Tuple[str, ...] = ()
-    schema_set: Optional[str] = None
+    selectable_for: tuple[str, ...] = ()
+    known_issues: tuple[str, ...] = ()
+    schema_set: str | None = None
     review_status: str = REVIEW_IN_USE
-    base_id: Optional[str] = None
-    pre_s4_sha256: Optional[str] = None
+    base_id: str | None = None
+    pre_s4_sha256: str | None = None
 
     @property
     def pending_review(self) -> bool:
@@ -289,14 +289,14 @@ def _classify(stem: str, doc: Mapping) -> str:
     return CLASS_UNCLASSIFIED
 
 
-def _entry_from_file(path: Path, schema_set: Optional[SchemaSet] = None) -> SchemaEntry:
+def _entry_from_file(path: Path, schema_set: SchemaSet | None = None) -> SchemaEntry:
     data = path.read_bytes()
     doc = yaml.safe_load(data.decode("utf-8"))
     doc = doc if isinstance(doc, dict) else {}
     stem = path.stem
     classification = _classify(stem, doc)
     linkml = classification in LINKML_CLASSES
-    selectable: Tuple[str, ...] = () if stem in KNOWN_BROKEN else _SELECTABLE.get(stem, ())
+    selectable: tuple[str, ...] = () if stem in KNOWN_BROKEN else _SELECTABLE.get(stem, ())
     version = doc.get("version") if linkml else None
     before = pre_s4_bytes(data)
     rel = f"{SCHEMA_REL_DIR}/{schema_set.directory}/{path.name}" if schema_set else f"{SCHEMA_REL_DIR}/{path.name}"
@@ -316,8 +316,8 @@ def _entry_from_file(path: Path, schema_set: Optional[SchemaSet] = None) -> Sche
     )
 
 
-def _set_entries(base: Path, sets: Sequence[SchemaSet]) -> Dict[str, SchemaEntry]:
-    out: Dict[str, SchemaEntry] = {}
+def _set_entries(base: Path, sets: Sequence[SchemaSet]) -> dict[str, SchemaEntry]:
+    out: dict[str, SchemaEntry] = {}
     for schema_set in sets:
         directory = base / schema_set.directory
         if not directory.is_dir():
@@ -339,11 +339,11 @@ class SchemaRegistry:
     """
 
     schema_dir: Path
-    entries: Dict[str, SchemaEntry] = field(default_factory=dict)
+    entries: dict[str, SchemaEntry] = field(default_factory=dict)
     version: str = REGISTRY_VERSION
 
     @classmethod
-    def discover(cls, schema_dir: Optional[Path] = None) -> "SchemaRegistry":
+    def discover(cls, schema_dir: Path | None = None) -> SchemaRegistry:
         """Register every ``*.yaml`` in ``schema_dir`` (default: the packaged ``storage/schema``).
 
         The directory is resolved like every other schema path (CWD-independent, ``F2W_RESOURCE_ROOT``).
@@ -354,11 +354,11 @@ class SchemaRegistry:
         entries.update(_set_entries(base, SCHEMA_SETS))
         return cls(schema_dir=base, entries=entries)
 
-    def base_entries(self) -> List[SchemaEntry]:
+    def base_entries(self) -> list[SchemaEntry]:
         """Entries of the base set (what every default path uses)."""
         return [e for e in self if e.schema_set is None]
 
-    def set_entries(self, version: str) -> List[SchemaEntry]:
+    def set_entries(self, version: str) -> list[SchemaEntry]:
         """Entries of one schema set, in member order."""
         return [e for e in self if e.schema_set == version]
 
@@ -373,7 +373,7 @@ class SchemaRegistry:
         except KeyError:
             raise RegistryError(f"schema {schema_id!r} is not registered") from None
 
-    def resolve(self, path_or_id: object) -> Optional[SchemaEntry]:
+    def resolve(self, path_or_id: object) -> SchemaEntry | None:
         """Entry for an id, file name or a ``.../storage/schema/<file>`` path; ``None`` if unregistered.
 
         Unknown paths keep working for callers as "unregistered" (ADR 2.2); the registry never guesses.
@@ -403,7 +403,7 @@ class SchemaRegistry:
                 return None  # same name, different bytes: a different, unregistered asset
         return entry
 
-    def for_graph(self, graph_path: str, schema_set: Optional[str] = None) -> Optional[SchemaEntry]:
+    def for_graph(self, graph_path: str, schema_set: str | None = None) -> SchemaEntry | None:
         """Overlay for a KG file name, reusing ``multi_kg.schema_path_for_graph`` (filename patterns).
 
         With ``schema_set`` (an explicit selection, never a default), the set's version of that overlay is
@@ -442,20 +442,20 @@ class SchemaRegistry:
             raise RegistryError(f"{entry.path} is not selectable for {purpose!r}")
         return entry
 
-    def by_fingerprint(self, content_fingerprint: str) -> List[SchemaEntry]:
+    def by_fingerprint(self, content_fingerprint: str) -> list[SchemaEntry]:
         """Entries whose file bytes hash to ``content_fingerprint``."""
         return [e for e in self if e.sha256 == content_fingerprint]
 
-    def id_collisions(self, schema_set: Optional[str] = None) -> Dict[str, List[str]]:
+    def id_collisions(self, schema_set: str | None = None) -> dict[str, list[str]]:
         """LinkML ``name`` values declared by more than one asset of one schema set (F1).
 
         A later version of a schema in another set shares its name on purpose and is not a collision.
         """
-        seen: Dict[str, List[str]] = {}
+        seen: dict[str, list[str]] = {}
         for entry in self:
             if entry.linkml_name and entry.schema_set == schema_set:
                 seen.setdefault(entry.linkml_name, []).append(entry.schema_id)
         return {k: v for k, v in seen.items() if len(v) > 1}
 
 
-SCHEMA_SET_DOCS: Dict[str, str] = {s.version: s.review_doc for s in SCHEMA_SETS}
+SCHEMA_SET_DOCS: dict[str, str] = {s.version: s.review_doc for s in SCHEMA_SETS}

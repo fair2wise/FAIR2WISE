@@ -16,9 +16,9 @@ simply a process that stops: the lease expires and another owner resumes from th
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+import logging
+from typing import Any, Callable, Mapping, Sequence
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
@@ -84,7 +84,7 @@ class JobInterrupted(Exception):
 class QuarantineStage(Exception):
     """The stage's output must not be used; stage -> ``quarantined`` with a reason."""
 
-    def __init__(self, reason: str, detail: Optional[Mapping[str, Any]] = None) -> None:
+    def __init__(self, reason: str, detail: Mapping[str, Any] | None = None) -> None:
         super().__init__(reason)
         self.reason = reason
         self.detail = dict(detail or {})
@@ -103,15 +103,15 @@ class StageResult:
             stage fails (retryable) and publication stays blocked.
     """
 
-    effects: Tuple[str, ...] = ()
-    artifact_refs: Tuple[str, ...] = ()
+    effects: tuple[str, ...] = ()
+    artifact_refs: tuple[str, ...] = ()
     progress: Mapping[str, int] = field(default_factory=dict)
     data: Mapping[str, Any] = field(default_factory=dict)
-    incomplete: Tuple[str, ...] = ()
+    incomplete: tuple[str, ...] = ()
 
 
 StageRun = Callable[["StageContext"], StageResult]
-StageVerify = Callable[["StageContext", StageResult], Optional[str]]
+StageVerify = Callable[["StageContext", StageResult], str | None]
 
 
 @dataclass(frozen=True)
@@ -134,11 +134,11 @@ class StageSpec:
     name: str
     run: StageRun
     phase: str = "other"
-    depends_on: Tuple[str, ...] = ()
-    relevant: Tuple[str, ...] = ("corpus_scope",)
-    params_keys: Tuple[str, ...] = ()
-    verify: Optional[StageVerify] = None
-    required_capability: Optional[str] = None
+    depends_on: tuple[str, ...] = ()
+    relevant: tuple[str, ...] = ("corpus_scope",)
+    params_keys: tuple[str, ...] = ()
+    verify: StageVerify | None = None
+    required_capability: str | None = None
     always_run: bool = False
 
 
@@ -157,22 +157,22 @@ class Pipeline:
             if spec.phase not in PHASES:
                 raise ValueError(f"unknown phase {spec.phase}")
             seen.add(spec.name)
-        self.specs: Tuple[StageSpec, ...] = tuple(specs)
-        self._by_name: Dict[str, StageSpec] = {s.name: s for s in specs}
+        self.specs: tuple[StageSpec, ...] = tuple(specs)
+        self._by_name: dict[str, StageSpec] = {s.name: s for s in specs}
 
     def __getitem__(self, name: str) -> StageSpec:
         return self._by_name[name]
 
-    def keys(self, inputs: OperationInputs) -> Dict[str, str]:
+    def keys(self, inputs: OperationInputs) -> dict[str, str]:
         """Operation key of every stage for ``inputs`` (upstream keys chained in)."""
-        keys: Dict[str, str] = {}
+        keys: dict[str, str] = {}
         for spec in self.specs:
             keys[spec.name] = stage_key(
                 inputs, spec.name, spec.relevant, {d: keys[d] for d in spec.depends_on}, spec.params_keys
             )
         return keys
 
-    def downstream(self, name: str) -> List[str]:
+    def downstream(self, name: str) -> list[str]:
         """``name`` and every stage that (transitively) consumes it."""
         out = {name}
         for spec in self.specs:
@@ -196,10 +196,10 @@ class StageContext:
         spec: StageSpec,
         op_key: str,
         *,
-        authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None,
+        authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
         admission: Any = None,
-        extra: Optional[Mapping[str, Any]] = None,
-        interrupt: Optional[Any] = None,
+        extra: Mapping[str, Any] | None = None,
+        interrupt: Any | None = None,
     ) -> None:
         self.store = store
         self.lease = lease
@@ -244,7 +244,7 @@ class StageContext:
         self.guard()
         self.store.update_progress(self.lease, self.job.job_id, self.stage, counters)
 
-    def unit(self, unit_id: str, unit_key: str) -> Optional[Dict[str, Any]]:
+    def unit(self, unit_id: str, unit_key: str) -> dict[str, Any] | None:
         """A previously settled, still compatible unit result (for example an extracted chunk)."""
         return self.store.get_unit(self.job.job_id, self.stage, unit_id, unit_key)
 
@@ -261,8 +261,8 @@ class StageContext:
         self,
         effect_id: str,
         effect: Callable[[], Mapping[str, Any]],
-        reconcile: Optional[Callable[[], Optional[Mapping[str, Any]]]] = None,
-    ) -> Dict[str, Any]:
+        reconcile: Callable[[], Mapping[str, Any] | None] | None = None,
+    ) -> dict[str, Any]:
         """Perform an effect at most once per stable ID, reconciling after a crash.
 
         ``done`` returns the stored result. ``intent`` means an earlier run may have crashed
@@ -289,11 +289,11 @@ class PipelineRunner:
         store: JobStore,
         pipeline: Pipeline,
         *,
-        authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None,
+        authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
         admission: Any = None,
-        extra: Optional[Mapping[str, Any]] = None,
-        on_denied: Optional[Callable[[JobRecord, str], None]] = None,
-        interrupt: Optional[Any] = None,
+        extra: Mapping[str, Any] | None = None,
+        on_denied: Callable[[JobRecord, str], None] | None = None,
+        interrupt: Any | None = None,
     ) -> None:
         self._interrupt = interrupt
         self.store = store
@@ -313,7 +313,7 @@ class PipelineRunner:
         keys = self.pipeline.keys(job.inputs)
         stored = {s.stage: s for s in self.store.stages(job_id)}
         stage_name = "job"
-        current: Dict[str, str] = {"stage": "job"}  # the stage a pause or stop is attributed to
+        current: dict[str, str] = {"stage": "job"}  # the stage a pause or stop is attributed to
         # A per-run authority (``JobAuthority.for_job``) keeps its stop across the run's stages.
         authority = self._authority
         begin = getattr(authority, "for_job", None)
@@ -378,9 +378,9 @@ class PipelineRunner:
             self.store.set_state(lease, job_id, pause.state, stage=stage_name, reason=pause.reason)
             return pause.state
 
-    def _run_stages(self, lease: Lease, job: JobRecord, keys: Dict[str, str],
-                    authority: Optional[Callable[[JobRecord, Sequence[str]], Any]],
-                    current: Dict[str, str]) -> None:
+    def _run_stages(self, lease: Lease, job: JobRecord, keys: dict[str, str],
+                    authority: Callable[[JobRecord, Sequence[str]], Any] | None,
+                    current: dict[str, str]) -> None:
         """One pass over the stages: reuse compatible completed ones, run the rest in order."""
         job_id = job.job_id
         for position, spec in enumerate(self.pipeline.specs):
@@ -420,7 +420,7 @@ class PipelineRunner:
         self, lease: Lease, job: JobRecord, keys: Mapping[str, str], stored: Mapping[str, Any]
     ) -> None:
         """Invalidate only stages whose key changed, plus the stages downstream of them."""
-        stale: List[str] = []
+        stale: list[str] = []
         for spec in self.pipeline.specs:
             row = stored.get(spec.name)
             if row is not None and row.op_key and row.op_key != keys[spec.name]:
@@ -430,7 +430,7 @@ class PipelineRunner:
             self.store.invalidate(lease, job.job_id, ordered, "inputs changed; recomputing affected stages only")
 
     def _run_stage(self, lease: Lease, job: JobRecord, spec: StageSpec, position: int, key: str,
-                   authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None) -> None:
+                   authority: Callable[[JobRecord, Sequence[str]], Any] | None = None) -> None:
         job_id = job.job_id
         ctx = StageContext(
             self.store,
@@ -559,7 +559,7 @@ class PipelineRunner:
         if self._on_denied is not None:
             self._on_denied(job, str(exc))
 
-    def publication_blockers(self, job_id: str) -> List[str]:
+    def publication_blockers(self, job_id: str) -> list[str]:
         """Reasons the job's output may not be published: any stage not completed or compatible."""
         bad = [
             f"{s.stage}:{s.status.value}"

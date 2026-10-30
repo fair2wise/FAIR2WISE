@@ -1,4 +1,3 @@
-app/modules/agents/chebi.py F401 'typing.Tuple' imported but unused
 app/modules/agents/properties.py F841 local variable 'target_unit' is assigned to but never used
 app/modules/extract_terms.py F541 f-string is missing placeholders
 app/modules/f2w_agent/api.py F401 '.multi_kg.DEFAULT_JSON_GRAPH' imported but unused
@@ -17,7 +16,6 @@ app/modules/f2w_agent/coordinator.py F401 '.extractor_agent.ExtractorAgent' impo
 app/modules/f2w_agent/coordinator.py F401 '.retrieval_agent.RetrievalAgent' imported but unused
 app/modules/f2w_agent/session_memory.py F841 local variable 'current_id' is assigned to but never used
 app/modules/graph/adoption.py F401 '.snapshots.graph_id_for_snapshot' imported but unused
-app/modules/hybrid_rag/context.py F401 'typing.Optional' imported but unused
 app/modules/term_extractor/academy_agent.py F401 'academy.agent.Agent' imported but unused
 app/modules/term_extractor/monitored_agent.py F821 undefined name 'UserAgent'
 app/modules/term_extractor/orchestrator.py F401 '.services.Services' imported but unused

@@ -1,11 +1,11 @@
 """Hybrid source RAG facade: index builders + retrieve/rank/pack."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import logging
 import os
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 from .chunker import CHUNKER_VERSION, chunk_pdf, chunk_text_document, iter_nonempty
 from .context import ContextBuilder
@@ -27,10 +27,10 @@ DEFAULT_OPS_INDEX = "storage/source_index/ops_bl1101"
 
 
 def _utcnow() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def literature_index_root(root: Optional[Path] = None) -> Path:
+def literature_index_root(root: Path | None = None) -> Path:
     """Return the literature index directory.
 
     The HYBRID_RAG_LITERATURE_INDEX environment variable wins; otherwise the
@@ -42,7 +42,7 @@ def literature_index_root(root: Optional[Path] = None) -> Path:
     return (root or repo_root()) / DEFAULT_LIT_INDEX
 
 
-def ops_index_root(root: Optional[Path] = None) -> Path:
+def ops_index_root(root: Path | None = None) -> Path:
     """Return the ops index directory.
 
     The HYBRID_RAG_OPS_INDEX environment variable wins; otherwise the default
@@ -54,7 +54,7 @@ def ops_index_root(root: Optional[Path] = None) -> Path:
     return (root or repo_root()) / DEFAULT_OPS_INDEX
 
 
-def _env_flag(name: str) -> Optional[str]:
+def _env_flag(name: str) -> str | None:
     raw = os.environ.get(name)
     if raw is None:
         return None
@@ -72,12 +72,12 @@ def hybrid_rag_enabled() -> bool:
 
 def build_literature_index(
     *,
-    dest: Optional[Path] = None,
-    root: Optional[Path] = None,
+    dest: Path | None = None,
+    root: Path | None = None,
     mode: str = "gold",
     limit: int = 12,
     incremental: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build or incrementally refresh the literature chunk index and return its metadata.
 
     Args:
@@ -98,8 +98,8 @@ def build_literature_index(
         for chunk in existing_chunks
         if chunk.get("doc_id")
     }
-    new_chunks: List[Dict[str, Any]] = []
-    replaced: List[str] = []
+    new_chunks: list[dict[str, Any]] = []
+    replaced: list[str] = []
     skipped = 0
     for doc in docs:
         path = Path(doc["path"])
@@ -160,10 +160,10 @@ def build_literature_index(
 
 def build_ops_index(
     *,
-    dest: Optional[Path] = None,
-    root: Optional[Path] = None,
+    dest: Path | None = None,
+    root: Path | None = None,
     incremental: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build or incrementally refresh the ops-document chunk index and return its metadata.
 
     Args:
@@ -182,8 +182,8 @@ def build_ops_index(
         for chunk in existing_chunks
         if chunk.get("doc_id")
     }
-    new_chunks: List[Dict[str, Any]] = []
-    replaced: List[str] = []
+    new_chunks: list[dict[str, Any]] = []
+    replaced: list[str] = []
     skipped = 0
     for doc in docs:
         path = Path(doc["path"])
@@ -242,8 +242,8 @@ class HybridSourceRAG:
     def __init__(
         self,
         *,
-        literature_root: Optional[Path] = None,
-        ops_root: Optional[Path] = None,
+        literature_root: Path | None = None,
+        ops_root: Path | None = None,
     ) -> None:
         self.literature_root = Path(literature_root) if literature_root else literature_index_root()
         self.ops_root = Path(ops_root) if ops_root else ops_index_root()
@@ -252,7 +252,7 @@ class HybridSourceRAG:
         self.context = ContextBuilder()
 
     @classmethod
-    def from_env(cls) -> "HybridSourceRAG":
+    def from_env(cls) -> HybridSourceRAG:
         """Create an instance using the environment-derived default index locations."""
         return cls()
 
@@ -262,10 +262,10 @@ class HybridSourceRAG:
         *,
         include_literature: bool = True,
         include_ops: bool = True,
-        kg_work_ids: Optional[Sequence[str]] = None,
-        kg_entity_ids: Optional[Sequence[str]] = None,
+        kg_work_ids: Sequence[str] | None = None,
+        kg_entity_ids: Sequence[str] | None = None,
         k: int = 12,
-    ) -> List[Evidence]:
+    ) -> list[Evidence]:
         """Retrieve up to `k` evidence chunks; returns [] (and logs) if retrieval fails."""
         try:
             return self.retriever.retrieve(
@@ -289,10 +289,10 @@ class HybridSourceRAG:
         include_ops: bool = True,
         layout: bool = False,
         numeric: bool = False,
-        kg_work_ids: Optional[Sequence[str]] = None,
-        kg_entity_ids: Optional[Sequence[str]] = None,
+        kg_work_ids: Sequence[str] | None = None,
+        kg_entity_ids: Sequence[str] | None = None,
         char_budget: int = 6000,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Retrieve, rank and pack source evidence for a question.
 
         Returns a dict with the inferred ``intent``, ranked ``evidence``, the

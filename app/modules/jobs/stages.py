@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Sequence, Tuple
+from typing import Any, Callable, Mapping, Sequence
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -70,7 +70,7 @@ def chunked_stage(
     units: Callable[[StageContext], Sequence[WorkUnit]],
     process: Callable[[StageContext, WorkUnit], Mapping[str, Any]],
     *,
-    counters: Tuple[str, str] = ("units_done", "units_total"),
+    counters: tuple[str, str] = ("units_done", "units_total"),
 ) -> StageRun:
     """Build a stage that checkpoints per unit and reports incomplete coverage."""
 
@@ -79,7 +79,7 @@ def chunked_stage(
         done = 0
         reused = 0
         missing = []
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
         sc.progress(**{counters[0]: 0, counters[1]: len(work)})
         for unit in work:
             sc.guard()

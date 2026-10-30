@@ -16,11 +16,11 @@ semaphores while the flag is off.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager, contextmanager
 import os
 import threading
 import time
-from contextlib import asynccontextmanager, contextmanager
-from typing import AsyncIterator, Callable, Dict, Iterator, Optional
+from typing import AsyncIterator, Callable, Iterator
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
@@ -30,7 +30,7 @@ def shared_admission_enabled() -> bool:
     return os.environ.get("F2W_SHARED_ADMISSION", "").strip().lower() in _TRUTHY
 
 
-def retry_after_seconds(exc: BaseException) -> Optional[float]:
+def retry_after_seconds(exc: BaseException) -> float | None:
     """Return a ``Retry-After`` delay from a provider exception, if it carries one."""
     response = getattr(exc, "response", None)
     headers = getattr(response, "headers", None) or {}
@@ -90,7 +90,7 @@ class AdmissionController:
         with self._cond:
             return self._try_acquire_locked()
 
-    def acquire(self, timeout: Optional[float] = None) -> bool:
+    def acquire(self, timeout: float | None = None) -> bool:
         """Block until a slot is free and no cooldown is active."""
         deadline = None if timeout is None else self._clock() + timeout
         with self._cond:
@@ -112,7 +112,7 @@ class AdmissionController:
             self._in_flight -= 1
             self._cond.notify_all()
 
-    def note_rate_limited(self, retry_after: Optional[float] = None) -> None:
+    def note_rate_limited(self, retry_after: float | None = None) -> None:
         """Start (or extend) a cooldown after a 429 response."""
         delay = self.default_cooldown if retry_after is None else retry_after
         with self._cond:
@@ -154,7 +154,7 @@ class AdmissionController:
 
 
 _CAP_ENV = {"cborg": "CBORG_MAX_CONCURRENCY"}
-_controllers: Dict[str, AdmissionController] = {}
+_controllers: dict[str, AdmissionController] = {}
 _controllers_lock = threading.Lock()
 
 

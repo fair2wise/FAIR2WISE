@@ -15,7 +15,7 @@ it has one and leaves slot ownership to the resolver.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Protocol
 
 
 @dataclass(frozen=True)
@@ -38,9 +38,9 @@ class ModelReply:
     """A completed call. ``cost_usd`` is ``None`` when the provider reported none (unknown, not free)."""
 
     text: str
-    cost_usd: Optional[float] = None
-    input_tokens: Optional[int] = None
-    output_tokens: Optional[int] = None
+    cost_usd: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
     executed_model: str = ""
 
 
@@ -59,9 +59,9 @@ class ModelCallError(Exception):
         message: str,
         *,
         served: bool = True,
-        status: Optional[int] = None,
-        cost_header: Optional[str] = None,
-        retry_after: Optional[float] = None,
+        status: int | None = None,
+        cost_header: str | None = None,
+        retry_after: float | None = None,
     ) -> None:
         super().__init__(message)
         self.served = served
@@ -91,7 +91,7 @@ class ChatClientAdapter:
         self,
         client_factory: Callable[[ModelRef], Any],
         *,
-        cost_probe: Optional[Callable[[Any], Optional[float]]] = None,
+        cost_probe: Callable[[Any], float | None] | None = None,
     ) -> None:
         self._factory = client_factory
         self._probe = cost_probe

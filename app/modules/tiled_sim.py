@@ -10,16 +10,16 @@ Reproducible: seed ``20260916`` in ``storage/schema/tiled_sim_seed.yaml``.
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime, timedelta
 import json
 import logging
 import os
+from pathlib import Path
 import random
 import re
-import uuid
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Sequence
 from urllib.parse import urlparse
+import uuid
 
 import yaml
 
@@ -94,7 +94,7 @@ query PageIdentityLinks($predicate: String, $limit: Int!, $offset: Int!) {
 _RSOXS_SNAPSHOT_RE = re.compile(r"^matkg_rsoxs_v(\d+)\.json$")
 
 
-def load_seed(path: Optional[Path] = None) -> Dict[str, Any]:
+def load_seed(path: Path | None = None) -> dict[str, Any]:
     """Load the tiled sim YAML seed, attaching a repo-relative path and default RNG seed."""
     dest = path or SEED_PATH
     data = yaml.safe_load(dest.read_text(encoding="utf-8")) or {}
@@ -115,7 +115,7 @@ def _uuid(rng: random.Random) -> str:
     return str(uuid.UUID(int=rng.getrandbits(128)))
 
 
-def _energy_range(seed: Dict[str, Any], edge: str) -> Tuple[float, float]:
+def _energy_range(seed: dict[str, Any], edge: str) -> tuple[float, float]:
     """Photon-energy bounds (eV) for an absorption edge from the seed table."""
     table = seed.get("energy_eV") or {}
     pair = table.get(edge) or table.get("default") or [165.0, 1500.0]
@@ -123,10 +123,10 @@ def _energy_range(seed: Dict[str, Any], edge: str) -> Tuple[float, float]:
 
 
 def generate_fixture(
-    seed: Optional[Dict[str, Any]] = None,
+    seed: dict[str, Any] | None = None,
     *,
-    rng_seed: Optional[int] = None,
-) -> Dict[str, Any]:
+    rng_seed: int | None = None,
+) -> dict[str, Any]:
     """Build the ESAF → Proposal → Sample / BlueskyRun tree (no KG writes)."""
     seed = seed or load_seed()
     documented = int(seed.get("seed") or DEFAULT_SEED)
@@ -138,8 +138,8 @@ def generate_fixture(
     plans = seed.get("plans") or []
     motors = list(seed.get("motors") or [])
     polarizations = seed.get("polarizations") or []
-    origin = datetime(2026, 3, 1, tzinfo=timezone.utc)
-    esafs: List[Dict[str, Any]] = []
+    origin = datetime(2026, 3, 1, tzinfo=UTC)
+    esafs: list[dict[str, Any]] = []
     scan_counter = 140
 
     for spec in seed.get("esafs") or []:
@@ -153,13 +153,13 @@ def generate_fixture(
         n_proposals = rng.randint(int(prop_lo), int(prop_hi))
         esaf_number = str(spec["esaf_number"])
         esaf_id = beam_id("ESAF", esaf_number)
-        proposals: List[Dict[str, Any]] = []
+        proposals: list[dict[str, Any]] = []
         for p_idx in range(n_proposals):
             proposal_code = f"P{esaf_number.replace('-', '')}-{p_idx + 1:02d}"
             proposal_id = beam_id("Proposal", proposal_code)
             n_samples = rng.randint(int(samp_lo), int(samp_hi))
             n_scans = rng.randint(int(scan_lo), int(scan_hi))
-            samples: List[Dict[str, Any]] = []
+            samples: list[dict[str, Any]] = []
             for s_idx in range(n_samples):
                 material = _choice(rng, materials)
                 sample_code = f"{proposal_code}-S{s_idx + 1:02d}"
@@ -172,7 +172,7 @@ def generate_fixture(
                         "bar_position": s_idx + 1,
                     }
                 )
-            scans: List[Dict[str, Any]] = []
+            scans: list[dict[str, Any]] = []
             for _ in range(n_scans):
                 plan = _choice(rng, plans) if plans else {"name": "count", "id": beam_id("plan", "count")}
                 sample = _choice(rng, samples)
@@ -248,7 +248,7 @@ def generate_fixture(
     }
 
 
-def fixture_stats(esafs: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+def fixture_stats(esafs: Sequence[dict[str, Any]]) -> dict[str, int]:
     """Count ESAFs, proposals, scans, and samples in a fixture tree."""
     proposals = [p for e in esafs for p in e.get("proposals") or []]
     scans = [s for p in proposals for s in p.get("scans") or []]
@@ -261,7 +261,7 @@ def fixture_stats(esafs: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     }
 
 
-def write_fixture(fixture: Dict[str, Any], path: Optional[Path] = None) -> Path:
+def write_fixture(fixture: dict[str, Any], path: Path | None = None) -> Path:
     """Write the fixture dict as pretty JSON and return the destination path."""
     dest = path or FIXTURE_PATH
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -269,7 +269,7 @@ def write_fixture(fixture: Dict[str, Any], path: Optional[Path] = None) -> Path:
     return dest
 
 
-def load_fixture(path: Optional[Path] = None) -> Dict[str, Any]:
+def load_fixture(path: Path | None = None) -> dict[str, Any]:
     """Read a fixture JSON file into a dict."""
     dest = path or FIXTURE_PATH
     return json.loads(dest.read_text(encoding="utf-8"))
@@ -287,7 +287,7 @@ def _load_repo_env() -> None:
     load_dotenv(env_path, override=False)
 
 
-def resolve_push_uri(uri: Optional[str] = None) -> str:
+def resolve_push_uri(uri: str | None = None) -> str:
     """Local Tiled only (loopback). Never ALS production."""
     from .tiled_graph import is_als_production_tiled_host, normalize_tiled_uri
 
@@ -303,9 +303,9 @@ def resolve_push_uri(uri: Optional[str] = None) -> str:
     return normalize_tiled_uri(raw, default=TILED_PUSH_DEFAULT_URI)
 
 
-def _compact_props(values: Dict[str, Any]) -> Dict[str, Any]:
+def _compact_props(values: dict[str, Any]) -> dict[str, Any]:
     """Drop empty values and keep nested JSON-serializable property dicts."""
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     for key, val in values.items():
         if val is None or val == "":
             continue
@@ -322,14 +322,14 @@ def _compact_props(values: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _scan_uri(scan: Dict[str, Any]) -> str:
+def _scan_uri(scan: dict[str, Any]) -> str:
     """BlueskyRun URI from a scan dict, falling back to its id."""
     return str(scan.get("uri") or scan.get("id") or "").strip()
 
 
-def iter_identity_entities(fixture: Dict[str, Any]) -> List[Dict[str, Any]]:
+def iter_identity_entities(fixture: dict[str, Any]) -> list[dict[str, Any]]:
     """Flatten the sim fixture into Tiled createEntity payloads."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for esaf in fixture.get("esafs") or []:
         rows.append(
             {
@@ -405,9 +405,9 @@ def iter_identity_entities(fixture: Dict[str, Any]) -> List[Dict[str, Any]]:
     return rows
 
 
-def iter_identity_links(fixture: Dict[str, Any]) -> List[Tuple[str, str, str]]:
+def iter_identity_links(fixture: dict[str, Any]) -> list[tuple[str, str, str]]:
     """Cookbook identity edges: ESAF→Proposal→Sample/Scan, Scan→Sample."""
-    edges: List[Tuple[str, str, str]] = []
+    edges: list[tuple[str, str, str]] = []
     seen = set()
     for esaf in fixture.get("esafs") or []:
         esaf_uri = str(esaf["id"])
@@ -422,7 +422,7 @@ def iter_identity_links(fixture: Dict[str, Any]) -> List[Tuple[str, str, str]]:
                 sample_uri = str(scan.get("sample_id") or "").strip()
                 if sample_uri:
                     edges.append((scan_uri, GRAPHQL_IDENTITY_RELS["used"], sample_uri))
-    unique: List[Tuple[str, str, str]] = []
+    unique: list[tuple[str, str, str]] = []
     for edge in edges:
         if edge in seen or not edge[0] or not edge[2]:
             continue
@@ -432,16 +432,16 @@ def iter_identity_links(fixture: Dict[str, Any]) -> List[Tuple[str, str, str]]:
 
 
 def _page_all(
-    graphql: Callable[..., Dict[str, Any]],
+    graphql: Callable[..., dict[str, Any]],
     query: str,
     key: str,
-    variables: Optional[Dict[str, Any]] = None,
+    variables: dict[str, Any] | None = None,
     *,
     page_size: int = 100,
     max_pages: int = 20,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Page a GraphQL list field until a short page or ``max_pages``."""
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     offset = 0
     base = dict(variables or {})
     for _ in range(max_pages):
@@ -457,12 +457,12 @@ def _page_all(
 
 
 def _index_existing_entities(
-    graphql: Callable[..., Dict[str, Any]],
-) -> Tuple[Dict[str, str], Dict[Tuple[str, str], str], Dict[str, int]]:
+    graphql: Callable[..., dict[str, Any]],
+) -> tuple[dict[str, str], dict[tuple[str, str], str], dict[str, int]]:
     """Map existing Tiled identity entities by URI and ``(type, name)``."""
-    by_uri: Dict[str, str] = {}
-    by_name: Dict[Tuple[str, str], str] = {}
-    counts: Dict[str, int] = {}
+    by_uri: dict[str, str] = {}
+    by_name: dict[tuple[str, str], str] = {}
+    counts: dict[str, int] = {}
     for entity_type in ("ESAF", "Proposal", "Sample", "BlueskyRun"):
         rows = _page_all(graphql, _PAGE_ENTITIES, "entities", {"entityType": entity_type})
         counts[entity_type] = len(rows)
@@ -480,8 +480,8 @@ def _index_existing_entities(
 
 
 def _existing_link_keys(
-    graphql: Callable[..., Dict[str, Any]],
-    by_uri: Dict[str, str],
+    graphql: Callable[..., dict[str, Any]],
+    by_uri: dict[str, str],
 ) -> set:
     """Collect existing identity links as ``(subjectId, predicate, objectId)`` keys."""
     keys = set()
@@ -504,12 +504,12 @@ def _existing_link_keys(
 
 
 def push_fixture_to_tiled(
-    fixture: Dict[str, Any],
+    fixture: dict[str, Any],
     *,
-    uri: Optional[str] = None,
-    api_key: Optional[str] = None,
-    graphql: Optional[Callable[..., Dict[str, Any]]] = None,
-) -> Dict[str, Any]:
+    uri: str | None = None,
+    api_key: str | None = None,
+    graphql: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Idempotently create ESAF/Proposal/Sample/BlueskyRun nodes and cookbook links."""
     target = resolve_push_uri(uri)
     key = (api_key if api_key is not None else os.environ.get("TILED_API_KEY") or "").strip()
@@ -519,7 +519,7 @@ def push_fixture_to_tiled(
     if graphql is None:
         from .tiled_graph import tiled_graphql
 
-        def _call(query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        def _call(query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
             """Run a GraphQL query against the resolved local Tiled URI."""
             return tiled_graphql(query, variables, uri=target, api_key=key)
 
@@ -610,7 +610,7 @@ def push_fixture_to_tiled(
     return result
 
 
-def fixture_to_overlay(fixture: Dict[str, Any], seed: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def fixture_to_overlay(fixture: dict[str, Any], seed: dict[str, Any] | None = None) -> dict[str, Any]:
     """Convert a fixture into new ``things`` / ``associations`` (ops namespace).
 
     json2kg always uses the current term as the edge subject, so hasProposal /
@@ -620,7 +620,7 @@ def fixture_to_overlay(fixture: Dict[str, Any], seed: Optional[Dict[str, Any]] =
     evidence = "tiled_sim"
     beamline_id = seed.get("beamline_id") or BEAMLINE_ID
     stage_id = seed.get("sample_stage_id") or beam_id("stage", "Sample-stage")
-    terms: List[Dict[str, Any]] = []
+    terms: list[dict[str, Any]] = []
 
     for esaf in fixture.get("esafs") or []:
         esaf_id = esaf["id"]
@@ -767,7 +767,7 @@ def fixture_to_overlay(fixture: Dict[str, Any], seed: Optional[Dict[str, Any]] =
     return overlay_graph
 
 
-def merge_overlay(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+def merge_overlay(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     """Union overlay nodes and edges into a base KG, skipping unknown endpoints."""
     things = list(base.get("things") or [])
     assocs = list(base.get("associations") or [])
@@ -798,13 +798,13 @@ def merge_overlay(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, An
 def run_tiled_sim_promote(
     *,
     source_kg: Path,
-    fixture: Optional[Dict[str, Any]] = None,
-    version: Optional[int] = None,
-    kg_dir: Optional[Path] = None,
-    terms_dir: Optional[Path] = None,
-    seed: Optional[Dict[str, Any]] = None,
+    fixture: dict[str, Any] | None = None,
+    version: int | None = None,
+    kg_dir: Path | None = None,
+    terms_dir: Path | None = None,
+    seed: dict[str, Any] | None = None,
     include_sim_nodes: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Copy an ops KG, optionally merge simulated ESAF/Proposal/run entities, write vN.
 
     .. note:: **2026-09-23 — sim nodes removed from bl1101 JSON KG**
@@ -902,7 +902,7 @@ def run_tiled_sim_promote(
     }
 
 
-def _count_unique_papers(terms: Iterable[Dict[str, Any]]) -> int:
+def _count_unique_papers(terms: Iterable[dict[str, Any]]) -> int:
     """Count distinct ``source_paper`` / ``source_papers`` values on terms."""
     papers: set[str] = set()
     for term in terms:
@@ -914,10 +914,10 @@ def _count_unique_papers(terms: Iterable[Dict[str, Any]]) -> int:
     return len(papers)
 
 
-def next_rsoxs_snapshot_version(kg_dir: Optional[Path] = None) -> int:
+def next_rsoxs_snapshot_version(kg_dir: Path | None = None) -> int:
     """Next unused ``matkg_rsoxs_vN`` version in the KG directory."""
     kg_dir = kg_dir or KG_DIR
-    versions: List[int] = []
+    versions: list[int] = []
     if kg_dir.exists():
         for path in kg_dir.iterdir():
             match = _RSOXS_SNAPSHOT_RE.match(path.name)
@@ -926,11 +926,11 @@ def next_rsoxs_snapshot_version(kg_dir: Optional[Path] = None) -> int:
     return (max(versions) + 1) if versions else 1
 
 
-def snapshot_copy_terms(live_path: Path, dest: Optional[Path] = None) -> Path:
+def snapshot_copy_terms(live_path: Path, dest: Path | None = None) -> Path:
     """Copy the live extract file. Never writes *live_path*."""
     live_path = live_path.resolve()
     if dest is None:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         dest = live_path.with_name(f"{live_path.stem}_{stamp}{live_path.suffix}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(live_path.read_bytes())
@@ -941,9 +941,9 @@ def snapshot_copy_terms(live_path: Path, dest: Optional[Path] = None) -> Path:
 def promote_rsoxs_snapshot(
     *,
     terms_snapshot: Path,
-    output_kg: Optional[Path] = None,
-    kg_dir: Optional[Path] = None,
-) -> Dict[str, Any]:
+    output_kg: Path | None = None,
+    kg_dir: Path | None = None,
+) -> dict[str, Any]:
     """json2kg a terms *copy* into the next ``matkg_rsoxs_vN.json``. Does not touch the live extract file."""
     terms_snapshot = terms_snapshot.resolve()
     if terms_snapshot.name == "extracted_terms_rsoxs_v1.json":
@@ -1005,7 +1005,7 @@ def promote_rsoxs_snapshot(
     return {"kg_path": dest, "graph": graph, "snapshot": snap, "terms_snapshot": terms_snapshot}
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """CLI for fixture generation, bl1101 promote, and ``--to-tiled`` push."""
     parser = argparse.ArgumentParser(description="Simulate Tiled Graph ESAF/Proposal/Scan overlay")
     parser.add_argument("--seed-yaml", type=Path, default=SEED_PATH)
@@ -1037,7 +1037,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Generate a fixture, then optionally promote the ops KG or push identity into local Tiled."""
     args = parse_args(argv)
     logging.basicConfig(

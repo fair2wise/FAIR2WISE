@@ -21,9 +21,9 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/kg/client.py (BSD-3-Cl
 
 from __future__ import annotations
 
-import re
 from functools import partial
-from typing import Any, Callable, Dict, Mapping, Optional
+import re
+from typing import Any, Callable, Mapping
 
 import requests
 
@@ -72,7 +72,7 @@ class TiledGraphClient:
     """
 
     def __init__(self, base_url: str, *, profile: str,
-                 credential: Optional[Any] = None, scheme: str = "Apikey",
+                 credential: Any | None = None, scheme: str = "Apikey",
                  timeout: float = 10.0, verify: Any = True, session: Any = None) -> None:
         try:
             self.base_url = validate_external_url(profile, base_url)
@@ -92,17 +92,17 @@ class TiledGraphClient:
         return f"TiledGraphClient({self.base_url!r}, profile={self.profile!r})"
 
     @classmethod
-    def from_external(cls, cfg: ExternalTiledConfig, *, session: Any = None) -> "TiledGraphClient":
+    def from_external(cls, cfg: ExternalTiledConfig, *, session: Any = None) -> TiledGraphClient:
         """Client for an external (connect-only) target; the secret file is read per request."""
         secret_file = cfg.writer_secret_file
-        provider: Optional[Callable[[], str]] = None
+        provider: Callable[[], str] | None = None
         if secret_file is not None:
             provider = partial(read_secret_file, secret_file)
         return cls(cfg.url, profile=cfg.profile, credential=provider, scheme=cfg.writer_scheme,
                    timeout=cfg.timeout, verify=str(cfg.ca_bundle) if cfg.ca_bundle else True, session=session)
 
     @classmethod
-    def from_managed(cls, server: Any, *, session: Any = None) -> "TiledGraphClient":
+    def from_managed(cls, server: Any, *, session: Any = None) -> TiledGraphClient:
         """Client for a running managed server (``tiled_lifecycle.ManagedServer``)."""
         from app.modules.deployment import tiled_lifecycle
 
@@ -110,14 +110,14 @@ class TiledGraphClient:
         return cls(server.url, profile=cfg.profile,
                    credential=lambda: tiled_lifecycle.writer_credential(cfg), session=session)
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         try:
             cred = self._credential() if callable(self._credential) else self._credential
         except TiledConfigError as exc:  # missing/unreadable runtime secret: graph unavailable, not empty
             raise ContractError(ErrorCode.UNAVAILABLE, f"Tiled graph credential unavailable: {exc}") from None
         return {"Authorization": f"{self._scheme} {cred}"} if cred else {}
 
-    def query(self, document: str, variables: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    def query(self, document: str, variables: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Run a read query and return ``data``.
 
         Raises:

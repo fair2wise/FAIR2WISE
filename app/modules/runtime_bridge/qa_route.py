@@ -30,11 +30,11 @@ Parity rules for the supervisor route:
 from __future__ import annotations
 
 import contextvars
+from enum import Enum
 import json
 import os
 import time
-from enum import Enum
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from .mode import RuntimeConfigError
 
@@ -52,7 +52,7 @@ class QaRoute(str, Enum):
 DEFAULT_QA_ROUTE = QaRoute.SUPERVISOR
 
 
-def qa_route(environ: Optional[Mapping[str, str]] = None) -> QaRoute:
+def qa_route(environ: Mapping[str, str] | None = None) -> QaRoute:
     """Return the configured UI QA route.
 
     Raises:
@@ -71,7 +71,7 @@ def qa_route(environ: Optional[Mapping[str, str]] = None) -> QaRoute:
 
 # -- argument pinning -------------------------------------------------------------
 
-_PINNED: contextvars.ContextVar[Optional[Dict[str, Any]]] = contextvars.ContextVar("f2w_qa_pinned", default=None)
+_PINNED: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("f2w_qa_pinned", default=None)
 
 
 class PinnedArgsService:
@@ -100,7 +100,7 @@ class PinnedArgsService:
                                       use_live_tiled=use_live_tiled)
 
 
-def pin_args(args: Dict[str, Any]) -> contextvars.Token:
+def pin_args(args: dict[str, Any]) -> contextvars.Token:
     """Pin ``args`` for tool calls made in the current context; reset with :func:`unpin_args`."""
     return _PINNED.set(dict(args))
 
@@ -128,7 +128,7 @@ def _content(message: Any) -> str:
 
 
 def _record(model: Any, messages: Sequence[Any], reply: Any, started: float,
-            error: Optional[BaseException]) -> None:
+            error: BaseException | None) -> None:
     from ..f2w_agent.trace import record_llm_call
 
     record_llm_call(
@@ -142,7 +142,7 @@ def _record(model: Any, messages: Sequence[Any], reply: Any, started: float,
 
 
 class _BoundPlanner:
-    def __init__(self, owner: "TracedPlanningModel", tools: List[Any]) -> None:
+    def __init__(self, owner: TracedPlanningModel, tools: list[Any]) -> None:
         self.owner = owner
         self.tools = tools
 
@@ -209,7 +209,7 @@ def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
     (CBORG with the fail-closed key check, or Ollama). Built lazily on the first
     planning call and rebuilt when the UI settings change backend or model.
     """
-    cache: Dict[Any, Any] = {}
+    cache: dict[Any, Any] = {}
 
     def current() -> Any:
         runtime = getattr(pipeline, "runtime", None)

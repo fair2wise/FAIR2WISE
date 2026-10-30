@@ -12,7 +12,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_audit.py (BSD-3-Cla
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Iterable
 
 from .gates import ApplyRefused, authorize_vocabulary_change
 from .merge_safety import check_merge, fold
@@ -28,7 +28,7 @@ class AliasVerdict:
     kind: str  # unsafe_alias | cross_entry_rendering | empty_alias
     reason: str
     blocking: bool = True
-    other_slug: Optional[str] = None
+    other_slug: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,7 @@ class AuditReport:
     """Alias-audit findings for one vocabulary revision."""
 
     vocabulary_revision: str
-    findings: Tuple[AliasVerdict, ...] = ()
+    findings: tuple[AliasVerdict, ...] = ()
     checked_aliases: int = 0
 
     @property
@@ -44,7 +44,7 @@ class AuditReport:
         """True when no finding is blocking."""
         return not any(f.blocking for f in self.findings)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the report as a plain dict, findings included."""
         return {
             "vocabulary_revision": self.vocabulary_revision,
@@ -54,7 +54,7 @@ class AuditReport:
         }
 
 
-def audit_aliases(vocab: Vocabulary, *, reviewed_ok: Iterable[Tuple[str, str]] = ()) -> List[AliasVerdict]:
+def audit_aliases(vocab: Vocabulary, *, reviewed_ok: Iterable[tuple[str, str]] = ()) -> list[AliasVerdict]:
     """Aliases that are not plausible renderings of their own entry (synonyms need a recorded review).
 
     Args:
@@ -62,7 +62,7 @@ def audit_aliases(vocab: Vocabulary, *, reviewed_ok: Iterable[Tuple[str, str]] =
         reviewed_ok: ``(slug, alias)`` pairs a human already reviewed as acceptable synonyms.
     """
     ok = {(s, fold(a)) for s, a in reviewed_ok}
-    out: List[AliasVerdict] = []
+    out: list[AliasVerdict] = []
     for entry in vocab.entries:
         for alias in entry.aliases:
             if not fold(alias):
@@ -76,9 +76,9 @@ def audit_aliases(vocab: Vocabulary, *, reviewed_ok: Iterable[Tuple[str, str]] =
     return out
 
 
-def audit_cross_entry(vocab: Vocabulary) -> List[AliasVerdict]:
+def audit_cross_entry(vocab: Vocabulary) -> list[AliasVerdict]:
     """An alias of one entry that is a rendering of a DIFFERENT entry's name: a wrong merge waiting."""
-    out: List[AliasVerdict] = []
+    out: list[AliasVerdict] = []
     surfaces = [(e, s) for e in vocab.entries for s in (e.display_name, *e.aliases)]
     for entry in vocab.entries:
         for alias in entry.aliases:
@@ -100,7 +100,7 @@ def audit_cross_entry(vocab: Vocabulary) -> List[AliasVerdict]:
 
 
 def audit_vocabulary(
-    vocab: Vocabulary, *, reviewed_ok: Iterable[Tuple[str, str]] = (), cross_entry: bool = True
+    vocab: Vocabulary, *, reviewed_ok: Iterable[tuple[str, str]] = (), cross_entry: bool = True
 ) -> AuditReport:
     """Run every audit. Pure report; changes nothing."""
     findings = audit_aliases(vocab, reviewed_ok=reviewed_ok)
@@ -116,11 +116,11 @@ class ActivationRecord:
     vocabulary_revision: str
     approval_id: str
     audit_checked_aliases: int = 0
-    notes: Tuple[str, ...] = field(default_factory=tuple)
+    notes: tuple[str, ...] = field(default_factory=tuple)
 
 
 def activate_vocabulary(
-    vocab: Vocabulary, approval: Optional[VocabularyApproval], report: AuditReport
+    vocab: Vocabulary, approval: VocabularyApproval | None, report: AuditReport
 ) -> ActivationRecord:
     """Authorize activation of an approved, audited vocabulary revision. Closed pre-H3.
 

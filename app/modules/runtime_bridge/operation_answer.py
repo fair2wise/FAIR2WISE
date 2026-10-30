@@ -14,7 +14,7 @@ operations), so the rendering adds no source material.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping
+from typing import Any, Mapping
 
 from ..contracts import ToolResult, ToolStatus
 
@@ -31,8 +31,8 @@ def _fmt(value: Any) -> str:
     return str(value)
 
 
-def _metric_lines(metrics: Mapping[str, Any], prefix: str = "") -> List[str]:
-    lines: List[str] = []
+def _metric_lines(metrics: Mapping[str, Any], prefix: str = "") -> list[str]:
+    lines: list[str] = []
     for key, value in metrics.items():
         name = f"{prefix}{key}"
         if isinstance(value, Mapping):
@@ -47,7 +47,7 @@ def _metric_lines(metrics: Mapping[str, Any], prefix: str = "") -> List[str]:
 
 def render_operation_answer(result: ToolResult) -> str:
     """Markdown text for ``result`` (an operation ``ToolResult``), deterministic and model-free."""
-    data: Dict[str, Any] = dict(result.data or {})
+    data: dict[str, Any] = dict(result.data or {})
     operation = data.get("operation") or result.tool
     scope = data.get("scope") or {}
     coverage = data.get("coverage") or {}
@@ -87,7 +87,7 @@ def render_operation_answer(result: ToolResult) -> str:
     return "\n".join(lines)
 
 
-def operation_verdict(result: ToolResult) -> Dict[str, Any]:
+def operation_verdict(result: ToolResult) -> dict[str, Any]:
     """A legacy retrieval verdict carrying ``result`` as the turn's answer.
 
     ``status`` is ``success`` and ``sufficient`` is true (the figure answers the question);

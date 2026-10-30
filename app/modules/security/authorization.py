@@ -18,14 +18,14 @@ field (header, cookie claim, body ``mode``/``is_admin``, hostname) is an input.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 import functools
 import inspect
 import ipaddress
 import threading
-from dataclasses import dataclass, field
+from typing import Any, Callable, Iterable, Mapping, Sequence, TypeVar, Union
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, RoleCheckEvidence
 from ..contracts.context import (
@@ -40,7 +40,6 @@ from ..contracts.context import (
     RequestContext,
 )
 from ..contracts.errors import ContractError, ErrorCode
-
 from .tiled_identity import (
     IdentityRejected,
     IdentityUnavailable,
@@ -121,11 +120,11 @@ class DeploymentSettings:
 
     profile: Union[DeploymentProfile, str]
     writer_identity: str
-    mode: Optional[Union[AuthorizationMode, str]] = None
-    tiled_target: Optional[str] = None
+    mode: Union[AuthorizationMode, str] | None = None
+    tiled_target: str | None = None
     local_bind: str = "loopback"
     role_check_max_age: timedelta = DEFAULT_ROLE_CHECK_MAX_AGE
-    corpus_scope: FrozenSet[str] = field(default_factory=frozenset)
+    corpus_scope: frozenset[str] = field(default_factory=frozenset)
     #: ``True`` only for settings built by :meth:`for_disposable_test_target` (T25C). Not an
     #: ``__init__`` argument, so no constructor call, ``from_mapping`` value or ``replace`` can set it.
     disposable_target: bool = field(default=False, init=False)
@@ -176,7 +175,7 @@ class DeploymentSettings:
         return fixed
 
     @classmethod
-    def from_mapping(cls, values: Mapping[str, str]) -> "DeploymentSettings":
+    def from_mapping(cls, values: Mapping[str, str]) -> DeploymentSettings:
         """Build settings from trusted startup values (for example the image entrypoint env).
 
         The caller passes the mapping explicitly; this never reads ``os.environ`` or ``.env``.
@@ -214,7 +213,7 @@ class DeploymentSettings:
 
     @classmethod
     def for_disposable_test_target(cls, profile: Union[DeploymentProfile, str], *, tiled_target: str,
-                                   writer_identity: str, **kwargs: Any) -> "DeploymentSettings":
+                                   writer_identity: str, **kwargs: Any) -> DeploymentSettings:
         """Test-only ALS settings bound to an application-owned disposable Tiled (T25C).
 
         Every ALS rule runs unchanged (profile, mode, identity, approvals, route policy);
@@ -260,7 +259,7 @@ class DeploymentSettings:
         return NETWORK_HOST if self.local_bind == "network" else LOOPBACK_HOST
 
     @property
-    def exposure_warning(self) -> Optional[str]:
+    def exposure_warning(self) -> str | None:
         """Warning to log and show in ``/health`` and the UI when ``:local`` is network-exposed."""
         return NETWORK_EXPOSURE_WARNING if self.is_local and self.local_bind == "network" else None
 
@@ -276,7 +275,7 @@ def is_loopback_host(host: Any) -> bool:
         return False
 
 
-def local_bind_warning(settings: DeploymentSettings, host: Any) -> Optional[str]:
+def local_bind_warning(settings: DeploymentSettings, host: Any) -> str | None:
     """The warning to log when a server binds ``settings`` at ``host`` beyond loopback (AUD-16).
 
     ``None`` on the ALS profiles (sign-in and the gateway apply) and for loopback hosts.
@@ -318,10 +317,10 @@ class RoleCheckCache:
     def __init__(self, max_age: timedelta, max_entries: int = 4096) -> None:
         self.max_age = max_age
         self.max_entries = max_entries
-        self._entries: Dict[Tuple[str, str], VerifiedIdentity] = {}
+        self._entries: dict[tuple[str, str], VerifiedIdentity] = {}
         self._lock = threading.Lock()
 
-    def get(self, target: str, credential: TiledCredential, now: datetime) -> Optional[VerifiedIdentity]:
+    def get(self, target: str, credential: TiledCredential, now: datetime) -> VerifiedIdentity | None:
         """Return a cached identity younger than ``max_age``, else ``None``."""
         key = (target, credential.fingerprint())
         with self._lock:
@@ -346,14 +345,14 @@ class RoleCheckCache:
             self._entries.pop((target, credential.fingerprint()), None)
 
 
-def capabilities_for(identity: VerifiedIdentity) -> FrozenSet[str]:
+def capabilities_for(identity: VerifiedIdentity) -> frozenset[str]:
     """Return the capability set for a verified ALS principal (section 6)."""
     return CAPABILITIES if identity.is_admin else CHAT_CAPABILITIES
 
 
-def local_operator_context(settings: DeploymentSettings, *, request_id: str, session_id: Optional[str] = None,
+def local_operator_context(settings: DeploymentSettings, *, request_id: str, session_id: str | None = None,
                            actor_kind: ActorKind = ActorKind.INTERACTIVE,
-                           run_id: Optional[str] = None) -> RequestContext:
+                           run_id: str | None = None) -> RequestContext:
     """Return the trusted-local context: local-operator with every capability (D34).
 
     No credential is read and no identity call is made (LOCAL-01, LOCAL-05).
@@ -368,7 +367,7 @@ def local_operator_context(settings: DeploymentSettings, *, request_id: str, ses
 
 
 def _als_context(settings: DeploymentSettings, identity: VerifiedIdentity, *, request_id: str,
-                 session_id: Optional[str], actor_kind: ActorKind, run_id: Optional[str]) -> RequestContext:
+                 session_id: str | None, actor_kind: ActorKind, run_id: str | None) -> RequestContext:
     """Build an ALS context from a verified identity."""
     principal = Principal(
         subject=identity.subject, issuer=identity.issuer, is_admin=identity.is_admin,
@@ -383,8 +382,8 @@ def _als_context(settings: DeploymentSettings, identity: VerifiedIdentity, *, re
 
 
 def verify_identity(settings: DeploymentSettings, credential: Union[TiledCredential, str, None], *,
-                    identity_port: Optional[TiledIdentityPort], clock: Clock,
-                    role_cache: Optional[RoleCheckCache] = None, require_fresh: bool = True) -> VerifiedIdentity:
+                    identity_port: TiledIdentityPort | None, clock: Clock,
+                    role_cache: RoleCheckCache | None = None, require_fresh: bool = True) -> VerifiedIdentity:
     """Verify an ALS user credential against the profile's own Tiled.
 
     Args:
@@ -442,11 +441,11 @@ def verify_identity(settings: DeploymentSettings, credential: Union[TiledCredent
 
 
 def resolve_context(settings: DeploymentSettings, request_credential: Union[TiledCredential, str, None], *,
-                    request_id: str, session_id: Optional[str] = None,
+                    request_id: str, session_id: str | None = None,
                     actor_kind: ActorKind = ActorKind.INTERACTIVE,
-                    identity_port: Optional[TiledIdentityPort] = None, clock: Clock,
-                    role_cache: Optional[RoleCheckCache] = None, require_fresh: bool = False,
-                    run_id: Optional[str] = None) -> RequestContext:
+                    identity_port: TiledIdentityPort | None = None, clock: Clock,
+                    role_cache: RoleCheckCache | None = None, require_fresh: bool = False,
+                    run_id: str | None = None) -> RequestContext:
     """Resolve the acting context for one request, job step, Tool call or SDK call.
 
     On ``:local`` this always returns the local-operator with all capabilities and never
@@ -483,7 +482,7 @@ def resolve_context(settings: DeploymentSettings, request_credential: Union[Tile
                         actor_kind=actor_kind, run_id=run_id)
 
 
-def _safe_normalize(url: str) -> Optional[str]:
+def _safe_normalize(url: str) -> str | None:
     """Normalize ``url`` or return ``None`` when it is not a Tiled URL."""
     try:
         return normalize_tiled_target(url)
@@ -493,7 +492,7 @@ def _safe_normalize(url: str) -> Optional[str]:
 
 # --- effect guard --------------------------------------------------------------
 
-def _check_names(capabilities: Iterable[str]) -> FrozenSet[str]:
+def _check_names(capabilities: Iterable[str]) -> frozenset[str]:
     """Return ``capabilities`` as a set, rejecting names outside the frozen vocabulary."""
     caps = frozenset(capabilities)
     unknown = caps - CAPABILITIES
@@ -502,7 +501,7 @@ def _check_names(capabilities: Iterable[str]) -> FrozenSet[str]:
     return caps
 
 
-def require(ctx: Optional[RequestContext], *capabilities: str) -> RequestContext:
+def require(ctx: RequestContext | None, *capabilities: str) -> RequestContext:
     """Raise ``ContractError(DENIED)`` unless ``ctx`` holds every capability. Call before any effect.
 
     Args:
@@ -525,7 +524,7 @@ def require(ctx: Optional[RequestContext], *capabilities: str) -> RequestContext
     return ctx
 
 
-def require_any(ctx: Optional[RequestContext], *capabilities: str) -> RequestContext:
+def require_any(ctx: RequestContext | None, *capabilities: str) -> RequestContext:
     """Raise ``ContractError(DENIED)`` unless ``ctx`` holds at least one of ``capabilities``."""
     needed = _check_names(capabilities)
     if not isinstance(ctx, RequestContext):
@@ -535,7 +534,7 @@ def require_any(ctx: Optional[RequestContext], *capabilities: str) -> RequestCon
     return ctx
 
 
-def _find_context(args: Tuple[Any, ...], kwargs: Mapping[str, Any], name: str) -> Optional[RequestContext]:
+def _find_context(args: tuple[Any, ...], kwargs: Mapping[str, Any], name: str) -> RequestContext | None:
     """Return the ``RequestContext`` passed as ``name=`` or positionally."""
     if isinstance(kwargs.get(name), RequestContext):
         return kwargs[name]
@@ -606,7 +605,7 @@ class RoutePolicy:
     surface: str
     method: str
     path: str
-    capabilities: FrozenSet[str]
+    capabilities: frozenset[str]
     public: bool = False
     on_local: bool = True
     on_als: bool = True
@@ -632,7 +631,7 @@ _MODEL_API_NOTE = ("ALS: signed-in browser session only (owner decision B7, O-A9
                    "/fair2wise/model-api by the UI API process); non-browser token sign-in is D-T8, still open")
 
 #: Per-route policy for every route in docs/migration/companion/f2w_http_routes.json.
-ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
+ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _p("R01", _A, "GET", "/health", "health.read", public=True,
        note="reduced projection unless health_projection(ctx) == 'full'"),
     _p("R02", _A, "GET", "/settings", "settings.personal",
@@ -681,7 +680,7 @@ ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
 )
 
 #: ``(surface, METHOD, path) -> RoutePolicy``.
-ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
+ROUTE_CAPABILITIES: Mapping[tuple[str, str, str], RoutePolicy] = {
     (p.surface, p.method, p.path): p for p in ROUTE_POLICIES
 }
 
@@ -689,7 +688,7 @@ ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
 #: FastAPI's generated API reference pages, outside the 34-route inventory. Public on
 #: every profile, including ALS (owner decision O-A8, 2026-10-12). They bypass route
 #: dependencies, so they must expose no data beyond the API schema.
-FRAMEWORK_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
+FRAMEWORK_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _p("F01", _A, "GET", "/docs", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
     _p("F02", _A, "GET", "/docs/oauth2-redirect", "health.read", public=True, note="FastAPI Swagger UI (O-A8)"),
     _p("F03", _A, "GET", "/redoc", "health.read", public=True, note="FastAPI ReDoc (O-A8)"),
@@ -701,14 +700,14 @@ FRAMEWORK_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("F08", _M, "GET", "/openapi.json", "health.read", public=True, note="FastAPI OpenAPI schema (O-A8)"),
 )
 
-FRAMEWORK_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
+FRAMEWORK_ROUTE_CAPABILITIES: Mapping[tuple[str, str, str], RoutePolicy] = {
     (p.surface, p.method, p.path): p for p in FRAMEWORK_ROUTE_POLICIES
 }
 
 
 #: ALS sign-in/sign-out handlers (access_contract.md section 7 "new" row; ``app/api/sessions.py``,
 #: T25C). Mounted on ALS only; there is no local login (D34).
-SESSION_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
+SESSION_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _p("S01", _A, "GET", "/auth/providers", "auth.session", public=True, on_local=False,
        note="sign-in options generated from the profile Tiled's advertised providers"),
     _p("S02", _A, "POST", "/auth/sign-in", "auth.session", public=True, on_local=False,
@@ -717,12 +716,12 @@ SESSION_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
        note="drops the F2W session and revokes the Tiled session"),
 )
 
-SESSION_ROUTE_CAPABILITIES: Mapping[Tuple[str, str, str], RoutePolicy] = {
+SESSION_ROUTE_CAPABILITIES: Mapping[tuple[str, str, str], RoutePolicy] = {
     (p.surface, p.method, p.path): p for p in SESSION_ROUTE_POLICIES
 }
 
 
-def route_capabilities(method: str, path: str, surface: str = AGENT_SURFACE) -> Optional[RoutePolicy]:
+def route_capabilities(method: str, path: str, surface: str = AGENT_SURFACE) -> RoutePolicy | None:
     """Return the policy for a route, or ``None`` (default-deny on ALS)."""
     key = (surface, method.upper(), path)
     return ROUTE_CAPABILITIES.get(key) or FRAMEWORK_ROUTE_CAPABILITIES.get(key) \
@@ -738,7 +737,7 @@ SETTINGS_NOT_WRITABLE = frozenset({"tiled_uri"})
 
 def settings_update_capabilities(
         fields: Iterable[str], *, local: bool = False
-) -> Tuple[FrozenSet[str], FrozenSet[str]]:
+) -> tuple[frozenset[str], frozenset[str]]:
     """Return ``(required capabilities, ignored fields)`` to change these fields server-wide.
 
     The legacy UI's PUT /settings uses :func:`settings_update_plan` since T25D (personal
@@ -778,10 +777,10 @@ class SettingsUpdatePlan:
         ignored: Fields dropped with a ``setting_not_writable`` warning.
     """
 
-    capabilities: FrozenSet[str]
-    personal: FrozenSet[str]
-    deployment: FrozenSet[str]
-    ignored: FrozenSet[str]
+    capabilities: frozenset[str]
+    personal: frozenset[str]
+    deployment: frozenset[str]
+    ignored: frozenset[str]
 
 
 def settings_update_plan(fields: Iterable[str], *, local: bool, admin: bool) -> SettingsUpdatePlan:
@@ -808,7 +807,7 @@ def settings_update_plan(fields: Iterable[str], *, local: bool, admin: bool) -> 
     return SettingsUpdatePlan(frozenset(caps), personal, deployment, ignored)
 
 
-def chat_action_capabilities(decision: str, kind: Optional[str]) -> FrozenSet[str]:
+def chat_action_capabilities(decision: str, kind: str | None) -> frozenset[str]:
     """Return capabilities for POST /chat/action[/stream] (R13/R16).
 
     ``yes`` without a ``kind`` may resolve to either pending kind, so it needs both.
@@ -824,7 +823,7 @@ def chat_action_capabilities(decision: str, kind: Optional[str]) -> FrozenSet[st
     return frozenset({"ingest.acquire", "ingest.extract"})
 
 
-def graph_node_read_capabilities(json_graph_path: Optional[str]) -> FrozenSet[str]:
+def graph_node_read_capabilities(json_graph_path: str | None) -> frozenset[str]:
     """Return capabilities for GET /graph/node/{id} (R09).
 
     Reading a JSON graph is open to every local user and every signed-in ALS user,
@@ -835,7 +834,7 @@ def graph_node_read_capabilities(json_graph_path: Optional[str]) -> FrozenSet[st
     return frozenset({"chat.read_support"})
 
 
-def require_owner_or(ctx: RequestContext, owner_subject: Optional[str], own: str, any_: str) -> RequestContext:
+def require_owner_or(ctx: RequestContext, owner_subject: str | None, own: str, any_: str) -> RequestContext:
     """Require ``own`` for the caller's own resource, else ``any_`` (sessions R04/R05, traces R17).
 
     An unowned (legacy) resource counts as someone else's on ALS.
@@ -845,7 +844,7 @@ def require_owner_or(ctx: RequestContext, owner_subject: Optional[str], own: str
     return require(ctx, own)
 
 
-def health_projection(ctx: Optional[RequestContext]) -> str:
+def health_projection(ctx: RequestContext | None) -> str:
     """Return ``"full"`` or ``"reduced"`` for GET /health (R01)."""
     return "full" if ctx is not None and ctx.has("settings.global") else "reduced"
 
@@ -882,8 +881,8 @@ class WorkerAuthority:
     """
 
     def __init__(self, ctx: RequestContext, settings: DeploymentSettings, *,
-                 identity_port: Optional[TiledIdentityPort] = None,
-                 credential_provider: Optional[Callable[[], Optional[TiledCredential]]] = None,
+                 identity_port: TiledIdentityPort | None = None,
+                 credential_provider: Callable[[], TiledCredential | None] | None = None,
                  clock: Clock) -> None:
         if ctx.profile is not settings.profile or ctx.tiled_target != settings.tiled_target:
             raise ContractError(ErrorCode.DENIED, "recorded context belongs to another deployment or target")
@@ -894,7 +893,7 @@ class WorkerAuthority:
         self._port = identity_port
         self._credentials = credential_provider
         self._clock = clock
-        self.stopped_reason: Optional[str] = None
+        self.stopped_reason: str | None = None
 
     def check(self, *capabilities: str) -> RequestContext:
         """Re-authorize before an effect and return the current context.
@@ -931,7 +930,7 @@ class WorkerAuthority:
 
 
 
-CredentialLookup = Callable[[str], Optional[TiledCredential]]
+CredentialLookup = Callable[[str], TiledCredential | None]
 
 
 class JobAuthority:
@@ -958,8 +957,8 @@ class JobAuthority:
         StartupConfigError: An ALS deployment without an identity port or credential lookup.
     """
 
-    def __init__(self, settings: DeploymentSettings, *, identity_port: Optional[TiledIdentityPort] = None,
-                 credential_lookup: Optional[CredentialLookup] = None, clock: Optional[Clock] = None) -> None:
+    def __init__(self, settings: DeploymentSettings, *, identity_port: TiledIdentityPort | None = None,
+                 credential_lookup: CredentialLookup | None = None, clock: Clock | None = None) -> None:
         if not settings.is_local:
             if identity_port is None:
                 raise StartupConfigError("config_rejected: ALS job authority needs an identity port")
@@ -969,10 +968,10 @@ class JobAuthority:
         self.settings = settings
         self._port = identity_port
         self._lookup = credential_lookup
-        self._clock: Clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock: Clock = clock or (lambda: datetime.now(UTC))
 
     @property
-    def credential_lookup(self) -> Optional[CredentialLookup]:
+    def credential_lookup(self) -> CredentialLookup | None:
         """The ``subject -> current credential`` lookup this authority re-verifies with (``None`` on local)."""
         return self._lookup
 
@@ -1019,8 +1018,8 @@ class _JobRunAuthority:
     def __init__(self, parent: JobAuthority, job: Any) -> None:
         self._parent = parent
         self._job_id = getattr(job, "job_id", None)
-        self._worker: Optional[WorkerAuthority] = None
-        self.stopped_reason: Optional[str] = None
+        self._worker: WorkerAuthority | None = None
+        self.stopped_reason: str | None = None
 
     def __call__(self, job: Any, capabilities: Sequence[str]) -> RequestContext:
         if self.stopped_reason is not None:
@@ -1062,10 +1061,10 @@ def _check_binding(settings: DeploymentSettings, ctx: RequestContext, target: st
 
 
 def create_approval(ctx: RequestContext, plan: ChangePlan, settings: DeploymentSettings, *, approval_id: str,
-                    clock: Clock, identity_port: Optional[TiledIdentityPort] = None,
-                    approver_credential: Optional[TiledCredential] = None,
-                    requester: Optional[Principal] = None, operation_id: Optional[str] = None,
-                    limits: Optional[Mapping[str, int]] = None, expires_at: Optional[datetime] = None,
+                    clock: Clock, identity_port: TiledIdentityPort | None = None,
+                    approver_credential: TiledCredential | None = None,
+                    requester: Principal | None = None, operation_id: str | None = None,
+                    limits: Mapping[str, int] | None = None, expires_at: datetime | None = None,
                     capability: str = "curation.approve") -> ApprovalRecord:
     """Record an explicit human approval of ``plan`` by the caller in ``ctx``.
 
@@ -1099,7 +1098,7 @@ def create_approval(ctx: RequestContext, plan: ChangePlan, settings: DeploymentS
         raise ContractError(ErrorCode.DENIED, "approvals are made by a human, not a worker or delegate")
     require(ctx, capability)
     _check_binding(settings, ctx, plan.target)
-    common: Dict[str, Any] = dict(
+    common: dict[str, Any] = dict(
         approval_id=approval_id, profile=settings.profile, mode=settings.mode, plan_id=plan.plan_id,
         plan_sha256=plan.plan_sha256, target=plan.target, scope=plan.corpus_scope,
         executed_as=settings.writer_identity, operation_id=operation_id, limits=dict(limits or {}),

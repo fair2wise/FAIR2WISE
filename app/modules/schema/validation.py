@@ -11,12 +11,12 @@ Diagnostic categories are kept separate: ``contract_error``, ``legacy_warning``,
 """
 from __future__ import annotations
 
+from collections import Counter
 import copy
+from dataclasses import dataclass, field
 import hashlib
 import json
-from collections import Counter
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Iterable, Mapping
 
 from .loading import closure_fingerprint, load_helper, pre_s4_fingerprint
 from .registry import (
@@ -47,18 +47,18 @@ class SchemaBindingError(ValueError):
     """An artifact claims a schema fingerprint that is not registered (never reinterpreted, ADR 2.5.3)."""
 
 
-def registered_fingerprints(registry: SchemaRegistry) -> Dict[str, str]:
+def registered_fingerprints(registry: SchemaRegistry) -> dict[str, str]:
     """``closure fingerprint -> schema id`` for every selectable LinkML asset (all schema sets)."""
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for entry in registry:
         if entry.is_linkml and not entry.known_broken:
             out[closure_fingerprint(entry)] = entry.schema_id
     return out
 
 
-def pre_s4_fingerprints(registry: SchemaRegistry) -> Dict[str, str]:
+def pre_s4_fingerprints(registry: SchemaRegistry) -> dict[str, str]:
     """``pre-S4 closure fingerprint -> schema id`` for every selectable base LinkML asset (T22C)."""
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for entry in registry:
         if entry.is_linkml and not entry.known_broken:
             fp = pre_s4_fingerprint(entry)
@@ -68,7 +68,7 @@ def pre_s4_fingerprints(registry: SchemaRegistry) -> Dict[str, str]:
 
 
 def check_binding(
-    registry: Optional[SchemaRegistry], entry: SchemaEntry, claimed: Optional[str], *, actual: Optional[str] = None
+    registry: SchemaRegistry | None, entry: SchemaEntry, claimed: str | None, *, actual: str | None = None
 ) -> str:
     """Compare an artifact's claimed schema fingerprint with ``entry``.
 
@@ -99,7 +99,7 @@ def check_binding(
     raise SchemaBindingError(f"schema {entry.schema_id}@{claimed[:12]} not registered (stale or unknown)")
 
 
-def normalize_term(helper: Any, term: Mapping[str, Any]) -> Dict[str, Any]:
+def normalize_term(helper: Any, term: Mapping[str, Any]) -> dict[str, Any]:
     """Run the existing ``validate_and_fix_term`` on a deep copy of ``term`` and return the result."""
     return helper.validate_and_fix_term(copy.deepcopy(dict(term)))
 
@@ -113,19 +113,19 @@ def relation_is_valid(helper: Any, subject_class: str, predicate: str, object_cl
 class GraphValidationReport:
     """Deterministic, path-free result of :func:`validate_graph` (no timestamps, so its hash is stable)."""
 
-    schema: Dict[str, Any]
+    schema: dict[str, Any]
     fingerprint_status: str
     normalizer: str
     selection_source: str
-    counts: Dict[str, int]
-    categories: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    counts: dict[str, int]
+    categories: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def status(self) -> str:
         """``fail`` only for contract errors; legacy warnings never fail a graph."""
         return "fail" if self.categories[CONTRACT_ERROR]["count"] else "pass"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready body (the content of ``validation.json``)."""
         return {
             "report_version": REPORT_VERSION,
@@ -149,7 +149,7 @@ class GraphValidationReport:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
-def _top(counter: Counter) -> Dict[str, int]:
+def _top(counter: Counter) -> dict[str, int]:
     return dict(sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))[:_TOP_N])
 
 
@@ -163,12 +163,12 @@ def validate_graph(
     payload: Any,
     entry: SchemaEntry,
     *,
-    registry: Optional[SchemaRegistry] = None,
-    claimed_fingerprint: Optional[str] = None,
+    registry: SchemaRegistry | None = None,
+    claimed_fingerprint: str | None = None,
     selection_source: str = "caller",
     helper: Any = None,
     implementation: str = NORMALIZER_TERM_EXTRACTOR,
-    fingerprint: Optional[str] = None,
+    fingerprint: str | None = None,
 ) -> GraphValidationReport:
     """Report-mode check of one graph payload against ``entry``. The payload is read, never modified.
 
@@ -190,9 +190,9 @@ def validate_graph(
         "name": entry.schema_id, "path": entry.path, "sha256": entry.sha256, "version": entry.version,
         "import_fingerprint": fingerprint,
     }
-    errors: List[str] = []
-    nodes: List[Any] = []
-    edges: List[Any] = []
+    errors: list[str] = []
+    nodes: list[Any] = []
+    edges: list[Any] = []
     if not isinstance(payload, Mapping):
         errors.append("payload is not a JSON object")
     else:
@@ -246,7 +246,7 @@ def validate_graph(
                 helper, str(subject.get("category")), slot, str(obj.get("category"))):
             domain_range += 1
 
-    categories: Dict[str, Dict[str, Any]] = {
+    categories: dict[str, dict[str, Any]] = {
         CONTRACT_ERROR: {"count": len(errors), "unit": "items", "examples": sorted(errors)[:_TOP_N]},
         LEGACY_WARNING: {
             "count": unknown_nodes + unknown_edges + domain_range + dangling + (
@@ -271,6 +271,6 @@ def validate_graph(
     )
 
 
-def categories_of(nodes: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
+def categories_of(nodes: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     """Category histogram of a node list (used to prove validation retypes nothing)."""
     return dict(Counter(str(n.get("category")) for n in nodes if isinstance(n, Mapping)))

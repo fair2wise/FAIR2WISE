@@ -22,7 +22,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_extraction.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 from ..contracts.evidence import EvidenceRef, SourceLocator
 from ..literature.parsed_document import ParsedDocument, ParsedFigure
@@ -50,14 +50,14 @@ class PanelResult:
     ordinal: int
     label_source: str                # "text_layer" | "caption_reading_order" | "none"
     method: str
-    pixel_box: Tuple[int, int, int, int]   # figure render pixels, top-left origin
+    pixel_box: tuple[int, int, int, int]   # figure render pixels, top-left origin
     bbox: Box                        # page points, top-left origin
     locator: SourceLocator
-    classification: Dict[str, Any] = field(default_factory=dict)
-    scale: Optional[ScaleFinding] = None
-    qrange: Optional[QRangeFinding] = None
+    classification: dict[str, Any] = field(default_factory=dict)
+    scale: ScaleFinding | None = None
+    qrange: QRangeFinding | None = None
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {
             "panel_id": self.panel_id, "label": self.label or None, "ordinal": self.ordinal,
@@ -79,23 +79,23 @@ class FigureAnalysis:
     page: int
     caption: str
     locator: SourceLocator
-    geometry: Dict[str, Any]
+    geometry: dict[str, Any]
     text_status: str                 # "ok" | "insufficient" | "ocr_fallback" | "ocr_unavailable" | "unlocated"
     n_text_spans: int
-    ocr: Optional[Dict[str, Any]]
-    panels: Tuple[PanelResult, ...] = ()
-    classification: Dict[str, Any] = field(default_factory=dict)
-    classification_units: Tuple[Dict[str, Any], ...] = ()
-    uncertainties: Tuple[Uncertainty, ...] = ()
-    capability_error: Optional[Dict[str, Any]] = None
-    evidence: Tuple[EvidenceRef, ...] = ()
+    ocr: dict[str, Any] | None
+    panels: tuple[PanelResult, ...] = ()
+    classification: dict[str, Any] = field(default_factory=dict)
+    classification_units: tuple[dict[str, Any], ...] = ()
+    uncertainties: tuple[Uncertainty, ...] = ()
+    capability_error: dict[str, Any] | None = None
+    evidence: tuple[EvidenceRef, ...] = ()
 
     @property
     def blocked(self) -> str:
         """The first blocking uncertainty code, or ``""``."""
         return next((u.code for u in self.uncertainties if u.blocking), "")
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {
             "figure_id": self.figure_id, "page": self.page, "caption": self.caption[:CAPTION_CHARS],
@@ -115,10 +115,10 @@ def figure_id_of(figure: ParsedFigure) -> str:
 
 def _assign_panels(
     image: Any, layer: FigureTextLayer, caption: str
-) -> Tuple[List[PanelBox], List[str], List[Uncertainty]]:
+) -> tuple[list[PanelBox], list[str], list[Uncertainty]]:
     """Segment panels and name them: text-layer letters first, then caption reading order, else unlabelled."""
     height, width = image.shape
-    unc: List[Uncertainty] = []
+    unc: list[Uncertainty] = []
     boxes = segment_panels(image) or [PanelBox(0, 0, width, height, method="whole_figure")]
     letters = {x for x in panel_labels(caption) if x in ALPHABET}
     allowed = ALPHABET if not letters else "".join(sorted(letters))
@@ -149,21 +149,21 @@ def analyze_figure(
     work_id: str = "",
     source_sha256: str = "",
     use_ocr: bool = False,
-    ocr_engine: Optional[OcrEngine] = None,
-    model: Optional[ChatAdapter] = None,
+    ocr_engine: OcrEngine | None = None,
+    model: ChatAdapter | None = None,
     default_scale: float = 2.0,
 ) -> FigureAnalysis:
     """Run the full pipeline on one parsed figure (see the module docstring)."""
     fid = figure_id_of(figure)
     layer = text_layer_for(doc, figure, info, default_scale=default_scale)
-    unc: List[Uncertainty] = list(layer.uncertainties)
+    unc: list[Uncertainty] = list(layer.uncertainties)
     caption = figure.caption or ""
     fig_loc = locator(figure.page, fid, None, layer.region)
     if layer.region is None or layer.frame is None:
         return FigureAnalysis(fid, figure.page, caption, fig_loc, layer.geometry(), "unlocated", 0, None,
                               uncertainties=tuple(unc))
     image = render_gray(doc, figure.page, layer.region, layer.scale)
-    spans: List[TextSpan] = list(layer.spans)
+    spans: list[TextSpan] = list(layer.spans)
     status, ocr_info, cap_err = "ok", None, None
     if not layer.sufficient:
         status = "insufficient"
@@ -185,19 +185,19 @@ def analyze_figure(
     blocked = next((u.code for u in unc if u.blocking and u.code in BLOCKING), "")
 
     frame = layer.frame
-    by_panel: Dict[int, List[TextSpan]] = {
+    by_panel: dict[int, list[TextSpan]] = {
         i: spans_inside(spans, frame, (float(b.left), float(b.top), float(b.right), float(b.bottom)))
         for i, b in enumerate(boxes)}
     scales = read_scales(image, boxes, caption, by_panel, blocked=blocked)
     qranges = read_qranges(boxes, caption, by_panel, blocked=blocked)
     fig_class = classify_text_context(caption, model=model)
 
-    panels: List[PanelResult] = []
-    refs: List[EvidenceRef] = []
+    panels: list[PanelResult] = []
+    refs: list[EvidenceRef] = []
     if work_id and source_sha256:
         refs.append(evidence(work_id, source_sha256, fig_loc, "figure"))
-    verdicts: Dict[str, Dict[str, Any]] = {fid: fig_class}
-    parents: Dict[str, str] = {}
+    verdicts: dict[str, dict[str, Any]] = {fid: fig_class}
+    parents: dict[str, str] = {}
     for i, box in enumerate(boxes):
         label = box.label
         x0, y0 = frame.to_points(box.left, box.top)
@@ -220,7 +220,7 @@ def analyze_figure(
                 refs.append(evidence(work_id, source_sha256, loc, "scale", scales[i].reading.nm_per_px))
             if qranges[i].reported:
                 refs.append(evidence(work_id, source_sha256, loc, "q_range", qranges[i].reading.q_max_nm_inv))
-    units: List[Unit] = resolve_units(verdicts, parents, panel_order={p.panel_id: p.ordinal for p in panels})
+    units: list[Unit] = resolve_units(verdicts, parents, panel_order={p.panel_id: p.ordinal for p in panels})
     return FigureAnalysis(
         fid, figure.page, caption, fig_loc, layer.geometry(), status, len(layer.spans), ocr_info, tuple(panels),
         fig_class,
@@ -235,15 +235,15 @@ class ExtractionOutcome:
 
     work_id: str
     source_sha256: str
-    figures: List[FigureAnalysis] = field(default_factory=list)
+    figures: list[FigureAnalysis] = field(default_factory=list)
 
     @property
-    def capability_errors(self) -> List[Dict[str, Any]]:
+    def capability_errors(self) -> list[dict[str, Any]]:
         """One entry per figure that could not be fully read for lack of a capability."""
         return [{"figure_id": f.figure_id, **f.capability_error} for f in self.figures if f.capability_error]
 
     @property
-    def evidence(self) -> Tuple[EvidenceRef, ...]:
+    def evidence(self) -> tuple[EvidenceRef, ...]:
         """All evidence references, in figure order."""
         return tuple(e for f in self.figures for e in f.evidence)
 
@@ -254,10 +254,10 @@ def extract_figures(
     *,
     work_id: str = "",
     figure_ids: Sequence[str] = (),
-    page: Optional[int] = None,
+    page: int | None = None,
     use_ocr: bool = False,
-    ocr_engine: Optional[OcrEngine] = None,
-    model: Optional[ChatAdapter] = None,
+    ocr_engine: OcrEngine | None = None,
+    model: ChatAdapter | None = None,
 ) -> ExtractionOutcome:
     """Analyse the selected figures (all when no selector) of one parsed paper."""
     doc = open_pdf(pdf_bytes)

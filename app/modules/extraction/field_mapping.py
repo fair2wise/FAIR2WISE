@@ -20,11 +20,14 @@ Nothing here reads the environment, a model or the network.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Iterable, Mapping
 
 from ..evidence.records import EvidenceRecord, EvidenceSource, ReportedQuantity, TagDecision
 from ..evidence.units import (
-    INSTRUMENT_QUANTITY_DIMENSION, QUANTITY_DIMENSION, base_quantity_name, expected_dimension,
+    INSTRUMENT_QUANTITY_DIMENSION,
+    QUANTITY_DIMENSION,
+    base_quantity_name,
+    expected_dimension,
 )
 
 #: Version of the F1/F4 tables below.
@@ -47,7 +50,7 @@ class FieldRow:
 
     name: str
     dimension: str
-    current_slot: Optional[str]
+    current_slot: str | None
     fills_current_slot: bool
     schema_030: str
     note: str = ""
@@ -56,8 +59,8 @@ class FieldRow:
 _QV = "QuantityValue (quantity_label = name, numeric_value/unit as printed, evidence_source_tag)"
 
 
-def _rows() -> Tuple[FieldRow, ...]:
-    rows: List[FieldRow] = [
+def _rows() -> tuple[FieldRow, ...]:
+    rows: list[FieldRow] = [
         FieldRow(name, dimension, None, False, _QV, "no current F2W slot; candidate quantity record")
         for name, dimension in sorted(QUANTITY_DIMENSION.items())
     ]
@@ -84,7 +87,7 @@ QUANTITY_FIELD_MAP: Mapping[str, FieldRow] = {row.name: row for row in _rows()}
 PEAK_ASSIGNMENT_SLOT = "ExperimentalTechnique.peak_assignments"
 
 
-def field_row(name: str) -> Optional[FieldRow]:
+def field_row(name: str) -> FieldRow | None:
     """The F1 row for a (possibly peak-qualified) quantity name, or ``None`` when unmapped."""
     return QUANTITY_FIELD_MAP.get(base_quantity_name(name))
 
@@ -93,21 +96,21 @@ def _peak_label(name: str) -> str:
     return name[name.index("[") + 1:-1].strip() if "[" in name and name.endswith("]") else ""
 
 
-def _printed(value: Optional[float], unit: str) -> str:
+def _printed(value: float | None, unit: str) -> str:
     return f"{value:g} {unit}".strip() if value is not None else ""
 
 
 def peak_slot_values(
-    accepted: Iterable[Tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
-) -> Dict[str, Any]:
+    accepted: Iterable[tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
+) -> dict[str, Any]:
     """F4: existing peak slot values from accepted *reported* peaks, each with its evidence ids.
 
     Returns ``{"peak_positions": [...], "d_spacing": [...], "peak_assignments": [...],
     "evidence_ids": {slot value: [ids]}, "skipped": [{name, tag}]}``, values in first-seen order.
     """
-    slots: Dict[str, List[str]] = {"peak_positions": [], "d_spacing": [], "peak_assignments": []}
-    evidence: Dict[str, List[str]] = {}
-    skipped: List[Dict[str, str]] = []
+    slots: dict[str, list[str]] = {"peak_positions": [], "d_spacing": [], "peak_assignments": []}
+    evidence: dict[str, list[str]] = {}
+    skipped: list[dict[str, str]] = []
 
     def add(slot: str, text: str, evidence_id: str) -> None:
         if not text:

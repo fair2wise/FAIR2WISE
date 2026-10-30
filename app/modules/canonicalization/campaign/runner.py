@@ -14,11 +14,11 @@ catalog readers and the in-place ``apply`` flag.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Sequence
+from typing import Any, Sequence
 
 from ..growth import ObservationLog
 from ..migration import PlanDraft, sha256_json
@@ -47,27 +47,27 @@ class CampaignRun:
     campaign_id: str
     vocabulary_revision: str
     source_revision: str
-    evidence: Dict[str, TermEvidence] = field(default_factory=dict)
-    quarantine: List[QuarantineRecord] = field(default_factory=list)
-    votes: Dict[str, List[TermVerdict]] = field(default_factory=dict)
-    decisions: Dict[str, Decision] = field(default_factory=dict)
-    pending: List[str] = field(default_factory=list)
-    parked: List[ParkedTerm] = field(default_factory=list)
-    rounds: List[RoundRecord] = field(default_factory=list)
-    reviews: List[ReviewDecision] = field(default_factory=list)
-    review_queue: List[str] = field(default_factory=list)
+    evidence: dict[str, TermEvidence] = field(default_factory=dict)
+    quarantine: list[QuarantineRecord] = field(default_factory=list)
+    votes: dict[str, list[TermVerdict]] = field(default_factory=dict)
+    decisions: dict[str, Decision] = field(default_factory=dict)
+    pending: list[str] = field(default_factory=list)
+    parked: list[ParkedTerm] = field(default_factory=list)
+    rounds: list[RoundRecord] = field(default_factory=list)
+    reviews: list[ReviewDecision] = field(default_factory=list)
+    review_queue: list[str] = field(default_factory=list)
     observations: ObservationLog = field(default_factory=ObservationLog)
     max_rounds: int = DEFAULT_MAX_ROUNDS
     max_terms_per_round: int = DEFAULT_MAX_TERMS_PER_ROUND
     min_pubs_review: int = DEFAULT_MIN_PUBS_REVIEW
 
-    def vote_objects(self, key: str) -> List[Vote]:
+    def vote_objects(self, key: str) -> list[Vote]:
         """Return the retained votes for `key` as ``Vote`` objects (empty if none)."""
         return [
             Vote(v.framing, v.verdict, v.target_slug, v.reject_kind, v.accepted) for v in self.votes.get(key, [])
         ]
 
-    def report(self) -> Dict[str, Any]:
+    def report(self) -> dict[str, Any]:
         """Counts a reviewer can act on. Candidate terms are counted separately from canonical entities."""
         return {
             "campaign_id": self.campaign_id,
@@ -111,8 +111,8 @@ class CampaignRun:
         return path
 
 
-def _count(items) -> Dict[str, int]:
-    out: Dict[str, int] = {}
+def _count(items) -> dict[str, int]:
+    out: dict[str, int] = {}
     for item in items:
         out[item] = out.get(item, 0) + 1
     return dict(sorted(out.items()))
@@ -136,7 +136,7 @@ def open_run(
     )
 
 
-def campaign_status(run: CampaignRun) -> Dict[str, Any]:
+def campaign_status(run: CampaignRun) -> dict[str, Any]:
     """Stage-by-stage counts, for progress and review dashboards."""
     return {**run.report(), "pending": len(run.pending)}
 
@@ -147,7 +147,7 @@ class CampaignOutcome:
 
     run: CampaignRun
     draft: PlanDraft
-    report: Dict[str, Any]
+    report: dict[str, Any]
 
 
 def run_campaign(

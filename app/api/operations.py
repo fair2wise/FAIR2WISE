@@ -33,12 +33,12 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
-import time
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Union
+import time
+from typing import Any, Callable, Iterable, Mapping, Sequence, Union
+import uuid
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan
 from ..modules.contracts.context import LOCAL_OPERATOR, ActorKind, RequestContext
@@ -67,7 +67,7 @@ DEFAULT_APPROVAL_TTL = ALS_APPROVAL_TTL
 PROFILE_APPROVAL_TTL: Any = ...
 
 
-def default_approval_ttl(settings: DeploymentSettings) -> Optional[timedelta]:
+def default_approval_ttl(settings: DeploymentSettings) -> timedelta | None:
     """Approval lifetime for ``settings``: ``None`` (never expires) on ``:local``, 24 h on ALS."""
     return None if settings.is_local else ALS_APPROVAL_TTL
 H5_MESSAGE = ("publication to {target} is gated at H5: only approved rehearsal targets (fixture or disposable "
@@ -75,10 +75,10 @@ H5_MESSAGE = ("publication to {target} is gated at H5: only approved rehearsal t
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-def _base(target: str) -> Optional[str]:
+def _base(target: str) -> str | None:
     try:
         return normalize_tiled_target(target.split("#", 1)[0])
     except ValueError:
@@ -94,7 +94,7 @@ class PublicationGate:
             servers. Empty by default; there is no environment variable or request field for it.
     """
 
-    rehearsal_targets: FrozenSet[str] = field(default_factory=frozenset)
+    rehearsal_targets: frozenset[str] = field(default_factory=frozenset)
 
     def allows(self, target: str) -> bool:
         """Return whether ``target`` is an approved rehearsal target."""
@@ -144,9 +144,9 @@ class F2WOperations:
     """
 
     def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Any = None,
-                 curation: Any = None, audit: Any = None, identity_port: Optional[TiledIdentityPort] = None,
-                 publication_gate: Optional[PublicationGate] = None, clock: Clock = _utcnow,
-                 approval_ttl: Optional[timedelta] = PROFILE_APPROVAL_TTL, knowledge: Any = None) -> None:
+                 curation: Any = None, audit: Any = None, identity_port: TiledIdentityPort | None = None,
+                 publication_gate: PublicationGate | None = None, clock: Clock = _utcnow,
+                 approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: Any = None) -> None:
         """Bind the services; see the class docstring for the arguments.
 
         Raises:
@@ -162,13 +162,13 @@ class F2WOperations:
         self.identity_port = identity_port
         self.gate = publication_gate or PublicationGate()
         self.clock = clock
-        self.approval_ttl: Optional[timedelta] = (default_approval_ttl(settings) if approval_ttl is PROFILE_APPROVAL_TTL
+        self.approval_ttl: timedelta | None = (default_approval_ttl(settings) if approval_ttl is PROFILE_APPROVAL_TTL
                                                   else approval_ttl)
         self.knowledge = knowledge
 
     # --- contexts ---------------------------------------------------------------------
 
-    def cli_context(self, *, request_id: Optional[str] = None) -> RequestContext:
+    def cli_context(self, *, request_id: str | None = None) -> RequestContext:
         """The CLI caller's context: the local operator on ``:local``; refused on ALS.
 
         ALS has no CLI sign-in; an ALS caller uses the HTTP API with a browser session.
@@ -185,7 +185,7 @@ class F2WOperations:
     # --- jobs ---------------------------------------------------------------------------
 
     def submit_job(self, ctx: RequestContext, kind: str, inputs: Union[OperationInputs, Mapping[str, Any]], *,
-                   settings_revision: Optional[str] = None) -> JobHandle:
+                   settings_revision: str | None = None) -> JobHandle:
         """Register a job of a registered ``kind`` (idempotent for identical inputs)."""
         if not isinstance(inputs, OperationInputs):
             try:
@@ -194,8 +194,8 @@ class F2WOperations:
                 raise ContractError(ErrorCode.INVALID_INPUT, f"invalid job inputs: {exc}") from None
         return self.jobs.submit(ctx, kind, inputs, settings_revision=settings_revision)
 
-    def list_jobs(self, ctx: RequestContext, *, state: Optional[str] = None, kind: Optional[str] = None,
-                  limit: int = 100) -> List[JobHandle]:
+    def list_jobs(self, ctx: RequestContext, *, state: str | None = None, kind: str | None = None,
+                  limit: int = 100) -> list[JobHandle]:
         """Most recently updated jobs the caller may see (creator or ``jobs.admin``, corpus scope)."""
         try:
             wanted = JobState(state) if state else None
@@ -208,11 +208,11 @@ class F2WOperations:
         """The job's handle."""
         return self.jobs.get(ctx, job_id)
 
-    def job_events(self, ctx: RequestContext, job_id: str, *, after: int = -1) -> List[JobEvent]:
+    def job_events(self, ctx: RequestContext, job_id: str, *, after: int = -1) -> list[JobEvent]:
         """Durable events after sequence ``after``."""
         return self.jobs.events(ctx, job_id, after=after)
 
-    def job_progress(self, ctx: RequestContext, job_id: str) -> Dict[str, Any]:
+    def job_progress(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """Per-phase progress."""
         return self.jobs.progress(ctx, job_id)
 
@@ -221,11 +221,11 @@ class F2WOperations:
         return self.jobs.cancel(ctx, job_id)
 
     def resume_job(self, ctx: RequestContext, job_id: str, *,
-                   expected_revision: Optional[int] = None) -> JobHandle:
+                   expected_revision: int | None = None) -> JobHandle:
         """Re-queue a paused, review-resolved or failed job."""
         return self.jobs.resume(ctx, job_id, expected_revision=expected_revision)
 
-    def job_view(self, ctx: RequestContext, job_id: str) -> Dict[str, Any]:
+    def job_view(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """UI view of one job: handle, progress, and staged/approved/published state.
 
         ``ui_state`` is one of ``queued``, ``running``, ``paused``, ``awaiting_review``,
@@ -244,7 +244,7 @@ class F2WOperations:
             JobState.PAUSED_PROVIDER: "paused", JobState.AWAITING_REVIEW: "awaiting_review",
             JobState.SUCCEEDED: "completed", JobState.FAILED: "failed", JobState.CANCELLED: "cancelled",
         }[state]
-        view: Dict[str, Any] = {"job": _json(handle), "ui_state": ui_state, "pause_reason": job.pause_reason,
+        view: dict[str, Any] = {"job": _json(handle), "ui_state": ui_state, "pause_reason": job.pause_reason,
                                 "stop_requested": job.stop_requested, "progress": progress, "publication": None}
         pub = self.publication
         if pub is None or job.kind != "publish":
@@ -252,7 +252,7 @@ class F2WOperations:
         store = pub.store
         record = store.current_plan(job_id)
         quarantined = store.quarantined(job_id)
-        detail: Dict[str, Any] = {"target": job.inputs.params.get("target"),
+        detail: dict[str, Any] = {"target": job.inputs.params.get("target"),
                                   "snapshot_ref": job.inputs.params.get("snapshot_ref"),
                                   "plan": None, "approvals": [], "receipt_id": None, "active": False,
                                   "quarantine": [{"subject": q.get("subject"), "reason": q.get("reason")}
@@ -289,26 +289,26 @@ class F2WOperations:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "curation review is not configured")
         return self.curation
 
-    def _case_scope(self, ctx: RequestContext) -> List[str]:
+    def _case_scope(self, ctx: RequestContext) -> list[str]:
         """Corpora the caller reviews: all stored corpora for the local operator (as review_case)."""
         store = self._curation()
         if ctx.principal.subject == LOCAL_OPERATOR and ctx.mode.value == "local_trusted":
             return [r[0] for r in store.db.query("SELECT DISTINCT corpus FROM uncertainty_cases")]
         return sorted(ctx.corpus_scope)
 
-    def curation_summary(self, ctx: RequestContext) -> Dict[str, Any]:
+    def curation_summary(self, ctx: RequestContext) -> dict[str, Any]:
         """Review queue counts by state and route, and the remote-cost ledger summary."""
         require(ctx, "curation.approve")
         store = self._curation()
         return {**store.summary(self._case_scope(ctx)), "budget": store.ledger.summary()}
 
-    def list_cases(self, ctx: RequestContext, *, state: Optional[str] = None, route: Optional[str] = None,
-                   limit: int = 100) -> List[Dict[str, Any]]:
+    def list_cases(self, ctx: RequestContext, *, state: str | None = None, route: str | None = None,
+                   limit: int = 100) -> list[dict[str, Any]]:
         """Bounded case summaries within the caller's scope."""
         require(ctx, "curation.approve")
         return self._curation().list_cases(self._case_scope(ctx), state=state, route=route, limit=limit)
 
-    def get_case(self, ctx: RequestContext, case_id: str) -> Dict[str, Any]:
+    def get_case(self, ctx: RequestContext, case_id: str) -> dict[str, Any]:
         """One case with its attempts and history (``revision`` is what a decision binds to)."""
         require(ctx, "curation.approve")
         store = self._curation()
@@ -316,7 +316,7 @@ class F2WOperations:
         return {"case": case, "attempts": store.attempts(case_id), "events": store.events(case_id)}
 
     def review_case(self, ctx: RequestContext, case_id: str, *, bound_revision: str, accept: bool,
-                    resolution: Optional[Dict[str, Any]] = None, reason: str = "") -> Dict[str, Any]:
+                    resolution: dict[str, Any] | None = None, reason: str = "") -> dict[str, Any]:
         """Accept or reject a case (``review_case``; write-ahead audited when audit is configured)."""
         from ..modules.curation.reviewer import review_case
 
@@ -331,7 +331,7 @@ class F2WOperations:
         return create_cost_approval(ctx, self._curation(), scope=scope, models=models, cap_usd=cap_usd,
                                     expires_at=expires_at, now=self.clock())
 
-    def revoke_cost_approval(self, ctx: RequestContext, approval_id: str) -> Dict[str, Any]:
+    def revoke_cost_approval(self, ctx: RequestContext, approval_id: str) -> dict[str, Any]:
         """Revoke a cost approval (human with ``curation.approve`` over its corpora)."""
         from ..modules.curation.approval import load_cost_approval
 
@@ -365,8 +365,8 @@ class F2WOperations:
         return self._publication().current_plan(ctx, job_id)
 
     def approve_publication(self, ctx: RequestContext, job_id: str, plan_sha256: str, *,
-                            approver_credential: Optional[TiledCredential] = None,
-                            expires_at: Optional[datetime] = None) -> Dict[str, Any]:
+                            approver_credential: TiledCredential | None = None,
+                            expires_at: datetime | None = None) -> dict[str, Any]:
         """Approve the job's current plan, bound to the ``plan_sha256`` the reviewer was shown.
 
         The approval is created by ``security.authorization.create_approval`` (human, verified
@@ -415,7 +415,7 @@ class F2WOperations:
         self.gate.check(plan.target, self.settings)
         return pub.submit_approval(ctx, approval.operation_id, approval)
 
-    def publication_pointer(self, ctx: RequestContext, target: str) -> Optional[Dict[str, Any]]:
+    def publication_pointer(self, ctx: RequestContext, target: str) -> dict[str, Any] | None:
         """The active publication pointer of ``target`` (``None`` when nothing is active)."""
         require(ctx, "chat.read_support")
         pointer = self._publication().pointer(target)
@@ -423,7 +423,7 @@ class F2WOperations:
             return None
         return {"target": pointer.name, "version": pointer.version, **pointer.as_dict()}
 
-    def rollback_publication(self, ctx: RequestContext, target: str, *, reason: str) -> Dict[str, Any]:
+    def rollback_publication(self, ctx: RequestContext, target: str, *, reason: str) -> dict[str, Any]:
         """Restore the previous active pointer of a rehearsal target (human, ``graph.publish``)."""
         require(ctx, "graph.publish")
         pub = self._publication()
@@ -456,36 +456,36 @@ class F2WOperations:
         """``kg_compare_snapshots`` over 2-12 graphs in the given order."""
         return self.run_knowledge_operation(ctx, "kg_compare_snapshots", {"graph_ids": list(graph_ids)})
 
-    def paper_subgraph(self, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: Optional[int] = None,
-                       max_edges: Optional[int] = None) -> ToolResult:
+    def paper_subgraph(self, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int | None = None,
+                       max_edges: int | None = None) -> ToolResult:
         """``kg_paper_subgraph``: what one graph holds about one Work."""
-        args: Dict[str, Any] = {"graph_id": graph_id, "paper": paper}
+        args: dict[str, Any] = {"graph_id": graph_id, "paper": paper}
         if max_nodes is not None:
             args["max_nodes"] = max_nodes
         if max_edges is not None:
             args["max_edges"] = max_edges
         return self.run_knowledge_operation(ctx, "kg_paper_subgraph", args)
 
-    def recent_entities(self, ctx: RequestContext, graph_id: str, *, since: Optional[str] = None,
-                        limit: Optional[int] = None) -> ToolResult:
+    def recent_entities(self, ctx: RequestContext, graph_id: str, *, since: str | None = None,
+                        limit: int | None = None) -> ToolResult:
         """``kg_recent_entities`` of a live (Tiled) graph; JSON snapshots are ``UNSUPPORTED_CAPABILITY``."""
-        args: Dict[str, Any] = {"graph_id": graph_id}
+        args: dict[str, Any] = {"graph_id": graph_id}
         if since:
             args["since"] = since
         if limit is not None:
             args["limit"] = limit
         return self.run_knowledge_operation(ctx, "kg_recent_entities", args)
 
-    def audit_corpus(self, ctx: RequestContext, corpus: str, *, sections: Optional[Sequence[str]] = None
+    def audit_corpus(self, ctx: RequestContext, corpus: str, *, sections: Sequence[str] | None = None
                      ) -> ToolResult:
         """``curate_audit_corpus`` of one configured extracted-terms corpus."""
-        args: Dict[str, Any] = {"corpus": corpus}
+        args: dict[str, Any] = {"corpus": corpus}
         if sections:
             args["sections"] = list(sections)
         return self.run_knowledge_operation(ctx, "curate_audit_corpus", args)
 
     def submit_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
-                                   corpus_scope: Optional[Sequence[str]] = None) -> JobHandle:
+                                   corpus_scope: Sequence[str] | None = None) -> JobHandle:
         """Submit one operation as a ``knowledge_operation`` job (``ops.run``; whole population, no inline bound).
 
         The arguments are schema-checked first. ``corpus_scope`` defaults to the graph ids /
@@ -504,7 +504,7 @@ class F2WOperations:
         inputs = OperationInputs(corpus_scope=scope, params=job_params(operation, dict(args)))
         return self.jobs.submit(ctx, OPERATION_JOB_KIND, inputs)
 
-    def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> Dict[str, Any]:
+    def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """The handle of a ``knowledge_operation`` job and, once computed, its bounded report.
 
         ``result`` is the stage's bounded ``OperationReport`` (``coverage.completeness`` says
@@ -533,7 +533,7 @@ class F2WOperations:
 
     # --- status ----------------------------------------------------------------------------------
 
-    def audit_status(self, ctx: RequestContext) -> Dict[str, Any]:
+    def audit_status(self, ctx: RequestContext) -> dict[str, Any]:
         """Audit-path health; ``degraded`` is true whenever critical mutations would be refused."""
         require(ctx, "jobs.admin")
         if self.audit is None:
@@ -544,10 +544,10 @@ class F2WOperations:
                 "reason": status.reason, "spilled": status.spilled, "dropped": status.dropped,
                 "pending_projection": status.pending_projection, "last_seq": status.last_seq}
 
-    def ops_status(self, ctx: RequestContext) -> Dict[str, Any]:
+    def ops_status(self, ctx: RequestContext) -> dict[str, Any]:
         """Ingestion-monitor DTO (O-07): visible jobs by state, review queue, audit, publication."""
         require(ctx, "jobs.admin")
-        by_state: Dict[str, int] = {}
+        by_state: dict[str, int] = {}
         for handle in self.list_jobs(ctx, limit=1000):
             by_state[handle.state.value] = by_state.get(handle.state.value, 0) + 1
         review = None
@@ -564,10 +564,10 @@ class F2WOperations:
 
 
 def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
-                     identity_port: Optional[TiledIdentityPort] = None, epoch: Callable[[], float] = time.time,
+                     identity_port: TiledIdentityPort | None = None, epoch: Callable[[], float] = time.time,
                      clock: Clock = _utcnow, owner: str = "api",
-                     publication_gate: Optional[PublicationGate] = None,
-                     credential_lookup: Optional[Callable[[str], Any]] = None,
+                     publication_gate: PublicationGate | None = None,
+                     credential_lookup: Callable[[str], Any] | None = None,
                      knowledge: Any = None) -> F2WOperations:
     """Build the default operations over SQLite stores under ``root`` (created if missing).
 
@@ -597,7 +597,7 @@ def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
                          publication_gate=publication_gate, clock=clock, knowledge=knowledge)
 
 
-def job_event_json(event: JobEvent) -> Dict[str, Any]:
+def job_event_json(event: JobEvent) -> dict[str, Any]:
     """JSON payload of one job event (SSE ``data``)."""
     return event.model_dump(mode="json")
 

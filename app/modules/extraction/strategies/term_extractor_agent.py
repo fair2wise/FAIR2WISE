@@ -24,7 +24,7 @@ Two input modes, both existing entry points:
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from ..contract import ChunkCoverage, ExtractionResult, ExtractionSource, frozen_copy
 from .legacy_f2w import mentions_for_term
@@ -33,7 +33,7 @@ STRATEGY_NAME = "f2w_term_extractor_agent"
 STRATEGY_VERSION = "term_extractor-orchestrator-2.1"
 
 
-def _as_dict(record: Any) -> Dict[str, Any]:
+def _as_dict(record: Any) -> dict[str, Any]:
     return record.to_dict() if hasattr(record, "to_dict") else dict(record)
 
 
@@ -50,14 +50,14 @@ class TermExtractorAgentStrategy:
     def __init__(self, orchestrator: Any) -> None:
         self.orchestrator = orchestrator
 
-    def _inference(self) -> Dict[str, Any]:
+    def _inference(self) -> dict[str, Any]:
         o = self.orchestrator
         return {"path": "term_extractor.Orchestrator.process_page", "model": getattr(o, "model", None),
                 "backend": getattr(o, "backend", None), "temperature": getattr(o, "temperature", None)}
 
-    def run(self, source: ExtractionSource) -> Tuple[str, List[ChunkCoverage]]:
+    def run(self, source: ExtractionSource) -> tuple[str, list[ChunkCoverage]]:
         """Run the orchestrator on ``source``; return the ``source_paper`` filename and coverage."""
-        coverage: List[ChunkCoverage] = []
+        coverage: list[ChunkCoverage] = []
         if source.pdf_path:
             filename = os.path.basename(source.pdf_path)
             pages = self.orchestrator.process_pdf(source.pdf_path)

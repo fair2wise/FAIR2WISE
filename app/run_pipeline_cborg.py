@@ -11,13 +11,12 @@ Organization:
 """
 
 import argparse
+from datetime import UTC, datetime
 import logging
-from datetime import datetime, timezone
+import os
 from pathlib import Path
-from typing import List
 import shutil
 import tempfile
-import os
 
 from modules.extract_terms import run_extraction
 from modules.json2kg import convert_terms_to_graph
@@ -71,7 +70,7 @@ def organize_papers_into_folders(source_dir: Path, output_root: Path, papers_per
 # -----------------------------------------------------------------------------
 def run_checkpoint_pipeline(
     pdf_root: Path,
-    models: List[str],
+    models: list[str],
     dry_run: bool = False
 ) -> None:
     """Run FAIR2WISE pipeline incrementally per model, retaining all JSONs with unique filenames."""
@@ -96,7 +95,7 @@ def run_checkpoint_pipeline(
                 new_pdfs.extend(list(folder_path.glob("*.pdf")))
 
             # Build unique filenames with timestamp
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             safe_model = model.replace(":", "_").replace("/", "_")  # make FS-safe
             terms_json = Path(f"./storage/terminology/extracted_terms_{safe_model}_{checkpoint}_{timestamp}.json")
             graph_json = Path(f"./storage/kg/matkg_{safe_model}_{checkpoint}_{timestamp}.json")

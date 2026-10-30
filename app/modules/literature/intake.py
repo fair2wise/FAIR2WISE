@@ -24,10 +24,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_intake.py (``IntakeRepor
 
 from __future__ import annotations
 
-import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+import re
+from typing import Any, Callable, Mapping
 
 from ..contracts.context import RequestContext
 from .legacy import LegacyIndex, doi_key, doi_only, looks_like_pdf
@@ -44,7 +44,7 @@ _DOI_IN_TEXT = re.compile(r"\b10\.\d{4,9}/[^\s\"'<>,;)\]}]+")
 _DOI_TRAILING = ".,;:)]}>'\"-"
 
 #: Closed set of outcomes. ``ready`` is the only ingestable one.
-STATUSES: Tuple[str, ...] = (
+STATUSES: tuple[str, ...] = (
     "ready",
     "skipped:not_pdf",
     "skipped:too_small",
@@ -65,7 +65,7 @@ INGESTABLE = frozenset({"ready"})
 RETRYABLE = frozenset({"skipped:openalex_unreachable", "skipped:openalex_quota_paused"})
 
 #: ``fetch(path, params) -> dict`` (an :meth:`OpenAlexClient.fetch`).
-Fetch = Callable[..., Dict[str, Any]]
+Fetch = Callable[..., dict[str, Any]]
 #: ``extract(path, pages) -> str`` first-pages text plus document metadata.
 TextExtractor = Callable[[Path, int], str]
 
@@ -75,16 +75,16 @@ class WorkIdentity:
     """The identity facts of one intake, kept separate (see module docstring)."""
 
     asserted_doi: str = ""
-    pdf_doi_candidates: List[str] = field(default_factory=list)
+    pdf_doi_candidates: list[str] = field(default_factory=list)
     verified_doi: str = ""
     verification: str = ""          # title_match | filename_match | asserted_registry_only
     canonical_work_id: str = ""     # OpenAlex work id of the bibliographic record, when resolved
     source_ref: str = ""            # sha256:<hex> of these bytes
     source_version: str = "unknown"  # preprint | journal | unknown
-    prior_source_refs: List[str] = field(default_factory=list)
+    prior_source_refs: list[str] = field(default_factory=list)
     doi_mismatch: bool = False      # the asserted DOI differs from every DOI printed in the PDF
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
@@ -99,12 +99,12 @@ class IntakeReport:
     doi: str = ""
     title: str = ""
     sha256: str = ""
-    duplicate_of: List[str] = field(default_factory=list)
-    candidates_tried: List[str] = field(default_factory=list)
+    duplicate_of: list[str] = field(default_factory=list)
+    candidates_tried: list[str] = field(default_factory=list)
     identity_asserted: bool = False
     identity: WorkIdentity = field(default_factory=WorkIdentity)
-    work: Optional[Dict[str, Any]] = None
-    warnings: List[str] = field(default_factory=list)
+    work: dict[str, Any] | None = None
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -116,7 +116,7 @@ class IntakeReport:
         """Whether a later run may succeed (registry outage or quota)."""
         return self.status in RETRYABLE
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form; the source filename only, never a store path."""
         data = asdict(self)
         data["source"] = Path(self.source).name
@@ -133,7 +133,7 @@ def pymupdf_first_pages_text(path: Path, pages: int = DOI_SEARCH_PAGES) -> str:
         import fitz
     except ImportError:
         return ""
-    chunks: List[str] = []
+    chunks: list[str] = []
     try:
         with fitz.open(str(path)) as doc:
             if getattr(doc, "needs_pass", False):
@@ -146,9 +146,9 @@ def pymupdf_first_pages_text(path: Path, pages: int = DOI_SEARCH_PAGES) -> str:
     return "\n".join(chunks)
 
 
-def extract_doi_candidates(text: str, *, limit: int = 5) -> List[str]:
+def extract_doi_candidates(text: str, *, limit: int = 5) -> list[str]:
     """Distinct DOIs in ``text`` in first-occurrence order; a stripped form first, the raw form after."""
-    seen: List[str] = []
+    seen: list[str] = []
     for match in _DOI_IN_TEXT.finditer(text or ""):
         raw = match.group(0)
         for form in (raw.rstrip(_DOI_TRAILING), raw):
@@ -160,7 +160,7 @@ def extract_doi_candidates(text: str, *, limit: int = 5) -> List[str]:
     return seen[:limit]
 
 
-def filename_doi_candidates(filename: str, *, limit: int = 6) -> List[str]:
+def filename_doi_candidates(filename: str, *, limit: int = 6) -> list[str]:
     """DOIs a filename implies; candidates only, each still verified.
 
     Patterns: F2W's own stems (``10.1021_acs.macromol.0c01782.pdf`` from
@@ -169,7 +169,7 @@ def filename_doi_candidates(filename: str, *, limit: int = 6) -> List[str]:
     """
     name = Path(filename).name
     stem = name[:-4] if name.lower().endswith(".pdf") else name
-    out: List[str] = []
+    out: list[str] = []
     f2w = re.match(r"^(10\.\d{4,9})_(.+)$", stem)
     if f2w:
         out.append(f"{f2w.group(1)}/{f2w.group(2)}")
@@ -184,7 +184,7 @@ def filename_doi_candidates(filename: str, *, limit: int = 6) -> List[str]:
     if arxiv:
         out.append(f"10.48550/arXiv.{arxiv.group(1)}")
         out.append(f"10.48550/arxiv.{arxiv.group(1)}")
-    unique: List[str] = []
+    unique: list[str] = []
     for doi in out:
         if doi not in unique:
             unique.append(doi)
@@ -208,10 +208,10 @@ def _fold(value: object) -> str:
     return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
 
 
-def resolve_by_filename(candidates: List[str], filename: str) -> Tuple[Optional[Dict[str, Any]], str, List[str]]:
+def resolve_by_filename(candidates: list[str], filename: str) -> tuple[dict[str, Any] | None, str, list[str]]:
     """Offline verification: a candidate found in the text that also folds to the filename."""
     stem = _fold(Path(filename).stem)
-    tried: List[str] = []
+    tried: list[str] = []
     if not stem:
         return None, "skipped:filename_mismatch", tried
     for doi in candidates:
@@ -227,7 +227,7 @@ def _ask(fetch: Fetch, doi: str) -> Mapping[str, Any]:
     return {} if payload is None else payload
 
 
-def _registry_answer(payload: Mapping[str, Any]) -> Tuple[str, List[Dict[str, Any]]]:
+def _registry_answer(payload: Mapping[str, Any]) -> tuple[str, list[dict[str, Any]]]:
     """``("", results)`` for an answer, else the closed-set status for the non-answer."""
     if is_quota_paused(payload):
         return "skipped:openalex_quota_paused", []
@@ -236,7 +236,7 @@ def _registry_answer(payload: Mapping[str, Any]) -> Tuple[str, List[Dict[str, An
     return "", list(payload.get("results") or [])
 
 
-def resolve_asserted(doi: str, *, fetch: Fetch) -> Tuple[Optional[Dict[str, Any]], str, List[str]]:
+def resolve_asserted(doi: str, *, fetch: Fetch) -> tuple[dict[str, Any] | None, str, list[str]]:
     """Resolve a caller-asserted DOI without the title check (an SI can fail it legitimately).
 
     Still shape-checked offline and still refused when the registry has no such record.
@@ -252,8 +252,8 @@ def resolve_asserted(doi: str, *, fetch: Fetch) -> Tuple[Optional[Dict[str, Any]
     return results[0], "", [normalised]
 
 
-def resolve_verified(candidates: List[str], pdf_text: str, *,
-                     fetch: Fetch) -> Tuple[Optional[Dict[str, Any]], str, List[str]]:
+def resolve_verified(candidates: list[str], pdf_text: str, *,
+                     fetch: Fetch) -> tuple[dict[str, Any] | None, str, list[str]]:
     """The first candidate whose registry title appears in ``pdf_text``.
 
     A registry outage or quota pause wins over "unresolved"/"mismatch" so a
@@ -261,7 +261,7 @@ def resolve_verified(candidates: List[str], pdf_text: str, *,
     """
     outage = ""
     saw_resolved = False
-    tried: List[str] = []
+    tried: list[str] = []
     for doi in candidates:
         tried.append(doi)
         status, results = _registry_answer(_ask(fetch, doi))
@@ -288,7 +288,7 @@ def is_preprint_doi(doi: str) -> bool:
 
 
 def version_pair_candidate(left: Mapping[str, Any], right: Mapping[str, Any], *,
-                           threshold: float = 0.8) -> Optional[Dict[str, Any]]:
+                           threshold: float = 0.8) -> dict[str, Any] | None:
     """Propose that a preprint and a journal record are versions of one Work, for review.
 
     Returns ``None`` unless exactly one side is a preprint DOI and the titles
@@ -309,7 +309,7 @@ def version_pair_candidate(left: Mapping[str, Any], right: Mapping[str, Any], *,
             "requires_review": True}
 
 
-def _detail(status: str, tried: List[str]) -> str:
+def _detail(status: str, tried: list[str]) -> str:
     return {
         "skipped:openalex_unreachable": f"the registry did not answer for {tried!r}; retryable",
         "skipped:openalex_quota_paused": "the registry allowance is spent; retry after the breaker resumes",
@@ -326,15 +326,15 @@ def prepare_local_pdf(
     path: Path,
     *,
     store: FileDocumentStore,
-    index: Optional[LegacyIndex] = None,
-    fetch: Optional[Fetch] = None,
+    index: LegacyIndex | None = None,
+    fetch: Fetch | None = None,
     text_extractor: TextExtractor = pymupdf_first_pages_text,
     apply: bool = False,
     force: bool = False,
     verify: str = "openalex",
     doi: str = "",
     max_bytes: int = 256 * 1024 * 1024,
-    allowed: Optional[Callable[[Path], Path]] = None,
+    allowed: Callable[[Path], Path] | None = None,
 ) -> IntakeReport:
     """Vet one local PDF and, with ``apply``, put its bytes in the candidate store.
 

@@ -11,9 +11,9 @@ als-computing/forge_rsoxs_analysis src/forge/analysis/figure_extraction/units.py
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+import math
+from typing import Any
 
 from ..vision.kernels.units import (
     INVERSE_UNIT_TO_NM_INV,
@@ -48,7 +48,7 @@ class NormalizedQuantity:
     folded_unit: str
     factor: float
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form including provenance."""
         return {
             "value": self.value, "unit": self.unit, "kind": self.kind,
@@ -69,7 +69,7 @@ def _finite_positive(value: Any) -> float:
     return number
 
 
-def science_normalize_quantity(value: Any, unit: str, kind: Optional[str] = None) -> NormalizedQuantity:
+def science_normalize_quantity(value: Any, unit: str, kind: str | None = None) -> NormalizedQuantity:
     """Normalize a length to nm or an inverse length to nm^-1.
 
     Args:
@@ -95,14 +95,14 @@ def science_normalize_quantity(value: Any, unit: str, kind: Optional[str] = None
     return NormalizedQuantity(folded, out_unit, inferred, number, str(unit), key, factor)
 
 
-def science_q_to_spacing(q: Any, unit: str) -> Dict[str, Any]:
+def science_q_to_spacing(q: Any, unit: str) -> dict[str, Any]:
     """Real-space spacing ``d = 2 pi / q`` in nm from q in nm^-1 or A^-1 (with provenance)."""
     norm = science_normalize_quantity(q, unit, INVERSE_LENGTH)
     d_nm = TWO_PI / norm.value
     return {"d_nm": d_nm, "d_angstrom": d_nm * 10.0, "q": norm.as_dict(), "formula": "d = 2*pi/q"}
 
 
-def science_spacing_to_q(d: Any, unit: str) -> Dict[str, Any]:
+def science_spacing_to_q(d: Any, unit: str) -> dict[str, Any]:
     """Inverse of :func:`science_q_to_spacing`: ``q = 2 pi / d``, in nm^-1 and A^-1."""
     norm = science_normalize_quantity(d, unit, LENGTH)
     q_nm = TWO_PI / norm.value

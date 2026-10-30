@@ -11,10 +11,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/vocab_quality_snapshot.py (BSD
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .migration import sha256_json
 
@@ -22,8 +22,8 @@ HISTORY_CAP = 200
 
 
 def summarise(
-    report: Dict[str, Any], plan: Optional[Dict[str, Any]] = None, audit: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    report: dict[str, Any], plan: dict[str, Any] | None = None, audit: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """The compact summary stored per snapshot (counts only; candidate vs canonical kept apart)."""
     return {
         "candidate": {
@@ -41,7 +41,7 @@ def summarise(
     }
 
 
-def write_snapshot(directory: Path, summary: Dict[str, Any], *, taken_at: datetime) -> Path:
+def write_snapshot(directory: Path, summary: dict[str, Any], *, taken_at: datetime) -> Path:
     """Write ``quality_<timestamp>_<hash>.json``; an existing identical snapshot is left as is."""
     directory.mkdir(parents=True, exist_ok=True)
     digest = sha256_json(summary)[:12]
@@ -54,7 +54,7 @@ def write_snapshot(directory: Path, summary: Dict[str, Any], *, taken_at: dateti
     return path
 
 
-def snapshot_history(directory: Path, *, limit: int = 30) -> List[Dict[str, Any]]:
+def snapshot_history(directory: Path, *, limit: int = 30) -> list[dict[str, Any]]:
     """Newest-first snapshots, reading at most ``min(limit, HISTORY_CAP)`` files."""
     files = sorted(directory.glob("quality_*.json"), reverse=True)[: max(0, min(limit, HISTORY_CAP))]
     return [json.loads(f.read_text(encoding="utf-8")) for f in files]

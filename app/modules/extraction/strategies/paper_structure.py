@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -55,8 +55,8 @@ class ObservationContext(BaseModel):
 
     sample_id: str = ""
     processing_state: str = ""
-    temperature_k: Optional[float] = None
-    uncertainty: Optional[float] = Field(default=None, ge=0)
+    temperature_k: float | None = None
+    uncertainty: float | None = Field(default=None, ge=0)
     uncertainty_kind: Literal["standard_deviation", "standard_error", "interval", "unknown"] = "unknown"
     observation_status: Literal["reported", "cited", "derived", "assumed"] = "reported"
 
@@ -76,9 +76,9 @@ class ReportedPeak(ObservationContext):
     """One scattering peak as reported (d-spacing or q, never derived from the other)."""
 
     label: str = ""
-    d_spacing_value: Optional[float] = None
+    d_spacing_value: float | None = None
     d_spacing_unit: str = ""
-    q_value: Optional[float] = None
+    q_value: float | None = None
     q_unit: str = ""
     direction: Literal["in_plane", "out_of_plane", "isotropic", "unknown"] = "unknown"
     location: str = ""
@@ -90,11 +90,11 @@ class PaperStructureExtraction(BaseModel):
 
     morphology: Morphology
     extraction_complete: bool = True
-    coverage: List[Dict[str, Any]] = Field(default_factory=list)
+    coverage: list[dict[str, Any]] = Field(default_factory=list)
     material_system: str = ""
     orientation: Literal["perpendicular", "parallel", "mixed", "unknown"] = "unknown"
-    quantities: List[ExtractedValue] = Field(default_factory=list)
-    peaks: List[ReportedPeak] = Field(default_factory=list)
+    quantities: list[ExtractedValue] = Field(default_factory=list)
+    peaks: list[ReportedPeak] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     evidence: str = ""
 
@@ -198,9 +198,9 @@ def is_attributed(sentence: str) -> bool:
     return bool(_ATTRIBUTION_RE.search(text) or _NAME_RE.search(text))
 
 
-def attributed_phase_mentions(text: str) -> List[Tuple[str, str]]:
+def attributed_phase_mentions(text: str) -> list[tuple[str, str]]:
     """``(term, sentence)`` for named network phases inside sentences crediting other work."""
-    found: List[Tuple[str, str]] = []
+    found: list[tuple[str, str]] = []
     for match in _PHASE_TERMS.finditer(text or ""):
         sentence = sentence_around(text, match.start(), match.end())
         if is_attributed(sentence):
@@ -294,7 +294,7 @@ def extract_structure_from_text(
     title: str = "",
     max_chars: int = 8000,
     max_retries: int = 2,
-) -> Optional[PaperStructureExtraction]:
+) -> PaperStructureExtraction | None:
     """Ask the model what structure the text reports; ``None`` means unknown, not absent.
 
     Long texts use overlapping chunks (overlap ``min(400, max_chars // 4)``) and keep
@@ -307,8 +307,8 @@ def extract_structure_from_text(
         raise ValueError("max_chars must be positive")
     if len(text) > max_chars:
         overlap = min(400, max_chars // 4)
-        outputs: List[PaperStructureExtraction] = []
-        coverage: List[Dict[str, Any]] = []
+        outputs: list[PaperStructureExtraction] = []
+        coverage: list[dict[str, Any]] = []
         for start in range(0, len(text), max_chars - overlap):
             chunk = text[start:start + max_chars]
             answer = extract_structure_from_text(chunk, adapter=adapter, title=title, max_chars=max_chars,
@@ -322,8 +322,8 @@ def extract_structure_from_text(
         if not outputs:
             return None
 
-        def unique(name: str) -> List[Any]:
-            values: Dict[str, Any] = {}
+        def unique(name: str) -> list[Any]:
+            values: dict[str, Any] = {}
             for answer in outputs:
                 for observation in getattr(answer, name):
                     values.setdefault(observation.model_dump_json(), observation)
@@ -366,7 +366,7 @@ def extract_structure_from_text(
     return None
 
 
-def _context(item: ObservationContext) -> Dict[str, Any]:
+def _context(item: ObservationContext) -> dict[str, Any]:
     return {
         "evidence_source": EvidenceSource(item.observation_status),
         "uncertainty": MeasuredUncertainty(item.uncertainty, UncertaintyKind(item.uncertainty_kind)),
@@ -374,13 +374,13 @@ def _context(item: ObservationContext) -> Dict[str, Any]:
     }
 
 
-def to_reported_quantities(extraction: PaperStructureExtraction) -> List[ReportedQuantity]:
+def to_reported_quantities(extraction: PaperStructureExtraction) -> list[ReportedQuantity]:
     """Flatten values and peaks into :class:`ReportedQuantity` proposals (units as printed).
 
     A peak contributes its d-spacing and/or its q exactly as reported, under
     ``peak_d_spacing``/``peak_q`` names qualified by the paper's label.
     """
-    out: List[ReportedQuantity] = []
+    out: list[ReportedQuantity] = []
     for value in extraction.quantities:
         out.append(ReportedQuantity(
             name=value.quantity, raw_value=value.value, raw_unit=value.unit, quote=value.quote,

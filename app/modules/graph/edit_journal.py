@@ -15,12 +15,12 @@ the current state of an edit is its last record (state changes append, never rew
 
 from __future__ import annotations
 
+from datetime import datetime
 import hashlib
 import json
 import os
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Literal, Optional, Sequence, Tuple
+from typing import Iterable, Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -60,19 +60,19 @@ class EditRecord(BaseModel):
     seq: int = Field(ge=1)
     state: State
     target: str
-    scope: Tuple[str, ...]
+    scope: tuple[str, ...]
     base_snapshot_id: str
     base_graph_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     profile: str
     mode: str
     actor: str
     operation: Literal["node_patch", "relationship_add", "relationship_remove", "snippet_upsert", "snippet_unlink"]
-    ids: Tuple[str, ...]
-    before: Dict[str, object] = Field(default_factory=dict)
-    after: Dict[str, object] = Field(default_factory=dict)
+    ids: tuple[str, ...]
+    before: dict[str, object] = Field(default_factory=dict)
+    after: dict[str, object] = Field(default_factory=dict)
     recorded_at: datetime
-    reconciled_in: Optional[str] = None
-    note: Optional[str] = None
+    reconciled_in: str | None = None
+    note: str | None = None
 
 
 class ConflictResolution(BaseModel):
@@ -107,7 +107,7 @@ class EditJournal:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
 
-    def _read(self) -> List[EditRecord]:
+    def _read(self) -> list[EditRecord]:
         if not self.path.exists():
             return []
         out = []
@@ -133,12 +133,12 @@ class EditJournal:
             os.fsync(handle.fileno())
         return record
 
-    def latest(self) -> Dict[str, EditRecord]:
+    def latest(self) -> dict[str, EditRecord]:
         """Current record of every edit."""
         return {r.edit_id: r for r in self._read()}
 
-    def advance(self, edit_id: str, state: State, at: datetime, *, reconciled_in: Optional[str] = None,
-                note: Optional[str] = None) -> EditRecord:
+    def advance(self, edit_id: str, state: State, at: datetime, *, reconciled_in: str | None = None,
+                note: str | None = None) -> EditRecord:
         """Append the next state of an existing edit."""
         current = self.latest().get(edit_id)
         if current is None:
@@ -153,7 +153,7 @@ class EditJournal:
 
 
 def unreconciled(journal: EditJournal, *, target: str, scope: Sequence[str],
-                 lineage: Iterable[str]) -> List[EditRecord]:
+                 lineage: Iterable[str]) -> list[EditRecord]:
     """List edits for this target/scope that are not yet reflected in the imported snapshot.
 
     These are edits that were applied or acknowledged but whose effect is not in the
@@ -169,8 +169,8 @@ def unreconciled(journal: EditJournal, *, target: str, scope: Sequence[str],
     return [r for r in out if r.reconciled_in not in ancestry]
 
 
-def check_import(journal: Optional[EditJournal], *, target: str, scope: Sequence[str], lineage: Iterable[str],
-                 resolutions: Sequence[ConflictResolution] = ()) -> List[EditRecord]:
+def check_import(journal: EditJournal | None, *, target: str, scope: Sequence[str], lineage: Iterable[str],
+                 resolutions: Sequence[ConflictResolution] = ()) -> list[EditRecord]:
     """Reconciliation hook for the importer: refuse when an acknowledged edit would be lost.
 
     Returns the edits covered by reviewed resolutions (for the plan record).
@@ -182,7 +182,7 @@ def check_import(journal: Optional[EditJournal], *, target: str, scope: Sequence
     if journal is None:
         return []
     open_edits = unreconciled(journal, target=target, scope=scope, lineage=lineage)
-    resolved: Dict[str, ConflictResolution] = {r.edit_id: r for r in resolutions}
+    resolved: dict[str, ConflictResolution] = {r.edit_id: r for r in resolutions}
     missing = sorted(r.edit_id for r in open_edits if r.edit_id not in resolved)
     if missing:
         raise ContractError(ErrorCode.CONFLICT,

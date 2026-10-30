@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,12 @@ _SUMMARY_FIELDS = [
 ]
 
 
-def extract_mp_queries(question: str) -> List[str]:
+def extract_mp_queries(question: str) -> list[str]:
     """Return formula / mp-id strings worth looking up. Empty = do not call MP."""
     text = str(question or "").strip()
     if not text:
         return []
-    found: List[str] = []
+    found: list[str] = []
     seen: set[str] = set()
 
     def _add(value: str) -> None:
@@ -91,8 +91,8 @@ def lookup_materials_project(
     question: str,
     *,
     limit: int = 3,
-    api_key: Optional[str] = None,
-) -> Dict[str, Any]:
+    api_key: str | None = None,
+) -> dict[str, Any]:
     """Search MP for formulas/ids in *question* and return a context pack."""
     queries = extract_mp_queries(question)
     empty = {
@@ -109,7 +109,7 @@ def lookup_materials_project(
         empty["skipped"] = "no_api_key"
         logger.info("Materials Project skipped: MP_API_KEY is not set")
         return empty
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     for query in queries[:3]:
         try:
@@ -135,11 +135,11 @@ def lookup_materials_project(
     return empty
 
 
-def search_mp_summary(query: str, *, api_key: str, limit: int = 3) -> List[Dict[str, Any]]:
+def search_mp_summary(query: str, *, api_key: str, limit: int = 3) -> list[dict[str, Any]]:
     """Live MP summary search. Isolated so tests can monkeypatch it."""
     from mp_api.client import MPRester
 
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "fields": list(_SUMMARY_FIELDS),
         "num_chunks": 1,
         "chunk_size": max(1, limit),
@@ -153,7 +153,7 @@ def search_mp_summary(query: str, *, api_key: str, limit: int = 3) -> List[Dict[
     return [_normalize_doc(doc) for doc in docs[:limit]]
 
 
-def format_mp_context(records: Sequence[Dict[str, Any]]) -> str:
+def format_mp_context(records: Sequence[dict[str, Any]]) -> str:
     """Render MP summary records as a cite-token context block for the judge."""
     if not records:
         return ""
@@ -191,7 +191,7 @@ def format_mp_context(records: Sequence[Dict[str, Any]]) -> str:
     return "\n".join(lines).strip()
 
 
-def cite_token(record: Dict[str, Any]) -> str:
+def cite_token(record: dict[str, Any]) -> str:
     """``[MP: mp-id formula]`` token, or empty when material_id is missing."""
     mid = str(record.get("material_id") or "").strip()
     formula = str(record.get("formula_pretty") or "").strip()
@@ -228,7 +228,7 @@ def _parse_ok(token: str) -> bool:
         return False
 
 
-def _normalize_doc(doc: Any) -> Dict[str, Any]:
+def _normalize_doc(doc: Any) -> dict[str, Any]:
     """Flatten an MP summary document or dict into citation-ready fields."""
     data = doc if isinstance(doc, dict) else getattr(doc, "model_dump", lambda: {})()
     if not data and hasattr(doc, "material_id"):

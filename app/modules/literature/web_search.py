@@ -15,10 +15,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/web_search.py (BSD-3-Clause).
 
 from __future__ import annotations
 
-import logging
-import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence
+import logging
+from typing import Any, Callable, Sequence
+import xml.etree.ElementTree as ET
 
 import httpx
 
@@ -32,7 +32,7 @@ _ATOM_NS = "{http://www.w3.org/2005/Atom}"
 _MAX = 25
 
 #: A DuckDuckGo text-search callable ``(query, max_results) -> [{"title","href","body"}]``.
-DdgSearch = Callable[[str, int], Sequence[Dict[str, Any]]]
+DdgSearch = Callable[[str, int], Sequence[dict[str, Any]]]
 
 
 class _ProviderFailed(Exception):
@@ -56,8 +56,8 @@ class DiscoveryReport:
     """
 
     query: str
-    results: List[Dict[str, str]] = field(default_factory=list)
-    providers: Dict[str, ProviderStatus] = field(default_factory=dict)
+    results: list[dict[str, str]] = field(default_factory=list)
+    providers: dict[str, ProviderStatus] = field(default_factory=dict)
 
     @property
     def all_unavailable(self) -> bool:
@@ -71,7 +71,7 @@ class DiscoveryReport:
         statuses = {p.status for p in self.providers.values()}
         return bool(statuses & {"ok", "empty"}) and bool(statuses & {"unavailable", "not_installed"})
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {"query": self.query, "results": list(self.results),
                 "providers": {k: asdict(v) for k, v in self.providers.items()}}
@@ -84,18 +84,18 @@ def _cap(value: Any) -> int:
         return 5
 
 
-def _item(title: str, url: str, snippet: str, source: str) -> Dict[str, str]:
+def _item(title: str, url: str, snippet: str, source: str) -> dict[str, str]:
     return {"title": title.strip(), "url": url.strip(), "snippet": snippet.strip()[:400], "source": source,
             "record_kind": EXTERNAL_RESULT}
 
 
-def crossref_search(http: httpx.Client, query: str, rows: int, *, mailto: str = "") -> List[Dict[str, str]]:
+def crossref_search(http: httpx.Client, query: str, rows: int, *, mailto: str = "") -> list[dict[str, str]]:
     """Crossref ``/works?query=`` (donor ``_do_crossref_search``); raises on failure."""
     query = query.strip()
     if not query:
         return []
     capped = _cap(rows)
-    params: Dict[str, Any] = {"query": query, "rows": capped,
+    params: dict[str, Any] = {"query": query, "rows": capped,
                               "select": "DOI,title,abstract,container-title,author"}
     if mailto:
         params["mailto"] = mailto
@@ -105,7 +105,7 @@ def crossref_search(http: httpx.Client, query: str, rows: int, *, mailto: str = 
         raise _ProviderFailed(type(exc).__name__) from exc
     if response.status_code != 200:
         raise _ProviderFailed(f"HTTP {response.status_code}")
-    items: List[Dict[str, str]] = []
+    items: list[dict[str, str]] = []
     for item in ((response.json() or {}).get("message", {}) or {}).get("items", []):
         title_list = item.get("title") or []
         title = title_list[0] if title_list else ""
@@ -119,7 +119,7 @@ def crossref_search(http: httpx.Client, query: str, rows: int, *, mailto: str = 
     return items
 
 
-def arxiv_search(http: httpx.Client, query: str, max_results: int) -> List[Dict[str, str]]:
+def arxiv_search(http: httpx.Client, query: str, max_results: int) -> list[dict[str, str]]:
     """Search the arXiv Atom API (donor ``_do_arxiv_search``); raises on failure."""
     query = query.strip()
     if not query:
@@ -136,7 +136,7 @@ def arxiv_search(http: httpx.Client, query: str, max_results: int) -> List[Dict[
         root = ET.fromstring(response.text)
     except ET.ParseError as exc:
         raise _ProviderFailed("unparseable feed") from exc
-    items: List[Dict[str, str]] = []
+    items: list[dict[str, str]] = []
     for entry in root.findall(f"{_ATOM_NS}entry"):
         title_el, link_el = entry.find(f"{_ATOM_NS}title"), entry.find(f"{_ATOM_NS}id")
         summary_el = entry.find(f"{_ATOM_NS}summary")
@@ -148,20 +148,20 @@ def arxiv_search(http: httpx.Client, query: str, max_results: int) -> List[Dict[
     return items[:capped]
 
 
-def default_ddg() -> Optional[DdgSearch]:
+def default_ddg() -> DdgSearch | None:
     """The ``duckduckgo_search`` text search when installed, else ``None`` (optional dependency)."""
     try:
         from duckduckgo_search import DDGS  # type: ignore[import-not-found]
     except ImportError:
         return None
 
-    def search(query: str, max_results: int) -> Sequence[Dict[str, Any]]:
+    def search(query: str, max_results: int) -> Sequence[dict[str, Any]]:
         with DDGS() as ddgs:
             return list(ddgs.text(query, max_results=max_results))
     return search
 
 
-def duckduckgo_search(ddg: Optional[DdgSearch], query: str, max_results: int) -> List[Dict[str, str]]:
+def duckduckgo_search(ddg: DdgSearch | None, query: str, max_results: int) -> list[dict[str, str]]:
     """DuckDuckGo text results normalized to the shared shape (donor ``_duckduckgo_results``)."""
     query = query.strip()
     if not query:
@@ -173,7 +173,7 @@ def duckduckgo_search(ddg: Optional[DdgSearch], query: str, max_results: int) ->
         entries = ddg(query, capped)
     except Exception as exc:  # noqa: BLE001 - library churn and network errors look alike
         raise _ProviderFailed(type(exc).__name__) from exc
-    items: List[Dict[str, str]] = []
+    items: list[dict[str, str]] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -184,12 +184,12 @@ def duckduckgo_search(ddg: Optional[DdgSearch], query: str, max_results: int) ->
     return items
 
 
-def search_all(query: str, max_results: int = 5, *, http: httpx.Client, ddg: Optional[DdgSearch] = None,
+def search_all(query: str, max_results: int = 5, *, http: httpx.Client, ddg: DdgSearch | None = None,
                providers: Sequence[str] = ("duckduckgo", "crossref", "arxiv"),
                mailto: str = "") -> DiscoveryReport:
     """Run each provider and merge results, preserving attribution and per-provider status."""
     report = DiscoveryReport(query=query)
-    runners: Dict[str, Callable[[], List[Dict[str, str]]]] = {
+    runners: dict[str, Callable[[], list[dict[str, str]]]] = {
         "duckduckgo": lambda: duckduckgo_search(ddg, query, max_results),
         "crossref": lambda: crossref_search(http, query, max_results, mailto=mailto),
         "arxiv": lambda: arxiv_search(http, query, max_results),

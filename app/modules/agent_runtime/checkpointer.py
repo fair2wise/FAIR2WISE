@@ -19,12 +19,12 @@ principal and session so two principals cannot address the same thread.
 
 from __future__ import annotations
 
-import hashlib
-import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
-from typing import Any, Dict, Iterator, Literal, Optional
+import threading
+from typing import Any, Iterator, Literal
 
 from ..contracts import RequestContext
 
@@ -39,7 +39,7 @@ class CheckpointerConfig:
     """
 
     kind: Literal["memory", "sqlite"] = "memory"
-    path: Optional[Path] = None
+    path: Path | None = None
 
 
 class CheckpointerBusyError(RuntimeError):
@@ -56,11 +56,11 @@ class ManagedCheckpointer:
         config: :class:`CheckpointerConfig`; defaults to in-memory.
     """
 
-    def __init__(self, config: Optional[CheckpointerConfig] = None) -> None:
+    def __init__(self, config: CheckpointerConfig | None = None) -> None:
         self.config = config or CheckpointerConfig()
         self._saver: Any = None
         self._cm: Any = None
-        self._active: Dict[str, int] = {}
+        self._active: dict[str, int] = {}
         self._lock = threading.Lock()
 
     def open(self) -> Any:
@@ -106,7 +106,7 @@ class ManagedCheckpointer:
                 if not self._active[thread_id]:
                     del self._active[thread_id]
 
-    def active_threads(self) -> Dict[str, int]:
+    def active_threads(self) -> dict[str, int]:
         """Threads with active runs and their counts."""
         with self._lock:
             return dict(self._active)
@@ -129,7 +129,7 @@ class ManagedCheckpointer:
 
     reset = close
 
-    def __enter__(self) -> "ManagedCheckpointer":
+    def __enter__(self) -> ManagedCheckpointer:
         self.open()
         return self
 
@@ -148,9 +148,9 @@ def scoped_thread_id(ctx: RequestContext, thread_id: str) -> str:
     return f"{digest}:{thread_id}"
 
 
-def thread_config(ctx: RequestContext, thread_id: str, *, recursion_limit: Optional[int] = None) -> Dict[str, Any]:
+def thread_config(ctx: RequestContext, thread_id: str, *, recursion_limit: int | None = None) -> dict[str, Any]:
     """LangGraph ``config`` for one scoped thread."""
-    config: Dict[str, Any] = {"configurable": {"thread_id": scoped_thread_id(ctx, thread_id)}}
+    config: dict[str, Any] = {"configurable": {"thread_id": scoped_thread_id(ctx, thread_id)}}
     if recursion_limit is not None:
         config["recursion_limit"] = recursion_limit
     return config

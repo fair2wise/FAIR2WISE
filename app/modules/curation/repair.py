@@ -15,10 +15,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/chunk_reextraction.py (``plan_
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from dataclasses import dataclass
-from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Iterable, Mapping, Sequence
 
 from ..contracts.errors import CapabilityError, ContractError, ErrorCode
 from ..contracts.ports import GraphCapabilities
@@ -46,9 +46,9 @@ class ReextractionPlan:
     """Immutable plan; ``plan_sha256`` is what an approval binds to."""
 
     corpus: str
-    chunks: Tuple[ChunkRepair, ...]
-    reused_chunks: Tuple[str, ...]
-    estimated_cost_usd: Optional[float]
+    chunks: tuple[ChunkRepair, ...]
+    reused_chunks: tuple[str, ...]
+    estimated_cost_usd: float | None
     extractor_version: str
 
     @property
@@ -68,11 +68,11 @@ def plan_reextraction(
     *,
     corpus: str,
     cases: Iterable[Mapping[str, Any]],
-    graph_read: Tuple[Sequence[Mapping[str, Any]], bool],
+    graph_read: tuple[Sequence[Mapping[str, Any]], bool],
     capabilities: GraphCapabilities,
     valid_chunk_ids: Iterable[str] = (),
     extractor_version: str,
-    cost_per_chunk_usd: Optional[float] = None,
+    cost_per_chunk_usd: float | None = None,
     limit: int,
 ) -> ReextractionPlan:
     """Plan re-extraction for ``incomplete_extraction`` cases.
@@ -100,8 +100,8 @@ def plan_reextraction(
     if not complete:
         raise IncompleteRead(f"read returned {len(entities)} entities but the listing is not complete")
     valid = set(valid_chunk_ids)
-    chunks: List[ChunkRepair] = []
-    reused: List[str] = []
+    chunks: list[ChunkRepair] = []
+    reused: list[str] = []
     for case in sorted(cases, key=lambda c: (-int(c.get("priority", 50)), str(c["id"]))):
         if case.get("case_type") != "incomplete_extraction" or case.get("corpus") != corpus:
             continue

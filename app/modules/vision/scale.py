@@ -14,7 +14,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_scale.py (reported-scal
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from .kernels.scalebar import caption_bar_lengths, pair_lengths_to_panels, read_panel_scale
 from .kernels.types import PanelBox, ScaleReading, TextSpan
@@ -34,7 +34,7 @@ class ScaleFinding:
     reported: bool
     withheld_reason: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form; ``nm_per_px`` is only populated in ``value`` when reported."""
         reading = self.reading.to_dict()
         return {
@@ -70,9 +70,9 @@ def read_scales(
     spans_by_panel: Mapping[int, Sequence[TextSpan]],
     *,
     blocked: str = "",
-) -> List[ScaleFinding]:
+) -> list[ScaleFinding]:
     """Read every panel's scale. ``blocked`` (a blocking uncertainty code) withholds every value."""
-    out: List[ScaleFinding] = []
+    out: list[ScaleFinding] = []
     for i, panel in enumerate(panels):
         length, why = caption_length_for(caption, panel.label, len(panels))
         reading = read_panel_scale(image, panel, caption_length_nm=length,

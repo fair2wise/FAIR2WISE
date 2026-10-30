@@ -22,7 +22,7 @@ Rules (docs/migration/api/README.md section 3):
 
 from __future__ import annotations
 
-from typing import Mapping, Optional, Tuple
+from typing import Mapping
 
 from ..modules.contracts.context import CAPABILITIES
 from ..modules.security.authorization import RoutePolicy
@@ -45,7 +45,7 @@ def _v(route_id: str, method: str, path: str, *caps: str, note: str = "") -> Rou
 
 
 #: Every ``/v1`` route (route_id, method, path, entry capabilities, note).
-API_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
+API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     # jobs (JobService)
     _v("V01", "POST", "/jobs", note="kind capability (DEFAULT_KIND_CAPABILITIES) in JobService.submit" + _FRESH),
     _v("V02", "GET", "/jobs", note="lists only jobs visible under " + _OBJ),
@@ -93,12 +93,12 @@ API_ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.
-API_ROUTE_CAPABILITIES: Mapping[Tuple[str, str], RoutePolicy] = {
+API_ROUTE_CAPABILITIES: Mapping[tuple[str, str], RoutePolicy] = {
     (p.method, p.path): p for p in API_ROUTE_POLICIES
 }
 
 
-def api_route_policy(method: str, path: str) -> Optional[RoutePolicy]:
+def api_route_policy(method: str, path: str) -> RoutePolicy | None:
     """Return the policy of a ``/v1`` route, or ``None``."""
     return API_ROUTE_CAPABILITIES.get((method.upper(), path))
 

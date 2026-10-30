@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
 from typing import Any
+import uuid
 
-from academy.agent import action
-from academy.agent import Agent
+from academy.agent import Agent, action
 from academy.identifier import AgentId
 
 from .dashboard import Dashboard

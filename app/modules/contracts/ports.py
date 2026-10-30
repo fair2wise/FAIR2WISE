@@ -8,7 +8,7 @@ section 3, ADR 0004).
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Mapping, Optional, Protocol, Sequence, Tuple, runtime_checkable
+from typing import Any, Iterable, Mapping, Protocol, Sequence, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -56,19 +56,19 @@ class GraphPort(Protocol):
         """Return the backend's supported operations."""
         ...
 
-    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> Optional[Dict[str, Any]]:
+    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> dict[str, Any] | None:
         """Return one entity in ``graph_id`` or ``None`` if absent in scope."""
         ...
 
     def find_entities(
         self, ctx: RequestContext, graph_id: str, query: str, *, limit: int
-    ) -> Tuple[Sequence[Dict[str, Any]], bool]:
+    ) -> tuple[Sequence[dict[str, Any]], bool]:
         """Return up to ``limit`` matches and whether the result is complete."""
         ...
 
     def neighborhood(
         self, ctx: RequestContext, graph_id: str, entity_id: str, *, hops: int, max_nodes: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Return a bounded neighborhood with ``truncated`` set when capped."""
         ...
 

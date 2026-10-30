@@ -8,7 +8,7 @@ perform network I/O, write staged artifacts and spend model budget (plan section
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, FrozenSet, List, Optional, Tuple
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -66,17 +66,17 @@ class ToolSpec(BaseModel):
     description: str
     when_to_use: str
     when_not_to_use: str
-    input_schema: Dict[str, Any]
-    output_schema: Dict[str, Any]
-    effects: FrozenSet[Effect] = Field(default_factory=frozenset)
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
+    effects: frozenset[Effect] = Field(default_factory=frozenset)
     cost_class: CostClass = CostClass.FREE
-    required_capabilities: FrozenSet[str] = Field(default_factory=frozenset)
+    required_capabilities: frozenset[str] = Field(default_factory=frozenset)
     evidence_contract: str = "none"
     idempotent: bool = True
-    aliases: Tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
 
     @model_validator(mode="after")
-    def _write_tools_declare_capability(self) -> "ToolSpec":
+    def _write_tools_declare_capability(self) -> ToolSpec:
         """Tools with write, destructive or paid effects must require a capability."""
         guarded = {Effect.WRITE_GRAPH, Effect.DESTRUCTIVE, Effect.PAID_INFERENCE}
         if self.effects & guarded and not self.required_capabilities:
@@ -117,7 +117,7 @@ _CODE_STATUS = {
 }
 
 
-def status_for_code(code: ErrorCode) -> "ToolStatus":
+def status_for_code(code: ErrorCode) -> ToolStatus:
     """Return the ToolResult status for a failure code.
 
     Denied/unauthenticated, invalid input and unavailable have their own statuses;
@@ -147,16 +147,16 @@ class ToolResult(BaseModel):
 
     tool: str
     status: ToolStatus
-    data: Optional[Dict[str, Any]] = None
-    artifact_refs: Tuple[str, ...] = ()
-    evidence: Tuple[EvidenceRef, ...] = ()
-    warnings: Tuple[str, ...] = ()
-    error_code: Optional[ErrorCode] = None
+    data: dict[str, Any] | None = None
+    artifact_refs: tuple[str, ...] = ()
+    evidence: tuple[EvidenceRef, ...] = ()
+    warnings: tuple[str, ...] = ()
+    error_code: ErrorCode | None = None
     retryable: bool = False
-    provenance_id: Optional[str] = None
+    provenance_id: str | None = None
 
     @model_validator(mode="after")
-    def _status_consistency(self) -> "ToolResult":
+    def _status_consistency(self) -> ToolResult:
         """Failure statuses need an error code; success statuses must not carry one."""
         failing = {ToolStatus.DENIED, ToolStatus.INVALID, ToolStatus.UNAVAILABLE, ToolStatus.ERROR}
         if self.status in failing and self.error_code is None:
@@ -172,6 +172,6 @@ class ToolResult(BaseModel):
         return self
 
     @property
-    def evidence_ids(self) -> List[str]:
+    def evidence_ids(self) -> list[str]:
         """Return the evidence IDs in order, for parity comparisons."""
         return [e.evidence_id for e in self.evidence]

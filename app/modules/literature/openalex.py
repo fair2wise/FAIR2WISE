@@ -25,17 +25,17 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/open
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import logging
+from pathlib import Path
 import re
 import sqlite3
 import threading
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
+from typing import Any, Callable, Mapping, Sequence, Union
 
 import httpx
 
@@ -104,10 +104,10 @@ class ProviderUnavailable(ContractError):
 class OpenAlexQuotaPaused(ProviderUnavailable):
     """Raised by the list-returning helpers while the breaker is open (donor ``OpenAlexQuotaPaused``)."""
 
-    def __init__(self, resume_at: Optional[float], reason: str = "") -> None:
+    def __init__(self, resume_at: float | None, reason: str = "") -> None:
         super().__init__("openalex", QUOTA_PAUSED, reason)
         self.resume_at = resume_at
-        when = (datetime.fromtimestamp(resume_at, timezone.utc).isoformat(timespec="seconds")
+        when = (datetime.fromtimestamp(resume_at, UTC).isoformat(timespec="seconds")
                 if resume_at else "unknown")
         self.args = (f"OpenAlex quota paused until {when} ({reason or 'quota'})",)
 
@@ -116,13 +116,13 @@ class OpenAlexQuotaPaused(ProviderUnavailable):
         """Resume time as ISO-8601 UTC, or ``""``."""
         if not self.resume_at:
             return ""
-        return datetime.fromtimestamp(self.resume_at, timezone.utc).isoformat(timespec="seconds")
+        return datetime.fromtimestamp(self.resume_at, UTC).isoformat(timespec="seconds")
 
 
 class OpenAlexNoData(dict):
     """An empty dict that says why it is empty (donor contract: falsy and ``== {}``)."""
 
-    def __init__(self, reason: str, *, resume_at: Optional[float] = None, detail: str = "") -> None:
+    def __init__(self, reason: str, *, resume_at: float | None = None, detail: str = "") -> None:
         super().__init__()
         self.reason = reason
         self.resume_at = resume_at
@@ -177,11 +177,11 @@ def install_log_redaction() -> None:
         httpx_logger.addFilter(_RedactApiKey())
 
 
-def abstract_from_inverted_index(inv_idx: Optional[Dict[str, List[int]]]) -> str:
+def abstract_from_inverted_index(inv_idx: dict[str, list[int]] | None) -> str:
     """Rebuild a readable abstract from OpenAlex's ``{word: [positions]}`` index."""
     if not inv_idx or not isinstance(inv_idx, dict):
         return ""
-    word_pos: List[tuple] = []
+    word_pos: list[tuple] = []
     for word, positions in inv_idx.items():
         if isinstance(positions, list):
             for pos in positions:
@@ -233,7 +233,7 @@ class QuotaBreaker:
                 self._reason = reason
             return self._until
 
-    def state(self) -> Optional[Dict[str, Any]]:
+    def state(self) -> dict[str, Any] | None:
         """``{"resume_at", "resume_at_iso", "seconds_left", "reason"}`` while paused, else ``None``."""
         with self._lock:
             until, reason = self._until, self._reason
@@ -242,7 +242,7 @@ class QuotaBreaker:
             return None
         return {
             "resume_at": until,
-            "resume_at_iso": datetime.fromtimestamp(until, timezone.utc).isoformat(timespec="seconds"),
+            "resume_at_iso": datetime.fromtimestamp(until, UTC).isoformat(timespec="seconds"),
             "seconds_left": round(until - now, 1), "reason": reason,
         }
 
@@ -262,7 +262,7 @@ def pause_openalex(seconds: float, reason: str) -> float:
     return DEFAULT_BREAKER.pause(seconds, reason)
 
 
-def openalex_pause_state() -> Optional[Dict[str, Any]]:
+def openalex_pause_state() -> dict[str, Any] | None:
     """Donor-compatible: state of :data:`DEFAULT_BREAKER`."""
     return DEFAULT_BREAKER.state()
 
@@ -274,12 +274,12 @@ def reset_openalex_pause() -> None:
 
 def seconds_to_utc_midnight(now: float) -> float:
     """Seconds until the daily allowance resets (OpenAlex's 429 body says midnight UTC)."""
-    current = datetime.fromtimestamp(now, timezone.utc)
+    current = datetime.fromtimestamp(now, UTC)
     midnight = (current + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     return (midnight - current).total_seconds()
 
 
-def retry_after_seconds(resp: Any) -> Optional[float]:
+def retry_after_seconds(resp: Any) -> float | None:
     """The integer ``Retry-After`` a response names, else ``None`` (dates are not parsed)."""
     try:
         raw = str(resp.headers.get("retry-after", "")).strip()
@@ -294,7 +294,7 @@ def retry_after_seconds(resp: Any) -> Optional[float]:
     return seconds if seconds >= 0 else None
 
 
-def quota_pause_seconds(resp: Any, now: float) -> Optional[float]:
+def quota_pause_seconds(resp: Any, now: float) -> float | None:
     """How long to pause when ``resp`` says the allowance is spent, else ``None``."""
     status = getattr(resp, "status_code", 0)
     retry_after = retry_after_seconds(resp)
@@ -348,7 +348,7 @@ class ResponseCache:
         payload = json.dumps({"path": url, "params": sorted(dict(params).items())}, default=str)
         return hashlib.sha256(payload.encode()).hexdigest()
 
-    def get(self, key: str, ttl: float) -> Optional[Dict[str, Any]]:
+    def get(self, key: str, ttl: float) -> dict[str, Any] | None:
         """A live positive answer, else ``None``."""
         with self._lock:
             row = self._con.execute("SELECT response_json, fetched_at FROM openalex_cache WHERE cache_key = ?",
@@ -381,7 +381,7 @@ class ResponseCache:
                               (key, int(status), self._clock()))
             self._con.commit()
 
-    def counts(self) -> Dict[str, int]:
+    def counts(self) -> dict[str, int]:
         """Row counts (positive, negative), for status reports."""
         with self._lock:
             pos = self._con.execute("SELECT COUNT(*) FROM openalex_cache").fetchone()[0]
@@ -418,7 +418,7 @@ class OpenAlexSettings:
     negative_ttl: float = DEFAULT_NEGATIVE_TTL
 
     @classmethod
-    def from_mapping(cls, values: Mapping[str, Any]) -> "OpenAlexSettings":
+    def from_mapping(cls, values: Mapping[str, Any]) -> OpenAlexSettings:
         """Build from an explicit settings mapping (keys as the donor's environment names)."""
         def num(name: str, default: float) -> float:
             try:
@@ -439,9 +439,9 @@ class OpenAlexSettings:
             return ""
         return email
 
-    def auth_params(self) -> Dict[str, str]:
+    def auth_params(self) -> dict[str, str]:
         """``api_key`` and ``mailto`` query parameters, each only when real."""
-        params: Dict[str, str] = {}
+        params: dict[str, str] = {}
         if self.api_key.strip():
             params["api_key"] = self.api_key.strip()
         if self.polite_mailto:
@@ -471,8 +471,8 @@ class OpenAlexClient:
         clock: Epoch seconds for quota arithmetic, injectable.
     """
 
-    def __init__(self, http: httpx.Client, *, cache: Optional[ResponseCache] = None,
-                 breaker: Optional[QuotaBreaker] = None, settings: Optional[OpenAlexSettings] = None,
+    def __init__(self, http: httpx.Client, *, cache: ResponseCache | None = None,
+                 breaker: QuotaBreaker | None = None, settings: OpenAlexSettings | None = None,
                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.time,
                  base_url: str = OPENALEX_BASE, s2_base_url: str = SEMANTIC_SCHOLAR_BASE) -> None:
         self.http = http
@@ -484,7 +484,7 @@ class OpenAlexClient:
         self.base_url = base_url.rstrip("/")
         self.s2_base_url = s2_base_url.rstrip("/")
         #: Requests actually sent (not cache hits), by kind.
-        self.requests: Dict[str, int] = {"openalex": 0, "semantic_scholar": 0}
+        self.requests: dict[str, int] = {"openalex": 0, "semantic_scholar": 0}
         install_log_redaction()
 
     def _is_singleton(self, url: str) -> bool:
@@ -493,8 +493,8 @@ class OpenAlexClient:
         collection, _, ident = url[len(self.base_url):].strip("/").partition("/")
         return collection in _SINGLETON_COLLECTIONS and bool(ident)
 
-    def fetch(self, path: str, params: Optional[Mapping[str, Any]] = None, *, ttl: Optional[float] = None,
-              use_cache: bool = True, timeout: float = 15.0, max_attempts: int = 3) -> Dict[str, Any]:
+    def fetch(self, path: str, params: Mapping[str, Any] | None = None, *, ttl: float | None = None,
+              use_cache: bool = True, timeout: float = 15.0, max_attempts: int = 3) -> dict[str, Any]:
         """GET from OpenAlex: cached, credentialed, backed off, behind the breaker.
 
         Returns parsed JSON on success, otherwise an empty :class:`OpenAlexNoData`
@@ -558,7 +558,7 @@ class OpenAlexClient:
     # -- searches -------------------------------------------------------------------------------
 
     def search_papers(self, query: str, *, technique: str = "", material: str = "", year_from: int = 0,
-                      year_to: int = 0, max_results: int = 10) -> List[Dict[str, Any]]:
+                      year_to: int = 0, max_results: int = 10) -> list[dict[str, Any]]:
         """Full-text OpenAlex search; technique/material are appended to the text.
 
         Raises:
@@ -568,7 +568,7 @@ class OpenAlexClient:
         search_text = " ".join(part for part in (query.strip(), technique, material) if part)
         if not search_text:
             return []
-        params: Dict[str, Any] = {"search": search_text, "per_page": min(max(1, int(max_results)), MAX_PER_PAGE),
+        params: dict[str, Any] = {"search": search_text, "per_page": min(max(1, int(max_results)), MAX_PER_PAGE),
                                   "sort": "relevance_score:desc", "select": _WORK_FIELDS}
         filters = []
         if year_from:
@@ -581,7 +581,7 @@ class OpenAlexClient:
         raise_for_no_data(data)
         return [paper_record(work) for work in data.get("results", [])]
 
-    def lookup_dois(self, dois: Sequence[str], *, limit: int = 10) -> "DoiLookup":
+    def lookup_dois(self, dois: Sequence[str], *, limit: int = 10) -> DoiLookup:
         """Resolve DOIs one by one (free singleton form), separating not-found from unavailable."""
         result = DoiLookup()
         for raw in list(dois)[:limit]:
@@ -604,7 +604,7 @@ class OpenAlexClient:
             result.papers.append(record)
         return result
 
-    def get_papers_by_doi(self, dois: Sequence[str]) -> List[Dict[str, Any]]:
+    def get_papers_by_doi(self, dois: Sequence[str]) -> list[dict[str, Any]]:
         """Donor contract: records for the DOIs that resolved; unknown DOIs omitted.
 
         Raises:
@@ -623,14 +623,14 @@ class OpenAlexClient:
         self.cache.put(ResponseCache.key(f"{self.base_url}/works/https://doi.org/{doi}", {}), dict(work))
 
     def fetch_works_by_doi(self, dois: Sequence[str], *, batch: int = BULK_DOI_BATCH,
-                           prime_cache: bool = True) -> "BulkResult":
+                           prime_cache: bool = True) -> BulkResult:
         """Resolve many DOIs in OR-filtered batches of up to 50, priming the per-DOI cache.
 
         Returns:
             :class:`BulkResult` with ``found`` (``{bare_doi: work}``), the DOIs never
             asked, and ``stopped`` (``quota_paused``/``unreachable``) when a batch failed.
         """
-        wanted: List[str] = []
+        wanted: list[str] = []
         seen: set = set()
         for raw in dois:
             doi = bare_doi(raw)
@@ -670,7 +670,7 @@ class OpenAlexClient:
                 out.not_asked.append(doi)
         return out
 
-    def find_citing_papers(self, openalex_id: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    def find_citing_papers(self, openalex_id: str, max_results: int = 10) -> list[dict[str, Any]]:
         """Works citing ``openalex_id``, most-cited first. Discovery only.
 
         Raises:
@@ -683,7 +683,7 @@ class OpenAlexClient:
         raise_for_no_data(data)
         return [paper_record(work) for work in data.get("results", [])]
 
-    def find_related_papers(self, paper_id: str, max_results: int = 10) -> List[Dict[str, Any]]:
+    def find_related_papers(self, paper_id: str, max_results: int = 10) -> list[dict[str, Any]]:
         """Semantic Scholar recommendations for ``paper_id`` (a DOI or S2 id). Not cached (POST).
 
         Raises:
@@ -704,7 +704,7 @@ class OpenAlexClient:
         if response.status_code != 200:
             reason = REJECTED if 400 <= response.status_code < 500 and response.status_code != 429 else UNREACHABLE
             raise ProviderUnavailable("semantic_scholar", reason, f"HTTP {response.status_code}")
-        papers: List[Dict[str, Any]] = []
+        papers: list[dict[str, Any]] = []
         for rec in (response.json() or {}).get("recommendedPapers", []):
             external = rec.get("externalIds") or {}
             papers.append({
@@ -721,23 +721,23 @@ class OpenAlexClient:
 class DoiLookup:
     """DOI lookup outcome: resolved records, verified not-found, and unanswered DOIs."""
 
-    papers: List[Dict[str, Any]] = field(default_factory=list)
-    not_found: List[str] = field(default_factory=list)
-    unavailable: List[str] = field(default_factory=list)
+    papers: list[dict[str, Any]] = field(default_factory=list)
+    not_found: list[str] = field(default_factory=list)
+    unavailable: list[str] = field(default_factory=list)
 
 
 @dataclass
 class BulkResult:
     """Bulk DOI resolution outcome. A DOI absent from ``found`` and ``not_asked`` is unknown to OpenAlex."""
 
-    found: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    not_asked: List[str] = field(default_factory=list)
+    found: dict[str, dict[str, Any]] = field(default_factory=dict)
+    not_asked: list[str] = field(default_factory=list)
     stopped: str = ""
-    resume_at: Optional[float] = None
+    resume_at: float | None = None
     batches: int = 0
 
 
-def paper_record(work: Mapping[str, Any], *, abstract_chars: int = 500) -> Dict[str, Any]:
+def paper_record(work: Mapping[str, Any], *, abstract_chars: int = 500) -> dict[str, Any]:
     """One OpenAlex work reduced to the donor's search-result fields, marked as external.
 
     Keeps both ``openalex_id`` and ``doi`` so callers never fork on which one they had.

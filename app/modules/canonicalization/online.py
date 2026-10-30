@@ -14,7 +14,7 @@ Candidate (non-approved) vocabularies never produce an accepted mapping.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, Tuple
+from typing import Mapping
 
 from ..extraction.contract import ExtractedMention
 from .adjudication import Judge, MentionVerdict, adjudicate_mention
@@ -32,14 +32,14 @@ class SourceMention:
     surface: str
     category: str = ""
     work_id: str = ""
-    section: Optional[str] = None
-    page: Optional[int] = None
-    chunk_id: Optional[str] = None
+    section: str | None = None
+    page: int | None = None
+    chunk_id: str | None = None
     quote: str = ""
-    identifiers: Tuple[Tuple[str, str], ...] = ()
+    identifiers: tuple[tuple[str, str], ...] = ()
 
     @classmethod
-    def from_extracted(cls, mention: ExtractedMention, work_id: str = "") -> "SourceMention":
+    def from_extracted(cls, mention: ExtractedMention, work_id: str = "") -> SourceMention:
         """Wrap a T06 candidate; identifiers come from its native attributes (formula, chebi, smiles)."""
         ids = tuple(
             (k, str(v))
@@ -79,11 +79,11 @@ class Resolution:
 
     mention: SourceMention
     status: str
-    entity_id: Optional[str]
+    entity_id: str | None
     method: str
     reason: str
-    shortlist: Optional[Shortlist] = None
-    verdict: Optional[MentionVerdict] = None
+    shortlist: Shortlist | None = None
+    verdict: MentionVerdict | None = None
 
     @property
     def is_proposal_only(self) -> bool:
@@ -94,12 +94,12 @@ class Resolution:
 def resolve_mention(
     mention: SourceMention,
     *,
-    vocabulary: Optional[Vocabulary] = None,
-    identifier_index: Optional[Mapping[Tuple[str, str], str]] = None,
-    search: Optional[CandidateSearch] = None,
-    judge: Optional[Judge] = None,
-    budget: Optional[MutableBudget] = None,
-    category_map: Optional[Mapping[str, str]] = None,
+    vocabulary: Vocabulary | None = None,
+    identifier_index: Mapping[tuple[str, str], str] | None = None,
+    search: CandidateSearch | None = None,
+    judge: Judge | None = None,
+    budget: MutableBudget | None = None,
+    category_map: Mapping[str, str] | None = None,
 ) -> Resolution:
     """Resolve one mention to a mapping proposal, a review item or a visible unresolved term."""
     surface = mention.surface.strip()

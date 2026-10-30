@@ -1,9 +1,8 @@
 """Shared service objects (formula checker, ChEBI, property extraction) for term extraction."""
 
+from dataclasses import dataclass, field
 import logging
 import os
-from dataclasses import dataclass, field
-from typing import Optional
 
 from ..agents.chebi import ChebiOboLookup
 from ..agents.chem_checker import ChemicalFormulaValidator
@@ -18,14 +17,14 @@ logger = logging.getLogger(__name__)
 class Services:
     """Bundles the three stateful service objects needed by tools and the orchestrator."""
     formula_checker: ChemicalFormulaValidator
-    chebi_lookup: Optional[ChebiOboLookup]
+    chebi_lookup: ChebiOboLookup | None
     prop_extractor: PhysicalPropertyExtractor = field(default_factory=PhysicalPropertyExtractor)
     prop_normalizer: PropertyNormalizer = field(default_factory=PropertyNormalizer)
 
 
 def build_services(
-    mp_api_key: Optional[str] = None,
-    chebi_obo_path: Optional[str] = None,
+    mp_api_key: str | None = None,
+    chebi_obo_path: str | None = None,
 ) -> Services:
     """Instantiate and return a Services bundle.
 
@@ -39,7 +38,7 @@ def build_services(
     if not api_key:
         logger.warning("MP_API_KEY not set; formula validation may be incomplete.")
 
-    chebi_lookup: Optional[ChebiOboLookup] = None
+    chebi_lookup: ChebiOboLookup | None = None
     if chebi_obo_path and os.path.exists(chebi_obo_path):
         try:
             chebi_lookup = ChebiOboLookup(chebi_obo_path)

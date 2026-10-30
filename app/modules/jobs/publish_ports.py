@@ -21,7 +21,7 @@ Contract for a :class:`PublishStep` implementation:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Protocol, Tuple
+from typing import Any, Callable, Protocol
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt, SnapshotManifest
 from ..contracts.context import RequestContext
@@ -43,7 +43,7 @@ class FrozenSnapshot:
     corpus: str
     sha256: str
     manifest: SnapshotManifest
-    package_keys: Tuple[str, ...] = ()
+    package_keys: tuple[str, ...] = ()
 
 
 class SnapshotSource(Protocol):
@@ -73,10 +73,10 @@ class ApplyOutcome:
     created: int = 0
     reconciled: int = 0
     id_mapping_sha256: str = ""
-    effects: Tuple[str, ...] = ()
+    effects: tuple[str, ...] = ()
     complete: bool = True
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the outcome as a plain dict (effects as a list)."""
         return {
             "created": self.created,
@@ -87,7 +87,7 @@ class ApplyOutcome:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ApplyOutcome":
+    def from_dict(cls, data: dict[str, Any]) -> ApplyOutcome:
         """Rebuild an outcome from :meth:`as_dict` output; missing fields take their defaults."""
         return cls(
             int(data.get("created", 0)),
@@ -133,7 +133,7 @@ class PublishStep(Protocol):
         """Apply the approved plan idempotently; may raise partway (a crash) and be called again."""
         ...
 
-    def reconcile(self, ctx: RequestContext, plan: ChangePlan, *, operation_id: str) -> Optional[ApplyOutcome]:
+    def reconcile(self, ctx: RequestContext, plan: ChangePlan, *, operation_id: str) -> ApplyOutcome | None:
         """Return the outcome if an earlier apply landed completely, else ``None``. Read-only."""
         ...
 
@@ -180,7 +180,7 @@ class PackageProblem:
 
     key: str
     reason: str
-    detail: Dict[str, Any] = field(default_factory=dict)
+    detail: dict[str, Any] = field(default_factory=dict)
 
 
 __all__ = (

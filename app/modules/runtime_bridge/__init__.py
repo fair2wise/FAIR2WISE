@@ -16,9 +16,9 @@ is built explicitly by :class:`app.modules.application.F2WApplication` or by
 from __future__ import annotations
 
 import importlib
-from typing import Any, Dict, Tuple
+from typing import Any
 
-_EXPORTS: Dict[str, Tuple[str, str]] = {
+_EXPORTS: dict[str, tuple[str, str]] = {
     "RUNTIME_ENV": ("mode", "RUNTIME_ENV"),
     "RuntimeConfigError": ("mode", "RuntimeConfigError"),
     "RuntimeMode": ("mode", "RuntimeMode"),

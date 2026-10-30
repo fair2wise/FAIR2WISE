@@ -15,12 +15,12 @@ a same-schema-class rule. Identity checks never use class inheritance as evidenc
 
 from __future__ import annotations
 
-import os
-import re
-import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from functools import lru_cache
+import os
+import re
+import unicodedata
 
 #: Character-similarity floor for calling two forms renderings of each other.
 #:

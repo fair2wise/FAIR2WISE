@@ -9,13 +9,12 @@ new term; ``expected`` is ``None``).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 from .candidate_search import IndexedEntity
 from .vocabulary import VocabEntry, Vocabulary
 
 #: The controls the plan names. Each must never merge, by any strategy's gate, with any judge.
-NAMED_NEGATIVE_CONTROLS: Tuple[Tuple[str, str], ...] = (
+NAMED_NEGATIVE_CONTROLS: tuple[tuple[str, str], ...] = (
     ("Princeton Instruments PI-MTE", "CCD area detector"),  # specific instrument vs generic class
     ("MoTe2", "WTe2"),  # distinct chemicals
     ("Al2O3[0001]", "Al2O3"),  # specific surface vs generic material
@@ -35,11 +34,11 @@ class FixtureMention:
     surface: str
     category: str
     kind: str
-    expected: Optional[str]
+    expected: str | None
 
 
-def _distractors() -> List[IndexedEntity]:
-    out: List[IndexedEntity] = []
+def _distractors() -> list[IndexedEntity]:
+    out: list[IndexedEntity] = []
     for i in range(1, 41):
         out.append(IndexedEntity(f"d:scat{i}", f"wide angle scattering study {i}", "technique"))
         out.append(IndexedEntity(f"d:film{i}", f"thin film sample batch {i}", "material"))
@@ -47,7 +46,7 @@ def _distractors() -> List[IndexedEntity]:
     return out
 
 
-def entities() -> List[IndexedEntity]:
+def entities() -> list[IndexedEntity]:
     """Existing entities: the labelled ones below plus 120 distractors that crowd any top-k."""
     base = [
         IndexedEntity("t:giwaxs", "grazing incidence wide angle x-ray scattering", "technique"),
@@ -67,7 +66,7 @@ def entities() -> List[IndexedEntity]:
     return base + _distractors()
 
 
-MENTIONS: Tuple[FixtureMention, ...] = (
+MENTIONS: tuple[FixtureMention, ...] = (
     # true merges: case, punctuation, acronym <-> expansion, typo, word order
     FixtureMention("GIWAXS", "technique", "true_merge", "t:giwaxs"),
     FixtureMention("GI-WAXS", "technique", "true_merge", "t:giwaxs"),

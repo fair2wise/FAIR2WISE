@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+import re
+from typing import Any, Sequence
 
 GOLD_TITLE_NEEDLES = (
     "p3ht",
@@ -39,7 +39,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def work_id_for_paper(paper: Dict[str, Any]) -> str:
+def work_id_for_paper(paper: dict[str, Any]) -> str:
     """Derive a stable work id from a harvest record.
 
     Preference order: ``doi:<doi>`` (top-level, then any version), ``arxiv:<id>``
@@ -61,7 +61,7 @@ def work_id_for_paper(paper: Dict[str, Any]) -> str:
     return f"title:{title or 'unknown'}"
 
 
-def resolve_pdf_path(paper: Dict[str, Any], root: Path) -> Optional[Path]:
+def resolve_pdf_path(paper: dict[str, Any], root: Path) -> Path | None:
     """Return the paper's ``pdf_path`` (relative paths resolved against ``root``) if the file exists, else None."""
     rel = str(paper.get("pdf_path") or "").strip()
     if not rel:
@@ -72,7 +72,7 @@ def resolve_pdf_path(paper: Dict[str, Any], root: Path) -> Optional[Path]:
     return path if path.is_file() else None
 
 
-def load_harvest_papers(manifest_path: Path) -> List[Dict[str, Any]]:
+def load_harvest_papers(manifest_path: Path) -> list[dict[str, Any]]:
     """Load paper records from a harvest manifest.
 
     Accepts a list or a dict under ``papers`` (list or id-keyed dict). Returns an
@@ -92,7 +92,7 @@ def load_harvest_papers(manifest_path: Path) -> List[Dict[str, Any]]:
     return []
 
 
-def _gold_score(paper: Dict[str, Any]) -> Tuple:
+def _gold_score(paper: dict[str, Any]) -> tuple:
     title = str(paper.get("title") or "").lower()
     seed = paper.get("kg_seed_rank")
     try:
@@ -108,17 +108,17 @@ def _gold_score(paper: Dict[str, Any]) -> Tuple:
 
 def select_literature_docs(
     *,
-    root: Optional[Path] = None,
-    manifest_path: Optional[Path] = None,
+    root: Path | None = None,
+    manifest_path: Path | None = None,
     mode: str = "gold",
     limit: int = DEFAULT_GOLD_LIMIT,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return one PDF per canonical Work. ``gold`` is a small sample; ``all`` is every on-disk PDF."""
     base = Path(root or repo_root())
     manifest = Path(manifest_path or base / "papers/rsoxs/manifest.json")
     papers = load_harvest_papers(manifest)
     seen_works: set[str] = set()
-    candidates: List[Dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
     for paper in papers:
         pdf = resolve_pdf_path(paper, base)
         if pdf is None:
@@ -142,7 +142,7 @@ def select_literature_docs(
         )
     mode_l = (mode or "gold").lower()
     if mode_l == "gold":
-        def _key(doc: Dict[str, Any]) -> Tuple:
+        def _key(doc: dict[str, Any]) -> tuple:
             paperish = {
                 "title": doc.get("title"),
                 "kg_seed_rank": doc.get("kg_seed_rank"),
@@ -161,17 +161,17 @@ def select_literature_docs(
     return candidates
 
 
-def _glob_existing(root: Path, patterns: Sequence[str]) -> List[Path]:
-    found: List[Path] = []
+def _glob_existing(root: Path, patterns: Sequence[str]) -> list[Path]:
+    found: list[Path] = []
     for pattern in patterns:
         found.extend(p for p in root.glob(pattern) if p.is_file())
     return found
 
 
-def collect_ops_docs(*, root: Optional[Path] = None) -> List[Dict[str, Any]]:
+def collect_ops_docs(*, root: Path | None = None) -> list[dict[str, Any]]:
     """HTML/md/README already on disk. Never mixes literature PDFs. Never reads h5."""
     base = Path(root or repo_root())
-    docs: List[Dict[str, Any]] = []
+    docs: list[dict[str, Any]] = []
 
     als = base / ".cache/bl1101/pages/als_11-0-1-2.html"
     if als.is_file():
@@ -246,7 +246,7 @@ def collect_ops_docs(*, root: Optional[Path] = None) -> List[Dict[str, Any]]:
             )
 
     # De-dupe by resolved path so literature PDFs cannot sneak in.
-    uniq: List[Dict[str, Any]] = []
+    uniq: list[dict[str, Any]] = []
     seen: set[str] = set()
     for doc in docs:
         resolved = str(Path(doc["path"]).resolve())

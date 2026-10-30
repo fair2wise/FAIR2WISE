@@ -18,7 +18,7 @@ Adapted in part from als-computing/forge_rsoxs_analysis src/forge/kg/paging.py (
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Mapping
 
 from app.modules.contracts.context import RequestContext
 from app.modules.contracts.errors import CapabilityError, ContractError, ErrorCode
@@ -78,7 +78,7 @@ def clamp_bounds(hops: int, max_nodes: int) -> tuple:
     return min(hops_i, MAX_HOPS), nodes_i
 
 
-def _citations(data: Mapping[str, Any]) -> List[str]:
+def _citations(data: Mapping[str, Any]) -> list[str]:
     for key in ("source_papers", "papers"):
         value = data.get(key)
         if isinstance(value, list):
@@ -89,8 +89,8 @@ def _citations(data: Mapping[str, Any]) -> List[str]:
 
 
 def entity_record(graph_id: str, entity_id: str, data: Mapping[str, Any], *, backend: str,
-                  name: Optional[str] = None, category: Optional[str] = None,
-                  extra: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+                  name: str | None = None, category: str | None = None,
+                  extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Build the graph-scoped entity record returned by every backend.
 
     Args:
@@ -118,7 +118,7 @@ def entity_record(graph_id: str, entity_id: str, data: Mapping[str, Any], *, bac
 
 
 def edge_record(graph_id: str, edge_id: str, data: Mapping[str, Any], *, backend: str,
-                extra: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+                extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Build the graph-scoped edge record (``subject``/``predicate``/``object`` plus verbatim ``data``)."""
     record = {
         "graph_id": graph_id,

@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
 
 from fastapi.responses import JSONResponse
@@ -47,11 +47,11 @@ STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 CROSS_SITE_CODE = "cross_site_request"
 
 
-def _default_port(scheme: str) -> Optional[int]:
+def _default_port(scheme: str) -> int | None:
     return {"http": 80, "https": 443}.get(scheme)
 
 
-def _origin_host(origin: str) -> Optional[Tuple[str, int]]:
+def _origin_host(origin: str) -> tuple[str, int] | None:
     """Return ``(host, port)`` of an ``Origin`` value, or ``None`` when it is not an http(s) origin."""
     try:
         parts = urlsplit(origin.strip())
@@ -64,7 +64,7 @@ def _origin_host(origin: str) -> Optional[Tuple[str, int]]:
     return parts.hostname.lower(), port or _default_port(scheme) or 0
 
 
-def _host_header(value: str, scheme: str) -> Optional[Tuple[str, int]]:
+def _host_header(value: str, scheme: str) -> tuple[str, int] | None:
     """Return ``(host, port)`` of a ``Host``-style header value (first entry only)."""
     first = value.split(",", 1)[0].strip()
     if not first:
@@ -80,7 +80,7 @@ def _host_header(value: str, scheme: str) -> Optional[Tuple[str, int]]:
 
 
 def origin_allowed(origin: str, headers: Mapping[str, str], *, scheme: str = "http",
-                   allowed_origins: Iterable[str] = (), allowed_origin_regex: Optional[str] = None) -> bool:
+                   allowed_origins: Iterable[str] = (), allowed_origin_regex: str | None = None) -> bool:
     """Return whether a present ``Origin`` may make a state-changing request.
 
     Args:
@@ -109,7 +109,7 @@ def origin_allowed(origin: str, headers: Mapping[str, str], *, scheme: str = "ht
 
 def browser_origin_refusal(method: str, headers: Mapping[str, str], *, scheme: str = "http",
                            allowed_origins: Iterable[str] = (),
-                           allowed_origin_regex: Optional[str] = None) -> Optional[str]:
+                           allowed_origin_regex: str | None = None) -> str | None:
     """Return why a request is refused as cross-site, or ``None`` when it may proceed."""
     if method.upper() not in STATE_CHANGING_METHODS:
         return None
@@ -132,7 +132,7 @@ def refusal_response(reason: str) -> JSONResponse:
 
 
 def check_browser_origin(request: Any, *, allowed_origins: Iterable[str] = (),
-                         allowed_origin_regex: Optional[str] = None) -> Optional[JSONResponse]:
+                         allowed_origin_regex: str | None = None) -> JSONResponse | None:
     """Return a 403 response for a cross-site state-changing ``request``, else ``None``."""
     headers = {k.lower(): v for k, v in request.headers.items()}
     reason = browser_origin_refusal(request.method, headers, scheme=request.url.scheme,
@@ -155,7 +155,7 @@ class OriginGateMiddleware:
     """
 
     def __init__(self, app: ASGIApp, allowed_origins: Iterable[str] = (),
-                 path_prefixes: Sequence[str] = ("/v1/",), allowed_origin_regex: Optional[str] = None) -> None:
+                 path_prefixes: Sequence[str] = ("/v1/",), allowed_origin_regex: str | None = None) -> None:
         """Bind the app and freeze the allowlist and guarded prefixes."""
         self.app = app
         self._allowed = frozenset(allowed_origins)

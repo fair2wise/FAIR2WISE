@@ -22,19 +22,19 @@ als_knowledge_agent/src/als_knowledge_agent/graph/bibliography_backfill.py
 
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 import hashlib
 import json
 import re
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Tuple
+from typing import Any, Iterable, Mapping, Protocol
 
 #: Bumped when :func:`normalise_record` changes shape.
 BIBLIO_VERSION = "1"
 #: Placeholder predicate name until T08 maps it into the F2W graph vocabulary
 #: (the donor's ``forge:hasBibliography`` is not imported as an authority).
 HAS_BIBLIOGRAPHY = "hasBibliography"
-BIBLIOGRAPHIC_FIELDS: Tuple[str, ...] = (
+BIBLIOGRAPHIC_FIELDS: tuple[str, ...] = (
     "authors", "year", "journal", "doi", "openalex_id", "referenced_works", "topics", "oa_status",
 )
 
@@ -43,7 +43,7 @@ class ResolvedLike(Protocol):
     """A :class:`.resolver_batch.Resolved`, structurally."""
 
     source: str
-    record: Optional[Dict[str, Any]]
+    record: dict[str, Any] | None
     fetched_at: str
 
 
@@ -55,7 +55,7 @@ def _bare_doi(value: object) -> str:
     return text
 
 
-def _year(value: object) -> Optional[int]:
+def _year(value: object) -> int | None:
     try:
         year = int(str(value)[:4])
     except (TypeError, ValueError):
@@ -68,7 +68,7 @@ def _strip(value: object, prefix: str) -> str:
     return text[len(prefix):] if text.startswith(prefix) else text
 
 
-def _from_openalex(w: Mapping[str, Any]) -> Dict[str, Any]:
+def _from_openalex(w: Mapping[str, Any]) -> dict[str, Any]:
     authors = []
     for authorship in w.get("authorships") or []:
         author = authorship.get("author") or {}
@@ -87,7 +87,7 @@ def _from_openalex(w: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _from_semantic_scholar(rec: Mapping[str, Any]) -> Dict[str, Any]:
+def _from_semantic_scholar(rec: Mapping[str, Any]) -> dict[str, Any]:
     external = rec.get("externalIds") or {}
     return {
         "title": str(rec.get("title") or ""), "year": _year(rec.get("year")),
@@ -99,7 +99,7 @@ def _from_semantic_scholar(rec: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _from_crossref(rec: Mapping[str, Any]) -> Dict[str, Any]:
+def _from_crossref(rec: Mapping[str, Any]) -> dict[str, Any]:
     year = None
     for name in ("issued", "published-print", "published-online"):
         parts = (rec.get(name) or {}).get("date-parts") or [[None]]
@@ -119,7 +119,7 @@ def _from_crossref(rec: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def normalise_record(source: str, record: Mapping[str, Any]) -> Dict[str, Any]:
+def normalise_record(source: str, record: Mapping[str, Any]) -> dict[str, Any]:
     """One field set (title, year, journal, authors, ids) whatever provider answered.
 
     Raises:
@@ -144,7 +144,7 @@ def _fold(value: object) -> str:
     return re.sub(r"[^a-z0-9]", "", _bare_doi(value))
 
 
-def _props(row: Mapping[str, Any]) -> Dict[str, Any]:
+def _props(row: Mapping[str, Any]) -> dict[str, Any]:
     raw = row.get("properties") or {}
     if isinstance(raw, str):
         try:
@@ -183,16 +183,16 @@ class BackfillProposal:
     publication_id: str
     status: str
     digest: str = ""
-    record: Dict[str, Any] = field(default_factory=dict)
-    link: Dict[str, Any] = field(default_factory=dict)
+    record: dict[str, Any] = field(default_factory=dict)
+    link: dict[str, Any] = field(default_factory=dict)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
 
 def propose_backfill(publication_id: str, resolved: ResolvedLike, *,
-                     newest: Optional[Mapping[str, Any]] = None) -> BackfillProposal:
+                     newest: Mapping[str, Any] | None = None) -> BackfillProposal:
     """The record and link :func:`backfill_publication` would write, as a reviewable proposal."""
     if not resolved.record:
         return BackfillProposal(publication_id, "no_record")
@@ -205,13 +205,13 @@ def propose_backfill(publication_id: str, resolved: ResolvedLike, *,
     link = {"subject": publication_id, "predicate": HAS_BIBLIOGRAPHY, "object_digest": digest,
             "properties": {"metadata_source": resolved.source, "biblio_version": BIBLIO_VERSION,
                            "record_digest": digest,
-                           "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}}
+                           "recorded_at": datetime.now(UTC).isoformat(timespec="seconds")}}
     return BackfillProposal(publication_id, "proposed", digest, node, link)
 
 
 def select_backfill_candidates(publications: Iterable[Mapping[str, Any]],
                                newest: Mapping[str, Mapping[str, Any]], *,
-                               refresh: bool = False) -> List[Mapping[str, Any]]:
+                               refresh: bool = False) -> list[Mapping[str, Any]]:
     """Publications needing a record: pdf-only ones without a link (or all of them with ``refresh``)."""
     out = []
     for publication in publications:
@@ -224,10 +224,10 @@ def select_backfill_candidates(publications: Iterable[Mapping[str, Any]],
     return out
 
 
-def newest_bibliography_link(rows: Iterable[Mapping[str, Any]], subject_id: str) -> Optional[Mapping[str, Any]]:
+def newest_bibliography_link(rows: Iterable[Mapping[str, Any]], subject_id: str) -> Mapping[str, Any] | None:
     """Newest ``hasBibliography`` row out of ``subject_id`` (by ``recorded_at``, ``createdAt``, ``id``)."""
-    best: Optional[Mapping[str, Any]] = None
-    best_key: Optional[Tuple[str, str, str]] = None
+    best: Mapping[str, Any] | None = None
+    best_key: tuple[str, str, str] | None = None
     for row in rows:
         if str(row.get("predicate") or "") != HAS_BIBLIOGRAPHY or str(row.get("subjectId") or "") != subject_id:
             continue
@@ -243,7 +243,7 @@ def _empty(value: object) -> bool:
 
 
 def effective_publication(name: str, properties: Mapping[str, Any],
-                          record: Optional[Mapping[str, Any]]) -> Tuple[str, Dict[str, Any], bool]:
+                          record: Mapping[str, Any] | None) -> tuple[str, dict[str, Any], bool]:
     """``(name, properties, used)`` with ``record`` filling gaps; own non-empty values always win."""
     merged = dict(properties or {})
     if not record:
@@ -262,9 +262,9 @@ def effective_publication(name: str, properties: Mapping[str, Any],
     return name, merged, used
 
 
-def author_names(authors: object) -> List[str]:
+def author_names(authors: object) -> list[str]:
     """Display names from either author shape (``[{"name": ...}]`` or bare strings)."""
-    names: List[str] = []
+    names: list[str] = []
     for author in authors if isinstance(authors, list) else []:
         value = (str(author.get("name") or author.get("display_name") or "") if isinstance(author, dict)
                  else str(author or ""))

@@ -26,7 +26,8 @@ Author: David Abramov (@dabramov)
 """
 
 import re
-from typing import List, Dict, Optional, Any
+from typing import Any
+
 import pytest
 
 
@@ -50,7 +51,7 @@ class PhysicalPropertyExtractor:
     """
 
     # Map various textual forms to canonical property names
-    PROPERTY_KEYWORDS: Dict[str, str] = {
+    PROPERTY_KEYWORDS: dict[str, str] = {
         # Standard properties
         "band gap": "band_gap",
         "band-gap": "band_gap",
@@ -85,7 +86,7 @@ class PhysicalPropertyExtractor:
     # Maximum number of characters between material and property phrase to be considered “proximal” 
     PROXIMITY_WINDOW = 30  # characters
 
-    def __init__(self, property_keywords: Optional[Dict[str, str]] = None):
+    def __init__(self, property_keywords: dict[str, str] | None = None):
         """Initialize extractor with optional custom property keywords.
 
         Args:
@@ -120,7 +121,7 @@ class PhysicalPropertyExtractor:
         return bool(re.search(pattern1, sentence, flags=re.IGNORECASE) or
                     re.search(pattern2, sentence, flags=re.IGNORECASE))
 
-    def extract(self, text: str, materials: List[str]) -> List[Dict[str, Any]]:
+    def extract(self, text: str, materials: list[str]) -> list[dict[str, Any]]:
         """Extract property entries for given materials from a block of text.
 
         Args:
@@ -137,7 +138,7 @@ class PhysicalPropertyExtractor:
                 - context: The full sentence containing the mention
                 - verified: True if numeric extracted and patterns matched; False otherwise
         """
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         # Split text into sentences to preserve context
         sentences = re.split(r'(?<=[\.\?\!])\s+', text)
         lower_text = text.lower()
@@ -191,7 +192,7 @@ class PhysicalPropertyExtractor:
 
         return results
 
-    def extract_from_relations(self, term_record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def extract_from_relations(self, term_record: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract “measured_property” relations from a term record.
 
         Args:
@@ -211,7 +212,7 @@ class PhysicalPropertyExtractor:
                 - context: "measured_property:<related_term>"
                 - verified: copied from relation entry
         """
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         material = term_record.get("term", "").strip()
         for rel in term_record.get("relations", []):
             if rel.get("relation") == "measured_property":
@@ -239,7 +240,7 @@ class PropertyNormalizer:
     """
 
     # Desired target units for each property
-    TARGET_UNITS: Dict[str, str] = {
+    TARGET_UNITS: dict[str, str] = {
         "band_gap": "eV",
         "melting_point": "K",
         "glass_transition_temperature": "K",
@@ -258,7 +259,7 @@ class PropertyNormalizer:
 
     # Plausibility ranges for certain properties; if normalized_value falls outside,
     # flag unit_conversion_failed=True
-    PLAUSIBILITY_RANGES: Dict[str, Any] = {
+    PLAUSIBILITY_RANGES: dict[str, Any] = {
         "efficiency": (0.0, 100.0),       # percent
         "density": (0.0, float("inf")),   # density must be positive
         "band_gap": (0.0, 10.0),          # reasonable eV range
@@ -269,7 +270,7 @@ class PropertyNormalizer:
         "energy_above_hull": (0.0, 5.0),  # eV/atom
     }
 
-    def normalize(self, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def normalize(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Convert raw values and units into canonical numeric + unit form.
 
         Plausibility filtering is applied after conversion.
@@ -286,7 +287,7 @@ class PropertyNormalizer:
                 - uncertainty_value: float or None
                 - unit_conversion_failed: bool
         """
-        normalized_entries: List[Dict[str, Any]] = []
+        normalized_entries: list[dict[str, Any]] = []
 
         for e in entries:
             prop = e["property"]

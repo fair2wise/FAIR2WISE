@@ -18,10 +18,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_classification.py
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 #: Core figure classes (donor taxonomy v1, general domain).
-FIGURE_CLASSES: Tuple[str, ...] = (
+FIGURE_CLASSES: tuple[str, ...] = (
     "experimental_scattering", "simulated_scattering", "simulated_optics", "1d_scattering_curve",
     "sem_image", "afm_image", "tem_image", "optical_microscopy", "spectrum", "device_curve",
     "thermal_trace", "other",
@@ -30,10 +30,10 @@ FIGURE_CLASSES: Tuple[str, ...] = (
 _PANEL_CLAUSE = re.compile(r"\(\s*([a-hA-H])\s*\)")
 
 
-def caption_clauses(caption: str) -> Dict[str, str]:
+def caption_clauses(caption: str) -> dict[str, str]:
     """A caption split into the clauses its ``(a)``, ``(b)`` markers introduce (lower-cased letter keys)."""
     marks = list(_PANEL_CLAUSE.finditer(caption or ""))
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for i, mark in enumerate(marks):
         end = marks[i + 1].start() if i + 1 < len(marks) else len(caption)
         out[mark.group(1).lower()] = caption[mark.end():end].strip()
@@ -52,7 +52,7 @@ def panel_context(label: str, figure_caption: str, *, limit: int = 300) -> str:
 
 
 # Ordered (class, pattern) pairs; first-match wins for the primary, all matches form candidates.
-_RULES: Tuple[Tuple[str, "re.Pattern[str]"], ...] = tuple(
+_RULES: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
     (cls, re.compile(pat, re.IGNORECASE)) for cls, pat in (
         ("simulated_scattering", r"simulat\w*[^.]{0,60}(?:scattering|gisaxs|giwaxs|saxs|waxs|diffraction)"),
         ("experimental_scattering", r"\b(?:2d|two-dimensional)\b[^.]{0,40}(?:gisaxs|giwaxs|saxs|waxs|rsoxs|"
@@ -75,7 +75,7 @@ class TextModel(Protocol):
     """The slice of an F2W chat client used here (``term_extractor.clients.ChatClient``)."""
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240,
-             trace_label: Optional[str] = None) -> str:  # pragma: no cover - protocol
+             trace_label: str | None = None) -> str:  # pragma: no cover - protocol
         """Return the model's text reply."""
 
 
@@ -106,13 +106,13 @@ def _prompt(context: str) -> str:
             f"Classes: {menu}.\nContext: {context}\nReply with exactly one class name, or other if unsure.")
 
 
-def caption_classes(text: str) -> List[str]:
+def caption_classes(text: str) -> list[str]:
     """Classes whose caption/axis keywords occur in ``text`` (source-supported evidence), in rule order."""
     return [cls for cls, pattern in _RULES if pattern.search(text or "")]
 
 
 def classify_text_context(caption: str, label: str = "", *, extra_text: str = "",
-                          model: Optional[ChatAdapter] = None) -> Dict[str, Any]:
+                          model: ChatAdapter | None = None) -> dict[str, Any]:
     """Classify one figure or panel from its caption clause (and axis text), optionally cross-checked by a model.
 
     The verdict shape follows the donor's: ``class``, ``also``, ``confidence``, ``needs_review``,
@@ -122,12 +122,12 @@ def classify_text_context(caption: str, label: str = "", *, extra_text: str = ""
     scope = caption_clauses(caption).get(label.lower()) if label else None
     evidence_text = f"{scope if scope else (caption or '')} {extra_text}".strip()
     found = caption_classes(evidence_text)
-    reasons: List[str] = []
+    reasons: list[str] = []
     if len(found) > 1:
         reasons.append("caption_names_several_classes")
     if label and not scope:
         reasons.append("panel_has_no_own_caption_clause")
-    verdict: Dict[str, Any] = {
+    verdict: dict[str, Any] = {
         "class": found[0] if found else "", "also": found[1:], "confidence": 0.0,
         "basis": "caption_keywords" if found else "none", "source_supported": bool(found), "model_used": False,
     }

@@ -18,9 +18,9 @@ Rewritten: transport, reasoning-level plumbing and provider fields removed.
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
-from typing import Callable, Optional
+import hashlib
+from typing import Callable
 
 from ..adjudication import clamp_confidence, parse_json_object
 from ..candidate_search import estimate_tokens
@@ -56,7 +56,7 @@ class StructuredTermResolver:
     """Resolve one :class:`TermEvidence` per call, within explicit budgets."""
 
     def __init__(
-        self, judge: Callable[[str], str], vocab: Vocabulary, config: Optional[ResolverConfig] = None
+        self, judge: Callable[[str], str], vocab: Vocabulary, config: ResolverConfig | None = None
     ) -> None:
         if judge is None:
             raise ValueError("a judge is required; there is no default provider")

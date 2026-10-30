@@ -20,11 +20,11 @@ Rewritten: plan binding, revision checks and the single gate; the donor's in-pla
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Mapping, Optional, Protocol, Sequence, Tuple
+import hashlib
+import json
+from typing import Any, Mapping, Protocol, Sequence
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from .campaign.models import Decision, TermEvidence
@@ -44,14 +44,14 @@ class MergeOp:
     term_key: str
     category: str
     surface: str
-    variants: Tuple[str, ...]
-    node_ids: Tuple[str, ...]
+    variants: tuple[str, ...]
+    node_ids: tuple[str, ...]
     target_slug: str
     method: str
     confidence: float
-    votes: Tuple[str, ...] = ()
+    votes: tuple[str, ...] = ()
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable dict with tuples as lists and confidence rounded to 4 places."""
         return {
             "term_key": self.term_key,
@@ -90,17 +90,17 @@ class ScopedMergePlan:
     """Immutable merge plan bound to a source revision, a vocabulary revision and a plan hash."""
 
     plan_id: str
-    scope: Tuple[str, ...]
+    scope: tuple[str, ...]
     target: str
     source_revision: str
     vocabulary_revision: str
-    ops: Tuple[MergeOp, ...]
+    ops: tuple[MergeOp, ...]
     report_sha256: str
     created_at: str
     plan_sha256: str
     version: str = PLAN_VERSION
 
-    def body(self) -> Dict[str, Any]:
+    def body(self) -> dict[str, Any]:
         """Return the hashed content: every field except the id, hash and ``plan_sha256``."""
         return {
             "version": self.version,
@@ -124,7 +124,7 @@ class ScopedMergePlan:
         ops: Sequence[MergeOp],
         report_sha256: str,
         created_at: str,
-    ) -> "ScopedMergePlan":
+    ) -> ScopedMergePlan:
         """Create a plan, refusing empty/whole-graph scope, empty plans and oversized plans."""
         scope_t = tuple(sorted({str(s).strip() for s in scope}))
         if not scope_t or any(s.lower() in _FORBIDDEN_SCOPES for s in scope_t):
@@ -184,8 +184,8 @@ class ScopedMergePlan:
 class PlanDraft:
     """A plan plus everything held back from it, with reasons (held terms stay visible)."""
 
-    plan: Optional[ScopedMergePlan]
-    held: Tuple[Tuple[str, str], ...] = ()
+    plan: ScopedMergePlan | None
+    held: tuple[tuple[str, str], ...] = ()
 
 
 def plan_migration(
@@ -200,8 +200,8 @@ def plan_migration(
     created_at: datetime,
 ) -> PlanDraft:
     """Turn proposed decisions into a scoped plan. Unsafe or unknown-target decisions are held, not dropped."""
-    ops: List[MergeOp] = []
-    held: List[Tuple[str, str]] = []
+    ops: list[MergeOp] = []
+    held: list[tuple[str, str]] = []
     for d in decisions:
         ev = evidence.get(d.term_key)
         entry = vocabulary.get(d.target_slug)
@@ -257,9 +257,9 @@ class ApplyResult:
 
     dry_run: bool
     plan_id: str
-    would_apply: Tuple[str, ...]
-    applied: Tuple[str, ...] = ()
-    refused: Tuple[Tuple[str, str], ...] = ()
+    would_apply: tuple[str, ...]
+    applied: tuple[str, ...] = ()
+    refused: tuple[tuple[str, str], ...] = ()
 
 
 class ApplyFailed(RuntimeError):
@@ -273,19 +273,19 @@ class ApplyFailed(RuntimeError):
 def apply_scoped_plan(
     gate: str,
     plan: ScopedMergePlan,
-    approval: Optional[ApprovalRecord],
-    target: Optional[MergeTarget],
+    approval: ApprovalRecord | None,
+    target: MergeTarget | None,
     vocabulary: Vocabulary,
     *,
     dry_run: bool = True,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> ApplyResult:
     """The only code path that may call ``MergeTarget.merge``. Default is a dry run.
 
     Real application requires an open gate, an ``ApprovalRecord`` for this plan hash, matching live
     source and vocabulary revisions, an approved vocabulary and passing per-operation safety checks.
     """
-    refused: List[Tuple[str, str]] = []
+    refused: list[tuple[str, str]] = []
     for op in plan.ops:
         entry = vocabulary.get(op.target_slug)
         reason = (
@@ -316,7 +316,7 @@ def apply_scoped_plan(
         raise ApplyRefused("vocabulary_not_approved", "apply needs an approved vocabulary revision")
     if refused:
         raise ApplyRefused("unsafe_operation", f"{len(refused)} operations fail the safety check: {refused[0]}")
-    done: List[str] = []
+    done: list[str] = []
     try:
         for op in plan.ops:
             target.merge(op)

@@ -1,13 +1,13 @@
 """Drive LLM term extraction over PDFs, page by page, into a ``TermStore``."""
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 import logging
 import os
-import json
-import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+import re
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
@@ -15,12 +15,10 @@ import fitz
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
+from . import provenance, source_repos
 from ..cborg_http import openai_http_kwargs, require_cborg_api_key
-
 from ..cborg_limiter import sync_slot
 from ..llm_admission import shared_admission_enabled
-
-from . import provenance, source_repos
 from .agent import build_graph
 from .clients import make_chat_client
 from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeIndex
@@ -70,7 +68,7 @@ def _short_error(exc: Exception, *, limit: int = 800) -> str:
     return text[:limit].rstrip() + "... [truncated]"
 
 
-def _extract_terms_json_from_text(text: str) -> Dict[str, Any]:
+def _extract_terms_json_from_text(text: str) -> dict[str, Any]:
     """Extract the largest JSON object containing a top-level ``terms`` key."""
     if not text:
         return {"terms": []}
@@ -98,8 +96,8 @@ def _context_for_term(text: str, term: str) -> str:
     return text.strip()[:500]
 
 
-def _keyword_tokens(values: Sequence[str]) -> List[str]:
-    tokens: List[str] = []
+def _keyword_tokens(values: Sequence[str]) -> list[str]:
+    tokens: list[str] = []
     seen = set()
     for value in values:
         for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9_\-]{2,}", str(value).lower()):
@@ -110,8 +108,8 @@ def _keyword_tokens(values: Sequence[str]) -> List[str]:
     return tokens
 
 
-def _focus_phrases(values: Sequence[str]) -> List[str]:
-    phrases: List[str] = []
+def _focus_phrases(values: Sequence[str]) -> list[str]:
+    phrases: list[str] = []
     seen = set()
     for value in values:
         text = re.sub(r"\s+", " ", str(value).strip().lower())
@@ -172,10 +170,10 @@ class Orchestrator:
         temperature: float = 0.0,
         context_length: int = 50,
         max_workers: int = 8,
-        cborg_base: Optional[str] = None,
-        cborg_api_key: Optional[str] = None,
+        cborg_base: str | None = None,
+        cborg_api_key: str | None = None,
         ollama_url: str = "http://localhost:11434",
-        chebi_obo_path: Optional[str] = "storage/ontologies/chebi.obo",
+        chebi_obo_path: str | None = "storage/ontologies/chebi.obo",
         merge_top_k: int = DEFAULT_MERGE_TOP_K,
         merge_embed_model: str = "",
     ):
@@ -341,7 +339,7 @@ class Orchestrator:
 
     def _register_json_terms_from_result(
         self,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         filename: str,
         page_num: int,
         text: str,
@@ -465,10 +463,10 @@ class Orchestrator:
         self,
         page_texts: Sequence[str],
         query: str,
-        missing_topics: Optional[Sequence[str]] = None,
+        missing_topics: Sequence[str] | None = None,
         *,
         max_pages: int = 6,
-    ) -> List[int]:
+    ) -> list[int]:
         """Return zero-based page indices most relevant to the query/missing topics."""
         if max_pages <= 0:
             return []
@@ -492,9 +490,9 @@ class Orchestrator:
         pdf_path: str,
         *,
         query: str,
-        missing_topics: Optional[Sequence[str]] = None,
+        missing_topics: Sequence[str] | None = None,
         max_pages: int = 6,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Process query-relevant pages from one PDF while always extracting publication metadata."""
         try:
             doc = fitz.open(pdf_path)
@@ -603,9 +601,9 @@ class Orchestrator:
         data_dir: str,
         *,
         query: str,
-        missing_topics: Optional[Sequence[str]] = None,
+        missing_topics: Sequence[str] | None = None,
         max_pages: int = 6,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Walk data_dir and partially process PDFs against one query."""
         if not os.path.isdir(data_dir):
             msg = f"Directory not found: {data_dir}"
@@ -616,7 +614,7 @@ class Orchestrator:
         if not pdfs:
             logger.warning("No PDFs in %s", data_dir)
 
-        pdf_results: List[Dict[str, Any]] = []
+        pdf_results: list[dict[str, Any]] = []
         for idx, pdf_path in enumerate(pdfs, start=1):
             logger.info("[%d/%d] Targeted processing: %s", idx, len(pdfs), pdf_path.name)
             result = self.process_pdf_targeted(
@@ -653,7 +651,7 @@ class Orchestrator:
             "pdf_results": pdf_results,
         }
 
-    def process_directory(self, data_dir: str) -> Dict[str, Any]:
+    def process_directory(self, data_dir: str) -> dict[str, Any]:
         """Walk data_dir, process all PDFs, assign importance scores, save final output."""
         if not os.path.isdir(data_dir):
             msg = f"Directory not found: {data_dir}"
@@ -695,14 +693,14 @@ def run_extraction(
     *,
     model: str,
     backend: str = "cborg",
-    cborg_base: Optional[str] = None,
-    cborg_api_key: Optional[str] = None,
+    cborg_base: str | None = None,
+    cborg_api_key: str | None = None,
     ollama_url: str = "http://localhost:11434",
     schema_path: str = "storage/schema/matkg_schema.yaml",
     temperature: float = 0.0,
     context_length: int = 50,
     max_workers: int = 8,
-    chebi_obo_path: Optional[str] = None,
+    chebi_obo_path: str | None = None,
     merge_top_k: int = DEFAULT_MERGE_TOP_K,
     merge_embed_model: str = "",
 ) -> dict:

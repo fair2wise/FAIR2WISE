@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
 from pathlib import Path
+import sys
 
 # .env MUST be loaded before importing coordinator/retrieval_agent so that
 # KG_RAG_RETRIEVAL_BACKEND (and other env vars) are visible to kg_rag_api at

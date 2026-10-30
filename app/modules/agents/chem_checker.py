@@ -12,7 +12,6 @@ import functools
 import logging
 import os
 import re
-from typing import Optional
 
 from mp_api.client import MPRester
 from pymatgen.core import Composition
@@ -24,7 +23,7 @@ class ChemicalFormulaValidator:
 
     _REDUCE_PATTERN = re.compile(r"\s+")
 
-    def __init__(self, api_key: Optional[str] = None, timeout: int = 60):
+    def __init__(self, api_key: str | None = None, timeout: int = 60):
         self.api_key = api_key or os.getenv("MP_API_KEY")
         self.timeout = timeout
         self._mp_disabled = False

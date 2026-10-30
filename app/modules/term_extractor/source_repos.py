@@ -8,11 +8,11 @@ records used by the existing PDF-embedded code path.
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 import logging
 import os
 import re
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Iterable, Sequence
 from urllib.parse import quote
 
 import requests
@@ -92,9 +92,9 @@ class SourceBlock:
     end_line: int
 
 
-def extract_github_repositories(text: str) -> List[GitHubRepoRef]:
+def extract_github_repositories(text: str) -> list[GitHubRepoRef]:
     """Return unique GitHub repositories explicitly linked in text."""
-    refs: List[GitHubRepoRef] = []
+    refs: list[GitHubRepoRef] = []
     seen: set[tuple[str, str]] = set()
     for match in _GITHUB_RE.finditer(text or ""):
         owner = match.group("owner").strip().rstrip(".,;:")
@@ -120,9 +120,9 @@ def _tokens(text: str) -> set[str]:
     return toks
 
 
-def extract_identifier_hints(text: str, *, limit: int = 80) -> List[str]:
+def extract_identifier_hints(text: str, *, limit: int = 80) -> list[str]:
     """Find function-like identifiers and dotted API names mentioned in text."""
-    candidates: List[str] = []
+    candidates: list[str] = []
     seen: set[str] = set()
     patterns = [
         r"`([A-Za-z_][A-Za-z0-9_\.]{2,})`",
@@ -167,14 +167,14 @@ def _path_score(path: str, hints: Sequence[str], paper_tokens: set[str]) -> floa
     return score
 
 
-def extract_python_blocks(source: str) -> List[SourceBlock]:
+def extract_python_blocks(source: str) -> list[SourceBlock]:
     """Extract exact function/class source blocks from Python source."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return []
     lines = source.splitlines()
-    blocks: List[SourceBlock] = []
+    blocks: list[SourceBlock] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             continue
@@ -222,7 +222,7 @@ class GitHubSourceClient:
     def __init__(
         self,
         *,
-        token: Optional[str] = None,
+        token: str | None = None,
         session: Any = None,
         timeout: int = 30,
     ) -> None:
@@ -230,7 +230,7 @@ class GitHubSourceClient:
         self.session = session or requests.Session()
         self.timeout = timeout
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -239,7 +239,7 @@ class GitHubSourceClient:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
 
-    def _get_json(self, url: str) -> Optional[Dict[str, Any]]:
+    def _get_json(self, url: str) -> dict[str, Any] | None:
         try:
             resp = self.session.get(url, headers=self._headers(), timeout=self.timeout)
             if getattr(resp, "status_code", 200) == 403:
@@ -253,7 +253,7 @@ class GitHubSourceClient:
             logger.warning("GitHub API request failed for %s: %s", url, exc)
             return None
 
-    def _get_text(self, url: str) -> Optional[str]:
+    def _get_text(self, url: str) -> str | None:
         """GET ``url`` and return the response body, or None (logged) on any failure."""
         try:
             headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
@@ -264,7 +264,7 @@ class GitHubSourceClient:
             logger.warning("GitHub raw request failed for %s: %s", url, exc)
             return None
 
-    def repo_metadata(self, ref: GitHubRepoRef) -> Optional[Dict[str, Any]]:
+    def repo_metadata(self, ref: GitHubRepoRef) -> dict[str, Any] | None:
         """Fetch default branch, head commit SHA and license for a repository.
 
         Returns:
@@ -288,10 +288,10 @@ class GitHubSourceClient:
         ref: GitHubRepoRef,
         *,
         default_branch: str,
-        commit_sha: Optional[str],
+        commit_sha: str | None,
         hints: Sequence[str],
         paper_tokens: set[str],
-    ) -> List[SourceFile]:
+    ) -> list[SourceFile]:
         """List the highest-scoring supported source files in a repository tree.
 
         Args:
@@ -309,7 +309,7 @@ class GitHubSourceClient:
         tree = self._get_json(f"{ref.api_url}/git/trees/{tree_ref}?recursive=1") or {}
         if tree.get("truncated"):
             logger.warning("GitHub tree truncated for %s; using scored subset", ref.url)
-        files: List[tuple[float, SourceFile]] = []
+        files: list[tuple[float, SourceFile]] = []
         for item in tree.get("tree") or []:
             if not isinstance(item, dict) or item.get("type") != "blob":
                 continue
@@ -332,7 +332,7 @@ class GitHubSourceClient:
         files.sort(key=lambda item: item[0], reverse=True)
         return [f for _, f in files[:MAX_SOURCE_FILES_PER_REPO]]
 
-    def fetch_file(self, source_file: SourceFile) -> Optional[str]:
+    def fetch_file(self, source_file: SourceFile) -> str | None:
         """Download a source file's raw text, or None if the request failed."""
         return self._get_text(source_file.raw_url)
 
@@ -341,12 +341,12 @@ def build_code_snippet_records(
     *,
     ref: GitHubRepoRef,
     source_file: SourceFile,
-    metadata: Dict[str, Any],
+    metadata: dict[str, Any],
     blocks: Iterable[SourceBlock],
     source_paper: str,
     paper_text: str,
     hints: Sequence[str],
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Convert scored source blocks into ``code_snippets`` records.
 
     Args:
@@ -371,7 +371,7 @@ def build_code_snippet_records(
     scored.sort(key=lambda item: item[0], reverse=True)
 
     license_name = metadata.get("license")
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for score, block in scored[:MAX_SNIPPETS_PER_REPO]:
         records.append({
             "source_type": "github",
@@ -407,8 +407,8 @@ def extract_github_code_snippets(
     paper_text: str,
     *,
     source_paper: str,
-    client: Optional[GitHubSourceClient] = None,
-) -> List[Dict[str, Any]]:
+    client: GitHubSourceClient | None = None,
+) -> list[dict[str, Any]]:
     """Fetch function/class snippets from GitHub repos linked in a paper."""
     refs = extract_github_repositories(paper_text)
     if not refs:
@@ -417,7 +417,7 @@ def extract_github_code_snippets(
     client = client or GitHubSourceClient()
     hints = extract_identifier_hints(paper_text)
     paper_tokens = _tokens(paper_text)
-    all_records: List[Dict[str, Any]] = []
+    all_records: list[dict[str, Any]] = []
     for ref in refs:
         metadata = client.repo_metadata(ref)
         if not metadata:
@@ -429,7 +429,7 @@ def extract_github_code_snippets(
             hints=hints,
             paper_tokens=paper_tokens,
         )
-        repo_records: List[Dict[str, Any]] = []
+        repo_records: list[dict[str, Any]] = []
         for source_file in files:
             source = client.fetch_file(source_file)
             if not source:

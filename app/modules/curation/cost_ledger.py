@@ -18,10 +18,9 @@ transport stays in the existing F2W chat clients.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import math
-from dataclasses import dataclass
-from typing import Optional
 
 from .budgets import BudgetLedger
 
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 COST_HEADER = "x-litellm-response-cost"
 
 
-def parse_cost_header(raw: Optional[str]) -> Optional[float]:
+def parse_cost_header(raw: str | None) -> float | None:
     """The cost the provider reported, or ``None`` when it reported none we can use (never 0)."""
     if raw is None or str(raw).strip() == "":
         return None
@@ -54,14 +53,14 @@ class CallOutcome:
         failed: Whether the call produced no usable completion.
     """
 
-    cost_usd: Optional[float] = None
+    cost_usd: float | None = None
     served: bool = True
     failed: bool = False
 
     @classmethod
     def from_response(
-        cls, status: Optional[int], cost_header: Optional[str], *, sent: bool = True
-    ) -> "CallOutcome":
+        cls, status: int | None, cost_header: str | None, *, sent: bool = True
+    ) -> CallOutcome:
         """Classify an HTTP outcome. 429 and never-sent requests were not served."""
         cost = parse_cost_header(cost_header)
         not_served = (not sent) or status == 429

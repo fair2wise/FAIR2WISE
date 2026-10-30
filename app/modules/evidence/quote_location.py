@@ -21,21 +21,20 @@ als_knowledge_agent/src/als_knowledge_agent/graph/quote_location.py (BSD-3-Claus
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import re
 import unicodedata
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
 from ..contracts.evidence import MatchType
 
 #: Closed set of match kinds, so a tally over them stays meaningful.
-MATCH_KINDS: Tuple[str, ...] = ("exact", "normalized", "not_found")
+MATCH_KINDS: tuple[str, ...] = ("exact", "normalized", "not_found")
 
 #: Profile recorded on ``EvidenceRef.normalization_profile`` for a normalized hit.
 NORMALIZATION_PROFILE = "forge-nfkc-glyph-ws-v1"
 
 #: Glyph pairs that survive a PDF parse looking identical and comparing unequal.
-_GLYPH_FOLDS: Tuple[Tuple[str, str], ...] = (
+_GLYPH_FOLDS: tuple[tuple[str, str], ...] = (
     ("Å", "Å"),
     ("µ", "μ"),
     ("‘", "'"), ("’", "'"),
@@ -59,8 +58,8 @@ class QuoteLocation:
     """
 
     match_kind: str
-    char_start: Optional[int] = None
-    char_end: Optional[int] = None
+    char_start: int | None = None
+    char_end: int | None = None
 
     @property
     def is_verbatim(self) -> bool:
@@ -76,7 +75,7 @@ class QuoteLocation:
         """The shared-contract :class:`MatchType` for this location."""
         return {"exact": MatchType.EXACT, "normalized": MatchType.NORMALIZED}.get(self.match_kind, MatchType.NONE)
 
-    def span(self) -> Optional[Tuple[int, int]]:
+    def span(self) -> tuple[int, int] | None:
         """``(start, end)`` when located, else ``None``."""
         if self.char_start is None or self.char_end is None:
             return None
@@ -91,10 +90,10 @@ def _fold_char(ch: str) -> str:
     return folded
 
 
-def _fold_with_map(text: str) -> Tuple[str, List[int]]:
+def _fold_with_map(text: str) -> tuple[str, list[int]]:
     """Fold ``text`` for comparison and keep an index back into the original string."""
-    folded_chars: List[str] = []
-    source_index: List[int] = []
+    folded_chars: list[str] = []
+    source_index: list[int] = []
     previous_was_space = False
     for index, ch in enumerate(text):
         if ch.isspace():

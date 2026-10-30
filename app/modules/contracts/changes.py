@@ -8,7 +8,7 @@ binds to one plan hash and target; it never authorizes a different plan.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Literal, Optional, Tuple
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -41,11 +41,11 @@ class SnapshotManifest(BaseModel):
     corpus: str
     graph_path: str
     graph_sha256: str = Field(pattern=_SHA256)
-    parent_snapshot_id: Optional[str] = None
+    parent_snapshot_id: str | None = None
     schema_fingerprint: str
     extraction_fingerprint: str
     corpus_fingerprint: str
-    validation_report_sha256: Optional[str] = Field(default=None, pattern=_SHA256)
+    validation_report_sha256: str | None = Field(default=None, pattern=_SHA256)
     created_at: datetime
 
 
@@ -75,12 +75,12 @@ class ChangePlan(BaseModel):
     snapshot_id: str
     input_sha256: str = Field(pattern=_SHA256)
     target: str
-    corpus_scope: Tuple[str, ...]
+    corpus_scope: tuple[str, ...]
     base_revision: str
     creates: int = Field(ge=0)
     links: int = Field(ge=0)
     supersessions: int = Field(ge=0)
-    affected_ids: Tuple[str, ...] = ()
+    affected_ids: tuple[str, ...] = ()
     validation_report_sha256: str = Field(pattern=_SHA256)
     plan_sha256: str = Field(pattern=_SHA256)
 
@@ -101,9 +101,9 @@ class RoleCheckEvidence(BaseModel):
 
     method: Literal["tiled_whoami"] = "tiled_whoami"
     tiled_target: str
-    roles: Tuple[str, ...]
-    identity_provider: Optional[str] = None
-    tiled_library_version: Optional[str] = None
+    roles: tuple[str, ...]
+    identity_provider: str | None = None
+    tiled_library_version: str | None = None
 
 
 class ApprovalRecord(BaseModel):
@@ -141,22 +141,22 @@ class ApprovalRecord(BaseModel):
     plan_id: str
     plan_sha256: str = Field(pattern=_SHA256)
     target: str
-    scope: Tuple[str, ...]
+    scope: tuple[str, ...]
     requested_by: str
     approved_by: str
     executed_as: str
-    approver_issuer: Optional[str] = None
-    role_checked_at: Optional[datetime] = None
-    approver_is_admin: Optional[bool] = None
-    role_check_evidence: Optional[RoleCheckEvidence] = None
-    requester_issuer: Optional[str] = None
-    operation_id: Optional[str] = None
-    limits: Dict[str, int] = Field(default_factory=dict)
-    expires_at: Optional[datetime] = None
+    approver_issuer: str | None = None
+    role_checked_at: datetime | None = None
+    approver_is_admin: bool | None = None
+    role_check_evidence: RoleCheckEvidence | None = None
+    requester_issuer: str | None = None
+    operation_id: str | None = None
+    limits: dict[str, int] = Field(default_factory=dict)
+    expires_at: datetime | None = None
     approved_at: datetime
 
     @model_validator(mode="after")
-    def _profile_rules(self) -> "ApprovalRecord":
+    def _profile_rules(self) -> ApprovalRecord:
         """Local approvals are local-operator with no synthetic identity; ALS ones are verified."""
         if self.mode is AuthorizationMode.LOCAL_TRUSTED:
             if self.profile is not DeploymentProfile.LOCAL:
@@ -227,6 +227,6 @@ class ImportReceipt(BaseModel):
     executed_as: str
     adapter_version: str
     id_mapping_sha256: str = Field(pattern=_SHA256)
-    outcomes: Dict[str, int] = Field(default_factory=dict)
+    outcomes: dict[str, int] = Field(default_factory=dict)
     verified: bool
     completed_at: datetime

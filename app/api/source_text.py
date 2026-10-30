@@ -43,10 +43,10 @@ import contextlib
 import contextvars
 import hashlib
 import logging
+from pathlib import Path
 import re
 import threading
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from ..modules.contracts.evidence import SourceLocator
 from ..modules.security.disclosure import SourceRef
@@ -61,7 +61,7 @@ _HEADING_RE = re.compile(r"^#{2,}\s")
 CHUNK_VERSION = "retrieved-chunks"
 PAGE_VERSION = "pdf-page-text"
 
-_CURRENT: contextvars.ContextVar[Optional["TurnSources"]] = contextvars.ContextVar(
+_CURRENT: contextvars.ContextVar[TurnSources | None] = contextvars.ContextVar(
     "f2w_legacy_turn_sources", default=None)
 
 
@@ -70,15 +70,15 @@ def citation_for(filename: str, page: int) -> str:
     return f"[PDF: {filename} p.{int(page)}]"
 
 
-def pdf_blocks(merged_context: str) -> Dict[Tuple[str, int], str]:
+def pdf_blocks(merged_context: str) -> dict[tuple[str, int], str]:
     """Return ``{(filename, page): chunk text}`` for the ``[PDF: f p.N]`` blocks of a merged context.
 
     A block is a citation line followed by its body, up to the next citation line or
     ``###`` heading (``ContextBuilder._section`` layout). Bodies of the same page are joined.
     """
-    out: Dict[Tuple[str, int], List[str]] = {}
-    key: Optional[Tuple[str, int]] = None
-    body: List[str] = []
+    out: dict[tuple[str, int], list[str]] = {}
+    key: tuple[str, int] | None = None
+    body: list[str] = []
 
     def flush() -> None:
         text = "\n".join(body).strip()
@@ -99,7 +99,7 @@ def pdf_blocks(merged_context: str) -> Dict[Tuple[str, int], str]:
     return {k: "\n".join(v) for k, v in out.items()}
 
 
-def _pdf_page_text(pdf_path: str, page: int) -> Optional[str]:
+def _pdf_page_text(pdf_path: str, page: int) -> str | None:
     """Extracted text of one PDF page, as ``PaperEvidenceAgent._query`` reads it."""
     # DEPRECATED(pymupdf): same reader as paper_evidence_agent.py (license audit E2).
     import fitz
@@ -120,11 +120,11 @@ class TurnSources:
         page_reader: ``(pdf_path, page) -> text`` for paper-evidence pages (PyMuPDF by default).
     """
 
-    def __init__(self, page_reader: Callable[[str, int], Optional[str]] = _pdf_page_text) -> None:
+    def __init__(self, page_reader: Callable[[str, int], str | None] = _pdf_page_text) -> None:
         """Start with no captured chunks or pages; ``page_reader`` reads PDF page text on demand."""
         self._lock = threading.Lock()
-        self._chunks: Dict[Tuple[str, int], str] = {}
-        self._pages: Dict[Tuple[str, int], str] = {}  # (filename, page) -> pdf path
+        self._chunks: dict[tuple[str, int], str] = {}
+        self._pages: dict[tuple[str, int], str] = {}  # (filename, page) -> pdf path
         self._page_reader = page_reader
 
     # ------------------------------------------------------------------ capture
@@ -163,12 +163,12 @@ class TurnSources:
     def _chunk_version(text: str) -> str:
         return f"{CHUNK_VERSION}:sha256:{hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]}"
 
-    def refs(self) -> List[SourceRef]:
+    def refs(self) -> list[SourceRef]:
         """One :class:`SourceRef` per captured PDF page (full pages before chunks of the same page)."""
         with self._lock:
             pages = dict(self._pages)
             chunks = dict(self._chunks)
-        out: List[SourceRef] = []
+        out: list[SourceRef] = []
         for (name, page) in sorted(pages):
             out.append(SourceRef(name, PAGE_VERSION, SourceLocator(page=page), citation_for(name, page)))
         for (name, page), text in sorted(chunks.items()):
@@ -177,11 +177,11 @@ class TurnSources:
                                      citation_for(name, page)))
         return out
 
-    def work_ids(self) -> List[str]:
+    def work_ids(self) -> list[str]:
         """Works the captured regions belong to (the grant's ``work_ids``)."""
         return sorted({ref.work_id for ref in self.refs()})
 
-    def reader_for(self, refs: Sequence[SourceRef]) -> Callable[[str, SourceLocator], Optional[str]]:
+    def reader_for(self, refs: Sequence[SourceRef]) -> Callable[[str, SourceLocator], str | None]:
         """``(source_version, locator) -> text`` over ``refs`` only; for ``QuoteVerifier``.
 
         Must only be passed to a ``QuoteVerifier``, which calls it inside ``SourceAccessScope.read``.
@@ -189,7 +189,7 @@ class TurnSources:
         with self._lock:
             pages = dict(self._pages)
             chunks = dict(self._chunks)
-        table: Dict[Tuple[str, Optional[int]], Callable[[], Optional[str]]] = {}
+        table: dict[tuple[str, int | None], Callable[[], str | None]] = {}
         for ref in refs:
             key = (ref.work_id, ref.locator.page)
             if ref.source_version == PAGE_VERSION and key in pages:
@@ -200,7 +200,7 @@ class TurnSources:
                 text = chunks[key]
                 table[(ref.source_version, ref.locator.page)] = lambda t=text: t
 
-        def read(source_version: str, locator: SourceLocator) -> Optional[str]:
+        def read(source_version: str, locator: SourceLocator) -> str | None:
             loader = table.get((source_version, locator.page))
             if loader is None:
                 return None
@@ -214,10 +214,10 @@ class TurnSources:
         return read
 
     @staticmethod
-    def _cached(loader: Callable[[], Optional[str]]) -> Callable[[], Optional[str]]:
-        box: Dict[str, Optional[str]] = {}
+    def _cached(loader: Callable[[], str | None]) -> Callable[[], str | None]:
+        box: dict[str, str | None] = {}
 
-        def load() -> Optional[str]:
+        def load() -> str | None:
             if "v" not in box:
                 box["v"] = loader()
             return box["v"]
@@ -229,7 +229,7 @@ class TurnSources:
 
 
 @contextlib.contextmanager
-def capture_turn(sources: Optional[TurnSources] = None) -> Iterator[TurnSources]:
+def capture_turn(sources: TurnSources | None = None) -> Iterator[TurnSources]:
     """Bind a :class:`TurnSources` to the current request (tasks created inside inherit it)."""
     sources = sources if sources is not None else TurnSources()
     token = _CURRENT.set(sources)
@@ -239,7 +239,7 @@ def capture_turn(sources: Optional[TurnSources] = None) -> Iterator[TurnSources]
         _CURRENT.reset(token)
 
 
-def current_turn() -> Optional[TurnSources]:
+def current_turn() -> TurnSources | None:
     """The turn capture of the running request, if any."""
     return _CURRENT.get()
 

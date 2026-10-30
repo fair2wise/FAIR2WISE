@@ -13,10 +13,10 @@ no on-disk approval file that any process could write.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import math
+from typing import Iterable
 import uuid
-from datetime import datetime, timezone
-from typing import Iterable, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,8 +31,8 @@ class CostApproval(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     approval_id: str
-    scope: Tuple[str, ...]
-    models: Tuple[str, ...]
+    scope: tuple[str, ...]
+    models: tuple[str, ...]
     cap_usd: float = Field(gt=0)
     expires_at: datetime
     approved_by: str
@@ -53,8 +53,8 @@ def create_cost_approval(
     models: Iterable[str],
     cap_usd: float,
     expires_at: datetime,
-    now: Optional[datetime] = None,
-    approval_id: Optional[str] = None,
+    now: datetime | None = None,
+    approval_id: str | None = None,
 ) -> CostApproval:
     """Record an approval made by the human in ``ctx``.
 
@@ -69,7 +69,7 @@ def create_cost_approval(
     corpora = tuple(sorted(set(scope)))
     if ctx.principal.subject != LOCAL_OPERATOR and not set(corpora) <= set(ctx.corpus_scope):
         raise ContractError(ErrorCode.DENIED, "corpus is outside the approver's scope")
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     if not corpora or not math.isfinite(cap_usd) or cap_usd <= 0 or expires_at <= moment:
         raise ContractError(
             ErrorCode.INVALID_INPUT, "approval needs corpora, a positive finite cap and a future expiry"
@@ -87,7 +87,7 @@ def create_cost_approval(
     return approval
 
 
-def load_cost_approval(store: CurationStore, approval_id: str) -> Tuple[CostApproval, str]:
+def load_cost_approval(store: CurationStore, approval_id: str) -> tuple[CostApproval, str]:
     """``(approval, status)`` where status is ``valid`` or ``revoked``."""
     found = store.get_cost_approval(approval_id)
     if found is None:
@@ -96,13 +96,13 @@ def load_cost_approval(store: CurationStore, approval_id: str) -> Tuple[CostAppr
 
 
 def check_cost_approval(
-    approval: Optional[CostApproval],
+    approval: CostApproval | None,
     store: CurationStore,
     *,
     corpus: str,
     model: str,
     amount_usd: float,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> None:
     """Refuse remote resolution unless the cost approval permits this spend.
 
@@ -114,7 +114,7 @@ def check_cost_approval(
     stored, status = load_cost_approval(store, approval.approval_id)
     if status != "valid" or stored != approval:
         raise ContractError(ErrorCode.DENIED, "cost approval is revoked or does not match its record")
-    if (now or datetime.now(timezone.utc)) >= approval.expires_at:
+    if (now or datetime.now(UTC)) >= approval.expires_at:
         raise ContractError(ErrorCode.DENIED, "cost approval expired")
     if corpus not in approval.scope or model not in approval.models:
         raise ContractError(ErrorCode.DENIED, "cost approval does not cover this corpus or model")

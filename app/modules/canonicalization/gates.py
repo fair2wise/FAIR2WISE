@@ -12,9 +12,9 @@ The gates are not configuration: opening one is an owner decision recorded in re
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..extraction import H3_GATES as _EXTRACTION_GATES
@@ -52,11 +52,11 @@ def require_gate(name: str) -> None:
 def authorize_apply(
     gate: str,
     plan: Any,
-    approval: Optional[ApprovalRecord],
+    approval: ApprovalRecord | None,
     *,
     current_source_revision: str,
     current_vocabulary_revision: str,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> ChangePlan:
     """The single authorization check shared by every apply route.
 
@@ -85,7 +85,7 @@ def authorize_apply(
     if approval is None:
         raise ApplyRefused("approval_missing", "an ApprovalRecord for this exact plan is required")
     change_plan = plan.to_change_plan()
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     if not approval.authorizes(change_plan, moment):
         raise ApplyRefused("approval_mismatch", "approval does not authorize this plan hash/target/scope")
     if plan.source_revision != current_source_revision:

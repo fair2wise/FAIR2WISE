@@ -16,7 +16,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_ocr.py
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Protocol, Sequence
 
 from .kernels.geometry import FigureFrame
 from .kernels.types import TextSpan
@@ -32,7 +32,7 @@ class Detection:
     """One OCR detection in figure-render pixels (top-left origin)."""
 
     text: str
-    box_px: Tuple[float, float, float, float]
+    box_px: tuple[float, float, float, float]
     confidence: float
 
 
@@ -60,7 +60,7 @@ class RapidOcrEngine:
     def detect(self, image: Any) -> Sequence[Detection]:
         """Run RapidOCR and convert its polygons to axis-aligned boxes."""
         result, _ = self._engine(image)
-        out: List[Detection] = []
+        out: list[Detection] = []
         for poly, text, conf in result or []:
             xs, ys = [p[0] for p in poly], [p[1] for p in poly]
             out.append(Detection(str(text), (min(xs), min(ys), max(xs), max(ys)), float(conf)))
@@ -76,13 +76,13 @@ def default_engine() -> OcrEngine:
 class OcrReading:
     """OCR output as page-point spans plus the method and confidences that produced them."""
 
-    spans: Tuple[TextSpan, ...]
-    confidences: Tuple[float, ...]
+    spans: tuple[TextSpan, ...]
+    confidences: tuple[float, ...]
     engine: str
     method: str = "ocr"
 
     @property
-    def min_confidence(self) -> Optional[float]:
+    def min_confidence(self) -> float | None:
         """Lowest confidence kept, or ``None`` when nothing was read."""
         return min(self.confidences) if self.confidences else None
 
@@ -93,12 +93,12 @@ class OcrReading:
 
 
 def read_figure_text(image: Any, frame: FigureFrame, *, engine: OcrEngine, page: int = 0,
-                     detections: Optional[Sequence[Detection]] = None,
+                     detections: Sequence[Detection] | None = None,
                      min_confidence: float = MIN_CONFIDENCE) -> OcrReading:
     """OCR the rendered figure and return spans in the figure's page frame (points, top-left)."""
     found = engine.detect(image) if detections is None else detections
-    spans: List[TextSpan] = []
-    confs: List[float] = []
+    spans: list[TextSpan] = []
+    confs: list[float] = []
     for det in found:
         if det.confidence < min_confidence or not det.text.strip():
             continue
@@ -110,7 +110,7 @@ def read_figure_text(image: Any, frame: FigureFrame, *, engine: OcrEngine, page:
 
 
 def read_bar_labels(image: Any, frame: FigureFrame, *, engine: OcrEngine, page: int = 0,
-                    detections: Optional[Sequence[Detection]] = None) -> OcrReading:
+                    detections: Sequence[Detection] | None = None) -> OcrReading:
     """The subset of OCR spans that read as a length (e.g. ``"200 nm"``): candidate bar labels."""
     full = read_figure_text(image, frame, engine=engine, page=page, detections=detections)
     keep = [(s, c) for s, c in zip(full.spans, full.confidences) if iter_lengths(s.text)]

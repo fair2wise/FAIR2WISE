@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 SOURCE_KINDS = ("kg", "paper_chunk", "tiled_run")
 SOURCE_TYPES = ("literature", "ops", "kg", "tiled")
@@ -11,7 +11,7 @@ CORPORA = ("literature", "bl1101")
 CHUNKER_VERSION = "1.0.0"
 LEXICAL_INDEX_VERSION = "bm25-1"
 
-INTENT_WEIGHTS: Dict[str, Dict[str, float]] = {
+INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "factual": {"kg": 0.70, "paper_chunk": 0.25, "tiled_run": 0.05},
     "why_how": {"kg": 0.25, "paper_chunk": 0.70, "tiled_run": 0.05},
     "layout": {"kg": 0.45, "paper_chunk": 0.55, "tiled_run": 0.00},
@@ -28,15 +28,15 @@ class Evidence:
     score: float
     text: str
     source_type: str = "kg"
-    paper_id: Optional[str] = None
-    work_id: Optional[str] = None
-    page: Optional[int] = None
+    paper_id: str | None = None
+    work_id: str | None = None
+    page: int | None = None
     locator: str = ""
     heading: str = ""
-    entity_ids: List[str] = field(default_factory=list)
-    matched_slots: Dict[str, Any] = field(default_factory=dict)
+    entity_ids: list[str] = field(default_factory=list)
+    matched_slots: dict[str, Any] = field(default_factory=dict)
     retrieval_method: str = "hybrid"
-    provenance: Dict[str, Any] = field(default_factory=dict)
+    provenance: dict[str, Any] = field(default_factory=dict)
     graph_id: str = ""
     name: str = ""
     category: str = ""
@@ -59,7 +59,7 @@ class Evidence:
         """Return the corpus name from provenance, or an empty string."""
         return str(self.provenance.get("corpus") or "")
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the hit as a dict, excluding the raw ``payload``."""
         data = asdict(self)
         data.pop("payload", None)
@@ -134,7 +134,7 @@ def kg_evidence_from_hit(hit: Any) -> Evidence:
 
 
 def evidence_from_chunk(
-    chunk: Dict[str, Any],
+    chunk: dict[str, Any],
     *,
     score: float,
     retrieval_method: str,
@@ -182,6 +182,6 @@ def evidence_from_chunk(
     )
 
 
-def tagged_source_types(items: Sequence[Evidence]) -> List[str]:
+def tagged_source_types(items: Sequence[Evidence]) -> list[str]:
     """Return each item's ``source_type``, in order."""
     return [item.source_type for item in items]

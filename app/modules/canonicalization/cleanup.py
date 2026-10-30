@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Sequence
 
 from .campaign.evidence import GraphRows, assemble, fold_terms
 from .campaign.models import Decision, TermEvidence
@@ -43,7 +43,7 @@ class NodeClass:
     detail: str = ""
 
 
-def classify_node(node: Dict[str, Any], vocab: Vocabulary) -> NodeClass:
+def classify_node(node: dict[str, Any], vocab: Vocabulary) -> NodeClass:
     """Classify one candidate node against the vocabulary.
 
     Returns a ``malformed`` class for an invalid context row, ``canonical`` or ``alias`` for a
@@ -61,7 +61,7 @@ def classify_node(node: Dict[str, Any], vocab: Vocabulary) -> NodeClass:
     return NodeClass("quarantine", detail=reason) if reason else NodeClass("unknown")
 
 
-def quality_report(rows: GraphRows, vocab: Vocabulary) -> Dict[str, Any]:
+def quality_report(rows: GraphRows, vocab: Vocabulary) -> dict[str, Any]:
     """Counts by class and category. ``candidate_terms`` (distinct folded terms) is not an entity count."""
     classes = Counter(classify_node(n, vocab).kind for n in rows.nodes)
     folded = fold_terms(GraphRows([n for n in rows.nodes if not check_context_row(n)], rows.edges))
@@ -97,8 +97,8 @@ class CleanupProposal:
 
     source_revision: str
     vocabulary_revision: str
-    items: Tuple[CleanupItem, ...]
-    evidence: Dict[str, TermEvidence]
+    items: tuple[CleanupItem, ...]
+    evidence: dict[str, TermEvidence]
 
 
 def propose_cleanup(
@@ -106,8 +106,8 @@ def propose_cleanup(
 ) -> CleanupProposal:
     """Propose an action per candidate term; optionally one resolver vote for undecided terms."""
     folded = fold_terms(GraphRows([n for n in rows.nodes if not check_context_row(n)], rows.edges))
-    items: List[CleanupItem] = []
-    evidence: Dict[str, TermEvidence] = {}
+    items: list[CleanupItem] = []
+    evidence: dict[str, TermEvidence] = {}
     for key, slot in sorted(folded.items()):
         if limit and len(items) >= limit:
             break
@@ -160,9 +160,9 @@ def propose_cleanup(
 
 def triage_proposal(
     proposal: CleanupProposal, *, min_novel_edges: int = MIN_NOVEL_EDGES, min_reject_edges: int = MIN_REJECT_EDGES
-) -> Dict[str, List[CleanupItem]]:
+) -> dict[str, list[CleanupItem]]:
     """Reviewer buckets. Low-support novel/reject items are *deferred*, never silently discarded."""
-    buckets: Dict[str, List[CleanupItem]] = {
+    buckets: dict[str, list[CleanupItem]] = {
         "plan_candidates": [],
         "novel_review": [],
         "reject_review": [],
@@ -181,7 +181,7 @@ def triage_proposal(
     return buckets
 
 
-def format_review_digest(triaged: Dict[str, List[CleanupItem]], limit: int = 0) -> str:
+def format_review_digest(triaged: dict[str, list[CleanupItem]], limit: int = 0) -> str:
     """Plain-text digest: counts per bucket and the first ``limit`` rows of each (all when ``limit`` is 0)."""
     lines = []
     for name, items in triaged.items():

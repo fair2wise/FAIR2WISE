@@ -29,13 +29,13 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import ipaddress
 import os
+from pathlib import Path
 import secrets
 import stat
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
 #: Exact Tiled version F2W supports (O-T1). Compared as an exact string with
@@ -49,14 +49,14 @@ PINNED_TILED_SDIST_SHA256 = "2f3943260c46824b162796fcb8a43c3d02f41205e2ccefc64e3
 PROFILES = ("local", "als-dev", "als-prod", "test")
 MODES = ("managed", "external")
 #: Modes each profile allows; the first one is the default.
-PROFILE_MODES: Dict[str, Tuple[str, ...]] = {
+PROFILE_MODES: dict[str, tuple[str, ...]] = {
     "local": ("managed",),
     "als-dev": ("external",),
     "als-prod": ("external",),
     "test": ("managed", "external"),
 }
 #: The one URL each ALS profile may connect to (never contacted by this module).
-ALS_PROFILE_URLS: Dict[str, str] = {
+ALS_PROFILE_URLS: dict[str, str] = {
     "als-dev": "https://tiled-staging.als.lbl.gov",
     "als-prod": "https://tiled.als.lbl.gov",
 }
@@ -81,7 +81,7 @@ class TiledDeploymentError(RuntimeError):
 
     code = "tiled_error"
 
-    def __init__(self, message: str, *, code: Optional[str] = None, detail: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, *, code: str | None = None, detail: dict[str, Any] | None = None):
         super().__init__(message)
         if code:
             self.code = code
@@ -113,9 +113,9 @@ class AuthnSpec:
     """
 
     provider: str = "f2wtest"
-    users: Tuple[str, ...] = ("admin", "reader")
-    admins: Tuple[str, ...] = ("admin",)
-    access_tags: Optional[Dict[str, Any]] = field(default=None, compare=False, hash=False)
+    users: tuple[str, ...] = ("admin", "reader")
+    admins: tuple[str, ...] = ("admin",)
+    access_tags: dict[str, Any] | None = field(default=None, compare=False, hash=False)
 
     def __post_init__(self) -> None:
         missing = [name for name in self.admins if name not in self.users]
@@ -157,9 +157,9 @@ class ManagedTiledConfig:
     port: int = DEFAULT_MANAGED_PORT
     host: str = DEFAULT_MANAGED_HOST
     expected_version: str = PINNED_TILED_VERSION
-    writer_secret_file: Optional[Path] = None
+    writer_secret_file: Path | None = None
     owner: str = OWNER_LOCAL
-    authn: Optional[AuthnSpec] = None
+    authn: AuthnSpec | None = None
 
     def __post_init__(self) -> None:
         if self.profile not in ("local", "test"):
@@ -253,10 +253,10 @@ class ExternalTiledConfig:
     profile: str
     url: str
     expected_version: str = PINNED_TILED_VERSION
-    writer_secret_file: Optional[Path] = None
+    writer_secret_file: Path | None = None
     writer_scheme: str = "Apikey"
-    ca_bundle: Optional[Path] = None
-    require_writer_role: Optional[str] = None
+    ca_bundle: Path | None = None
+    require_writer_role: str | None = None
     timeout: float = 10.0
 
     def __post_init__(self) -> None:
@@ -272,8 +272,8 @@ class TiledSettings:
 
     profile: str
     mode: str
-    managed: Optional[ManagedTiledConfig] = None
-    external: Optional[ExternalTiledConfig] = None
+    managed: ManagedTiledConfig | None = None
+    external: ExternalTiledConfig | None = None
 
 
 def normalize_base_url(url: str) -> str:
@@ -300,13 +300,13 @@ def normalize_base_url(url: str) -> str:
     return urlunsplit((parts.scheme.lower(), netloc, path.rstrip("/"), "", ""))
 
 
-def is_als_host(host: Optional[str]) -> bool:
+def is_als_host(host: str | None) -> bool:
     """True for ``als.lbl.gov`` and its subdomains."""
     name = (host or "").strip().lower().rstrip(".")
     return name == "als.lbl.gov" or name.endswith(".als.lbl.gov")
 
 
-def _is_loopback_host(host: Optional[str]) -> bool:
+def _is_loopback_host(host: str | None) -> bool:
     name = (host or "").strip().lower().strip("[]")
     if name == "localhost":
         return True
@@ -508,7 +508,7 @@ def generate_api_key() -> str:
     return secrets.token_hex(32)
 
 
-def render_server_config(cfg: ManagedTiledConfig, *, port: int, init_catalog: bool) -> Dict[str, Any]:
+def render_server_config(cfg: ManagedTiledConfig, *, port: int, init_catalog: bool) -> dict[str, Any]:
     """Build the Tiled server configuration for a managed instance.
 
     The result has no secret: the single-user API key, passwords and token-signing keys
@@ -523,7 +523,7 @@ def render_server_config(cfg: ManagedTiledConfig, *, port: int, init_catalog: bo
     Returns:
         A mapping that serializes to a Tiled ``config.yml``.
     """
-    config: Dict[str, Any] = {
+    config: dict[str, Any] = {
         "catalog": {
             "uri": f"sqlite:///{cfg.catalog_path}",
             "writable_storage": [str(cfg.storage_dir)],

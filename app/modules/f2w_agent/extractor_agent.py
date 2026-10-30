@@ -11,7 +11,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from academy.agent import Agent, action
 
@@ -25,9 +25,9 @@ class ExtractorAgent(Agent):
         self,
         *,
         backend: str = "cborg",
-        model: Optional[str] = None,
+        model: str | None = None,
         schema_path: str = "storage/schema/matkg_schema.yaml",
-        chebi_obo_path: Optional[str] = None,
+        chebi_obo_path: str | None = None,
         ollama_url: str = "http://localhost:11434",
         temperature: float = 0.0,
         max_workers: int = 8,
@@ -44,7 +44,7 @@ class ExtractorAgent(Agent):
         self._cborg_base = os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov")
         self._cborg_api_key = os.environ.get("CBORG_API_KEY")
 
-    def _run(self, pdf_dir: str, terms_json: str, max_workers: Optional[int]) -> Dict[str, Any]:
+    def _run(self, pdf_dir: str, terms_json: str, max_workers: int | None) -> dict[str, Any]:
         """Synchronous full-directory extract into cumulative *terms_json*."""
         from ..term_extractor import Orchestrator
 
@@ -68,10 +68,10 @@ class ExtractorAgent(Agent):
         pdf_dir: str,
         terms_json: str,
         query: str,
-        missing_topics: Optional[List[str]],
+        missing_topics: list[str] | None,
         max_pages: int,
-        max_workers: Optional[int],
-    ) -> Dict[str, Any]:
+        max_workers: int | None,
+    ) -> dict[str, Any]:
         """Synchronous query-targeted extract of selected pages in *pdf_dir*."""
         from ..term_extractor import Orchestrator
 
@@ -100,8 +100,8 @@ class ExtractorAgent(Agent):
         self,
         pdf_dir: str,
         terms_json: str,
-        max_workers: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        max_workers: int | None = None,
+    ) -> dict[str, Any]:
         """Extract/merge terms from ``pdf_dir`` into cumulative ``terms_json``."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._run, pdf_dir, terms_json, max_workers)
@@ -112,10 +112,10 @@ class ExtractorAgent(Agent):
         pdf_dir: str,
         terms_json: str,
         query: str,
-        missing_topics: Optional[List[str]] = None,
+        missing_topics: list[str] | None = None,
         max_pages: int = 6,
-        max_workers: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        max_workers: int | None = None,
+    ) -> dict[str, Any]:
         """Extract/merge query-relevant terms from selected pages in ``pdf_dir``."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(

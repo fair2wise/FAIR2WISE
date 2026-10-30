@@ -6,7 +6,6 @@ new registered version would change. Nothing is rewritten, retyped or applied.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from .loading import closure_fingerprint, load_schema_view
 from .registry import SchemaEntry
@@ -18,11 +17,11 @@ class SchemaDiff:
 
     old_fingerprint: str
     new_fingerprint: str
-    classes_added: List[str] = field(default_factory=list)
-    classes_removed: List[str] = field(default_factory=list)
-    is_a_changed: Dict[str, List[Optional[str]]] = field(default_factory=dict)
-    slots_added: List[str] = field(default_factory=list)
-    slots_removed: List[str] = field(default_factory=list)
+    classes_added: list[str] = field(default_factory=list)
+    classes_removed: list[str] = field(default_factory=list)
+    is_a_changed: dict[str, list[str | None]] = field(default_factory=dict)
+    slots_added: list[str] = field(default_factory=list)
+    slots_removed: list[str] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:

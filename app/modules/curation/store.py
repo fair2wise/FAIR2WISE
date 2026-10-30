@@ -17,8 +17,8 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from typing import Any, Callable, Iterable, Sequence
 import uuid
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.sqlite import OperationalDB
@@ -69,7 +69,7 @@ class CurationStore:
     """Cases, attempts, approvals and the budget ledger over one operational database."""
 
     def __init__(
-        self, path: Any = ":memory:", *, clock: Callable[[], float] = time.time, db: Optional[OperationalDB] = None
+        self, path: Any = ":memory:", *, clock: Callable[[], float] = time.time, db: OperationalDB | None = None
     ) -> None:
         self.db = db or OperationalDB(path)
         self.clock = clock
@@ -90,7 +90,7 @@ class CurationStore:
         locator: str,
         content_hash: str,
         path: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Idempotently register an artifact identity (the bytes stay in the content-addressed store)."""
         artifact_id = hashlib.sha256(
@@ -117,13 +117,13 @@ class CurationStore:
     # --- cases -------------------------------------------------------------------------
 
     @staticmethod
-    def _row(row: Any) -> Dict[str, Any]:
+    def _row(row: Any) -> dict[str, Any]:
         out = dict(row)
         out["payload"] = json.loads(out["payload"])
         out["resolution"] = json.loads(out["resolution"]) if out["resolution"] else None
         return out
 
-    def enqueue(self, case: UncertaintyCase) -> Tuple[str, bool]:
+    def enqueue(self, case: UncertaintyCase) -> tuple[str, bool]:
         """Add a case once.
 
         Re-enqueueing with a changed revision (new evidence, vocabulary or schema)
@@ -179,7 +179,7 @@ class CurationStore:
             )
             return case.id, True
 
-    def _event(self, con: Any, case_id: str, corpus: str, event_type: str, payload: Dict[str, Any]) -> None:
+    def _event(self, con: Any, case_id: str, corpus: str, event_type: str, payload: dict[str, Any]) -> None:
         con.execute(
             "INSERT INTO case_events VALUES (?, ?, ?, ?, ?, ?)",
             (uuid.uuid4().hex, case_id, corpus, event_type, _json(payload), self.clock()),
@@ -192,9 +192,9 @@ class CurationStore:
         *,
         limit: int = 1,
         lease_seconds: float = 300.0,
-        route: Optional[str] = None,
-        case_type: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        route: str | None = None,
+        case_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Atomically lease ready cases (priority order) within ``corpora`` only."""
         scope = sorted(set(corpora))
         if limit < 1 or not scope:
@@ -274,8 +274,8 @@ class CurationStore:
         attempt: ResolutionAttempt,
         token: str,
         *,
-        next_state: Optional[CaseState] = None,
-        route: Optional[str] = None,
+        next_state: CaseState | None = None,
+        route: str | None = None,
     ) -> str:
         """Append an attempt and move the case.
 
@@ -345,10 +345,10 @@ class CurationStore:
         *,
         bound_revision: str,
         accept: bool,
-        resolution: Optional[Dict[str, Any]],
+        resolution: dict[str, Any] | None,
         reviewer: str,
         reason: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Record a reviewer's decision. Called only by the trusted reviewer interface.
 
         Raises:
@@ -383,7 +383,7 @@ class CurationStore:
             self._event(con, case_id, row["corpus"], "reviewed", {"by": reviewer, "accepted": accept})
         return self.get_case(case_id, scope)
 
-    def get_case(self, case_id: str, corpora: Iterable[str]) -> Dict[str, Any]:
+    def get_case(self, case_id: str, corpora: Iterable[str]) -> dict[str, Any]:
         """One case within scope, or ``NOT_FOUND``."""
         row = self.db.one("SELECT * FROM uncertainty_cases WHERE id=?", (case_id,))
         if row is None or row["corpus"] not in set(corpora):
@@ -391,8 +391,8 @@ class CurationStore:
         return self._row(row)
 
     def list_cases(
-        self, corpora: Iterable[str], *, state: Optional[str] = None, route: Optional[str] = None, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+        self, corpora: Iterable[str], *, state: str | None = None, route: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Bounded case summaries within scope."""
         scope = sorted(set(corpora))
         if not scope:
@@ -412,7 +412,7 @@ class CurationStore:
         )
         return [self._row(r) for r in rows]
 
-    def awaiting_validation(self, corpora: Iterable[str]) -> List[Dict[str, Any]]:
+    def awaiting_validation(self, corpora: Iterable[str]) -> list[dict[str, Any]]:
         """Resolved cases whose candidate must go back through validation (never straight to publication)."""
         scope = sorted(set(corpora))
         if not scope:
@@ -429,7 +429,7 @@ class CurationStore:
         with self.db.tx() as con:
             con.execute("UPDATE uncertainty_cases SET needs_validation=0 WHERE id=?", (case_id,))
 
-    def attempts(self, case_id: str) -> List[Dict[str, Any]]:
+    def attempts(self, case_id: str) -> list[dict[str, Any]]:
         """Attempts for a case, oldest first."""
         rows = self.db.query("SELECT * FROM resolution_attempts WHERE case_id=? ORDER BY created, id", (case_id,))
         out = []
@@ -439,7 +439,7 @@ class CurationStore:
             out.append(d)
         return out
 
-    def attempt_count(self, case_id: str, *, provider: Optional[str] = None) -> int:
+    def attempt_count(self, case_id: str, *, provider: str | None = None) -> int:
         """Completed resolver calls (leases lost before a response are not counted)."""
         sql, params = "SELECT COUNT(*) FROM resolution_attempts WHERE case_id=?", [case_id]
         if provider:
@@ -447,14 +447,14 @@ class CurationStore:
             params.append(provider)
         return int(self.db.one(sql, params)[0])
 
-    def events(self, case_id: str) -> List[Dict[str, Any]]:
+    def events(self, case_id: str) -> list[dict[str, Any]]:
         """Case history."""
         return [
             {**dict(r), "payload": json.loads(r["payload"])}
             for r in self.db.query("SELECT * FROM case_events WHERE case_id=? ORDER BY created, rowid", (case_id,))
         ]
 
-    def summary(self, corpora: Sequence[str]) -> Dict[str, Any]:
+    def summary(self, corpora: Sequence[str]) -> dict[str, Any]:
         """Queue counts by state and route for the given corpora."""
         scope = sorted(set(corpora))
         if not scope:
@@ -478,14 +478,14 @@ class CurationStore:
 
     # --- cost approvals ----------------------------------------------------------------
 
-    def save_cost_approval(self, approval_id: str, record: Dict[str, Any]) -> None:
+    def save_cost_approval(self, approval_id: str, record: dict[str, Any]) -> None:
         """Persist a cost approval record (created only by the trusted approval interface)."""
         with self.db.tx() as con:
             con.execute(
                 "INSERT INTO cost_approvals VALUES (?, ?, 'valid', ?)", (approval_id, _json(record), self.clock())
             )
 
-    def get_cost_approval(self, approval_id: str) -> Optional[Tuple[Dict[str, Any], str]]:
+    def get_cost_approval(self, approval_id: str) -> tuple[dict[str, Any], str] | None:
         """``(record, status)`` or ``None``."""
         row = self.db.one("SELECT record, status FROM cost_approvals WHERE approval_id=?", (approval_id,))
         return (json.loads(row["record"]), row["status"]) if row else None

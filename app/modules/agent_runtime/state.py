@@ -14,7 +14,7 @@ the context of the resuming call, not by stored state.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, FrozenSet, List, Mapping, Optional
+from typing import Any, Mapping
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -24,8 +24,8 @@ from ..contracts import ContractError, ErrorCode, RequestContext
 
 
 def merge_open_approvals(
-    left: Optional[Mapping[str, Any]], right: Optional[Mapping[str, Any]],
-) -> Dict[str, Any]:
+    left: Mapping[str, Any] | None, right: Mapping[str, Any] | None,
+) -> dict[str, Any]:
     """Reducer for ``open_approvals``: merge by tool-call id; a ``None`` value closes that entry (T02B)."""
     merged = dict(left or {})
     for key, value in (right or {}).items():
@@ -51,11 +51,11 @@ class LiteratureState(TypedDict):
             JSON dict, or ``None`` for a decline), consumed by the apply step.
     """
 
-    messages: Annotated[List[BaseMessage], add_messages]
+    messages: Annotated[list[BaseMessage], add_messages]
     owner: NotRequired[str]
-    pending_approvals: NotRequired[List[Dict[str, Any]]]
-    open_approvals: NotRequired[Annotated[Dict[str, Dict[str, Any]], merge_open_approvals]]
-    approvals: NotRequired[Dict[str, Optional[Dict[str, Any]]]]
+    pending_approvals: NotRequired[list[dict[str, Any]]]
+    open_approvals: NotRequired[Annotated[dict[str, dict[str, Any]], merge_open_approvals]]
+    approvals: NotRequired[dict[str, dict[str, Any] | None]]
 
 
 @dataclass(frozen=True)
@@ -71,8 +71,8 @@ class RunContext:
     """
 
     request: RequestContext
-    scope: Optional[FrozenSet[str]] = None
-    tools: Optional[FrozenSet[str]] = None
+    scope: frozenset[str] | None = None
+    tools: frozenset[str] | None = None
 
 
 def as_run_context(value: Any) -> RunContext:

@@ -44,16 +44,16 @@ per-instance bounded ledger for the legacy adapter.
 
 from __future__ import annotations
 
-import json
-import re
-import threading
-import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+import json
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple
+import re
+import threading
+from typing import Any, Callable, Iterator, Literal, Mapping, Sequence
+import uuid
 
 from pydantic import BaseModel, ConfigDict
 
@@ -198,13 +198,13 @@ class PaperScope:
     terms_path: str
     manifest_path: str
     filename: str
-    paper_id: Optional[str] = None
+    paper_id: str | None = None
 
 
 #: Resolves the paper for one request; ``None`` means the session has no active extracted paper.
-PaperScopeResolver = Callable[[RequestContext], Optional[PaperScope]]
+PaperScopeResolver = Callable[[RequestContext], PaperScope | None]
 
-_PINNED: ContextVar[Optional[PaperScope]] = ContextVar("f2w_pinned_paper_scope", default=None)
+_PINNED: ContextVar[PaperScope | None] = ContextVar("f2w_pinned_paper_scope", default=None)
 
 
 @contextmanager
@@ -240,8 +240,8 @@ class PaperTermSummary(BaseModel):
     outcome: Literal["summarized", "insufficient", "unreadable"]
     legacy_status: str
     source_paper: str
-    paper_id: Optional[str] = None
-    extraction_state: Optional[str] = None
+    paper_id: str | None = None
+    extraction_state: str | None = None
     counting_unit: str = COUNTING_UNIT
     population: str = POPULATION
     term_count: int = 0
@@ -249,19 +249,19 @@ class PaperTermSummary(BaseModel):
     displayed_term_count: int = 0
     omitted_term_count: int = 0
     legacy_omitted_note_count: int = 0
-    relevance_mode: Optional[str] = None
+    relevance_mode: str | None = None
     max_terms: int = MAX_TERMS_CAP
     scan_complete: bool = False
     completeness: Literal["complete", "partial"] = "partial"
-    completeness_reason: Optional[str] = None
+    completeness_reason: str | None = None
     summary_text: str = ""
     summary_truncated: bool = False
     summary_chars: int = 0
-    citations: Tuple[str, ...] = ()
-    used_pages: Tuple[int, ...] = ()
-    warnings: Tuple[str, ...] = ()
+    citations: tuple[str, ...] = ()
+    used_pages: tuple[int, ...] = ()
+    warnings: tuple[str, ...] = ()
 
-    def to_data(self) -> Dict[str, Any]:
+    def to_data(self) -> dict[str, Any]:
         """``ToolResult.data`` payload (warnings travel on the ToolResult instead)."""
         data = self.model_dump(mode="json", exclude={"warnings"})
         data["citations"] = list(self.citations)
@@ -274,7 +274,7 @@ class SummaryOutcome:
     """A typed summary plus the unchanged dictionary ``summarize_extracted_terms`` returned."""
 
     summary: PaperTermSummary
-    legacy: Dict[str, Any]
+    legacy: dict[str, Any]
 
 
 def _int(value: Any) -> int:
@@ -290,7 +290,7 @@ def _legacy_omitted_note(answer: str) -> int:
     return int(match.group(1)) if match else 0
 
 
-def _completeness(mode: str, total: int, relevant: int, shown: int, max_terms: int) -> Optional[str]:
+def _completeness(mode: str, total: int, relevant: int, shown: int, max_terms: int) -> str | None:
     if shown >= total:
         return None
     if mode == "matched":
@@ -303,7 +303,7 @@ def _completeness(mode: str, total: int, relevant: int, shown: int, max_terms: i
     return f"display capped at max_terms={max_terms}: {shown} of {total} records listed"
 
 
-def _extraction_state(scope: PaperScope) -> Optional[str]:
+def _extraction_state(scope: PaperScope) -> str | None:
     from ..f2w_agent.paper_evidence_agent import _manifest_entry
 
     try:
@@ -337,9 +337,9 @@ def _fit(summary: PaperTermSummary, limit: int) -> PaperTermSummary:
     return candidate.model_copy(update={"warnings": (*candidate.warnings, note)})
 
 
-def citation_tokens(text: str) -> List[str]:
+def citation_tokens(text: str) -> list[str]:
     """Citation tokens in ``text`` verbatim, first appearance order (the frontend's regex)."""
-    out: List[str] = []
+    out: list[str] = []
     for match in CITATION_TOKEN_RE.finditer(text or ""):
         if match.group(0) not in out:
             out.append(match.group(0))
@@ -351,8 +351,8 @@ def summarize_paper_terms(
     *,
     max_terms: int = MAX_TERMS_CAP,
     query: str = "",
-    missing_topics: Optional[Sequence[str]] = None,
-    relevant_node_names: Optional[Sequence[str]] = None,
+    missing_topics: Sequence[str] | None = None,
+    relevant_node_names: Sequence[str] | None = None,
     result_chars: int = MAX_RESULT_CHARS,
 ) -> SummaryOutcome:
     """Run the existing ``summarize_extracted_terms`` over ``scope`` and type its result.
@@ -369,7 +369,7 @@ def summarize_paper_terms(
     )
     status = str(legacy.get("status") or "")
     answer = str(legacy.get("answer") or "")
-    base: Dict[str, Any] = {"legacy_status": status, "source_paper": scope.filename, "paper_id": scope.paper_id,
+    base: dict[str, Any] = {"legacy_status": status, "source_paper": scope.filename, "paper_id": scope.paper_id,
                             "max_terms": max(1, int(max_terms))}
     if status != "success":
         outcome = "unreadable" if status == "manifest_error" else "insufficient"
@@ -381,7 +381,7 @@ def summarize_paper_terms(
     mode = str(legacy.get("relevance_mode") or "")
     reason = _completeness(mode, total, relevant, shown, base["max_terms"])
     note = _legacy_omitted_note(answer)
-    warnings: List[str] = []
+    warnings: list[str] = []
     if reason:
         warnings.append(f"partial display: {shown} of {total} page-grounded term records are listed; "
                         f"term_count is the full count for this paper")
@@ -409,7 +409,7 @@ class LedgerEntry:
     """What one invocation produced on the legacy side (dict returned, or exception raised)."""
 
     legacy: Any = _MISSING
-    error: Optional[BaseException] = None
+    error: BaseException | None = None
 
     @property
     def ran(self) -> bool:
@@ -424,7 +424,7 @@ class SummaryLedger:
         if max_entries < 1:
             raise ValueError("max_entries must be >= 1")
         self._max = max_entries
-        self._entries: "OrderedDict[str, LedgerEntry]" = OrderedDict()
+        self._entries: OrderedDict[str, LedgerEntry] = OrderedDict()
         self._lock = threading.Lock()
 
     def put(self, provenance_id: str, entry: LedgerEntry) -> None:
@@ -434,7 +434,7 @@ class SummaryLedger:
             while len(self._entries) > self._max:
                 self._entries.popitem(last=False)
 
-    def pop(self, provenance_id: Optional[str]) -> Optional[LedgerEntry]:
+    def pop(self, provenance_id: str | None) -> LedgerEntry | None:
         """Remove and return the entry for ``provenance_id``."""
         if not provenance_id:
             return None
@@ -446,7 +446,7 @@ class SummaryLedger:
             return len(self._entries)
 
 
-def _evidence(summary: PaperTermSummary) -> Tuple[EvidenceRef, ...]:
+def _evidence(summary: PaperTermSummary) -> tuple[EvidenceRef, ...]:
     refs = []
     for token in summary.citations:
         match = _PDF_TOKEN_RE.fullmatch(token)
@@ -461,7 +461,7 @@ def _evidence(summary: PaperTermSummary) -> Tuple[EvidenceRef, ...]:
     return tuple(refs)
 
 
-def summary_to_result(summary: PaperTermSummary, *, provenance_id: Optional[str] = None) -> ToolResult:
+def summary_to_result(summary: PaperTermSummary, *, provenance_id: str | None = None) -> ToolResult:
     """Map a typed summary to a ``ToolResult``.
 
     ``summarized`` -> OK with data; ``insufficient`` (no page-grounded record) ->
@@ -493,15 +493,15 @@ class PaperSummaryTool:
     spec = LIT_SUMMARIZE_EXTRACTED_TERMS
     skill = SUMMARIZE_LITERATURE_SKILL
 
-    def __init__(self, resolver: Optional[PaperScopeResolver] = None, *, ledger_size: int = 64) -> None:
+    def __init__(self, resolver: PaperScopeResolver | None = None, *, ledger_size: int = 64) -> None:
         self._resolver = resolver
         self.ledger = SummaryLedger(ledger_size)
 
-    def registration(self) -> Tuple[ToolSpec, Callable[[Any], ToolResult]]:
+    def registration(self) -> tuple[ToolSpec, Callable[[Any], ToolResult]]:
         """``(spec, fn)`` for ``build_registry(extra=...)``."""
         return self.spec, self.run
 
-    def resolve(self, ctx: RequestContext) -> Optional[PaperScope]:
+    def resolve(self, ctx: RequestContext) -> PaperScope | None:
         """The pinned scope, else the resolver's answer for ``ctx``."""
         pinned = _PINNED.get()
         if pinned is not None:
@@ -531,7 +531,7 @@ class PaperSummaryTool:
         return summary_to_result(outcome.summary, provenance_id=provenance_id)
 
 
-__all__: Tuple[str, ...] = (
+__all__: tuple[str, ...] = (
     "COUNTING_UNIT", "LIT_SUMMARIZE_EXTRACTED_TERMS", "LedgerEntry", "MAX_RESULT_CHARS", "MAX_TERMS_CAP",
     "OPERATION_VERSION", "POPULATION", "PaperScope", "PaperScopeResolver", "PaperSummaryTool", "PaperTermSummary",
     "SUMMARIZE_LITERATURE_SKILL", "SummaryLedger", "SummaryOutcome", "TOOL_NAME", "citation_tokens",

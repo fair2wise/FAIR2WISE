@@ -32,11 +32,10 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any, Callable
 import uuid
-from typing import Any, Callable, Dict, List, Optional
 
 from ..contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus
-
 from .papers import MAX_TERMS_CAP, TOOL_NAME, PaperScope, PaperScopeResolver, PaperSummaryTool, pinned_paper_scope
 
 logger = logging.getLogger(__name__)
@@ -44,7 +43,7 @@ logger = logging.getLogger(__name__)
 _SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
-def _session_id(pipeline: Any) -> Optional[str]:
+def _session_id(pipeline: Any) -> str | None:
     key = str(getattr(pipeline, "_active_session_key", "") or "")
     return key if _SESSION_RE.match(key) else None
 
@@ -62,7 +61,7 @@ def session_paper_resolver(pipeline: Any) -> PaperScopeResolver:
         ContractError: ``DENIED`` when the request's session is not the active one.
     """
 
-    def resolve(ctx: RequestContext) -> Optional[PaperScope]:
+    def resolve(ctx: RequestContext) -> PaperScope | None:
         if ctx.session_id != _session_id(pipeline):
             raise ContractError(ErrorCode.DENIED, "the request does not belong to the active chat session")
         paper = (pipeline.workflow.snapshot() or {}).get("active_paper")
@@ -95,9 +94,9 @@ class LegacySummaryPath:
         self.fallbacks = 0
 
     @staticmethod
-    def _args(max_terms: int, query: str, missing_topics: Optional[List[str]],
-              relevant_node_names: Optional[List[str]]) -> Dict[str, Any]:
-        args: Dict[str, Any] = {"max_terms": max_terms}
+    def _args(max_terms: int, query: str, missing_topics: list[str] | None,
+              relevant_node_names: list[str] | None) -> dict[str, Any]:
+        args: dict[str, Any] = {"max_terms": max_terms}
         if query:
             args["query"] = query
         if missing_topics is not None:
@@ -114,9 +113,9 @@ class LegacySummaryPath:
         *,
         max_terms: int = MAX_TERMS_CAP,
         query: str = "",
-        missing_topics: Optional[List[str]] = None,
-        relevant_node_names: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        missing_topics: list[str] | None = None,
+        relevant_node_names: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Same contract as ``paper_evidence_agent.summarize_extracted_terms``.
 
         Arguments outside the Tool's input bounds (``max_terms`` > 16, a query over
@@ -151,7 +150,7 @@ class LegacySummaryPath:
         raise ContractError(code, "; ".join(result.warnings) or f"{TOOL_NAME} was not run ({code.value})")
 
 
-def build_legacy_summary_path(pipeline: Any, environ: Optional[Any] = None) -> LegacySummaryPath:
+def build_legacy_summary_path(pipeline: Any, environ: Any | None = None) -> LegacySummaryPath:
     """Build the summary adapter for one ``AgentPipelineService`` (``:local`` only).
 
     The registry comes from the runtime bridge bootstrap (``answer_from_knowledge``

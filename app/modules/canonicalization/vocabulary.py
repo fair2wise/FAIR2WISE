@@ -21,14 +21,14 @@ content revision. Dropped: effective-vocabulary SQLite overlay (replaced by :mod
 
 from __future__ import annotations
 
-import hashlib
-import json
-import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
+import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+import re
+from typing import Any, Iterable
+import unicodedata
 
 CATEGORIES = ("technique", "analysis", "instrument", "material")
 
@@ -52,16 +52,16 @@ class VocabEntry:
     slug: str
     display_name: str
     category: str
-    aliases: Tuple[str, ...] = ()
-    patterns: Tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
+    patterns: tuple[str, ...] = ()
     notes: str = ""
     smiles: str = ""
 
-    def compiled_patterns(self) -> List["re.Pattern[str]"]:
+    def compiled_patterns(self) -> list[re.Pattern[str]]:
         """Compile this entry's regex patterns, case-insensitively."""
         return [re.compile(p, re.IGNORECASE) for p in self.patterns]
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the entry as a plain, JSON-serializable dict (tuples become lists)."""
         return {
             "slug": self.slug,
@@ -106,18 +106,18 @@ class Vocabulary:
         *,
         status: str = "candidate",
         source: str = "",
-        approval_id: Optional[str] = None,
+        approval_id: str | None = None,
     ) -> None:
         if status not in ("candidate", "approved"):
             raise ValueError(f"unknown vocabulary status {status!r}")
         self.version = version
-        self.entries: List[VocabEntry] = list(entries)
+        self.entries: list[VocabEntry] = list(entries)
         self.status = status
         self.source = source
         self.approval_id = approval_id
-        self._by_slug: Dict[str, VocabEntry] = {}
-        self._by_alias: Dict[str, VocabEntry] = {}
-        self._by_structure: Optional[Dict[str, VocabEntry]] = None
+        self._by_slug: dict[str, VocabEntry] = {}
+        self._by_alias: dict[str, VocabEntry] = {}
+        self._by_structure: dict[str, VocabEntry] | None = None
         for entry in self.entries:
             if entry.category not in CATEGORIES:
                 raise ValueError(f"vocabulary entry {entry.slug!r}: unknown category {entry.category!r}")
@@ -145,7 +145,7 @@ class Vocabulary:
             ).encode()
         ).hexdigest()
 
-    def approve(self, approval: VocabularyApproval) -> "Vocabulary":
+    def approve(self, approval: VocabularyApproval) -> Vocabulary:
         """Return an approved copy; the approval must name exactly this content revision."""
         if approval.vocabulary_revision != self.revision:
             raise ValueError("approval is for a different vocabulary revision")
@@ -158,11 +158,11 @@ class Vocabulary:
         """Whether the vocabulary has been approved."""
         return self.status == "approved"
 
-    def get(self, slug: str) -> Optional[VocabEntry]:
+    def get(self, slug: str) -> VocabEntry | None:
         """Return the entry with exactly this slug, or ``None``."""
         return self._by_slug.get(slug)
 
-    def match(self, term: str, category: Optional[str] = None) -> Optional[VocabEntry]:
+    def match(self, term: str, category: str | None = None) -> VocabEntry | None:
         """The entry *term* denotes by exact slug/alias equality after normalization, or ``None``.
 
         No fuzzy matching: a wrong merge in a provenance graph is effectively unrecoverable.
@@ -175,7 +175,7 @@ class Vocabulary:
             return None
         return entry
 
-    def match_smiles(self, smiles: str) -> Optional[VocabEntry]:
+    def match_smiles(self, smiles: str) -> VocabEntry | None:
         """Resolve a typed SMILES to its named entity by canonical structure (needs RDKit)."""
         from .chemical_identity import canonical_smiles
 
@@ -183,7 +183,7 @@ class Vocabulary:
         if normalized is None:
             return None
         if self._by_structure is None:
-            index: Dict[str, VocabEntry] = {}
+            index: dict[str, VocabEntry] = {}
             for entry in self.entries:
                 key = canonical_smiles(entry.smiles) if entry.category == "material" and entry.smiles else None
                 if key:
@@ -193,7 +193,7 @@ class Vocabulary:
             self._by_structure = index
         return self._by_structure.get(normalized)
 
-    def match_within(self, term: str, category: Optional[str] = None) -> Optional[VocabEntry]:
+    def match_within(self, term: str, category: str | None = None) -> VocabEntry | None:
         """The single entry whose own pattern or long alias fires inside *term*; ambiguous -> ``None``.
 
         Materials are never matched by containment. The longest span wins; an exact tie is refused.
@@ -201,7 +201,7 @@ class Vocabulary:
         text = (term or "").strip()
         if not text:
             return None
-        hits: Dict[str, Tuple[int, VocabEntry]] = {}
+        hits: dict[str, tuple[int, VocabEntry]] = {}
         for entry in self.entries:
             if (
                 category is not None and entry.category != category
@@ -223,12 +223,12 @@ class Vocabulary:
             return ranked[0][1]
         return None
 
-    def entries_for(self, category: str) -> List[VocabEntry]:
+    def entries_for(self, category: str) -> list[VocabEntry]:
         """Return the entries belonging to `category`."""
         return [e for e in self.entries if e.category == category]
 
 
-def _entry_from_raw(raw: Dict[str, Any]) -> VocabEntry:
+def _entry_from_raw(raw: dict[str, Any]) -> VocabEntry:
     return VocabEntry(
         slug=str(raw["slug"]),
         display_name=str(raw.get("display_name") or raw["slug"]),
@@ -240,7 +240,7 @@ def _entry_from_raw(raw: Dict[str, Any]) -> VocabEntry:
     )
 
 
-def vocabulary_from_mapping(raw: Dict[str, Any], *, source: str = "") -> Vocabulary:
+def vocabulary_from_mapping(raw: dict[str, Any], *, source: str = "") -> Vocabulary:
     """Build a *candidate* vocabulary from a parsed ``{version, entries}`` mapping."""
     if not isinstance(raw, dict) or "entries" not in raw:
         raise ValueError("not a vocabulary mapping (no 'entries' key)")

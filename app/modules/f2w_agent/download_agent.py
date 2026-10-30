@@ -17,10 +17,10 @@ import asyncio
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from academy.agent import Agent, action
 
@@ -67,11 +67,11 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-def _reconstruct_abstract(inverted_index: Optional[Dict[str, List[int]]]) -> str:
+def _reconstruct_abstract(inverted_index: dict[str, list[int]] | None) -> str:
     """Rebuild abstract text from an OpenAlex abstract_inverted_index."""
     if not inverted_index:
         return ""
-    positions: List[tuple] = []
+    positions: list[tuple] = []
     for word, idxs in inverted_index.items():
         for i in idxs:
             positions.append((i, word))
@@ -79,7 +79,7 @@ def _reconstruct_abstract(inverted_index: Optional[Dict[str, List[int]]]) -> str
     return " ".join(w for _, w in positions)
 
 
-def _candidate_abstract(work: Dict[str, Any]) -> str:
+def _candidate_abstract(work: dict[str, Any]) -> str:
     """Return candidate abstract from either OpenAlex raw or scout summary."""
     abstract = work.get("abstract")
     if abstract:
@@ -87,13 +87,13 @@ def _candidate_abstract(work: Dict[str, Any]) -> str:
     return _reconstruct_abstract(work.get("abstract_inverted_index"))
 
 
-def _pdf_urls(work: Dict[str, Any]) -> List[str]:
+def _pdf_urls(work: dict[str, Any]) -> list[str]:
     """Open-access URLs in PDF-first preference order."""
     explicit = work.get("pdf_urls")
     if isinstance(explicit, list):
         return [str(url) for url in explicit if str(url).strip()]
 
-    urls: List[str] = []
+    urls: list[str] = []
     for loc_key in ("best_oa_location", "primary_location"):
         loc = work.get(loc_key) or {}
         url = loc.get("pdf_url")
@@ -133,7 +133,7 @@ def _is_valid_pdf(path: Path) -> bool:
         return False
 
 
-def _openalex_work_id(candidate: Dict[str, Any]) -> Optional[str]:
+def _openalex_work_id(candidate: dict[str, Any]) -> str | None:
     """Return the OpenAlex short work id, or None if the id is not an OpenAlex URL."""
     wid = str(candidate.get("id") or "").strip()
     if not wid or "openalex.org/" not in wid.lower():
@@ -146,16 +146,16 @@ def _is_reliable_pdf_url(url: str) -> bool:
     return _dl.is_reliable_pdf_url(url)
 
 
-def _reliable_pdf_urls(work: Dict[str, Any]) -> List[str]:
+def _reliable_pdf_urls(work: dict[str, Any]) -> list[str]:
     """Return repository-backed PDF URLs, rewritten and ranked by preference."""
     selected, _, _ = _dl.select_openalex_oa_pdfs(work)
-    candidates: List[str] = []
+    candidates: list[str] = []
     candidates.extend(selected)
     candidates.extend(_pdf_urls(work))
     oa_url = (work.get("open_access") or {}).get("oa_url") or work.get("oa_url")
     if oa_url:
         candidates.append(str(oa_url))
-    rewritten: List[str] = []
+    rewritten: list[str] = []
     seen: set[str] = set()
     for url in candidates:
         mapped = _dl.rewrite_oa_pdf_url(str(url).strip())
@@ -166,7 +166,7 @@ def _reliable_pdf_urls(work: Dict[str, Any]) -> List[str]:
     return _prefer_pdf_urls(rewritten)
 
 
-def _prefer_pdf_urls(urls: List[str]) -> List[str]:
+def _prefer_pdf_urls(urls: list[str]) -> list[str]:
     """Sort PDF URLs so arXiv and other trusted hosts come first."""
 
     def rank(url: str) -> tuple[int, str]:
@@ -193,7 +193,7 @@ def _prefer_pdf_urls(urls: List[str]) -> List[str]:
     return sorted(urls, key=rank)
 
 
-def _safe_name(work: Dict[str, Any]) -> str:
+def _safe_name(work: dict[str, Any]) -> str:
     """Filename stem from DOI (preferred) or OpenAlex id."""
     doi = work.get("doi")
     if doi:
@@ -202,7 +202,7 @@ def _safe_name(work: Dict[str, Any]) -> str:
     return wid or "openalex_work"
 
 
-def _candidate_summary(work: Dict[str, Any]) -> Dict[str, Any]:
+def _candidate_summary(work: dict[str, Any]) -> dict[str, Any]:
     """Compact JSON-safe candidate used by agentic preflight."""
     urls = _pdf_urls(work)
     return {
@@ -219,7 +219,7 @@ def _candidate_summary(work: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _repository_name(urls: List[str]) -> str:
+def _repository_name(urls: list[str]) -> str:
     """Infer a short repository label from PDF URL hostnames."""
     joined = " ".join(urls).lower()
     if "arxiv.org" in joined:
@@ -254,7 +254,7 @@ def _lexical_score(query: str, text: str) -> float:
     return len(q & t) / len(q)
 
 
-def _dedupe_key(work: Dict[str, Any]) -> str:
+def _dedupe_key(work: dict[str, Any]) -> str:
     """Stable key for a work: DOI, else OpenAlex id, else a JSON snippet."""
     doi = (work.get("doi") or "").strip().lower()
     if doi:
@@ -262,9 +262,9 @@ def _dedupe_key(work: Dict[str, Any]) -> str:
     return (work.get("id") or "").strip().lower() or json.dumps(work, sort_keys=True, default=str)[:200]
 
 
-def _search_queries(query: str, missing_topics: List[str]) -> List[str]:
+def _search_queries(query: str, missing_topics: list[str]) -> list[str]:
     """Build focused OpenAlex queries, broad first then missing-topic variants."""
-    out: List[str] = []
+    out: list[str] = []
 
     def add(text: str) -> None:
         """Append a sanitized query if it is non-empty and not already present."""
@@ -280,7 +280,7 @@ def _search_queries(query: str, missing_topics: List[str]) -> List[str]:
     return out[:MAX_SEARCH_QUERIES]
 
 
-def _parse_json_object(raw: str) -> Dict[str, Any]:
+def _parse_json_object(raw: str) -> dict[str, Any]:
     """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     if not raw:
         return {}
@@ -302,14 +302,14 @@ def _download_manifest_path(target_dir: Path) -> Path:
 def _manifest_record(
     *,
     query: str,
-    missing_topics: List[str],
-    work: Dict[str, Any],
+    missing_topics: list[str],
+    work: dict[str, Any],
     dest: Path,
-    urls: List[str],
-    attempted_urls: List[str],
+    urls: list[str],
+    attempted_urls: list[str],
     status: str,
     reason: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build one JSONL download-attempt record for the session manifest."""
     return {
         "ts": time.time(),
@@ -327,7 +327,7 @@ def _manifest_record(
     }
 
 
-def _append_download_record(manifest: Path, record: Dict[str, Any]) -> None:
+def _append_download_record(manifest: Path, record: dict[str, Any]) -> None:
     """Append one JSON object as a line on the download manifest."""
     manifest.parent.mkdir(parents=True, exist_ok=True)
     with manifest.open("a") as fh:
@@ -361,11 +361,11 @@ class DownloadAgent(Agent):
     def __init__(
         self,
         *,
-        backend: Optional[str] = None,
-        model: Optional[str] = None,
-        mailto: Optional[str] = None,
-        download_delay_seconds: Optional[float] = None,
-        validate_downloads: Optional[bool] = None,
+        backend: str | None = None,
+        model: str | None = None,
+        mailto: str | None = None,
+        download_delay_seconds: float | None = None,
+        validate_downloads: bool | None = None,
         document_store: Any = None,
         legacy_index: Any = None,
         store_context: Any = None,
@@ -395,7 +395,7 @@ class DownloadAgent(Agent):
         )
 
     # ------------------------------------------------------------------
-    def _search_one(self, works, search_text: str, pool: int) -> List[Dict[str, Any]]:
+    def _search_one(self, works, search_text: str, pool: int) -> list[dict[str, Any]]:
         """Search OpenAlex for ``search_text``, retrying without the OA filter on failure."""
         try:
             results = (
@@ -418,9 +418,9 @@ class DownloadAgent(Agent):
     def _search_arxiv_candidates(
         self,
         query: str,
-        missing_topics: List[str],
+        missing_topics: list[str],
         pool: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search arXiv directly and normalize results to OpenAlex-like records."""
         try:
             import arxiv
@@ -428,7 +428,7 @@ class DownloadAgent(Agent):
             logger.warning("arxiv package unavailable; using repository-backed OpenAlex results")
             return []
 
-        merged: List[Dict[str, Any]] = []
+        merged: list[dict[str, Any]] = []
         seen = set()
         per_query = max(1, min(pool, 25))
         client = arxiv.Client(page_size=per_query, delay_seconds=0, num_retries=2)
@@ -470,9 +470,10 @@ class DownloadAgent(Agent):
                 logger.warning("arXiv search failed for %r (%s)", search_text, exc)
         return merged
 
-    def _search_candidates(self, query: str, missing_topics: List[str], pool: int) -> List[Dict[str, Any]]:
+    def _search_candidates(self, query: str, missing_topics: list[str], pool: int) -> list[dict[str, Any]]:
         """Merge arXiv then OpenAlex OA works until ``pool`` unique candidates."""
-        from pyalex import Works, config as pyalex_config
+        from pyalex import Works
+        from pyalex import config as pyalex_config
 
         if self._mailto:
             pyalex_config.email = self._mailto
@@ -506,7 +507,7 @@ class DownloadAgent(Agent):
                     return merged
         return merged
 
-    def _rank(self, query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _rank(self, query: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Score candidates by relevance to the query. LLM with lexical fallback."""
         scored = candidates
         try:
@@ -545,7 +546,7 @@ class DownloadAgent(Agent):
         scored = sorted(candidates, key=lambda w: w.get("_score", 0.0), reverse=True)
         return scored
 
-    def _forward_to_store(self, target: Path, dest: Path, work: Dict[str, Any], source_url: str = "") -> None:
+    def _forward_to_store(self, target: Path, dest: Path, work: dict[str, Any], source_url: str = "") -> None:
         """Record an accepted PDF in the shared literature store (T05); never changes the result."""
         if self._legacy_index is None or self._store_context is None:
             return
@@ -565,10 +566,10 @@ class DownloadAgent(Agent):
 
     _sleep_between_download_attempts = _sleep_between_downloads
 
-    def _refresh_candidate_urls(self, candidate: Dict[str, Any]) -> Dict[str, Any]:
+    def _refresh_candidate_urls(self, candidate: dict[str, Any]) -> dict[str, Any]:
         """Expand PDF URL options before a user-approved download attempt."""
         refreshed = dict(candidate)
-        urls: List[str] = [str(url) for url in (refreshed.get("pdf_urls") or []) if str(url).strip()]
+        urls: list[str] = [str(url) for url in (refreshed.get("pdf_urls") or []) if str(url).strip()]
         oa_url = refreshed.get("oa_url")
         if oa_url:
             urls.append(str(oa_url))
@@ -576,7 +577,8 @@ class DownloadAgent(Agent):
         work_id = _openalex_work_id(candidate)
         if work_id:
             try:
-                from pyalex import Works, config as pyalex_config
+                from pyalex import Works
+                from pyalex import config as pyalex_config
 
                 if self._mailto:
                     pyalex_config.email = self._mailto
@@ -601,7 +603,7 @@ class DownloadAgent(Agent):
             upw_urls, _ = _dl.fetch_unpaywall_oa_pdfs(doi, self._mailto)
             urls.extend(upw_urls)
 
-        deduped: List[str] = []
+        deduped: list[str] = []
         seen = set()
         for url in _prefer_pdf_urls(urls):
             cleaned = _dl.rewrite_oa_pdf_url(str(url).strip())
@@ -611,7 +613,7 @@ class DownloadAgent(Agent):
         refreshed["pdf_urls"] = deduped
         return refreshed
 
-    def _validate_downloaded_pdf(self, query: str, work: Dict[str, Any], path: Path) -> bool:
+    def _validate_downloaded_pdf(self, query: str, work: dict[str, Any], path: Path) -> bool:
         """Best-effort semantic check; fail open if validator cannot run."""
         if not self._validate_downloads:
             return True
@@ -661,10 +663,10 @@ class DownloadAgent(Agent):
             note_error("DownloadAgent._validate_downloaded_pdf", e)
             return True
 
-    def _candidate_search(self, query: str, missing_topics: List[str], candidate_pool: int) -> Dict[str, Any]:
+    def _candidate_search(self, query: str, missing_topics: list[str], candidate_pool: int) -> dict[str, Any]:
         """Search, keep reliable PDFs, rank, and return compact candidate summaries."""
         candidates = self._search_candidates(query, missing_topics, candidate_pool)
-        prepared: List[Dict[str, Any]] = []
+        prepared: list[dict[str, Any]] = []
         for work in candidates:
             urls = _reliable_pdf_urls(work)
             if not urls:
@@ -687,13 +689,13 @@ class DownloadAgent(Agent):
     def _download_candidates(
         self,
         query: str,
-        missing_topics: List[str],
+        missing_topics: list[str],
         target_dir: str,
-        candidates: List[Dict[str, Any]],
+        candidates: list[dict[str, Any]],
         max_papers: int,
         *,
-        validate_downloads: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+        validate_downloads: bool | None = None,
+    ) -> dict[str, Any]:
         """Download ranked candidates to ``target_dir`` and append JSONL records."""
         from ..literature import download_pdfs as dl
 
@@ -723,7 +725,7 @@ class DownloadAgent(Agent):
             reverse=True,
         )
 
-        downloaded: List[str] = []
+        downloaded: list[str] = []
         skipped = 0
         failed = 0
         semantic_rejected = 0
@@ -755,7 +757,7 @@ class DownloadAgent(Agent):
                 dest.unlink(missing_ok=True)
 
             ok = False
-            attempted_urls: List[str] = []
+            attempted_urls: list[str] = []
             oa_url = (w.get("open_access") or {}).get("oa_url") or w.get("oa_url")
             for url in urls:
                 attempted_urls.append(url)
@@ -832,8 +834,8 @@ class DownloadAgent(Agent):
             "manifest": str(manifest),
         }
 
-    def _download(self, query: str, missing_topics: List[str], target_dir: str,
-                  max_papers: int, candidate_pool: int) -> Dict[str, Any]:
+    def _download(self, query: str, missing_topics: list[str], target_dir: str,
+                  max_papers: int, candidate_pool: int) -> dict[str, Any]:
         """Search then download the top-ranked papers in one unattended pass."""
         search = self._candidate_search(query, missing_topics, candidate_pool)
         return self._download_candidates(
@@ -848,9 +850,9 @@ class DownloadAgent(Agent):
     async def search_candidates(
         self,
         query: str,
-        missing_topics: Optional[List[str]] = None,
+        missing_topics: list[str] | None = None,
         candidate_pool: int = 25,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Search/rank OpenAlex candidates without writing PDFs."""
         from .trace import bind_context
 
@@ -864,16 +866,16 @@ class DownloadAgent(Agent):
     async def download_selected(
         self,
         query: str,
-        missing_topics: Optional[List[str]] = None,
+        missing_topics: list[str] | None = None,
         target_dir: str = "pdfs",
-        candidates: Optional[List[Dict[str, Any]]] = None,
+        candidates: list[dict[str, Any]] | None = None,
         max_papers: int = 1,
         *,
-        validate_downloads: Optional[bool] = None,
+        validate_downloads: bool | None = None,
         refresh_urls: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Download only controller-approved candidate(s)."""
-        prepared: List[Dict[str, Any]] = []
+        prepared: list[dict[str, Any]] = []
         for candidate in candidates or []:
             if not isinstance(candidate, dict):
                 continue
@@ -899,11 +901,11 @@ class DownloadAgent(Agent):
     async def find_and_download(
         self,
         query: str,
-        missing_topics: Optional[List[str]] = None,
+        missing_topics: list[str] | None = None,
         target_dir: str = "pdfs",
         max_papers: int = 3,
         candidate_pool: int = 25,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Search OpenAlex, rank by relevance, download top-N PDFs."""
         from .trace import bind_context
 

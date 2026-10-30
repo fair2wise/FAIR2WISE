@@ -5,12 +5,12 @@ merges scored hit lists tagged with ``graph_id``.
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple  # noqa: I001
+import re
+from typing import Any, Iterable, Sequence  # noqa: I001
 
-DEFAULT_JSON_GRAPH_PATHS: Tuple[str, ...] = (
+DEFAULT_JSON_GRAPH_PATHS: tuple[str, ...] = (
     "storage/kg/matkg_rsoxs_v1.json",
     "storage/kg/matkg_bl1101_v1.json",
 )
@@ -49,17 +49,17 @@ def normalize_graph_path(path: str) -> str:
     return str(path or "").replace("\\", "/").strip()
 
 
-def split_graph_arg(value: Optional[str]) -> List[str]:
+def split_graph_arg(value: str | None) -> list[str]:
     """Split a comma-separated ``--graph`` value into unique paths."""
     if not value:
         return []
     return unique_graph_paths(part for part in str(value).split(",") if part.strip())
 
 
-def unique_graph_paths(paths: Iterable[str]) -> List[str]:
+def unique_graph_paths(paths: Iterable[str]) -> list[str]:
     """Deduplicate graph paths while preserving first-seen order."""
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for raw in paths:
         path = normalize_graph_path(raw)
         if not path or path in seen:
@@ -70,10 +70,10 @@ def unique_graph_paths(paths: Iterable[str]) -> List[str]:
 
 
 def collect_graph_paths(
-    *groups: Optional[Sequence[str] | str],
-) -> List[str]:
+    *groups: Sequence[str] | str | None,
+) -> list[str]:
     """Flatten mixed string/sequence graph arguments into unique paths."""
-    values: List[str] = []
+    values: list[str] = []
     for group in groups:
         if group is None:
             continue
@@ -138,7 +138,7 @@ def is_xray_graph(path: str) -> bool:
     return bool(_XRAY_GRAPH_RE.match(graph_filename(path)))
 
 
-def schema_path_for_graph(path: str) -> Optional[str]:
+def schema_path_for_graph(path: str) -> str | None:
     """LinkML overlay path for a KG file, or None when no overlay is known.
 
     Selection is by file name only: bl1101 and rsoxs patterns as before, and x-ray graphs bind
@@ -157,9 +157,9 @@ def schema_path_for_graph(path: str) -> Optional[str]:
     return None
 
 
-def _latest_snapshot_path(available: Sequence[str], pattern: re.Pattern[str]) -> Optional[str]:
+def _latest_snapshot_path(available: Sequence[str], pattern: re.Pattern[str]) -> str | None:
     """Highest ``vN`` snapshot matching *pattern* among *available* paths."""
-    best: Optional[str] = None
+    best: str | None = None
     best_n = -1
     for raw in available:
         path = normalize_graph_path(raw)
@@ -173,28 +173,28 @@ def _latest_snapshot_path(available: Sequence[str], pattern: re.Pattern[str]) ->
     return best
 
 
-def latest_bl1101_path(available: Sequence[str]) -> Optional[str]:
+def latest_bl1101_path(available: Sequence[str]) -> str | None:
     """Pick the highest matkg_bl1101_vN.json from *available* (v1 is never deleted)."""
     return _latest_snapshot_path(available, _BL1101_SNAPSHOT_RE)
 
 
-def latest_rsoxs_path(available: Sequence[str]) -> Optional[str]:
+def latest_rsoxs_path(available: Sequence[str]) -> str | None:
     """Pick the highest matkg_rsoxs_vN.json from *available* (v1 is never deleted)."""
     return _latest_snapshot_path(available, _RSOXS_SNAPSHOT_RE)
 
 
 def default_json_graph_paths(
     *,
-    configured_graphs: Optional[Sequence[str]] = None,
-    configured_graph: Optional[str] = None,
-    available: Optional[Sequence[str]] = None,
-) -> List[str]:
+    configured_graphs: Sequence[str] | None = None,
+    configured_graph: str | None = None,
+    available: Sequence[str] | None = None,
+) -> list[str]:
     """Return query graphs. Never auto-unions the x-ray demo KG."""
     options = [normalize_graph_path(item) for item in (available or []) if normalize_graph_path(item)]
     option_names = {Path(item).name: item for item in options}
     configured = collect_graph_paths(configured_graphs, configured_graph)
     if configured:
-        resolved: List[str] = []
+        resolved: list[str] = []
         for path in configured:
             if options:
                 if path in options:
@@ -207,7 +207,7 @@ def default_json_graph_paths(
             resolved.append(path)
         return unique_graph_paths(resolved)
 
-    selected: List[str] = []
+    selected: list[str] = []
     rsoxs = latest_rsoxs_path(options)
     if rsoxs:
         selected.append(rsoxs)
@@ -235,7 +235,7 @@ def default_json_graph_paths(
     return [path for path in options if not is_xray_demo_graph(path)]
 
 
-def primary_json_graph_path(paths: Sequence[str]) -> Optional[str]:
+def primary_json_graph_path(paths: Sequence[str]) -> str | None:
     """First non-empty path in *paths* (viewer/backward-compat primary)."""
     for path in paths:
         normalized = normalize_graph_path(path)
@@ -245,8 +245,8 @@ def primary_json_graph_path(paths: Sequence[str]) -> Optional[str]:
 
 
 MAX_KG_QUERY_HOPS = 20
-KG_QUERY_HOPS_PRESETS: Tuple[int, ...] = tuple(range(1, MAX_KG_QUERY_HOPS + 1))
-KG_QUERY_MAX_NODES_PRESETS: Tuple[int, ...] = (50, 100, 250, 500, 1000)
+KG_QUERY_HOPS_PRESETS: tuple[int, ...] = tuple(range(1, MAX_KG_QUERY_HOPS + 1))
+KG_QUERY_MAX_NODES_PRESETS: tuple[int, ...] = (50, 100, 250, 500, 1000)
 DEFAULT_KG_QUERY_HOPS = 20
 DEFAULT_KG_QUERY_MAX_NODES = 1000
 
@@ -282,7 +282,7 @@ class ScoredHit:
     graph_label: str = ""
     payload: Any = field(default=None, repr=False)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe hit for agent response ``selected_hits``."""
         return {
             "id": self.id,
@@ -299,9 +299,9 @@ def merge_hits(
     *,
     limit: int = 12,
     max_snippets: int = 6,
-) -> List[ScoredHit]:
+) -> list[ScoredHit]:
     """Merge per-graph hit lists. Identity is (graph_id, node id), never URI smash."""
-    best: Dict[Tuple[str, str], ScoredHit] = {}
+    best: dict[tuple[str, str], ScoredHit] = {}
     for hit in hits:
         if not hit.id:
             continue
@@ -315,7 +315,7 @@ def merge_hits(
         reverse=True,
     )
     code_ct = 0
-    capped: List[ScoredHit] = []
+    capped: list[ScoredHit] = []
     for hit in ranked:
         if str(hit.category).lower() == "codesnippet":
             code_ct += 1

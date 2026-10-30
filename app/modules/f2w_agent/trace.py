@@ -12,33 +12,33 @@ retrieval work in a worker must wrap the callable with :func:`bind_context`.
 from __future__ import annotations
 
 import contextvars
+from datetime import UTC, datetime
 import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import subprocess
 import threading
 import time
+from typing import Any, Callable, Mapping, Sequence
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
 
-_TURN_ID: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+_TURN_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "f2w_turn_id", default=None
 )
-_COLLECTOR: contextvars.ContextVar[Optional["TurnTrace"]] = contextvars.ContextVar(
+_COLLECTOR: contextvars.ContextVar[TurnTrace | None] = contextvars.ContextVar(
     "f2w_trace_collector", default=None
 )
 
 _WRITE_LOCK = threading.Lock()
-_LAST_TURN_BY_SESSION: Dict[str, str] = {}
-_GIT_SHA: Optional[str] = None
+_LAST_TURN_BY_SESSION: dict[str, str] = {}
+_GIT_SHA: str | None = None
 _GIT_SHA_READY = False
 
 _SECRET_NAME = re.compile(
@@ -146,7 +146,7 @@ def trace_dir() -> Path:
     return Path(os.environ.get("F2W_TRACE_DIR") or "runs/traces")
 
 
-def current_turn_id() -> Optional[str]:
+def current_turn_id() -> str | None:
     """Turn id for the active context, if a turn is open."""
     try:
         return _TURN_ID.get()
@@ -154,7 +154,7 @@ def current_turn_id() -> Optional[str]:
         return None
 
 
-def current_trace() -> Optional["TurnTrace"]:
+def current_trace() -> TurnTrace | None:
     """Active collector, if a turn is open in this context."""
     try:
         return _COLLECTOR.get()
@@ -177,14 +177,14 @@ def bind_context(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapped
 
 
-def last_turn_id_for_session(session_id: Optional[str]) -> Optional[str]:
+def last_turn_id_for_session(session_id: str | None) -> str | None:
     """Most recently finished turn for a browser session, if any."""
     if not session_id:
         return None
     return _LAST_TURN_BY_SESSION.get(str(session_id))
 
 
-def git_sha() -> Optional[str]:
+def git_sha() -> str | None:
     """HEAD sha for this checkout, or None when git is unavailable."""
     global _GIT_SHA, _GIT_SHA_READY
     if _GIT_SHA_READY:
@@ -204,8 +204,8 @@ def git_sha() -> Optional[str]:
     return _GIT_SHA
 
 
-def _secret_values() -> List[str]:
-    found: List[str] = []
+def _secret_values() -> list[str]:
+    found: list[str] = []
     for name, value in os.environ.items():
         if not value or len(value) < 6:
             continue
@@ -223,7 +223,7 @@ def redact(value: Any) -> Any:
 
 def _redact(value: Any, secrets: Sequence[str]) -> Any:
     if isinstance(value, Mapping):
-        cleaned: Dict[str, Any] = {}
+        cleaned: dict[str, Any] = {}
         for key, item in value.items():
             name = str(key)
             if _SECRET_NAME.search(name):
@@ -244,9 +244,9 @@ def _redact(value: Any, secrets: Sequence[str]) -> Any:
     return value
 
 
-def settings_snapshot() -> Dict[str, str]:
+def settings_snapshot() -> dict[str, str]:
     """``F2W_*`` and ``KG_RAG_*`` environment values, with secrets redacted."""
-    raw: Dict[str, str] = {}
+    raw: dict[str, str] = {}
     for name, value in os.environ.items():
         if name.startswith("F2W_") or name.startswith("KG_RAG_"):
             raw[name] = value
@@ -254,14 +254,14 @@ def settings_snapshot() -> Dict[str, str]:
     return redacted if isinstance(redacted, dict) else {}
 
 
-def graph_fingerprints(paths: Sequence[str]) -> List[Dict[str, Optional[str]]]:
+def graph_fingerprints(paths: Sequence[str]) -> list[dict[str, str | None]]:
     """Path plus sha256 for each loaded graph file. Missing files stay listed."""
-    rows: List[Dict[str, Optional[str]]] = []
+    rows: list[dict[str, str | None]] = []
     for path in paths:
         text = str(path or "").strip()
         if not text:
             continue
-        digest: Optional[str] = None
+        digest: str | None = None
         file_path = Path(text)
         try:
             if file_path.is_file():
@@ -276,7 +276,7 @@ def graph_fingerprints(paths: Sequence[str]) -> List[Dict[str, Optional[str]]]:
     return rows
 
 
-def _empty_retrieval() -> Dict[str, Any]:
+def _empty_retrieval() -> dict[str, Any]:
     return {
         "selected_hits": [],
         "sufficient": None,
@@ -295,8 +295,8 @@ def _empty_retrieval() -> Dict[str, Any]:
     }
 
 
-def _empty_record(turn_id: str, session_id: Optional[str], parent_turn_id: Optional[str]) -> Dict[str, Any]:
-    now = datetime.now(timezone.utc).isoformat()
+def _empty_record(turn_id: str, session_id: str | None, parent_turn_id: str | None) -> dict[str, Any]:
+    now = datetime.now(UTC).isoformat()
     return {
         "schema_version": SCHEMA_VERSION,
         "turn_id": turn_id,
@@ -345,7 +345,7 @@ def _empty_record(turn_id: str, session_id: Optional[str], parent_turn_id: Optio
     }
 
 
-def _normalize_turn_id(client_turn_id: Optional[str]) -> str:
+def _normalize_turn_id(client_turn_id: str | None) -> str:
     text = str(client_turn_id or "").strip()
     if text and _TURN_ID_RE.fullmatch(text):
         return text
@@ -359,8 +359,8 @@ class TurnTrace:
         self,
         turn_id: str,
         *,
-        session_id: Optional[str],
-        parent_turn_id: Optional[str],
+        session_id: str | None,
+        parent_turn_id: str | None,
         enabled: bool,
     ) -> None:
         """Create a collector for one turn. It is not active until :meth:`bind` is called.
@@ -377,14 +377,14 @@ class TurnTrace:
         self.started_monotonic = time.monotonic()
         self._lock = threading.Lock()
         self.data = _empty_record(turn_id, session_id, parent_turn_id)
-        self._tokens: List[contextvars.Token[Any]] = []
+        self._tokens: list[contextvars.Token[Any]] = []
 
     def bind(self) -> None:
         """Install this collector in the current context."""
         self._tokens.append(_TURN_ID.set(self.turn_id))
         self._tokens.append(_COLLECTOR.set(self))
 
-    def merge_env(self, env: Optional[Mapping[str, Any]]) -> None:
+    def merge_env(self, env: Mapping[str, Any] | None) -> None:
         """Copy known environment settings into the record.
 
         Only keys in ``ENV_KEYS`` with non-``None`` values are kept; later calls
@@ -398,7 +398,7 @@ class TurnTrace:
                 if key in env and env[key] is not None:
                     current[key] = env[key]
 
-    def merge_request(self, request: Optional[Mapping[str, Any]]) -> None:
+    def merge_request(self, request: Mapping[str, Any] | None) -> None:
         """Merge request fields into the record.
 
         Only keys in ``REQUEST_KEYS`` with non-``None`` values are kept. An empty
@@ -430,7 +430,7 @@ class TurnTrace:
             flags = self.data["orchestration"]["prechecks"]
             flags[name] = bool(flags.get(name)) or bool(fired)
 
-    def note_classifier_raw(self, raw: Optional[str]) -> None:
+    def note_classifier_raw(self, raw: str | None) -> None:
         """Record the classifier's raw output. Only the first non-``None`` value is kept."""
         with self._lock:
             slot = self.data["orchestration"]
@@ -458,7 +458,7 @@ class TurnTrace:
             if classification and not slot.get("classification"):
                 slot["classification"] = str(classification)
 
-    def note_progress(self, name: str, message: str, data: Optional[Mapping[str, Any]] = None) -> None:
+    def note_progress(self, name: str, message: str, data: Mapping[str, Any] | None = None) -> None:
         """Append a progress event stamped with milliseconds elapsed since the turn started.
 
         Args:
@@ -505,12 +505,12 @@ class TurnTrace:
         self,
         *,
         label: str,
-        model: Optional[str],
+        model: str | None,
         messages: Sequence[Mapping[str, Any]],
-        response: Optional[str],
+        response: str | None,
         latency_ms: float,
-        timeout: Optional[float],
-        error: Optional[BaseException],
+        timeout: float | None,
+        error: BaseException | None,
     ) -> None:
         """Append one model call to the record.
 
@@ -603,7 +603,7 @@ class TurnTrace:
         try:
             elapsed = time.monotonic() - self.started_monotonic
             with self._lock:
-                self.data["finished_at"] = datetime.now(timezone.utc).isoformat()
+                self.data["finished_at"] = datetime.now(UTC).isoformat()
                 response = self.data["response"]
                 if response.get("elapsed_seconds") is None:
                     response["elapsed_seconds"] = elapsed
@@ -625,13 +625,13 @@ class TurnTrace:
             self._tokens = []
 
 
-def _error_dict(exc: Optional[BaseException]) -> Optional[Dict[str, str]]:
+def _error_dict(exc: BaseException | None) -> dict[str, str] | None:
     if exc is None:
         return None
     return {"type": type(exc).__name__, "message": str(exc)}
 
 
-def parse_citations(answer: str) -> Dict[str, List[str]]:
+def parse_citations(answer: str) -> dict[str, list[str]]:
     """Pull ``[KG:]``, ``[PDF:]``, and ``[OPS:]`` tokens out of an answer."""
     return {
         "kg": [match.strip() for match in _CITATION_KG.findall(answer)],
@@ -640,7 +640,7 @@ def parse_citations(answer: str) -> Dict[str, List[str]]:
     }
 
 
-def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> Dict[str, Any]:
+def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> dict[str, Any]:
     request = payload.get("request") or {}
     orchestration = payload.get("orchestration") or {}
     retrieval = payload.get("retrieval") or {}
@@ -648,7 +648,7 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> Dict[str, Any
     decision = orchestration.get("decision") or {}
     question = str(request.get("message") or "")
     hits = retrieval.get("selected_hits") or []
-    graph_ids: List[str] = []
+    graph_ids: list[str] = []
     for hit in hits:
         if not isinstance(hit, Mapping):
             continue
@@ -684,7 +684,7 @@ def _final_sufficient(response: Mapping[str, Any], retrieval: Mapping[str, Any])
 
 
 def _write_turn(payload: Mapping[str, Any], summary: Mapping[str, Any]) -> None:
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day = datetime.now(UTC).strftime("%Y-%m-%d")
     root = trace_dir() / day
     detail_dir = root / "turns"
     detail_path = detail_dir / f"{payload.get('turn_id')}.json"
@@ -726,11 +726,11 @@ def _reset_tokens(tokens: Sequence[contextvars.Token[Any]]) -> None:
 
 def open_turn(
     *,
-    client_turn_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    parent_turn_id: Optional[str] = None,
-    request: Optional[Mapping[str, Any]] = None,
-    env: Optional[Mapping[str, Any]] = None,
+    client_turn_id: str | None = None,
+    session_id: str | None = None,
+    parent_turn_id: str | None = None,
+    request: Mapping[str, Any] | None = None,
+    env: Mapping[str, Any] | None = None,
 ) -> TurnTrace:
     """Start a turn, or return the collector already bound in this context."""
     try:
@@ -789,7 +789,7 @@ def note_precheck(name: str, fired: bool) -> None:
     _call(lambda collector: collector.note_precheck(name, fired))
 
 
-def note_classifier_raw(raw: Optional[str]) -> None:
+def note_classifier_raw(raw: str | None) -> None:
     """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_classifier_raw(raw))
 
@@ -799,7 +799,7 @@ def note_decision(decision: Mapping[str, Any]) -> None:
     _call(lambda collector: collector.note_decision(decision))
 
 
-def note_progress(name: str, message: str, data: Optional[Mapping[str, Any]] = None) -> None:
+def note_progress(name: str, message: str, data: Mapping[str, Any] | None = None) -> None:
     """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_progress(name, message, data))
 
@@ -817,12 +817,12 @@ def note_error(where: str, exc: BaseException) -> None:
 def record_llm_call(
     *,
     label: str,
-    model: Optional[str],
+    model: str | None,
     messages: Sequence[Mapping[str, Any]],
-    response: Optional[str],
+    response: str | None,
     latency_ms: float,
-    timeout: Optional[float] = None,
-    error: Optional[BaseException] = None,
+    timeout: float | None = None,
+    error: BaseException | None = None,
 ) -> None:
     """Record one model call on the active turn. No-op when no turn is open."""
     collector = current_trace()
@@ -847,7 +847,7 @@ def attach_response(response: Any) -> None:
     _call(lambda collector: collector.attach_response(response))
 
 
-def _call(fn: Callable[["TurnTrace"], None]) -> None:
+def _call(fn: Callable[[TurnTrace], None]) -> None:
     collector = current_trace()
     if collector is None or collector.finished:
         return
@@ -857,7 +857,7 @@ def _call(fn: Callable[["TurnTrace"], None]) -> None:
         logger.warning("Trace update failed: %s", exc)
 
 
-def find_detail(turn_id: str) -> Optional[Path]:
+def find_detail(turn_id: str) -> Path | None:
     """Locate ``turns/<turn_id>.json`` under the trace directory."""
     if not _TURN_ID_RE.fullmatch(turn_id or ""):
         return None
@@ -872,7 +872,7 @@ def append_ui_events(events: Sequence[Mapping[str, Any]]) -> None:
     """Append a batch of UI events to today's ``ui_events.jsonl``."""
     if not tracing_enabled():
         return
-    day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day = datetime.now(UTC).strftime("%Y-%m-%d")
     path = trace_dir() / day / "ui_events.jsonl"
     try:
         for event in events:
@@ -892,7 +892,7 @@ def append_annotation(record: Mapping[str, Any]) -> None:
         logger.warning("Annotation trace write failed: %s", exc)
 
 
-def load_detail(turn_id: str) -> Optional[Dict[str, Any]]:
+def load_detail(turn_id: str) -> dict[str, Any] | None:
     """Read a detail record, or None when it is missing."""
     path = find_detail(turn_id)
     if path is None:

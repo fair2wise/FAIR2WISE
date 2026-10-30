@@ -19,10 +19,10 @@ cap and honor 429 cooldowns (H1-3). The flag is read per call.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager, contextmanager
 import os
 import threading
-from contextlib import asynccontextmanager, contextmanager
-from typing import AsyncIterator, Iterator, Optional
+from typing import AsyncIterator, Iterator
 
 try:
     from .llm_admission import get_controller, shared_admission_enabled
@@ -43,7 +43,7 @@ CBORG_MAX_CONCURRENCY = _read_cap()
 
 _sync_sem = threading.BoundedSemaphore(CBORG_MAX_CONCURRENCY)
 
-_async_sem: Optional[asyncio.Semaphore] = None
+_async_sem: asyncio.Semaphore | None = None
 _async_sem_lock = threading.Lock()
 
 

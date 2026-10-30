@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+import subprocess
+from typing import Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,7 +29,7 @@ STAGE = "term_resolution"
 _CODE_DIR = Path(__file__).resolve().parent
 
 
-def git_sha(cwd: Optional[Path] = None) -> str:
+def git_sha(cwd: Path | None = None) -> str:
     """HEAD of *this* checkout (not the process's cwd), or ``""`` when git cannot say."""
     try:
         done = subprocess.run(
@@ -55,11 +55,11 @@ class ResolutionPlan(BaseModel):
     schema_sha256: str
     model_ref: str
     model_revision: str = ""
-    decoding: Dict[str, Any] = Field(default_factory=dict)
+    decoding: dict[str, Any] = Field(default_factory=dict)
     vocabulary_revision: str = ""
     f2w_commit: str = ""
     donor_commit: str = ""
-    extra: Dict[str, Any] = Field(default_factory=dict)
+    extra: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def plan_id(self) -> str:
@@ -78,7 +78,7 @@ def activity_node_id(round_key: str) -> str:
     return "activity:term_resolution_" + hashlib.sha256(round_key.encode()).hexdigest()[:32]
 
 
-def write_plan(recorder: AuditRecorder, plan: ResolutionPlan, *, actor: str, run_id: Optional[str] = None) -> str:
+def write_plan(recorder: AuditRecorder, plan: ResolutionPlan, *, actor: str, run_id: str | None = None) -> str:
     """Record the plan (idempotent by content) and return its node id."""
     node = plan_node_id(plan.plan_id)
     recorder.record(
@@ -103,11 +103,11 @@ def write_activity(
     started: float,
     finished: float,
     counts: Mapping[str, int],
-    cost_usd: Optional[float],
-    input_tokens: Optional[int],
-    output_tokens: Optional[int],
+    cost_usd: float | None,
+    input_tokens: int | None,
+    output_tokens: int | None,
     actor: str,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> str:
     """Record one resolution round. ``cost_usd=None`` means the cost is unknown (never recorded as 0)."""
     node = activity_node_id(round_key)
@@ -143,7 +143,7 @@ def link_resolved_terms(
     targets: Mapping[str, str],
     *,
     actor: str,
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> int:
     """Link each source term id to the canonical id it resolved to; returns the number of links."""
     for source, target in sorted(targets.items()):

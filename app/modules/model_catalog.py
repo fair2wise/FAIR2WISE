@@ -19,13 +19,13 @@ no side effects.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import os
 import re
 import threading
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Iterable, Optional, Tuple
+from typing import Any, Callable, Iterable
 
 DEFAULT_CBORG_BASE = "https://api.cborg.lbl.gov"
 #: Seconds a successful listing is reused before the endpoint is asked again.
@@ -37,7 +37,7 @@ _SECRETISH = re.compile(r"(?i)(bearer\s+\S+|sk-[A-Za-z0-9_\-]{6,}|api[_-]?key\S*
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass(frozen=True)
@@ -54,9 +54,9 @@ class ModelListing:
 
     backend: str
     source: str
-    models: Tuple[str, ...] = ()
+    models: tuple[str, ...] = ()
     listed_at: str = field(default_factory=_utc_now)
-    error: Optional[str] = None
+    error: str | None = None
 
     @property
     def available(self) -> bool:
@@ -69,7 +69,7 @@ class ModelListing:
                 "listed_at": self.listed_at, "error": self.error}
 
 
-def _scrub(text: str, secret: Optional[str] = None, limit: int = 200) -> str:
+def _scrub(text: str, secret: str | None = None, limit: int = 200) -> str:
     out = str(text or "")
     if secret:
         out = out.replace(secret, "<redacted>")
@@ -94,11 +94,11 @@ def _model_ids(page: Any) -> Iterable[str]:
 
 def list_cborg_models_live(
     *,
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
     client: Any = None,
     timeout: float = 15.0,
-    slot: Optional[Callable[[], Any]] = None,
+    slot: Callable[[], Any] | None = None,
 ) -> ModelListing:
     """Ask the CBORG listing endpoint which models it offers right now.
 
@@ -116,7 +116,7 @@ def list_cborg_models_live(
     from .cborg_http import openai_http_kwargs, require_cborg_api_key
     from .cborg_limiter import sync_slot
 
-    key: Optional[str] = None
+    key: str | None = None
     if client is None:
         try:
             key = require_cborg_api_key(api_key)
@@ -154,7 +154,7 @@ class CachedModelCatalog:
 
     def __init__(
         self,
-        lister: Optional[Callable[[], ModelListing]] = None,
+        lister: Callable[[], ModelListing] | None = None,
         *,
         ttl: float = DEFAULT_TTL_SECONDS,
         failure_ttl: float = DEFAULT_FAILURE_TTL_SECONDS,
@@ -165,7 +165,7 @@ class CachedModelCatalog:
         self.failure_ttl = failure_ttl
         self._clock = clock
         self._lock = threading.Lock()
-        self._cached: Optional[ModelListing] = None
+        self._cached: ModelListing | None = None
         self._expires = 0.0
 
     def get(self, *, refresh: bool = False) -> ModelListing:

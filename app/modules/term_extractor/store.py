@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import threading
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from . import provenance
 from .models import PropertyRecord, TermRecord
@@ -33,14 +33,14 @@ class TermStore:
                 directory is created automatically if it does not exist.
         """
         self.output_file = output_file
-        self._records: Dict[str, TermRecord] = {}
-        self._display_to_key: Dict[str, str] = {}
-        self.code_snippets: List[Dict[str, Any]] = []
+        self._records: dict[str, TermRecord] = {}
+        self._display_to_key: dict[str, str] = {}
+        self.code_snippets: list[dict[str, Any]] = []
         self._snippet_seen: set = set()
         self._state_lock = threading.Lock()
         self._save_lock = threading.Lock()
         self._tl = threading.local()
-        self.metadata: Dict[str, Any] = {
+        self.metadata: dict[str, Any] = {
             "extraction_date": datetime.datetime.utcnow().isoformat() + "Z",
             "processed_files": 0,
             "processed_pages_total": 0,
@@ -111,17 +111,17 @@ class TermStore:
     # Reads
     # ------------------------------------------------------------------
 
-    def get(self, key: str) -> Optional[TermRecord]:
+    def get(self, key: str) -> TermRecord | None:
         """Return the ``TermRecord`` for the normalised *key*, or ``None`` if absent."""
         with self._state_lock:
             return self._records.get(key)
 
-    def all_records(self) -> List[TermRecord]:
+    def all_records(self) -> list[TermRecord]:
         """Return a snapshot list of all ``TermRecord`` objects in the store."""
         with self._state_lock:
             return list(self._records.values())
 
-    def all_display_names(self) -> List[str]:
+    def all_display_names(self) -> list[str]:
         """Return a snapshot list of original (non-normalised) term strings."""
         with self._state_lock:
             return list(self._display_to_key.keys())
@@ -130,7 +130,7 @@ class TermStore:
     # Writes
     # ------------------------------------------------------------------
 
-    def upsert(self, record: TermRecord) -> Tuple[str, bool]:
+    def upsert(self, record: TermRecord) -> tuple[str, bool]:
         """Insert or merge a TermRecord. Returns (key, was_modified).
 
         Merge rules:
@@ -228,8 +228,8 @@ class TermStore:
 
     def add_code_snippets(
         self,
-        snips: List[Dict[str, Any]],
-        pub_meta: Optional[Dict[str, Any]] = None,
+        snips: list[dict[str, Any]],
+        pub_meta: dict[str, Any] | None = None,
     ) -> bool:
         """Dedup-append code snippets, stamping PDF-derived publication metadata.
 
@@ -271,7 +271,7 @@ class TermStore:
             self._tl.updated = True
         return updated
 
-    def stamp_source_metadata(self, source_paper: str, pub_meta: Optional[Dict[str, Any]]) -> bool:
+    def stamp_source_metadata(self, source_paper: str, pub_meta: dict[str, Any] | None) -> bool:
         """Merge PDF-derived ``pub_meta`` into the metadata of terms/snippets citing ``source_paper``.
 
         Returns True if anything changed.

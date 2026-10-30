@@ -11,11 +11,11 @@ Rewritten: row model, menu bounding, no store/catalog readers.
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Any, Dict, List, Mapping, Protocol, Tuple
+import re
+from typing import Any, Mapping, Protocol
 
 from ..merge_safety import fold, is_acronym_of
 from ..migration import sha256_json
@@ -35,8 +35,8 @@ class IncompleteRead(RuntimeError):
 class GraphRows:
     """Candidate-term node rows. Each row: node_id, surface, category, publication_id, section_id, text."""
 
-    nodes: List[Dict[str, Any]] = field(default_factory=list)
-    edges: Dict[str, int] = field(default_factory=dict)
+    nodes: list[dict[str, Any]] = field(default_factory=list)
+    edges: dict[str, int] = field(default_factory=dict)
     complete: bool = True
 
     def revision(self) -> str:
@@ -81,7 +81,7 @@ def fold_key(surface: str) -> str:
 
 def build_menu(
     vocab: Vocabulary, category: str, surface: str, limit: int = MAX_MENU_ENTRIES
-) -> Tuple[MenuEntry, ...]:
+) -> tuple[MenuEntry, ...]:
     """Same-category vocabulary entries, bounded to ``limit`` and ranked by closeness to ``surface``."""
     entries = vocab.entries_for(category) if category else []
     key = fold(surface)
@@ -97,9 +97,9 @@ def build_menu(
     return tuple(MenuEntry(e.slug, e.display_name, e.category, tuple(e.aliases)) for e in ranked)
 
 
-def fold_terms(rows: GraphRows) -> Dict[str, Dict[str, Any]]:
+def fold_terms(rows: GraphRows) -> dict[str, dict[str, Any]]:
     """Group node rows by (category, fold_key). ``variants`` is a Counter of raw surfaces."""
-    terms: Dict[str, Dict[str, Any]] = {}
+    terms: dict[str, dict[str, Any]] = {}
     for node in rows.nodes:
         category = str(node.get("category") or "unknown")
         folded = fold_key(str(node.get("surface") or ""))
@@ -120,7 +120,7 @@ def assemble(rows: GraphRows, key: str, slot: Mapping[str, Any], vocab: Vocabula
     surface = sorted(variants.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
     nodes = slot["nodes"]
     seen: set = set()
-    snippets: List[Snippet] = []
+    snippets: list[Snippet] = []
     for node in sorted(nodes, key=lambda n: (str(n.get("publication_id")), str(n.get("node_id")))):
         pub = str(node.get("publication_id") or "")
         if pub in seen or len(snippets) >= k or not node.get("text"):

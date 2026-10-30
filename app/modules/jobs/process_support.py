@@ -12,12 +12,12 @@ als_knowledge_agent/src/als_knowledge_agent/graph/child_process.py (``write_text
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
-from typing import List, Sequence
+from typing import Sequence
 
 TAIL_BYTES = 64 * 1024
 TAIL_LINE_CHARS = 400
@@ -84,7 +84,7 @@ def scrub(line: str) -> str:
 
 def tail_lines(
     path: Path, n: int = 12, *, max_bytes: int = TAIL_BYTES, max_chars: int = TAIL_LINE_CHARS
-) -> List[str]:
+) -> list[str]:
     """The last ``n`` non-empty lines of a log, each scrubbed and cut to ``max_chars``; ``[]`` when none."""
     try:
         with Path(path).open("rb") as stream:
@@ -97,7 +97,7 @@ def tail_lines(
     return [scrub(line)[:max_chars] for line in lines if line][-n:]
 
 
-def worker_command(db_path: str, *, factory: str, extra: Sequence[str] = ()) -> List[str]:
+def worker_command(db_path: str, *, factory: str, extra: Sequence[str] = ()) -> list[str]:
     """Build the argv for an owned worker process; refuses a factory outside ``app.modules.`` and any shell metacharacter."""
     if not re.fullmatch(r"app\.modules(\.[A-Za-z_][A-Za-z0-9_]*)+:[A-Za-z_][A-Za-z0-9_]*", factory):
         raise ValueError("worker factory must be 'app.modules.<package>:<callable>'")

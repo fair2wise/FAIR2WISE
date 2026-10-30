@@ -11,14 +11,15 @@ Usage:
         --max-results 100
 """
 
-import os
-import re
-import time
 import argparse
 import logging
+import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+import re
+import time
+from typing import Any, Iterable
 from urllib.parse import parse_qs, quote, urlparse
+
 import requests
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -122,7 +123,7 @@ def _looks_like_pdf_url(url: str) -> bool:
     return False
 
 
-def _pmcid_from_text(text: str) -> Optional[str]:
+def _pmcid_from_text(text: str) -> str | None:
     match = _PMCID_RE.search(text or "")
     if match:
         return f"PMC{match.group(1)}"
@@ -138,7 +139,7 @@ def europepmc_pdf_url(pmcid: str) -> str:
     return f"https://europepmc.org/articles/{ident.upper()}?pdf=render"
 
 
-def rewrite_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> Optional[str]:
+def rewrite_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> str | None:
     """Map a known OA landing page to a direct PDF URL, or keep an already-PDF URL.
 
     Returns None for publisher pages, PubMed abstracts, and other non-PDF landings.
@@ -215,7 +216,7 @@ def is_reliable_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> bool:
     return rewrite_oa_pdf_url(url, osti_biblio_ok=osti_biblio_ok) is not None
 
 
-def listed_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> Optional[str]:
+def listed_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> str | None:
     """Keep an OpenAlex/Unpaywall pdf_url, including publisher hosts.
 
     Repository landings are rewritten as before. Publisher hosts are kept only
@@ -241,10 +242,10 @@ def listed_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> Optional[str
     return None
 
 
-def prefer_repository_pdfs(urls: Iterable[str]) -> List[str]:
+def prefer_repository_pdfs(urls: Iterable[str]) -> list[str]:
     """Stable-sort so allowlisted repository PDFs are tried before publishers."""
-    repos: List[str] = []
-    others: List[str] = []
+    repos: list[str] = []
+    others: list[str] = []
     seen: set[str] = set()
     for url in urls:
         cleaned = str(url or "").strip()
@@ -258,9 +259,9 @@ def prefer_repository_pdfs(urls: Iterable[str]) -> List[str]:
     return repos + others
 
 
-def _dedupe_urls(urls: Iterable[str]) -> List[str]:
+def _dedupe_urls(urls: Iterable[str]) -> list[str]:
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for url in urls:
         cleaned = str(url or "").strip()
         if not cleaned or cleaned in seen:
@@ -270,14 +271,14 @@ def _dedupe_urls(urls: Iterable[str]) -> List[str]:
     return out
 
 
-def arxiv_id_from_text(*parts: Any) -> Optional[str]:
+def arxiv_id_from_text(*parts: Any) -> str | None:
     """Return the first arXiv id found in the joined text parts, or None."""
     blob = " ".join(str(part or "") for part in parts)
     match = _ARXIV_ID_RE.search(blob)
     return match.group(1) if match else None
 
 
-def pmcid_from_openalex_work(work: Dict[str, Any]) -> Optional[str]:
+def pmcid_from_openalex_work(work: dict[str, Any]) -> str | None:
     """Return the first PMC id found in an OpenAlex work record, or None.
 
     Checks the work's ``ids``/``pmcid`` fields, then the PDF and landing-page
@@ -298,8 +299,8 @@ def pmcid_from_openalex_work(work: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _iter_openalex_locations(work: Dict[str, Any]) -> List[Dict[str, Any]]:
-    locs: List[Dict[str, Any]] = []
+def _iter_openalex_locations(work: dict[str, Any]) -> list[dict[str, Any]]:
+    locs: list[dict[str, Any]] = []
     seen: set[tuple] = set()
     for loc in [work.get("best_oa_location"), work.get("primary_location"), *(work.get("locations") or [])]:
         if not isinstance(loc, dict):
@@ -312,9 +313,9 @@ def _iter_openalex_locations(work: Dict[str, Any]) -> List[Dict[str, Any]]:
     return locs
 
 
-def select_openalex_oa_pdfs(work: Dict[str, Any]) -> Tuple[List[str], Optional[str], List[str]]:
+def select_openalex_oa_pdfs(work: dict[str, Any]) -> tuple[list[str], str | None, list[str]]:
     """OA PDF URLs from an OpenAlex work. Repositories first; listed publisher pdf_urls last."""
-    sourced: List[Tuple[str, str]] = []
+    sourced: list[tuple[str, str]] = []
     loc_urls = []
     for loc in _iter_openalex_locations(work):
         loc_urls.extend([loc.get("pdf_url"), loc.get("landing_page_url")])
@@ -355,9 +356,9 @@ def select_openalex_oa_pdfs(work: Dict[str, Any]) -> Tuple[List[str], Optional[s
     return urls, arxiv_id, sources if urls else []
 
 
-def select_unpaywall_oa_pdfs(payload: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+def select_unpaywall_oa_pdfs(payload: dict[str, Any]) -> tuple[list[str], list[str]]:
     """OA PDF URLs from an Unpaywall JSON body. Repositories first; listed publisher pdf_urls last."""
-    urls: List[str] = []
+    urls: list[str] = []
     locations = []
     best = payload.get("best_oa_location")
     if isinstance(best, dict):
@@ -388,7 +389,7 @@ def select_unpaywall_oa_pdfs(payload: Dict[str, Any]) -> Tuple[List[str], List[s
     return urls, (["unpaywall"] if urls else [])
 
 
-def is_usable_contact_email(email: Optional[str]) -> bool:
+def is_usable_contact_email(email: str | None) -> bool:
     """True for an address safe to send to Unpaywall / the OpenAlex polite pool."""
     candidate = str(email or "").strip()
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}", candidate):
@@ -396,7 +397,7 @@ def is_usable_contact_email(email: Optional[str]) -> bool:
     return not _PLACEHOLDER_EMAIL_RE.search(candidate)
 
 
-def fetch_unpaywall_oa_pdfs(doi: str, email: str, *, timeout: float = 15.0) -> Tuple[List[str], List[str]]:
+def fetch_unpaywall_oa_pdfs(doi: str, email: str, *, timeout: float = 15.0) -> tuple[list[str], list[str]]:
     """Look up Unpaywall by DOI. Requires a real contact email. Does not invent DOIs."""
     raw = re.sub(r"^https?://(dx\.)?doi\.org/", "", str(doi or "").strip(), flags=re.I)
     if not raw.lower().startswith("10.") or not is_usable_contact_email(email):
@@ -421,7 +422,7 @@ def fetch_unpaywall_oa_pdfs(doi: str, email: str, *, timeout: float = 15.0) -> T
 
 
 # Informal polite-pool gaps. CLI --delay is applied as a floor on top of these.
-OA_HOST_DELAYS: Dict[str, float] = {
+OA_HOST_DELAYS: dict[str, float] = {
     "api.semanticscholar.org": 1.2,
     "api.core.ac.uk": 1.0,
     "www.osti.gov": 1.0,
@@ -437,7 +438,7 @@ S2_BATCH_URL = "https://api.semanticscholar.org/graph/v1/paper/batch"
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 _delay_floor = 1.0
-_last_host_hit: Dict[str, float] = {}
+_last_host_hit: dict[str, float] = {}
 
 
 def set_delay_floor(seconds: float) -> None:
@@ -472,7 +473,7 @@ def _respect_rate_limit(url: str) -> None:
     _last_host_hit[host] = time.monotonic()
 
 
-def bare_doi(doi: Optional[str]) -> Optional[str]:
+def bare_doi(doi: str | None) -> str | None:
     """Strip a doi.org prefix. Returns None when the value is not a DOI."""
     raw = re.sub(r"^https?://(dx\.)?doi\.org/", "", str(doi or "").strip(), flags=re.I)
     if not raw.lower().startswith("10."):
@@ -485,8 +486,8 @@ def _trusted_oa_urls(
     source: str,
     *,
     osti_biblio_ok: bool = False,
-) -> Tuple[List[str], List[str]]:
-    urls: List[str] = []
+) -> tuple[list[str], list[str]]:
+    urls: list[str] = []
     for url in candidates:
         rewritten = rewrite_oa_pdf_url(str(url or ""), osti_biblio_ok=osti_biblio_ok)
         if rewritten:
@@ -495,7 +496,7 @@ def _trusted_oa_urls(
     return urls, ([source] if urls else [])
 
 
-def _json_headers() -> Dict[str, str]:
+def _json_headers() -> dict[str, str]:
     return {**DOWNLOAD_HEADERS, "Accept": "application/json"}
 
 
@@ -529,7 +530,7 @@ def _oa_post(url: str, **kwargs):
     return response
 
 
-def select_semantic_scholar_oa_pdfs(paper: Optional[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
+def select_semantic_scholar_oa_pdfs(paper: dict[str, Any] | None) -> tuple[list[str], list[str]]:
     """Allowlisted OA PDF from a Semantic Scholar paper object."""
     if not isinstance(paper, dict):
         return [], []
@@ -541,13 +542,13 @@ def fetch_semantic_scholar_batch_oa_pdfs(
     dois: Iterable[str],
     *,
     timeout: float = 30.0,
-) -> Dict[str, Tuple[List[str], List[str]]]:
+) -> dict[str, tuple[list[str], list[str]]]:
     """Batch-lookup Semantic Scholar openAccessPdf. Keyed by each input DOI."""
     ordered = [str(doi) for doi in dois]
-    out: Dict[str, Tuple[List[str], List[str]]] = {doi: ([], []) for doi in ordered}
-    indexed: List[Tuple[str, str]] = []
+    out: dict[str, tuple[list[str], list[str]]] = {doi: ([], []) for doi in ordered}
+    indexed: list[tuple[str, str]] = []
     seen_ids: set[str] = set()
-    originals_for: Dict[str, List[str]] = {}
+    originals_for: dict[str, list[str]] = {}
     for doi in ordered:
         bare = bare_doi(doi)
         if not bare:
@@ -599,9 +600,9 @@ def fetch_semantic_scholar_batch_oa_pdfs(
     return out
 
 
-def select_core_oa_pdfs(payload: Any) -> Tuple[List[str], List[str]]:
+def select_core_oa_pdfs(payload: Any) -> tuple[list[str], list[str]]:
     """CORE search/work JSON → allowlisted PDF URLs."""
-    works: List[Dict[str, Any]] = []
+    works: list[dict[str, Any]] = []
     if isinstance(payload, dict):
         results = payload.get("results")
         if isinstance(results, list):
@@ -610,7 +611,7 @@ def select_core_oa_pdfs(payload: Any) -> Tuple[List[str], List[str]]:
             works.append(payload)
     elif isinstance(payload, list):
         works.extend(item for item in payload if isinstance(item, dict))
-    candidates: List[str] = []
+    candidates: list[str] = []
     for work in works:
         for key in ("downloadUrl", "download_url"):
             if work.get(key):
@@ -626,7 +627,7 @@ def select_core_oa_pdfs(payload: Any) -> Tuple[List[str], List[str]]:
     return _trusted_oa_urls(candidates, "core")
 
 
-def fetch_core_oa_pdfs(doi: str, api_key: Optional[str], *, timeout: float = 15.0) -> Tuple[List[str], List[str]]:
+def fetch_core_oa_pdfs(doi: str, api_key: str | None, *, timeout: float = 15.0) -> tuple[list[str], list[str]]:
     """Look up CORE.ac.uk by DOI. API key goes in Authorization, never the query."""
     bare = bare_doi(doi)
     key = str(api_key or os.environ.get("CORE_API_KEY") or "").strip()
@@ -649,9 +650,9 @@ def fetch_core_oa_pdfs(doi: str, api_key: Optional[str], *, timeout: float = 15.
     return select_core_oa_pdfs(body)
 
 
-def select_osti_oa_pdfs(payload: Any) -> Tuple[List[str], List[str]]:
+def select_osti_oa_pdfs(payload: Any) -> tuple[list[str], list[str]]:
     """OSTI records JSON → allowlisted PURL / repository PDFs."""
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     if isinstance(payload, list):
         records.extend(item for item in payload if isinstance(item, dict))
     elif isinstance(payload, dict):
@@ -662,7 +663,7 @@ def select_osti_oa_pdfs(payload: Any) -> Tuple[List[str], List[str]]:
                 break
         if not records and (payload.get("osti_id") or payload.get("ostiId")):
             records.append(payload)
-    candidates: List[str] = []
+    candidates: list[str] = []
     for record in records:
         osti_id = record.get("osti_id") or record.get("ostiId")
         if osti_id:
@@ -679,7 +680,7 @@ def select_osti_oa_pdfs(payload: Any) -> Tuple[List[str], List[str]]:
     return _trusted_oa_urls(candidates, "osti", osti_biblio_ok=True)
 
 
-def fetch_osti_oa_pdfs(doi: str, *, timeout: float = 15.0) -> Tuple[List[str], List[str]]:
+def fetch_osti_oa_pdfs(doi: str, *, timeout: float = 15.0) -> tuple[list[str], list[str]]:
     """Look up DOE public-access copies on OSTI by DOI. Keyless."""
     bare = bare_doi(doi)
     if not bare:
@@ -702,7 +703,7 @@ def fetch_osti_oa_pdfs(doi: str, *, timeout: float = 15.0) -> Tuple[List[str], L
     return select_osti_oa_pdfs(body)
 
 
-def select_europepmc_search_oa_pdfs(payload: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+def select_europepmc_search_oa_pdfs(payload: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Europe PMC search JSON → PMC render URLs (and other allowlisted PDFs)."""
     if not isinstance(payload, dict):
         return [], []
@@ -710,7 +711,7 @@ def select_europepmc_search_oa_pdfs(payload: Dict[str, Any]) -> Tuple[List[str],
     results = result_list.get("result") or []
     if isinstance(results, dict):
         results = [results]
-    candidates: List[str] = []
+    candidates: list[str] = []
     for record in results:
         if not isinstance(record, dict):
             continue
@@ -729,7 +730,7 @@ def select_europepmc_search_oa_pdfs(payload: Dict[str, Any]) -> Tuple[List[str],
     return _trusted_oa_urls(candidates, "europepmc")
 
 
-def fetch_europepmc_search_oa_pdfs(doi: str, *, timeout: float = 15.0) -> Tuple[List[str], List[str]]:
+def fetch_europepmc_search_oa_pdfs(doi: str, *, timeout: float = 15.0) -> tuple[list[str], list[str]]:
     """Find a PMCID / OA PDF from a bare DOI via Europe PMC search. Keyless."""
     bare = bare_doi(doi)
     if not bare:
@@ -759,13 +760,13 @@ def fetch_europepmc_search_oa_pdfs(doi: str, *, timeout: float = 15.0) -> Tuple[
     return select_europepmc_search_oa_pdfs(body)
 
 
-def select_crossref_tdm_pdfs(payload: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+def select_crossref_tdm_pdfs(payload: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Mine Crossref `link` for text-mining PDFs. Allowlist still gates hosts."""
     if not isinstance(payload, dict):
         return [], []
     message = payload.get("message") if isinstance(payload.get("message"), dict) else payload
     links = message.get("link") or []
-    candidates: List[str] = []
+    candidates: list[str] = []
     for link in links:
         if not isinstance(link, dict):
             continue
@@ -780,7 +781,7 @@ def select_crossref_tdm_pdfs(payload: Dict[str, Any]) -> Tuple[List[str], List[s
     return _trusted_oa_urls(candidates, "crossref-tdm")
 
 
-def fetch_crossref_tdm_pdfs(doi: str, *, timeout: float = 15.0) -> Tuple[List[str], List[str]]:
+def fetch_crossref_tdm_pdfs(doi: str, *, timeout: float = 15.0) -> tuple[list[str], list[str]]:
     """Crossref work links with intended-application=text-mining. No TDM token."""
     bare = bare_doi(doi)
     if not bare:

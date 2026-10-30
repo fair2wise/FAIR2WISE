@@ -6,24 +6,23 @@ from :class:`PaperEvidenceAgent` reading an approved PDF on demand.
 """
 from __future__ import annotations
 
+from copy import deepcopy
+from datetime import UTC, datetime
 import json
 import os
-import tempfile
-from copy import deepcopy
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+import tempfile
+from typing import Any
 
 STATE_VERSION = 1
 
 
 def _now() -> str:
     """UTC ISO-8601 timestamp for workflow-state ``updated_at``."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def default_workflow_state() -> Dict[str, Any]:
+def default_workflow_state() -> dict[str, Any]:
     """Empty idle workflow document written on first load or after ``clear``."""
     return {
         "version": STATE_VERSION,
@@ -55,7 +54,7 @@ class WorkflowStateStore:
         self.path = Path(path)
         self.data = self._load()
 
-    def _load(self) -> Dict[str, Any]:
+    def _load(self) -> dict[str, Any]:
         """Read JSON from disk and coerce list/dict fields; ignore corrupt files."""
         state = default_workflow_state()
         if not self.path.exists():
@@ -78,7 +77,7 @@ class WorkflowStateStore:
         state["version"] = STATE_VERSION
         return state
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Deep copy of the in-memory state for API responses."""
         return deepcopy(self.data)
 
@@ -102,7 +101,7 @@ class WorkflowStateStore:
             except FileNotFoundError:
                 pass
 
-    def update(self, **values: Any) -> Dict[str, Any]:
+    def update(self, **values: Any) -> dict[str, Any]:
         """Merge *values* into state, persist, and return a snapshot."""
         self.data.update(values)
         self.save()
@@ -114,7 +113,7 @@ class WorkflowStateStore:
         self.save()
 
     @property
-    def pending(self) -> Optional[Dict[str, Any]]:
+    def pending(self) -> dict[str, Any] | None:
         """Copy of the current pending user-action payload, if any."""
         value = self.data.get("pending")
         return deepcopy(value) if isinstance(value, dict) else None

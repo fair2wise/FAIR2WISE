@@ -26,12 +26,12 @@ imports the evaluation suite or waits on a binary result.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 import logging
-import threading
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+import threading
+from typing import Any, Callable
 
 from .contracts.context import RequestContext
 from .contracts.errors import ContractError, ErrorCode
@@ -53,7 +53,7 @@ def judge_settings_path(workdir: Path) -> Path:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class JudgeModelStore:
@@ -69,7 +69,7 @@ class JudgeModelStore:
         self._clock = clock
         self._lock = threading.Lock()
 
-    def read(self) -> Dict[str, Any]:
+    def read(self) -> dict[str, Any]:
         """``{"judge_model", "updated_by", "updated_at", "scope"}``; ``judge_model`` is None when unset."""
         empty = {"judge_model": None, "updated_by": None, "updated_at": None, "scope": JUDGE_SCOPE}
         with self._lock:
@@ -86,7 +86,7 @@ class JudgeModelStore:
         return {"judge_model": model, "updated_by": data.get("updated_by") if model else None,
                 "updated_at": data.get("updated_at") if model else None, "scope": JUDGE_SCOPE}
 
-    def write(self, judge_model: Optional[str], *, updated_by: str) -> Dict[str, Any]:
+    def write(self, judge_model: str | None, *, updated_by: str) -> dict[str, Any]:
         """Persist ``judge_model`` (``None`` clears it) and return the stored record."""
         record = {"judge_model": judge_model, "updated_by": updated_by, "updated_at": self._clock(),
                   "scope": JUDGE_SCOPE}
@@ -106,11 +106,11 @@ class JudgeModelService:
         catalog: Live model listing (cached).
     """
 
-    def __init__(self, store: JudgeModelStore, catalog: Optional[CachedModelCatalog] = None) -> None:
+    def __init__(self, store: JudgeModelStore, catalog: CachedModelCatalog | None = None) -> None:
         self.store = store
         self.catalog = catalog or CachedModelCatalog()
 
-    def view(self, ctx: RequestContext, *, refresh: bool = False) -> Dict[str, Any]:
+    def view(self, ctx: RequestContext, *, refresh: bool = False) -> dict[str, Any]:
         """The current judge plus the models the provider offers right now."""
         require(ctx, JUDGE_CAPABILITY)
         listing = self.catalog.get(refresh=refresh)
@@ -126,7 +126,7 @@ class JudgeModelService:
             "backend": listing.backend,
         }
 
-    def update(self, ctx: RequestContext, judge_model: Optional[str]) -> Dict[str, Any]:
+    def update(self, ctx: RequestContext, judge_model: str | None) -> dict[str, Any]:
         """Set (or clear, with ``None``/empty) the judge; the model must be listed right now."""
         require(ctx, JUDGE_CAPABILITY)
         cleaned = (judge_model or "").strip() or None
@@ -146,7 +146,7 @@ class JudgeModelService:
         return self.view(ctx)
 
 
-def read_judge_model(workdir: Path) -> Optional[str]:
+def read_judge_model(workdir: Path) -> str | None:
     """The stored judge id under ``workdir`` (no context: for the trusted validation CLI only)."""
     return JudgeModelStore(judge_settings_path(workdir)).read()["judge_model"]
 

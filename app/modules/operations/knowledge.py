@@ -49,12 +49,13 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from datetime import UTC
 import logging
 import os
+from pathlib import Path
 import threading
 import time
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Mapping, Sequence, Union
 from urllib.parse import urlsplit
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolSpec
@@ -84,7 +85,7 @@ _DISCOVER_Q = "query($l: Int!, $o: Int!) { entities(limit: $l, offset: $o) { uri
 
 GraphFilesProvider = Callable[[], Sequence[Union[str, Path]]]
 #: Returns the Tiled GraphPort to read, or ``None`` when no server is reachable right now.
-TiledBackendFactory = Callable[[], Optional[Any]]
+TiledBackendFactory = Callable[[], Any | None]
 
 
 class DynamicJsonGraphs:
@@ -99,7 +100,7 @@ class DynamicJsonGraphs:
 
     def __init__(self, provider: GraphFilesProvider) -> None:
         self._provider = provider
-        self._files: Tuple[str, ...] = ()
+        self._files: tuple[str, ...] = ()
         self._backend: Any = None
         self._lock = threading.Lock()
 
@@ -117,7 +118,7 @@ class DynamicJsonGraphs:
         """The JSON backend's capabilities (complete listing, snapshot-isolated)."""
         return self._current().capabilities()
 
-    def graph_ids(self) -> List[str]:
+    def graph_ids(self) -> list[str]:
         """Graph ids of the current selection."""
         return self._current().graph_ids()
 
@@ -155,7 +156,7 @@ class CompositeGraphPort:
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._json = json_port
         if tiled is None:
-            self._factory: Optional[TiledBackendFactory] = None
+            self._factory: TiledBackendFactory | None = None
         elif callable(tiled) and not hasattr(tiled, "capabilities"):
             self._factory = tiled
         else:
@@ -166,14 +167,14 @@ class CompositeGraphPort:
         self._clock = clock
         self._lock = threading.RLock()
         self._backend: Any = None
-        self._ids: Tuple[str, ...] = ()
-        self._expires: Optional[float] = None
-        self._warnings: List[str] = []
+        self._ids: tuple[str, ...] = ()
+        self._expires: float | None = None
+        self._warnings: list[str] = []
 
     # -- diagnostics ----------------------------------------------------------------------------
 
     @property
-    def warnings(self) -> Tuple[str, ...]:
+    def warnings(self) -> tuple[str, ...]:
         """Reasons recorded (once each) for Tiled graphs being absent or partially listed."""
         return tuple(self._warnings)
 
@@ -192,7 +193,7 @@ class CompositeGraphPort:
 
     # -- Tiled side -------------------------------------------------------------------------------
 
-    def tiled_backend(self) -> Optional[Any]:
+    def tiled_backend(self) -> Any | None:
         """The Tiled GraphPort, resolving it through the factory when needed (``None`` if absent)."""
         with self._lock:
             if self._backend is not None or self._factory is None:
@@ -211,14 +212,14 @@ class CompositeGraphPort:
             self._backend = backend
             return backend
 
-    def _discover(self) -> List[str]:
+    def _discover(self) -> list[str]:
         backend = self.tiled_backend()
         if backend is None:
             return []
         from ..graph.identity_adapter import literature_entity_key
 
         page = max(1, int(getattr(backend, "page_size", 500)))
-        found: List[str] = []
+        found: list[str] = []
         offset = 0
         try:
             while True:
@@ -241,7 +242,7 @@ class CompositeGraphPort:
             return []
         return sorted(found)
 
-    def tiled_graph_ids(self) -> List[str]:
+    def tiled_graph_ids(self) -> list[str]:
         """Graph ids discovered in Tiled (cached for ``ttl`` seconds; empty when Tiled is absent)."""
         with self._lock:
             now = self._clock()
@@ -252,7 +253,7 @@ class CompositeGraphPort:
 
     # -- GraphPort ---------------------------------------------------------------------------------
 
-    def graph_ids(self) -> List[str]:
+    def graph_ids(self) -> list[str]:
         """JSON graph ids, then the Tiled graph ids not shadowed by a JSON graph."""
         json_ids = list(self._json.graph_ids())
         tiled_ids = self.tiled_graph_ids()
@@ -276,7 +277,7 @@ class CompositeGraphPort:
                 return backend
         raise ContractError(ErrorCode.NOT_FOUND, f"graph {graph_id!r} is not configured")
 
-    def capabilities(self, graph_id: Optional[str] = None) -> Any:
+    def capabilities(self, graph_id: str | None = None) -> Any:
         """Capabilities of the backend serving ``graph_id`` (the JSON backend's when no id is given)."""
         if graph_id is None:
             return self._json.capabilities()
@@ -293,7 +294,7 @@ class CompositeGraphPort:
             self._warnings = []
 
 
-def _same_target(url: str, target: Optional[str]) -> bool:
+def _same_target(url: str, target: str | None) -> bool:
     if not target:
         return False
     a, b = urlsplit(url), urlsplit(target)
@@ -318,13 +319,13 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     if tiled_settings.mode == "external":
         external = tiled_settings.external
 
-        def from_external() -> Optional[Any]:
+        def from_external() -> Any | None:
             return TiledGraphBackend(TiledGraphClient.from_external(external), **backend_kw)
 
         return from_external
     managed = tiled_settings.managed
 
-    def from_managed() -> Optional[Any]:
+    def from_managed() -> Any | None:
         from ..deployment.tiled_lifecycle import find_managed
 
         server = find_managed(managed)
@@ -335,7 +336,7 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     return from_managed
 
 
-def resolve_tiled_settings(settings: Any, environ: Any = None) -> Tuple[Optional[Any], Optional[str]]:
+def resolve_tiled_settings(settings: Any, environ: Any = None) -> tuple[Any | None, str | None]:
     """``(TiledSettings, None)`` for the deployment, or ``(None, reason)`` when Tiled is not usable.
 
     Args:
@@ -357,7 +358,7 @@ def resolve_tiled_settings(settings: Any, environ: Any = None) -> Tuple[Optional
         if tiled.profile != profile:
             return None, f"Tiled settings are for profile {tiled.profile!r}, the deployment runs {profile!r}"
     else:
-        env: Dict[str, str] = {k: str(v) for k, v in (os.environ if environ is None else environ).items()}
+        env: dict[str, str] = {k: str(v) for k, v in (os.environ if environ is None else environ).items()}
         env["F2W_DEPLOYMENT_PROFILE"] = profile
         try:
             tiled = load_tiled_settings(env)
@@ -374,7 +375,7 @@ def resolve_tiled_settings(settings: Any, environ: Any = None) -> Tuple[Optional
     return tiled, None
 
 
-def storage_graph_files(root: Union[str, Path]) -> List[str]:
+def storage_graph_files(root: Union[str, Path]) -> list[str]:
     """``<root>/storage/kg/*.json``, sorted by name (the legacy ``list_storage_kg_json_files`` rule)."""
     kg_dir = Path(root) / "storage" / "kg"
     if not kg_dir.is_dir():
@@ -392,7 +393,7 @@ def directory_corpus_resolver(directory: Union[str, Path]) -> CorpusResolver:
     """
     base = Path(directory)
 
-    def resolve(ctx: RequestContext, name: str) -> Optional[CorpusSource]:
+    def resolve(ctx: RequestContext, name: str) -> CorpusSource | None:
         if not name or "/" in name or "\\" in name or name.startswith("."):
             return None
         path = (base / f"{name}.json")
@@ -419,7 +420,7 @@ class KnowledgeOperations:
             (jobs pass their own through ``register_operation_jobs``).
     """
 
-    def __init__(self, graph: GraphOperationsTool, corpus: Optional[CorpusAuditTool] = None, *,
+    def __init__(self, graph: GraphOperationsTool, corpus: CorpusAuditTool | None = None, *,
                  artifact_store: Any = None) -> None:
         if not isinstance(graph, GraphOperationsTool):
             raise TypeError("graph must be an operations.graph.GraphOperationsTool")
@@ -428,15 +429,15 @@ class KnowledgeOperations:
         self.graph = graph
         self.corpus = corpus
         self.artifact_store = artifact_store
-        suites: List[Any] = [graph] + ([corpus] if corpus is not None else [])
+        suites: list[Any] = [graph] + ([corpus] if corpus is not None else [])
         self._dispatch: OperationFn = operation_dispatch(*suites)
-        self._names: Tuple[str, ...] = tuple(n for s in suites for n in s.operation_names())
+        self._names: tuple[str, ...] = tuple(n for s in suites for n in s.operation_names())
 
     # -- construction helpers -----------------------------------------------------------------
 
     @classmethod
     def from_storage(cls, root: Union[str, Path], *, artifact_store: Any = None,
-                     graph_max_records: int = 500_000) -> "KnowledgeOperations":
+                     graph_max_records: int = 500_000) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` (graphs) and ``<root>/storage/terminology`` (corpora).
 
         The graph list is re-read on every call, so a graph added to ``storage/kg`` while the
@@ -451,7 +452,7 @@ class KnowledgeOperations:
     @classmethod
     def from_deployment(cls, settings: Any, environ: Any = None, root: Union[str, Path, None] = None, *,
                         artifact_store: Any = None, graph_max_records: int = 500_000,
-                        discovery_ttl: float = TILED_DISCOVERY_TTL) -> "KnowledgeOperations":
+                        discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` *and* the deployment's Tiled graphs (D3.17).
 
         Args:
@@ -481,10 +482,10 @@ class KnowledgeOperations:
         return cls(graph, corpus, artifact_store=artifact_store)
 
     @classmethod
-    def from_graph_files(cls, provider: GraphFilesProvider, *, corpus: Optional[CorpusAuditTool] = None,
+    def from_graph_files(cls, provider: GraphFilesProvider, *, corpus: CorpusAuditTool | None = None,
                          artifact_store: Any = None, graph_max_records: int = 500_000,
                          tiled: Union[Any, TiledBackendFactory, None] = None,
-                         discovery_ttl: float = TILED_DISCOVERY_TTL) -> "KnowledgeOperations":
+                         discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations following a caller-supplied graph selection (T25D: the active runtime's files).
 
         ``tiled`` (a Tiled GraphPort or a :data:`TiledBackendFactory`) adds the deployment's Tiled
@@ -498,25 +499,25 @@ class KnowledgeOperations:
 
     # -- agent runtime -------------------------------------------------------------------------
 
-    def operation_names(self) -> Tuple[str, ...]:
+    def operation_names(self) -> tuple[str, ...]:
         """Tool names this bundle serves."""
         return self._names
 
-    def specs(self) -> List[ToolSpec]:
+    def specs(self) -> list[ToolSpec]:
         """The Tool specs (graph suite first, then the corpus audit)."""
         out = list(self.graph.specs)
         if self.corpus is not None:
             out.append(self.corpus.spec)
         return out
 
-    def registrations(self) -> List[Tuple[ToolSpec, Callable[[Any], ToolResult]]]:
+    def registrations(self) -> list[tuple[ToolSpec, Callable[[Any], ToolResult]]]:
         """``(spec, fn)`` pairs for ``build_registry(extra=...)``."""
         out = list(self.graph.registrations())
         if self.corpus is not None:
             out.append(self.corpus.registration())
         return out
 
-    def skills(self) -> List[Any]:
+    def skills(self) -> list[Any]:
         """The skills covering the registered Tools."""
         out = [ANALYZE_KNOWLEDGE_GRAPH_SKILL]
         if self.corpus is not None:
@@ -531,7 +532,7 @@ class KnowledgeOperations:
         return self._dispatch
 
     def compute(self, ctx: RequestContext, operation: str, args: Mapping[str, Any],
-                control: Optional[ScanControl] = None) -> OperationReport:
+                control: ScanControl | None = None) -> OperationReport:
         """Run one operation by Tool name and return its full report.
 
         Raises:
@@ -544,7 +545,7 @@ class KnowledgeOperations:
         return self._dispatch(ctx, operation, dict(args), control)
 
     def result(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
-               control: Optional[ScanControl] = None, artifact_store: Any = None) -> ToolResult:
+               control: ScanControl | None = None, artifact_store: Any = None) -> ToolResult:
         """The bounded typed result of one operation: what the agent Tool returns for the same call.
 
         ``status`` is ``OK`` for a complete scan and ``PARTIAL`` for a stopped one; refusals and
@@ -572,15 +573,15 @@ class KnowledgeOperations:
 
 
 def knowledge_job_context(settings: Any, *, identity_port: Any = None,
-                          credential_lookup: Optional[Callable[[str], Any]] = None,
-                          clock: Optional[Callable[[], Any]] = None) -> Callable[[Any], RequestContext]:
+                          credential_lookup: Callable[[str], Any] | None = None,
+                          clock: Callable[[], Any] | None = None) -> Callable[[Any], RequestContext]:
     """``context_for_job`` for :func:`~.reports.register_operation_jobs` (trusted wiring).
 
     On ``:local`` the worker carries the local operator. On ALS it re-resolves the initiating
     subject's credential through ``credential_lookup(job.created_by)`` with a fresh role check;
     a missing or revoked credential is ``DENIED`` (the job fails closed, AUD-01).
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from ..contracts.context import ActorKind
     from ..security.authorization import local_operator_context, resolve_context, worker_context
@@ -593,24 +594,24 @@ def knowledge_job_context(settings: Any, *, identity_port: Any = None,
         if credential is None:
             raise ContractError(ErrorCode.DENIED, "the initiating subject has no live credential")
         ctx = resolve_context(settings, credential, request_id=job.job_id, identity_port=identity_port,
-                              clock=clock or (lambda: datetime.now(timezone.utc)), require_fresh=True)
+                              clock=clock or (lambda: datetime.now(UTC)), require_fresh=True)
         return worker_context(ctx, run_id=job.job_id)
 
     return context_for_job
 
 
-def job_params(operation: str, args: Mapping[str, Any]) -> Dict[str, Any]:
+def job_params(operation: str, args: Mapping[str, Any]) -> dict[str, Any]:
     """``inputs.params`` of a :data:`~.reports.OPERATION_JOB_KIND` job."""
     return {"operation": operation, "args": dict(args)}
 
 
-def job_scope(args: Mapping[str, Any]) -> Tuple[str, ...]:
+def job_scope(args: Mapping[str, Any]) -> tuple[str, ...]:
     """The corpora an operation job touches, derived from its arguments (graph ids, corpus name).
 
     This is the job's ``corpus_scope``: ``JobService`` checks it against the caller's scope on
     ALS exactly as ``graph.ports.require_scope`` checks each graph read (T19C).
     """
-    names: List[str] = []
+    names: list[str] = []
     for key in ("graph_id", "corpus"):
         value = args.get(key)
         if isinstance(value, str) and value and value not in names:
@@ -621,7 +622,7 @@ def job_scope(args: Mapping[str, Any]) -> Tuple[str, ...]:
     return tuple(names)
 
 
-__all__: Tuple[str, ...] = (
+__all__: tuple[str, ...] = (
     "CompositeGraphPort", "DynamicJsonGraphs", "KnowledgeOperations", "OPERATION_JOB_KIND", "READ_CAPABILITY",
     "TILED_DISCOVERY_MAX_SCAN", "TILED_DISCOVERY_TTL", "TiledBackendFactory", "directory_corpus_resolver",
     "job_params", "job_scope", "knowledge_job_context", "resolve_tiled_settings", "storage_graph_files",

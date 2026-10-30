@@ -26,15 +26,15 @@ malicious host code. Importing it has no side effects.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from enum import Enum
 import hashlib
 import hmac
 import secrets
 import threading
+from typing import Any, Callable, Iterable, TypeVar
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Any, Callable, FrozenSet, Iterable, Optional, TypeVar
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -84,7 +84,7 @@ class SourceAccessDenied(ContractError):
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -111,9 +111,9 @@ class InternalReadGrant:
     request_id: str
     subject: str
     purpose: ReadPurpose
-    kinds: FrozenSet[SourceKind]
-    corpus_scope: FrozenSet[str]
-    work_ids: FrozenSet[str]
+    kinds: frozenset[SourceKind]
+    corpus_scope: frozenset[str]
+    work_ids: frozenset[str]
     issued_at: datetime
     expires_at: datetime
     _seal: bytes = field(default=b"", repr=False, compare=False)
@@ -145,7 +145,7 @@ class SourceAccessAuthority:
     """
 
     def __init__(self, *, max_ttl: timedelta = timedelta(minutes=30),
-                 clock: Optional[Callable[[], datetime]] = None) -> None:
+                 clock: Callable[[], datetime] | None = None) -> None:
         self._key = secrets.token_bytes(32)
         self._max_ttl = max_ttl
         self._clock = clock or _now
@@ -166,7 +166,7 @@ class SourceAccessAuthority:
         kinds: Iterable[SourceKind],
         corpus_scope: Iterable[str] = (),
         work_ids: Iterable[str] = (),
-        ttl: Optional[timedelta] = None,
+        ttl: timedelta | None = None,
     ) -> InternalReadGrant:
         """Issue a grant for trusted service code acting on ``context``.
 
@@ -219,8 +219,8 @@ class SourceAccessAuthority:
         grant: Any,
         *,
         kind: SourceKind,
-        corpus: Optional[str] = None,
-        work_id: Optional[str] = None,
+        corpus: str | None = None,
+        work_id: str | None = None,
     ) -> None:
         """Raise unless ``grant`` authorizes reading ``kind`` for ``context``.
 
@@ -253,7 +253,7 @@ class SourceAccessAuthority:
             raise SourceAccessDenied("work outside grant scope")
 
     def is_authorized(self, context: Any, grant: Any, *, kind: SourceKind,
-                      corpus: Optional[str] = None, work_id: Optional[str] = None) -> bool:
+                      corpus: str | None = None, work_id: str | None = None) -> bool:
         """Boolean form of :meth:`check`."""
         try:
             self.check(context, grant, kind=kind, corpus=corpus, work_id=work_id)
@@ -261,7 +261,7 @@ class SourceAccessAuthority:
             return False
         return True
 
-    def scope(self, context: RequestContext, grant: InternalReadGrant) -> "SourceAccessScope":
+    def scope(self, context: RequestContext, grant: InternalReadGrant) -> SourceAccessScope:
         """Bind ``context`` and ``grant`` into a scope handed to internal tools."""
         if not isinstance(grant, InternalReadGrant):
             raise SourceAccessDenied("not a grant object")
@@ -306,17 +306,17 @@ class SourceAccessScope:
         """Purpose of the bound grant."""
         return self._grant.purpose
 
-    def require(self, kind: SourceKind, *, corpus: Optional[str] = None, work_id: Optional[str] = None) -> None:
+    def require(self, kind: SourceKind, *, corpus: str | None = None, work_id: str | None = None) -> None:
         """Raise :class:`SourceAccessDenied` unless the scope covers the read."""
         self._authority.check(self._context, self._grant, kind=kind, corpus=corpus, work_id=work_id)
 
-    def allows(self, kind: SourceKind, *, corpus: Optional[str] = None, work_id: Optional[str] = None) -> bool:
+    def allows(self, kind: SourceKind, *, corpus: str | None = None, work_id: str | None = None) -> bool:
         """Boolean form of :meth:`require`."""
         return self._authority.is_authorized(self._context, self._grant, kind=kind, corpus=corpus,
                                              work_id=work_id)
 
-    def read(self, kind: SourceKind, reader: Callable[[], T], *, corpus: Optional[str] = None,
-             work_id: Optional[str] = None) -> T:
+    def read(self, kind: SourceKind, reader: Callable[[], T], *, corpus: str | None = None,
+             work_id: str | None = None) -> T:
         """Check the grant, then run ``reader`` and return its result.
 
         Args:

@@ -18,9 +18,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_grouping.py (BSD-3-Clause
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Sequence, Set
+import math
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -42,11 +42,11 @@ class TermGroup:
 
     category: str
     representative: str
-    members: List[str] = field(default_factory=list)
+    members: list[str] = field(default_factory=list)
     min_similarity: float = 1.0
     auto_applicable: bool = True
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the group as a plain dict (similarity rounded to 4 places)."""
         return {
             "category": self.category,
@@ -57,7 +57,7 @@ class TermGroup:
         }
 
 
-def embedding_text(surface: str, snippets: Sequence[Dict[str, str]]) -> str:
+def embedding_text(surface: str, snippets: Sequence[dict[str, str]]) -> str:
     """Surface first, then up to three evidence snippets."""
     parts = [surface.strip()]
     for snippet in list(snippets)[:3]:
@@ -81,7 +81,7 @@ def estimate_matrix_bytes(n: int) -> int:
 
 def estimate_grouping_memory(
     n: int, dim: int, *, max_matrix_bytes: int = DEFAULT_MAX_MATRIX_BYTES
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Memory estimate a caller can show before running: mode, matrix bytes and vector bytes."""
     matrix = estimate_matrix_bytes(n)
     return {
@@ -94,7 +94,7 @@ def estimate_grouping_memory(
     }
 
 
-def _normalise(vectors: Sequence[Sequence[float]]) -> "np.ndarray":
+def _normalise(vectors: Sequence[Sequence[float]]) -> np.ndarray:
     matrix = np.asarray(vectors, dtype=np.float32)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms[norms == 0.0] = 1.0
@@ -102,13 +102,13 @@ def _normalise(vectors: Sequence[Sequence[float]]) -> "np.ndarray":
 
 
 def group_terms(
-    terms: Sequence[Dict[str, Any]],
+    terms: Sequence[dict[str, Any]],
     vectors: Sequence[Sequence[float]],
     *,
     threshold: float = DEFAULT_THRESHOLD,
     max_matrix_bytes: int = DEFAULT_MAX_MATRIX_BYTES,
     max_terms_per_category: int = DEFAULT_MAX_TERMS_PER_CATEGORY,
-) -> List[TermGroup]:
+) -> list[TermGroup]:
     """Group ``terms`` by vector similarity within each category.
 
     Raises:
@@ -117,10 +117,10 @@ def group_terms(
     """
     if len(terms) != len(vectors):
         raise ValueError(f"{len(terms)} terms and {len(vectors)} vectors; they are matched by position")
-    by_category: Dict[str, List[int]] = {}
+    by_category: dict[str, list[int]] = {}
     for index, term in enumerate(terms):
         by_category.setdefault(str(term.get("category") or "unknown"), []).append(index)
-    groups: List[TermGroup] = []
+    groups: list[TermGroup] = []
     for category, indices in sorted(by_category.items()):
         if len(indices) > max_terms_per_category:
             raise GroupingTooLarge(f"{category}: {len(indices)} terms > cap {max_terms_per_category}; block first")
@@ -128,7 +128,7 @@ def group_terms(
         unit = _normalise([vectors[i] for i in ordered])
         position = {index: row for row, index in enumerate(ordered)}
         full = unit @ unit.T if estimate_matrix_bytes(len(ordered)) <= max_matrix_bytes else None
-        taken: Set[int] = set()
+        taken: set[int] = set()
         for seed in ordered:
             if seed in taken:
                 continue
@@ -160,7 +160,7 @@ def group_terms(
     return groups
 
 
-def summarize(groups: Sequence[TermGroup]) -> Dict[str, Any]:
+def summarize(groups: Sequence[TermGroup]) -> dict[str, Any]:
     """Counts a reviewer can act on, split by whether a group may ever be applied."""
     applicable = [g for g in groups if g.auto_applicable]
     proposal = [g for g in groups if not g.auto_applicable]

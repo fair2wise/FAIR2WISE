@@ -43,13 +43,13 @@ still goes through the live whoami role check in ``resolve_context``.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 import hashlib
 import logging
 import secrets
 import threading
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -78,7 +78,7 @@ DEFAULT_MAX_SESSIONS = 10_000
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SignInFailed(Exception):
@@ -92,12 +92,12 @@ class _Session:
     """One signed-in browser session. Never serialized; ``repr`` hides the tokens."""
 
     access_token: str = field(repr=False)
-    refresh_token: Optional[str] = field(repr=False)
-    expires_at: Optional[datetime]
+    refresh_token: str | None = field(repr=False)
+    expires_at: datetime | None
     created_at: datetime
     #: Verified subject of the session once a request resolved it (``bind_subject``); workers
     #: look the session up by it (``credential_for_subject``). Never taken from request data.
-    subject: Optional[str] = None
+    subject: str | None = None
 
 
 class TiledSessionStore:
@@ -126,7 +126,7 @@ class TiledSessionStore:
         self._clock = clock
         self._timeout = timeout
         self._max = max_sessions
-        self._sessions: Dict[str, _Session] = {}
+        self._sessions: dict[str, _Session] = {}
         self._lock = threading.Lock()
 
     def __repr__(self) -> str:
@@ -146,7 +146,7 @@ class TiledSessionStore:
             raise ContractError(ErrorCode.UNAVAILABLE, f"Tiled sign-in service unavailable ({type(exc).__name__})",
                                 retryable=True) from None
 
-    def providers(self) -> List[Dict[str, str]]:
+    def providers(self) -> list[dict[str, str]]:
         """Return the advertised providers as ``[{"provider", "mode"}]`` (sign-in options)."""
         resp = self._call("get", ABOUT_PATH, headers={"Accept": "application/json"})
         try:
@@ -162,7 +162,7 @@ class TiledSessionStore:
                 out.append({"provider": item["provider"], "mode": str(item.get("mode") or "")})
         return out
 
-    def _tokens(self, resp: Any) -> Tuple[str, Optional[str], Optional[datetime]]:
+    def _tokens(self, resp: Any) -> tuple[str, str | None, datetime | None]:
         """Read ``access_token``/``refresh_token``/``expires_in`` from a Tiled token response."""
         try:
             body = resp.json()
@@ -209,7 +209,7 @@ class TiledSessionStore:
             self._sessions[self._key(token)] = _Session(access, refresh, expires_at, self._clock())
         return token
 
-    def get(self, session_token: str) -> Optional[TiledCredential]:
+    def get(self, session_token: str) -> TiledCredential | None:
         """Return the session's current credential, refreshing it when about to expire.
 
         Returns ``None`` for an unknown or signed-out session, or when Tiled refuses the
@@ -231,7 +231,7 @@ class TiledSessionStore:
                 return None
         return TiledCredential(sess.access_token, tiled_target=self.tiled_target, expires_at=sess.expires_at)
 
-    def _refresh(self, key: str, sess: _Session) -> Optional[_Session]:
+    def _refresh(self, key: str, sess: _Session) -> _Session | None:
         if not sess.refresh_token:
             self.drop(key)
             return None
@@ -262,7 +262,7 @@ class TiledSessionStore:
                 self._sessions[key] = _Session(sess.access_token, sess.refresh_token, sess.expires_at,
                                                sess.created_at, subject)
 
-    def credential_for_subject(self, subject: str) -> Optional[TiledCredential]:
+    def credential_for_subject(self, subject: str) -> TiledCredential | None:
         """The current credential of ``subject``'s newest live session, or ``None`` once signed out.
 
         This is the worker's ``credential_lookup`` (``JobAuthority``): a job keeps its authority
@@ -283,7 +283,7 @@ class TiledSessionStore:
             return TiledCredential(sess.access_token, tiled_target=self.tiled_target, expires_at=sess.expires_at)
         return None
 
-    def drop(self, key: str) -> Optional[_Session]:
+    def drop(self, key: str) -> _Session | None:
         """Forget a session by its store key."""
         with self._lock:
             return self._sessions.pop(key, None)
@@ -347,7 +347,7 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
                             path=store.cookie_path)
 
     @app.get("/auth/providers")
-    async def auth_providers() -> Dict[str, Any]:
+    async def auth_providers() -> dict[str, Any]:
         """Sign-in options, generated from the profile Tiled's advertised providers."""
         return {"providers": store.providers()}
 
@@ -388,7 +388,7 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
 
 
 def als_identity_wiring(settings: DeploymentSettings, http_client: Any = None, *, timeout: float = 5.0,
-                        **store_kwargs: Any) -> Tuple[TiledWhoamiAdapter, TiledSessionStore]:
+                        **store_kwargs: Any) -> tuple[TiledWhoamiAdapter, TiledSessionStore]:
     """Return the identity port and session store for an ALS deployment, both bound to its Tiled.
 
     Pass both to ``create_app(identity_port=..., credential_store=...)``. ``http_client``

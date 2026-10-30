@@ -18,7 +18,6 @@ turn; it can never grant one. Privileges always come from the server-built
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, FrozenSet, Optional
 
 from ..contracts import ADMIN_CAPABILITIES, CAPABILITIES, CHAT_CAPABILITIES, RequestContext
 
@@ -34,7 +33,7 @@ class CapabilityGroup:
     """
 
     name: str
-    capabilities: FrozenSet[str]
+    capabilities: frozenset[str]
     description: str = ""
 
     def __post_init__(self) -> None:
@@ -52,10 +51,10 @@ CURATOR = CapabilityGroup("curator",
 MAINTAINER = CapabilityGroup("maintainer", frozenset(CHAT_CAPABILITIES | ADMIN_CAPABILITIES),
                              "Every application capability the context already holds.")
 
-GROUPS: Dict[str, CapabilityGroup] = {g.name: g for g in (LITERATURE_READER, CURATOR, MAINTAINER)}
+GROUPS: dict[str, CapabilityGroup] = {g.name: g for g in (LITERATURE_READER, CURATOR, MAINTAINER)}
 
 
-def get_group(name: Optional[str]) -> Optional[CapabilityGroup]:
+def get_group(name: str | None) -> CapabilityGroup | None:
     """Return the named group, ``None`` for no narrowing.
 
     Raises:
@@ -69,7 +68,7 @@ def get_group(name: Optional[str]) -> Optional[CapabilityGroup]:
     return group
 
 
-def turn_capabilities(ctx: RequestContext, group: Optional[CapabilityGroup] = None) -> FrozenSet[str]:
+def turn_capabilities(ctx: RequestContext, group: CapabilityGroup | None = None) -> frozenset[str]:
     """Capabilities for one turn: the context's, intersected with ``group`` if given."""
     caps = frozenset(ctx.capabilities)
     return caps & group.capabilities if group is not None else caps

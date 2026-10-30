@@ -13,13 +13,13 @@ cache (network); a ``StructuralAuthority`` port may be supplied instead.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import re
+from typing import Any, Iterable, Protocol
 import unicodedata
 import uuid
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Protocol, Tuple
 
 from ..canonicalization.chemical_identity import canonical_smiles
 from ..canonicalization.growth import definitions
@@ -34,7 +34,7 @@ POLICY = "local-resolution-v1"
 class StructuralAuthority(Protocol):
     """Optional authority for molecular identity (for example a cached PubChem client)."""
 
-    def lookup(self, label: str) -> Optional[Dict[str, Any]]:
+    def lookup(self, label: str) -> dict[str, Any] | None:
         """Return ``{"smiles": ..., "source": ...}`` or ``None``."""
         ...
 
@@ -60,7 +60,7 @@ def _normal(value: str) -> str:
     return " ".join(value.split()).casefold()
 
 
-def terminology_group(case: Dict[str, Any], vocabulary: Vocabulary) -> str:
+def terminology_group(case: dict[str, Any], vocabulary: Vocabulary) -> str:
     """Group controlled aliases across papers for review; never merges verdicts."""
     payload = case["payload"]
     if case["case_type"] != "unresolved_term" or payload.get("category") == "material":
@@ -82,7 +82,7 @@ class LocalResolver:
         corpora: Iterable[str],
         *,
         settings: TriageSettings = TriageSettings(),
-        authority: Optional[StructuralAuthority] = None,
+        authority: StructuralAuthority | None = None,
     ) -> None:
         self.store = store
         self.vocabulary = vocabulary
@@ -91,7 +91,7 @@ class LocalResolver:
         self.authority = authority
         self.owner = f"local-{uuid.uuid4().hex}"
 
-    def _interpret(self, case: Dict[str, Any]) -> Tuple[str, str, bool]:
+    def _interpret(self, case: dict[str, Any]) -> tuple[str, str, bool]:
         """``(label, literal quote, defined_in_text)``; an empty quote means no literal support."""
         surface = str(case["payload"].get("surface") or "")
         evidence = case["evidence"]
@@ -109,7 +109,7 @@ class LocalResolver:
 
     def _accept(
         self,
-        case: Dict[str, Any],
+        case: dict[str, Any],
         token: str,
         label: str,
         quote: str,
@@ -117,7 +117,7 @@ class LocalResolver:
         route: Route,
         method: str,
         scope: str,
-        identity: Optional[Dict[str, Any]] = None,
+        identity: dict[str, Any] | None = None,
     ) -> None:
         if not quote or quote not in case["evidence"]:
             raise ValueError("local resolution requires a literal source quote")
@@ -155,7 +155,7 @@ class LocalResolver:
             self._triage(case)
         return len(cases)
 
-    def _triage(self, case: Dict[str, Any]) -> None:
+    def _triage(self, case: dict[str, Any]) -> None:
         token = case["lease_token"]
         group = terminology_group(case, self.vocabulary)
         model_route = self.settings.model_route
@@ -224,7 +224,7 @@ class LocalResolver:
             return 1
         explicit = re.fullmatch(r"smiles\s*:\s*(\S+)", label, re.I)
         smiles = canonical_smiles(explicit[1]) if explicit else None
-        result: Dict[str, Any] = {"smiles": smiles, "source": "explicit SMILES"} if smiles else {}
+        result: dict[str, Any] = {"smiles": smiles, "source": "explicit SMILES"} if smiles else {}
         if not result and self.authority is not None and not explicit:
             result = dict(self.authority.lookup(label) or {})
         if result and canonical_smiles(str(result.get("smiles") or "")):

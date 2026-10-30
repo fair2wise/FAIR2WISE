@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Sequence
 
 from .evidence import Evidence
 
@@ -70,7 +70,7 @@ class ContextBuilder:
             lit_budget = int(char_budget * 0.55)
             ops_budget = int(char_budget * 0.45)
 
-        parts: List[str] = []
+        parts: list[str] = []
         remaining = char_budget
         if kg_items:
             block = self._kg_index(kg_items)

@@ -26,7 +26,7 @@ Changed for F2W:
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Iterable, Sequence
 
 from langchain_core.messages import AIMessage, BaseMessage, RemoveMessage
 
@@ -43,7 +43,7 @@ _RESTORE_HINT = (
 )
 
 
-def media_placeholder(block: Dict[str, Any]) -> str:
+def media_placeholder(block: dict[str, Any]) -> str:
     """Render one dropped media block as text naming it and how to restore it."""
     kind = "image" if block.get("type") == "image" else "document"
     if "base64" in block:
@@ -63,7 +63,7 @@ def strip_media_from_content(content: Any) -> Any:
     """Replace media blocks with placeholders; returns ``content`` itself when unchanged."""
     if not isinstance(content, list) or not any(_is_media_block(b) for b in content):
         return content
-    parts: List[str] = []
+    parts: list[str] = []
     for block in content:
         if _is_media_block(block):
             parts.append(media_placeholder(block))
@@ -84,7 +84,7 @@ def current_turn_start(messages: Sequence[BaseMessage]) -> int:
     return 0
 
 
-def trim_stale_media(messages: Sequence[BaseMessage]) -> Tuple[List[BaseMessage], List[BaseMessage]]:
+def trim_stale_media(messages: Sequence[BaseMessage]) -> tuple[list[BaseMessage], list[BaseMessage]]:
     """Drop media from every message before the current turn.
 
     Returns:
@@ -92,8 +92,8 @@ def trim_stale_media(messages: Sequence[BaseMessage]) -> Tuple[List[BaseMessage]
         id-less messages (trimmed for the model only).
     """
     boundary = current_turn_start(messages)
-    for_model: List[BaseMessage] = list(messages)
-    replacements: List[BaseMessage] = []
+    for_model: list[BaseMessage] = list(messages)
+    replacements: list[BaseMessage] = []
     for index in range(boundary):
         message = messages[index]
         trimmed = strip_media_from_content(message.content)
@@ -106,7 +106,7 @@ def trim_stale_media(messages: Sequence[BaseMessage]) -> Tuple[List[BaseMessage]
     return for_model, replacements
 
 
-def _kept_references(content: str) -> Dict[str, List[str]]:
+def _kept_references(content: str) -> dict[str, list[str]]:
     try:
         payload = json.loads(content)
     except (TypeError, ValueError):
@@ -123,7 +123,7 @@ def _kept_references(content: str) -> Dict[str, List[str]]:
 
 def _tool_result_stub(message: BaseMessage, content: str) -> str:
     name = getattr(message, "name", None) or "a tool"
-    stub: Dict[str, Any] = {
+    stub: dict[str, Any] = {
         "trimmed": True,
         "note": (f"{name}'s output from an earlier turn was dropped to fit the context window "
                  f"({len(content):,} characters). Call it again if you still need it."),
@@ -134,14 +134,14 @@ def _tool_result_stub(message: BaseMessage, content: str) -> str:
 
 def trim_stale_tool_results(
     messages: Sequence[BaseMessage], *, budget_chars: int = STALE_TOOL_RESULT_BUDGET_CHARS,
-) -> Tuple[List[BaseMessage], List[BaseMessage]]:
+) -> tuple[list[BaseMessage], list[BaseMessage]]:
     """Stub stale tool output beyond ``budget_chars``, newest kept first; current turn untouched.
 
     Stubs keep evidence IDs and artifact refs; ``ToolMessage.artifact`` is preserved.
     """
     boundary = current_turn_start(messages)
-    for_model: List[BaseMessage] = list(messages)
-    replacements: List[BaseMessage] = []
+    for_model: list[BaseMessage] = list(messages)
+    replacements: list[BaseMessage] = []
     spent = 0
     for index in range(boundary - 1, -1, -1):
         message = messages[index]
@@ -173,7 +173,7 @@ def _text_of(content: Any) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def _describe_call(call: Dict[str, Any]) -> str:
+def _describe_call(call: dict[str, Any]) -> str:
     args = json.dumps(call.get("args", {}), sort_keys=True, default=str)
     if len(args) > _ORPHAN_ARGS_CAP_CHARS:
         args = args[: _ORPHAN_ARGS_CAP_CHARS - 3] + "..."
@@ -182,7 +182,7 @@ def _describe_call(call: Dict[str, Any]) -> str:
 
 def repair_orphaned_tool_calls(
     messages: Sequence[BaseMessage], *, keep_pending_ids: Iterable[str] = (),
-) -> Tuple[List[BaseMessage], List[BaseMessage]]:
+) -> tuple[list[BaseMessage], list[BaseMessage]]:
     """Rewrite every AI tool call that never got a result so the model can be called.
 
     The rebuilt message keeps its id and text and every answered call; unanswered
@@ -191,8 +191,8 @@ def repair_orphaned_tool_calls(
     """
     answered = {getattr(m, "tool_call_id", None) for m in messages if getattr(m, "type", None) == "tool"}
     pending = set(keep_pending_ids)
-    for_model: List[BaseMessage] = list(messages)
-    replacements: List[BaseMessage] = []
+    for_model: list[BaseMessage] = list(messages)
+    replacements: list[BaseMessage] = []
     for index, message in enumerate(messages):
         if not isinstance(message, AIMessage) or not message.tool_calls:
             continue
@@ -213,7 +213,7 @@ def repair_orphaned_tool_calls(
 
 def drop_orphaned_tool_results(
     messages: Sequence[BaseMessage],
-) -> Tuple[List[BaseMessage], List[BaseMessage]]:
+) -> tuple[list[BaseMessage], list[BaseMessage]]:
     """Remove tool results whose originating call is absent.
 
     Returns:
@@ -221,8 +221,8 @@ def drop_orphaned_tool_results(
         ``RemoveMessage`` entries for those that have an id.
     """
     called = {c.get("id") for m in messages if isinstance(m, AIMessage) for c in (m.tool_calls or [])}
-    for_model: List[BaseMessage] = []
-    removals: List[BaseMessage] = []
+    for_model: list[BaseMessage] = []
+    removals: list[BaseMessage] = []
     for message in messages:
         if getattr(message, "type", None) == "tool" and getattr(message, "tool_call_id", None) not in called:
             if message.id is not None:
@@ -242,14 +242,14 @@ def count_media_blocks(messages: Iterable[BaseMessage]) -> int:
 
 def prepare_for_model(
     messages: Sequence[BaseMessage], *, budget_chars: int = STALE_TOOL_RESULT_BUDGET_CHARS,
-) -> Tuple[List[BaseMessage], List[BaseMessage]]:
+) -> tuple[list[BaseMessage], list[BaseMessage]]:
     """Apply every repair and trim in the donor's order; returns ``(for_model, state_updates)``."""
     for_model, updates = repair_orphaned_tool_calls(messages)
     for_model, removals = drop_orphaned_tool_results(for_model)
     updates.extend(removals)
     for_model, media = trim_stale_media(for_model)
     for_model, text = trim_stale_tool_results(for_model, budget_chars=budget_chars)
-    by_id: Dict[Any, BaseMessage] = {}
+    by_id: dict[Any, BaseMessage] = {}
     for message in [*updates, *media, *text]:
         by_id[message.id] = message
     return for_model, list(by_id.values())

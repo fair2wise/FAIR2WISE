@@ -28,16 +28,16 @@ talks to Git; snapshot creation does not import it for that purpose and calls no
 """
 from __future__ import annotations
 
+from collections import Counter
+from dataclasses import dataclass, field
 import hashlib
 import json
 import math
 import os
+from pathlib import Path
 import re
 import subprocess
-from collections import Counter
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Collection, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Collection, Iterable, Iterator, Mapping, Sequence
 
 from .snapshot_manifest import CORPUS_RE, KGManifest, parse_manifest
 
@@ -114,9 +114,9 @@ class Finding:
     severity: str  # "reject" or "review"
     location: str
     detail: str
-    allowlist_key: Optional[str] = None
+    allowlist_key: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {"rule": self.rule, "severity": self.severity, "location": self.location,
                 "detail": self.detail, "allowlist_key": self.allowlist_key}
@@ -128,16 +128,16 @@ class DisclosureReport:
 
     check_version: str
     status: str  # pass | fail | owner_waiver
-    findings: List[Finding] = field(default_factory=list)
-    snippet_volume: Dict[str, Any] = field(default_factory=dict)
-    waiver_ref: Optional[str] = None
+    findings: list[Finding] = field(default_factory=list)
+    snippet_volume: dict[str, Any] = field(default_factory=dict)
+    waiver_ref: str | None = None
 
     @property
     def commit_ready(self) -> bool:
         """True when no unwaived reject/review finding remains."""
         return self.status in ("pass", "owner_waiver")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready body."""
         return {
             "check_version": self.check_version, "status": self.status, "waiver_ref": self.waiver_ref,
@@ -156,9 +156,9 @@ class DisclosureReport:
         return sha256_bytes(self.canonical_bytes())
 
 
-def check_paths(paths: Iterable[str]) -> List[Finding]:
+def check_paths(paths: Iterable[str]) -> list[Finding]:
     """R1: only ``storage/kg/<corpus>/v<N>/{graph,manifest,validation}.json`` and the flat copy are allowed."""
-    findings: List[Finding] = []
+    findings: list[Finding] = []
     for raw in paths:
         path = str(raw).replace("\\", "/")
         if _SNAPSHOT_FILE.match(path) or _FLAT_FILE.match(path):
@@ -170,7 +170,7 @@ def check_paths(paths: Iterable[str]) -> List[Finding]:
     return findings
 
 
-def _walk(value: Any, where: str) -> Iterator[Tuple[str, str]]:
+def _walk(value: Any, where: str) -> Iterator[tuple[str, str]]:
     """Yield ``(location, string)`` for every string in a JSON value."""
     if isinstance(value, str):
         yield where, value
@@ -182,7 +182,7 @@ def _walk(value: Any, where: str) -> Iterator[Tuple[str, str]]:
             yield from _walk(item, f"{where}[{index}]")
 
 
-def _records(graph: Mapping[str, Any]) -> Iterator[Tuple[str, str, Any]]:
+def _records(graph: Mapping[str, Any]) -> Iterator[tuple[str, str, Any]]:
     """``(record id, field, value)`` for every node and edge field."""
     nodes = graph.get("things") if "things" in graph else graph.get("nodes")
     edges = graph.get("associations") if "associations" in graph else graph.get("edges")
@@ -201,11 +201,11 @@ def _records(graph: Mapping[str, Any]) -> Iterator[Tuple[str, str, Any]]:
             yield "metadata", str(key), value
 
 
-def _snippet_volume(graph: Mapping[str, Any]) -> Dict[str, Any]:
+def _snippet_volume(graph: Mapping[str, Any]) -> dict[str, Any]:
     """R6 statistics: lengths of snippet-like values, per value and per source paper. Information only."""
     nodes = graph.get("things") if "things" in graph else graph.get("nodes")
-    per_paper: Dict[str, int] = {}
-    lengths: List[int] = []
+    per_paper: dict[str, int] = {}
+    lengths: list[int] = []
     for node in nodes or []:
         if not isinstance(node, Mapping):
             continue
@@ -225,9 +225,9 @@ def _snippet_volume(graph: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _string_findings(location: str, text: str, key: Optional[str]) -> List[Finding]:
+def _string_findings(location: str, text: str, key: str | None) -> list[Finding]:
     """R3/R4/R5 findings for one string value (the value itself is never stored)."""
-    found: List[Finding] = []
+    found: list[Finding] = []
     hit = False
     for name, pattern in _SECRET_PATTERNS:
         if pattern.search(text):
@@ -251,7 +251,7 @@ def check_disclosure(
     *,
     paths: Sequence[str] = (),
     allowlist: Collection[str] = frozenset(),
-    waiver_ref: Optional[str] = None,
+    waiver_ref: str | None = None,
 ) -> DisclosureReport:
     """Commit-ready disclosure check of one graph payload (R1, R3-R7). The payload is only read.
 
@@ -261,7 +261,7 @@ def check_disclosure(
         allowlist: Reviewed R3/R4 exceptions as :func:`allowlist_key` values.
         waiver_ref: Owner waiver reference; turns a failing status into ``owner_waiver``.
     """
-    findings: List[Finding] = list(check_paths(paths))
+    findings: list[Finding] = list(check_paths(paths))
     for record_id, field_name, value in _records(graph):
         if field_name in _BODY_FIELDS and isinstance(value, str) and value.strip():
             findings.append(Finding("R7", "reject", f"{record_id}:{field_name}",
@@ -291,7 +291,7 @@ class VerifiedSnapshot:
     graph_bytes: bytes
     graph_sha256: str
     manifest_sha256: str
-    compat_paths: Tuple[str, ...]
+    compat_paths: tuple[str, ...]
 
 
 def _read(path: Path, what: str) -> bytes:
@@ -301,7 +301,7 @@ def _read(path: Path, what: str) -> bytes:
         raise ReleaseVerificationError("missing", f"{what} is unreadable: {exc.strerror}") from None
 
 
-def _graph_counts(blob: bytes) -> Tuple[int, int]:
+def _graph_counts(blob: bytes) -> tuple[int, int]:
     try:
         data = json.loads(blob.decode("utf-8"))
         nodes = data.get("things") if "things" in data else data.get("nodes")
@@ -345,7 +345,7 @@ def verify_snapshot_dir(snapshot_dir: Path) -> VerifiedSnapshot:
         report = _read(snapshot_dir / "validation.json", "validation.json")
         if sha256_bytes(report) != manifest.validation.report_sha256:
             raise ReleaseVerificationError("tampered", "validation.json no longer matches the manifest")
-    compat: List[str] = []
+    compat: list[str] = []
     for item in manifest.compat_paths or []:
         flat = snapshot_dir.parents[1] / Path(item.path).name
         if flat.is_symlink() or not flat.is_file():
@@ -369,7 +369,7 @@ GIT_READ_ONLY_COMMANDS = frozenset({"cat-file", "ls-tree", "rev-parse", "status"
                                     "ls-files"})
 
 
-def _git(repo: Path, *args: str, stdin: Optional[bytes] = None, ok_codes: Tuple[int, ...] = (0,)) -> bytes:
+def _git(repo: Path, *args: str, stdin: bytes | None = None, ok_codes: tuple[int, ...] = (0,)) -> bytes:
     """Run a read-only ``git -C <repo> ...`` with an argument list (no shell) and a scrubbed environment.
 
     Raises:
@@ -406,7 +406,7 @@ class VerifiedArtifact:
 
 
 def verify_git_artifact(repo: Path, commit: str, path: str, sha256: str,
-                        *, git_blob: Optional[str] = None) -> VerifiedArtifact:
+                        *, git_blob: str | None = None) -> VerifiedArtifact:
     """Read ``path`` at ``commit`` and require its bytes to hash to ``sha256``.
 
     Raises:
@@ -445,8 +445,8 @@ class VerifiedRelease:
     manifest: KGManifest
     graph: VerifiedArtifact
     manifest_artifact: VerifiedArtifact
-    compat: Tuple[VerifiedArtifact, ...]
-    validation: Optional[VerifiedArtifact] = None
+    compat: tuple[VerifiedArtifact, ...]
+    validation: VerifiedArtifact | None = None
 
 
 def verify_git_release(
@@ -454,7 +454,7 @@ def verify_git_release(
     data_commit: str,
     artifacts: Sequence[Mapping[str, Any]],
     *,
-    supported_schema_fingerprints: Optional[Collection[str]] = None,
+    supported_schema_fingerprints: Collection[str] | None = None,
 ) -> VerifiedRelease:
     """Verify a release selection ``(data_commit, path, sha256)`` for graph, manifest and flat copies.
 
@@ -470,14 +470,14 @@ def verify_git_release(
     Raises:
         ReleaseVerificationError: any hash, blob, manifest, layout or compat mismatch.
     """
-    by_role: Dict[str, List[Mapping[str, Any]]] = {}
+    by_role: dict[str, list[Mapping[str, Any]]] = {}
     for item in artifacts:
         by_role.setdefault(str(item.get("role")), []).append(item)
     if len(by_role.get("graph", [])) != 1 or len(by_role.get("manifest", [])) != 1:
         raise ReleaseVerificationError("layout", "exactly one graph and one manifest artifact are required")
     if set(by_role) - {"graph", "manifest", "validation", "compat_copy"} or len(by_role.get("validation", [])) > 1:
         raise ReleaseVerificationError("layout", "unsupported artifact role")
-    loaded: Dict[str, List[VerifiedArtifact]] = {}
+    loaded: dict[str, list[VerifiedArtifact]] = {}
     for role, items in by_role.items():
         for item in items:
             loaded.setdefault(role, []).append(verify_git_artifact(
@@ -561,7 +561,7 @@ def canonical_json_bytes(doc: Any) -> bytes:
     return (json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
 
 
-def _nul_split(blob: bytes) -> List[str]:
+def _nul_split(blob: bytes) -> list[str]:
     return [part.decode("utf-8", "surrogateescape") for part in blob.split(b"\0") if part]
 
 
@@ -576,7 +576,7 @@ def _object_format(repo: Path) -> str:
     return fmt or "sha1"
 
 
-def _head(repo: Path) -> Optional[str]:
+def _head(repo: Path) -> str | None:
     out = _git(repo, "rev-parse", "-q", "--verify", "HEAD^{commit}", ok_codes=(0, 1)).decode().strip()
     return out or None
 
@@ -594,11 +594,11 @@ def _repo_root(repo: Path) -> Path:
     return repo
 
 
-def _tree_blobs(repo: Path, commit: Optional[str], paths: Sequence[str]) -> Dict[str, Tuple[str, str]]:
+def _tree_blobs(repo: Path, commit: str | None, paths: Sequence[str]) -> dict[str, tuple[str, str]]:
     """``path -> (mode, blob)`` for regular entries of ``paths`` at ``commit`` (empty when no commit)."""
     if not commit or not paths:
         return {}
-    out: Dict[str, Tuple[str, str]] = {}
+    out: dict[str, tuple[str, str]] = {}
     for entry in _nul_split(_git(repo, "ls-tree", "-z", commit, "--", *paths)):
         meta, _, name = entry.partition("\t")
         mode, kind, blob = meta.split(" ")
@@ -606,8 +606,8 @@ def _tree_blobs(repo: Path, commit: Optional[str], paths: Sequence[str]) -> Dict
     return out
 
 
-def _index_blobs(repo: Path, paths: Sequence[str]) -> Dict[str, str]:
-    out: Dict[str, str] = {}
+def _index_blobs(repo: Path, paths: Sequence[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
     for entry in _nul_split(_git(repo, "ls-files", "-s", "-z", "--", *paths)):
         meta, _, name = entry.partition("\t")
         out[name] = meta.split(" ")[1]
@@ -628,7 +628,7 @@ def _ignored(repo: Path, paths: Sequence[str]) -> set:
 
 
 def check_worktree(repo: Path, candidate: Mapping[str, bytes], *, object_format: str,
-                   allow_untracked: bool = False) -> Dict[str, Any]:
+                   allow_untracked: bool = False) -> dict[str, Any]:
     """Git preflight for a commit candidate (``candidate`` maps repo paths to the tested bytes).
 
     Refusals: ``dirty_worktree`` (any staged, modified, deleted, renamed or conflicted path outside the candidate,
@@ -640,7 +640,7 @@ def check_worktree(repo: Path, candidate: Mapping[str, bytes], *, object_format:
     paths = sorted(candidate)
     head = _head(repo)
     entries = _nul_split(_git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"))
-    dirty: List[str] = []
+    dirty: list[str] = []
     untracked_outside = 0
     for entry in entries:
         code, path = entry[:2], entry[3:]
@@ -659,7 +659,7 @@ def check_worktree(repo: Path, candidate: Mapping[str, bytes], *, object_format:
                              f"{dirty[0]}); commit or stash them first so only the tested files are committed")
     committed = _tree_blobs(repo, head, paths)
     staged = _index_blobs(repo, paths)
-    already: List[str] = []
+    already: list[str] = []
     for path in paths:
         blob = git_blob_id(candidate[path], object_format)
         if path in committed:
@@ -690,7 +690,7 @@ _CROP_FIELDS = frozenset({"crop", "crops", "crop_path", "crop_url", "crop_ref", 
 _DATA_IMAGE = re.compile(r"(?i)\bdata:image/")
 
 
-def _walk_keys(value: Any, where: str) -> Iterator[Tuple[str, str, Any]]:
+def _walk_keys(value: Any, where: str) -> Iterator[tuple[str, str, Any]]:
     """``(location, key, value)`` for every mapping entry at any depth."""
     if isinstance(value, Mapping):
         for key, item in value.items():
@@ -702,7 +702,7 @@ def _walk_keys(value: Any, where: str) -> Iterator[Tuple[str, str, Any]]:
             yield from _walk_keys(item, f"{where}[{index}]")
 
 
-def _path_tokens(text: str) -> List[str]:
+def _path_tokens(text: str) -> list[str]:
     out = []
     for match in _PATH_TOKEN.finditer(text):
         token = match.group(1).rstrip(".,;:)]}'\"")
@@ -715,9 +715,9 @@ def _is_parsed_package(path: str) -> bool:
     return "/parsed/" in f"/{path}" or path.endswith("/paper.json") or path.endswith(".parsed.json")
 
 
-def _manifest_refs(manifest: KGManifest) -> List[Tuple[str, str]]:
+def _manifest_refs(manifest: KGManifest) -> list[tuple[str, str]]:
     """``(location, ref)`` of every repository reference a manifest makes."""
-    refs: List[Tuple[str, str]] = [("schema.path", manifest.schema_block.path)]
+    refs: list[tuple[str, str]] = [("schema.path", manifest.schema_block.path)]
     refs += [(f"inputs[{i}].ref", item.ref) for i, item in enumerate(manifest.inputs)]
     if manifest.corpus_revision.source_list_ref:
         refs.append(("corpus_revision.source_list_ref", manifest.corpus_revision.source_list_ref))
@@ -734,7 +734,7 @@ def check_private_dependencies(
     *,
     candidate_paths: Collection[str],
     allowlist: Collection[str] = frozenset(),
-) -> List[Finding]:
+) -> list[Finding]:
     """Refuse dependencies on material that must stay out of Git (task T26B; release_contract.md section 4).
 
     Rules (all ``reject``):
@@ -751,8 +751,8 @@ def check_private_dependencies(
 
     Values are never echoed; a finding names the record, field and rule only.
     """
-    findings: List[Finding] = []
-    graph_tokens: Dict[str, str] = {}
+    findings: list[Finding] = []
+    graph_tokens: dict[str, str] = {}
     for record_id, field_name, value in _records(graph):
         for where, key, item in [(field_name, field_name, value)] + list(_walk_keys(value, field_name)):
             if key in _CROP_FIELDS and item not in (None, "", [], {}):
@@ -801,7 +801,7 @@ def check_private_dependencies(
 
 
 def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mapping[str, Any], *,
-                         allow_pending_review_schema: bool = False) -> Dict[str, Any]:
+                         allow_pending_review_schema: bool = False) -> dict[str, Any]:
     """Check that the manifest's schema block binds to a schema of the repository.
 
     The block must name a selectable schema of the repository, by path, bytes and closure
@@ -864,11 +864,11 @@ _PRIVATE_REF = re.compile(r"^private:(?!.*\.\.)[A-Za-z0-9._:/-]+$")
 class EvidenceReport:
     """Path-free availability of every evidence locator and required private asset (hash in the record)."""
 
-    sources: List[Dict[str, Any]]
+    sources: list[dict[str, Any]]
     unlocated_snippets: int
 
     @property
-    def counts(self) -> Dict[str, int]:
+    def counts(self) -> dict[str, int]:
         """Sources by status."""
         return dict(sorted(Counter(s["status"] for s in self.sources).items()))
 
@@ -884,12 +884,12 @@ class EvidenceReport:
         return "incomplete" if any(s["status"] == "unavailable" for s in self.sources) else "complete"
 
     @property
-    def required_unavailable(self) -> List[str]:
+    def required_unavailable(self) -> list[str]:
         """Required private assets that are not available (they block promotion)."""
         return sorted(str(s["ref"] or s["source"]) for s in self.sources
                       if s["required"] and s["status"] != "available")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready body."""
         return {"report_kind": "f2w.kg_evidence_availability", "check_version": EVIDENCE_CHECK_VERSION,
                 "status": self.status, "counts": self.counts, "unlocated_snippets": self.unlocated_snippets,
@@ -901,7 +901,7 @@ class EvidenceReport:
         return sha256_bytes(canonical_json_bytes(self.to_dict()))
 
 
-def _locators(graph: Mapping[str, Any]) -> Tuple[Counter, int]:
+def _locators(graph: Mapping[str, Any]) -> tuple[Counter, int]:
     """Locator counts per source id, and the number of snippets that carry no source."""
     counts: Counter = Counter()
     unlocated = 0
@@ -928,7 +928,7 @@ def _locators(graph: Mapping[str, Any]) -> Tuple[Counter, int]:
     return counts, unlocated
 
 
-def _asset_status(ref: Any, sha256: Any, evidence_root: Optional[Path]) -> Tuple[str, Optional[str]]:
+def _asset_status(ref: Any, sha256: Any, evidence_root: Path | None) -> tuple[str, str | None]:
     if not isinstance(ref, str) or not _PRIVATE_REF.match(ref) or not isinstance(sha256, str) or not _SHA256.match(
             sha256):
         return "invalid", "inventory_entry_needs_private_ref_and_sha256"
@@ -948,12 +948,12 @@ def _asset_status(ref: Any, sha256: Any, evidence_root: Optional[Path]) -> Tuple
 
 
 def check_evidence_availability(
-    repo: Optional[Path],
+    repo: Path | None,
     graph: Mapping[str, Any],
     manifest: KGManifest,
     *,
-    inventory: Optional[Mapping[str, Any]] = None,
-    evidence_root: Optional[Path] = None,
+    inventory: Mapping[str, Any] | None = None,
+    evidence_root: Path | None = None,
 ) -> EvidenceReport:
     """Resolve every evidence locator or record it as unavailable; nothing is fetched or rebuilt.
 
@@ -977,9 +977,9 @@ def check_evidence_availability(
     entries = dict((inventory or {}).get("sources") or {})
     repo_like = [s for s in counts if "/" in s and not _WEB_SOURCE.match(s) and _REPO_PATH.match(s)]
     tracked = _tracked(repo, repo_like) if repo is not None and repo_like else set()
-    sources: List[Dict[str, Any]] = []
+    sources: list[dict[str, Any]] = []
     for source in sorted(counts):
-        row: Dict[str, Any] = {"source": source, "locators": counts[source], "required": False, "ref": None,
+        row: dict[str, Any] = {"source": source, "locators": counts[source], "required": False, "ref": None,
                                "sha256": None}
         if source in tracked:
             row.update(kind="repository", status="available", reason=None, ref=source)
@@ -1005,9 +1005,9 @@ def check_evidence_availability(
     return EvidenceReport(sources, unlocated)
 
 
-def verify_release_dependencies(repo: Optional[Path], graph: Mapping[str, Any], manifest: KGManifest, *,
-                                inventory: Optional[Mapping[str, Any]] = None,
-                                evidence_root: Optional[Path] = None) -> EvidenceReport:
+def verify_release_dependencies(repo: Path | None, graph: Mapping[str, Any], manifest: KGManifest, *,
+                                inventory: Mapping[str, Any] | None = None,
+                                evidence_root: Path | None = None) -> EvidenceReport:
     """Promotion-time dependency gate: required private assets must be present with the pinned bytes.
 
     Raises:
@@ -1034,21 +1034,21 @@ class BinaryReportBinding:
     sha256: str
     ref: str
     suite: str
-    manifest_sha256: Optional[str]
-    runner_revision: Optional[str]
+    manifest_sha256: str | None
+    runner_revision: str | None
     gate_status: str
     verdict: str
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     subject: Mapping[str, Any]
-    source_commit: Optional[str]
-    source_dirty: Optional[bool]
+    source_commit: str | None
+    source_dirty: bool | None
 
     @property
     def passed(self) -> bool:
         """True only for a PASS verdict (PROVISIONAL and NOT_PASS are not passes)."""
         return self.verdict == "PASS"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form for the release record."""
         return {"sha256": self.sha256, "ref": self.ref, "suite": self.suite,
                 "manifest_sha256": self.manifest_sha256,
@@ -1134,7 +1134,7 @@ class CandidateArtifact:
     size_bytes: int
     git_blob: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Record form."""
         return {"role": self.role, "path": self.path, "sha256": self.sha256, "size_bytes": self.size_bytes,
                 "git_blob": self.git_blob}
@@ -1145,7 +1145,7 @@ class CommitCandidate:
     """A snapshot that passed every commit-ready check."""
 
     manifest: KGManifest
-    artifacts: Tuple[CandidateArtifact, ...]
+    artifacts: tuple[CandidateArtifact, ...]
     schema: Mapping[str, Any]
     disclosure: DisclosureReport
     evidence: EvidenceReport
@@ -1158,7 +1158,7 @@ class CommitCandidate:
         return f"{self.manifest.corpus}-{self.manifest.snapshot_id}-{self.manifest.graph.sha256[:12]}"
 
     @property
-    def paths(self) -> List[str]:
+    def paths(self) -> list[str]:
         """Repository paths the owner commits."""
         return [a.path for a in self.artifacts]
 
@@ -1169,8 +1169,8 @@ def validate_commit_candidate(
     *,
     binary_report: bytes,
     binary_report_ref: str,
-    evidence_inventory: Optional[Mapping[str, Any]] = None,
-    evidence_root: Optional[Path] = None,
+    evidence_inventory: Mapping[str, Any] | None = None,
+    evidence_root: Path | None = None,
     allowlist: Collection[str] = frozenset(),
     allow_pending_review_schema: bool = False,
     allow_untracked: bool = False,
@@ -1247,7 +1247,7 @@ def validate_commit_candidate(
 _REPOSITORY = re.compile(r"^[A-Za-z0-9.-]+(?:/[A-Za-z0-9._-]+)+$")
 
 
-def owner_commands(candidate: CommitCandidate, record_name: str, repository: str) -> List[str]:
+def owner_commands(candidate: CommitCandidate, record_name: str, repository: str) -> list[str]:
     """Return the exact commands the owner runs from the repository root.
 
     Nothing runs them automatically, and there is deliberately no push: publishing the branch is a
@@ -1268,7 +1268,7 @@ def owner_commands(candidate: CommitCandidate, record_name: str, repository: str
     ]
 
 
-def build_release_record(candidate: CommitCandidate, *, record_name: str, repository: str) -> Dict[str, Any]:
+def build_release_record(candidate: CommitCandidate, *, record_name: str, repository: str) -> dict[str, Any]:
     """The tested-release record (``f2w.kg_tested_release`` v1), written BEFORE the commit exists.
 
     It names the tested bytes (path, sha256, expected Git blob), the checks they passed and the binary report and
@@ -1312,7 +1312,7 @@ def build_release_record(candidate: CommitCandidate, *, record_name: str, reposi
 _RECORD_ROLES = ("graph", "manifest", "validation", "compat_copy")
 
 
-def parse_release_record(data: bytes) -> Dict[str, Any]:
+def parse_release_record(data: bytes) -> dict[str, Any]:
     """Load and shape-check a tested-release record."""
     try:
         record = json.loads(data.decode("utf-8"))
@@ -1342,7 +1342,7 @@ class CommittedRelease:
     data_commit: str
     record: Mapping[str, Any]
     release: VerifiedRelease
-    artifacts: Tuple[VerifiedArtifact, ...]
+    artifacts: tuple[VerifiedArtifact, ...]
 
 
 def verify_snapshot_selection(repo: Path, record: Mapping[str, Any], data_commit: str) -> CommittedRelease:
@@ -1360,7 +1360,7 @@ def verify_snapshot_selection(repo: Path, record: Mapping[str, Any], data_commit
     record = parse_release_record(canonical_json_bytes(record))
     if (record.get("git") or {}).get("object_format", "sha1") != _object_format(repo):
         raise ReleaseRefused("object_format_mismatch", "the repository uses a different Git object format")
-    loaded: List[VerifiedArtifact] = []
+    loaded: list[VerifiedArtifact] = []
     for item in record["artifacts"]:
         try:
             loaded.append(verify_git_artifact(repo, data_commit, item["path"], item["sha256"],
@@ -1388,7 +1388,7 @@ def verify_snapshot_selection(repo: Path, record: Mapping[str, Any], data_commit
 
 
 def build_data_release_descriptor(committed: CommittedRelease, *, importer_name: str,
-                                  importer_version: str) -> Dict[str, Any]:
+                                  importer_version: str) -> dict[str, Any]:
     """T26A data-release descriptor (``schemas/data_release_descriptor.schema.json``), state ``candidate``.
 
     Created only after the commit exists and verified equal to the tested bytes. ``staging.binary_report.passed``
@@ -1458,7 +1458,7 @@ def lookup_snapshot(repo: Path, data_commit: str, corpus: str, snapshot_id: str)
 
 
 def export_snapshot_selection(repo: Path, data_commit: str, artifacts: Sequence[Mapping[str, Any]],
-                              dest_root: Path) -> List[Dict[str, Any]]:
+                              dest_root: Path) -> list[dict[str, Any]]:
     """Export pinned artifacts from ``data_commit`` to ``dest_root/<path>`` (a mount), byte for byte.
 
     The selection is verified first (:func:`verify_git_release`); each file is created exclusively, synced and
@@ -1477,7 +1477,7 @@ def export_snapshot_selection(repo: Path, data_commit: str, artifacts: Sequence[
         raise ReleaseVerificationError("export_conflict", "the export root is a symlink")
     root.mkdir(parents=True, exist_ok=True)
     root = root.resolve()
-    done: List[Dict[str, Any]] = []
+    done: list[dict[str, Any]] = []
     for art in chosen:
         target = root.joinpath(*art.path.split("/"))
         for parent in [target, *target.parents]:

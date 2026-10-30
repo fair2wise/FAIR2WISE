@@ -31,10 +31,10 @@ import contextlib
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import time
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -86,11 +86,11 @@ def save_package(
     source_ref: str,
     parse_record: Mapping[str, Any],
     pipeline: Mapping[str, Any],
-    extraction: Optional[Mapping[str, Any]] = None,
+    extraction: Mapping[str, Any] | None = None,
     extraction_requested: bool = False,
     incomplete_chunks: Sequence[Any] = (),
-    timings: Optional[Mapping[str, float]] = None,
-    identity: Optional[Mapping[str, Any]] = None,
+    timings: Mapping[str, float] | None = None,
+    identity: Mapping[str, Any] | None = None,
 ) -> Path:
     """Write one package atomically after checking every asset it names is in the store.
 
@@ -115,7 +115,7 @@ def save_package(
         PackageInvalid: An asset is missing or corrupt in the store; nothing is written.
     """
     refs = [source_ref, str(parse_record["document_ref"]), *[str(r) for r in parse_record.get("asset_refs", [])]]
-    assets: Dict[str, int] = {}
+    assets: dict[str, int] = {}
     for ref in refs:
         if not store.verify(ctx, ref):
             raise PackageInvalid(f"asset {ref[:19]} is missing or corrupt; package not written")
@@ -158,7 +158,7 @@ def save_package(
     return path
 
 
-def _write_ordered(path: Path, payload: Dict[str, Any]) -> None:
+def _write_ordered(path: Path, payload: dict[str, Any]) -> None:
     # atomic_write_json sorts keys; packages keep insertion order so "complete" leads.
     tmp = path.with_name(f".tmp-{os.getpid()}-{path.name}")
     with tmp.open("w", encoding="utf-8") as stream:
@@ -168,7 +168,7 @@ def _write_ordered(path: Path, payload: Dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
-def load_package(ctx: RequestContext, store: FileDocumentStore, path: Path) -> Dict[str, Any]:
+def load_package(ctx: RequestContext, store: FileDocumentStore, path: Path) -> dict[str, Any]:
     """Validate a complete package and every asset checksum; return its payload."""
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -212,9 +212,9 @@ def import_package(
     store: FileDocumentStore,
     path: Path,
     *,
-    publish: Callable[[Dict[str, Any]], Mapping[str, Any]],
+    publish: Callable[[dict[str, Any]], Mapping[str, Any]],
     target: str = "candidate",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Import once per package checksum and target; write a receipt only on confirmed success.
 
     ``publish`` must be idempotent (a crash can land after its write and before
@@ -265,8 +265,8 @@ def _receipt_matches(path: Path) -> bool:
 
 
 def pending_packages(
-    root: Path, seen: Dict[Path, Tuple[int, int]], priorities: Optional[Mapping[str, Tuple[int, ...]]] = None
-) -> List[Path]:
+    root: Path, seen: dict[Path, tuple[int, int]], priorities: Mapping[str, tuple[int, ...]] | None = None
+) -> list[Path]:
     """Complete, not-yet-imported packages changed since last seen, highest priority first.
 
     Incomplete or unreadable packages are remembered in ``seen`` so they are not
@@ -291,13 +291,13 @@ def pending_packages(
     return [path for _, _, path in queue]
 
 
-def read_staged_import_status(root: Path) -> Dict[str, Any]:
+def read_staged_import_status(root: Path) -> dict[str, Any]:
     """Counts of complete, imported, waiting and incomplete packages, and incomplete stages.
 
     Import status is distinct from extraction success and parse completion.
     """
     counts = {"complete_packages": 0, "imported_packages": 0, "incomplete_packages": 0}
-    incomplete_stages: Dict[str, int] = {}
+    incomplete_stages: dict[str, int] = {}
     for path in Path(root).glob("*/paper.json"):
         try:
             if _header_complete(path):

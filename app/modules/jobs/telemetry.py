@@ -13,7 +13,7 @@ graph-database reads are not ported.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..contracts.jobs import JobState, StageOutcome
 from .pipeline import PHASES, Pipeline
@@ -33,7 +33,7 @@ _COUNTED = (
 
 def job_progress(
     store: JobStore, pipeline: Pipeline, job_id: str, *, stall_after: float = STALL_AFTER_SECONDS
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Per-phase progress of one job.
 
     Returns:
@@ -42,7 +42,7 @@ def job_progress(
     """
     job = store.get(job_id)
     rows = {r.stage: r for r in store.stages(job_id)}
-    phases: Dict[str, Dict[str, Any]] = {p: {"stages": {}, "counts": {}, "progress": {}} for p in PHASES}
+    phases: dict[str, dict[str, Any]] = {p: {"stages": {}, "counts": {}, "progress": {}} for p in PHASES}
     for spec in pipeline.specs:
         row = rows.get(spec.name)
         outcome = row.status if row is not None else StageOutcome.PENDING
@@ -66,15 +66,15 @@ def job_progress(
     }
 
 
-def summarize(store: JobStore, *, limit: int = 200) -> Dict[str, Any]:
+def summarize(store: JobStore, *, limit: int = 200) -> dict[str, Any]:
     """Counts of jobs by state (staged, paused, awaiting review, failed...) without one completion number."""
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     for job in store.list_jobs(limit=limit):
         counts[job.state.value] = counts.get(job.state.value, 0) + 1
     return {"jobs_by_state": counts}
 
 
-def choose_job(store: JobStore, kind: Optional[str] = None) -> Optional[str]:
+def choose_job(store: JobStore, kind: str | None = None) -> str | None:
     """The job worth showing: a running one, else the most recently updated one."""
     jobs = store.list_jobs(kind=kind, limit=50)
     for job in jobs:

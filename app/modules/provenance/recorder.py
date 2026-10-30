@@ -16,10 +16,10 @@ mutation is allowed.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import threading
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Mapping
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.keys import digest
@@ -66,7 +66,7 @@ class AuditLog:
     """Append-only, hash-chained SQLite audit log."""
 
     def __init__(
-        self, path: Any = ":memory:", *, clock: Callable[[], float], db: Optional[OperationalDB] = None
+        self, path: Any = ":memory:", *, clock: Callable[[], float], db: OperationalDB | None = None
     ) -> None:
         self.db = db or OperationalDB(path)
         self._clock = clock
@@ -104,8 +104,8 @@ class AuditLog:
             return
 
     def events(
-        self, *, after: int = 0, kind: Optional[str] = None, operation_id: Optional[str] = None, limit: int = 500
-    ) -> List[Tuple[int, GraphWriteEvent]]:
+        self, *, after: int = 0, kind: str | None = None, operation_id: str | None = None, limit: int = 500
+    ) -> list[tuple[int, GraphWriteEvent]]:
         """Events with ``seq > after`` in order."""
         rows = self.db.query(
             "SELECT seq, event FROM audit_events WHERE seq>? ORDER BY seq LIMIT ?",
@@ -118,7 +118,7 @@ class AuditLog:
             if (kind is None or e.kind == kind) and (operation_id is None or e.operation_id == operation_id)
         ]
 
-    def verify_chain(self) -> Tuple[bool, int]:
+    def verify_chain(self) -> tuple[bool, int]:
         """Check the hash chain; returns ``(ok, events_checked)``. A gap or edit makes it false."""
         prev, count = GENESIS, 0
         for row in self.db.query("SELECT seq, event, prev_hash, hash FROM audit_events ORDER BY seq"):
@@ -153,14 +153,14 @@ class AuditRecorder:
     def __init__(self, log: AuditLog, *, spill_limit: int = 1000) -> None:
         self.log = log
         self._lock = threading.RLock()
-        self._spill: List[GraphWriteEvent] = []
+        self._spill: list[GraphWriteEvent] = []
         self._spill_limit = spill_limit
         self._dropped = 0
         self._degraded_reason = ""
 
     # --- recording ---------------------------------------------------------------------
 
-    def record(self, event: GraphWriteEvent) -> Optional[int]:
+    def record(self, event: GraphWriteEvent) -> int | None:
         """Durably record ``event``.
 
         Critical events raise :class:`AuditUnavailable` when they cannot be written. Other events
@@ -236,8 +236,8 @@ class AuditRecorder:
         actor: str,
         target: str,
         mutation: Callable[[], Any],
-        payload: Optional[Mapping[str, Any]] = None,
-        run_id: Optional[str] = None,
+        payload: Mapping[str, Any] | None = None,
+        run_id: str | None = None,
     ) -> Any:
         """Run a critical ``mutation`` with write-ahead audit.
 
@@ -249,7 +249,7 @@ class AuditRecorder:
            mutation is blocked until it persists.
         """
         self.ensure_healthy()
-        common: Dict[str, Any] = dict(
+        common: dict[str, Any] = dict(
             kind=kind, operation_id=operation_id, actor=actor, target=target, run_id=run_id, critical=True
         )
         self.record(GraphWriteEvent.build(phase="intent", status="started", payload=payload, **common))
@@ -273,7 +273,7 @@ class AuditRecorder:
                 self._hold(event)  # the mutation already ran: keep its outcome and stay degraded
 
 
-def events_payload(event: GraphWriteEvent) -> Dict[str, Any]:
+def events_payload(event: GraphWriteEvent) -> dict[str, Any]:
     """JSON-ready dict of an event (for projection sinks)."""
     return json.loads(event.model_dump_json())
 

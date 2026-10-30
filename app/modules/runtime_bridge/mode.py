@@ -15,9 +15,9 @@ Any other value refuses startup instead of silently picking a mode.
 
 from __future__ import annotations
 
-import os
 from enum import Enum
-from typing import Mapping, Optional
+import os
+from typing import Mapping
 
 RUNTIME_ENV = "F2W_RUNTIME"
 
@@ -33,7 +33,7 @@ class RuntimeMode(str, Enum):
     LANGGRAPH = "langgraph"
 
 
-def runtime_mode(environ: Optional[Mapping[str, str]] = None) -> RuntimeMode:
+def runtime_mode(environ: Mapping[str, str] | None = None) -> RuntimeMode:
     """Return the configured runtime mode.
 
     Args:

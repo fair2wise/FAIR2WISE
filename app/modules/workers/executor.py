@@ -21,7 +21,6 @@ import logging
 import os
 import threading
 import time
-from typing import List, Optional
 
 from ..jobs.service import JobService
 
@@ -44,7 +43,7 @@ class WorkerExecutor:
         *,
         max_concurrency: int = 2,
         poll_interval: float = 0.25,
-        owner: Optional[str] = None,
+        owner: str | None = None,
     ) -> None:
         if max_concurrency < 1:
             raise ValueError("max_concurrency must be at least 1")
@@ -52,11 +51,11 @@ class WorkerExecutor:
         self.max_concurrency = max_concurrency
         self.poll_interval = poll_interval
         self.owner = owner or f"worker-{os.getpid()}"
-        self._threads: List[threading.Thread] = []
+        self._threads: list[threading.Thread] = []
         self._stop = threading.Event()
         self._lock = threading.Lock()
         self._running = 0
-        self.errors: List[str] = []
+        self.errors: list[str] = []
         self.completed = 0
 
     @property
@@ -70,7 +69,7 @@ class WorkerExecutor:
         with self._lock:
             return self._running
 
-    def start(self) -> "WorkerExecutor":
+    def start(self) -> WorkerExecutor:
         """Start the workers. Calling it twice is an error (explicit lifecycle)."""
         if self._threads:
             raise RuntimeError("executor already started")
@@ -131,7 +130,7 @@ class WorkerExecutor:
             )
         return stopped
 
-    def __enter__(self) -> "WorkerExecutor":
+    def __enter__(self) -> WorkerExecutor:
         return self.start()
 
     def __exit__(self, *exc_info: object) -> None:

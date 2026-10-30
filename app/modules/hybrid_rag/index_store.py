@@ -1,12 +1,12 @@
 """On-disk source index: JSONL chunks + in-memory BM25. One corpus per directory."""
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 import json
 import math
-import re
-from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+import re
+from typing import Any, Iterable, Sequence
 
 from .evidence import CHUNKER_VERSION, LEXICAL_INDEX_VERSION
 
@@ -19,7 +19,7 @@ SCI_TOKEN_RE = re.compile(
 )
 
 
-def tokenize(text: str) -> List[str]:
+def tokenize(text: str) -> list[str]:
     """Casefold `text` and split it into lexical tokens; None or empty yields []."""
     return [tok.casefold() for tok in TOKEN_RE.findall(text or "")]
 
@@ -34,8 +34,8 @@ class BM25Index:
         self.n = len(self.docs)
         self.doc_len = [len(doc) or 1 for doc in self.docs]
         self.avgdl = (sum(self.doc_len) / self.n) if self.n else 1.0
-        df: Dict[str, int] = defaultdict(int)
-        self.tf: List[Counter] = []
+        df: dict[str, int] = defaultdict(int)
+        self.tf: list[Counter] = []
         for doc in self.docs:
             counts = Counter(doc)
             self.tf.append(counts)
@@ -46,7 +46,7 @@ class BM25Index:
             for token, freq in df.items()
         }
 
-    def scores(self, query_tokens: Sequence[str]) -> List[float]:
+    def scores(self, query_tokens: Sequence[str]) -> list[float]:
         """Return one BM25 score per indexed document, in document order."""
         if not self.docs:
             return []
@@ -73,15 +73,15 @@ class SourceIndex:
         self.root = Path(root)
         self.chunks_path = self.root / "chunks.jsonl"
         self.meta_path = self.root / "meta.json"
-        self._chunks: Optional[List[Dict[str, Any]]] = None
-        self._bm25: Optional[BM25Index] = None
+        self._chunks: list[dict[str, Any]] | None = None
+        self._bm25: BM25Index | None = None
 
     @property
     def available(self) -> bool:
         """Whether both the chunks and meta files exist on disk."""
         return self.chunks_path.is_file() and self.meta_path.is_file()
 
-    def meta(self) -> Dict[str, Any]:
+    def meta(self) -> dict[str, Any]:
         """Return the index metadata, or {} if missing, unreadable or not a JSON object."""
         if not self.meta_path.is_file():
             return {}
@@ -91,11 +91,11 @@ class SourceIndex:
             return {}
         return data if isinstance(data, dict) else {}
 
-    def load(self) -> List[Dict[str, Any]]:
+    def load(self) -> list[dict[str, Any]]:
         """Load and cache chunks (skipping blank, malformed or textless lines) and build the BM25 index."""
         if self._chunks is not None:
             return self._chunks
-        chunks: List[Dict[str, Any]] = []
+        chunks: list[dict[str, Any]] = []
         if not self.chunks_path.is_file():
             self._chunks = chunks
             return chunks
@@ -117,7 +117,7 @@ class SourceIndex:
         self._bm25 = BM25Index([tokenize(chunk.get("text") or "") for chunk in chunks])
         return chunks
 
-    def search(self, query: str, k: int = 20) -> List[Tuple[Dict[str, Any], float, str]]:
+    def search(self, query: str, k: int = 20) -> list[tuple[dict[str, Any], float, str]]:
         """Return (chunk, score, retrieval_method) without mixing other corpora."""
         if not self.available:
             return []
@@ -127,7 +127,7 @@ class SourceIndex:
         q_tokens = tokenize(query)
         bm25_scores = self._bm25.scores(q_tokens)
         sci_hits = {tok.casefold() for tok in SCI_TOKEN_RE.findall(query or "")}
-        ranked: List[Tuple[float, int, str]] = []
+        ranked: list[tuple[float, int, str]] = []
         for i, chunk in enumerate(chunks):
             method = "bm25"
             score = float(bm25_scores[i]) if i < len(bm25_scores) else 0.0
@@ -140,7 +140,7 @@ class SourceIndex:
             if score > 0:
                 ranked.append((score, i, method))
         ranked.sort(key=lambda item: item[0], reverse=True)
-        out: List[Tuple[Dict[str, Any], float, str]] = []
+        out: list[tuple[dict[str, Any], float, str]] = []
         for score, idx, method in ranked[: max(1, k)]:
             out.append((chunks[idx], score, method))
         return out
@@ -148,12 +148,12 @@ class SourceIndex:
 
 def write_index(
     root: Path,
-    chunks: Sequence[Dict[str, Any]],
+    chunks: Sequence[dict[str, Any]],
     *,
     index_name: str,
     corpus_revision: str,
-    extra_meta: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    extra_meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Write `chunks` as chunks.jsonl plus meta.json under `root` and return the metadata.
 
     Args:
@@ -192,11 +192,11 @@ def write_index(
 
 
 def merge_chunks(
-    existing: Iterable[Dict[str, Any]],
-    incoming: Iterable[Dict[str, Any]],
+    existing: Iterable[dict[str, Any]],
+    incoming: Iterable[dict[str, Any]],
     *,
-    replace_doc_ids: Optional[Iterable[str]] = None,
-) -> List[Dict[str, Any]]:
+    replace_doc_ids: Iterable[str] | None = None,
+) -> list[dict[str, Any]]:
     """Return `existing` chunks minus those of `replace_doc_ids`, followed by `incoming`."""
     skip = {str(doc) for doc in (replace_doc_ids or [])}
     kept = [chunk for chunk in existing if str(chunk.get("doc_id") or "") not in skip]

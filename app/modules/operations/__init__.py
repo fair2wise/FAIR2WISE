@@ -19,9 +19,9 @@ load when an operation runs). Public names resolve lazily.
 from __future__ import annotations
 
 import importlib
-from typing import Any, Dict, Tuple
+from typing import Any
 
-_EXPORTS: Dict[str, Tuple[str, str]] = {
+_EXPORTS: dict[str, tuple[str, str]] = {
     "LIT_SUMMARIZE_EXTRACTED_TERMS": ("papers", "LIT_SUMMARIZE_EXTRACTED_TERMS"),
     "SUMMARIZE_LITERATURE_SKILL": ("papers", "SUMMARIZE_LITERATURE_SKILL"),
     "TOOL_NAME": ("papers", "TOOL_NAME"),

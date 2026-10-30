@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from ..evidence.persistence import InMemoryEvidenceSink
 from .contract import ExtractionResult
@@ -38,7 +38,7 @@ def _coverage(result: ExtractionResult) -> list:
             for c in result.coverage]
 
 
-def stage_artifact(result: ExtractionResult, report: StageReport, sink: InMemoryEvidenceSink) -> Dict[str, Any]:
+def stage_artifact(result: ExtractionResult, report: StageReport, sink: InMemoryEvidenceSink) -> dict[str, Any]:
     """JSON-ready candidate record of one validated run (see module docstring)."""
     if report.strategy != result.strategy or report.work_id != result.work_id:
         raise ValueError("report does not belong to this extraction result")

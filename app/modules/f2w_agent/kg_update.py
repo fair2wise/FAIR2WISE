@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib import request
 from urllib.parse import urlparse
 
@@ -34,7 +34,7 @@ def _splash_base_url(uri: str) -> str:
     raise ValueError(f"unsupported splash URI: {uri}")
 
 
-def _splash_db_path(repo: Path) -> Optional[Path]:
+def _splash_db_path(repo: Path) -> Path | None:
     """Resolve the splash-links SQLite path relative to ``repo``, or None for memory."""
     raw = str(config_value("paths.splash_links_db", fallback="links.sqlite"))
     if raw in {":memory:", "sqlite:///:memory:"}:
@@ -57,10 +57,10 @@ def _splash_is_local(uri: str) -> bool:
 def _splash_graphql(
     splash_uri: str,
     query: str,
-    variables: Optional[Dict[str, Any]] = None,
+    variables: dict[str, Any] | None = None,
     *,
     timeout: int = 30,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """POST a GraphQL query to splash-links and return ``data``, raising on errors."""
     payload = json.dumps({"query": query, "variables": variables or {}}).encode("utf-8")
     req = request.Request(
@@ -101,7 +101,7 @@ def _wipe_splash_via_graphql(splash_uri: str, *, page_size: int = 500) -> int:
             deleted += 1
 
 
-def rebuild_kg(terms_json: str, kg_json: str) -> Dict[str, Any]:
+def rebuild_kg(terms_json: str, kg_json: str) -> dict[str, Any]:
     """Convert ``terms_json`` to MatKG ``kg_json`` (keeps provenance + snippets)."""
     from ..json2kg import convert_terms_to_graph
 
@@ -119,11 +119,11 @@ def rebuild_kg(terms_json: str, kg_json: str) -> Dict[str, Any]:
 def splash_reimport(
     kg_json: str,
     *,
-    splash_repo: Optional[str] = None,
-    splash_uri: Optional[str] = None,
+    splash_repo: str | None = None,
+    splash_uri: str | None = None,
     wipe: bool = True,
     allow_wipe: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Re-import ``kg_json`` into splash-links (wipe DB first, per HANDOFF).
 
     Requires a `splash_links` checkout and a running/`pixi`-managed environment.
@@ -229,9 +229,9 @@ def splash_uri_default() -> str:
 def splash_find_entity_by_matkg_id(
     matkg_id: str,
     *,
-    splash_uri: Optional[str] = None,
+    splash_uri: str | None = None,
     page_size: int = 500,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Resolve a splash entity by MatKG id (uri / properties.matkg_id) or splash UUID."""
     uri = splash_uri or splash_uri_default()
     if not matkg_id:
@@ -270,14 +270,14 @@ def splash_find_entity_by_matkg_id(
 def splash_update_entity(
     entity_id: str,
     *,
-    name: Optional[str] = None,
-    entity_type: Optional[str] = None,
-    properties: Optional[Dict[str, Any]] = None,
-    splash_uri: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    name: str | None = None,
+    entity_type: str | None = None,
+    properties: dict[str, Any] | None = None,
+    splash_uri: str | None = None,
+) -> dict[str, Any] | None:
     """Patch splash entity fields; no-op fetch if the update payload is empty."""
     uri = splash_uri or splash_uri_default()
-    input_payload: Dict[str, Any] = {}
+    input_payload: dict[str, Any] = {}
     if name is not None:
         input_payload["name"] = name
     if entity_type is not None:
@@ -302,10 +302,10 @@ def splash_create_entity(
     *,
     entity_type: str,
     name: str,
-    uri: Optional[str] = None,
-    properties: Optional[Dict[str, Any]] = None,
-    splash_uri: Optional[str] = None,
-) -> Dict[str, Any]:
+    uri: str | None = None,
+    properties: dict[str, Any] | None = None,
+    splash_uri: str | None = None,
+) -> dict[str, Any]:
     """Create a splash entity and return it, raising if the mutation is null."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
@@ -335,9 +335,9 @@ def splash_create_link(
     subject_id: str,
     predicate: str,
     object_id: str,
-    properties: Optional[Dict[str, Any]] = None,
-    splash_uri: Optional[str] = None,
-) -> Dict[str, Any]:
+    properties: dict[str, Any] | None = None,
+    splash_uri: str | None = None,
+) -> dict[str, Any]:
     """Create a splash link and return it, raising if the mutation is null."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
@@ -364,12 +364,12 @@ def splash_create_link(
 
 def splash_find_links(
     *,
-    subject_id: Optional[str] = None,
-    predicate: Optional[str] = None,
-    object_id: Optional[str] = None,
-    splash_uri: Optional[str] = None,
+    subject_id: str | None = None,
+    predicate: str | None = None,
+    object_id: str | None = None,
+    splash_uri: str | None = None,
     limit: int = 100,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Query splash links filtered by subject, predicate, and/or object."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
@@ -391,7 +391,7 @@ def splash_find_links(
     return list(data.get("links") or [])
 
 
-def splash_delete_link(link_id: str, *, splash_uri: Optional[str] = None) -> bool:
+def splash_delete_link(link_id: str, *, splash_uri: str | None = None) -> bool:
     """Delete a splash link by id and return whether the mutation succeeded."""
     splash = splash_uri or splash_uri_default()
     data = _splash_graphql(
@@ -402,13 +402,13 @@ def splash_delete_link(link_id: str, *, splash_uri: Optional[str] = None) -> boo
     return bool(data.get("deleteLink"))
 
 
-def _splash_node_id(entity: Dict[str, Any]) -> str:
+def _splash_node_id(entity: dict[str, Any]) -> str:
     """Prefer uri/matkg_id as the MatKG node id, else the splash UUID."""
     props = entity.get("properties") or {}
     return entity.get("uri") or props.get("matkg_id") or entity["id"]
 
 
-def _splash_entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
+def _splash_entity_to_node(entity: dict[str, Any]) -> dict[str, Any]:
     """Map a splash entity into a MatKG-shaped thing dict."""
     props = dict(entity.get("properties") or {})
     node_id = _splash_node_id(entity)
@@ -425,14 +425,14 @@ def _splash_entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
 
 def load_splash_graph(
     *,
-    splash_uri: Optional[str] = None,
+    splash_uri: str | None = None,
     page_size: int = 500,
     timeout: int = 30,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Load splash-links entities/links into MatKG-shaped JSON."""
     uri = splash_uri or splash_uri_default()
-    entities: List[Dict[str, Any]] = []
-    links: List[Dict[str, Any]] = []
+    entities: list[dict[str, Any]] = []
+    links: list[dict[str, Any]] = []
 
     offset = 0
     list_entities = f"""
@@ -477,7 +477,7 @@ def load_splash_graph(
 
     uuid_to_node_id = {entity["id"]: _splash_node_id(entity) for entity in entities}
     nodes = [_splash_entity_to_node(entity) for entity in entities]
-    associations: List[Dict[str, Any]] = []
+    associations: list[dict[str, Any]] = []
     for link in links:
         subject = uuid_to_node_id.get(link.get("subjectId"))
         obj = uuid_to_node_id.get(link.get("objectId"))
@@ -498,10 +498,10 @@ def load_splash_graph(
 def export_splash_graph_to_json(
     dest: Path,
     *,
-    splash_uri: Optional[str] = None,
+    splash_uri: str | None = None,
     page_size: int = 500,
     timeout: int = 5,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Write the live splash graph into a MatKG JSON file for UI session reads."""
     data = load_splash_graph(
         splash_uri=splash_uri, page_size=page_size, timeout=timeout

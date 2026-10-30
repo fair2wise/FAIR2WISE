@@ -35,10 +35,10 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 import re
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -69,7 +69,7 @@ _ABS_PATH = re.compile(r"^(?:/[^/\s]+/[^\s]*|[A-Za-z]:\\)")
 
 def utcnow() -> datetime:
     """Current UTC time (patched in tests)."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Coverage(BaseModel):
@@ -89,14 +89,14 @@ class Coverage(BaseModel):
 
     scan_complete: bool
     records_scanned: int = Field(ge=0)
-    records_expected: Optional[int] = None
+    records_expected: int | None = None
     exactness: Exactness = "snapshot"
     completeness: Completeness
-    reasons: Tuple[str, ...] = ()
+    reasons: tuple[str, ...] = ()
 
     @classmethod
     def of(cls, *, scan_complete: bool, records_scanned: int, exactness: Exactness = "snapshot",
-           records_expected: Optional[int] = None, reasons: Sequence[str] = ()) -> "Coverage":
+           records_expected: int | None = None, reasons: Sequence[str] = ()) -> Coverage:
         """Build coverage; ``completeness`` follows ``scan_complete`` (never set independently)."""
         return cls(scan_complete=scan_complete, records_scanned=records_scanned, records_expected=records_expected,
                    exactness=exactness, completeness="complete" if scan_complete else "partial",
@@ -116,28 +116,28 @@ class OperationReport(BaseModel):
     operation: str
     operation_version: str
     method: str
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    scope: Dict[str, Any] = Field(default_factory=dict)
-    source_revisions: Dict[str, str] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    scope: dict[str, Any] = Field(default_factory=dict)
+    source_revisions: dict[str, str] = Field(default_factory=dict)
     population: str
-    counting_units: Dict[str, str] = Field(default_factory=dict)
+    counting_units: dict[str, str] = Field(default_factory=dict)
     coverage: Coverage
-    metrics: Dict[str, Any] = Field(default_factory=dict)
-    preview: Dict[str, Any] = Field(default_factory=dict)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    preview: dict[str, Any] = Field(default_factory=dict)
     display_truncated: bool = False
-    excluded: Dict[str, str] = Field(default_factory=dict)
-    effects: Tuple[str, ...] = ("read_corpus",)
+    excluded: dict[str, str] = Field(default_factory=dict)
+    effects: tuple[str, ...] = ("read_corpus",)
     model_calls: int = 0
-    warnings: Tuple[str, ...] = ()
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
+    warnings: tuple[str, ...] = ()
+    started_at: str | None = None
+    finished_at: str | None = None
 
     @property
     def completeness(self) -> Completeness:
         """Shortcut for ``coverage.completeness``."""
         return self.coverage.completeness
 
-    def to_data(self) -> Dict[str, Any]:
+    def to_data(self) -> dict[str, Any]:
         """JSON-ready payload for ``ToolResult.data`` / job data / artifacts."""
         return self.model_dump(mode="json")
 
@@ -151,7 +151,7 @@ def check_no_source_material(payload: Any, *, where: str = "report") -> None:
     on every report before it leaves the operation, so a future metric cannot leak
     ``context_snippets``/definitions/paths by accident.
     """
-    stack: List[Tuple[str, Any]] = [(where, payload)]
+    stack: list[tuple[str, Any]] = [(where, payload)]
     while stack:
         loc, value = stack.pop()
         if isinstance(value, Mapping):
@@ -185,8 +185,8 @@ def fit_report(report: OperationReport, limit: int = MAX_RESULT_CHARS) -> Operat
     """
     check_no_source_material(report.to_data())
 
-    def shorten(preview: Mapping[str, Any], cap: int) -> Tuple[Dict[str, Any], bool]:
-        out: Dict[str, Any] = {}
+    def shorten(preview: Mapping[str, Any], cap: int) -> tuple[dict[str, Any], bool]:
+        out: dict[str, Any] = {}
         cut = False
         for key, value in preview.items():
             if isinstance(value, list) and len(value) > cap:
@@ -222,14 +222,14 @@ def fit_report(report: OperationReport, limit: int = MAX_RESULT_CHARS) -> Operat
     return candidate
 
 
-def top_items(counter: Mapping[str, int], n: int) -> List[List[Any]]:
+def top_items(counter: Mapping[str, int], n: int) -> list[list[Any]]:
     """``[[key, count], ...]`` sorted by count desc, then key; at most ``n``."""
     return [[k, v] for k, v in sorted(counter.items(), key=lambda kv: (-kv[1], str(kv[0])))[:n]]
 
 
 # -- ToolResult mapping ----------------------------------------------------------------
 
-def report_to_result(tool: str, report: OperationReport, *, provenance_id: Optional[str] = None,
+def report_to_result(tool: str, report: OperationReport, *, provenance_id: str | None = None,
                      artifact_refs: Sequence[str] = (), limit: int = MAX_RESULT_CHARS) -> ToolResult:
     """Map a report to a ``ToolResult``: ``OK`` when complete, ``PARTIAL`` otherwise.
 
@@ -249,7 +249,7 @@ def report_to_result(tool: str, report: OperationReport, *, provenance_id: Optio
                       warnings=tuple(warnings), provenance_id=provenance_id)
 
 
-def error_result(tool: str, exc: ContractError, *, provenance_id: Optional[str] = None) -> ToolResult:
+def error_result(tool: str, exc: ContractError, *, provenance_id: str | None = None) -> ToolResult:
     """A typed failure (status follows the error code; the message names no server path)."""
     from ..contracts.tools import status_for_code
 
@@ -259,7 +259,7 @@ def error_result(tool: str, exc: ContractError, *, provenance_id: Optional[str] 
 
 # -- artifacts -----------------------------------------------------------------------
 
-def store_report_artifact(store: Any, ctx: RequestContext, report: OperationReport) -> Optional[str]:
+def store_report_artifact(store: Any, ctx: RequestContext, report: OperationReport) -> str | None:
     """Store the full report as a private JSON artifact and return its ``sha256:`` ref.
 
     ``store`` is the injected ``DocumentStore`` (``FileDocumentStore`` or the executor's
@@ -293,8 +293,8 @@ class ScanControl:
             ``NEAR_DUPLICATE_INLINE_LIMIT`` keys, owner decision D1.10) do not apply.
     """
 
-    def __init__(self, max_records: int = 200_000, *, checkpoint: Optional[Callable[[int], None]] = None,
-                 deadline: Optional[datetime] = None, every: int = 1000,
+    def __init__(self, max_records: int = 200_000, *, checkpoint: Callable[[int], None] | None = None,
+                 deadline: datetime | None = None, every: int = 1000,
                  clock: Callable[[], datetime] = utcnow, job: bool = False) -> None:
         if max_records < 1 or every < 1:
             raise ContractError(ErrorCode.INVALID_INPUT, "max_records and every must be >= 1")
@@ -305,7 +305,7 @@ class ScanControl:
         self.every = every
         self.clock = clock
         self.count = 0
-        self.stopped_reason: Optional[str] = None
+        self.stopped_reason: str | None = None
 
     def tick(self, n: int = 1) -> bool:
         """Count ``n`` records; return ``False`` (and record why) when the scan must stop."""
@@ -334,7 +334,7 @@ def operation_dispatch(*suites: Any) -> OperationFn:
     Each suite provides ``operation_names()`` and ``compute_operation(ctx, name, args, control)``.
     An unknown or duplicated operation name is rejected.
     """
-    table: Dict[str, Any] = {}
+    table: dict[str, Any] = {}
     for suite in suites:
         for name in suite.operation_names():
             if name in table:
@@ -398,9 +398,9 @@ def stamp(report: OperationReport, started: datetime) -> OperationReport:
     return report.model_copy(update={"started_at": started.isoformat(), "finished_at": utcnow().isoformat()})
 
 
-def merge_warnings(*groups: Iterable[str]) -> Tuple[str, ...]:
+def merge_warnings(*groups: Iterable[str]) -> tuple[str, ...]:
     """Concatenate warning groups, dropping repeats, preserving order."""
-    out: List[str] = []
+    out: list[str] = []
     for group in groups:
         for item in group:
             if item and item not in out:
@@ -408,7 +408,7 @@ def merge_warnings(*groups: Iterable[str]) -> Tuple[str, ...]:
     return tuple(out)
 
 
-__all__: Tuple[str, ...] = (
+__all__: tuple[str, ...] = (
     "Coverage", "FORBIDDEN_KEYS", "MAX_PREVIEW_ITEMS", "MAX_RESULT_CHARS", "OPERATION_JOB_CAPABILITY",
     "OPERATION_JOB_KIND", "OperationFn", "OperationReport", "REPORT_SCHEMA", "ScanControl",
     "build_operation_pipeline", "check_no_source_material", "error_result", "fit_report", "merge_warnings",

@@ -18,15 +18,15 @@ als_knowledge_agent/src/als_knowledge_agent/graph/ingest_journal.py (``IngestJou
 
 from __future__ import annotations
 
+from collections import Counter
+from contextlib import contextmanager
 import hashlib
 import json
+from pathlib import Path
 import sqlite3
 import threading
 import time
-from collections import Counter
-from contextlib import contextmanager
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional
+from typing import Any, Callable, Iterator, Mapping
 
 
 class IngestJournal:
@@ -77,7 +77,7 @@ class IngestJournal:
         """Identity of a job configuration."""
         return hashlib.sha256(json.dumps(dict(config), sort_keys=True, default=str).encode()).hexdigest()
 
-    def acquire(self, config: Mapping[str, Any], owner: str) -> Optional[str]:
+    def acquire(self, config: Mapping[str, Any], owner: str) -> str | None:
         """Start or resume the job for ``config``; ``None`` while another job holds a live lease.
 
         ``force`` in the config clears the checkpoints of a previously *completed* job;
@@ -117,7 +117,7 @@ class IngestJournal:
                 (state, self._clock(), key, owner),
             )
 
-    def checkpoint(self, key: str, operation: str, stage: str) -> Optional[Dict[str, Any]]:
+    def checkpoint(self, key: str, operation: str, stage: str) -> dict[str, Any] | None:
         """The settled result of a stage, else ``None``."""
         with self._lock:
             row = self._con.execute(
@@ -126,7 +126,7 @@ class IngestJournal:
         return json.loads(row[0]) if row and row[0] else None
 
     def save(
-        self, key: str, operation: str, stage: str, result: Optional[Mapping[str, Any]], error: str = ""
+        self, key: str, operation: str, stage: str, result: Mapping[str, Any] | None, error: str = ""
     ) -> None:
         """Record a stage: a settled ``result``, or ``None`` plus an ``error`` to retry later."""
         with self._tx() as con:
@@ -136,7 +136,7 @@ class IngestJournal:
                 (key, operation, stage, json.dumps(dict(result)) if result is not None else None, error),
             )
 
-    def completion_snapshot(self, key: str) -> Dict[str, Any]:
+    def completion_snapshot(self, key: str) -> dict[str, Any]:
         """Durable progress: settled verdicts, retryable/failed ones, counts by status."""
         with self._lock:
             rows = self._con.execute(
@@ -144,7 +144,7 @@ class IngestJournal:
                 "stage='complete' ORDER BY rowid",
                 (key,),
             ).fetchall()
-        settled: List[Dict[str, Any]] = [json.loads(r["result"]) for r in rows if r["result"]]
+        settled: list[dict[str, Any]] = [json.loads(r["result"]) for r in rows if r["result"]]
         pending = [
             {"operation": r["operation"], "error": r["error"], "attempts": r["attempts"]}
             for r in rows
@@ -157,7 +157,7 @@ class IngestJournal:
             "pending": pending,
         }
 
-    def _job(self, sql: str, params: tuple) -> Optional[Dict[str, Any]]:
+    def _job(self, sql: str, params: tuple) -> dict[str, Any] | None:
         with self._lock:
             row = self._con.execute(sql, params).fetchone()
         if not row:
@@ -166,14 +166,14 @@ class IngestJournal:
         result["config"] = json.loads(result["config"])
         return result
 
-    def latest(self) -> Optional[Dict[str, Any]]:
+    def latest(self) -> dict[str, Any] | None:
         """The live job, else the most recently updated one."""
         return self._job(
             "SELECT * FROM jobs ORDER BY (state='running' AND lease_until>?) DESC, updated DESC LIMIT 1",
             (self._clock(),),
         )
 
-    def recoverable(self) -> Optional[Dict[str, Any]]:
+    def recoverable(self) -> dict[str, Any] | None:
         """A running job whose lease expired (its owner died) and that was not asked to stop."""
         return self._job(
             "SELECT * FROM jobs WHERE state='running' AND lease_until<? AND stop_requested=0 "

@@ -15,13 +15,13 @@ Retries are at-least-once with reconciled effects; exactly-once is not claimed.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 import hashlib
 import json
 import os
-import uuid
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
+import uuid
 
 from ..ports import ContractError, ErrorCode
 
@@ -49,9 +49,9 @@ class Lease:
         self.path = Path(path)
         self.clock = clock
         self.seconds = seconds
-        self.token: Optional[str] = None
+        self.token: str | None = None
 
-    def _read(self) -> Optional[Dict[str, Any]]:
+    def _read(self) -> dict[str, Any] | None:
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
         except FileNotFoundError:
@@ -64,7 +64,7 @@ class Lease:
                 "expires_at": (self.clock() + timedelta(seconds=self.seconds)).isoformat()}
         _atomic_write(self.path, json.dumps(body))
 
-    def acquire(self) -> "Lease":
+    def acquire(self) -> Lease:
         """Take the lease or raise ``CONFLICT`` while another unexpired owner holds it."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.token = uuid.uuid4().hex
@@ -112,7 +112,7 @@ class ImportJournal:
             handle.flush()
             os.fsync(handle.fileno())
 
-    def records(self) -> List[Dict[str, Any]]:
+    def records(self) -> list[dict[str, Any]]:
         """All records (a torn last line from a crash is ignored)."""
         if not self.path.exists():
             return []

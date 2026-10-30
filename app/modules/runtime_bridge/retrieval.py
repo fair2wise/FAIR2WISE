@@ -24,9 +24,9 @@ had to move.
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+import threading
+from typing import Any, Callable, Sequence
 
 
 @dataclass(frozen=True)
@@ -45,22 +45,22 @@ class RetrievalSettings:
         tiled_uri: Tiled URI for live lookup.
     """
 
-    graph_files: Tuple[str, ...] = ()
+    graph_files: tuple[str, ...] = ()
     graph_source: str = "json"
-    backend: Optional[str] = None
-    model: Optional[str] = None
-    kg_query_hops: Optional[int] = None
-    kg_query_max_nodes: Optional[int] = None
-    source_rag: Optional[bool] = None
-    live_tiled: Optional[bool] = None
-    tiled_uri: Optional[str] = None
+    backend: str | None = None
+    model: str | None = None
+    kg_query_hops: int | None = None
+    kg_query_max_nodes: int | None = None
+    source_rag: bool | None = None
+    live_tiled: bool | None = None
+    tiled_uri: str | None = None
 
 
 def build_retrieval_agent(settings: RetrievalSettings) -> Any:
     """Construct an existing ``RetrievalAgent`` from ``settings`` (imported lazily)."""
     from ..f2w_agent.retrieval_agent import RetrievalAgent
 
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "graph_files": list(settings.graph_files) or None,
         "graph_source": settings.graph_source,
         "backend": settings.backend,
@@ -95,10 +95,10 @@ class LegacyRetrievalService:
         self,
         agent: Any = None,
         *,
-        agent_provider: Optional[Callable[[], Any]] = None,
-        settings: Optional[RetrievalSettings] = None,
+        agent_provider: Callable[[], Any] | None = None,
+        settings: RetrievalSettings | None = None,
         factory: Callable[[RetrievalSettings], Any] = build_retrieval_agent,
-        tiled_uri_provider: Optional[Callable[[], Optional[str]]] = None,
+        tiled_uri_provider: Callable[[], str | None] | None = None,
     ) -> None:
         given = [x is not None for x in (agent, agent_provider, settings)]
         if sum(given) != 1:
@@ -122,7 +122,7 @@ class LegacyRetrievalService:
                     self._agent = self._factory(self._settings)
         return self._agent
 
-    def _tiled_uri(self, agent: Any) -> Optional[str]:
+    def _tiled_uri(self, agent: Any) -> str | None:
         if self._tiled_uri_provider is not None:
             return self._tiled_uri_provider()
         if self._settings is not None and self._settings.tiled_uri is not None:
@@ -133,9 +133,9 @@ class LegacyRetrievalService:
         self,
         question: str,
         *,
-        history: Optional[Sequence[Dict[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        history: Sequence[dict[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
     ) -> Any:
         """Run the existing retrieval/QA query and return its verdict object unchanged.
 
@@ -151,7 +151,7 @@ class LegacyRetrievalService:
             setter = getattr(agent, "set_live_tiled", None)
             if callable(setter):
                 setter(bool(use_live_tiled), uri=self._tiled_uri(agent))
-        history_arg: Optional[List[Dict[str, str]]] = list(history) if history is not None else None
+        history_arg: list[dict[str, str]] | None = list(history) if history is not None else None
         query = agent.query
         try:
             return await query(question, history=history_arg, source_rag=source_rag)

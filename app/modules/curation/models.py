@@ -13,11 +13,11 @@ that may be unknown.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional
+import hashlib
+import json
+from typing import Any
 
 
 class CaseState(str, Enum):
@@ -74,7 +74,7 @@ class UncertaintyCase:
     case_type: str
     reason: str
     evidence: str
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
     priority: int = 50
     vocabulary_revision: str = ""
     schema_revision: str = ""
@@ -114,11 +114,11 @@ class ResolutionAttempt:
     executed_model: str
     request_fingerprint: str
     outcome: str  # proposed | abstained | invalid | failed | resolved (deterministic local)
-    response: Dict[str, Any]
-    validation: Dict[str, Any]
-    cost_usd: Optional[float] = None
-    input_tokens: Optional[int] = None
-    output_tokens: Optional[int] = None
+    response: dict[str, Any]
+    validation: dict[str, Any]
+    cost_usd: float | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
 
 
 __all__ = ("CaseState", "ResolutionAttempt", "Route", "UncertaintyCase")

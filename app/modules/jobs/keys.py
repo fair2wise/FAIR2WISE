@@ -13,11 +13,11 @@ digest is taken over canonical JSON so it never reveals the inputs.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Sequence, Tuple
+from typing import Any, Mapping, Sequence
 
 #: Input fields a stage may depend on.
 INPUT_FIELDS = (
@@ -74,7 +74,7 @@ def digest(value: Any) -> str:
 class OperationInputs:
     """The inputs a job was submitted with (immutable, secret-free)."""
 
-    corpus_scope: Tuple[str, ...]
+    corpus_scope: tuple[str, ...]
     source_sha256: str = ""
     source_version: str = ""
     parser_version: str = ""
@@ -91,7 +91,7 @@ class OperationInputs:
         for name in INPUT_FIELDS[1:-1]:
             _scan(getattr(self, name), name)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-ready mapping."""
         data = {name: getattr(self, name) for name in INPUT_FIELDS}
         data["corpus_scope"] = list(self.corpus_scope)
@@ -99,7 +99,7 @@ class OperationInputs:
         return data
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> "OperationInputs":
+    def from_dict(cls, data: Mapping[str, Any]) -> OperationInputs:
         """Rebuild from :meth:`as_dict` output."""
         kwargs = {name: data.get(name, "") for name in INPUT_FIELDS[1:-1]}
         return cls(
@@ -134,7 +134,7 @@ def stage_key(
     if unknown:
         raise ValueError(f"unknown key inputs: {sorted(unknown)}")
     data = inputs.as_dict()
-    body: Dict[str, Any] = {"stage": stage, "upstream": dict(sorted(upstream.items()))}
+    body: dict[str, Any] = {"stage": stage, "upstream": dict(sorted(upstream.items()))}
     for name in sorted(relevant):
         value = data[name]
         if name == "params" and params_keys:
@@ -143,7 +143,7 @@ def stage_key(
     return digest(body)
 
 
-def changed_inputs(old: Mapping[str, Any], new: Mapping[str, Any]) -> Tuple[str, ...]:
+def changed_inputs(old: Mapping[str, Any], new: Mapping[str, Any]) -> tuple[str, ...]:
     """Names of input fields that differ (for the invalidation event reason)."""
     return tuple(name for name in INPUT_FIELDS if old.get(name) != new.get(name))
 

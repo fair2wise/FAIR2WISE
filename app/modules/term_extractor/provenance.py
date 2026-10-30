@@ -17,7 +17,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
@@ -42,9 +42,9 @@ _PUB_FIELDS = (
 )
 
 
-def clean_pub_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def clean_pub_meta(meta: dict[str, Any] | None) -> dict[str, Any]:
     """Drop empty metadata fields before storing source-scoped provenance."""
-    cleaned: Dict[str, Any] = {}
+    cleaned: dict[str, Any] = {}
     for key in _PUB_FIELDS:
         value = (meta or {}).get(key)
         if value in (None, "", []):
@@ -58,9 +58,9 @@ def clean_pub_meta(meta: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def merge_into_source_metadata(
-    source_metadata: Dict[str, Any],
+    source_metadata: dict[str, Any],
     source_paper: str,
-    meta: Optional[Dict[str, Any]],
+    meta: dict[str, Any] | None,
 ) -> bool:
     """Merge cleaned ``meta`` into ``source_metadata[source_paper]`` in place.
 
@@ -77,11 +77,11 @@ def merge_into_source_metadata(
     return True
 
 
-def publications_from_source_metadata(source_metadata: Any) -> List[Dict[str, Any]]:
+def publications_from_source_metadata(source_metadata: Any) -> list[dict[str, Any]]:
     """Convert source-scoped metadata map into embedded publication records."""
     if not isinstance(source_metadata, dict):
         return []
-    publications: List[Dict[str, Any]] = []
+    publications: list[dict[str, Any]] = []
     for source_paper in sorted(str(k) for k in source_metadata if str(k).strip()):
         meta = source_metadata.get(source_paper)
         if not isinstance(meta, dict):
@@ -93,7 +93,7 @@ def publications_from_source_metadata(source_metadata: Any) -> List[Dict[str, An
 
 
 # ───────────────────────── code snippet helpers ─────────────────────────
-def snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
+def snippet_key(snip: dict[str, Any]) -> tuple[str, str, str]:
     """Dedup key for a code snippet (source_paper, page, code body)."""
     return (
         str(snip.get("source_paper", "")),
@@ -102,7 +102,7 @@ def snippet_key(snip: Dict[str, Any]) -> Tuple[str, str, str]:
     )
 
 
-def extract_snippets_json_from_text(text: str) -> Dict[str, Any]:
+def extract_snippets_json_from_text(text: str) -> dict[str, Any]:
     """Extract the largest JSON object containing ``snippets`` from LLM output."""
     pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
     matches = list(re.finditer(pattern, text or ""))
@@ -118,7 +118,7 @@ def extract_snippets_json_from_text(text: str) -> Dict[str, Any]:
     return {"snippets": []}
 
 
-def normalize_domain_features(features: Any, schema_helper: Any) -> List[Dict[str, Optional[str]]]:
+def normalize_domain_features(features: Any, schema_helper: Any) -> list[dict[str, str | None]]:
     """Keep only schema-allowed CodeSnippet domain features."""
     try:
         ctx = schema_helper.get_code_domain_feature_context()
@@ -129,7 +129,7 @@ def normalize_domain_features(features: Any, schema_helper: Any) -> List[Dict[st
         for line in ctx.splitlines()
         if line.startswith("- ") and line != "- None"
     }
-    normalized: List[Dict[str, Optional[str]]] = []
+    normalized: list[dict[str, str | None]] = []
     feature_items = features if isinstance(features, list) else [features]
     for feature in feature_items:
         if not isinstance(feature, dict):
@@ -209,7 +209,7 @@ def extract_code_snippets(
     source_paper: str = "",
     page: int = 0,
     temperature: float = 0.0,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Extract code snippets from a page.
 
     Regex deterministically extracts named code blocks (code bodies); the LLM
@@ -226,7 +226,7 @@ def extract_code_snippets(
         re.MULTILINE,
     )
 
-    regex_results: List[Dict[str, Any]] = []
+    regex_results: list[dict[str, Any]] = []
     seen_fn_names: set = set()
     seen_bodies: set = set()
 
@@ -256,7 +256,7 @@ def extract_code_snippets(
     if not regex_results:
         return []
 
-    llm_context: Dict[str, Dict[str, Any]] = {}
+    llm_context: dict[str, dict[str, Any]] = {}
     try:
         prompt = _prepare_code_snippet_prompt(page_text, schema_helper)
         response = chat_client.chat(prompt, temperature=temperature, timeout=120)
@@ -269,7 +269,7 @@ def extract_code_snippets(
     except Exception as e:
         logger.warning("LLM code-context extraction failed (%s p.%s): %s — regex only", source_paper, page, e)
 
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     for r in regex_results:
         fn_key = (r["function_name"] or "").lower()
         ctx = llm_context.get(fn_key) or llm_context.get("__anonymous__") or {}
@@ -285,14 +285,14 @@ def extract_code_snippets(
 
 
 # ───────────────────────── publication metadata ─────────────────────────
-def extract_pub_metadata(doc: "fitz.Document", pdf_path: str) -> Dict[str, Any]:
+def extract_pub_metadata(doc: fitz.Document, pdf_path: str) -> dict[str, Any]:
     """Extract publication metadata from PDF metadata fields and first-page text.
 
     All values are ``None`` or ``[]`` if not found. Never invents fields.
     """
     pdf_meta = doc.metadata or {}
     filename = os.path.basename(pdf_path)
-    current_year = datetime.datetime.now(datetime.timezone.utc).year
+    current_year = datetime.datetime.now(datetime.UTC).year
 
     _MONTHS = (
         r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
@@ -301,7 +301,7 @@ def extract_pub_metadata(doc: "fitz.Document", pdf_path: str) -> Dict[str, Any]:
 
     first_text = doc.load_page(0).get_text() if doc.page_count > 0 else ""
 
-    publication_year: Optional[int] = None
+    publication_year: int | None = None
     explicit_patterns = [
         rf"(?i)(?:published|accepted|received|revised|available\s+online)[^\n]{{0,40}}"
         rf"(?:{_MONTHS}\s+\d{{1,2}},?\s*((?:19|20)\d{{2}})"
@@ -355,7 +355,7 @@ def extract_pub_metadata(doc: "fitz.Document", pdf_path: str) -> Dict[str, Any]:
         if all_years:
             publication_year = max(set(all_years), key=all_years.count)
 
-    paper_title: Optional[str] = (pdf_meta.get("title") or "").strip() or None
+    paper_title: str | None = (pdf_meta.get("title") or "").strip() or None
     if not paper_title and doc.page_count > 0:
         first_lines = [ln.strip() for ln in first_text.splitlines() if ln.strip()]
         _skip = re.compile(r"(?i)^(https?://|10\.\d{4}|doi|vol|pp\.|©|received|accepted|published|edited|keywords)")
@@ -373,13 +373,13 @@ def extract_pub_metadata(doc: "fitz.Document", pdf_path: str) -> Dict[str, Any]:
                 paper_title = " ".join(title_parts)
                 break
 
-    authors: List[str] = []
+    authors: list[str] = []
     raw_author = (pdf_meta.get("author") or "").strip()
     if raw_author:
         parts = re.split(r";| and ", raw_author)
         authors = [p.strip() for p in parts if p.strip()]
 
-    doi: Optional[str] = None
+    doi: str | None = None
     for key in ("subject", "keywords", "identifier"):
         val = pdf_meta.get(key, "") or ""
         m = re.search(r"10\.\d{4,}/\S+", val)
@@ -394,17 +394,17 @@ def extract_pub_metadata(doc: "fitz.Document", pdf_path: str) -> Dict[str, Any]:
                 doi = m.group(0).rstrip(".,)")
                 break
 
-    keywords: List[str] = []
+    keywords: list[str] = []
     raw_kw = (pdf_meta.get("keywords") or "").strip()
     if raw_kw:
         kw_parts = re.split(r"[;,]", raw_kw)
         keywords = [k.strip() for k in kw_parts if k.strip()]
 
-    journal: Optional[str] = None
-    volume: Optional[str] = None
-    issue: Optional[str] = None
-    pages_range: Optional[str] = None
-    abstract_text: Optional[str] = None
+    journal: str | None = None
+    volume: str | None = None
+    issue: str | None = None
+    pages_range: str | None = None
+    abstract_text: str | None = None
 
     if first_text:
         jrnl_m = re.search(

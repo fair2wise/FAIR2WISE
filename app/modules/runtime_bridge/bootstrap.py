@@ -24,17 +24,17 @@ The T09 ``vision_*`` paper-figure tools (``app.modules.vision.tools.VisionToolse
 
 from __future__ import annotations
 
-from typing import Any, Tuple
+from typing import Any
 
 from ..agent_runtime.registry import ToolRegistry
 from ..agent_runtime.skills import Skill, SkillRegistry
-from ..tools.bootstrap import build_registry, build_skill_registry
 from ..literature.skill import LITERATURE_RESEARCH_SKILL
-from ..vision.skill import PAPER_FIGURES_SKILL
 from ..operations.corpus import AUDIT_LITERATURE_CORPUS_SKILL
 from ..operations.graph import ANALYZE_KNOWLEDGE_GRAPH_SKILL
-from ..operations.papers import SUMMARIZE_LITERATURE_SKILL, TOOL_NAME as SUMMARY_TOOL_NAME
-
+from ..operations.papers import SUMMARIZE_LITERATURE_SKILL
+from ..operations.papers import TOOL_NAME as SUMMARY_TOOL_NAME
+from ..tools.bootstrap import build_registry, build_skill_registry
+from ..vision.skill import PAPER_FIGURES_SKILL
 from .qa_tool import ANSWER_FROM_KNOWLEDGE, TOOL_NAME, LegacyResultLedger, make_answer_tool
 
 ANSWER_SKILL = Skill(
@@ -106,4 +106,4 @@ def build_read_skills(registry: ToolRegistry) -> SkillRegistry:
     return build_skill_registry(registry, skills=skills, require_coverage=True)
 
 
-__all__: Tuple[str, ...] = ("ANSWER_SKILL", "QA_DELEGATION_PROMPT", "build_read_registry", "build_read_skills")
+__all__: tuple[str, ...] = ("ANSWER_SKILL", "QA_DELEGATION_PROMPT", "build_read_registry", "build_read_skills")

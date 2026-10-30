@@ -22,7 +22,7 @@ code-snippet provenance stay attached as mention attributes.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 from ..contract import ChunkCoverage, ExtractedMention, ExtractionResult, ExtractionSource, frozen_copy
 
@@ -47,7 +47,7 @@ class TextPages:
     def __init__(self, page_texts: Sequence[str]) -> None:
         self._pages = [str(t) for t in page_texts]
         self.page_count = len(self._pages)
-        self.metadata: Dict[str, Any] = {}
+        self.metadata: dict[str, Any] = {}
 
     def load_page(self, number: int) -> _Page:
         """Return page ``number`` (0-based)."""
@@ -67,7 +67,7 @@ class LegacyF2WStrategy:
     def __init__(self, extractor: Any) -> None:
         self.extractor = extractor
 
-    def _inference(self) -> Dict[str, Any]:
+    def _inference(self) -> dict[str, Any]:
         client = getattr(self.extractor, "chat_client", None)
         return {
             "path": "extract_terms.LLMTermExtractor.call_llm",
@@ -76,9 +76,9 @@ class LegacyF2WStrategy:
             "temperature": getattr(self.extractor, "temperature", None),
         }
 
-    def run(self, source: ExtractionSource) -> Tuple[str, List[ChunkCoverage]]:
+    def run(self, source: ExtractionSource) -> tuple[str, list[ChunkCoverage]]:
         """Run the extractor on ``source``; return the ``source_paper`` filename and coverage."""
-        coverage: List[ChunkCoverage] = []
+        coverage: list[ChunkCoverage] = []
         if source.pdf_path:
             filename = os.path.basename(source.pdf_path)
             changed_pages = self.extractor.process_pdf(source.pdf_path)
@@ -126,8 +126,8 @@ class LegacyF2WStrategy:
         )
 
 
-def mentions_for_term(term: Dict[str, Any], filename: str, *, extracted_by: str = STRATEGY_NAME
-                      ) -> List[ExtractedMention]:
+def mentions_for_term(term: dict[str, Any], filename: str, *, extracted_by: str = STRATEGY_NAME
+                      ) -> list[ExtractedMention]:
     """One mention per (page, snippet) of this file for one terms-JSON entry (shared by the agent strategy)."""
     pages = list(term.get("pages") or [])
     snippets = [s for s in term.get("context_snippets") or [] if s.get("source_paper") == filename]
@@ -140,7 +140,7 @@ def mentions_for_term(term: Dict[str, Any], filename: str, *, extracted_by: str 
                 canonical=False, slug=str(term.get("term", "")).strip().lower(), extracted_by=extracted_by,
                 attributes=attributes)
     if not snippets:
-        page: Optional[int] = pages[0] if pages else None
+        page: int | None = pages[0] if pages else None
         return [ExtractedMention(page=page, **base)]
     return [
         ExtractedMention(page=s.get("page"), chunk_id=f"page:{s.get('page')}", quote=str(s.get("text") or ""),

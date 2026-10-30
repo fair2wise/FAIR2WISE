@@ -18,20 +18,18 @@ never authorization: the executor still checks every call.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import re
 import threading
-from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, List, Optional, Tuple
 
 from ..contracts import CAPABILITIES, RequestContext
-
 from .registry import FORBIDDEN_NAME_PREFIXES, RegisteredTool, ToolRegistry, effective_capabilities
 
 SKILL_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*[a-z0-9]$", re.ASCII)
 
 #: Skill-name fragments that stay in FORGE (simulation, calibration, fitting measured data).
 #: ``analyze_paper_figures`` is a planned literature skill, so "analy" is not banned by name.
-FORBIDDEN_SKILL_WORDS: Tuple[str, ...] = ("simulat", "calibrat", "fit_measured")
+FORBIDDEN_SKILL_WORDS: tuple[str, ...] = ("simulat", "calibrat", "fit_measured")
 
 
 class SkillRegistryError(Exception):
@@ -54,8 +52,8 @@ class Skill:
     name: str
     description: str
     when_to_use: str
-    tools: Tuple[str, ...] = ()
-    required_capabilities: FrozenSet[str] = field(default_factory=frozenset)
+    tools: tuple[str, ...] = ()
+    required_capabilities: frozenset[str] = field(default_factory=frozenset)
 
 
 class SkillRegistry:
@@ -69,7 +67,7 @@ class SkillRegistry:
         if not isinstance(tool_registry, ToolRegistry):
             raise SkillRegistryError("SkillRegistry needs an explicit ToolRegistry instance")
         self._tools = tool_registry
-        self._skills: Dict[str, Skill] = {}
+        self._skills: dict[str, Skill] = {}
         self._frozen = False
         self._lock = threading.Lock()
 
@@ -115,26 +113,26 @@ class SkillRegistry:
                 raise SkillRegistryError(f"skill {skill.name!r} requires unknown capabilities {sorted(unknown)}")
             self._skills[skill.name] = skill
 
-    def freeze(self, *, require_coverage: bool = True) -> "SkillRegistry":
+    def freeze(self, *, require_coverage: bool = True) -> SkillRegistry:
         """Verify, then refuse every further registration. Returns ``self``."""
         self.verify(require_coverage=require_coverage)
         with self._lock:
             self._frozen = True
         return self
 
-    def get(self, name: str) -> Optional[Skill]:
+    def get(self, name: str) -> Skill | None:
         """Return the skill called ``name`` or ``None``."""
         return self._skills.get(name)
 
-    def list_skills(self) -> List[Skill]:
+    def list_skills(self) -> list[Skill]:
         """All skills, sorted by name."""
         return sorted(self._skills.values(), key=lambda s: s.name)
 
-    def skills_for_tool(self, tool_name: str) -> List[Skill]:
+    def skills_for_tool(self, tool_name: str) -> list[Skill]:
         """Every skill that includes ``tool_name``, sorted by name."""
         return sorted((s for s in self._skills.values() if tool_name in s.tools), key=lambda s: s.name)
 
-    def resolve(self, name: str) -> List[RegisteredTool]:
+    def resolve(self, name: str) -> list[RegisteredTool]:
         """Return the registry entries behind a skill, in declared order.
 
         Raises:
@@ -165,8 +163,8 @@ class SkillRegistry:
             if orphans:
                 raise SkillRegistryError(f"{len(orphans)} registered tool(s) belong to no skill: {orphans}")
 
-    def visible_to(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None,
-                   tools: Optional[FrozenSet[str]] = None) -> List[Skill]:
+    def visible_to(self, ctx: RequestContext, *, scope: frozenset[str] | None = None,
+                   tools: frozenset[str] | None = None) -> list[Skill]:
         """Skills a turn may see: required capabilities held and at least one tool visible.
 
         Each returned skill lists only the tools visible to ``ctx`` (narrowed further to
@@ -187,13 +185,13 @@ class SkillRegistry:
                                  skill.required_capabilities))
         return out
 
-    def render_prompt_section(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None,
-                              tools: Optional[FrozenSet[str]] = None) -> str:
+    def render_prompt_section(self, ctx: RequestContext, *, scope: frozenset[str] | None = None,
+                              tools: frozenset[str] | None = None) -> str:
         """Prompt text for the skills visible to ``ctx``; empty when none are visible."""
         return render_prompt_section(self.visible_to(ctx, scope=scope, tools=tools))
 
 
-def render_prompt_section(skills: List[Skill]) -> str:
+def render_prompt_section(skills: list[Skill]) -> str:
     """Render skills as prompt text (description, when-to-use, tool count; no tool names)."""
     if not skills:
         return ""

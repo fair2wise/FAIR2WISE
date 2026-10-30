@@ -26,8 +26,8 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/analysis/figure_extrac
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
+import re
 from typing import Any
 
 import numpy as np

@@ -20,12 +20,12 @@ als_knowledge_agent/src/als_knowledge_agent/graph/parsed_document.py
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
-import re
-from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Tuple
+import re
+from typing import Any, Mapping
 
 #: Version of the serialized document record.
 DOCUMENT_SCHEMA_VERSION = 1
@@ -54,7 +54,7 @@ class BoundingBox:
     coord_origin: str = "BOTTOMLEFT"
     units: str = "pt"
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Flat form (donor keys plus ``units``)."""
         return {
             "l": self.left,
@@ -66,7 +66,7 @@ class BoundingBox:
         }
 
     @classmethod
-    def from_dict(cls, value: Optional[Mapping[str, Any]]) -> Optional["BoundingBox"]:
+    def from_dict(cls, value: Mapping[str, Any] | None) -> BoundingBox | None:
         """Inverse of :meth:`as_dict`; ``None`` passes through."""
         if not value:
             return None
@@ -101,14 +101,14 @@ class ParsedFigure:
     caption: str
     page: int
     index: int
-    bbox: Optional[BoundingBox] = None
-    images_scale: Optional[float] = None
+    bbox: BoundingBox | None = None
+    images_scale: float | None = None
     asset_ref: str = ""
     spans_ref: str = ""
-    caption_bbox: Optional[BoundingBox] = None
+    caption_bbox: BoundingBox | None = None
     figure_id: str = ""
-    path: Optional[Path] = None
-    spans_path: Optional[Path] = None
+    path: Path | None = None
+    spans_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -117,25 +117,25 @@ class ParsedSection:
 
     name: str
     text: str
-    page: Optional[int] = None
+    page: int | None = None
     level: int = 0
     structural_id: str = ""
-    bbox: Optional[BoundingBox] = None
-    end_page: Optional[int] = None
+    bbox: BoundingBox | None = None
+    end_page: int | None = None
 
 
 @dataclass(frozen=True)
 class ParsedTable:
     """One table with its CSV asset and geometry."""
 
-    page: Optional[int]
+    page: int | None
     n_rows: int
     n_cols: int
     data_ref: str = ""
     caption: str = ""
-    bbox: Optional[BoundingBox] = None
+    bbox: BoundingBox | None = None
     table_id: str = ""
-    data_path: Optional[Path] = None
+    data_path: Path | None = None
 
 
 def config_hash(config: Mapping[str, Any]) -> str:
@@ -162,14 +162,14 @@ class ParsedDocument:
     num_pages: int
     parser: str
     parser_version: str = ""
-    parser_config: Dict[str, Any] = field(default_factory=dict)
-    sections: Tuple[ParsedSection, ...] = ()
-    figures: Tuple[ParsedFigure, ...] = ()
-    tables: Tuple[ParsedTable, ...] = ()
-    pages: Tuple[PageInfo, ...] = ()
-    timings: Dict[str, float] = field(default_factory=dict)
+    parser_config: dict[str, Any] = field(default_factory=dict)
+    sections: tuple[ParsedSection, ...] = ()
+    figures: tuple[ParsedFigure, ...] = ()
+    tables: tuple[ParsedTable, ...] = ()
+    pages: tuple[PageInfo, ...] = ()
+    timings: dict[str, float] = field(default_factory=dict)
     schema_version: int = DOCUMENT_SCHEMA_VERSION
-    pdf_path: Optional[Path] = None
+    pdf_path: Path | None = None
 
     @property
     def file_sha256(self) -> str:
@@ -181,11 +181,11 @@ class ParsedDocument:
         """Versioned output namespace: ``<parser>-<version>-<config hash>``."""
         return f"{self.parser}-{self.parser_version or 'unknown'}-{config_hash(self.parser_config)}"
 
-    def section_names(self) -> Tuple[str, ...]:
+    def section_names(self) -> tuple[str, ...]:
         """Section names in document order."""
         return tuple(s.name for s in self.sections)
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         """Serialized form with asset refs only (no local paths)."""
         return {
             "schema_version": self.schema_version,
@@ -241,7 +241,7 @@ class ParsedDocument:
             ],
         }
 
-    def as_legacy_dict(self) -> Dict[str, Any]:
+    def as_legacy_dict(self) -> dict[str, Any]:
         """The donor's legacy dict contract (``markdown``, ``figures`` ...), for unmigrated callers.
 
         Asset locations are the transient path when present, else the store ref.
@@ -277,7 +277,7 @@ class ParsedDocument:
             "timings": self.timings,
         }
 
-    def without_paths(self) -> "ParsedDocument":
+    def without_paths(self) -> ParsedDocument:
         """Copy with every transient local path cleared."""
         return replace(
             self,
@@ -287,9 +287,9 @@ class ParsedDocument:
         )
 
 
-def figure_geometry_props(figure: Mapping[str, Any]) -> Dict[str, Any]:
+def figure_geometry_props(figure: Mapping[str, Any]) -> dict[str, Any]:
     """Geometry keys a figure record should carry (only those present; bbox JSON-encoded)."""
-    props: Dict[str, Any] = {}
+    props: dict[str, Any] = {}
     if figure.get("bbox"):
         props["bbox"] = json.dumps(figure["bbox"], sort_keys=True)
     if figure.get("images_scale"):
@@ -361,12 +361,12 @@ def document_from_dict(data: Mapping[str, Any]) -> ParsedDocument:
     )
 
 
-def extract_sections(markdown: str) -> Dict[str, str]:
+def extract_sections(markdown: str) -> dict[str, str]:
     """Split markdown into named sections on ``#`` headings, ignoring fenced code (donor ``_extract_sections``).
 
     Names are lowercased; a repeated name gets `` [2]``, `` [3]`` ...
     """
-    sections: Dict[str, str] = {}
+    sections: dict[str, str] = {}
     current, content, in_fence = "preamble", [], False
 
     def flush() -> None:

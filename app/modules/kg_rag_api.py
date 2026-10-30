@@ -12,9 +12,9 @@ if __name__ == "__main__" and not __package__:
     # relative imports resolve under one name. sys.path[0] is the script's own
     # directory (app/modules); replace it with the repo root instead of adding
     # app/ or app/modules to sys.path.
+    from pathlib import Path as _Path
     import runpy as _runpy
     import sys as _sys
-    from pathlib import Path as _Path
 
     _sys.path[0] = str(_Path(__file__).resolve().parents[2])
     _runpy.run_module("app.modules.kg_rag_api", run_name="__main__", alter_sys=True)
@@ -22,34 +22,38 @@ if __name__ == "__main__" and not __package__:
 
 import argparse
 import asyncio
+from collections import defaultdict, deque
 import contextlib
 import contextvars
+from dataclasses import dataclass
 import datetime
 import hashlib
 import json
 import logging
 import math
 import os
+from pathlib import Path
 import re
 import sys
-from collections import defaultdict, deque
-from dataclasses import dataclass
-from pathlib import Path
 import time
-from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Sequence, Tuple, Union
+from typing import Any, Callable, Protocol, Sequence, Union
 from urllib.parse import urlparse
+
 import aiohttp
-import openai
-import requests
-from colorama import Fore, Style, init as colorama_init
+from colorama import Fore, Style
+from colorama import init as colorama_init
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz  # PyMuPDF
 import numpy as np
+import openai
+
 # from nvtx import annotate
 from rapidfuzz import fuzz
+import requests
 import uvicorn
 
 # Skip heavy semantic-retrieval imports (faiss + sentence-transformers + torch,
@@ -81,9 +85,9 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-from .project_config import config_value  # noqa: E402 - after the optional semantic imports
-from .cborg_limiter import async_slot  # noqa: E402
 from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
+from .cborg_limiter import async_slot  # noqa: E402
+from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if __name__ == "__main__":
     # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):
@@ -148,7 +152,7 @@ DEFAULT_RETRIEVAL_BACKEND = (
     else "lexical"
 )
 RETRIEVAL_BACKEND = os.environ.get("KG_RAG_RETRIEVAL_BACKEND", DEFAULT_RETRIEVAL_BACKEND).lower()
-USER_BATCH_OVERRIDE: Optional[str] = os.environ.get("KG_RAG_BATCH")
+USER_BATCH_OVERRIDE: str | None = os.environ.get("KG_RAG_BATCH")
 
 PDF_SNIPPET_LEN = int(os.environ.get("KG_RAG_SNIP", "1_000"))
 CONTEXT_CHAR_BUDGET = int(os.environ.get("KG_RAG_CTX_CHARS", "16_000"))
@@ -212,14 +216,14 @@ DEFAULT_API_PORT = 11435
 
 #: PDF snippets ``KnowledgeGraph.build_context`` put into the prompt of the running model-API
 #: turn, as ``(pdf name, snippet)``; ``None`` outside :func:`capture_pdf_snippets`.
-_PDF_SNIPPETS: contextvars.ContextVar[Optional[List[Tuple[str, str]]]] = contextvars.ContextVar(
+_PDF_SNIPPETS: contextvars.ContextVar[list[tuple[str, str]] | None] = contextvars.ContextVar(
     "kg_rag_pdf_snippets", default=None)
 
 
 @contextlib.contextmanager
 def capture_pdf_snippets():
     """Collect the PDF snippets rendered into the prompt while the block runs (D19 sources)."""
-    captured: List[Tuple[str, str]] = []
+    captured: list[tuple[str, str]] = []
     token = _PDF_SNIPPETS.set(captured)
     try:
         yield captured
@@ -240,8 +244,8 @@ class ModelTurnSources:
 
     VERSION_PREFIX = "kg-rag-snippet"
 
-    def __init__(self, snippets: Sequence[Tuple[str, str]] = ()) -> None:
-        self._text: Dict[Tuple[str, str], str] = {}
+    def __init__(self, snippets: Sequence[tuple[str, str]] = ()) -> None:
+        self._text: dict[tuple[str, str], str] = {}
         for pdf, snippet in snippets:
             self.add(pdf, snippet)
 
@@ -257,18 +261,18 @@ class ModelTurnSources:
     def __bool__(self) -> bool:
         return bool(self._text)
 
-    def refs(self) -> List[Any]:
+    def refs(self) -> list[Any]:
         """One ``SourceRef`` per retained snippet."""
         from .contracts.evidence import SourceLocator
         from .security.disclosure import SourceRef
 
         return [SourceRef(name, version, SourceLocator(), f"[PDF: {name}]") for name, version in sorted(self._text)]
 
-    def work_ids(self) -> List[str]:
+    def work_ids(self) -> list[str]:
         """PDF names the regions belong to (the grant's ``work_ids``)."""
         return sorted({name for name, _version in self._text})
 
-    def read(self, source_version: str, locator: Any) -> Optional[str]:
+    def read(self, source_version: str, locator: Any) -> str | None:
         """Retained text of one region; only ever called by a ``QuoteVerifier`` under a grant."""
         for (_name, version), text in self._text.items():
             if version == source_version:
@@ -279,14 +283,14 @@ class ModelTurnSources:
 def create_fastapi_app(
     graph_file: str,
     backend: str = LLM_BACKEND,
-    model: Optional[str] = None,
+    model: str | None = None,
     *,
-    deployment: Optional[Any] = None,
-    startup_config: Optional[Dict[str, str]] = None,
-    identity_port: Optional[Any] = None,
-    credential_store: Optional[Any] = None,
-    clock: Optional[Callable[[], Any]] = None,
-    gaps_dir: Optional[Union[str, Path]] = None,
+    deployment: Any | None = None,
+    startup_config: dict[str, str] | None = None,
+    identity_port: Any | None = None,
+    credential_store: Any | None = None,
+    clock: Callable[[], Any] | None = None,
+    gaps_dir: Union[str, Path] | None = None,
 ) -> FastAPI:
     """Create a FastAPI app that proxies chat requests through the KG-RAG pipeline.
 
@@ -324,6 +328,7 @@ def create_fastapi_app(
     """
     from app.api.auth import AccessRuntime, install_access_control, request_context, undeclared_routes
     from app.api.legacy_ui import deployment_settings_from
+
     from .contracts.context import RequestContext
     from .security.authorization import MODEL_API_SURFACE, StartupConfigError
     from .security.content_access import ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceKind
@@ -333,7 +338,7 @@ def create_fastapi_app(
     if not settings.is_local and (identity_port is None or credential_store is None):
         raise StartupConfigError("config_rejected: ALS profiles need identity_port and credential_store")
     app = FastAPI(title="KG-RAG Chat Proxy")
-    runtime_kw: Dict[str, Any] = {"identity_port": identity_port, "credential_store": credential_store,
+    runtime_kw: dict[str, Any] = {"identity_port": identity_port, "credential_store": credential_store,
                                   "surface": MODEL_API_SURFACE}
     if clock is not None:
         runtime_kw["clock"] = clock
@@ -343,7 +348,7 @@ def create_fastapi_app(
     source_authority = SourceAccessAuthority()
 
     kg = KnowledgeGraph(graph_file)
-    clients: List[ChatClient] = []
+    clients: list[ChatClient] = []
 
     def _client() -> ChatClient:
         """The chat client, built on the first chat turn (startup never needs the provider key)."""
@@ -355,7 +360,7 @@ def create_fastapi_app(
     # base_c = Conversation(BASELINE_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file, out_dir=gaps_dir)  # disabled when the directory is read-only
 
-    def _project(ctx: RequestContext, payload: Dict[str, Any], sources: ModelTurnSources) -> Any:
+    def _project(ctx: RequestContext, payload: dict[str, Any], sources: ModelTurnSources) -> Any:
         """Project a chat body for ``ctx`` with the turn's PDF windows as verifiable source regions."""
         viewer = Viewer.from_context(ctx)
         refs = sources.refs()
@@ -376,7 +381,7 @@ def create_fastapi_app(
             if grant is not None:
                 source_authority.revoke(grant)
 
-    async def _answer_messages(messages: Sequence[Dict[str, str]]) -> str:
+    async def _answer_messages(messages: Sequence[dict[str, str]]) -> str:
         """Answer the last user message from *messages* using KG-RAG context."""
         q = messages[-1]["content"]
 
@@ -391,7 +396,7 @@ def create_fastapi_app(
         rag_prompt = build_rag_prompt(q, ctx)
         rag_resp = await _client().chat(rag_c.build(rag_prompt))
 
-        missing: List[MissingNode] = []
+        missing: list[MissingNode] = []
         if all(ni.evidence_ct == 0 for ni in infos):
             missing.append(MissingNode(q, "unknown", "no evidence in KG", time.time()))
         for m in re.findall(r"\[Domain Knowledge\](.*?)\n", rag_resp):
@@ -483,8 +488,8 @@ def create_fastapi_app(
     return app
 
 
-def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: Optional[str] = None, *,
-                host: Optional[str] = None, port: int = DEFAULT_API_PORT):
+def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: str | None = None, *,
+                host: str | None = None, port: int = DEFAULT_API_PORT):
     """Launch the FastAPI KG-RAG server (default ``127.0.0.1:11435``).
 
     Args:
@@ -531,11 +536,11 @@ class MissingNodeTracker:
             disabled: ``path`` is ``None``, ``log`` keeps nothing, and a warning is logged once.
     """
 
-    def __init__(self, kg_file: str, out_dir: Optional[Union[str, Path]] = None) -> None:
+    def __init__(self, kg_file: str, out_dir: Union[str, Path] | None = None) -> None:
         """Initialize tracker with output path derived from KG filename."""
         kg_name = Path(kg_file).stem
         directory = Path(out_dir) if out_dir is not None else DEFAULT_GAPS_DIR
-        self.path: Optional[Path] = directory / f"missing_nodes_{kg_name}.jsonl"
+        self.path: Path | None = directory / f"missing_nodes_{kg_name}.jsonl"
         try:
             directory.mkdir(parents=True, exist_ok=True)
             if not self.path.exists():
@@ -578,13 +583,13 @@ def _strip_ansi(text: str) -> str:
 
 
 # @annotate('_tokenize')
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     """Split text into lowercase alphanumeric tokens."""
     return re.findall(r"[A-Za-z0-9]+", text.lower())
 
 
 # @annotate('_noun_phrases')
-def _noun_phrases(text: str) -> List[str]:
+def _noun_phrases(text: str) -> list[str]:
     """Extract noun phrases via NLTK chunking, or return text as-is if NLTK unavailable."""
     if not _NLTK_OK:
         return [text] if text.strip() else []
@@ -592,7 +597,7 @@ def _noun_phrases(text: str) -> List[str]:
     tags = pos_tag(toks)
     grammar = "NP: {<DT>?<JJ.*>*<NN.*>+}"
     tree = RegexpParser(grammar).parse(tags)
-    out: List[str] = []
+    out: list[str] = []
     for subtree in tree.subtrees(lambda t: t.label() == "NP"):
         phrase = " ".join(w for w, _ in subtree.leaves()).strip()
         if phrase:
@@ -601,13 +606,13 @@ def _noun_phrases(text: str) -> List[str]:
 
 
 # @annotate('extract_query_entities')
-def extract_query_entities(q: str) -> List[str]:
+def extract_query_entities(q: str) -> list[str]:
     """Return deduplicated noun phrases + ≥3-char tokens."""
-    ents: List[str] = []
+    ents: list[str] = []
     ents.extend([np for np in _noun_phrases(q) if len(np) >= 3])
     ents.extend([tok for tok in _tokenize(q) if len(tok) >= 3])
     seen: set[str] = set()
-    uniq: List[str] = []
+    uniq: list[str] = []
     for e in ents:
         k = e.lower()
         if k in seen:
@@ -668,7 +673,7 @@ def format_domain_features(features: Any, *, multiline: bool = False) -> str:
     """Format schema-driven CodeSnippet domain features for search and context."""
     if not isinstance(features, list):
         return ""
-    parts: List[str] = []
+    parts: list[str] = []
     for feature in features:
         if not isinstance(feature, dict):
             continue
@@ -689,12 +694,12 @@ def format_domain_features(features: Any, *, multiline: bool = False) -> str:
     return " ".join(parts)
 
 
-def _as_source_metadata(raw: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def _as_source_metadata(raw: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Return source_paper -> metadata map from supported graph shapes."""
     meta = raw.get("source_metadata") or {}
     if not isinstance(meta, dict):
         meta = {}
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for source, values in meta.items():
         if isinstance(values, dict):
             out[str(source)] = values
@@ -709,9 +714,9 @@ def _as_source_metadata(raw: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     return out
 
 
-def _as_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _as_publications(raw: dict[str, Any]) -> list[dict[str, Any]]:
     """Return embedded publication records from new or legacy graph shapes."""
-    publications: List[Dict[str, Any]] = []
+    publications: list[dict[str, Any]] = []
     for pub in raw.get("publications") or []:
         if isinstance(pub, dict):
             source = str(pub.get("source_paper") or "").strip()
@@ -747,9 +752,9 @@ def _as_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
     return []
 
 
-def _unique_sources(sources: Sequence[Any], limit: int = 3) -> List[str]:
+def _unique_sources(sources: Sequence[Any], limit: int = 3) -> list[str]:
     """Return first unique non-empty source strings."""
-    out: List[str] = []
+    out: list[str] = []
     seen: set[str] = set()
     for source in sources:
         text = str(source).strip()
@@ -762,7 +767,7 @@ def _unique_sources(sources: Sequence[Any], limit: int = 3) -> List[str]:
     return out
 
 
-def _format_source_metadata(source: str, meta: Dict[str, Any]) -> str:
+def _format_source_metadata(source: str, meta: dict[str, Any]) -> str:
     """Render one source-scoped provenance line."""
     parts = [source]
     field_labels = (
@@ -792,7 +797,7 @@ def _splash_base_url(uri: str) -> str:
     raise ValueError(f"Unsupported splash-links URI scheme {parsed.scheme!r}")
 
 
-def _splash_graphql(uri: str, query: str, variables: Optional[dict] = None) -> dict:
+def _splash_graphql(uri: str, query: str, variables: dict | None = None) -> dict:
     """Execute one splash-links GraphQL request and return data payload."""
     url = f"{_splash_base_url(uri)}/splash_links/graphql"
     resp = requests.post(
@@ -832,13 +837,13 @@ query Links($limit: Int, $offset: Int) {
 """
 
 
-def _splash_node_id(entity: Dict[str, Any]) -> str:
+def _splash_node_id(entity: dict[str, Any]) -> str:
     """Stable node id from Splash URI, matkg_id property, or GraphQL entity id."""
     props = entity.get("properties") or {}
     return entity.get("uri") or props.get("matkg_id") or entity["id"]
 
 
-def _splash_entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
+def _splash_entity_to_node(entity: dict[str, Any]) -> dict[str, Any]:
     """Convert splash-links Entity GraphQL record to MatKG node dict."""
     props = dict(entity.get("properties") or {})
     node_id = _splash_node_id(entity)
@@ -856,10 +861,10 @@ def _splash_entity_to_node(entity: Dict[str, Any]) -> Dict[str, Any]:
 def _load_splash_links_graph(
     uri: str,
     page_size: int = SPLASH_LINKS_PAGE_SIZE,
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """Load all splash-links entities and links into MatKG-shaped data."""
-    entities: List[Dict[str, Any]] = []
-    links: List[Dict[str, Any]] = []
+    entities: list[dict[str, Any]] = []
+    links: list[dict[str, Any]] = []
 
     offset = 0
     while True:
@@ -881,7 +886,7 @@ def _load_splash_links_graph(
 
     uuid_to_node_id = {entity["id"]: _splash_node_id(entity) for entity in entities}
     nodes = [_splash_entity_to_node(entity) for entity in entities]
-    associations: List[Dict[str, Any]] = []
+    associations: list[dict[str, Any]] = []
     for link in links:
         subject = uuid_to_node_id.get(link.get("subjectId"))
         obj = uuid_to_node_id.get(link.get("objectId"))
@@ -932,7 +937,7 @@ class NodeInfo:
         # decaying linearly for older papers. No penalty for missing year.
         recency = 0.0
         if self.publication_year:
-            current_year = datetime.datetime.now(datetime.timezone.utc).year
+            current_year = datetime.datetime.now(datetime.UTC).year
             age = max(0, current_year - self.publication_year)
             recency = max(0.0, 0.1 * (1.0 - age / 10.0))
         return (
@@ -976,7 +981,7 @@ class KnowledgeGraph:
         self,
         graph_file: str,
         embed_model: str = EMBED_MODEL,
-        graph_source: Optional[str] = None,
+        graph_source: str | None = None,
     ) -> None:
         """Load KG from configured source, build adjacency index, and initialize retrieval backend."""
         logger.info(Fore.YELLOW + "Loading KG..." + Style.RESET_ALL)
@@ -1006,14 +1011,14 @@ class KnowledgeGraph:
         # Support both old format (things/associations) and new format (nodes/edges).
         _raw_nodes = data.get("things") or data.get("nodes") or []
         _raw_edges = data.get("associations") or data.get("edges") or []
-        self.nodes: Dict[str, Dict[str, Any]] = {
+        self.nodes: dict[str, dict[str, Any]] = {
             n["id"]: n for n in _raw_nodes if isinstance(n, dict) and n.get("id")
         }
-        self.out_edges: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        self.out_edges: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for e in _raw_edges:
             self.out_edges[e["subject"]].append(e)
 
-        self._canon_to_id: Dict[str, str] = {}
+        self._canon_to_id: dict[str, str] = {}
         for nid, n in self.nodes.items():
             canon = re.sub(r"[^a-z0-9]", "", n.get("name", "").lower())
             self._canon_to_id.setdefault(canon, nid)
@@ -1054,7 +1059,7 @@ class KnowledgeGraph:
         elif self.retrieval_backend != "lexical":
             raise ValueError(f"Unknown KG_RAG_RETRIEVAL_BACKEND: {self.retrieval_backend}")
 
-        self._cache: Dict[str, List[NodeScore]] = {}
+        self._cache: dict[str, list[NodeScore]] = {}
         logger.info(
             Fore.GREEN
             + f"KG ready ({len(self.ids)} nodes, retrieval={self.retrieval_backend})."
@@ -1083,7 +1088,7 @@ class KnowledgeGraph:
         self.batch_size = int(USER_BATCH_OVERRIDE or (16 if device == "cuda" else 32))
         logger.info("Encode batch size = %d", self.batch_size)
         logger.info("Encoding %d nodes (≤%d chars)...", len(texts), MAX_TEXT_CHARS)
-        embs: List[np.ndarray] = []
+        embs: list[np.ndarray] = []
         for i in range(0, len(texts), self.batch_size):
             chunk = texts[i: i + self.batch_size]
             try:
@@ -1147,7 +1152,7 @@ class KnowledgeGraph:
         """Normalize inner-product distances from [-1,1] to [0,1]."""
         return np.clip((d + 1.0) * 0.5, 0.0, 1.0)
 
-    def _semantic_search(self, q: str, topk: int) -> List[NodeScore]:
+    def _semantic_search(self, q: str, topk: int) -> list[NodeScore]:
         """Search nodes by embedding similarity using FAISS."""
         if q in self._cache:
             return self._cache[q]
@@ -1162,7 +1167,7 @@ class KnowledgeGraph:
         ]
         #  canonical de-dup
         seen: set[str] = set()
-        uniq: List[NodeScore] = []
+        uniq: list[NodeScore] = []
         for h in hits:
             canon = re.sub(r"[^a-z0-9]", "", self.nodes[h.id].get("name", "").lower())
             if canon in seen:
@@ -1172,14 +1177,14 @@ class KnowledgeGraph:
         self._cache[q] = uniq
         return uniq
 
-    def _lexical_search(self, q: str, topk: int) -> List[NodeScore]:
+    def _lexical_search(self, q: str, topk: int) -> list[NodeScore]:
         """Search nodes by token overlap (Jaccard-like) with query terms."""
         if q in self._cache:
             return self._cache[q]
         qt = set(t for t in _tokenize(q) if len(t) >= 3)
         if not qt:
             return []
-        hits: List[NodeScore] = []
+        hits: list[NodeScore] = []
         for nid, toks in zip(self.ids, self._lexical_docs):
             overlap = len(qt & toks)
             if overlap == 0:
@@ -1193,7 +1198,7 @@ class KnowledgeGraph:
         return self._cache[q]
 
     # @annotate('KnowledgeGraph::semantic_search')
-    def semantic_search(self, q: str, topk: int = DEFAULT_K * 2) -> List[NodeScore]:
+    def semantic_search(self, q: str, topk: int = DEFAULT_K * 2) -> list[NodeScore]:
         """Dispatch to semantic or lexical search based on configured retrieval backend."""
         if self.retrieval_backend == "semantic":
             return self._semantic_search(q, topk)
@@ -1201,17 +1206,17 @@ class KnowledgeGraph:
 
     #  Weighted BFS ---------------------------------------------------------
     # @annotate('KnowledgeGraph::weighted_bfs')
-    def neighborhood(self, seeds: Sequence[NodeScore], hops: int) -> List[NodeScore]:
+    def neighborhood(self, seeds: Sequence[NodeScore], hops: int) -> list[NodeScore]:
         """BFS neighborhood around seed nodes (graph.neighborhood contract)."""
         return self.weighted_bfs(seeds, hops=hops)
 
-    def weighted_bfs(self, seeds: Sequence[NodeScore], hops: int) -> List[NodeScore]:
+    def weighted_bfs(self, seeds: Sequence[NodeScore], hops: int) -> list[NodeScore]:
         """Expand seed nodes via weighted breadth-first search over KG edges."""
         if not seeds:
             return []
-        visited: Dict[str, float] = {}
-        depths: Dict[str, int] = {}
-        dq: Deque[Tuple[str, float, int]] = deque((s.id, s.score, 0) for s in seeds)
+        visited: dict[str, float] = {}
+        depths: dict[str, int] = {}
+        dq: deque[tuple[str, float, int]] = deque((s.id, s.score, 0) for s in seeds)
         while dq:
             nid, score, depth = dq.popleft()
             if depth > hops:
@@ -1240,12 +1245,12 @@ class KnowledgeGraph:
     # @annotate('KnowledgeGraph::build_nodeinfo')
     def build_nodeinfo(
         self, sem: Sequence[NodeScore], graph: Sequence[NodeScore], q_tokens: Sequence[str]
-    ) -> List[NodeInfo]:
+    ) -> list[NodeInfo]:
         """Merge semantic and graph scores into ranked NodeInfo objects with lexical overlap."""
         qt = [t.lower() for t in q_tokens if t]
         gmap, smap = {n.id: n for n in graph}, {n.id: n for n in sem}
         ids = set(gmap) | set(smap)
-        out: List[NodeInfo] = []
+        out: list[NodeInfo] = []
         for nid in ids:
             raw = self.nodes[nid]
             name = raw.get("name", nid)
@@ -1302,12 +1307,12 @@ class KnowledgeGraph:
         Returns:
             Formatted context string with node metadata, code blocks, and relations.
         """
-        parts: List[str] = []
+        parts: list[str] = []
         chars = 0
         rendered_ids = {ni.id for ni in nodes}
 
         if include_structured:
-            triples: List[str] = []
+            triples: list[str] = []
             for ni in nodes:
                 for e in self.out_edges.get(ni.id, []):
                     tgt_id = e["object"]
@@ -1444,7 +1449,7 @@ class KnowledgeGraph:
                         if captured is not None:
                             captured.append((pdf, snip))
             if self.out_edges.get(ni.id):
-                rel_lines: List[str] = []
+                rel_lines: list[str] = []
                 for e in sorted(self.out_edges[ni.id], key=lambda x: x["predicate"]):
                     tgt_id = e["object"]
                     if tgt_id not in rendered_ids:
@@ -1465,7 +1470,7 @@ class KnowledgeGraph:
 
 # ───────────────────── retrieval orchestrator ─────────────────────
 # @annotate('decompose')
-def decompose(q: str) -> List[str]:
+def decompose(q: str) -> list[str]:
     """Split a compound query into sub-questions for stepwise retrieval."""
     segs = re.split(r"[?;,]|\band\b|\bthen\b", q, flags=re.I)
     out = [s.strip() for s in segs if len(s.strip()) >= 3]
@@ -1477,9 +1482,9 @@ def retrieve_nodes(
     q: str,
     kg: KnowledgeGraph,
     *,
-    hops: Optional[int] = None,
-    max_nodes: Optional[int] = None,
-) -> List[NodeInfo]:
+    hops: int | None = None,
+    max_nodes: int | None = None,
+) -> list[NodeInfo]:
     """Retrieve and rank KG nodes relevant to query, including BFS expansion."""
     hop_count = MAX_BFS_HOPS if hops is None else max(0, int(hops))
     limit = DEFAULT_K if max_nodes is None else max(1, int(max_nodes))
@@ -1492,14 +1497,14 @@ def retrieve_nodes(
             seeds.extend(kg.semantic_search(sub)[:seed_k])
 
     #  keep highest score per node
-    s_map: Dict[str, NodeScore] = {}
+    s_map: dict[str, NodeScore] = {}
     for ns in seeds:
         cur = s_map.get(ns.id)
         if cur is None or ns.score > cur.score:
             s_map[ns.id] = ns
     sem = list(s_map.values())
 
-    graph: List[NodeScore] = []
+    graph: list[NodeScore] = []
     if ENABLE_BFS and hop_count > 0:
         expand = getattr(kg, "neighborhood", kg.weighted_bfs)
         graph = expand(
@@ -1518,7 +1523,7 @@ def retrieve_nodes(
     # context on code-heavy queries (each snippet renders full code body).
     MAX_SNIPPETS = 6
     code_ct = 0
-    capped: List[NodeInfo] = []
+    capped: list[NodeInfo] = []
     for ni in ranked:
         if ni.category == "CodeSnippet":
             code_ct += 1
@@ -1573,7 +1578,7 @@ async def run_competency_questions(
         print(Fore.GREEN + "[Baseline]\n" + base_resp[:500] + "..." + Style.RESET_ALL)
         print(Fore.GREEN + "[KG-RAG]\n" + rag_resp[:500] + "..." + Style.RESET_ALL)
 
-        missing: List[MissingNode] = []
+        missing: list[MissingNode] = []
         if all(ni.evidence_ct == 0 for ni in infos):
             missing.append(MissingNode(q, "unknown", "no evidence in KG", time.time()))
         for m in re.findall(r"\[Domain Knowledge\](.*?)\n", rag_resp):
@@ -1595,7 +1600,7 @@ class ChatClient(Protocol):
 
     model: str
 
-    async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+    async def chat(self, messages: Sequence[dict[str, str]]) -> str:
         """Send messages and return the assistant response."""
         ...
 
@@ -1609,7 +1614,7 @@ class OllamaClient:
         self.url, self.model = url, model
         self.timeout = aiohttp.ClientTimeout(total=LLM_TIMEOUT)
 
-    async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+    async def chat(self, messages: Sequence[dict[str, str]]) -> str:
         """Send messages to Ollama and return the assistant response."""
         async with aiohttp.ClientSession(timeout=self.timeout) as sess:
             r = await sess.post(
@@ -1635,8 +1640,8 @@ class CBorgClient:
     def __init__(
         self,
         model: str = CBORG_MODEL,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         """Initialize with CBORG model, API key, and base URL."""
         self.model = model
@@ -1646,7 +1651,7 @@ class CBorgClient:
             **openai_http_kwargs(asynchronous=True),
         )
 
-    async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+    async def chat(self, messages: Sequence[dict[str, str]]) -> str:
         """Send messages to CBORG and return the assistant response."""
         from .cborg_http import collect_stream_text_async
 
@@ -1673,7 +1678,7 @@ class CBorgClient:
             raise RuntimeError("CBORG authentication failed. Check CBORG_API_KEY.") from exc
 
 
-def make_chat_client(backend: str = LLM_BACKEND, model: Optional[str] = None) -> ChatClient:
+def make_chat_client(backend: str = LLM_BACKEND, model: str | None = None) -> ChatClient:
     """Instantiate the appropriate async chat client for the given backend."""
     b = (backend or "ollama").lower()
     if b == "ollama":
@@ -1690,7 +1695,7 @@ class Conversation:
     # @annotate('Conversation::__init__')
     def __init__(self, system_prompt: str) -> None:
         """Initialize with a system prompt message."""
-        self.messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        self.messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
     # @annotate('Conversation::add')
     def add(self, user: str, assistant: str) -> None:
@@ -1699,7 +1704,7 @@ class Conversation:
         self.messages.append({"role": "assistant", "content": assistant})
 
     # @annotate('Conversation::build')
-    def build(self, user: str, prepend: str | None = None) -> List[Dict[str, str]]:
+    def build(self, user: str, prepend: str | None = None) -> list[dict[str, str]]:
         """Build message list for LLM call, optionally prepending a system message."""
         msgs = list(self.messages)
         if prepend:
@@ -1789,7 +1794,7 @@ def build_rag_prompt(q: str, ctx: str) -> str:
 # ───────────────────── main Q&A loop ─────────────────────
 
 
-async def call_llm(cli: ChatClient, messages: Sequence[Dict[str, str]], label: str) -> str:
+async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: str) -> str:
     """Call the LLM with timeout handling, printing status to stdout."""
     from .f2w_agent.trace import record_llm_call
 
@@ -1878,7 +1883,7 @@ async def answer(
         print(Fore.GREEN + "\n[Baseline]\n" + base_resp + Style.RESET_ALL)
     print(Fore.GREEN + "\n[KG-RAG]\n" + rag_resp + Style.RESET_ALL)
 
-    missing: List[MissingNode] = []
+    missing: list[MissingNode] = []
     if all(ni.evidence_ct == 0 for ni in infos):
         missing.append(MissingNode(q, "unknown", "no evidence in KG", time.time()))
 

@@ -4,15 +4,17 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import contextvars
+from dataclasses import dataclass, field
+from dataclasses import replace as dataclass_replace
+from datetime import UTC
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import shutil
+from typing import Any, Awaitable, Callable, Sequence
 import uuid
-from dataclasses import dataclass, field, replace as dataclass_replace
-from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,9 +22,29 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import kg_update
-from .coordinator import Coordinator, CoordinatorConfig
 from .. import kg_rag_api as krag
-
+from ...api.auth import undeclared_routes, warn_if_exposed
+from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
+from ...api.origin_gate import OriginGateMiddleware
+from ...api.sessions import TiledSessionStore, install_session_routes
+from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
+from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
+from ..contracts.context import RequestContext
+from ..hybrid_rag.pipeline import hybrid_rag_enabled
+from ..project_config import config_value, get_config
+from ..runtime_bridge.selection import attach_read_path, attach_summary_path
+from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
+from ..tiled_graph import (
+    CITE_FOCUS_HOPS,
+    TILED_GRAPH_ID,
+    coerce_local_tiled_uri,
+    load_tiled_config,
+    lookup_experiment_identity,
+    probe_tiled_status,
+    resolve_tiled_node_id,
+    tiled_neighborhood_ids,
+)
+from .coordinator import Coordinator, CoordinatorConfig
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import (
     DownloadAgent,
@@ -31,39 +53,6 @@ from .download_agent import (
     _sanitize_openalex_search,
 )
 from .extractor_agent import ExtractorAgent
-from .orchestrator_agent import (
-    WorkflowOrchestratorAgent,
-    _direct_download_request,
-    _extracted_terms_followup,
-    _paper_reference_followup,
-)
-from .paper_evidence_agent import PaperEvidenceAgent, summarize_extracted_terms
-from .paper_evidence_agent import summarize_extracted_terms as _LEGACY_SUMMARIZE_EXTRACTED_TERMS
-from .trace import (
-    append_annotation,
-    append_ui_events,
-    attach_response as attach_trace_response,
-    bind_context,
-    current_turn_id,
-    finish_turn,
-    git_sha,
-    graph_fingerprints,
-    load_detail,
-    note_decision,
-    note_error,
-    note_precheck,
-    note_progress,
-    note_request,
-    open_turn,
-    settings_snapshot,
-    tracing_enabled,
-)
-from .retrieval_agent import (
-    RetrievalAgent,
-    _is_conceptual_question,
-    _is_numeric_claim,
-    _is_ops_layout_question,
-)
 from .multi_kg import (
     DEFAULT_JSON_GRAPH,
     DEFAULT_JSON_GRAPH_PATHS,
@@ -82,28 +71,43 @@ from .multi_kg import (
     primary_json_graph_path,
     unique_graph_paths,
 )
-from ..hybrid_rag.pipeline import hybrid_rag_enabled
-from ..tiled_graph import (
-    CITE_FOCUS_HOPS,
-    TILED_GRAPH_ID,
-    coerce_local_tiled_uri,
-    load_tiled_config,
-    lookup_experiment_identity,
-    probe_tiled_status,
-    resolve_tiled_node_id,
-    tiled_neighborhood_ids,
+from .orchestrator_agent import (
+    WorkflowOrchestratorAgent,
+    _direct_download_request,
+    _extracted_terms_followup,
+    _paper_reference_followup,
 )
-from ..project_config import config_value, get_config
-from ..runtime_bridge.selection import attach_read_path, attach_summary_path
-from ...api.auth import undeclared_routes, warn_if_exposed
-from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
-from ...api.origin_gate import OriginGateMiddleware
-from ...api.sessions import TiledSessionStore, install_session_routes
-from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
-from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
-from ..contracts.context import RequestContext
-from ..security.authorization import SETTINGS_DEPLOYMENT_FIELDS, StartupConfigError
+from .paper_evidence_agent import PaperEvidenceAgent
+from .paper_evidence_agent import summarize_extracted_terms
+from .paper_evidence_agent import summarize_extracted_terms as _LEGACY_SUMMARIZE_EXTRACTED_TERMS
+from .retrieval_agent import (
+    RetrievalAgent,
+    _is_conceptual_question,
+    _is_numeric_claim,
+    _is_ops_layout_question,
+)
 from .session_memory import SessionMemory
+from .trace import (
+    append_annotation,
+    append_ui_events,
+)
+from .trace import attach_response as attach_trace_response
+from .trace import (
+    bind_context,
+    current_turn_id,
+    finish_turn,
+    git_sha,
+    graph_fingerprints,
+    load_detail,
+    note_decision,
+    note_error,
+    note_precheck,
+    note_progress,
+    note_request,
+    open_turn,
+    settings_snapshot,
+    tracing_enabled,
+)
 from .workflow_state import WorkflowStateStore
 
 logger = logging.getLogger(__name__)
@@ -134,50 +138,50 @@ class ChatMessageInput(BaseModel):
 class ChatRequest(BaseModel):
     """Inbound chat request including message, history, session, and graph options."""
     message: str = Field(..., min_length=1)
-    messages: List[ChatMessageInput] = Field(default_factory=list)
-    session_id: Optional[str] = Field(
+    messages: list[ChatMessageInput] = Field(default_factory=list)
+    session_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
-    client_turn_id: Optional[str] = Field(
+    client_turn_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
-    ui_settings: Optional[Dict[str, Any]] = None
-    batch_id: Optional[str] = Field(
+    ui_settings: dict[str, Any] | None = None
+    batch_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=80,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$",
     )
-    graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
-    json_graph_path: Optional[str] = None
-    json_graph_paths: Optional[List[str]] = None
-    source_rag: Optional[bool] = None
-    use_live_tiled: Optional[bool] = None
+    graph_source: str | None = Field(default=None, pattern="^(splash|json)$")
+    json_graph_path: str | None = None
+    json_graph_paths: list[str] | None = None
+    source_rag: bool | None = None
+    use_live_tiled: bool | None = None
 
 
 class LinkedCodeSnippet(BaseModel):
     """A code snippet linked to a knowledge-graph node."""
     id: str
     label: str = ""
-    function_name: Optional[str] = None
-    code_language: Optional[str] = None
+    function_name: str | None = None
+    code_language: str | None = None
     code_snippet: str
-    publications: List[Dict[str, Any]] = Field(default_factory=list)
-    source_type: Optional[str] = None
-    repo_url: Optional[str] = None
-    repo_owner: Optional[str] = None
-    repo_name: Optional[str] = None
-    repo_commit_sha: Optional[str] = None
-    source_file_path: Optional[str] = None
-    source_file_url: Optional[str] = None
-    source_start_line: Optional[int] = None
-    source_end_line: Optional[int] = None
+    publications: list[dict[str, Any]] = Field(default_factory=list)
+    source_type: str | None = None
+    repo_url: str | None = None
+    repo_owner: str | None = None
+    repo_name: str | None = None
+    repo_commit_sha: str | None = None
+    source_file_path: str | None = None
+    source_file_url: str | None = None
+    source_start_line: int | None = None
+    source_end_line: int | None = None
 
 
 class GraphNode(BaseModel):
@@ -186,27 +190,27 @@ class GraphNode(BaseModel):
     label: str
     type: str
     description: str = ""
-    publications: List[Dict[str, Any]] = Field(default_factory=list)
-    code_snippet: Optional[str] = None
-    code_language: Optional[str] = None
-    function_name: Optional[str] = None
-    linked_code_snippets: List[LinkedCodeSnippet] = Field(default_factory=list)
-    graph_id: Optional[str] = None
-    graph_label: Optional[str] = None
-    formula: Optional[str] = None
-    source_papers: List[str] = Field(default_factory=list)
-    properties: List[Dict[str, Any]] = Field(default_factory=list)
-    extra_fields: Dict[str, Any] = Field(default_factory=dict)
-    source_type: Optional[str] = None
-    repo_url: Optional[str] = None
-    repo_owner: Optional[str] = None
-    repo_name: Optional[str] = None
-    repo_commit_sha: Optional[str] = None
-    source_file_path: Optional[str] = None
-    source_file_url: Optional[str] = None
-    source_start_line: Optional[int] = None
-    source_end_line: Optional[int] = None
-    repository_license: Optional[str] = None
+    publications: list[dict[str, Any]] = Field(default_factory=list)
+    code_snippet: str | None = None
+    code_language: str | None = None
+    function_name: str | None = None
+    linked_code_snippets: list[LinkedCodeSnippet] = Field(default_factory=list)
+    graph_id: str | None = None
+    graph_label: str | None = None
+    formula: str | None = None
+    source_papers: list[str] = Field(default_factory=list)
+    properties: list[dict[str, Any]] = Field(default_factory=list)
+    extra_fields: dict[str, Any] = Field(default_factory=dict)
+    source_type: str | None = None
+    repo_url: str | None = None
+    repo_owner: str | None = None
+    repo_name: str | None = None
+    repo_commit_sha: str | None = None
+    source_file_path: str | None = None
+    source_file_url: str | None = None
+    source_start_line: int | None = None
+    source_end_line: int | None = None
+    repository_license: str | None = None
 
 
 class GraphEdge(BaseModel):
@@ -218,8 +222,8 @@ class GraphEdge(BaseModel):
 
 class GraphPayload(BaseModel):
     """Nodes, edges, and source path for a graph view."""
-    nodes: List[GraphNode]
-    edges: List[GraphEdge]
+    nodes: list[GraphNode]
+    edges: list[GraphEdge]
     source_path: str
 
 
@@ -228,80 +232,80 @@ class ChatResponse(BaseModel):
     status: str
     answer: str
     sufficient: bool
-    node_ids: List[str]
-    publications: List[Dict[str, Any]] = Field(default_factory=list)
+    node_ids: list[str]
+    publications: list[dict[str, Any]] = Field(default_factory=list)
     confidence: float
-    rounds: List[Dict[str, Any]]
+    rounds: list[dict[str, Any]]
     graph: GraphPayload
-    graph_source_requested: Optional[str] = None
-    graph_source_used: Optional[str] = None
+    graph_source_requested: str | None = None
+    graph_source_used: str | None = None
     workdir: str
-    pending: Optional[Dict[str, Any]] = None
-    orchestration: Optional[Dict[str, Any]] = None
-    turn_id: Optional[str] = None
+    pending: dict[str, Any] | None = None
+    orchestration: dict[str, Any] | None = None
+    turn_id: str | None = None
 
 
 class ChatActionRequest(BaseModel):
     """Yes/no decision for a pending download or extraction."""
     decision: str = Field(..., pattern="^(yes|no)$")
-    kind: Optional[str] = Field(default=None, pattern="^(download|extraction)$")
-    candidate_index: Optional[int] = Field(default=None, ge=0)
-    messages: List[ChatMessageInput] = Field(default_factory=list)
-    session_id: Optional[str] = Field(
+    kind: str | None = Field(default=None, pattern="^(download|extraction)$")
+    candidate_index: int | None = Field(default=None, ge=0)
+    messages: list[ChatMessageInput] = Field(default_factory=list)
+    session_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
-    client_turn_id: Optional[str] = Field(
+    client_turn_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
-    parent_turn_id: Optional[str] = Field(
+    parent_turn_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
-    ui_settings: Optional[Dict[str, Any]] = None
-    graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
-    json_graph_path: Optional[str] = None
+    ui_settings: dict[str, Any] | None = None
+    graph_source: str | None = Field(default=None, pattern="^(splash|json)$")
+    json_graph_path: str | None = None
 
 
 class UiTelemetryEvent(BaseModel):
     """One browser interaction, never including draft keystrokes."""
     type: str = Field(..., min_length=1, max_length=80)
-    turn_id: Optional[str] = Field(
+    turn_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$",
     )
-    ts: Optional[str] = None
-    data: Dict[str, Any] = Field(default_factory=dict)
+    ts: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
 
 
 class UiTelemetryBatch(BaseModel):
     """Batch of UI events flushed by the browser."""
-    events: List[UiTelemetryEvent] = Field(default_factory=list)
+    events: list[UiTelemetryEvent] = Field(default_factory=list)
 
 
 class AnnotationRequest(BaseModel):
     """Human pass/fail label for one traced turn."""
     turn_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
     verdict: str = Field(..., pattern="^(pass|fail)$")
-    failure_tags: List[str] = Field(default_factory=list)
+    failure_tags: list[str] = Field(default_factory=list)
     note: str = ""
     annotator: str = ""
-    ts: Optional[str] = None
+    ts: str | None = None
 
 
 class GraphUploadRequest(BaseModel):
     """Uploaded MatKG JSON graph and suggested filename."""
     filename: str = "uploaded_graph.json"
-    graph: Dict[str, Any]
+    graph: dict[str, Any]
 
 
 class GraphUploadResponse(BaseModel):
@@ -327,18 +331,18 @@ class GraphNodeSearchResponse(BaseModel):
     """Node-search results with the retrieval backend used."""
     query: str
     retrieval_backend: str
-    results: List[GraphNodeSearchResult] = Field(default_factory=list)
+    results: list[GraphNodeSearchResult] = Field(default_factory=list)
 
 
 class LinkedCodeSnippetUpdate(BaseModel):
     """Upsert or unlink a linked code snippet on a node."""
     model_config = ConfigDict(populate_by_name=True)
 
-    id: Optional[str] = None
-    label: Optional[str] = None
-    function_name: Optional[str] = None
-    code_language: Optional[str] = None
-    code_snippet: Optional[str] = None
+    id: str | None = None
+    label: str | None = None
+    function_name: str | None = None
+    code_language: str | None = None
+    code_snippet: str | None = None
     action: str = Field(default="upsert", alias="_action", pattern="^(upsert|unlink)$")
 
 
@@ -352,13 +356,13 @@ class GraphRelationshipUpdate(BaseModel):
 
 class GraphNodeUpdateRequest(BaseModel):
     """Partial patch for a splash-mode graph node."""
-    label: Optional[str] = None
-    type: Optional[str] = None
-    description: Optional[str] = None
-    code_snippet: Optional[str] = None
-    publications: Optional[List[Dict[str, Any]]] = None
-    linked_code_snippets: Optional[List[LinkedCodeSnippetUpdate]] = None
-    relationship_updates: Optional[List[GraphRelationshipUpdate]] = None
+    label: str | None = None
+    type: str | None = None
+    description: str | None = None
+    code_snippet: str | None = None
+    publications: list[dict[str, Any]] | None = None
+    linked_code_snippets: list[LinkedCodeSnippetUpdate] | None = None
+    relationship_updates: list[GraphRelationshipUpdate] | None = None
 
 
 class PublicationSearchRequest(BaseModel):
@@ -372,8 +376,8 @@ class PublicationSearchResponse(BaseModel):
     """Ranked publications matching a search query."""
     status: str
     query: str
-    publications: List[Dict[str, Any]] = Field(default_factory=list)
-    matched_node_ids: List[str] = Field(default_factory=list)
+    publications: list[dict[str, Any]] = Field(default_factory=list)
+    matched_node_ids: list[str] = Field(default_factory=list)
     source: str
 
 
@@ -382,13 +386,13 @@ class SessionResetResponse(BaseModel):
     status: str
     session_memory: str
     session_memory_has_context: bool
-    workflow_state: Optional[str] = None
+    workflow_state: str | None = None
     workflow_phase: str = "idle"
 
 
 class SessionResetRequest(BaseModel):
     """Optional session id for a session reset."""
-    session_id: Optional[str] = Field(
+    session_id: str | None = Field(
         default=None,
         min_length=1,
         max_length=64,
@@ -404,47 +408,47 @@ class AgentSettingsResponse(BaseModel):
     workflow_mode: str = "agentic"
     extraction_mode: str = "targeted"
     targeted_max_pages: int = 6
-    json_graph_path: Optional[str] = None
-    json_graph_paths: List[str] = Field(default_factory=list)
+    json_graph_path: str | None = None
+    json_graph_paths: list[str] = Field(default_factory=list)
     kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
     kg_query_hops: int = DEFAULT_KG_QUERY_HOPS
     source_rag: bool = False
     use_live_tiled: bool = False
-    tiled_uri: Optional[str] = None
+    tiled_uri: str | None = None
     tiled_api_key_set: bool = False
     tiled_status: str = "disabled"
-    tiled_error: Optional[str] = None
-    available_json_graphs: List[str] = Field(default_factory=list)
+    tiled_error: str | None = None
+    available_json_graphs: list[str] = Field(default_factory=list)
     # Richer per-graph metadata (path, graph_id, label) for all KGs in storage/kg.
-    available_graphs: List[Dict[str, str]] = Field(default_factory=list)
+    available_graphs: list[dict[str, str]] = Field(default_factory=list)
     # IDs of currently selected graphs (subset of available_graphs).
-    selected_graph_ids: List[str] = Field(default_factory=list)
-    available_cborg_models: List[str] = Field(default_factory=list)
+    selected_graph_ids: list[str] = Field(default_factory=list)
+    available_cborg_models: list[str] = Field(default_factory=list)
     default_ollama_model: str = "deepseek-r1:70b"
 
 
 class AgentSettingsUpdate(BaseModel):
     """Partial update for runtime agent settings."""
-    backend: Optional[str] = Field(default=None, pattern="^(cborg|ollama)$")
-    model: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    graph_source: Optional[str] = Field(default=None, pattern="^(splash|json)$")
-    workflow_mode: Optional[str] = Field(default=None, pattern="^(deterministic|agentic)$")
-    extraction_mode: Optional[str] = Field(default=None, pattern="^(full|targeted)$")
-    targeted_max_pages: Optional[int] = Field(default=None, ge=1, le=100)
-    json_graph_path: Optional[str] = None
-    json_graph_paths: Optional[List[str]] = None
+    backend: str | None = Field(default=None, pattern="^(cborg|ollama)$")
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    graph_source: str | None = Field(default=None, pattern="^(splash|json)$")
+    workflow_mode: str | None = Field(default=None, pattern="^(deterministic|agentic)$")
+    extraction_mode: str | None = Field(default=None, pattern="^(full|targeted)$")
+    targeted_max_pages: int | None = Field(default=None, ge=1, le=100)
+    json_graph_path: str | None = None
+    json_graph_paths: list[str] | None = None
     # Alternative to json_graph_paths: select graphs by graph_id.
     # When present and json_graph_paths is absent, each id is resolved to
     # the best matching path from storage/kg (highest version wins).
-    selected_graph_ids: Optional[List[str]] = None
-    kg_query_max_nodes: Optional[int] = Field(default=None, ge=10, le=1000)
-    kg_query_hops: Optional[int] = Field(default=None, ge=1, le=MAX_KG_QUERY_HOPS)
-    source_rag: Optional[bool] = None
-    use_live_tiled: Optional[bool] = None
-    tiled_uri: Optional[str] = None
+    selected_graph_ids: list[str] | None = None
+    kg_query_max_nodes: int | None = Field(default=None, ge=10, le=1000)
+    kg_query_hops: int | None = Field(default=None, ge=1, le=MAX_KG_QUERY_HOPS)
+    source_rag: bool | None = None
+    use_live_tiled: bool | None = None
+    tiled_uri: str | None = None
 
 
-ProgressEmitter = Callable[[str, str, Dict[str, Any]], Awaitable[None]]
+ProgressEmitter = Callable[[str, str, dict[str, Any]], Awaitable[None]]
 
 # Legacy CBORG ids that still appear in old env/localStorage values.
 _CBORG_MODEL_ALIASES = {
@@ -458,7 +462,7 @@ _CBORG_MODEL_ALIASES = {
 }
 
 
-def normalize_cborg_model(model: Optional[str]) -> Optional[str]:
+def normalize_cborg_model(model: str | None) -> str | None:
     """Map a CBORG model name through aliases, or return it unchanged."""
     if model is None:
         return None
@@ -473,12 +477,12 @@ def project_root() -> Path:
     return Path.cwd()
 
 
-def storage_kg_dir(root: Optional[Path] = None) -> Path:
+def storage_kg_dir(root: Path | None = None) -> Path:
     """Return the storage/kg directory under the project root."""
     return (root or project_root()) / "storage" / "kg"
 
 
-def list_storage_kg_json_files(root: Optional[Path] = None) -> List[str]:
+def list_storage_kg_json_files(root: Path | None = None) -> list[str]:
     """List relative paths of JSON graphs in storage/kg."""
     kg_dir = storage_kg_dir(root)
     if not kg_dir.is_dir():
@@ -493,10 +497,10 @@ def list_storage_kg_json_files(root: Optional[Path] = None) -> List[str]:
 
 def default_json_graph_path(
     *,
-    configured_graph: Optional[str],
-    available: Optional[List[str]] = None,
-    configured_graphs: Optional[Sequence[str]] = None,
-) -> Optional[str]:
+    configured_graph: str | None,
+    available: list[str] | None = None,
+    configured_graphs: Sequence[str] | None = None,
+) -> str | None:
     """Pick the primary default JSON graph path from configured and available files."""
     paths = default_json_graph_paths(
         configured_graphs=configured_graphs,
@@ -515,13 +519,13 @@ class RuntimeSettings:
     workflow_mode: str = "agentic"
     extraction_mode: str = "targeted"
     targeted_max_pages: int = 6
-    json_graph_path: Optional[str] = None
-    json_graph_paths: List[str] = field(default_factory=list)
+    json_graph_path: str | None = None
+    json_graph_paths: list[str] = field(default_factory=list)
     kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES
     kg_query_hops: int = DEFAULT_KG_QUERY_HOPS
     source_rag: bool = False
     use_live_tiled: bool = False
-    tiled_uri: Optional[str] = None
+    tiled_uri: str | None = None
 
 
 #: T25D: runtime fields kept per ALS principal (deployment-wide ones stay on the server runtime).
@@ -543,11 +547,11 @@ _UPDATE_TOUCHES = {
     "use_live_tiled": ("use_live_tiled",),
 }
 #: T25D: personal-settings key of the caller for the current request (``None``: server settings).
-_SETTINGS_KEY: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("f2w_settings_key", default=None)
+_SETTINGS_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar("f2w_settings_key", default=None)
 
 
 @contextlib.contextmanager
-def settings_scope(key: Optional[str]):
+def settings_scope(key: str | None):
     """Run the enclosed service calls with ``key``'s effective settings (T25D)."""
     token = _SETTINGS_KEY.set(key)
     try:
@@ -561,11 +565,11 @@ class ChatSessionContext:
     """Per-session memory, workflow, and pending-action state."""
     memory: SessionMemory
     workflow: WorkflowStateStore
-    pending: Optional[Dict[str, Any]] = None
-    last_orchestration: Optional[Dict[str, Any]] = None
+    pending: dict[str, Any] | None = None
+    last_orchestration: dict[str, Any] | None = None
 
 
-def default_runtime_model(backend: str, configured: Optional[str] = None) -> str:
+def default_runtime_model(backend: str, configured: str | None = None) -> str:
     """Resolve the default LLM model name for the given backend."""
     if configured and str(configured).strip():
         model = str(configured).strip()
@@ -587,10 +591,10 @@ def default_runtime_model(backend: str, configured: Optional[str] = None) -> str
     return normalize_cborg_model(default) or default
 
 
-def list_cborg_models(*, current_model: Optional[str] = None) -> List[str]:
+def list_cborg_models(*, current_model: str | None = None) -> list[str]:
     """Return configured CBORG model names, ensuring the current model is included."""
     configured = get_config("f2w_agent.cborg_models", [])
-    models: List[str] = []
+    models: list[str] = []
     seen: set[str] = set()
     if isinstance(configured, list):
         for item in configured:
@@ -620,7 +624,7 @@ def _string_value(value: Any, default: str = "") -> str:
     return text or default
 
 
-def _optional_int(value: Any) -> Optional[int]:
+def _optional_int(value: Any) -> int | None:
     """Parse a value as int, or return None if missing or invalid."""
     if value in (None, ""):
         return None
@@ -685,13 +689,13 @@ _CORE_NODE_KEYS = {
 }
 
 
-def _source_paper_list(raw: Dict[str, Any]) -> List[str]:
+def _source_paper_list(raw: dict[str, Any]) -> list[str]:
     # New-format KGs store DOIs in "papers"; old format uses "source_papers".
     """Collect unique source-paper identifiers from a raw KG node."""
     papers = raw.get("source_papers") or raw.get("papers") or []
     if not isinstance(papers, list):
         papers = [papers]
-    values: List[str] = []
+    values: list[str] = []
     seen: set[str] = set()
     for paper in papers:
         text = _string_value(paper)
@@ -702,9 +706,9 @@ def _source_paper_list(raw: Dict[str, Any]) -> List[str]:
     return values
 
 
-def _property_entries(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _property_entries(raw: dict[str, Any]) -> list[dict[str, Any]]:
     """Normalize MatKG property lists and Tiled GraphQL property dicts."""
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     props = raw.get("properties")
     if isinstance(props, dict):
         for key, value in props.items():
@@ -750,9 +754,9 @@ _IDENTITY_EXTRA_KEYS = (
 )
 
 
-def _node_extra_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _node_extra_fields(raw: dict[str, Any]) -> dict[str, Any]:
     """Copy non-core, identity, and property fields from a raw KG node."""
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = {}
     for key, value in raw.items():
         if key in _CORE_NODE_KEYS or value in (None, "", [], {}):
             continue
@@ -768,7 +772,7 @@ def _node_extra_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(value, dict) and len(value) <= 16:
             extra[key] = value
     props = raw.get("properties")
-    identity_source: Dict[str, Any] = {}
+    identity_source: dict[str, Any] = {}
     if isinstance(props, dict):
         identity_source.update(props)
     elif isinstance(props, list):
@@ -794,7 +798,7 @@ def _node_extra_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
     return extra
 
 
-def _provenance_kwargs(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _provenance_kwargs(raw: dict[str, Any]) -> dict[str, Any]:
     """Extract code-provenance fields from a raw node dict."""
     return {
         "source_type": _string_value(raw.get("source_type")) or None,
@@ -809,7 +813,7 @@ def _provenance_kwargs(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _split_display_node_id(node_id: str, graph_ids: Sequence[str]) -> tuple[Optional[str], str]:
+def _split_display_node_id(node_id: str, graph_ids: Sequence[str]) -> tuple[str | None, str]:
     """Split a graph_id:local_id display id if a known graph prefix is present."""
     cleaned = str(node_id or "").strip()
     for gid in sorted((str(item) for item in graph_ids if str(item)), key=len, reverse=True):
@@ -819,7 +823,7 @@ def _split_display_node_id(node_id: str, graph_ids: Sequence[str]) -> tuple[Opti
     return None, cleaned
 
 
-def _tag_graph_node(node: GraphNode, graph_path: Path, graph_id: Optional[str] = None) -> GraphNode:
+def _tag_graph_node(node: GraphNode, graph_path: Path, graph_id: str | None = None) -> GraphNode:
     """Fill graph_id and graph_label on a node from its source path."""
     gid = _string_value(graph_id) or graph_id_for_path(str(graph_path))
     node.graph_id = node.graph_id or gid
@@ -831,15 +835,15 @@ def resolve_graph_node(
     node_id: str,
     *,
     fallback_path: Path,
-    graph_paths_by_id: Optional[Dict[str, Path]] = None,
-) -> Optional[GraphNode]:
+    graph_paths_by_id: dict[str, Path] | None = None,
+) -> GraphNode | None:
     """Look up a graph node by display id across mapped graph files."""
     mapping = dict(graph_paths_by_id or {})
     fallback_id = graph_id_for_path(str(fallback_path))
     if fallback_id not in mapping:
         mapping[fallback_id] = fallback_path
     gid, raw_id = _split_display_node_id(node_id, list(mapping.keys()))
-    search_order: List[tuple[str, Path, str]] = []
+    search_order: list[tuple[str, Path, str]] = []
     if gid and gid in mapping:
         search_order.append((gid, mapping[gid], raw_id))
     search_order.append((fallback_id, fallback_path, node_id))
@@ -862,7 +866,7 @@ def resolve_graph_node(
     return None
 
 
-def _safe_candidate_filename(candidate: Dict[str, Any]) -> str:
+def _safe_candidate_filename(candidate: dict[str, Any]) -> str:
     """Expected downloaded PDF filename for an OpenAlex candidate summary."""
     return f"{_safe_name(candidate)}.pdf"
 
@@ -888,7 +892,7 @@ _DOI_PDF_FILENAME_STRIPPED_RE = re.compile(r"^(10\.\d{4,})([a-z][a-z0-9]*\.\d+)\
 _ARXIV_PDF_FILENAME_RE = re.compile(r"^(?:arxiv[_-]?)?(\d{4}\.\d{4,5}(?:v\d+)?)\.pdf$", re.I)
 
 
-def _doi_from_pdf_filename(source: str) -> Optional[str]:
+def _doi_from_pdf_filename(source: str) -> str | None:
     """Parse a DOI from a PDF filename if the name matches a known pattern."""
     doi_match = _DOI_PDF_FILENAME_RE.match(source)
     if doi_match:
@@ -899,10 +903,10 @@ def _doi_from_pdf_filename(source: str) -> Optional[str]:
     return None
 
 
-def _publication_from_source_identifier(source: str) -> Dict[str, Any]:
+def _publication_from_source_identifier(source: str) -> dict[str, Any]:
     """Derive stable identifiers from source filenames without inventing metadata."""
     clean_source = str(source or "").strip()
-    publication: Dict[str, Any] = {"source_paper": clean_source} if clean_source else {}
+    publication: dict[str, Any] = {"source_paper": clean_source} if clean_source else {}
     doi = _doi_from_pdf_filename(clean_source)
     if doi:
         publication["doi"] = doi
@@ -913,7 +917,7 @@ def _publication_from_source_identifier(source: str) -> Dict[str, Any]:
     return publication
 
 
-def _publication_key(publication: Dict[str, Any]) -> str:
+def _publication_key(publication: dict[str, Any]) -> str:
     """Build a stable merge key for a publication dict from DOI or source/title."""
     doi = str(publication.get("doi") or "").strip().lower()
     if doi:
@@ -923,9 +927,9 @@ def _publication_key(publication: Dict[str, Any]) -> str:
     return f"source-title:{source}:{title}"
 
 
-def _node_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _node_publications(raw: dict[str, Any]) -> list[dict[str, Any]]:
     """Normalize publication dicts stored on a raw KG node."""
-    publications: List[Dict[str, Any]] = []
+    publications: list[dict[str, Any]] = []
     has_explicit_publications = "publications" in raw and isinstance(raw.get("publications"), list)
     for pub in raw.get("publications") or []:
         if not isinstance(pub, dict):
@@ -975,7 +979,7 @@ def _node_publications(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
     return publications
 
 
-def _merge_publication_pages(existing: Dict[str, Any], incoming: Dict[str, Any]) -> None:
+def _merge_publication_pages(existing: dict[str, Any], incoming: dict[str, Any]) -> None:
     """Append incoming page numbers onto an existing publication dict."""
     incoming_pages = incoming.get("pages")
     if not isinstance(incoming_pages, list):
@@ -991,11 +995,11 @@ def _merge_publication_pages(existing: Dict[str, Any], incoming: Dict[str, Any])
         existing["pages"] = merged_pages
 
 
-def _publications_for_graph_node(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _publications_for_graph_node(raw: dict[str, Any]) -> list[dict[str, Any]]:
     """Collect publication records tied to a KG node, including snippet sources."""
-    merged: Dict[str, Dict[str, Any]] = {}
+    merged: dict[str, dict[str, Any]] = {}
 
-    def add_publication(publication: Dict[str, Any]) -> None:
+    def add_publication(publication: dict[str, Any]) -> None:
         """Merge one publication into the node's publication map by key."""
         key = _publication_key(publication)
         if not key or key == "source-title::":
@@ -1018,7 +1022,7 @@ def _publications_for_graph_node(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
         source = str(snippet.get("source_paper") or "").strip()
         if not source:
             continue
-        entry: Dict[str, Any] = _publication_from_source_identifier(source)
+        entry: dict[str, Any] = _publication_from_source_identifier(source)
         page = snippet.get("page")
         if page is not None:
             entry["pages"] = [page]
@@ -1041,13 +1045,13 @@ def _publications_for_graph_node(raw: Dict[str, Any]) -> List[Dict[str, Any]]:
     )
 
 
-def _is_code_snippet_raw(raw: Dict[str, Any]) -> bool:
+def _is_code_snippet_raw(raw: dict[str, Any]) -> bool:
     """Return True if a raw node looks like a code-snippet entity."""
     category = _string_value(raw.get("category") or raw.get("type")).lower()
     return category == "codesnippet" or bool(str(raw.get("code_snippet") or "").strip())
 
 
-def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[LinkedCodeSnippet]:
+def _linked_code_snippets_from_data(data: dict[str, Any], node_id: str) -> list[LinkedCodeSnippet]:
     """Collect CodeSnippet things associated with a node."""
     linked_ids: set[str] = set()
     raw_nodes_all, associations = _kg_raw_parts(data)
@@ -1063,7 +1067,7 @@ def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[
                 linked_ids.add(source)
 
     raw_nodes = raw_nodes_all
-    by_id: Dict[str, Dict[str, Any]] = {}
+    by_id: dict[str, dict[str, Any]] = {}
     if isinstance(raw_nodes, list):
         for raw in raw_nodes:
             if isinstance(raw, dict):
@@ -1071,7 +1075,7 @@ def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[
                 if raw_id:
                     by_id[raw_id] = raw
 
-    snippets: List[LinkedCodeSnippet] = []
+    snippets: list[LinkedCodeSnippet] = []
     for linked_id in sorted(linked_ids):
         raw = by_id.get(linked_id)
         if raw is None or not _is_code_snippet_raw(raw):
@@ -1094,11 +1098,11 @@ def _linked_code_snippets_from_data(data: Dict[str, Any], node_id: str) -> List[
 
 
 def _graph_node_from_raw(
-    raw: Dict[str, Any],
+    raw: dict[str, Any],
     *,
     include_code: bool = False,
     include_linked_code: bool = False,
-    graph_data: Optional[Dict[str, Any]] = None,
+    graph_data: dict[str, Any] | None = None,
 ) -> GraphNode:
     """Build a GraphNode from a raw KG thing dict."""
     node_id = _string_value(raw.get("id"))
@@ -1115,7 +1119,7 @@ def _graph_node_from_raw(
         or raw.get("definition")
         or raw.get("code_description")
     )
-    code_snippet: Optional[str] = None
+    code_snippet: str | None = None
     code_language = _string_value(raw.get("code_language")) or None
     function_name = _string_value(raw.get("function_name")) or None
     if include_code:
@@ -1123,7 +1127,7 @@ def _graph_node_from_raw(
         if code_text:
             code_snippet = code_text
 
-    linked_code_snippets: List[LinkedCodeSnippet] = []
+    linked_code_snippets: list[LinkedCodeSnippet] = []
     if include_linked_code and graph_data is not None:
         linked_code_snippets = _linked_code_snippets_from_data(graph_data, node_id)
 
@@ -1150,10 +1154,10 @@ def _graph_node_from_raw(
     )
 
 
-_GRAPH_JSON_CACHE: Dict[str, tuple[float, int, Dict[str, Any]]] = {}
+_GRAPH_JSON_CACHE: dict[str, tuple[float, int, dict[str, Any]]] = {}
 
 
-def _read_graph_json(graph_path: Path) -> Optional[Dict[str, Any]]:
+def _read_graph_json(graph_path: Path) -> dict[str, Any] | None:
     """Load and cache parsed JSON for a graph file, keyed by mtime and size."""
     try:
         stat = graph_path.stat()
@@ -1178,7 +1182,7 @@ def graph_node_from_file(
     node_id: str,
     *,
     include_linked_code: bool = True,
-) -> Optional[GraphNode]:
+) -> GraphNode | None:
     """Load one node from a graph JSON file by id."""
     if not graph_path.exists() or not node_id:
         return None
@@ -1205,7 +1209,7 @@ def graph_node_from_file(
     return None
 
 
-def _clean_publication_entry(publication: Dict[str, Any]) -> Dict[str, Any]:
+def _clean_publication_entry(publication: dict[str, Any]) -> dict[str, Any]:
     """Keep known publication fields and fill DOI from a source identifier."""
     clean = {
         field: publication.get(field)
@@ -1221,7 +1225,7 @@ def _clean_publication_entry(publication: Dict[str, Any]) -> Dict[str, Any]:
     return clean
 
 
-def _is_temp_snippet_id(snippet_id: Optional[str]) -> bool:
+def _is_temp_snippet_id(snippet_id: str | None) -> bool:
     """Return True if a snippet id is missing or a temp:/new: placeholder."""
     if not snippet_id:
         return True
@@ -1237,7 +1241,7 @@ def _new_snippet_matkg_id(*, label: str = "", function_name: str = "", code: str
     return f"matkg:snippet{slug}{code_hash}"
 
 
-def _load_session_graph(graph_path: Path) -> Dict[str, Any]:
+def _load_session_graph(graph_path: Path) -> dict[str, Any]:
     """Load a session graph JSON, or an empty things/associations dict."""
     if not graph_path.exists():
         return {"things": [], "associations": []}
@@ -1249,14 +1253,14 @@ def _load_session_graph(graph_path: Path) -> Dict[str, Any]:
     return data
 
 
-def _save_session_graph(graph_path: Path, data: Dict[str, Any]) -> None:
+def _save_session_graph(graph_path: Path, data: dict[str, Any]) -> None:
     """Write a session graph JSON and drop its parse cache entry."""
     graph_path.parent.mkdir(parents=True, exist_ok=True)
     graph_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     _GRAPH_JSON_CACHE.pop(str(graph_path), None)
 
 
-def _find_thing(data: Dict[str, Any], node_id: str) -> Optional[Dict[str, Any]]:
+def _find_thing(data: dict[str, Any], node_id: str) -> dict[str, Any] | None:
     """Find a thing dict by id in graph JSON."""
     things = data.get("things") or []
     if not isinstance(things, list):
@@ -1295,16 +1299,16 @@ def _normalize_relationship_predicate(value: str) -> str:
 
 
 def _apply_node_field_updates(
-    thing: Dict[str, Any],
+    thing: dict[str, Any],
     *,
-    label: Optional[str],
-    node_type: Optional[str],
-    description: Optional[str],
-    code_snippet: Optional[str],
-    publications: Optional[List[Dict[str, Any]]],
-) -> Dict[str, Any]:
+    label: str | None,
+    node_type: str | None,
+    description: str | None,
+    code_snippet: str | None,
+    publications: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
     """Apply editable fields onto a MatKG thing dict; return splash property patch."""
-    splash_props: Dict[str, Any] = {}
+    splash_props: dict[str, Any] = {}
     if label is not None:
         thing["name"] = label
     if node_type is not None:
@@ -1362,10 +1366,10 @@ def _snippet_thing_payload(
     *,
     snippet_id: str,
     label: str,
-    function_name: Optional[str],
-    code_language: Optional[str],
+    function_name: str | None,
+    code_language: str | None,
     code_snippet: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a CodeSnippet thing dict for insertion into the graph."""
     return {
         "id": snippet_id,
@@ -1383,7 +1387,7 @@ def _snippet_thing_payload(
     }
 
 
-def _kg_raw_parts(data: Dict[str, Any]) -> tuple[list, list]:
+def _kg_raw_parts(data: dict[str, Any]) -> tuple[list, list]:
     """Return (raw_nodes, raw_edges) for old and new MatKG JSON formats.
 
     Reads ``things``/``associations`` (old) or ``nodes``/``edges`` (new).
@@ -1399,8 +1403,8 @@ def graph_payload_from_file(graph_path: Path) -> GraphPayload:
         data = json.load(fh)
 
     raw_nodes, raw_edges = _kg_raw_parts(data)
-    nodes: List[GraphNode] = []
-    edges: List[GraphEdge] = []
+    nodes: list[GraphNode] = []
+    edges: list[GraphEdge] = []
 
     if isinstance(raw_nodes, list):
         for raw in raw_nodes:
@@ -1431,14 +1435,14 @@ def graph_payload_from_file(graph_path: Path) -> GraphPayload:
     return GraphPayload(nodes=nodes, edges=edges, source_path=str(graph_path))
 
 
-def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, Any]:
+def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, Any]:
     """Return the induced subgraph (nodes + internal edges) for the given ids.
 
     Used to stream retrieved nodes to the UI as soon as retrieval finishes,
     before the slower download/extraction steps run.
     """
     wanted = [str(n) for n in node_ids if str(n)]
-    empty: Dict[str, Any] = {"nodes": [], "edges": []}
+    empty: dict[str, Any] = {"nodes": [], "edges": []}
     if not wanted or not graph_path.exists():
         return empty
 
@@ -1451,7 +1455,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
 
     wanted_set = set(wanted)
     raw_nodes, raw_edges_all = _kg_raw_parts(data)
-    by_id: Dict[str, Dict[str, Any]] = {}
+    by_id: dict[str, dict[str, Any]] = {}
     if isinstance(raw_nodes, list):
         for raw in raw_nodes:
             if isinstance(raw, dict):
@@ -1460,7 +1464,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
                     by_id[node_id] = raw
 
     # Preserve the retrieval order of the selected ids.
-    nodes: List[Dict[str, Any]] = []
+    nodes: list[dict[str, Any]] = []
     for node_id in wanted:
         raw = by_id.get(node_id)
         if raw is None:
@@ -1474,7 +1478,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
         nodes.append(_model_to_jsonable(node))
 
     present = {node["id"] for node in nodes}
-    edges: List[Dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
     raw_edges = raw_edges_all
     if isinstance(raw_edges, list):
         for raw in raw_edges:
@@ -1494,10 +1498,10 @@ def graph_subset_from_file(graph_path: Path, node_ids: List[str]) -> Dict[str, A
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> Dict[str, Any]:
+def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> dict[str, Any]:
     """Serialize an in-memory lookup graph (Tiled) into the UI node contract."""
     wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
-    empty: Dict[str, Any] = {"nodes": [], "edges": []}
+    empty: dict[str, Any] = {"nodes": [], "edges": []}
     nodes_map = getattr(kg, "nodes", {}) or {}
     if not wanted_ids or not isinstance(nodes_map, dict):
         return empty
@@ -1515,7 +1519,7 @@ def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> Dict[str, Any]:
     if not expanded:
         return empty
 
-    nodes: List[Dict[str, Any]] = []
+    nodes: list[dict[str, Any]] = []
     for node_id in expanded:
         raw = nodes_map.get(node_id)
         if not isinstance(raw, dict):
@@ -1531,7 +1535,7 @@ def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> Dict[str, Any]:
         nodes.append(dumped)
 
     present = {node["id"] for node in nodes}
-    edges: List[Dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
     for source, outgoing in (getattr(kg, "out_edges", {}) or {}).items():
         if source not in present:
             continue
@@ -1566,10 +1570,10 @@ def graph_neighborhood_from_lookup(kg: Any, node_id: str) -> GraphPayload:
 def query_graph_payload(
     *,
     selected_ids: Sequence[str],
-    selected_hits: Optional[Sequence[Any]] = None,
+    selected_hits: Sequence[Any] | None = None,
     graph_path: Path,
-    graph_paths_by_id: Optional[Dict[str, Path]] = None,
-    graphs_by_id: Optional[Dict[str, Any]] = None,
+    graph_paths_by_id: dict[str, Path] | None = None,
+    graphs_by_id: dict[str, Any] | None = None,
 ) -> GraphPayload:
     """Induced query subgraph across selected KGs — never a concatenated full dump.
 
@@ -1582,7 +1586,7 @@ def query_graph_payload(
     if fallback_id not in path_map:
         path_map[fallback_id] = graph_path
 
-    hits: List[Dict[str, str]] = []
+    hits: list[dict[str, str]] = []
     if isinstance(selected_hits, list) and selected_hits:
         for raw in selected_hits:
             if not isinstance(raw, dict):
@@ -1615,20 +1619,20 @@ def query_graph_payload(
     if not hits:
         return GraphPayload(nodes=[], edges=[], source_path=f"query:{graph_path}")
 
-    id_counts: Dict[str, int] = {}
+    id_counts: dict[str, int] = {}
     for hit in hits:
         id_counts[hit["id"]] = id_counts.get(hit["id"], 0) + 1
     colliding = {node_id for node_id, count in id_counts.items() if count > 1}
 
-    grouped: Dict[str, List[Dict[str, str]]] = {}
+    grouped: dict[str, list[dict[str, str]]] = {}
     for hit in hits:
         grouped.setdefault(hit["graph_id"], []).append(hit)
 
-    remap: Dict[tuple[str, str], str] = {}
-    nodes_by_display: Dict[str, Dict[str, Any]] = {}
-    edges: List[Dict[str, Any]] = []
+    remap: dict[tuple[str, str], str] = {}
+    nodes_by_display: dict[str, dict[str, Any]] = {}
+    edges: list[dict[str, Any]] = []
     seen_edges: set[tuple[str, str, str]] = set()
-    source_names: List[str] = []
+    source_names: list[str] = []
 
     live_graphs = dict(graphs_by_id or {})
 
@@ -1681,7 +1685,7 @@ def query_graph_payload(
             seen_edges.add(key)
             edges.append({"source": source, "target": target, "predicate": predicate})
 
-    ordered_ids: List[str] = []
+    ordered_ids: list[str] = []
     seen_display: set[str] = set()
     for hit in hits:
         display = remap.get((hit["graph_id"], hit["id"]))
@@ -1701,14 +1705,14 @@ def query_graph_payload(
     return GraphPayload(nodes=nodes, edges=edges, source_path=source_path)
 
 
-def _model_to_jsonable(model: BaseModel) -> Dict[str, Any]:
+def _model_to_jsonable(model: BaseModel) -> dict[str, Any]:
     """Dump a Pydantic model to a JSON-serializable dict."""
     if hasattr(model, "model_dump"):
         return model.model_dump(mode="json")  # type: ignore[attr-defined]
     return json.loads(model.json())
 
 
-def _sse(event: str, data: Dict[str, Any]) -> str:
+def _sse(event: str, data: dict[str, Any]) -> str:
     """Format one Server-Sent Event with a JSON data payload."""
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
@@ -1781,7 +1785,7 @@ def _direct_download_query(message: str, fallback_topic: str = "") -> str:
     return str(fallback_topic or "").strip() if query.casefold() in generic else query
 
 
-def _is_arxiv_candidate(candidate: Dict[str, Any]) -> bool:
+def _is_arxiv_candidate(candidate: dict[str, Any]) -> bool:
     """Return True if a paper candidate looks like an arXiv record."""
     repository = str(candidate.get("repository") or "").casefold()
     urls = " ".join(str(url) for url in (candidate.get("pdf_urls") or [])).casefold()
@@ -1796,7 +1800,7 @@ def _is_arxiv_candidate(candidate: Dict[str, Any]) -> bool:
     )
 
 
-def _extraction_outcome_text(result: Dict[str, Any]) -> str:
+def _extraction_outcome_text(result: dict[str, Any]) -> str:
     """Summarize extractor output without treating cumulative terms as newly added."""
     processed_files = int(result.get("processed_files") or 0)
     processed_pages = int(result.get("processed_pages_total") or 0)
@@ -1823,7 +1827,7 @@ JSON_GRAPH_NO_EVIDENCE_REFUSAL = (
 )
 
 
-def _json_graph_insufficient_answer(verdict: Dict[str, Any]) -> str:
+def _json_graph_insufficient_answer(verdict: dict[str, Any]) -> str:
     """Canned refusal for empty retrieval or invented-number gaps.
 
     On-topic hits that lack a numeric slot/snippet get a missing-topics message
@@ -1851,7 +1855,7 @@ def _json_graph_insufficient_answer(verdict: Dict[str, Any]) -> str:
     )
 
 
-def _json_graph_should_use_canned_refusal(question: str, verdict: Dict[str, Any]) -> bool:
+def _json_graph_should_use_canned_refusal(question: str, verdict: dict[str, Any]) -> bool:
     """Canned insufficient_json_graph only for empty retrieval or numeric-slot gaps."""
     selected = [str(node).strip() for node in (verdict.get("selected") or []) if str(node).strip()]
     if verdict.get("no_evidence") or not selected:
@@ -1962,12 +1966,12 @@ def _is_comparative_or_optimization_question(question: str) -> bool:
     return bool(_COMPARATIVE_OPTIMIZATION_RE.search(question or ""))
 
 
-def _json_graph_selected_ids(verdict: Dict[str, Any]) -> List[str]:
+def _json_graph_selected_ids(verdict: dict[str, Any]) -> list[str]:
     """Return stripped selected node ids from a retrieval verdict."""
     return [str(node).strip() for node in (verdict.get("selected") or []) if str(node).strip()]
 
 
-def _json_graph_selected_tokens(verdict: Dict[str, Any]) -> set[str]:
+def _json_graph_selected_tokens(verdict: dict[str, Any]) -> set[str]:
     """Collect tokens from selected node ids and hit payloads."""
     tokens: set[str] = set()
     for node in _json_graph_selected_ids(verdict):
@@ -1984,7 +1988,7 @@ def _json_graph_selected_tokens(verdict: Dict[str, Any]) -> set[str]:
     return tokens
 
 
-def _json_graph_nodes_on_topic(question: str, verdict: Dict[str, Any]) -> bool:
+def _json_graph_nodes_on_topic(question: str, verdict: dict[str, Any]) -> bool:
     """Return True if the question tokens overlap selected-node tokens."""
     asked = _significant_question_tokens(question)
     if not asked:
@@ -1992,14 +1996,14 @@ def _json_graph_nodes_on_topic(question: str, verdict: Dict[str, Any]) -> bool:
     return bool(asked & _json_graph_selected_tokens(verdict))
 
 
-def _json_graph_missing_is_slot_gap(missing: List[str]) -> bool:
+def _json_graph_missing_is_slot_gap(missing: list[str]) -> bool:
     """Return True if missing topics are empty, slot-like, or numeric claims."""
     if not missing:
         return True
     return all(_JSON_GRAPH_SLOT_GAP_RE.search(topic) or _is_numeric_claim(topic) for topic in missing)
 
 
-def _json_graph_answer_admits_missing_asked_concept(question: str, verdict: Dict[str, Any]) -> bool:
+def _json_graph_answer_admits_missing_asked_concept(question: str, verdict: dict[str, Any]) -> bool:
     """Return True if the answer admits an asked concept absent from selected nodes."""
     answer = str(verdict.get("answer") or "")
     if not answer or not _LACKS_CONCEPT_RE.search(answer):
@@ -2012,7 +2016,7 @@ def _json_graph_answer_admits_missing_asked_concept(question: str, verdict: Dict
     return any(re.search(rf"\b{re.escape(token)}\b", folded) for token in missing_from_nodes)
 
 
-def _json_graph_nodes_address_question(question: str, verdict: Dict[str, Any]) -> bool:
+def _json_graph_nodes_address_question(question: str, verdict: dict[str, Any]) -> bool:
     """True only when selected JSON-KG nodes actually teach or answer the ask."""
     selected = _json_graph_selected_ids(verdict)
     if verdict.get("no_evidence") or not selected:
@@ -2039,7 +2043,7 @@ def _json_graph_nodes_address_question(question: str, verdict: Dict[str, Any]) -
     return _is_conceptual_question(question) or _is_ops_layout_question(question)
 
 
-def _json_graph_search_missing_topics(question: str, verdict: Dict[str, Any]) -> List[str]:
+def _json_graph_search_missing_topics(question: str, verdict: dict[str, Any]) -> list[str]:
     """Keep candidate search aligned with the asked question, not off-query slots."""
     if not _json_graph_nodes_address_question(question, verdict):
         return [question]
@@ -2051,7 +2055,7 @@ def _json_graph_search_missing_topics(question: str, verdict: Dict[str, Any]) ->
     return missing or [question]
 
 
-def _json_graph_should_search_candidates(question: str, verdict: Dict[str, Any]) -> bool:
+def _json_graph_should_search_candidates(question: str, verdict: dict[str, Any]) -> bool:
     """JSON mode offers paper ingest unless on-topic nodes actually answer the ask."""
     if verdict.get("operation"):
         return False  # D3.16: a knowledge-operation figure answered the turn; no retrieval to supplement
@@ -2061,10 +2065,10 @@ def _json_graph_should_search_candidates(question: str, verdict: Dict[str, Any])
 
 
 def _post_extraction_answer(
-    extraction: Dict[str, Any],
-    term_report: Dict[str, Any],
+    extraction: dict[str, Any],
+    term_report: dict[str, Any],
     question: str,
-    verdict: Dict[str, Any],
+    verdict: dict[str, Any],
 ) -> str:
     """Combine extraction facts with an explicit original-query verdict."""
     extraction_summary = _extraction_outcome_text(extraction)
@@ -2125,7 +2129,7 @@ def _post_extraction_answer(
     return "\n\n".join(section for section in sections if section)
 
 
-def _parse_json_object(raw: str) -> Dict[str, Any]:
+def _parse_json_object(raw: str) -> dict[str, Any]:
     """Extract the first JSON object from a model string, or return an empty dict."""
     if not raw:
         return {}
@@ -2153,9 +2157,9 @@ def _normalize_chat_text(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s']", " ", text.lower())).strip()
 
 
-def _history_payload(messages: Optional[List[ChatMessageInput]]) -> List[Dict[str, str]]:
+def _history_payload(messages: list[ChatMessageInput] | None) -> list[dict[str, str]]:
     """Convert recent user/assistant messages into trimmed role/content dicts."""
-    history: List[Dict[str, str]] = []
+    history: list[dict[str, str]] = []
     for message in (messages or [])[-MAX_HISTORY_MESSAGES:]:
         if isinstance(message, dict):
             role = str(message.get("role") or "").strip()
@@ -2198,7 +2202,7 @@ def _is_pure_greeting(question: str) -> bool:
     )
 
 
-def _pending_scientific_question(history: List[Dict[str, str]]) -> str:
+def _pending_scientific_question(history: list[dict[str, str]]) -> str:
     """Last user scientific/code ask that is not a meta-instruction or greeting."""
     for message in reversed(history or []):
         if str(message.get("role") or "").strip() != "user":
@@ -2212,7 +2216,7 @@ def _pending_scientific_question(history: List[Dict[str, str]]) -> str:
     return ""
 
 
-def _compose_history_aware_question(question: str, history: List[Dict[str, str]]) -> str:
+def _compose_history_aware_question(question: str, history: list[dict[str, str]]) -> str:
     """Deterministic rewrite so follow-ups keep the pending scientific question."""
     pending = _pending_scientific_question(history)
     current = (question or "").strip()
@@ -2230,7 +2234,7 @@ def _compose_history_aware_question(question: str, history: List[Dict[str, str]]
     return current
 
 
-def _needs_history_rewrite(question: str, history: List[Dict[str, str]]) -> bool:
+def _needs_history_rewrite(question: str, history: list[dict[str, str]]) -> bool:
     """Return True if the turn should be rewritten against chat history."""
     if not history:
         return False
@@ -2281,15 +2285,15 @@ def _looks_contextual_followup(question: str) -> bool:
 
 
 def _select_candidates_by_indices(
-    candidates: List[Dict[str, Any]],
+    candidates: list[dict[str, Any]],
     indices: Any,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Pick candidate dicts whose indices appear in the given list."""
     if isinstance(indices, int):
         indices = [indices]
     if not isinstance(indices, list):
         return []
-    selected: List[Dict[str, Any]] = []
+    selected: list[dict[str, Any]] = []
     for item in indices:
         try:
             idx = int(item)
@@ -2300,7 +2304,7 @@ def _select_candidates_by_indices(
     return selected
 
 
-def _confidence(verdict: Dict[str, Any]) -> float:
+def _confidence(verdict: dict[str, Any]) -> float:
     """Heuristic confidence score from a retrieval verdict."""
     if verdict.get("sufficient"):
         selected = len(verdict.get("selected") or [])
@@ -2316,12 +2320,12 @@ def _token_set(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
-def _publication_relevance(query: str, publication: Dict[str, Any]) -> float:
+def _publication_relevance(query: str, publication: dict[str, Any]) -> float:
     """Score how well a publication's text overlaps a query."""
     query_tokens = _token_set(query)
     if not query_tokens:
         return 0.0
-    text_parts: List[str] = []
+    text_parts: list[str] = []
     for field in ("paper_title", "abstract_text", "journal", "source_paper"):
         value = publication.get(field)
         if value:
@@ -2354,7 +2358,7 @@ def _publication_relevance(query: str, publication: Dict[str, Any]) -> float:
     return score
 
 
-def _rank_publications(query: str, publications: List[Dict[str, Any]], max_results: int) -> List[Dict[str, Any]]:
+def _rank_publications(query: str, publications: list[dict[str, Any]], max_results: int) -> list[dict[str, Any]]:
     """Sort publications by relevance, supporting nodes, and year."""
     indexed = list(enumerate(publications))
     ranked = sorted(
@@ -2376,14 +2380,14 @@ def _normalize_doi(value: Any) -> str:
 
 
 def _merge_publications_prefer_existing(
-    base: List[Dict[str, Any]],
-    incoming: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    base: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Merge publication lists by key, filling empty fields from incoming records."""
-    merged: Dict[str, Dict[str, Any]] = {}
-    order: List[str] = []
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
 
-    def add(publication: Dict[str, Any]) -> None:
+    def add(publication: dict[str, Any]) -> None:
         """Insert or fill one publication into the merge map."""
         pub = dict(publication)
         if pub.get("doi"):
@@ -2414,10 +2418,10 @@ def _merge_publications_prefer_existing(
     return [merged[key] for key in order]
 
 
-def _openalex_work_to_publication(work: Dict[str, Any]) -> Dict[str, Any]:
+def _openalex_work_to_publication(work: dict[str, Any]) -> dict[str, Any]:
     """Map an OpenAlex work dict to the internal publication schema."""
-    authors: List[str] = []
-    institutions: List[str] = []
+    authors: list[str] = []
+    institutions: list[str] = []
     for authorship in work.get("authorships") or []:
         if not isinstance(authorship, dict):
             continue
@@ -2448,7 +2452,7 @@ def _openalex_work_to_publication(work: Dict[str, Any]) -> Dict[str, Any]:
         for keyword in work.get("keywords") or work.get("concepts") or []
         if isinstance(keyword, dict) and str(keyword.get("display_name") or keyword.get("keyword") or "").strip()
     ]
-    publication: Dict[str, Any] = {
+    publication: dict[str, Any] = {
         "source_paper": str(work.get("id") or "").rstrip("/").split("/")[-1] or "OpenAlex",
         "paper_title": work.get("title") or work.get("display_name"),
         "publication_year": work.get("publication_year"),
@@ -2465,10 +2469,11 @@ def _openalex_work_to_publication(work: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in publication.items() if value not in (None, "", [])}
 
 
-def _search_openalex_publications(query: str, max_results: int) -> List[Dict[str, Any]]:
+def _search_openalex_publications(query: str, max_results: int) -> list[dict[str, Any]]:
     """Search OpenAlex for works matching the query."""
     try:
-        from pyalex import Works, config as pyalex_config
+        from pyalex import Works
+        from pyalex import config as pyalex_config
     except Exception:
         return []
 
@@ -2487,7 +2492,7 @@ def _search_openalex_publications(query: str, max_results: int) -> List[Dict[str
     return [publication for publication in publications if publication.get("paper_title") or publication.get("doi")]
 
 
-def publications_for_selected_nodes(graph_path: Path, node_ids: List[str]) -> List[Dict[str, Any]]:
+def publications_for_selected_nodes(graph_path: Path, node_ids: list[str]) -> list[dict[str, Any]]:
     """Collect deduped publication records for selected KG nodes."""
     if not graph_path.exists() or not node_ids:
         return []
@@ -2499,7 +2504,7 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: List[str]) -> Li
     if not isinstance(raw_nodes, list):
         return []
     by_id = {raw.get("id"): raw for raw in raw_nodes if isinstance(raw, dict)}
-    merged: Dict[str, Dict[str, Any]] = {}
+    merged: dict[str, dict[str, Any]] = {}
 
     for node_id in node_ids:
         raw = by_id.get(node_id)
@@ -2539,10 +2544,10 @@ class AgentPipelineService:
         self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
         self.lock = asyncio.Lock()
         # Pending approvals survive backend and one-shot CLI restarts.
-        self.pending: Optional[Dict[str, Any]] = self.workflow.pending
-        self._last_orchestration: Optional[Dict[str, Any]] = None
+        self.pending: dict[str, Any] | None = self.workflow.pending
+        self._last_orchestration: dict[str, Any] | None = None
         self._active_session_key = "__legacy__"
-        self._session_contexts: Dict[str, ChatSessionContext] = {
+        self._session_contexts: dict[str, ChatSessionContext] = {
             self._active_session_key: ChatSessionContext(
                 memory=self.memory,
                 workflow=self.workflow,
@@ -2584,9 +2589,9 @@ class AgentPipelineService:
         # T25D: the server runtime holds the deployment defaults; ``self.runtime`` is the one the
         # agents were built for (the same object on :local, a principal's copy during their ALS turn).
         self.deployment_runtime = self.runtime
-        self._runtime_key: Optional[str] = None
+        self._runtime_key: str | None = None
         #: Personal settings per ALS principal (``PersonalSettingsStore``); ``None`` on :local.
-        self.personal_settings: Optional[Any] = None
+        self.personal_settings: Any | None = None
         self._rebuild_agents()
         if self.runtime.graph_source == "splash":
             self._sync_session_graph_from_splash()
@@ -2596,7 +2601,7 @@ class AgentPipelineService:
         self._summary_path = attach_summary_path(self)
 
     @staticmethod
-    def _session_key(session_id: Optional[str]) -> str:
+    def _session_key(session_id: str | None) -> str:
         """Validate a session id or return the legacy session key."""
         if session_id is None:
             return "__legacy__"
@@ -2614,7 +2619,7 @@ class AgentPipelineService:
             last_orchestration=self._last_orchestration,
         )
 
-    def _activate_session(self, session_id: Optional[str]) -> None:
+    def _activate_session(self, session_id: str | None) -> None:
         """Switch in-memory state to the given session, creating it if needed."""
         key = self._session_key(session_id)
         if key == self._active_session_key:
@@ -2705,7 +2710,7 @@ class AgentPipelineService:
             return self.coord.session_kg
         return Path(self.coord.initial_graph)
 
-    def _runtime_json_paths(self) -> List[str]:
+    def _runtime_json_paths(self) -> list[str]:
         """Return unique JSON graph paths from runtime settings."""
         paths = unique_graph_paths(self.runtime.json_graph_paths or [])
         if self.runtime.json_graph_path and self.runtime.json_graph_path not in paths:
@@ -2772,7 +2777,7 @@ class AgentPipelineService:
             default_ollama_model=default_ollama_model_name(),
         )
 
-    def _tiled_status_snapshot(self) -> Dict[str, Any]:
+    def _tiled_status_snapshot(self) -> dict[str, Any]:
         """Probe Tiled connectivity and overlay the last retrieval status."""
         snap = probe_tiled_status(
             uri=self.runtime.tiled_uri,
@@ -2785,7 +2790,7 @@ class AgentPipelineService:
                 snap["tiled_error"] = last.get("error")
         return snap
 
-    def _effective_runtime(self, key: Optional[str]) -> RuntimeSettings:
+    def _effective_runtime(self, key: str | None) -> RuntimeSettings:
         """T25D: deployment defaults with ``key``'s saved personal fields on top."""
         if key is None or self.personal_settings is None:
             return self.deployment_runtime
@@ -2795,7 +2800,7 @@ class AgentPipelineService:
                                  json_graph_paths=list(self.deployment_runtime.json_graph_paths))
         return dataclass_replace(base, **personal)
 
-    async def _use_runtime(self, key: Optional[str]) -> None:
+    async def _use_runtime(self, key: str | None) -> None:
         """T25D: make ``key``'s effective settings the active runtime (call under ``self.lock``).
 
         A no-op on :local. Agents and the retrieval graphs are rebuilt only when the
@@ -2827,7 +2832,7 @@ class AgentPipelineService:
             await self._reload_retrieval(path, graph_source="splash", graph_files=[path])
 
     @contextlib.contextmanager
-    def runtime_view(self, key: Optional[str]):
+    def runtime_view(self, key: str | None):
         """T25D: read ``key``'s effective settings synchronously, without rebuilding agents.
 
         For reads outside a turn (settings, graph view); the body must not ``await``.
@@ -2843,12 +2848,12 @@ class AgentPipelineService:
         finally:
             self.runtime = saved
 
-    def settings_response_for(self, key: Optional[str]) -> AgentSettingsResponse:
+    def settings_response_for(self, key: str | None) -> AgentSettingsResponse:
         """T25D: the settings payload with ``key``'s effective settings (GET /settings)."""
         with self.runtime_view(key):
             return self.settings_response()
 
-    async def apply_settings_for(self, key: Optional[str], update: AgentSettingsUpdate) -> AgentSettingsResponse:
+    async def apply_settings_for(self, key: str | None, update: AgentSettingsUpdate) -> AgentSettingsResponse:
         """T25D: apply an (already checked) update for ``key``; ``None`` updates the server settings.
 
         On ALS deployment-wide fields go to the server runtime and personal fields to
@@ -2948,7 +2953,7 @@ class AgentPipelineService:
             if update.selected_graph_ids is not None and update.json_graph_paths is None:
                 avail_for_ids = list_storage_kg_json_files()
                 # Build graph_id → sorted candidate paths; take last (highest version).
-                id_to_candidates: Dict[str, List[str]] = {}
+                id_to_candidates: dict[str, list[str]] = {}
                 for _p in avail_for_ids:
                     _gid = graph_id_for_path(_p)
                     id_to_candidates.setdefault(_gid, []).append(_p)
@@ -3028,9 +3033,9 @@ class AgentPipelineService:
             return GraphPayload(nodes=[], edges=[], source_path=str(path))
         return graph_payload_from_file(path)
 
-    def _retrieval_graph_paths(self, fallback: Path) -> Dict[str, Path]:
+    def _retrieval_graph_paths(self, fallback: Path) -> dict[str, Path]:
         """Map retrieval graph ids to existing filesystem paths, skipping Tiled."""
-        mapping: Dict[str, Path] = {}
+        mapping: dict[str, Path] = {}
         graphs = getattr(self.retrieval, "_graphs", None) or {}
         if isinstance(graphs, dict):
             for gid, kg in graphs.items():
@@ -3046,7 +3051,7 @@ class AgentPipelineService:
             mapping[graph_id_for_path(str(fallback))] = fallback
         return mapping
 
-    def _query_graph_payload(self, verdict: Dict[str, Any], graph_path: Path) -> GraphPayload:
+    def _query_graph_payload(self, verdict: dict[str, Any], graph_path: Path) -> GraphPayload:
         """Build a subgraph payload for nodes selected in a verdict."""
         selected_ids = [str(node) for node in (verdict.get("selected") or []) if str(node).strip()]
         selected_hits = verdict.get("selected_hits") or []
@@ -3058,7 +3063,7 @@ class AgentPipelineService:
             graphs_by_id=getattr(self.retrieval, "_graphs", None),
         )
 
-    def _query_graph_event(self, payload: GraphPayload) -> Dict[str, Any]:
+    def _query_graph_event(self, payload: GraphPayload) -> dict[str, Any]:
         """Return nodes and edges from a GraphPayload for a progress event."""
         dumped = _model_to_jsonable(payload)
         return {
@@ -3074,7 +3079,7 @@ class AgentPipelineService:
         # Ask for extra candidates because unresolved Unknown stubs are not useful in the UI.
         ranked = await self.retrieval.search_node_scores(query, min(25, max(limit * 3, limit)))
         graph_path = self.graph_path()
-        results: List[GraphNodeSearchResult] = []
+        results: list[GraphNodeSearchResult] = []
         graphs = getattr(self.retrieval, "_graphs", {}) or {}
         for match in ranked.get("matches") or []:
             gid = _string_value(match.get("graph_id")) or None
@@ -3200,10 +3205,10 @@ class AgentPipelineService:
 
     @staticmethod
     def _validate_relationship_updates(
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         edited_node_id: str,
-        updates: List[GraphRelationshipUpdate],
+        updates: list[GraphRelationshipUpdate],
     ) -> None:
         """Reject relationship edits that do not involve the edited node or known endpoints."""
         for update in updates:
@@ -3221,10 +3226,10 @@ class AgentPipelineService:
 
     def _apply_relationship_updates(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         edited_node_id: str,
-        updates: List[GraphRelationshipUpdate],
+        updates: list[GraphRelationshipUpdate],
     ) -> None:
         """Add or remove associations for the edited node in JSON and Splash."""
         associations = data.setdefault("associations", [])
@@ -3283,11 +3288,11 @@ class AgentPipelineService:
 
     async def _apply_linked_snippet_updates(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         subject_node_id: str,
         subject_splash_id: str,
-        updates: List[LinkedCodeSnippetUpdate],
+        updates: list[LinkedCodeSnippetUpdate],
     ) -> None:
         """Upsert or unlink code snippets associated with a node."""
         current = {
@@ -3498,7 +3503,7 @@ class AgentPipelineService:
         graph_path = self.graph_path()
         loop = asyncio.get_event_loop()
 
-        def retrieve_node_ids() -> List[str]:
+        def retrieve_node_ids() -> list[str]:
             """Retrieve KG node ids matching the publication search query."""
             graph_source = "json" if self.runtime.graph_source == "json" else self.cfg.kg_mode
             kg = krag.KnowledgeGraph(str(graph_path), graph_source=graph_source)
@@ -3537,7 +3542,7 @@ class AgentPipelineService:
             clean = f"{clean}.json"
         return self._upload_dir() / clean
 
-    def save_uploaded_graph(self, filename: str, graph: Dict[str, Any]) -> GraphUploadResponse:
+    def save_uploaded_graph(self, filename: str, graph: dict[str, Any]) -> GraphUploadResponse:
         """Validate and write an uploaded MatKG JSON graph."""
         if not isinstance(graph.get("things"), list) or not isinstance(graph.get("associations"), list):
             raise ValueError("Uploaded graph must be a MatKG JSON with list fields: things and associations")
@@ -3564,9 +3569,9 @@ class AgentPipelineService:
             raise FileNotFoundError(f"JSON graph not found: {path}")
         return graph_path
 
-    def _configured_graph_paths(self) -> List[Path]:
+    def _configured_graph_paths(self) -> list[Path]:
         """Resolve configured graph paths against the project root."""
-        roots: List[Path] = []
+        roots: list[Path] = []
         for raw in collect_graph_paths(getattr(self.cfg, "graphs", None), self.cfg.graph):
             candidate = Path(raw)
             if not candidate.is_absolute():
@@ -3576,7 +3581,7 @@ class AgentPipelineService:
             roots.append(candidate)
         return roots
 
-    def _try_resolve_runtime_json_graph_path(self, path: str) -> Optional[Path]:
+    def _try_resolve_runtime_json_graph_path(self, path: str) -> Path | None:
         """Resolve a runtime JSON graph path, skipping missing files."""
         try:
             return self._resolve_runtime_json_graph_path(path, missing_ok=True)
@@ -3613,8 +3618,8 @@ class AgentPipelineService:
         graph_file: str,
         *,
         graph_source: str,
-        graph_files: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        graph_files: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Reload the retrieval agent KG, falling back if graph_files is unsupported."""
         reload = self.retrieval.reload_kg
         try:
@@ -3626,10 +3631,10 @@ class AgentPipelineService:
         self,
         question: str,
         *,
-        history: Optional[List[Dict[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+        history: list[dict[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
+    ) -> dict[str, Any]:
         """Query the retrieval agent with history, source RAG, and Tiled flags."""
         enabled = self.runtime.source_rag if source_rag is None else bool(source_rag)
         tiled_enabled = (
@@ -3652,7 +3657,7 @@ class AgentPipelineService:
             except TypeError:
                 return note_retrieval(self.retrieval, await query(question))
 
-    def _trace_env(self) -> Dict[str, Any]:
+    def _trace_env(self) -> dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""
         key = _SETTINGS_KEY.get()
         runtime = self.runtime if key == self._runtime_key else self._effective_runtime(key)
@@ -3687,15 +3692,15 @@ class AgentPipelineService:
     def _trace_request(
         self,
         question: str,
-        messages: Optional[List[ChatMessageInput]],
-        graph_source: Optional[str],
-        json_graph_path: Optional[str],
-        json_graph_paths: Optional[List[str]],
-        source_rag: Optional[bool],
-        use_live_tiled: Optional[bool],
-        ui_settings: Optional[Dict[str, Any]],
-        batch_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        messages: list[ChatMessageInput] | None,
+        graph_source: str | None,
+        json_graph_path: str | None,
+        json_graph_paths: list[str] | None,
+        source_rag: bool | None,
+        use_live_tiled: bool | None,
+        ui_settings: dict[str, Any] | None,
+        batch_id: str | None = None,
+    ) -> dict[str, Any]:
         """Request fields stored on the turn, with server defaults filled in."""
         paths = [path for path in (json_graph_paths or []) if str(path or "").strip()]
         if not paths and json_graph_path:
@@ -3719,17 +3724,17 @@ class AgentPipelineService:
         self,
         question: str,
         *,
-        messages: Optional[List[ChatMessageInput]],
-        session_id: Optional[str],
-        graph_source: Optional[str],
-        json_graph_path: Optional[str],
-        json_graph_paths: Optional[List[str]],
-        source_rag: Optional[bool],
-        use_live_tiled: Optional[bool],
-        client_turn_id: Optional[str],
-        parent_turn_id: Optional[str],
-        ui_settings: Optional[Dict[str, Any]],
-        batch_id: Optional[str] = None,
+        messages: list[ChatMessageInput] | None,
+        session_id: str | None,
+        graph_source: str | None,
+        json_graph_path: str | None,
+        json_graph_paths: list[str] | None,
+        source_rag: bool | None,
+        use_live_tiled: bool | None,
+        client_turn_id: str | None,
+        parent_turn_id: str | None,
+        ui_settings: dict[str, Any] | None,
+        batch_id: str | None = None,
     ) -> None:
         """Bind a turn collector. Reuses one already opened for this request."""
         open_turn(
@@ -3761,17 +3766,17 @@ class AgentPipelineService:
         self,
         question: str,
         *,
-        messages: Optional[List[ChatMessageInput]] = None,
-        session_id: Optional[str] = None,
-        graph_source: Optional[str] = None,
-        json_graph_path: Optional[str] = None,
-        json_graph_paths: Optional[List[str]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        messages: list[ChatMessageInput] | None = None,
+        session_id: str | None = None,
+        graph_source: str | None = None,
+        json_graph_path: str | None = None,
+        json_graph_paths: list[str] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
         auto_approve: bool = False,
-        client_turn_id: Optional[str] = None,
-        ui_settings: Optional[Dict[str, Any]] = None,
-        batch_id: Optional[str] = None,
+        client_turn_id: str | None = None,
+        ui_settings: dict[str, Any] | None = None,
+        batch_id: str | None = None,
         ) -> ChatResponse:
         """Run a chat turn without streaming progress events."""
         self._open_chat_trace(
@@ -3811,13 +3816,13 @@ class AgentPipelineService:
         self,
         question: str,
         *,
-        messages: Optional[List[ChatMessageInput]] = None,
-        session_id: Optional[str] = None,
-        graph_source: Optional[str] = None,
-        json_graph_path: Optional[str] = None,
-        json_graph_paths: Optional[List[str]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        messages: list[ChatMessageInput] | None = None,
+        session_id: str | None = None,
+        graph_source: str | None = None,
+        json_graph_path: str | None = None,
+        json_graph_paths: list[str] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         """Run a chat turn without streaming progress events."""
@@ -3909,17 +3914,17 @@ class AgentPipelineService:
         question: str,
         emit: ProgressEmitter,
         *,
-        messages: Optional[List[ChatMessageInput]] = None,
-        session_id: Optional[str] = None,
-        graph_source: Optional[str] = None,
-        json_graph_path: Optional[str] = None,
-        json_graph_paths: Optional[List[str]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        messages: list[ChatMessageInput] | None = None,
+        session_id: str | None = None,
+        graph_source: str | None = None,
+        json_graph_path: str | None = None,
+        json_graph_paths: list[str] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
         auto_approve: bool = False,
-        client_turn_id: Optional[str] = None,
-        ui_settings: Optional[Dict[str, Any]] = None,
-        batch_id: Optional[str] = None,
+        client_turn_id: str | None = None,
+        ui_settings: dict[str, Any] | None = None,
+        batch_id: str | None = None,
         ) -> ChatResponse:
         """Run a chat turn, emitting progress events along the way."""
         self._open_chat_trace(
@@ -3961,13 +3966,13 @@ class AgentPipelineService:
         question: str,
         emit: ProgressEmitter,
         *,
-        messages: Optional[List[ChatMessageInput]] = None,
-        session_id: Optional[str] = None,
-        graph_source: Optional[str] = None,
-        json_graph_path: Optional[str] = None,
-        json_graph_paths: Optional[List[str]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        messages: list[ChatMessageInput] | None = None,
+        session_id: str | None = None,
+        graph_source: str | None = None,
+        json_graph_path: str | None = None,
+        json_graph_paths: list[str] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
         auto_approve: bool = False,
         ) -> ChatResponse:
         """Run a chat turn, emitting progress events along the way."""
@@ -4056,7 +4061,7 @@ class AgentPipelineService:
 
     async def _emit(
         self,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         event: str,
         message: str,
         **data: Any,
@@ -4071,10 +4076,10 @@ class AgentPipelineService:
             return
         await emit(event, message, payload)
 
-    def _set_pending(self, pending: Optional[Dict[str, Any]], *, phase: Optional[str] = None) -> None:
+    def _set_pending(self, pending: dict[str, Any] | None, *, phase: str | None = None) -> None:
         """Store pending approval state and optionally update the workflow phase."""
         self.pending = pending
-        values: Dict[str, Any] = {"pending": pending}
+        values: dict[str, Any] = {"pending": pending}
         if phase is not None:
             values["phase"] = phase
         self.workflow.update(**values)
@@ -4087,7 +4092,7 @@ class AgentPipelineService:
         q = question.strip()
         if not q:
             return
-        declined: List[str] = list(self.workflow.data.get("declined_download_topics") or [])
+        declined: list[str] = list(self.workflow.data.get("declined_download_topics") or [])
         q_lower = q.lower()
         if q_lower not in [d.lower() for d in declined]:
             declined.append(q)
@@ -4100,7 +4105,7 @@ class AgentPipelineService:
         Uses word-overlap similarity (≥50 % of the shorter question's 4+-char tokens
         must appear in the declined topic) to handle minor rephrasing.
         """
-        declined: List[str] = list(self.workflow.data.get("declined_download_topics") or [])
+        declined: list[str] = list(self.workflow.data.get("declined_download_topics") or [])
         if not declined:
             return False
         q_tokens = set(re.findall(r"\w{4,}", question.lower()))
@@ -4115,14 +4120,14 @@ class AgentPipelineService:
                 return True
         return False
 
-    def _normalize_pending_state(self) -> Optional[Dict[str, Any]]:
+    def _normalize_pending_state(self) -> dict[str, Any] | None:
         """Migrate legacy/in-memory pending payloads into durable token state."""
         if not isinstance(self.pending, dict):
             return None
         pending = dict(self.pending)
         pending.setdefault("approval_token", uuid.uuid4().hex)
         kind = pending.get("kind")
-        values: Dict[str, Any] = {
+        values: dict[str, Any] = {
             "pending": pending,
             "phase": f"awaiting_{kind}_approval",
         }
@@ -4154,10 +4159,10 @@ class AgentPipelineService:
     async def _orchestrator_decision(
         self,
         user_turn: str,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         *,
-        route_hint: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        route_hint: str | None = None,
+    ) -> dict[str, Any]:
         """Ask the workflow orchestrator which agent action to take next."""
         state = self.workflow.snapshot()
         decision = await self.orchestrator.decide(
@@ -4203,10 +4208,10 @@ class AgentPipelineService:
     async def _maybe_query_active_paper(
         self,
         question: str,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         force: bool = False,
         decide: bool = True,
-    ) -> Optional[ChatResponse]:
+    ) -> ChatResponse | None:
         """Answer a follow-up against the currently extracted paper, if routed."""
         state = self.workflow.snapshot()
         if not force and not _paper_reference_followup(question, state):
@@ -4243,10 +4248,10 @@ class AgentPipelineService:
     async def _maybe_report_active_extraction(
         self,
         question: str,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         force: bool = False,
         decide: bool = True,
-    ) -> Optional[ChatResponse]:
+    ) -> ChatResponse | None:
         """Report extracted terms for the active paper, if routed."""
         state = self.workflow.snapshot()
         if not force and not _extracted_terms_followup(question, state):
@@ -4278,7 +4283,7 @@ class AgentPipelineService:
             publications_override=[],
         )
 
-    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """``summarize_extracted_terms``, through the T19B Tool adapter in langgraph mode.
 
         Default mode, or a replaced module-level ``summarize_extracted_terms``: that name, as before.
@@ -4291,8 +4296,8 @@ class AgentPipelineService:
     async def _handle_pending_message(
         self,
         message: str,
-        emit: Optional[ProgressEmitter],
-    ) -> Optional[ChatResponse]:
+        emit: ProgressEmitter | None,
+    ) -> ChatResponse | None:
         """Interpret a user message against a pending download or extraction."""
         if not self.pending:
             return None
@@ -4396,8 +4401,8 @@ class AgentPipelineService:
         self,
         original_question: str,
         effective_question: str,
-        graph_source: Optional[str],
-        json_graph_path: Optional[str],
+        graph_source: str | None,
+        json_graph_path: str | None,
     ) -> None:
         """Copy question and graph context onto the current pending dict."""
         if not self.pending:
@@ -4408,7 +4413,7 @@ class AgentPipelineService:
         self.pending.setdefault("json_graph_path", json_graph_path)
         self._set_pending(self.pending)
 
-    async def reset_session_context(self, session_id: Optional[str] = None) -> SessionResetResponse:
+    async def reset_session_context(self, session_id: str | None = None) -> SessionResetResponse:
         """Clear memory, workflow, and pending state for a session."""
         async with self.lock:
             self._activate_session(session_id)
@@ -4424,7 +4429,7 @@ class AgentPipelineService:
                 workflow_phase=str(self.workflow.data.get("phase") or "idle"),
             )
 
-    async def delete_session_context(self, session_id: str) -> Dict[str, str]:
+    async def delete_session_context(self, session_id: str) -> dict[str, str]:
         """Delete a named chat session's on-disk context."""
         key = self._session_key(session_id)
         if key == "__legacy__":
@@ -4441,8 +4446,8 @@ class AgentPipelineService:
     async def _prepare_chat_question(
         self,
         question: str,
-        messages: Optional[List[ChatMessageInput]],
-    ) -> Dict[str, str]:
+        messages: list[ChatMessageInput] | None,
+    ) -> dict[str, str]:
         """Rewrite follow-ups and decide whether agents are required."""
         history = _history_payload(messages)
         pending = _pending_scientific_question(history)
@@ -4471,9 +4476,9 @@ class AgentPipelineService:
     async def _prepare_orchestrated_question(
         self,
         question: str,
-        messages: Optional[List[ChatMessageInput]],
-        emit: Optional[ProgressEmitter],
-    ) -> Dict[str, str]:
+        messages: list[ChatMessageInput] | None,
+        emit: ProgressEmitter | None,
+    ) -> dict[str, str]:
         """Let the orchestrator classify a fresh turn, then resolve references.
 
         ``_judge_agent_requirement`` is no longer part of production routing. A
@@ -4496,7 +4501,7 @@ class AgentPipelineService:
         if _looks_meta_grounding_instruction(question) and pending:
             return {"status": "kg_question", "question": effective}
 
-        route_hint: Optional[str] = None
+        route_hint: str | None = None
         if "_judge_agent_requirement" in self.__dict__:
             legacy = await self._judge_agent_requirement(effective, history)
             route_hint = "retrieve_kg" if legacy.get("requires_agents", True) else "direct_response"
@@ -4536,7 +4541,7 @@ class AgentPipelineService:
     async def _start_direct_download_search(
         self,
         message: str,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
     ) -> ChatResponse:
         """Search for papers when the user asks to download one directly."""
         active_paper = self.workflow.data.get("active_paper") or {}
@@ -4675,8 +4680,8 @@ class AgentPipelineService:
     async def _judge_agent_requirement(
         self,
         question: str,
-        history: List[Dict[str, str]],
-    ) -> Dict[str, Any]:
+        history: list[dict[str, str]],
+    ) -> dict[str, Any]:
         """Ask the LLM whether this turn needs the agent workflow."""
         prompt = (
             "You route messages for a FAIR2WISE materials-science assistant.\n"
@@ -4694,7 +4699,7 @@ class AgentPipelineService:
             f"USER_MESSAGE:\n{question}"
         )
 
-        def run() -> Dict[str, Any]:
+        def run() -> dict[str, Any]:
             """Call the router prompt and parse requires_agents JSON."""
             raw = self._labeled_completion(prompt, timeout=60, label="legacy-route")
             obj = _parse_json_object(raw)
@@ -4715,8 +4720,8 @@ class AgentPipelineService:
     async def _generate_direct_response(
         self,
         question: str,
-        history: List[Dict[str, str]],
-        classification: Optional[str] = None,
+        history: list[dict[str, str]],
+        classification: str | None = None,
     ) -> str:
         """Generate a brief conversational reply without retrieval."""
         classification = classification or str(
@@ -4756,7 +4761,7 @@ class AgentPipelineService:
     async def _generate_domain_knowledge_fallback(
         self,
         question: str,
-        missing_topics: List[str],
+        missing_topics: list[str],
     ) -> str:
         """Generate an uncited domain-knowledge answer after KG evidence fails."""
         prompt = (
@@ -4813,7 +4818,7 @@ class AgentPipelineService:
     async def _rewrite_standalone_question(
         self,
         question: str,
-        history: List[Dict[str, str]],
+        history: list[dict[str, str]],
     ) -> str:
         """Rewrite the current turn into a standalone question using history."""
         prompt = (
@@ -4850,8 +4855,8 @@ class AgentPipelineService:
     async def _generate_json_graph_leeway_answer(
         self,
         question: str,
-        verdict: Dict[str, Any],
-        history: Optional[List[Dict[str, str]]] = None,
+        verdict: dict[str, Any],
+        history: list[dict[str, str]] | None = None,
     ) -> str:
         """Elaborate when JSON-KG nodes exist but numeric slots / code objects do not."""
         missing = [
@@ -4924,10 +4929,10 @@ class AgentPipelineService:
     async def _retired_deterministic_locked(
         self,
         question: str,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         *,
-        graph_source: Optional[str],
-        json_graph_path: Optional[str],
+        graph_source: str | None,
+        json_graph_path: str | None,
     ) -> ChatResponse:
         # Legacy workflow mode names are accepted by settings/configuration, but
         # both resolve to this one canonical orchestrated implementation.
@@ -4939,8 +4944,8 @@ class AgentPipelineService:
             json_graph_path=json_graph_path,
         )
 
-        rounds: List[Dict[str, Any]] = []
-        last_verdict: Dict[str, Any] = {}
+        rounds: list[dict[str, Any]] = []
+        last_verdict: dict[str, Any] = {}
         effective_graph_source = (graph_source or self.runtime.graph_source).lower()
 
         if effective_graph_source == "json":
@@ -4989,7 +4994,7 @@ class AgentPipelineService:
                     active_graph_path,
                 )
             last_verdict = verdict
-            round_info: Dict[str, Any] = {
+            round_info: dict[str, Any] = {
                 "round": round_no,
                 "retrieval": verdict,
             }
@@ -5217,18 +5222,18 @@ class AgentPipelineService:
     async def _ask_locked(
         self,
         question: str,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         *,
-        graph_source: Optional[str],
-        json_graph_path: Optional[str],
-        json_graph_paths: Optional[List[str]] = None,
-        history: Optional[List[Dict[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        graph_source: str | None,
+        json_graph_path: str | None,
+        json_graph_paths: list[str] | None = None,
+        history: list[dict[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
     ) -> ChatResponse:
         """Run the orchestrated retrieval, download, and extraction chat loop."""
-        rounds: List[Dict[str, Any]] = []
-        last_verdict: Dict[str, Any] = {}
+        rounds: list[dict[str, Any]] = []
+        last_verdict: dict[str, Any] = {}
         effective_graph_source = (graph_source or self.runtime.graph_source).lower()
 
         if effective_graph_source == "json":
@@ -5240,7 +5245,7 @@ class AgentPipelineService:
                 selected_paths = self._runtime_json_paths()
             if not selected_paths:
                 raise ValueError("JSON graph mode requires a graph file")
-            resolved_files: List[str] = []
+            resolved_files: list[str] = []
             for path in selected_paths:
                 resolved = self._try_resolve_runtime_json_graph_path(path)
                 if resolved is None:
@@ -5293,7 +5298,7 @@ class AgentPipelineService:
                     active_graph_path,
                 )
             last_verdict = verdict
-            round_info: Dict[str, Any] = {
+            round_info: dict[str, Any] = {
                 "round": round_no,
                 "retrieval": verdict,
             }
@@ -5426,8 +5431,8 @@ class AgentPipelineService:
                     active_graph_path,
                 )
 
-            candidates: List[Dict[str, Any]] = []
-            debate_summary: Dict[str, Any] = {}
+            candidates: list[dict[str, Any]] = []
+            debate_summary: dict[str, Any] = {}
             # For generic "download another paper" requests, resolve to the actual
             # topic (stored on the active paper) so the candidate search returns
             # papers relevant to what the user originally asked about, not the raw
@@ -5684,9 +5689,9 @@ class AgentPipelineService:
 
     def _pick_candidate(
         self,
-        candidates: List[Dict[str, Any]],
-        debate_summary: Dict[str, Any],
-    ) -> tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+        candidates: list[dict[str, Any]],
+        debate_summary: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
         """Best candidate (debate pick, else top-ranked) plus a few alternatives."""
         if not candidates:
             return None, []
@@ -5698,15 +5703,15 @@ class AgentPipelineService:
     async def _extract_rebuild_reload(
         self,
         *,
-        emit: Optional[ProgressEmitter],
+        emit: ProgressEmitter | None,
         question: str,
-        missing: List[str],
+        missing: list[str],
         round_no: int,
-        round_info: Dict[str, Any],
-        verdict: Dict[str, Any],
-        rounds: List[Dict[str, Any]],
-        approved_pdfs: List[Path],
-    ) -> Optional[ChatResponse]:
+        round_info: dict[str, Any],
+        verdict: dict[str, Any],
+        rounds: list[dict[str, Any]],
+        approved_pdfs: list[Path],
+    ) -> ChatResponse | None:
         """Stage -> extract -> rebuild -> reload. Returns ChatResponse only on failure/no-op."""
         round_pdf_dir, pending_pdfs = self.coord._stage_unprocessed_pdfs(
             round_no,
@@ -5894,7 +5899,7 @@ class AgentPipelineService:
     # ------------------------------------------------------------------
     # Interactive resume (agentic gating)
     # ------------------------------------------------------------------
-    def _pending_candidate_list(self) -> List[Dict[str, Any]]:
+    def _pending_candidate_list(self) -> list[dict[str, Any]]:
         """Return pending download candidates, falling back to selected plus alternatives."""
         pending = self.pending or {}
         candidates = [c for c in (pending.get("candidate_list") or []) if isinstance(c, dict)]
@@ -5906,9 +5911,9 @@ class AgentPipelineService:
 
     def _pending_recommended_candidate_index(
         self,
-        candidates: List[Dict[str, Any]],
+        candidates: list[dict[str, Any]],
         failed: set[int],
-    ) -> Optional[int]:
+    ) -> int | None:
         """Return the recommended candidate index that has not failed."""
         pending = self.pending or {}
         if "recommended_candidate_index" in pending:
@@ -5926,8 +5931,8 @@ class AgentPipelineService:
     def _heuristic_pending_download_intent(
         self,
         message: str,
-        candidates: List[Dict[str, Any]],
-    ) -> Optional[Dict[str, Any]]:
+        candidates: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
         """Parse download, decline, or clarify intent from a pending-download message."""
         normalized = _normalize_chat_text(message)
         wants_download = bool(re.search(r"\b(download|fetch|get|take|choose|select|use|grab)\b", normalized))
@@ -5983,7 +5988,7 @@ class AgentPipelineService:
                 "download", "fetch", "get", "take", "choose", "select", "use", "grab",
                 "paper", "candidate", "option", "the", "a", "an", "please",
             }
-            best_index: Optional[int] = None
+            best_index: int | None = None
             best_score = 0.0
             for index, candidate in enumerate(candidates):
                 title_tokens = set(_normalize_chat_text(str(candidate.get("title") or "")).split())
@@ -5998,7 +6003,7 @@ class AgentPipelineService:
                 return {"action": "download", "candidate_index": 0}
         return None
 
-    async def _interpret_pending_download_message(self, message: str) -> Dict[str, Any]:
+    async def _interpret_pending_download_message(self, message: str) -> dict[str, Any]:
         """Resolve pending-download intent via heuristics or an LLM."""
         candidates = self._pending_candidate_list()
         heuristic = self._heuristic_pending_download_intent(message, candidates)
@@ -6030,7 +6035,7 @@ class AgentPipelineService:
             f"USER_MESSAGE:\n{message}"
         )
 
-        def run() -> Dict[str, Any]:
+        def run() -> dict[str, Any]:
             """Parse JSON intent from the pending-download interpreter prompt."""
             return _parse_json_object(self._labeled_completion(
                 prompt, timeout=60, label="pending-download-intent"
@@ -6058,8 +6063,8 @@ class AgentPipelineService:
     async def _handle_pending_download_message(
         self,
         message: str,
-        emit: Optional[ProgressEmitter],
-    ) -> Optional[ChatResponse]:
+        emit: ProgressEmitter | None,
+    ) -> ChatResponse | None:
         """Act on a pending download message, or re-prompt if the intent is unclear."""
         intent = await self._interpret_pending_download_message(message)
         action_name = intent.get("action")
@@ -6100,13 +6105,13 @@ class AgentPipelineService:
     async def act(
         self,
         decision: str,
-        kind: Optional[str] = None,
+        kind: str | None = None,
         *,
-        candidate_index: Optional[int] = None,
-        session_id: Optional[str] = None,
-        client_turn_id: Optional[str] = None,
-        parent_turn_id: Optional[str] = None,
-        ui_settings: Optional[Dict[str, Any]] = None,
+        candidate_index: int | None = None,
+        session_id: str | None = None,
+        client_turn_id: str | None = None,
+        parent_turn_id: str | None = None,
+        ui_settings: dict[str, Any] | None = None,
     ) -> ChatResponse:
         """Apply a yes/no pending decision without streaming progress."""
         self._open_chat_trace(
@@ -6140,10 +6145,10 @@ class AgentPipelineService:
     async def _act_body(
         self,
         decision: str,
-        kind: Optional[str] = None,
+        kind: str | None = None,
         *,
-        candidate_index: Optional[int] = None,
-        session_id: Optional[str] = None,
+        candidate_index: int | None = None,
+        session_id: str | None = None,
     ) -> ChatResponse:
         """Apply a yes/no pending decision without streaming progress."""
         async with self.lock:
@@ -6155,13 +6160,13 @@ class AgentPipelineService:
         self,
         decision: str,
         emit: ProgressEmitter,
-        kind: Optional[str] = None,
+        kind: str | None = None,
         *,
-        candidate_index: Optional[int] = None,
-        session_id: Optional[str] = None,
-        client_turn_id: Optional[str] = None,
-        parent_turn_id: Optional[str] = None,
-        ui_settings: Optional[Dict[str, Any]] = None,
+        candidate_index: int | None = None,
+        session_id: str | None = None,
+        client_turn_id: str | None = None,
+        parent_turn_id: str | None = None,
+        ui_settings: dict[str, Any] | None = None,
     ) -> ChatResponse:
         """Apply a yes/no pending decision, emitting progress events."""
         self._open_chat_trace(
@@ -6197,10 +6202,10 @@ class AgentPipelineService:
         self,
         decision: str,
         emit: ProgressEmitter,
-        kind: Optional[str] = None,
+        kind: str | None = None,
         *,
-        candidate_index: Optional[int] = None,
-        session_id: Optional[str] = None,
+        candidate_index: int | None = None,
+        session_id: str | None = None,
     ) -> ChatResponse:
         """Apply a yes/no pending decision, emitting progress events."""
         async with self.lock:
@@ -6211,10 +6216,10 @@ class AgentPipelineService:
     async def _act_locked(
         self,
         decision: str,
-        kind: Optional[str],
-        emit: Optional[ProgressEmitter],
+        kind: str | None,
+        emit: ProgressEmitter | None,
         *,
-        candidate_index: Optional[int] = None,
+        candidate_index: int | None = None,
     ) -> ChatResponse:
         """Execute an approved or declined download or extraction while holding the lock."""
         pending = self._normalize_pending_state()
@@ -6238,7 +6243,7 @@ class AgentPipelineService:
                     "Okay - I will not download a paper. The current knowledge graph does not "
                     "have enough direct evidence to answer this question."
                 )
-                publications_override: Optional[List[Dict[str, Any]]] = None
+                publications_override: list[dict[str, Any]] | None = None
             else:
                 message = (
                     "Okay - I downloaded the paper but will not run extraction. Ask again if "
@@ -6301,8 +6306,8 @@ class AgentPipelineService:
 
     async def _resume_download(
         self,
-        pending: Dict[str, Any],
-        emit: Optional[ProgressEmitter],
+        pending: dict[str, Any],
+        emit: ProgressEmitter | None,
     ) -> ChatResponse:
         """Download the approved paper candidate and continue the workflow."""
         verdict = pending.get("verdict") or {}
@@ -6311,7 +6316,7 @@ class AgentPipelineService:
         question = pending.get("effective_question") or pending.get("original_question") or ""
         original_question = pending.get("original_question") or question
         round_no = int(pending.get("round_no") or 1)
-        rounds: List[Dict[str, Any]] = [{"round": round_no, "retrieval": verdict}]
+        rounds: list[dict[str, Any]] = [{"round": round_no, "retrieval": verdict}]
 
         await self._emit(
             emit,
@@ -6454,8 +6459,8 @@ class AgentPipelineService:
 
     async def _resume_extraction(
         self,
-        pending: Dict[str, Any],
-        emit: Optional[ProgressEmitter],
+        pending: dict[str, Any],
+        emit: ProgressEmitter | None,
     ) -> ChatResponse:
         """Extract the approved PDFs into the graph and continue the workflow."""
         verdict = pending.get("verdict") or {}
@@ -6463,8 +6468,8 @@ class AgentPipelineService:
         question = pending.get("effective_question") or pending.get("original_question") or ""
         original_question = pending.get("original_question") or question
         round_no = int(pending.get("round_no") or 1)
-        round_info: Dict[str, Any] = {"round": round_no, "retrieval": verdict}
-        rounds: List[Dict[str, Any]] = [round_info]
+        round_info: dict[str, Any] = {"round": round_no, "retrieval": verdict}
+        rounds: list[dict[str, Any]] = [round_info]
         approved_pdfs = [Path(str(path)) for path in (pending.get("downloaded") or [])]
 
         failure = await self._extract_rebuild_reload(
@@ -6657,12 +6662,12 @@ class AgentPipelineService:
         status: str,
         answer: str,
         sufficient: bool,
-        verdict: Dict[str, Any],
-        rounds: List[Dict[str, Any]],
+        verdict: dict[str, Any],
+        rounds: list[dict[str, Any]],
         graph_path: Path,
         *,
-        pending: Optional[Dict[str, Any]] = None,
-        publications_override: Optional[List[Dict[str, Any]]] = None,
+        pending: dict[str, Any] | None = None,
+        publications_override: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
         """Build a ChatResponse from status, verdict, rounds, and the current graph."""
         selected_ids = [str(n) for n in (verdict.get("selected") or [])]
@@ -6692,11 +6697,11 @@ class AgentPipelineService:
 
     @staticmethod
     def _candidate_public(
-        candidate: Optional[Dict[str, Any]],
+        candidate: dict[str, Any] | None,
         *,
-        index: Optional[int] = None,
+        index: int | None = None,
         recommended: bool = False,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Project a download candidate into the public pending-paper payload."""
         if not isinstance(candidate, dict):
             return None
@@ -6713,12 +6718,12 @@ class AgentPipelineService:
             payload["index"] = index
         return payload
 
-    def _download_papers_public(self) -> List[Dict[str, Any]]:
+    def _download_papers_public(self) -> list[dict[str, Any]]:
         """List pending download candidates with recommended and failed flags."""
         candidates = self._pending_candidate_list()
         failed = {int(index) for index in ((self.pending or {}).get("failed_candidate_indices") or [])}
         recommended_index = self._pending_recommended_candidate_index(candidates, failed)
-        papers: List[Dict[str, Any]] = []
+        papers: list[dict[str, Any]] = []
         for index, candidate in enumerate(candidates):
             public = self._candidate_public(
                 candidate,
@@ -6731,7 +6736,7 @@ class AgentPipelineService:
                 papers.append(public)
         return papers
 
-    def _candidate_publication(self, candidate: Dict[str, Any], filename: Optional[str] = None) -> Dict[str, Any]:
+    def _candidate_publication(self, candidate: dict[str, Any], filename: str | None = None) -> dict[str, Any]:
         """Map a download candidate to a publication dict."""
         return {
             "paper_title": str(candidate.get("title") or "Untitled"),
@@ -6743,8 +6748,8 @@ class AgentPipelineService:
 
     @staticmethod
     def _download_failure_message(
-        dl: Dict[str, Any],
-        candidate: Optional[Dict[str, Any]],
+        dl: dict[str, Any],
+        candidate: dict[str, Any] | None,
     ) -> str:
         """User-facing message for a failed or rejected paper download."""
         title = str((candidate or {}).get("title") or "the selected paper")
@@ -6761,7 +6766,7 @@ class AgentPipelineService:
             )
         return f"The open-access paper **{title}** could not be downloaded."
 
-    def _pending_payload(self) -> Optional[Dict[str, Any]]:
+    def _pending_payload(self) -> dict[str, Any] | None:
         """Public pending download or extraction payload for the client."""
         if not self.pending:
             return None
@@ -6791,7 +6796,7 @@ DEFAULT_CORS_ORIGINS = [
 ]
 
 
-def effective_cors_origins(cors_origins: Optional[List[str]], *, is_local: bool) -> List[str]:
+def effective_cors_origins(cors_origins: list[str] | None, *, is_local: bool) -> list[str]:
     """CORS allowlist for a deployment (AUD-04, C7).
 
     ``:local`` keeps the Vite development origins as its fallback. On ``als-dev``/``als-prod``
@@ -6806,12 +6811,12 @@ def effective_cors_origins(cors_origins: Optional[List[str]], *, is_local: bool)
 def create_app(
     cfg: CoordinatorConfig,
     *,
-    cors_origins: Optional[List[str]] = None,
-    deployment: Optional[Any] = None,
-    startup_config: Optional[Dict[str, str]] = None,
-    identity_port: Optional[Any] = None,
-    credential_store: Optional[Any] = None,
-    clock: Optional[Callable[[], Any]] = None,
+    cors_origins: list[str] | None = None,
+    deployment: Any | None = None,
+    startup_config: dict[str, str] | None = None,
+    identity_port: Any | None = None,
+    credential_store: Any | None = None,
+    clock: Callable[[], Any] | None = None,
 ) -> FastAPI:
     """Build the FastAPI app with CORS and agent pipeline routes.
 
@@ -6855,7 +6860,7 @@ def create_app(
     app.add_middleware(OriginGateMiddleware, allowed_origins=allowed_origins, path_prefixes=("/",))
 
     @app.get("/health")
-    async def health(ctx: Optional[RequestContext] = Depends(ui_optional_context)) -> Dict[str, Any]:
+    async def health(ctx: RequestContext | None = Depends(ui_optional_context)) -> dict[str, Any]:
         """Return process health, runtime settings, and session paths."""
         return guard.project_health(ctx, {
             "status": "ok",
@@ -6899,7 +6904,7 @@ def create_app(
 
     @app.post("/session/reset", response_model=SessionResetResponse)
     async def reset_session(
-        request: Request, req: Optional[SessionResetRequest] = None, ctx: RequestContext = Depends(ui_context),
+        request: Request, req: SessionResetRequest | None = None, ctx: RequestContext = Depends(ui_context),
     ) -> SessionResetResponse:
         """Clear the requested chat session."""
         guard.session_access(request, ctx, req.session_id if req else None, claim=True)
@@ -6909,7 +6914,7 @@ def create_app(
     @app.delete("/session/{session_id}")
     async def delete_session(
         session_id: str, request: Request, ctx: RequestContext = Depends(ui_context),
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Delete a named chat session."""
         try:
             guard.session_access(request, ctx, session_id, claim=False)
@@ -6953,7 +6958,7 @@ def create_app(
             return guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload))
         raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
 
-    def _tiled_graph_node(node_id: str) -> Optional[GraphNode]:
+    def _tiled_graph_node(node_id: str) -> GraphNode | None:
         """Resolve a Tiled graph node into a GraphNode, if present."""
         tiled_kg = (getattr(service.retrieval, "_graphs", {}) or {}).get(TILED_GRAPH_ID)
         if tiled_kg is None:
@@ -6975,14 +6980,14 @@ def create_app(
     @app.get("/graph/node/{node_id}", response_model=GraphNode)
     async def graph_node(
         node_id: str,
-        json_graph_path: Optional[str] = None,
+        json_graph_path: str | None = None,
         ctx: RequestContext = Depends(ui_context),
     ) -> GraphNode:
         """Return one graph node by id from Tiled or a JSON graph file."""
         node = await _graph_node(node_id, json_graph_path, guard.settings_key(ctx))
         return guard.project_route(ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(node))
 
-    async def _graph_node(node_id: str, json_graph_path: Optional[str], key: Optional[str]) -> GraphNode:
+    async def _graph_node(node_id: str, json_graph_path: str | None, key: str | None) -> GraphNode:
         """Resolve one node; ``json_graph_path`` may be an opaque ``f2w://`` id (T18B)."""
         try:
             json_graph_path = guard.paths.decode(json_graph_path)
@@ -7045,7 +7050,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=guard.error_detail(ctx, exc)) from exc
         return guard.project_route(ctx, "POST", "/graph/upload", _model_to_jsonable(saved))
 
-    async def _withhold_pending(ctx: RequestContext, session_id: Optional[str], payload: Dict[str, Any]) -> None:
+    async def _withhold_pending(ctx: RequestContext, session_id: str | None, payload: dict[str, Any]) -> None:
         """Drop a download/extraction offer the caller may not act on (AUTH-03)."""
         if payload.get("pending") and not guard.offers_ingestion(ctx):
             async with service.lock:
@@ -7155,7 +7160,7 @@ def create_app(
             )
             note_progress("turn_started", "Turn started", {"turn_id": collector.turn_id})
             guard.claim_turn(ctx, collector.turn_id)
-            queue: asyncio.Queue[Optional[tuple[str, Dict[str, Any]]]] = asyncio.Queue()
+            queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
             await queue.put((
                 "progress",
                 {
@@ -7165,7 +7170,7 @@ def create_app(
                 },
             ))
 
-            async def emit(event: str, message: str, data: Dict[str, Any]) -> None:
+            async def emit(event: str, message: str, data: dict[str, Any]) -> None:
                 """Enqueue a progress event for the chat SSE stream."""
                 await queue.put((
                     "progress",
@@ -7264,7 +7269,7 @@ def create_app(
             )
             note_progress("turn_started", "Turn started", {"turn_id": collector.turn_id})
             guard.claim_turn(ctx, collector.turn_id)
-            queue: asyncio.Queue[Optional[tuple[str, Dict[str, Any]]]] = asyncio.Queue()
+            queue: asyncio.Queue[tuple[str, dict[str, Any]] | None] = asyncio.Queue()
             await queue.put((
                 "progress",
                 {
@@ -7274,7 +7279,7 @@ def create_app(
                 },
             ))
 
-            async def emit(event: str, message: str, data: Dict[str, Any]) -> None:
+            async def emit(event: str, message: str, data: dict[str, Any]) -> None:
                 """Enqueue a progress event for the action SSE stream."""
                 await queue.put((
                     "progress",
@@ -7341,7 +7346,7 @@ def create_app(
     @app.get("/traces/{turn_id}")
     async def get_trace(
         turn_id: str, request: Request, ctx: RequestContext = Depends(ui_context),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Return the unclipped detail record for one turn."""
         # T18B: raw for trace.read_any (every :local user, ALS admins), projected otherwise.
         ctx = guard.trace_access(request, ctx, turn_id)
@@ -7351,7 +7356,7 @@ def create_app(
         return guard.project_trace(ctx, record)
 
     @app.post("/telemetry/ui")
-    async def telemetry_ui(req: UiTelemetryBatch, ctx: RequestContext = Depends(ui_context)) -> Dict[str, Any]:
+    async def telemetry_ui(req: UiTelemetryBatch, ctx: RequestContext = Depends(ui_context)) -> dict[str, Any]:
         """Append a batch of UI events. No-op when tracing is disabled."""
         if not tracing_enabled():
             return {"status": "disabled", "written": 0}
@@ -7362,15 +7367,15 @@ def create_app(
     @app.post("/annotations")
     async def create_annotation(
         req: AnnotationRequest, request: Request, ctx: RequestContext = Depends(ui_context),
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Append a human pass/fail label. Multiple labels per turn are allowed."""
         record = guard.annotation(request, ctx, req.model_dump())
         if not tracing_enabled():
             return {"status": "disabled"}
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         if not record.get("ts"):
-            record["ts"] = datetime.now(timezone.utc).isoformat()
+            record["ts"] = datetime.now(UTC).isoformat()
         append_annotation(record)
         return {"status": "ok", "turn_id": req.turn_id, "verdict": req.verdict}
 
@@ -7380,7 +7385,7 @@ def create_app(
     return app
 
 
-def run_api(cfg: CoordinatorConfig, *, host: str, port: int, cors_origins: Optional[List[str]] = None) -> None:
+def run_api(cfg: CoordinatorConfig, *, host: str, port: int, cors_origins: list[str] | None = None) -> None:
     """Start the uvicorn server for the agent pipeline API.
 
     Behind the ``/fair2wise`` gateway (T24C) the trusted startup setting

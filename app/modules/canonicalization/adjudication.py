@@ -23,10 +23,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/group_adjudication.py (BSD-3-C
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup
@@ -91,10 +91,10 @@ class GroupVerdict:
 
     category: str
     canonical: str
-    aliases: List[str] = field(default_factory=list)
-    separate: List[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
+    separate: list[str] = field(default_factory=list)
     #: Aliases the model accepted but the deterministic check refused: (alias, reason).
-    held_for_review: List[tuple] = field(default_factory=list)
+    held_for_review: list[tuple] = field(default_factory=list)
     same_thing: bool = False
     confidence: float = 0.0
     reason: str = ""
@@ -112,7 +112,7 @@ class GroupVerdict:
             and bool(self.aliases)
         )
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the judgement as a plain dict (confidence rounded to 3 places)."""
         return {
             "category": self.category,
@@ -128,7 +128,7 @@ class GroupVerdict:
         }
 
 
-def build_group_prompt(group: TermGroup, contexts: Dict[str, List[str]]) -> str:
+def build_group_prompt(group: TermGroup, contexts: dict[str, list[str]]) -> str:
     """One bounded prompt for a whole cluster (members and snippets are capped)."""
     members = group.members[:MAX_GROUP_MEMBERS]
     lines = [
@@ -153,7 +153,7 @@ def _keep(group: TermGroup, method: str, reason: str) -> GroupVerdict:
     )
 
 
-def parse_json_object(raw: Any) -> Optional[Dict[str, Any]]:
+def parse_json_object(raw: Any) -> dict[str, Any] | None:
     """The first JSON object in ``raw`` (tolerates prose or fences), else ``None``."""
     text = str(raw or "").strip()
     start, end = text.find("{"), text.rfind("}")
@@ -167,7 +167,7 @@ def parse_json_object(raw: Any) -> Optional[Dict[str, Any]]:
     return value if isinstance(value, dict) else None
 
 
-def _strings(value: Any) -> List[str]:
+def _strings(value: Any) -> list[str]:
     return [str(v).strip() for v in value if str(v).strip()] if isinstance(value, list) else []
 
 
@@ -180,7 +180,7 @@ def clamp_confidence(value: Any) -> float:
 
 
 def adjudicate_group(
-    group: TermGroup, contexts: Dict[str, List[str]], *, judge: Optional[Judge] = None
+    group: TermGroup, contexts: dict[str, list[str]], *, judge: Judge | None = None
 ) -> GroupVerdict:
     """Decide one cluster in one call. Never raises: a judge fault is not a verdict."""
     if judge is None:
@@ -198,8 +198,8 @@ def adjudicate_group(
     if canonical not in members:
         return _keep(group, "canonical_not_in_group", f"model chose {canonical!r}, which is not a clustered form")
     separate = [s for s in _strings(payload.get("separate")) if s in members]
-    accepted: List[str] = []
-    held: List[tuple] = []
+    accepted: list[str] = []
+    held: list[tuple] = []
     for alias in _strings(payload.get("aliases")):
         if alias not in members or alias == canonical or alias in separate:
             continue
@@ -242,7 +242,7 @@ class MentionVerdict:
     """Outcome of constrained adjudication for one mention."""
 
     status: str  # "match", "abstain", "refused", "no_judge", "judge_failed", "unparseable", "not_offered"
-    entity_id: Optional[str] = None
+    entity_id: str | None = None
     confidence: float = 0.0
     reason: str = ""
     prompt_tokens: int = 0
@@ -258,7 +258,7 @@ def adjudicate_mention(
     category: str,
     shortlist: Shortlist,
     *,
-    judge: Optional[Judge] = None,
+    judge: Judge | None = None,
     min_confidence: float = AUTO_APPLY_CONFIDENCE,
 ) -> MentionVerdict:
     """Ask the judge to choose among shortlist ids; the id must be offered and pass the safety check."""

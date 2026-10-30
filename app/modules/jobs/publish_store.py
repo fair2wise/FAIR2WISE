@@ -11,10 +11,10 @@ rebuilding anything. Until a new triple is activated the old one stays in place.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from datetime import UTC, datetime
+import json
+from typing import Any, Callable, Iterable
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.errors import ContractError, ErrorCode
@@ -63,7 +63,7 @@ class Pointer:
     receipt_id: str
     index_ref: str
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the pointer fields as a plain dict."""
         return {
             "snapshot_ref": self.snapshot_ref,
@@ -102,7 +102,7 @@ class PublishStore:
                 ),
             )
 
-    def current_plan(self, job_id: str) -> Optional[PlanRecord]:
+    def current_plan(self, job_id: str) -> PlanRecord | None:
         """The most recent plan of a job."""
         row = self.db.one("SELECT * FROM pub_plans WHERE job_id=? ORDER BY rowid DESC LIMIT 1", (job_id,))
         if row is None:
@@ -134,7 +134,7 @@ class PublishStore:
                 ),
             )
 
-    def valid_approvals(self, job_id: str, plan: ChangePlan) -> List[ApprovalRecord]:
+    def valid_approvals(self, job_id: str, plan: ChangePlan) -> list[ApprovalRecord]:
         """Approvals still valid for exactly this plan hash."""
         rows = self.db.query(
             "SELECT record FROM pub_approvals WHERE job_id=? AND plan_sha256=? AND status='valid' ORDER BY "
@@ -143,7 +143,7 @@ class PublishStore:
         )
         return [ApprovalRecord.model_validate_json(r["record"]) for r in rows]
 
-    def get_approval(self, approval_id: str) -> Optional[ApprovalRecord]:
+    def get_approval(self, approval_id: str) -> ApprovalRecord | None:
         """An approval by id whatever its status (a consumed approval still documents what was imported)."""
         row = self.db.one("SELECT record FROM pub_approvals WHERE approval_id=?", (approval_id,))
         return ApprovalRecord.model_validate_json(row["record"]) if row else None
@@ -159,8 +159,8 @@ class PublishStore:
         self,
         *,
         reason: str,
-        job_id: Optional[str] = None,
-        subject: Optional[str] = None,
+        job_id: str | None = None,
+        subject: str | None = None,
         corpora: Iterable[str] = (),
     ) -> int:
         """Invalidate valid approvals by job, by requester or approver, or by corpus overlap."""
@@ -184,7 +184,7 @@ class PublishStore:
                     count += 1
         return count
 
-    def approval_status(self, approval_id: str) -> Optional[Tuple[str, str]]:
+    def approval_status(self, approval_id: str) -> tuple[str, str] | None:
         """``(status, reason)`` of an approval."""
         row = self.db.one("SELECT status, reason FROM pub_approvals WHERE approval_id=?", (approval_id,))
         return (row["status"], row["reason"]) if row else None
@@ -215,7 +215,7 @@ class PublishStore:
             )
         return receipt
 
-    def receipt_for(self, plan_sha256: str, target: str) -> Optional[ImportReceipt]:
+    def receipt_for(self, plan_sha256: str, target: str) -> ImportReceipt | None:
         """The receipt of a plan on a target (receipts are valid only for the target they name)."""
         row = self.db.one(
             "SELECT receipt FROM pub_receipts WHERE plan_sha256=? AND target=?", (plan_sha256, target)
@@ -224,7 +224,7 @@ class PublishStore:
 
     # --- quarantine ------------------------------------------------------------------------
 
-    def quarantine(self, job_id: str, subject: str, reason: str, detail: Optional[Dict[str, Any]] = None) -> None:
+    def quarantine(self, job_id: str, subject: str, reason: str, detail: dict[str, Any] | None = None) -> None:
         """Record why a package, snapshot or step output must not be published."""
         with self.db.tx() as con:
             con.execute(
@@ -232,7 +232,7 @@ class PublishStore:
                 (job_id, subject, reason[:300], canonical_json(detail or {}), self.clock()),
             )
 
-    def quarantined(self, job_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def quarantined(self, job_id: str | None = None) -> list[dict[str, Any]]:
         """Quarantine entries, newest last."""
         sql, params = "SELECT * FROM pub_quarantine", ()
         if job_id is not None:
@@ -243,7 +243,7 @@ class PublishStore:
 
     # --- active pointer --------------------------------------------------------------------
 
-    def pointer(self, name: str) -> Optional[Pointer]:
+    def pointer(self, name: str) -> Pointer | None:
         """The active pointer for ``name`` (a target), or ``None`` before the first activation."""
         row = self.db.one("SELECT version, record FROM pub_pointers WHERE name=?", (name,))
         if row is None:
@@ -320,7 +320,7 @@ class PublishStore:
             )
         return Pointer(name, version, **json.loads(history["record"]))
 
-    def pointer_history(self, name: str) -> List[Dict[str, Any]]:
+    def pointer_history(self, name: str) -> list[dict[str, Any]]:
         """All pointer movements for ``name``."""
         return [
             {**dict(r), "record": json.loads(r["record"])}
@@ -330,9 +330,8 @@ class PublishStore:
 
 def utc(moment: float) -> datetime:
     """Epoch seconds as an aware UTC datetime."""
-    from datetime import timezone
 
-    return datetime.fromtimestamp(moment, tz=timezone.utc)
+    return datetime.fromtimestamp(moment, tz=UTC)
 
 
 __all__ = ("PlanRecord", "Pointer", "PublishStore", "SCHEMA", "utc")

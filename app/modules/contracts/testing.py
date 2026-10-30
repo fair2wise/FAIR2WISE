@@ -8,9 +8,9 @@ or network. Replies are deterministic: a scripted queue, then a fixed default.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import hashlib
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Iterable, Mapping, Sequence
 
 from .changes import ApprovalRecord, ChangePlan, ImportReceipt
 from .context import RequestContext
@@ -31,7 +31,7 @@ class FakeSyncChatClient:
         self.model = model
         self._replies = list(replies)
         self._default = default
-        self.calls: List[Dict[str, Any]] = []
+        self.calls: list[dict[str, Any]] = []
 
     def chat(
         self,
@@ -39,7 +39,7 @@ class FakeSyncChatClient:
         *,
         temperature: float = 0.0,
         timeout: int = 240,
-        trace_label: Optional[str] = None,
+        trace_label: str | None = None,
     ) -> str:
         """Record the call and return the next scripted reply."""
         self.calls.append(
@@ -61,9 +61,9 @@ class FakeAsyncChatClient:
         self.model = model
         self._replies = list(replies)
         self._default = default
-        self.calls: List[List[Dict[str, str]]] = []
+        self.calls: list[list[dict[str, str]]] = []
 
-    async def chat(self, messages: Sequence[Dict[str, str]]) -> str:
+    async def chat(self, messages: Sequence[dict[str, str]]) -> str:
         """Record the messages and return the next scripted reply."""
         self.calls.append([dict(m) for m in messages])
         return self._replies.pop(0) if self._replies else self._default
@@ -79,33 +79,33 @@ class InMemoryGraphPort:
 
     def __init__(
         self,
-        graphs: Optional[Mapping[str, Mapping[str, Dict[str, Any]]]] = None,
+        graphs: Mapping[str, Mapping[str, dict[str, Any]]] | None = None,
         *,
-        capabilities: Optional[GraphCapabilities] = None,
+        capabilities: GraphCapabilities | None = None,
     ) -> None:
-        self._graphs: Dict[str, Dict[str, Dict[str, Any]]] = {g: dict(e) for g, e in (graphs or {}).items()}
+        self._graphs: dict[str, dict[str, dict[str, Any]]] = {g: dict(e) for g, e in (graphs or {}).items()}
         self._caps = capabilities or GraphCapabilities(
             backend="memory", complete_listing=True, bounded_traversal=True
         )
-        self.receipts: List[ImportReceipt] = []
+        self.receipts: list[ImportReceipt] = []
 
     def capabilities(self) -> GraphCapabilities:
         """Return the advertised capabilities."""
         return self._caps
 
-    def _scoped(self, ctx: RequestContext, graph_id: str) -> Dict[str, Dict[str, Any]]:
+    def _scoped(self, ctx: RequestContext, graph_id: str) -> dict[str, dict[str, Any]]:
         if ctx.corpus_scope and graph_id not in ctx.corpus_scope:
             raise ContractError(ErrorCode.DENIED, f"graph {graph_id!r} is outside the request scope")
         return self._graphs.get(graph_id, {})
 
-    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> Optional[Dict[str, Any]]:
+    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> dict[str, Any] | None:
         """Return one entity or ``None``."""
         entity = self._scoped(ctx, graph_id).get(entity_id)
         return dict(entity, graph_id=graph_id) if entity is not None else None
 
     def find_entities(
         self, ctx: RequestContext, graph_id: str, query: str, *, limit: int
-    ) -> Tuple[Sequence[Dict[str, Any]], bool]:
+    ) -> tuple[Sequence[dict[str, Any]], bool]:
         """Return label matches and whether the listing is complete."""
         needle = query.lower()
         hits = [
@@ -117,7 +117,7 @@ class InMemoryGraphPort:
 
     def neighborhood(
         self, ctx: RequestContext, graph_id: str, entity_id: str, *, hops: int, max_nodes: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Return a breadth-first neighborhood over ``links`` lists."""
         if not self._caps.bounded_traversal:
             raise CapabilityError("neighborhood", self._caps.backend)
@@ -138,7 +138,7 @@ class InMemoryGraphPort:
         """Record a receipt for an approved plan; raises if unsupported or not approved."""
         if not self._caps.batch_writes:
             raise CapabilityError("apply_plan", self._caps.backend)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not approval.authorizes(plan, now):
             raise ContractError(ErrorCode.STALE_APPROVAL, "approval does not cover this plan")
         mapping = hashlib.sha256("\n".join(plan.affected_ids).encode()).hexdigest()
@@ -164,7 +164,7 @@ class InMemoryDocumentStore:
     """Content-addressed in-memory store implementing :class:`~.ports.DocumentStore`."""
 
     def __init__(self) -> None:
-        self._blobs: Dict[str, Tuple[bytes, str, Dict[str, str]]] = {}
+        self._blobs: dict[str, tuple[bytes, str, dict[str, str]]] = {}
 
     def put(self, ctx: RequestContext, data: bytes, *, media_type: str, metadata: Mapping[str, str]) -> str:
         """Store ``data`` under its SHA-256 address."""

@@ -23,15 +23,15 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``Publicatio
 
 from __future__ import annotations
 
+from collections import Counter
 import csv
 import io
 import json
 import logging
+from pathlib import Path
 import re
 import time
-from collections import Counter
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Sequence, Tuple, runtime_checkable
+from typing import Any, Protocol, Sequence, runtime_checkable
 
 from .parsed_document import (
     BoundingBox,
@@ -70,7 +70,7 @@ class PublicationParser(Protocol):
         """Installed library version, or ``""``."""
         ...
 
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         """Settings that change output; part of the versioned output key."""
         ...
 
@@ -147,7 +147,7 @@ class PyMuPDFParser:
         """Installed PyMuPDF version."""
         return library_version("PyMuPDF") or library_version("pymupdf")
 
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         """Output-changing settings (part of the versioned key)."""
         return {
             "adapter_version": PYMUPDF_ADAPTER_VERSION,
@@ -166,10 +166,10 @@ class PyMuPDFParser:
         with fitz.open(str(pdf_path)) as doc:
             if getattr(doc, "needs_pass", False):
                 raise ValueError("encrypted PDF")
-            pages: List[PageInfo] = []
-            lines: List[Dict[str, Any]] = []
-            figures: List[ParsedFigure] = []
-            tables: List[ParsedTable] = []
+            pages: list[PageInfo] = []
+            lines: list[dict[str, Any]] = []
+            figures: list[ParsedFigure] = []
+            tables: list[ParsedTable] = []
             for page_index in range(doc.page_count):
                 page = doc.load_page(page_index)
                 number = page_index + 1
@@ -200,7 +200,7 @@ class PyMuPDFParser:
     # -- text -----------------------------------------------------------------------------------
 
     @staticmethod
-    def _lines(page: Any, number: int) -> List[Dict[str, Any]]:
+    def _lines(page: Any, number: int) -> list[dict[str, Any]]:
         out = []
         for block in page.get_text("dict", sort=True).get("blocks", []):
             if block.get("type") != 0:
@@ -223,7 +223,7 @@ class PyMuPDFParser:
                 )
         return out
 
-    def _sections(self, lines: List[Dict[str, Any]]) -> Tuple[List[ParsedSection], str]:
+    def _sections(self, lines: list[dict[str, Any]]) -> tuple[list[ParsedSection], str]:
         if not lines:
             return [], ""
         weights: Counter = Counter()
@@ -232,7 +232,7 @@ class PyMuPDFParser:
         body = weights.most_common(1)[0][0]
         threshold = body * self.heading_ratio
 
-        def is_heading(line: Dict[str, Any]) -> bool:
+        def is_heading(line: dict[str, Any]) -> bool:
             return line["size"] >= threshold and len(line["text"]) <= self.max_heading_chars
 
         heading_sizes = sorted({ln["size"] for ln in lines if is_heading(ln)}, reverse=True)
@@ -243,8 +243,8 @@ class PyMuPDFParser:
                 title_size = heading_sizes[0]  # the title is front matter, not a section
                 heading_sizes = heading_sizes[1:]
         levels = {size: i + 1 for i, size in enumerate(heading_sizes)}
-        sections: List[ParsedSection] = []
-        markdown: List[str] = []
+        sections: list[ParsedSection] = []
+        markdown: list[str] = []
         name, level, page, bbox, parts, last_page = "preamble", 0, lines[0]["page"], None, [], lines[0]["page"]
 
         def flush() -> None:
@@ -285,14 +285,14 @@ class PyMuPDFParser:
         doc: Any,
         page: Any,
         number: int,
-        lines: List[Dict[str, Any]],
+        lines: list[dict[str, Any]],
         work_dir: Path,
         stem: str,
-        out: List[ParsedFigure],
-    ) -> List[Tuple[float, ...]]:
+        out: list[ParsedFigure],
+    ) -> list[tuple[float, ...]]:
         import fitz
 
-        rects: List[Tuple[float, ...]] = []
+        rects: list[tuple[float, ...]] = []
         for index, info in enumerate(page.get_image_info(xrefs=True)):
             xref = int(info.get("xref") or 0)
             rect = tuple(float(v) for v in info.get("bbox") or (0, 0, 0, 0))
@@ -342,12 +342,12 @@ class PyMuPDFParser:
         self,
         page: Any,
         number: int,
-        lines: List[Dict[str, Any]],
+        lines: list[dict[str, Any]],
         work_dir: Path,
         stem: str,
-        out: List[ParsedTable],
-    ) -> List[Tuple[float, ...]]:
-        rects: List[Tuple[float, ...]] = []
+        out: list[ParsedTable],
+    ) -> list[tuple[float, ...]]:
+        rects: list[tuple[float, ...]] = []
         try:
             finder = page.find_tables()
         except Exception as exc:  # noqa: BLE001 - table detection is best-effort
@@ -356,8 +356,8 @@ class PyMuPDFParser:
         for index, table in enumerate(getattr(finder, "tables", []) or []):
             rect = tuple(float(v) for v in table.bbox)
             table_id = f"tab-p{number:03d}-{index:02d}"
-            data_path: Optional[Path] = None
-            rows: List[List[Any]] = []
+            data_path: Path | None = None
+            rows: list[list[Any]] = []
             try:
                 rows = [[("" if cell is None else str(cell)) for cell in row] for row in table.extract()]
                 buffer = io.StringIO()
@@ -383,10 +383,10 @@ class PyMuPDFParser:
 
     @staticmethod
     def _caption(
-        lines: List[Dict[str, Any]], rect: Sequence[float], pattern: "re.Pattern[str]"
-    ) -> Tuple[str, Optional[Tuple[float, ...]]]:
+        lines: list[dict[str, Any]], rect: Sequence[float], pattern: re.Pattern[str]
+    ) -> tuple[str, tuple[float, ...] | None]:
         """Nearest caption line above or below ``rect`` (within 72 pt) matching ``pattern``."""
-        best: Optional[Dict[str, Any]] = None
+        best: dict[str, Any] | None = None
         best_gap = 72.0
         for line in lines:
             if not pattern.match(line["text"]):
@@ -403,7 +403,7 @@ class PyMuPDFParser:
         return best["text"], best["bbox"]
 
 
-def sections_from_markdown(markdown: str) -> Tuple[ParsedSection, ...]:
+def sections_from_markdown(markdown: str) -> tuple[ParsedSection, ...]:
     """Sections recovered from markdown headings when a parser offers no structure (page unknown)."""
     return tuple(
         ParsedSection(name=name, text=text, structural_id=f"section-{i:05d}")
@@ -411,7 +411,7 @@ def sections_from_markdown(markdown: str) -> Tuple[ParsedSection, ...]:
     )
 
 
-def default_parsers() -> Tuple[PublicationParser, ...]:
+def default_parsers() -> tuple[PublicationParser, ...]:
     """The parsers available now (PyMuPDF only; Docling joins with T09/E2)."""
     return (PyMuPDFParser(),)
 

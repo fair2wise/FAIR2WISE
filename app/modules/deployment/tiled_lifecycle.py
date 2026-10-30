@@ -20,19 +20,19 @@ Nothing here runs at import time. External mode never imports this module.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import json
 import os
+from pathlib import Path
 import shutil
 import signal
 import socket
 import subprocess
 import tempfile
 import time
+from typing import Any
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -99,10 +99,10 @@ class ManagedServer:
     pid: int
     nonce: str
     log_path: Path
-    process: Optional[subprocess.Popen] = None
-    capabilities: Optional[CapabilityReport] = None
+    process: subprocess.Popen | None = None
+    capabilities: CapabilityReport | None = None
     started_utc: str = ""
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def url(self) -> str:
@@ -116,10 +116,10 @@ class ManagedServer:
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _read_manifest(path: Path) -> Optional[Dict[str, Any]]:
+def _read_manifest(path: Path) -> dict[str, Any] | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -127,7 +127,7 @@ def _read_manifest(path: Path) -> Optional[Dict[str, Any]]:
     return data if isinstance(data, dict) and data.get("schema") == MANIFEST_SCHEMA else None
 
 
-def _write_json(path: Path, data: Dict[str, Any]) -> None:
+def _write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -178,7 +178,7 @@ def _port_listening(host: str, port: int) -> bool:
         return sock.connect_ex((host, port)) == 0
 
 
-def probe_environment(tiled_python: Path, expected_version: str = PINNED_TILED_VERSION) -> Dict[str, str]:
+def probe_environment(tiled_python: Path, expected_version: str = PINNED_TILED_VERSION) -> dict[str, str]:
     """Check the isolated Tiled interpreter before launching anything.
 
     Returns:
@@ -215,7 +215,7 @@ def probe_environment(tiled_python: Path, expected_version: str = PINNED_TILED_V
     return {"prefix": prefix, "version": version, "python": pyver}
 
 
-def _child_env(home: Path) -> Dict[str, str]:
+def _child_env(home: Path) -> dict[str, str]:
     """A minimal explicit environment: nothing inherited (no TILED_*, F2W_*, proxies, .env)."""
     return {"PATH": "/usr/bin:/bin", "HOME": str(home), "TMPDIR": str(home), "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8"}
@@ -257,14 +257,14 @@ def _compile_access_tags(cfg: ManagedTiledConfig) -> None:
         raise TiledConfigError("Access-tag compilation failed", detail={"stderr": out.stderr[-4000:]})
 
 
-def writer_credential(cfg: ManagedTiledConfig) -> Optional[str]:
+def writer_credential(cfg: ManagedTiledConfig) -> str | None:
     """The single-user writer API key of a managed instance (``None`` in multi-user mode)."""
     if cfg.authn is not None:
         return None
     return read_secret_file(cfg.effective_writer_secret_file, alphanumeric=True)
 
 
-def authn_passwords(cfg: ManagedTiledConfig) -> Dict[str, str]:
+def authn_passwords(cfg: ManagedTiledConfig) -> dict[str, str]:
     """Generated user passwords of a multi-user managed instance (test fixtures only)."""
     if cfg.authn is None:
         return {}
@@ -338,7 +338,7 @@ def start_managed(
     _prepare_secrets(cfg)
 
     attempts = 1 + (max(0, port_retries) if cfg.port == 0 else 0)
-    last_error: Optional[TiledDeploymentError] = None
+    last_error: TiledDeploymentError | None = None
     for _ in range(attempts):
         port = _free_port(cfg.host) if cfg.port == 0 else cfg.port
         if _port_listening(cfg.host, port):
@@ -359,12 +359,12 @@ def start_managed(
     raise last_error
 
 
-def _spawn(cfg: ManagedTiledConfig, port: int, env_info: Dict[str, str]) -> ManagedServer:
+def _spawn(cfg: ManagedTiledConfig, port: int, env_info: dict[str, str]) -> ManagedServer:
     init_catalog = not cfg.catalog_path.exists()
     server_config = _render_yaml(cfg, port, init_catalog)
     cfg.server_config_path.write_text(server_config, encoding="utf-8")
     nonce = uuid.uuid4().hex
-    log_path = cfg.log_dir / f"tiled-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}.log"
+    log_path = cfg.log_dir / f"tiled-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%f')}.log"
     manifest = {
         "schema": MANIFEST_SCHEMA,
         "run_id": uuid.uuid4().hex,
@@ -439,7 +439,7 @@ def wait_until_ready(server: ManagedServer, *, timeout: float = DEFAULT_READY_TI
     return report
 
 
-def managed_status(cfg: ManagedTiledConfig) -> Dict[str, Any]:
+def managed_status(cfg: ManagedTiledConfig) -> dict[str, Any]:
     """Describe the managed instance without changing anything.
 
     Returns:
@@ -459,7 +459,7 @@ def managed_status(cfg: ManagedTiledConfig) -> Dict[str, Any]:
     return {"state": "running" if url and check_health(url) else "unhealthy", **base}
 
 
-def find_managed(cfg: ManagedTiledConfig) -> Optional[ManagedServer]:
+def find_managed(cfg: ManagedTiledConfig) -> ManagedServer | None:
     """Return the live server recorded in ``cfg``'s manifest, if this instance owns one."""
     manifest = _read_manifest(cfg.manifest_path)
     if not manifest:
@@ -484,7 +484,7 @@ def _wait_gone(server: ManagedServer, timeout: float) -> bool:
     return False
 
 
-def stop_managed(server: ManagedServer, *, timeout: float = DEFAULT_STOP_TIMEOUT) -> Dict[str, Any]:
+def stop_managed(server: ManagedServer, *, timeout: float = DEFAULT_STOP_TIMEOUT) -> dict[str, Any]:
     """Stop an owned server: SIGTERM its process group, wait, SIGKILL if needed. Keeps data.
 
     Returns:
@@ -493,7 +493,7 @@ def stop_managed(server: ManagedServer, *, timeout: float = DEFAULT_STOP_TIMEOUT
     Raises:
         TiledNotOwned: If the PID is alive but not provably this instance's process.
     """
-    receipt: Dict[str, Any] = {"pid": server.pid, "port": server.port, "data_dir": str(server.config.data_dir),
+    receipt: dict[str, Any] = {"pid": server.pid, "port": server.port, "data_dir": str(server.config.data_dir),
                                "data_retained": True, "signal": None, "stopped_utc": None}
     running = (server.process.poll() is None) if server.process is not None else _pid_alive(server.pid)
     if running:
@@ -523,7 +523,7 @@ def stop_managed(server: ManagedServer, *, timeout: float = DEFAULT_STOP_TIMEOUT
     return receipt
 
 
-def destroy_owned(server: ManagedServer, *, base: Path) -> Dict[str, Any]:
+def destroy_owned(server: ManagedServer, *, base: Path) -> dict[str, Any]:
     """Stop a disposable test instance and delete its storage, if and only if it is owned.
 
     Deletes ``server.config.data_dir`` only when all hold: owner ``f2w-test``; the manifest
@@ -534,7 +534,7 @@ def destroy_owned(server: ManagedServer, *, base: Path) -> Dict[str, Any]:
         A teardown receipt (also safe to write outside the deleted root).
     """
     cfg = server.config
-    receipt: Dict[str, Any] = {"root": str(cfg.data_dir), "nonce": server.nonce, "removed": False}
+    receipt: dict[str, Any] = {"root": str(cfg.data_dir), "nonce": server.nonce, "removed": False}
     if cfg.owner != OWNER_TEST:
         raise TiledNotOwned(f"{cfg.data_dir} is not a disposable test instance (owner {cfg.owner})")
     receipt["stop"] = stop_managed(server)
@@ -545,7 +545,7 @@ def destroy_owned(server: ManagedServer, *, base: Path) -> Dict[str, Any]:
     base_real = Path(os.path.realpath(base))
     if cfg.data_dir.is_symlink() or root == base_real or base_real not in root.parents:
         raise TiledNotOwned(f"{cfg.data_dir} is not inside the fixture base {base}")
-    escapes: List[str] = []
+    escapes: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
         for name in dirnames + filenames:
             full = Path(dirpath) / name
@@ -560,7 +560,7 @@ def destroy_owned(server: ManagedServer, *, base: Path) -> Dict[str, Any]:
     return receipt
 
 
-def upgrade_catalog(cfg: ManagedTiledConfig, *, timeout: float = 300.0) -> Dict[str, Any]:
+def upgrade_catalog(cfg: ManagedTiledConfig, *, timeout: float = 300.0) -> dict[str, Any]:
     """Explicit operator command: upgrade an older catalog with the pinned Tiled.
 
     Refuses while a server owns the data dir. Back up ``catalog.db`` first.

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import FrozenSet, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -84,12 +83,12 @@ class Principal(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     subject: str
-    issuer: Optional[str] = None
-    is_admin: Optional[bool] = None
-    verified_at: Optional[datetime] = None
-    identity_provider: Optional[str] = None
-    roles: Optional[Tuple[str, ...]] = None
-    credential_expires_at: Optional[datetime] = None
+    issuer: str | None = None
+    is_admin: bool | None = None
+    verified_at: datetime | None = None
+    identity_provider: str | None = None
+    roles: tuple[str, ...] | None = None
+    credential_expires_at: datetime | None = None
 
     def is_local_operator(self) -> bool:
         """Return whether this is the local-operator with no Tiled identity fields."""
@@ -122,18 +121,18 @@ class RequestContext(BaseModel):
     profile: DeploymentProfile
     mode: AuthorizationMode
     principal: Principal
-    capabilities: FrozenSet[str] = Field(default_factory=frozenset)
-    corpus_scope: FrozenSet[str] = Field(default_factory=frozenset)
+    capabilities: frozenset[str] = Field(default_factory=frozenset)
+    corpus_scope: frozenset[str] = Field(default_factory=frozenset)
     request_id: str
-    run_id: Optional[str] = None
-    deadline: Optional[datetime] = None
-    budget_ref: Optional[str] = None
-    session_id: Optional[str] = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
-    tiled_target: Optional[str] = None
+    run_id: str | None = None
+    deadline: datetime | None = None
+    budget_ref: str | None = None
+    session_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+    tiled_target: str | None = None
     actor_kind: ActorKind = ActorKind.INTERACTIVE
 
     @model_validator(mode="after")
-    def _profile_matches_mode(self) -> "RequestContext":
+    def _profile_matches_mode(self) -> RequestContext:
         """Validate the context's mode, profile and capabilities together.
 
         Rejects trusted-local mode outside ``:local``, unverified ALS principals and

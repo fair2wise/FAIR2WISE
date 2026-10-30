@@ -22,22 +22,23 @@ Changed:
 
 from __future__ import annotations
 
-import threading
+import builtins
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple
+import threading
+from typing import Any, Callable, Iterable
 
 from ..contracts import CAPABILITIES, RequestContext, ToolSpec
 
 #: Domains a literature runtime may register. Experimental FORGE domains are absent.
-LITERATURE_DOMAINS: FrozenSet[str] = frozenset({
+LITERATURE_DOMAINS: frozenset[str] = frozenset({
     "literature", "graph", "retrieval", "extraction", "canonicalization", "curation", "vision", "science",
     "operations",
 })
 
 #: Domains and name prefixes that stay in FORGE (simulation, analysis, calibration, catalog).
-FORBIDDEN_DOMAINS: FrozenSet[str] = frozenset({"sim", "simulation", "analysis", "calibration", "catalog"})
-FORBIDDEN_NAME_PREFIXES: Tuple[str, ...] = ("sim_", "analysis_", "calibration_", "catalog_")
-FORBIDDEN_MODULE_ROOTS: FrozenSet[str] = frozenset({"forge", "als_knowledge_agent", "reduction_api"})
+FORBIDDEN_DOMAINS: frozenset[str] = frozenset({"sim", "simulation", "analysis", "calibration", "catalog"})
+FORBIDDEN_NAME_PREFIXES: tuple[str, ...] = ("sim_", "analysis_", "calibration_", "catalog_")
+FORBIDDEN_MODULE_ROOTS: frozenset[str] = frozenset({"forge", "als_knowledge_agent", "reduction_api"})
 
 
 class ToolRegistryError(Exception):
@@ -88,14 +89,14 @@ class ToolRegistry:
             :data:`LITERATURE_DOMAINS`. Forbidden domains are refused regardless.
     """
 
-    def __init__(self, *, name: str = "f2w", allowed_domains: Optional[Iterable[str]] = None) -> None:
+    def __init__(self, *, name: str = "f2w", allowed_domains: Iterable[str] | None = None) -> None:
         self.name = name
         self._allowed = frozenset(allowed_domains) if allowed_domains is not None else LITERATURE_DOMAINS
         bad = self._allowed & FORBIDDEN_DOMAINS
         if bad:
             raise ToolRegistryError(f"experimental domains cannot be allowed: {sorted(bad)}")
-        self._tools: Dict[str, RegisteredTool] = {}
-        self._aliases: Dict[str, str] = {}
+        self._tools: dict[str, RegisteredTool] = {}
+        self._aliases: dict[str, str] = {}
         self._frozen = False
         self._lock = threading.Lock()
 
@@ -141,7 +142,7 @@ class ToolRegistry:
                 self._aliases[alias] = spec.name
             return entry
 
-    def freeze(self) -> "ToolRegistry":
+    def freeze(self) -> ToolRegistry:
         """Verify, then refuse every further mutation. Returns ``self``."""
         self.verify()
         with self._lock:
@@ -155,23 +156,23 @@ class ToolRegistry:
 
     # -- reads ----------------------------------------------------------------
 
-    def get(self, name: str) -> Optional[RegisteredTool]:
+    def get(self, name: str) -> RegisteredTool | None:
         """Return the entry for canonical ``name`` (aliases are not resolved here)."""
         return self._tools.get(name)
 
-    def resolve_alias(self, name: str) -> Optional[str]:
+    def resolve_alias(self, name: str) -> str | None:
         """Return the canonical name for a legacy alias, for compatibility boundaries only."""
         return name if name in self._tools else self._aliases.get(name)
 
-    def list(self) -> List[ToolSpec]:
+    def list(self) -> builtins.list[ToolSpec]:
         """All specs, sorted by name."""
         return [self._tools[n].spec for n in sorted(self._tools)]
 
-    def list_by_domain(self, domain: str) -> List[ToolSpec]:
+    def list_by_domain(self, domain: str) -> builtins.list[ToolSpec]:
         """Specs in ``domain``, sorted by name."""
         return [s for s in self.list() if s.domain == domain]
 
-    def visible_to(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None) -> List[RegisteredTool]:
+    def visible_to(self, ctx: RequestContext, *, scope: frozenset[str] | None = None) -> builtins.list[RegisteredTool]:
         """Entries whose every required capability ``ctx`` holds (narrowed by ``scope``)."""
         caps = effective_capabilities(ctx, scope)
         return [self._tools[n] for n in sorted(self._tools) if self._tools[n].spec.required_capabilities <= caps]
@@ -186,7 +187,7 @@ class ToolRegistry:
 
     def verify(self) -> None:
         """Check every invariant; raises :class:`ToolRegistryError` on the first violation."""
-        seen_aliases: Dict[str, str] = {}
+        seen_aliases: dict[str, str] = {}
         for key, entry in self._tools.items():
             spec = entry.spec
             if key != spec.name:
@@ -205,7 +206,7 @@ class ToolRegistry:
             raise ToolRegistryError("alias index is out of sync with registered tools")
 
 
-def effective_capabilities(ctx: RequestContext, scope: Optional[FrozenSet[str]] = None) -> FrozenSet[str]:
+def effective_capabilities(ctx: RequestContext, scope: frozenset[str] | None = None) -> frozenset[str]:
     """``ctx.capabilities`` narrowed (never widened) by an optional per-turn ``scope``."""
     caps = frozenset(ctx.capabilities)
     return caps & frozenset(scope) if scope is not None else caps

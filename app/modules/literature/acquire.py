@@ -23,9 +23,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``_download_
 
 from __future__ import annotations
 
-import logging
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Mapping, Optional
+import logging
+from typing import Any, Mapping
 
 import httpx
 
@@ -49,15 +49,15 @@ class AcquireResult:
     status: str
     ref: str = ""
     source_url: str = ""
-    attempts: List[Dict[str, Any]] = field(default_factory=list)
-    lookups: Dict[str, str] = field(default_factory=dict)
+    attempts: list[dict[str, Any]] = field(default_factory=list)
+    lookups: dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
         """Whether a stored source is available."""
         return self.status in {"cached", "acquired"}
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
@@ -69,13 +69,13 @@ def _f2w_urls() -> Any:
     return download_pdfs
 
 
-def openalex_work_urls(work: Mapping[str, Any]) -> List[str]:
+def openalex_work_urls(work: Mapping[str, Any]) -> list[str]:
     """PDF URLs on an OpenAlex work, through F2W's repository-first selector (B22)."""
     urls, _, _ = _f2w_urls().select_openalex_oa_pdfs(dict(work))
     return list(urls)
 
 
-def unpaywall_urls(payload: Mapping[str, Any]) -> List[str]:
+def unpaywall_urls(payload: Mapping[str, Any]) -> list[str]:
     """PDF URLs from an Unpaywall body: every location, repositories first (F2W selector)."""
     urls, _ = _f2w_urls().select_unpaywall_oa_pdfs(dict(payload))
     return list(urls)
@@ -102,7 +102,7 @@ class PaperAcquirer:
     """
 
     def __init__(self, store: FileDocumentStore, index: LegacyIndex, fetcher: SafeFetcher, http: httpx.Client,
-                 settings: Optional[OpenAlexSettings] = None, *, legacy_root_id: str = "acquired") -> None:
+                 settings: OpenAlexSettings | None = None, *, legacy_root_id: str = "acquired") -> None:
         self.store = store
         self.index = index
         self.fetcher = fetcher
@@ -110,7 +110,7 @@ class PaperAcquirer:
         self.settings = settings or OpenAlexSettings()
         self.legacy_root_id = legacy_root_id
 
-    def cached(self, ctx: RequestContext, doi: str) -> Optional[str]:
+    def cached(self, ctx: RequestContext, doi: str) -> str | None:
         """A verified stored source for ``doi`` (alias or legacy filename), else ``None``."""
         ref = self.index.find_by_doi(doi)
         if ref and self.store.verify(ctx, ref):
@@ -119,7 +119,7 @@ class PaperAcquirer:
             logger.warning("stored source for %s failed its checksum; treating as absent", doi_key(doi))
         return None
 
-    def _lookup(self, name: str, url: str, result: AcquireResult, **kw: Any) -> Optional[Dict[str, Any]]:
+    def _lookup(self, name: str, url: str, result: AcquireResult, **kw: Any) -> dict[str, Any] | None:
         try:
             response = self.http.get(url, timeout=15.0, **kw)
         except httpx.HTTPError as exc:
@@ -136,10 +136,10 @@ class PaperAcquirer:
             return None
         return body if isinstance(body, dict) else None
 
-    def candidate_urls(self, doi: str, work: Optional[Mapping[str, Any]], result: AcquireResult) -> List[str]:
+    def candidate_urls(self, doi: str, work: Mapping[str, Any] | None, result: AcquireResult) -> list[str]:
         """Candidate PDF URLs in cost order, de-duplicated."""
         bare = doi_only(doi)
-        urls: List[str] = []
+        urls: list[str] = []
         if work:
             urls.extend(openalex_work_urls(work))
         email = self.settings.polite_mailto
@@ -160,7 +160,7 @@ class PaperAcquirer:
         arxiv = arxiv_url_for(doi)
         if arxiv:
             urls.append(arxiv)
-        mapped: List[str] = []
+        mapped: list[str] = []
         dl = _f2w_urls()
         for url in urls:
             rewritten = dl.rewrite_oa_pdf_url(url) or dl.listed_oa_pdf_url(url) or ""
@@ -168,7 +168,7 @@ class PaperAcquirer:
                 mapped.append(rewritten)
         return dl.prefer_repository_pdfs(mapped)
 
-    def acquire(self, ctx: RequestContext, doi: str, *, work: Optional[Mapping[str, Any]] = None) -> AcquireResult:
+    def acquire(self, ctx: RequestContext, doi: str, *, work: Mapping[str, Any] | None = None) -> AcquireResult:
         """Return a stored source for ``doi``, downloading an OA copy if needed.
 
         Raises:

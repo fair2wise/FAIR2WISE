@@ -16,14 +16,14 @@ empty success. A shortlist is a retrieval result, not identity.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Sequence, Tuple
+import math
+from typing import Sequence
 
 import numpy as np
 
-from .embeddings import Encoder, EmbeddingCache, EmbeddingUnavailable, embed_texts_cached
+from .embeddings import EmbeddingCache, EmbeddingUnavailable, Encoder, embed_texts_cached
 from .merge_safety import fold, is_acronym_of, looks_like_an_acronym
 
 HARD_MAX_CANDIDATES = 50
@@ -46,7 +46,7 @@ class IndexedEntity:
     entity_id: str
     label: str
     category: str = ""
-    aliases: Tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -57,7 +57,7 @@ class Candidate:
     label: str
     category: str
     score: float
-    channels: Tuple[str, ...]
+    channels: tuple[str, ...]
     matched_text: str = ""
 
 
@@ -77,10 +77,10 @@ class Shortlist:
     mention: str
     category: str
     status: str
-    candidates: Tuple[Candidate, ...] = ()
+    candidates: tuple[Candidate, ...] = ()
     truncated: bool = False
     dropped: int = 0
-    degraded: Tuple[str, ...] = ()
+    degraded: tuple[str, ...] = ()
     token_estimate: int = 0
 
     def render(self) -> str:
@@ -95,10 +95,10 @@ class CandidateSearch:
         self,
         entities: Sequence[IndexedEntity],
         *,
-        encoder: Optional[Encoder] = None,
+        encoder: Encoder | None = None,
         model: str = "",
         revision: str = "",
-        cache: Optional[EmbeddingCache] = None,
+        cache: EmbeddingCache | None = None,
         max_candidates: int = DEFAULT_MAX_CANDIDATES,
         token_budget: int = DEFAULT_TOKEN_BUDGET,
     ) -> None:
@@ -109,12 +109,12 @@ class CandidateSearch:
         self.cache = cache if cache is not None else EmbeddingCache()
         self.max_candidates = max(1, min(int(max_candidates), HARD_MAX_CANDIDATES))
         self.token_budget = max(1, int(token_budget))
-        self._rows: List[Tuple[int, str]] = []  # (entity index, surface)
+        self._rows: list[tuple[int, str]] = []  # (entity index, surface)
         for i, ent in enumerate(self.entities):
             for surface in dict.fromkeys((ent.label, *ent.aliases)):
                 self._rows.append((i, surface))
-        self._matrix: Optional[np.ndarray] = None
-        self._embedding_error: Optional[str] = None
+        self._matrix: np.ndarray | None = None
+        self._embedding_error: str | None = None
         self._built = False
 
     def _build(self) -> None:
@@ -139,13 +139,13 @@ class CandidateSearch:
         norms[norms == 0.0] = 1.0
         self._matrix = batch.vectors / norms
 
-    def search(self, mention: str, category: Optional[str] = None) -> Shortlist:
+    def search(self, mention: str, category: str | None = None) -> Shortlist:
         """Return a bounded shortlist for ``mention`` (never raises for encoder faults)."""
         self._build()
         key = fold(mention)
         if not key:
             return Shortlist(mention, category or "", "empty")
-        scores: Dict[int, Tuple[float, set, str]] = {}
+        scores: dict[int, tuple[float, set, str]] = {}
 
         def bump(i: int, score: float, channel: str, text: str) -> None:
             cur = scores.get(i)
@@ -178,7 +178,7 @@ class CandidateSearch:
             if lexical >= LEXICAL_FLOOR:
                 bump(i, lexical, "lexical", surface)
 
-        degraded: List[str] = []
+        degraded: list[str] = []
         if self._matrix is not None and self.encoder is not None:
             try:
                 q = embed_texts_cached(
@@ -210,7 +210,7 @@ class CandidateSearch:
             )
             for i, (s, ch, text) in ranked
         ]
-        kept: List[Candidate] = []
+        kept: list[Candidate] = []
         used = estimate_tokens(mention)
         for cand in candidates:
             cost = estimate_tokens(f"- {cand.entity_id}: {cand.label}\n")

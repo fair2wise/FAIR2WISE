@@ -30,18 +30,22 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_simulation.py
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import logging
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Iterable, Protocol, Sequence
 
 from ..contracts.evidence import EvidenceRef, MatchType, SourceLocator
 from ..literature.parsed_document import SECTION_TEXT_MAX_CHARS, ParsedDocument, ParsedSection
 from .quote_location import NORMALIZATION_PROFILE, QuoteLocation, count_occurrences, locate_quote
 from .records import (
-    EvidenceRecord, MissingData, QuantityRecord, ReportedQuantity, TagDecision,
+    EvidenceRecord,
+    MissingData,
+    QuantityRecord,
+    ReportedQuantity,
+    TagDecision,
 )
 from .units import dimension_mismatch, normalize_quantity
 
@@ -59,7 +63,7 @@ def stable_evidence_id(pub_path: str, text: str) -> str:
     return hashlib.md5(f"{pub_path}|{text}".encode(), usedforsecurity=False).hexdigest()[:16]
 
 
-def quantity_id(pub_path: str, name: str, value: Optional[float], unit: str) -> Optional[str]:
+def quantity_id(pub_path: str, name: str, value: float | None, unit: str) -> str | None:
     """Deterministic quantity id (``pub|name|value|unit``), or ``None`` without name/value."""
     name = (name or "").strip()
     if not name or value is None:
@@ -73,11 +77,11 @@ def _section_id(section: ParsedSection, index: int) -> str:
     return section.structural_id or f"section-{index:05d}"
 
 
-def _sections(document: ParsedDocument) -> List[Tuple[str, ParsedSection]]:
+def _sections(document: ParsedDocument) -> list[tuple[str, ParsedSection]]:
     return [(_section_id(s, i), s) for i, s in enumerate(document.sections)]
 
 
-def section_text_for(document: ParsedDocument, section_id: Optional[str]) -> str:
+def section_text_for(document: ParsedDocument, section_id: str | None) -> str:
     """The section text as stored (truncated at ``SECTION_TEXT_MAX_CHARS``), or ``""``."""
     if not section_id:
         return ""
@@ -87,7 +91,7 @@ def section_text_for(document: ParsedDocument, section_id: Optional[str]) -> str
     return ""
 
 
-def section_page_for(document: ParsedDocument, section_id: Optional[str]) -> Optional[int]:
+def section_page_for(document: ParsedDocument, section_id: str | None) -> int | None:
     """The page the section starts on, or ``None`` when the parser could not say."""
     if not section_id:
         return None
@@ -97,7 +101,7 @@ def section_page_for(document: ParsedDocument, section_id: Optional[str]) -> Opt
     return None
 
 
-def section_for_label(document: ParsedDocument, label: str) -> Optional[str]:
+def section_for_label(document: ParsedDocument, label: str) -> str | None:
     """The section a region label names, or ``None`` when absent or several match equally."""
     wanted = (label or "").strip().lower()
     if not wanted:
@@ -123,13 +127,13 @@ class SectionMatch:
             occurs more than once in the chosen section.
     """
 
-    section_id: Optional[str]
-    location: Optional[QuoteLocation]
+    section_id: str | None
+    location: QuoteLocation | None
     ambiguous: bool = False
 
 
 def locate_in_any_section(
-    document: ParsedDocument, quote: str, *, sections: Optional[Sequence[Tuple[str, ParsedSection]]] = None
+    document: ParsedDocument, quote: str, *, sections: Sequence[tuple[str, ParsedSection]] | None = None
 ) -> SectionMatch:
     """Find the section whose stored text actually contains ``quote``.
 
@@ -138,7 +142,7 @@ def locate_in_any_section(
     """
     if not quote:
         return SectionMatch(None, None)
-    candidates: List[Tuple[int, int, str, QuoteLocation]] = []
+    candidates: list[tuple[int, int, str, QuoteLocation]] = []
     for sid, section in sections if sections is not None else _sections(document):
         text = section.text[:SECTION_TEXT_MAX_CHARS]
         if not text:
@@ -170,8 +174,8 @@ class InMemoryEvidenceSink:
     """Candidate sink kept in memory (tests, previews)."""
 
     def __init__(self) -> None:
-        self.evidence: Dict[str, EvidenceRecord] = {}
-        self.quantities: Dict[str, QuantityRecord] = {}
+        self.evidence: dict[str, EvidenceRecord] = {}
+        self.quantities: dict[str, QuantityRecord] = {}
 
     def put_evidence(self, record: EvidenceRecord) -> None:
         """Keep the first record for an id; a quotation is immutable."""
@@ -188,7 +192,7 @@ class InMemoryEvidenceSink:
 
         self.quantities[record.quantity_id] = replace(existing, evidence_ids=ids)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Sorted JSON-ready dump."""
         return {
             "status": "candidate",
@@ -216,7 +220,7 @@ class CandidateFileEvidenceSink(InMemoryEvidenceSink):
         return self.path
 
 
-def _parser_meta(document: ParsedDocument) -> Dict[str, Any]:
+def _parser_meta(document: ParsedDocument) -> dict[str, Any]:
     return {"parser": document.parser, "parser_version": document.parser_version,
             "parser_key": document.parser_key}
 
@@ -231,8 +235,8 @@ def build_evidence(
     strategy: str = "",
     prompt_version: str = "",
     caveat: str = "",
-    sections: Optional[Sequence[Tuple[str, ParsedSection]]] = None,
-) -> Optional[EvidenceRecord]:
+    sections: Sequence[tuple[str, ParsedSection]] | None = None,
+) -> EvidenceRecord | None:
     """Resolve one quote to an :class:`EvidenceRecord` over ``document``.
 
     Returns ``None`` when there is neither a quote nor a label (nothing to cite).
@@ -241,9 +245,9 @@ def build_evidence(
     label = (location_label or "").strip()
     if not quote and not label:
         return None
-    missing: List[MissingData] = []
+    missing: list[MissingData] = []
     section_id = section_for_label(document, label)
-    located: Optional[QuoteLocation] = None
+    located: QuoteLocation | None = None
     located_by = "none"
     ambiguous = False
     if quote:
@@ -309,13 +313,13 @@ def record_evidence(
     pub_path: str,
     strategy: str = "",
     prompt_version: str = "",
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """Write evidence for each quantity's quote; return ``{quantity_name: [evidence_id]}``.
 
     Best-effort per quantity, like the donor: one failure is logged and skipped.
     """
     sections = _sections(document)
-    linked: Dict[str, List[str]] = {}
+    linked: dict[str, list[str]] = {}
     for quantity in quantities:
         try:
             record = build_evidence(
@@ -342,7 +346,7 @@ def record_reported_quantities(
     pub_path: str,
     strategy: str = "",
     prompt_version: str = "",
-    tags: Optional[Sequence[Optional[TagDecision]]] = None,
+    tags: Sequence[TagDecision | None] | None = None,
 ) -> int:
     """Record what the paper reported, as candidates, with evidence attached.
 
@@ -383,7 +387,7 @@ def record_reported_quantities(
         )
         if evidence is not None:
             sink.put_evidence(evidence)
-        missing: List[MissingData] = []
+        missing: list[MissingData] = []
         normalized = None
         if quantity.raw_value is not None:
             normalized = normalize_quantity(float(quantity.raw_value), quantity.raw_unit)

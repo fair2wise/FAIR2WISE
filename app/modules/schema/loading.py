@@ -11,10 +11,10 @@ import hashlib
 import importlib.metadata
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-import yaml
 from linkml_runtime.utils.schemaview import SchemaView
+import yaml
 
 from .registry import (
     NORMALIZER_LEGACY,
@@ -97,7 +97,7 @@ def _file_hash(data: bytes, pre_s4: bool) -> str:
     return sha256_bytes(before)
 
 
-def closure_files(entry: SchemaEntry, *, pre_s4: bool = False) -> List[Tuple[str, str]]:
+def closure_files(entry: SchemaEntry, *, pre_s4: bool = False) -> list[tuple[str, str]]:
     """Sorted ``(file name, sha256)`` pairs of the resolved import closure (local files only).
 
     The closure comes from ``SchemaView.imports_closure()``, so import resolution is LinkML's own.
@@ -118,7 +118,7 @@ def closure_files(entry: SchemaEntry, *, pre_s4: bool = False) -> List[Tuple[str
     root_hash = entry.pre_s4_sha256 if pre_s4 else entry.sha256  # bytes as discovered
     if root_hash is None:
         raise SchemaLoadError(f"{entry.path} has no pre-S4 form")
-    pairs: Dict[str, str] = {entry.file: root_hash}
+    pairs: dict[str, str] = {entry.file: root_hash}
     for name in sv.imports_closure():
         if name == root_name or name.startswith("linkml:"):
             continue
@@ -154,7 +154,7 @@ def closure_fingerprint(entry: SchemaEntry, *, pre_s4: bool = False) -> str:
     return hashlib.sha256(blob).hexdigest()
 
 
-def pre_s4_fingerprint(entry: SchemaEntry) -> Optional[str]:
+def pre_s4_fingerprint(entry: SchemaEntry) -> str | None:
     """Fingerprint ``entry``'s closure had before the S4 licence change, or ``None`` if it has no such form.
 
     Only base-set entries whose whole closure carried ``license: MIT`` have one; a T22C schema set never did.
@@ -167,7 +167,7 @@ def pre_s4_fingerprint(entry: SchemaEntry) -> Optional[str]:
         return None
 
 
-def probe_known_issue(entry: SchemaEntry) -> Optional[str]:
+def probe_known_issue(entry: SchemaEntry) -> str | None:
     """Re-observe the F1 defect of ``rsoxs_schema_extract`` without changing it.
 
     Returns the error text when ``class_induced_slots('RSoXSMeasurement')`` fails, else ``None``.

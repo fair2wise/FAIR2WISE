@@ -15,13 +15,12 @@ v2 adds structure to reduce cross-topic smear:
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
-import re
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional
-
+import re
+from typing import Any, Callable, Iterable
+import uuid
 
 MAX_SUMMARY_CHARS = 3000
 MAX_RECENT_TURNS = 12
@@ -81,7 +80,7 @@ _ENTITY_STOPWORDS = {
 
 def _now() -> str:
     """Return the current UTC time as an ISO-8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _clip(text: Any, limit: int) -> str:
@@ -92,10 +91,10 @@ def _clip(text: Any, limit: int) -> str:
     return value[: max(0, limit - 1)].rstrip() + "…"
 
 
-def _unique(values: Iterable[Any], *, limit: int) -> List[str]:
+def _unique(values: Iterable[Any], *, limit: int) -> list[str]:
     """Deduplicate clipped strings case-insensitively, preserving order up to ``limit``."""
     seen: set[str] = set()
-    result: List[str] = []
+    result: list[str] = []
     for value in values:
         text = _clip(value, 120)
         key = text.casefold()
@@ -108,7 +107,7 @@ def _unique(values: Iterable[Any], *, limit: int) -> List[str]:
     return result
 
 
-def _default_memory() -> Dict[str, Any]:
+def _default_memory() -> dict[str, Any]:
     """Return an empty v2 session-memory document."""
     return {
         "version": 2,
@@ -123,9 +122,9 @@ def _default_memory() -> Dict[str, Any]:
     }
 
 
-def _extract_entities(*texts: Any) -> List[str]:
+def _extract_entities(*texts: Any) -> list[str]:
     """Pull likely entity tokens from text, skipping conversational stopwords."""
-    candidates: List[str] = []
+    candidates: list[str] = []
     for text in texts:
         for token in re.findall(r"\b[A-Za-z][A-Za-z0-9_./+-]{2,}\b", str(text or "")):
             clean = token.strip(".,;:()[]{}")
@@ -139,9 +138,9 @@ def _extract_entities(*texts: Any) -> List[str]:
     return _unique(candidates, limit=MAX_ENTITIES)
 
 
-def _publication_refs(publications: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
+def _publication_refs(publications: list[dict[str, Any]] | None) -> list[dict[str, str]]:
     """Compact title/DOI refs from publication dicts, dropping empty entries."""
-    refs: List[Dict[str, str]] = []
+    refs: list[dict[str, str]] = []
     for pub in publications or []:
         if not isinstance(pub, dict):
             continue
@@ -158,8 +157,8 @@ def _publication_refs(publications: Optional[List[Dict[str, Any]]]) -> List[Dict
 def _round_growth_event(
     *,
     query: str,
-    round_info: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    round_info: dict[str, Any],
+) -> dict[str, Any] | None:
     """Build a KG-growth event from one extraction/rebuild round, or None."""
     extraction = round_info.get("extraction")
     kg = round_info.get("kg")
@@ -194,7 +193,7 @@ def _round_growth_event(
     return {key: value for key, value in event.items() if value not in (None, "", [])}
 
 
-def _parse_json_object(raw: str) -> Dict[str, Any]:
+def _parse_json_object(raw: str) -> dict[str, Any]:
     """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     if not raw:
         return {}
@@ -216,7 +215,7 @@ class SessionMemory:
         self.path = Path(path)
         self.data = self._load()
 
-    def _load(self) -> Dict[str, Any]:
+    def _load(self) -> dict[str, Any]:
         """Read and normalize on-disk memory, returning defaults if corrupt."""
         if not self.path.exists():
             return _default_memory()
@@ -258,7 +257,7 @@ class SessionMemory:
     # ------------------------------------------------------------------
     # Topic segmentation
     # ------------------------------------------------------------------
-    def _current_topic(self) -> Optional[Dict[str, Any]]:
+    def _current_topic(self) -> dict[str, Any] | None:
         """Return the topic dict for ``current_topic_id``, or None."""
         current_id = self.data.get("current_topic_id")
         if not current_id:
@@ -317,7 +316,7 @@ class SessionMemory:
             return ""
         current_id = self.data.get("current_topic_id")
         current = self._current_topic()
-        lines: List[str] = []
+        lines: list[str] = []
         summary = _clip(self.data.get("summary"), 1000)
         if summary:
             lines.append(f"Summary: {summary}")
@@ -330,7 +329,7 @@ class SessionMemory:
         if entities:
             lines.append("Important entities: " + ", ".join(entities))
 
-        growth_lines: List[str] = []
+        growth_lines: list[str] = []
         for event in (self.data.get("kg_growth") or [])[-3:]:
             if not isinstance(event, dict):
                 continue
@@ -356,7 +355,7 @@ class SessionMemory:
             lines.append("Recent turns: " + " | ".join(recent_turns))
         return _clip("\n".join(lines), max_chars)
 
-    def _current_topic_turns(self) -> List[Dict[str, Any]]:
+    def _current_topic_turns(self) -> list[dict[str, Any]]:
         """Turns tagged for the current topic, or all turns if none are tagged."""
         current_id = self.data.get("current_topic_id")
         turns = [t for t in (self.data.get("recent_turns") or []) if isinstance(t, dict)]
@@ -399,10 +398,10 @@ class SessionMemory:
         answer: str,
         status: str,
         sufficient: bool,
-        rounds: List[Dict[str, Any]],
-        effective_question: Optional[str] = None,
-        node_ids: Optional[List[str]] = None,
-        publications: Optional[List[Dict[str, Any]]] = None,
+        rounds: list[dict[str, Any]],
+        effective_question: str | None = None,
+        node_ids: list[str] | None = None,
+        publications: list[dict[str, Any]] | None = None,
     ) -> None:
         """Append a user/assistant turn, update summary/topics, and persist."""
         user_message = _clip(user_message, 1200)

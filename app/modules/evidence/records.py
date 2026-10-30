@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ..contracts.evidence import EvidenceRef
 from .units import NormalizedQuantity
@@ -83,15 +83,15 @@ class TagDecision:
 
     proposed: EvidenceSource
     tag: EvidenceSource
-    reasons: Tuple[str, ...] = ()
-    derivation: Optional[Dict[str, Any]] = None
+    reasons: tuple[str, ...] = ()
+    derivation: dict[str, Any] | None = None
 
     @property
     def retagged(self) -> bool:
         """Whether the rules changed the proposed tag."""
         return self.tag is not self.proposed
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {"proposed": self.proposed.value, "tag": self.tag.value, "reasons": list(self.reasons),
                 "derivation": dict(self.derivation) if self.derivation else None,
@@ -131,7 +131,7 @@ class MeasuredUncertainty:
         kind: What the magnitude means.
     """
 
-    value: Optional[float] = None
+    value: float | None = None
     kind: UncertaintyKind = UncertaintyKind.UNKNOWN
 
     def __post_init__(self) -> None:
@@ -158,13 +158,13 @@ class ReportedQuantity:
     """
 
     name: str
-    raw_value: Optional[float]
+    raw_value: float | None
     raw_unit: str = ""
     quote: str = ""
     location_label: str = ""
     evidence_source: EvidenceSource = EvidenceSource.REPORTED
     uncertainty: MeasuredUncertainty = field(default_factory=MeasuredUncertainty)
-    extraction_confidence: Optional[float] = None
+    extraction_confidence: float | None = None
     sample_id: str = ""
     processing_state: str = ""
     qualitative_value: str = ""
@@ -189,11 +189,11 @@ class EvidenceRecord:
     """
 
     ref: EvidenceRef
-    section_id: Optional[str]
+    section_id: str | None
     section_label: str
     located_by: str
-    missing: Tuple[MissingData, ...] = ()
-    parser: Dict[str, Any] = field(default_factory=dict)
+    missing: tuple[MissingData, ...] = ()
+    parser: dict[str, Any] = field(default_factory=dict)
     strategy: str = ""
     caveat: str = ""
     status: str = "candidate"
@@ -204,7 +204,7 @@ class EvidenceRecord:
         """The quote was found in the stored section text (exact or normalized)."""
         return self.located_by != "none"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {
             "record_version": self.record_version, "status": self.status,
@@ -239,22 +239,22 @@ class QuantityRecord:
     quantity_id: str
     work_id: str
     name: str
-    quantity: Optional[NormalizedQuantity]
+    quantity: NormalizedQuantity | None
     evidence_source: EvidenceSource
     uncertainty: MeasuredUncertainty
-    extraction_confidence: Optional[float]
-    evidence_ids: Tuple[str, ...] = ()
+    extraction_confidence: float | None
+    evidence_ids: tuple[str, ...] = ()
     sample_id: str = ""
     processing_state: str = ""
     qualitative_value: str = ""
-    missing: Tuple[MissingData, ...] = ()
-    proposed_evidence_source: Optional[EvidenceSource] = None
-    tag_reasons: Tuple[str, ...] = ()
-    derivation: Optional[Dict[str, Any]] = None
+    missing: tuple[MissingData, ...] = ()
+    proposed_evidence_source: EvidenceSource | None = None
+    tag_reasons: tuple[str, ...] = ()
+    derivation: dict[str, Any] | None = None
     status: str = "candidate"
     record_version: int = RECORD_VERSION
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {
             "record_version": self.record_version, "status": self.status,

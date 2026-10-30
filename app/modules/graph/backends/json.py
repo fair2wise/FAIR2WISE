@@ -14,9 +14,9 @@ that changed on disk is not silently re-read mid-session ("caches reload intenti
 
 from __future__ import annotations
 
-import threading
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
+import threading
+from typing import Any, Iterable, Iterator, Mapping, Sequence, Union
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext
@@ -63,21 +63,21 @@ class JsonGraphBackend:
             pairs = [(str(g), Path(p)) for g, p in graphs.items()]
         else:
             pairs = [(graph_id_for_snapshot(Path(p)), Path(p)) for p in graphs]
-        self._paths: Dict[str, Path] = {}
+        self._paths: dict[str, Path] = {}
         for graph_id, path in pairs:
             if graph_id in self._paths and self._paths[graph_id] != path:
                 raise ContractError(ErrorCode.INVALID_INPUT,
                                     f"graph_id {graph_id!r} is claimed by two files; graphs are never merged")
             self._paths[graph_id] = path
-        self._cache: Dict[str, GraphSnapshot] = {}
+        self._cache: dict[str, GraphSnapshot] = {}
         self._lock = threading.Lock()
 
     # -- lifecycle -------------------------------------------------------
-    def graph_ids(self) -> List[str]:
+    def graph_ids(self) -> list[str]:
         """Configured graph ids, in configuration order."""
         return list(self._paths)
 
-    def reload(self, graph_id: Optional[str] = None) -> None:
+    def reload(self, graph_id: str | None = None) -> None:
         """Drop the cached snapshot(s); the next read loads the file again."""
         with self._lock:
             if graph_id is None:
@@ -102,22 +102,22 @@ class JsonGraphBackend:
         """Return the JSON backend capabilities."""
         return CAPABILITIES
 
-    def _entity(self, snap: GraphSnapshot, node_id: str) -> Dict[str, Any]:
+    def _entity(self, snap: GraphSnapshot, node_id: str) -> dict[str, Any]:
         return entity_record(snap.graph_id, node_id, snap.nodes[node_id], backend=BACKEND,
                              extra={"snapshot_sha256": snap.sha256})
 
-    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> Optional[Dict[str, Any]]:
+    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> dict[str, Any] | None:
         """Return one node of ``graph_id`` or ``None`` (the listing is complete, so absence is real)."""
         snap = self.snapshot(ctx, graph_id)
         return self._entity(snap, entity_id) if entity_id in snap.nodes else None
 
-    def iter_entities(self, ctx: RequestContext, graph_id: str) -> Iterator[Dict[str, Any]]:
+    def iter_entities(self, ctx: RequestContext, graph_id: str) -> Iterator[dict[str, Any]]:
         """Yield every node record of ``graph_id`` in file order (complete listing)."""
         snap = self.snapshot(ctx, graph_id)
         for node_id in snap.nodes:
             yield self._entity(snap, node_id)
 
-    def iter_edges(self, ctx: RequestContext, graph_id: str) -> Iterator[Dict[str, Any]]:
+    def iter_edges(self, ctx: RequestContext, graph_id: str) -> Iterator[dict[str, Any]]:
         """Yield every edge record of ``graph_id`` in file order."""
         snap = self.snapshot(ctx, graph_id)
         for eid, edge in snap.edges:
@@ -125,13 +125,13 @@ class JsonGraphBackend:
 
     def find_entities(
         self, ctx: RequestContext, graph_id: str, query: str, *, limit: int
-    ) -> Tuple[Sequence[Dict[str, Any]], bool]:
+    ) -> tuple[Sequence[dict[str, Any]], bool]:
         """Case-insensitive substring match on name/label or id; returns ``(hits, complete)``."""
         if limit < 1:
             raise ContractError(ErrorCode.INVALID_INPUT, "limit must be >= 1")
         needle = (query or "").lower()
         snap = self.snapshot(ctx, graph_id)
-        hits: List[Dict[str, Any]] = []
+        hits: list[dict[str, Any]] = []
         total = 0
         for node_id, node in snap.nodes.items():
             label = str(node.get("name") or node.get("label") or "")
@@ -144,7 +144,7 @@ class JsonGraphBackend:
     def neighborhood(
         self, ctx: RequestContext, graph_id: str, entity_id: str, *, hops: int, max_nodes: int,
         direction: str = "both",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Breadth-first neighborhood within ``hops`` and ``max_nodes``.
 
         ``direction="out"`` follows ``subject -> object`` only, which reaches exactly the
@@ -158,14 +158,14 @@ class JsonGraphBackend:
         snap = self.snapshot(ctx, graph_id)
         if entity_id not in snap.nodes:
             raise ContractError(ErrorCode.NOT_FOUND, f"no entity {entity_id!r} in graph {graph_id!r}")
-        seen: Dict[str, int] = {entity_id: 0}
-        order: List[str] = [entity_id]
-        edge_idx: List[int] = []
+        seen: dict[str, int] = {entity_id: 0}
+        order: list[str] = [entity_id]
+        edge_idx: list[int] = []
         edge_seen: set = set()
         frontier = [entity_id]
         truncated = False
         for depth in range(1, hops + 1):
-            nxt: List[str] = []
+            nxt: list[str] = []
             for node in frontier:
                 for idx, other in self._adjacent(snap, node, direction):
                     if other not in seen:
@@ -189,7 +189,7 @@ class JsonGraphBackend:
                 "snapshot_sha256": snap.sha256}
 
     @staticmethod
-    def _adjacent(snap: GraphSnapshot, node: str, direction: str) -> Iterable[Tuple[int, str]]:
+    def _adjacent(snap: GraphSnapshot, node: str, direction: str) -> Iterable[tuple[int, str]]:
         if direction in ("both", "out"):
             for idx in snap.out_index.get(node, []):
                 yield idx, str(snap.edges[idx][1].get("object"))

@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from academy.agent import Agent, action
 
@@ -23,7 +23,7 @@ MIN_FALLBACK_SCORE = 0.12
 MAX_PROMPT_CANDIDATES = 6
 
 
-def _score(candidate: Dict[str, Any]) -> float:
+def _score(candidate: dict[str, Any]) -> float:
     """Return the candidate relevance score, or 0.0 if missing or invalid."""
     try:
         return float(candidate.get("score", candidate.get("_score", 0.0)) or 0.0)
@@ -31,7 +31,7 @@ def _score(candidate: Dict[str, Any]) -> float:
         return 0.0
 
 
-def _candidate_titles(candidates: List[Dict[str, Any]]) -> List[str]:
+def _candidate_titles(candidates: list[dict[str, Any]]) -> list[str]:
     """Return display titles (title, DOI, id, or Untitled) for each candidate."""
     return [
         str(candidate.get("title") or candidate.get("doi") or candidate.get("id") or "Untitled")
@@ -39,7 +39,7 @@ def _candidate_titles(candidates: List[Dict[str, Any]]) -> List[str]:
     ]
 
 
-def _parse_json_object(raw: str) -> Dict[str, Any]:
+def _parse_json_object(raw: str) -> dict[str, Any]:
     """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     if not raw:
         return {}
@@ -53,7 +53,7 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
     return obj if isinstance(obj, dict) else {}
 
 
-def _normalize_objections(value: Any) -> List[str]:
+def _normalize_objections(value: Any) -> list[str]:
     """Coerce a string or list of objections into stripped non-empty strings."""
     if isinstance(value, str):
         value = [value]
@@ -62,13 +62,13 @@ def _normalize_objections(value: Any) -> List[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
-def _selected_indices(value: Any, candidate_count: int) -> List[int]:
+def _selected_indices(value: Any, candidate_count: int) -> list[int]:
     """Parse unique in-range candidate indices from an int or list."""
     if isinstance(value, int):
         value = [value]
     if not isinstance(value, list):
         return []
-    indices: List[int] = []
+    indices: list[int] = []
     for item in value:
         try:
             idx = int(item)
@@ -83,13 +83,13 @@ def _summary_from_decision(
     *,
     selected_action: str,
     reason: str,
-    retrieval_probe: Dict[str, Any],
-    candidates: List[Dict[str, Any]],
-    hypothesis: Optional[str] = None,
-    objections: Optional[List[str]] = None,
-    candidate_indices: Optional[List[int]] = None,
-    refined_query: Optional[str] = None,
-) -> Dict[str, Any]:
+    retrieval_probe: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    hypothesis: str | None = None,
+    objections: list[str] | None = None,
+    candidate_indices: list[int] | None = None,
+    refined_query: str | None = None,
+) -> dict[str, Any]:
     """Build the compact debate decision dict shown to CLI/UI."""
     candidate_indices = candidate_indices or []
     selected_candidates = [candidates[i] for i in candidate_indices if 0 <= i < len(candidates)]
@@ -115,8 +115,8 @@ class EvidenceDebateAgent(Agent):
     def __init__(
         self,
         *,
-        backend: Optional[str] = None,
-        model: Optional[str] = None,
+        backend: str | None = None,
+        model: str | None = None,
     ) -> None:
         """Store chat backend/model used for LLM debate decisions."""
         super().__init__()
@@ -126,9 +126,9 @@ class EvidenceDebateAgent(Agent):
     def _fallback_decide(
         self,
         question: str,
-        retrieval_probe: Dict[str, Any],
-        candidates: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        retrieval_probe: dict[str, Any],
+        candidates: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """Heuristic next action when the LLM is unavailable or returns invalid JSON."""
         if retrieval_probe.get("sufficient"):
             return _summary_from_decision(
@@ -175,10 +175,10 @@ class EvidenceDebateAgent(Agent):
     def _llm_decide(
         self,
         question: str,
-        retrieval_probe: Dict[str, Any],
-        candidates: List[Dict[str, Any]],
+        retrieval_probe: dict[str, Any],
+        candidates: list[dict[str, Any]],
         round_no: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Ask the chat model for a JSON action, falling back to heuristics."""
         from ..term_extractor.clients import make_chat_client
 
@@ -245,10 +245,10 @@ class EvidenceDebateAgent(Agent):
     async def decide(
         self,
         question: str,
-        retrieval_probe: Dict[str, Any],
-        candidates: Optional[List[Dict[str, Any]]] = None,
+        retrieval_probe: dict[str, Any],
+        candidates: list[dict[str, Any]] | None = None,
         round_no: int = 1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Return summarized debate decision; raw transcript is not exposed."""
         candidates = candidates or []
         loop = asyncio.get_event_loop()

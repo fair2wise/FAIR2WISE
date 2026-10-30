@@ -10,7 +10,7 @@ publication at an uncertainty queue.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..contracts.context import LOCAL_OPERATOR, ActorKind, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -33,10 +33,10 @@ def review_case(
     *,
     bound_revision: str,
     accept: bool,
-    resolution: Optional[Dict[str, Any]] = None,
+    resolution: dict[str, Any] | None = None,
     reason: str = "",
-    recorder: Optional[AuditRecorder] = None,
-) -> Dict[str, Any]:
+    recorder: AuditRecorder | None = None,
+) -> dict[str, Any]:
     """Resolve (``accept=True``) or reject a case awaiting review.
 
     Args:
@@ -64,7 +64,7 @@ def review_case(
         raise ContractError(
             ErrorCode.STALE_APPROVAL, "the candidate, schema or vocabulary changed since this was reviewed"
         )
-    verdict_data: Optional[Dict[str, Any]] = None
+    verdict_data: dict[str, Any] | None = None
     if accept:
         verdict_data = resolution
         if verdict_data is None:
@@ -85,7 +85,7 @@ def review_case(
                 ErrorCode.INVALID_INPUT, "resolution fails validation: " + ",".join(checked["errors"])
             )
 
-    def apply() -> Dict[str, Any]:
+    def apply() -> dict[str, Any]:
         return store.apply_decision(
             case_id,
             scope,

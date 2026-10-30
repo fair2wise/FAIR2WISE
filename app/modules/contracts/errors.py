@@ -8,7 +8,6 @@ internal contract always keeps the original code.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 
 class ErrorCode(str, Enum):
@@ -56,7 +55,7 @@ class ContractError(Exception):
         retryable: Override for the code's default retryability.
     """
 
-    def __init__(self, code: ErrorCode, message: str, *, retryable: Optional[bool] = None) -> None:
+    def __init__(self, code: ErrorCode, message: str, *, retryable: bool | None = None) -> None:
         super().__init__(message)
         self.code = code
         self.retryable = code in RETRYABLE_CODES if retryable is None else retryable

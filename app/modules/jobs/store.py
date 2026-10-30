@@ -18,12 +18,12 @@ recovery of running jobs whose lease expired.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import UTC, datetime
 import json
 import time
+from typing import Any, Callable, Iterable, Mapping, Sequence
 import uuid
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JOB_EVENT_VERSION, TERMINAL_STATES, JobEvent, JobHandle, JobState, StageOutcome
@@ -111,13 +111,13 @@ class JobRecord:
     state: JobState
     inputs: OperationInputs
     created_by: str
-    settings_revision: Optional[str]
+    settings_revision: str | None
     submitted_at: float
     updated_at: float
     revision: int
     stop_requested: bool
     pause_reason: str
-    last_progress_at: Optional[float]
+    last_progress_at: float | None
 
     def handle(self) -> JobHandle:
         """The public handle."""
@@ -140,18 +140,18 @@ class StageRecord:
     status: StageOutcome
     op_key: str
     attempts: int
-    error_code: Optional[ErrorCode]
+    error_code: ErrorCode | None
     error: str
-    intent_at: Optional[float]
-    completed_at: Optional[float]
-    effects: Tuple[str, ...]
-    artifact_refs: Tuple[str, ...]
-    progress: Dict[str, int]
-    result: Optional[Dict[str, Any]]
+    intent_at: float | None
+    completed_at: float | None
+    effects: tuple[str, ...]
+    artifact_refs: tuple[str, ...]
+    progress: dict[str, int]
+    result: dict[str, Any] | None
 
 
 def _dt(value: float) -> datetime:
-    return datetime.fromtimestamp(value, tz=timezone.utc)
+    return datetime.fromtimestamp(value, tz=UTC)
 
 
 def _json(value: Any) -> str:
@@ -174,7 +174,7 @@ class JobStore:
         *,
         lease_seconds: float = 120.0,
         clock: Callable[[], float] = time.time,
-        db: Optional[OperationalDB] = None,
+        db: OperationalDB | None = None,
     ) -> None:
         self.db = db or OperationalDB(path)
         self.lease_seconds = lease_seconds
@@ -185,7 +185,7 @@ class JobStore:
 
     # --- leases -----------------------------------------------------------------------
 
-    def acquire_lease(self, resource: str, owner: str, ttl: Optional[float] = None) -> Optional[Lease]:
+    def acquire_lease(self, resource: str, owner: str, ttl: float | None = None) -> Lease | None:
         """Take the lease on ``resource`` unless another owner holds an unexpired one."""
         now = self.clock()
         with self.db.tx() as con:
@@ -219,7 +219,7 @@ class JobStore:
         with self.db.tx(immediate=False) as con:
             self._check_lease(con, lease)
 
-    def renew_lease(self, lease: Lease, ttl: Optional[float] = None) -> Lease:
+    def renew_lease(self, lease: Lease, ttl: float | None = None) -> Lease:
         """Extend the lease; refused once expired or superseded (a stale owner cannot revive it)."""
         with self.db.tx() as con:
             self._check_lease(con, lease)
@@ -234,7 +234,7 @@ class JobStore:
                 "UPDATE leases SET expires_at=0 WHERE resource=? AND token=?", (lease.resource, lease.token)
             )
 
-    def lease_holder(self, resource: str) -> Optional[Tuple[str, float]]:
+    def lease_holder(self, resource: str) -> tuple[str, float] | None:
         """``(owner, expires_at)`` of an unexpired lease, else ``None``."""
         row = self.db.one("SELECT owner, expires_at FROM leases WHERE resource=?", (resource,))
         return (row["owner"], row["expires_at"]) if row is not None and row["expires_at"] > self.clock() else None
@@ -263,7 +263,7 @@ class JobStore:
         )
 
     def submit(
-        self, kind: str, inputs: OperationInputs, *, created_by: str, settings_revision: Optional[str] = None
+        self, kind: str, inputs: OperationInputs, *, created_by: str, settings_revision: str | None = None
     ) -> JobRecord:
         """Register a job; the same kind and inputs return the existing job (idempotent submit)."""
         job_id = inputs.job_identity(kind)
@@ -286,20 +286,20 @@ class JobStore:
         return self._record(row)
 
     def list_jobs(
-        self, *, state: Optional[JobState] = None, kind: Optional[str] = None, limit: int = 100
-    ) -> List[JobRecord]:
+        self, *, state: JobState | None = None, kind: str | None = None, limit: int = 100
+    ) -> list[JobRecord]:
         """Most recently updated jobs, optionally filtered."""
         return self.list_jobs_scoped(state=state, kind=kind, limit=limit)
 
     def list_jobs_scoped(
         self,
         *,
-        created_by: Optional[str] = None,
-        within_scope: Optional[Iterable[str]] = None,
-        state: Optional[JobState] = None,
-        kind: Optional[str] = None,
+        created_by: str | None = None,
+        within_scope: Iterable[str] | None = None,
+        state: JobState | None = None,
+        kind: str | None = None,
         limit: int = 100,
-    ) -> List[JobRecord]:
+    ) -> list[JobRecord]:
         """Most recently updated jobs, filtered in SQL (C3; T14 Q8).
 
         Args:
@@ -310,8 +310,8 @@ class JobStore:
             kind: Only jobs of this kind; ``None`` for any.
             limit: Maximum rows, clamped to 1..1000, applied after every filter.
         """
-        clauses: List[str] = []
-        params: List[Any] = []
+        clauses: list[str] = []
+        params: list[Any] = []
         if created_by is not None:
             clauses.append("created_by=?")
             params.append(created_by)
@@ -337,8 +337,8 @@ class JobStore:
         return [self._record(r) for r in rows]
 
     def claim_next(
-        self, owner: str, *, kinds: Optional[Sequence[str]] = None, ttl: Optional[float] = None
-    ) -> Optional[Tuple[Lease, JobRecord]]:
+        self, owner: str, *, kinds: Sequence[str] | None = None, ttl: float | None = None
+    ) -> tuple[Lease, JobRecord] | None:
         """Lease the next runnable job: ``queued``, or ``running`` whose owner's lease expired."""
         now = self.clock()
         rows = self.db.query(
@@ -385,7 +385,7 @@ class JobStore:
         stage: str = "job",
         outcome: StageOutcome = StageOutcome.PENDING,
         reason: str = "",
-        error_code: Optional[ErrorCode] = None,
+        error_code: ErrorCode | None = None,
     ) -> JobRecord:
         """Move the job to ``new`` under ``lease`` (validated against :data:`TRANSITIONS`)."""
         with self.db.tx() as con:
@@ -407,7 +407,7 @@ class JobStore:
         self.release_lease(lease)
 
     def transition_without_lease(
-        self, job_id: str, new: JobState, *, reason: str, actor: str, expected_revision: Optional[int] = None
+        self, job_id: str, new: JobState, *, reason: str, actor: str, expected_revision: int | None = None
     ) -> JobRecord:
         """Operator/service transition for a job nobody is running (cancel, resume, retry).
 
@@ -472,14 +472,14 @@ class JobStore:
             result=json.loads(row["result"]) if row["result"] else None,
         )
 
-    def stages(self, job_id: str) -> List[StageRecord]:
+    def stages(self, job_id: str) -> list[StageRecord]:
         """Stage rows in pipeline order."""
         return [
             self._stage(r)
             for r in self.db.query("SELECT * FROM job_stages WHERE job_id=? ORDER BY position", (job_id,))
         ]
 
-    def stage(self, job_id: str, stage: str) -> Optional[StageRecord]:
+    def stage(self, job_id: str, stage: str) -> StageRecord | None:
         """One stage row or ``None``."""
         row = self.db.one("SELECT * FROM job_stages WHERE job_id=? AND stage=?", (job_id, stage))
         return self._stage(row) if row is not None else None
@@ -511,8 +511,8 @@ class JobStore:
         *,
         effects: Sequence[str] = (),
         artifact_refs: Sequence[str] = (),
-        progress: Optional[Mapping[str, int]] = None,
-        result: Optional[Mapping[str, Any]] = None,
+        progress: Mapping[str, int] | None = None,
+        result: Mapping[str, Any] | None = None,
         outcome: StageOutcome = StageOutcome.COMPLETED,
     ) -> None:
         """Durable completion record, written only after the stage's effects were verified."""
@@ -552,7 +552,7 @@ class JobStore:
         stage: str,
         outcome: StageOutcome,
         *,
-        error_code: Optional[ErrorCode] = None,
+        error_code: ErrorCode | None = None,
         error: str = "",
         job_state: JobState = JobState.RUNNING,
     ) -> None:
@@ -629,7 +629,7 @@ class JobStore:
 
     # --- units (chunk-level retention) -------------------------------------------------
 
-    def get_unit(self, job_id: str, stage: str, unit_id: str, unit_key: str) -> Optional[Dict[str, Any]]:
+    def get_unit(self, job_id: str, stage: str, unit_id: str, unit_key: str) -> dict[str, Any] | None:
         """The settled result of a unit when its key still matches, else ``None``."""
         row = self.db.one(
             "SELECT unit_key, status, result FROM job_units WHERE job_id=? AND stage=? AND unit_id=?",
@@ -646,7 +646,7 @@ class JobStore:
         stage: str,
         unit_id: str,
         unit_key: str,
-        result: Optional[Mapping[str, Any]],
+        result: Mapping[str, Any] | None,
         error: str = "",
     ) -> None:
         """Record a unit: a settled ``result`` (``done``) or an ``error`` (``failed``, retried on resume)."""
@@ -670,8 +670,8 @@ class JobStore:
             )
 
     def unit_counts(
-        self, job_id: str, stage: str, valid_keys: Optional[Mapping[str, str]] = None
-    ) -> Dict[str, int]:
+        self, job_id: str, stage: str, valid_keys: Mapping[str, str] | None = None
+    ) -> dict[str, int]:
         """``done``/``failed`` counts; with ``valid_keys`` (unit id -> key) stale-keyed units count as missing."""
         rows = self.db.query(
             "SELECT unit_id, unit_key, status FROM job_units WHERE job_id=? AND stage=?", (job_id, stage)
@@ -686,7 +686,7 @@ class JobStore:
 
     # --- effects ----------------------------------------------------------------------
 
-    def effect(self, job_id: str, stage: str, effect_id: str) -> Optional[Tuple[str, Optional[Dict[str, Any]]]]:
+    def effect(self, job_id: str, stage: str, effect_id: str) -> tuple[str, dict[str, Any] | None] | None:
         """``(status, result)`` of a stable-ID effect, or ``None`` if never started."""
         row = self.db.one(
             "SELECT status, result FROM job_effects WHERE job_id=? AND stage=? AND effect_id=?",
@@ -703,7 +703,7 @@ class JobStore:
         stage: str,
         effect_id: str,
         status: str,
-        result: Optional[Mapping[str, Any]] = None,
+        result: Mapping[str, Any] | None = None,
     ) -> None:
         """Write an effect's ``intent`` before it runs and ``done`` after it is verified."""
         with self.db.tx() as con:
@@ -732,11 +732,11 @@ class JobStore:
         outcome: StageOutcome,
         state: JobState,
         *,
-        progress: Optional[Mapping[str, int]] = None,
-        error_code: Optional[ErrorCode] = None,
+        progress: Mapping[str, int] | None = None,
+        error_code: ErrorCode | None = None,
         retry: int = 0,
         artifact_refs: Sequence[str] = (),
-        detail: Optional[Mapping[str, Any]] = None,
+        detail: Mapping[str, Any] | None = None,
     ) -> None:
         now = self.clock()
         sequence = con.execute(
@@ -760,7 +760,7 @@ class JobStore:
             (job_id, sequence, event.model_dump_json(), _json(dict(detail or {})), now),
         )
 
-    def events(self, job_id: str, *, after: int = -1, limit: int = 500) -> List[JobEvent]:
+    def events(self, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobEvent]:
         """Durable events with ``sequence > after``."""
         rows = self.db.query(
             "SELECT event FROM job_events WHERE job_id=? AND sequence>? ORDER BY sequence LIMIT ?",
@@ -768,7 +768,7 @@ class JobStore:
         )
         return [JobEvent.model_validate_json(r["event"]) for r in rows]
 
-    def event_details(self, job_id: str) -> List[Dict[str, Any]]:
+    def event_details(self, job_id: str) -> list[dict[str, Any]]:
         """Non-contract audit detail (actor, reason) beside each event, for operators."""
         rows = self.db.query("SELECT sequence, detail FROM job_events WHERE job_id=? ORDER BY sequence", (job_id,))
         return [{"sequence": r["sequence"], **json.loads(r["detail"])} for r in rows]

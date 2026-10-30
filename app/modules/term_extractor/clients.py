@@ -1,21 +1,20 @@
 """Chat-completion clients (Ollama, CBORG) with LLM-call tracing."""
 
+from abc import ABC, abstractmethod
 import logging
 import time
-from abc import ABC, abstractmethod
-from typing import Optional
 
 import openai
 import requests
 
-from ..cborg_limiter import sync_slot
 from ..cborg_http import collect_stream_text, openai_http_kwargs, require_cborg_api_key
+from ..cborg_limiter import sync_slot
 from ..f2w_agent.trace import record_llm_call
 
 logger = logging.getLogger(__name__)
 
 
-def _traced_chat(model: str, prompt: str, trace_label: Optional[str], timeout: int, call):
+def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int, call):
     """Run ``call`` and record the rendered prompt when a turn trace is active."""
     label = trace_label or "chat"
     started = time.perf_counter()
@@ -55,7 +54,7 @@ class ChatClient(ABC):
         *,
         temperature: float = 0.0,
         timeout: int = 240,
-        trace_label: Optional[str] = None,
+        trace_label: str | None = None,
     ) -> str:
         """Send ``prompt`` as one user message and return the reply text."""
         ...
@@ -74,7 +73,7 @@ class OllamaChatClient(ChatClient):
         *,
         temperature: float = 0.0,
         timeout: int = 240,
-        trace_label: Optional[str] = None,
+        trace_label: str | None = None,
     ) -> str:
         """Send ``prompt`` as a single user message and return the reply text.
 
@@ -111,7 +110,7 @@ class CBorgChatClient(ChatClient):
     Env: CBORG_API_KEY, CBORG_BASE_URL
     """
 
-    def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
+    def __init__(self, model: str, api_key: str | None = None, base_url: str | None = None):
         import os
         self.model = model
         self.client = openai.OpenAI(
@@ -126,7 +125,7 @@ class CBorgChatClient(ChatClient):
         *,
         temperature: float = 0.0,
         timeout: int = 240,
-        trace_label: Optional[str] = None,
+        trace_label: str | None = None,
     ) -> str:
         """Send ``prompt`` as a single user message and return the streamed reply text.
 
@@ -159,8 +158,8 @@ def make_chat_client(
     model: str,
     *,
     ollama_url: str = "http://localhost:11434",
-    cborg_base: Optional[str] = None,
-    cborg_api_key: Optional[str] = None,
+    cborg_base: str | None = None,
+    cborg_api_key: str | None = None,
 ) -> ChatClient:
     """Create a chat client for the named backend.
 

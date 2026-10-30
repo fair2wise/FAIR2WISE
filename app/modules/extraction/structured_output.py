@@ -23,12 +23,12 @@ src/forge/agents/literature/structured_output.py (BSD-3-Clause).
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import inspect
 import json
 import re
 import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Protocol
 
 
 class SyncChatClient(Protocol):
@@ -43,7 +43,7 @@ class Completion:
     """One model reply and the non-secret settings that produced it."""
 
     text: str
-    settings: Dict[str, Any] = field(default_factory=dict)
+    settings: dict[str, Any] = field(default_factory=dict)
 
 
 class TextCompletionAdapter:
@@ -63,8 +63,8 @@ class TextCompletionAdapter:
         *,
         temperature: float = 0.0,
         timeout: int = 240,
-        trace_label: Optional[str] = None,
-        limiter: Optional[threading.Semaphore] = None,
+        trace_label: str | None = None,
+        limiter: threading.Semaphore | None = None,
     ) -> None:
         if not callable(getattr(client, "chat", None)):
             raise TypeError("client must expose the F2W chat(prompt, *, temperature, timeout) method")
@@ -80,11 +80,11 @@ class TextCompletionAdapter:
         self._accepts_trace = "trace_label" in params
 
     @property
-    def model(self) -> Optional[str]:
+    def model(self) -> str | None:
         """Model name the client reports, if any."""
         return getattr(self.client, "model", None)
 
-    def settings(self) -> Dict[str, Any]:
+    def settings(self) -> dict[str, Any]:
         """Non-secret settings recorded with every completion."""
         return {
             "client_class": f"{type(self.client).__module__}.{type(self.client).__qualname__}",
@@ -93,7 +93,7 @@ class TextCompletionAdapter:
 
     def complete(self, prompt: str) -> Completion:
         """Send one prompt through the wrapped client and return its reply."""
-        kwargs: Dict[str, Any] = {"temperature": self.temperature, "timeout": self.timeout}
+        kwargs: dict[str, Any] = {"temperature": self.temperature, "timeout": self.timeout}
         if self._accepts_trace and self.trace_label:
             kwargs["trace_label"] = self.trace_label
         if self.limiter is None:
@@ -119,7 +119,7 @@ def strip_control_chars(text: str) -> str:
     return str(text).translate(_CONTROL_CHARS)
 
 
-def _loads_object(text: str) -> Optional[Dict[str, Any]]:
+def _loads_object(text: str) -> dict[str, Any] | None:
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
@@ -130,7 +130,7 @@ def _loads_object(text: str) -> Optional[Dict[str, Any]]:
     return parsed if isinstance(parsed, dict) else None
 
 
-def parse_json_object(reply: str) -> Optional[Dict[str, Any]]:
+def parse_json_object(reply: str) -> dict[str, Any] | None:
     """Best-effort JSON object from a model reply (fences, chatter, control chars)."""
     cleaned = (reply or "").strip()
     if cleaned.startswith("```"):

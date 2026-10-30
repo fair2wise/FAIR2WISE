@@ -24,16 +24,16 @@ the objects at that commit, and checked with :func:`validate_descriptor` against
 """
 from __future__ import annotations
 
-import json
-import os
-import re
-import shutil
-import uuid
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+import json
+import os
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence
+import re
+import shutil
+from typing import Any, Mapping, Sequence
+import uuid
 
 from app.modules import json2kg
 from app.modules.f2w_agent.multi_kg import graph_id_for_path
@@ -63,8 +63,8 @@ from .snapshot_manifest import (
     CORPUS_RE,
     SNAPSHOT_ID_RE,
     CompatPath,
-    Created,
     CorpusRevision,
+    Created,
     DisclosureBlock,
     ExtractionBlock,
     ExtractionRevision,
@@ -99,7 +99,7 @@ RULE_TARGET_EXISTS = "target-exists"
 class AdoptionRefused(SnapshotError):
     """A flat file was not adopted; nothing was written. ``rule`` names the failing check."""
 
-    def __init__(self, rule: str, message: str, findings: Optional[Mapping[str, int]] = None) -> None:
+    def __init__(self, rule: str, message: str, findings: Mapping[str, int] | None = None) -> None:
         super().__init__(f"{rule}: {message}")
         self.rule = rule
         self.findings = dict(findings or {})
@@ -111,22 +111,22 @@ class AdoptionOutcome:
 
     flat_name: str
     status: str  # "adopted" | "would_adopt" | "skipped"
-    corpus: Optional[str] = None
-    snapshot_id: Optional[str] = None
-    graph_sha256: Optional[str] = None
-    rule: Optional[str] = None
+    corpus: str | None = None
+    snapshot_id: str | None = None
+    graph_sha256: str | None = None
+    rule: str | None = None
     detail: str = ""
     findings: Mapping[str, int] = field(default_factory=dict)
-    directory: Optional[Path] = None
+    directory: Path | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready, path-free summary."""
         return {"flat_name": self.flat_name, "status": self.status, "corpus": self.corpus,
                 "snapshot_id": self.snapshot_id, "graph_sha256": self.graph_sha256, "rule": self.rule,
                 "detail": self.detail, "findings": dict(self.findings)}
 
 
-def derive_identity(flat_name: str) -> "tuple[str, str]":
+def derive_identity(flat_name: str) -> tuple[str, str]:
     """``(corpus, snapshot_id)`` for a legacy flat file name (see the module docstring)."""
     match = _FLAT_NAME.match(flat_name)
     if match:
@@ -179,7 +179,7 @@ def _parse_legacy_graph(blob: bytes) -> Mapping[str, Any]:
     return graph
 
 
-def _stats(graph: Mapping[str, Any]) -> Dict[str, int]:
+def _stats(graph: Mapping[str, Any]) -> dict[str, int]:
     nodes = graph.get("things") or []
     return {"nodes": len(nodes), "edges": len(graph.get("associations") or []),
             "snippets": sum(1 for n in nodes if isinstance(n, dict) and str(n.get("type", "")).endswith("CodeSnippet"))}
@@ -188,14 +188,14 @@ def _stats(graph: Mapping[str, Any]) -> Dict[str, int]:
 def adopt_legacy_flat_file(
     flat_path: Path,
     *,
-    storage_kg: Optional[Path] = None,
-    code_commit: Optional[str] = None,
-    now: Optional[datetime] = None,
-    registry: Optional[SchemaRegistry] = None,
-    disclosure_allowlist: FrozenSet[str] = frozenset(),
+    storage_kg: Path | None = None,
+    code_commit: str | None = None,
+    now: datetime | None = None,
+    registry: SchemaRegistry | None = None,
+    disclosure_allowlist: frozenset[str] = frozenset(),
     allow_pending_review_schema: bool = False,
-    run_id: Optional[str] = None,
-    profile: Optional[str] = "local",
+    run_id: str | None = None,
+    profile: str | None = "local",
     dry_run: bool = False,
 ) -> AdoptionOutcome:
     """Adopt one flat legacy KG file as ``storage/kg/<corpus>/v<N>/``.
@@ -268,7 +268,7 @@ def adopt_legacy_flat_file(
                          edge_count=stats["edges"], codesnippet_count=stats["snippets"]),
         compat_paths=[CompatPath(path=f"storage/kg/{flat.name}", sha256=graph_sha)] if standard_flat else None,
         parent=Parent(snapshot_id=flat.name[:-len(".json")], graph_sha256=graph_sha, relation="legacy_adoption"),
-        created=Created(at=utc_iso(now or datetime.now(timezone.utc)), tool=ADOPTION_TOOL, code_commit=code_commit,
+        created=Created(at=utc_iso(now or datetime.now(UTC)), tool=ADOPTION_TOOL, code_commit=code_commit,
                         json2kg_sha256=sha256_bytes(Path(json2kg.__file__).read_bytes()), run_id=run_id,
                         profile=profile),
         schema=SchemaBlock(name=entry.schema_id, path=entry.path, sha256=entry.sha256, version=entry.version,
@@ -303,14 +303,14 @@ def adopt_legacy_flat_file(
     return outcome
 
 
-def adopt_legacy_directory(storage_kg: Path, *, only: Optional[Sequence[str]] = None, **kwargs: Any) -> List[AdoptionOutcome]:
+def adopt_legacy_directory(storage_kg: Path, *, only: Sequence[str] | None = None, **kwargs: Any) -> list[AdoptionOutcome]:
     """Adopt every top-level entry of ``storage_kg`` that passes; list the rest with the exact rule.
 
     Directories (already nested snapshots) are not entries. Order is by file name, so a run is deterministic.
     ``kwargs`` go to :func:`adopt_legacy_flat_file`.
     """
     kg_dir = Path(storage_kg)
-    outcomes: List[AdoptionOutcome] = []
+    outcomes: list[AdoptionOutcome] = []
     for entry in sorted(kg_dir.iterdir(), key=lambda p: p.name):
         if entry.is_dir() and not entry.is_symlink():
             continue
@@ -331,7 +331,7 @@ def adopt_legacy_directory(storage_kg: Path, *, only: Optional[Sequence[str]] = 
 _SCHEMA_FILE = "docs/migration/data_releases/schemas/data_release_descriptor.schema.json"
 
 
-def descriptor_schema(repo: Optional[Path] = None) -> Dict[str, Any]:
+def descriptor_schema(repo: Path | None = None) -> dict[str, Any]:
     """The normative descriptor JSON Schema of ``repo`` (default: the resource root)."""
     base = Path(repo) if repo is not None else resource_root()
     if base is None:
@@ -339,7 +339,7 @@ def descriptor_schema(repo: Optional[Path] = None) -> Dict[str, Any]:
     return json.loads((base / _SCHEMA_FILE).read_text(encoding="utf-8"))
 
 
-def validate_descriptor(descriptor: Mapping[str, Any], repo: Optional[Path] = None) -> List[str]:
+def validate_descriptor(descriptor: Mapping[str, Any], repo: Path | None = None) -> list[str]:
     """Schema errors of ``descriptor`` (empty list when valid), against ``data_release_descriptor.schema.json``."""
     import jsonschema  # lazy: only descriptor tooling needs it
 
@@ -351,7 +351,7 @@ def validate_descriptor(descriptor: Mapping[str, Any], repo: Optional[Path] = No
 
 def build_adoption_descriptor(repo: Path, data_commit: str, corpus: str, snapshot_id: str, *, repository: str,
                               importer_name: str, importer_version: str,
-                              legacy_flat_name: Optional[str] = None) -> Dict[str, Any]:
+                              legacy_flat_name: str | None = None) -> dict[str, Any]:
     """State-``candidate`` descriptor for an adopted snapshot, from the objects at ``data_commit``.
 
     Created only after the commit exists (release_contract.md section 3): the manifest, graph and validation
@@ -371,7 +371,7 @@ def build_adoption_descriptor(repo: Path, data_commit: str, corpus: str, snapsho
     manifest = release.manifest
     base = f"storage/kg/{corpus}/{snapshot_id}"
 
-    def entry(role: str, path: str, art: Any) -> Dict[str, Any]:
+    def entry(role: str, path: str, art: Any) -> dict[str, Any]:
         return {"role": role, "path": path, "sha256": art.sha256, "git_blob": art.git_blob,
                 "size_bytes": len(art.data)}
 
@@ -392,7 +392,7 @@ def build_adoption_descriptor(repo: Path, data_commit: str, corpus: str, snapsho
         if flat.data != release.graph.data:
             raise ReleaseVerificationError("manifest_mismatch", f"{flat_path} is not the graph bytes")
         artifacts.append(entry("legacy_flat_graph", flat_path, flat))
-    descriptor: Dict[str, Any] = {
+    descriptor: dict[str, Any] = {
         "descriptor_version": "1",
         "release_id": f"{corpus}-{snapshot_id}-{manifest.graph.sha256[:12]}",
         "repository": repository, "data_commit": data_commit, "corpus": corpus, "snapshot_id": snapshot_id,

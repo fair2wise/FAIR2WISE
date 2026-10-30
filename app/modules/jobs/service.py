@@ -8,10 +8,10 @@ context is never accepted from a request body.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import threading
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Mapping, Sequence
 
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -66,16 +66,16 @@ class JobService:
         *,
         owner: str = "worker",
         admission: Any = None,
-        heartbeat_interval: Optional[float] = None,
-        settings: Optional[DeploymentSettings] = None,
-        identity_port: Optional[Any] = None,
-        credential_lookup: Optional[Callable[[str], Any]] = None,
-        clock: Optional[Callable[[], Any]] = None,
+        heartbeat_interval: float | None = None,
+        settings: DeploymentSettings | None = None,
+        identity_port: Any | None = None,
+        credential_lookup: Callable[[str], Any] | None = None,
+        clock: Callable[[], Any] | None = None,
     ) -> None:
         self.store = store
         self.owner = owner
         #: Default stage authority (``None`` when the service was built without deployment settings).
-        self.authority: Optional[JobAuthority] = None
+        self.authority: JobAuthority | None = None
         if settings is not None:
             self.authority = JobAuthority(settings, identity_port=identity_port, credential_lookup=credential_lookup,
                                           clock=clock)
@@ -85,8 +85,8 @@ class JobService:
         self.heartbeat_interval = heartbeat_interval
         #: Set at shutdown: running jobs return to ``queued`` at their next boundary.
         self.interrupt = threading.Event()
-        self._kinds: Dict[str, RegisteredKind] = {}
-        self._scope_hooks: List[Callable[[Mapping[str, Any]], None]] = []
+        self._kinds: dict[str, RegisteredKind] = {}
+        self._scope_hooks: list[Callable[[Mapping[str, Any]], None]] = []
 
     # --- registration -----------------------------------------------------------------
 
@@ -95,11 +95,11 @@ class JobService:
         kind: str,
         pipeline: Pipeline,
         *,
-        capability: Optional[str] = None,
-        authority: Optional[Callable[[JobRecord, Sequence[str]], Any]] = None,
+        capability: str | None = None,
+        authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
         admission: Any = None,
-        extra: Optional[Mapping[str, Any]] = None,
-        on_denied: Optional[Callable[[JobRecord, str], None]] = None,
+        extra: Mapping[str, Any] | None = None,
+        on_denied: Callable[[JobRecord, str], None] | None = None,
     ) -> RegisteredKind:
         """Declare a job kind.
 
@@ -188,9 +188,9 @@ class JobService:
         raise ContractError(ErrorCode.NOT_FOUND, "no such job")
 
     def list_visible(
-        self, ctx: RequestContext, *, state: Optional[JobState] = None, kind: Optional[str] = None,
+        self, ctx: RequestContext, *, state: JobState | None = None, kind: str | None = None,
         limit: int = 100,
-    ) -> List[JobRecord]:
+    ) -> list[JobRecord]:
         """Most recently updated jobs ``ctx`` may see, filtered in SQL by the store (C3).
 
         The same rule as :meth:`_visible`, expressed as store filters: ``jobs.admin`` sees every
@@ -208,7 +208,7 @@ class JobService:
     # --- API-facing operations ---------------------------------------------------------
 
     def submit(
-        self, ctx: RequestContext, kind: str, inputs: OperationInputs, *, settings_revision: Optional[str] = None
+        self, ctx: RequestContext, kind: str, inputs: OperationInputs, *, settings_revision: str | None = None
     ) -> JobHandle:
         """Register a job (idempotent for identical kind and inputs). Does not run it."""
         entry = self.kind(kind)
@@ -225,12 +225,12 @@ class JobService:
         self._visible(ctx, job)
         return job.handle()
 
-    def events(self, ctx: RequestContext, job_id: str, *, after: int = -1) -> List[JobEvent]:
+    def events(self, ctx: RequestContext, job_id: str, *, after: int = -1) -> list[JobEvent]:
         """Durable events after sequence ``after`` (for polling and SSE)."""
         self._visible(ctx, self.store.get(job_id))
         return self.store.events(job_id, after=after)
 
-    def progress(self, ctx: RequestContext, job_id: str) -> Dict[str, Any]:
+    def progress(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """Per-phase progress (parsing, extraction, validation, review, import)."""
         from .telemetry import job_progress
 
@@ -265,7 +265,7 @@ class JobService:
             job_id, JobState.CANCELLED, reason="cancelled by operator", actor=ctx.principal.subject
         ).handle()
 
-    def resume(self, ctx: RequestContext, job_id: str, *, expected_revision: Optional[int] = None) -> JobHandle:
+    def resume(self, ctx: RequestContext, job_id: str, *, expected_revision: int | None = None) -> JobHandle:
         """Re-queue a paused, review-resolved or failed job; only compatible completed stages are reused."""
         job = self.store.get(job_id)
         self._visible(ctx, job)
@@ -283,8 +283,8 @@ class JobService:
     # --- worker-facing ----------------------------------------------------------------
 
     def work_one(
-        self, owner: Optional[str] = None, *, kinds: Optional[Sequence[str]] = None
-    ) -> Optional[Tuple[str, Optional[JobState]]]:
+        self, owner: str | None = None, *, kinds: Sequence[str] | None = None
+    ) -> tuple[str, JobState | None] | None:
         """Claim and run one job. Returns ``(job_id, state)``, or ``None`` when nothing is runnable.
 
         ``state`` is ``None`` when the owner lost its lease mid-run (a newer owner took over);
@@ -297,7 +297,7 @@ class JobService:
         entry = self.kind(job.kind)
         beat = self._start_heartbeat(lease)
         try:
-            state: Optional[JobState] = entry.runner.run(lease, job)
+            state: JobState | None = entry.runner.run(lease, job)
         except LeaseLost:
             beat.set()
             self.store.release_lease(lease)

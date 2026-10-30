@@ -10,7 +10,7 @@ bound; ``GET /v1/operations/jobs/{job_id}`` returns its bounded report once comp
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,8 +25,8 @@ class OperationJobRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     operation: str = Field(min_length=1, max_length=100)
-    args: Dict[str, Any] = Field(default_factory=dict)
-    corpus_scope: Optional[List[str]] = Field(default=None, max_length=50)
+    args: dict[str, Any] = Field(default_factory=dict)
+    corpus_scope: list[str] | None = Field(default=None, max_length=50)
 
 
 def install(app: FastAPI) -> FastAPI:
@@ -35,13 +35,13 @@ def install(app: FastAPI) -> FastAPI:
 
     @router.get("/statistics")
     def statistics(request: Request, ctx: RequestContext = Depends(context),
-                   graph_id: str = Query(min_length=1, max_length=128)) -> Dict[str, Any]:
+                   graph_id: str = Query(min_length=1, max_length=128)) -> dict[str, Any]:
         """``kg_compute_statistics``: structural statistics of one graph."""
         return project(request, dump(operations(request).graph_statistics(ctx, graph_id)))
 
     @router.get("/compare")
     def compare(request: Request, ctx: RequestContext = Depends(context),
-                graph_ids: List[str] = Query(min_length=2, max_length=12)) -> Dict[str, Any]:
+                graph_ids: list[str] = Query(min_length=2, max_length=12)) -> dict[str, Any]:
         """``kg_compare_snapshots``: growth across graph versions in the given order."""
         return project(request, dump(operations(request).compare_graphs(ctx, graph_ids)))
 
@@ -49,8 +49,8 @@ def install(app: FastAPI) -> FastAPI:
     def paper_subgraph(request: Request, ctx: RequestContext = Depends(context),
                        graph_id: str = Query(min_length=1, max_length=128),
                        paper: str = Query(min_length=3, max_length=300),
-                       max_nodes: Optional[int] = Query(default=None, ge=1, le=200),
-                       max_edges: Optional[int] = Query(default=None, ge=1, le=400)) -> Dict[str, Any]:
+                       max_nodes: int | None = Query(default=None, ge=1, le=200),
+                       max_edges: int | None = Query(default=None, ge=1, le=400)) -> dict[str, Any]:
         """``kg_paper_subgraph``: what one graph holds about one Work."""
         result = operations(request).paper_subgraph(ctx, graph_id, paper, max_nodes=max_nodes, max_edges=max_edges)
         return project(request, dump(result))
@@ -58,21 +58,21 @@ def install(app: FastAPI) -> FastAPI:
     @router.get("/recent")
     def recent(request: Request, ctx: RequestContext = Depends(context),
                graph_id: str = Query(min_length=1, max_length=128),
-               since: Optional[str] = Query(default=None, max_length=40),
-               limit: Optional[int] = Query(default=None, ge=1, le=50)) -> Dict[str, Any]:
+               since: str | None = Query(default=None, max_length=40),
+               limit: int | None = Query(default=None, ge=1, le=50)) -> dict[str, Any]:
         """``kg_recent_entities``: entities added to a live graph after ``since``."""
         return project(request, dump(operations(request).recent_entities(ctx, graph_id, since=since, limit=limit)))
 
     @router.get("/corpus-audit")
     def corpus_audit(request: Request, ctx: RequestContext = Depends(context),
                      corpus: str = Query(min_length=1, max_length=128),
-                     sections: Optional[List[str]] = Query(default=None, max_length=6)) -> Dict[str, Any]:
+                     sections: list[str] | None = Query(default=None, max_length=6)) -> dict[str, Any]:
         """``curate_audit_corpus``: read-only audit of one configured corpus."""
         return project(request, dump(operations(request).audit_corpus(ctx, corpus, sections=sections)))
 
     @router.post("/jobs")
     def submit_operation_job(request: Request, body: OperationJobRequest,
-                             ctx: RequestContext = Depends(fresh_context)) -> Dict[str, Any]:
+                             ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Submit a ``knowledge_operation`` job (whole population; ``ops.run``)."""
         handle = operations(request).submit_knowledge_operation(ctx, body.operation, body.args,
                                                                 corpus_scope=body.corpus_scope)
@@ -80,7 +80,7 @@ def install(app: FastAPI) -> FastAPI:
 
     @router.get("/jobs/{job_id}")
     def operation_job_result(request: Request, job_id: str,
-                             ctx: RequestContext = Depends(context)) -> Dict[str, Any]:
+                             ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The job handle and, once computed, the bounded report of a ``knowledge_operation`` job."""
         return project(request, operations(request).knowledge_job_result(ctx, job_id))
 

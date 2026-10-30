@@ -15,7 +15,7 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/pape
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Mapping
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -39,7 +39,7 @@ class NoSourceAvailable(ContractError):
 class SectionNotFound(ContractError):
     """No section name matches; ``available`` lists the real names for a retry."""
 
-    def __init__(self, section: str, available: List[str]) -> None:
+    def __init__(self, section: str, available: list[str]) -> None:
         super().__init__(ErrorCode.NOT_FOUND, f"no section matching {section!r}", retryable=False)
         self.available = available
 
@@ -49,7 +49,7 @@ class PaperOverview:
     """What ``lit_read_paper`` reports: structure, not text."""
 
     doi: str
-    section_names: List[str]
+    section_names: list[str]
     num_pages: int
     num_figures: int
     num_tables: int
@@ -57,9 +57,9 @@ class PaperOverview:
     parser_version: str
     source_version: str
     source_status: str
-    figure_pages: List[int] = field(default_factory=list)
+    figure_pages: list[int] = field(default_factory=list)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
@@ -72,11 +72,11 @@ class SectionText:
     section: str
     text: str
     truncated: bool
-    page: Optional[int]
+    page: int | None
     source_version: str
     parser: str
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return asdict(self)
 
@@ -96,7 +96,7 @@ class PaperReader:
         store: FileDocumentStore,
         index: LegacyIndex,
         parse_service: ParseService,
-        acquirer: Optional[PaperAcquirer] = None,
+        acquirer: PaperAcquirer | None = None,
     ) -> None:
         self.store = store
         self.index = index
@@ -109,7 +109,7 @@ class PaperReader:
             raise SourceAccessDenied("reading a paper needs a trusted source-access scope")
         scope.require(kind, work_id=doi_key(doi))
 
-    def _source(self, ctx: RequestContext, doi: str, work: Optional[Mapping[str, Any]]) -> tuple:
+    def _source(self, ctx: RequestContext, doi: str, work: Mapping[str, Any] | None) -> tuple:
         if self.acquirer is not None:
             result = self.acquirer.acquire(ctx, doi, work=work)
             if result.ok:
@@ -120,7 +120,7 @@ class PaperReader:
             return ref, "cached"
         raise NoSourceAvailable(doi_only(doi), "not stored")
 
-    def _document(self, ctx: RequestContext, doi: str, work: Optional[Mapping[str, Any]]) -> tuple:
+    def _document(self, ctx: RequestContext, doi: str, work: Mapping[str, Any] | None) -> tuple:
         if not doi_key(doi):
             raise ContractError(ErrorCode.INVALID_INPUT, "not a DOI", retryable=False)
         ref, status = self._source(ctx, doi, work)
@@ -128,7 +128,7 @@ class PaperReader:
         return self.parse_service.load(ctx, record), status
 
     def read_paper(
-        self, ctx: RequestContext, doi: str, *, scope: Any, work: Optional[Mapping[str, Any]] = None
+        self, ctx: RequestContext, doi: str, *, scope: Any, work: Mapping[str, Any] | None = None
     ) -> PaperOverview:
         """Acquire (if allowed and needed), parse, and list the paper's sections."""
         self._require(scope, SourceKind.PDF_BYTES, doi)

@@ -20,11 +20,11 @@ reproduces the stored bytes.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import json
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Mapping
 
 from app.modules.f2w_agent.multi_kg import graph_id_for_path
 
@@ -62,11 +62,11 @@ class GraphSnapshot:
     path: Path
     sha256: str
     family: str
-    raw: Dict[str, Any]
-    nodes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    edges: List[Tuple[str, Dict[str, Any]]] = field(default_factory=list)
-    out_index: Dict[str, List[int]] = field(default_factory=dict)
-    in_index: Dict[str, List[int]] = field(default_factory=dict)
+    raw: dict[str, Any]
+    nodes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    edges: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+    out_index: dict[str, list[int]] = field(default_factory=dict)
+    in_index: dict[str, list[int]] = field(default_factory=dict)
 
     @property
     def node_key(self) -> str:
@@ -89,7 +89,7 @@ def _family(data: Mapping[str, Any]) -> str:
     raise ContractError(ErrorCode.INVALID_INPUT, "KG JSON has neither things/associations nor nodes/edges")
 
 
-def load_snapshot(path: Path, *, graph_id: Optional[str] = None) -> GraphSnapshot:
+def load_snapshot(path: Path, *, graph_id: str | None = None) -> GraphSnapshot:
     """Load and index one KG file.
 
     Raises:
@@ -132,7 +132,7 @@ def load_snapshot(path: Path, *, graph_id: Optional[str] = None) -> GraphSnapsho
     return snap
 
 
-def export_payload(snap: GraphSnapshot) -> Dict[str, Any]:
+def export_payload(snap: GraphSnapshot) -> dict[str, Any]:
     """The stored document, rebuilt from the loaded snapshot (round-trip check)."""
     return json.loads(json.dumps(snap.raw, ensure_ascii=False))
 

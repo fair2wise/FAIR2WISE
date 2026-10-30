@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Iterable
 
 from academy.agent import Agent, action
 
@@ -55,7 +55,7 @@ FRESH_TURN_CLASSES = {
 }
 
 
-def _parse_json_object(raw: str) -> Dict[str, Any]:
+def _parse_json_object(raw: str) -> dict[str, Any]:
     """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     match = re.search(r"\{[\s\S]*\}", str(raw or ""))
     if not match:
@@ -75,7 +75,7 @@ def _direct_download_request(message: str) -> bool:
     return bool(re.search(r"\b(download|fetch|grab)\b", text))
 
 
-def _paper_reference_followup(message: str, state: Dict[str, Any]) -> bool:
+def _paper_reference_followup(message: str, state: dict[str, Any]) -> bool:
     """Return True if the turn refers to the active extracted paper."""
     paper = state.get("active_paper")
     if not isinstance(paper, dict) or paper.get("status") != "extracted":
@@ -104,7 +104,7 @@ def _paper_reference_followup(message: str, state: Dict[str, Any]) -> bool:
     return True
 
 
-def _extracted_terms_followup(message: str, state: Dict[str, Any]) -> bool:
+def _extracted_terms_followup(message: str, state: dict[str, Any]) -> bool:
     """Recognize requests about terms produced by the active extraction."""
     paper = state.get("active_paper")
     if not isinstance(paper, dict) or paper.get("status") != "extracted":
@@ -136,7 +136,7 @@ def _decision(
     paper_id: Any = None,
     candidate_index: Any = None,
     classification: Any = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a validated-shape orchestration decision dict."""
     decision = {
         "action": action_name,
@@ -161,8 +161,8 @@ class WorkflowOrchestratorAgent(Agent):
     def __init__(
         self,
         *,
-        backend: Optional[str] = None,
-        model: Optional[str] = None,
+        backend: str | None = None,
+        model: str | None = None,
         max_steps: int = DEFAULT_MAX_STEPS,
     ) -> None:
         """Store chat backend/model and the maximum orchestration step budget."""
@@ -174,9 +174,9 @@ class WorkflowOrchestratorAgent(Agent):
     def _safe_fallback(
         self,
         user_turn: str,
-        state: Dict[str, Any],
-        route_hint: Optional[str],
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+        route_hint: str | None,
+    ) -> dict[str, Any]:
         """Choose the next action from approvals, phase, and cheap turn heuristics."""
         if int(state.get("orchestration_steps") or 0) >= self.max_steps:
             return _decision("stop_insufficient", "Maximum orchestration step count reached.")
@@ -296,7 +296,7 @@ class WorkflowOrchestratorAgent(Agent):
             classification="scientific_or_uncertain",
         )
 
-    def _llm_classify(self, user_turn: str, state: Dict[str, Any]) -> Dict[str, Any]:
+    def _llm_classify(self, user_turn: str, state: dict[str, Any]) -> dict[str, Any]:
         """Ask the chat model to classify a fresh turn; returns parsed JSON."""
         from ..term_extractor.clients import make_chat_client
 
@@ -352,7 +352,7 @@ class WorkflowOrchestratorAgent(Agent):
         return _parse_json_object(raw)
 
     @staticmethod
-    def _fresh_turn_decision(classification: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _fresh_turn_decision(classification: dict[str, Any]) -> dict[str, Any] | None:
         """Map a fresh-turn classification to retrieve_kg or direct_response."""
         label = str(classification.get("classification") or "").strip()
         if label not in FRESH_TURN_CLASSES:
@@ -367,11 +367,11 @@ class WorkflowOrchestratorAgent(Agent):
 
     def validate(
         self,
-        proposed: Dict[str, Any],
-        state: Dict[str, Any],
+        proposed: dict[str, Any],
+        state: dict[str, Any],
         *,
-        available_agents: Optional[Iterable[str]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        available_agents: Iterable[str] | None = None,
+    ) -> dict[str, Any] | None:
         """Accept a proposed action only if it matches phase, approvals, and agents."""
         action_name = str(proposed.get("action") or "")
         if action_name not in ACTIONS:
@@ -468,10 +468,10 @@ class WorkflowOrchestratorAgent(Agent):
     async def decide(
         self,
         user_turn: str,
-        state: Dict[str, Any],
-        route_hint: Optional[str] = None,
-        available_agents: Optional[list[str]] = None,
-    ) -> Dict[str, Any]:
+        state: dict[str, Any],
+        route_hint: str | None = None,
+        available_agents: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Return a validated strict-JSON-shaped next action."""
         fallback = self._safe_fallback(user_turn, state, route_hint)
         if fallback.get("action") in {

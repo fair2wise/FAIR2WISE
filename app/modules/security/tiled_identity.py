@@ -36,10 +36,10 @@ Importing this module has no side effects and does not import ``httpx`` or ``til
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping, Optional, Protocol, Tuple, runtime_checkable
+import hashlib
+from typing import Any, Mapping, Protocol, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 
 #: Tiled role name that makes a principal an F2W admin (0.2.18 authn_database/core.py:51).
@@ -96,8 +96,8 @@ class TiledCredential:
     """
 
     access_token: str = field(repr=False)
-    tiled_target: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    tiled_target: str | None = None
+    expires_at: datetime | None = None
     scheme: str = "Bearer"
 
     def __post_init__(self) -> None:
@@ -128,12 +128,12 @@ class VerifiedIdentity:
     subject: str
     issuer: str
     principal_type: str
-    roles: Tuple[str, ...]
+    roles: tuple[str, ...]
     verified_at: datetime
-    identity_provider: Optional[str] = None
-    identity_ids: Tuple[str, ...] = ()
-    credential_expires_at: Optional[datetime] = None
-    tiled_library_version: Optional[str] = None
+    identity_provider: str | None = None
+    identity_ids: tuple[str, ...] = ()
+    credential_expires_at: datetime | None = None
+    tiled_library_version: str | None = None
 
     @property
     def is_admin(self) -> bool:
@@ -189,8 +189,8 @@ class TiledIdentityPort(Protocol):
 
 
 def identity_from_whoami(payload: Any, *, issuer: str, now: datetime,
-                         credential_expires_at: Optional[datetime] = None,
-                         tiled_library_version: Optional[str] = None) -> VerifiedIdentity:
+                         credential_expires_at: datetime | None = None,
+                         tiled_library_version: str | None = None) -> VerifiedIdentity:
     """Map a tiled 0.2.18 ``whoami`` JSON body to a :class:`VerifiedIdentity`.
 
     Args:
@@ -272,9 +272,9 @@ class TiledWhoamiAdapter:
         self.tiled_target = normalize_tiled_target(tiled_target)
         self._client = http_client
         self._timeout = timeout
-        self._library_version: Optional[str] = None
+        self._library_version: str | None = None
 
-    def library_version(self) -> Optional[str]:
+    def library_version(self) -> str | None:
         """Return the server's ``library_version`` (read once), or ``None`` if it cannot be read."""
         if self._library_version is None:
             try:

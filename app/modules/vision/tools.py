@@ -21,11 +21,11 @@ als-computing/forge_rsoxs_analysis als_knowledge_agent graph/figure_*.py).
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 import re
+from typing import Any, Callable, NamedTuple, Protocol, Sequence
 import uuid
-from datetime import timedelta
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Protocol, Sequence, Tuple
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -33,7 +33,11 @@ from ..contracts.tools import CostClass, Effect, ToolResult, ToolSpec, ToolStatu
 from ..literature.legacy import doi_key
 from ..literature.parsed_document import ParsedDocument
 from ..security.content_access import (
-    ReadPurpose, SourceAccessAuthority, SourceAccessDenied, SourceAccessScope, SourceKind,
+    ReadPurpose,
+    SourceAccessAuthority,
+    SourceAccessDenied,
+    SourceAccessScope,
+    SourceKind,
 )
 from .classification import ChatAdapter
 from .figure_extraction import ExtractionOutcome, FigureAnalysis, extract_figures, figure_id_of
@@ -111,8 +115,8 @@ _COMMON = {
 }
 
 
-def _spec(name: str, description: str, when: str, when_not: str, props: Dict[str, Any], required: Sequence[str],
-          output: Dict[str, Any], *, model: bool, evidence: str, cost: CostClass = CostClass.MODERATE) -> ToolSpec:
+def _spec(name: str, description: str, when: str, when_not: str, props: dict[str, Any], required: Sequence[str],
+          output: dict[str, Any], *, model: bool, evidence: str, cost: CostClass = CostClass.MODERATE) -> ToolSpec:
     effects = {Effect.READ_PRIVATE_SOURCE} | ({Effect.MODEL_INFERENCE} if model else set())
     return ToolSpec(
         name=name, version=TOOL_VERSION, domain="vision", description=description, when_to_use=when,
@@ -124,7 +128,7 @@ def _spec(name: str, description: str, when: str, when_not: str, props: Dict[str
     )
 
 
-def build_specs(*, model: bool = False) -> Tuple[ToolSpec, ...]:
+def build_specs(*, model: bool = False) -> tuple[ToolSpec, ...]:
     """The vision ToolSpecs; ``MODEL_INFERENCE`` is declared only when a model is configured."""
     private = "Results are agent-private derived findings with locators; never publish image bytes or URLs."
     ev = "figure/panel locator (page, figure, panel, bbox in pt, top-left origin) with source_version"
@@ -203,12 +207,12 @@ class VisionToolset:
         ocr_engine: Optional OCR engine for ``use_ocr`` (default: lazy RapidOCR, else retryable unavailable).
     """
 
-    def __init__(self, source: PaperSource, *, scope_provider: Optional[ScopeProvider] = None,
-                 model: Optional[ChatAdapter] = None, ocr_engine: Optional[OcrEngine] = None) -> None:
+    def __init__(self, source: PaperSource, *, scope_provider: ScopeProvider | None = None,
+                 model: ChatAdapter | None = None, ocr_engine: OcrEngine | None = None) -> None:
         self.source, self.scope_provider, self.model, self.ocr_engine = source, scope_provider, model, ocr_engine
         self.specs = build_specs(model=model is not None)
 
-    def registrations(self) -> Tuple[Tuple[ToolSpec, Callable[[Any], ToolResult]], ...]:
+    def registrations(self) -> tuple[tuple[ToolSpec, Callable[[Any], ToolResult]], ...]:
         """``(spec, fn)`` pairs for ``build_registry(extra=...)``."""
         fns = (self.extract_figures, self.classify_figure, self.read_scale, self.read_qrange,
                self.read_orientation, self.extract_tables)
@@ -232,7 +236,7 @@ class VisionToolset:
                                ocr_engine=self.ocr_engine, model=self.model)
 
     def _figures_result(self, tool: str, inv: Any, paper: LoadedPaper, outcome: ExtractionOutcome,
-                        render: Callable[[FigureAnalysis], Dict[str, Any]]) -> ToolResult:
+                        render: Callable[[FigureAnalysis], dict[str, Any]]) -> ToolResult:
         a = inv.args
         provenance = f"vision:{uuid.uuid4().hex}"
         if not outcome.figures:
@@ -247,7 +251,7 @@ class VisionToolset:
         data = {"doi": paper.work_id, "source_version": paper.document.file_sha256,
                 "parser": paper.document.parser_key, "figures": rows,
                 "capability_errors": outcome.capability_errors}
-        warnings: List[str] = []
+        warnings: list[str] = []
         for f in outcome.figures:
             warnings += [f"{f.figure_id}: {u.code}" for u in f.uncertainties if u.blocking]
         if outcome.capability_errors and a.get("figure_required", True):
@@ -262,7 +266,7 @@ class VisionToolset:
         return ToolResult(tool=tool, status=ToolStatus.PARTIAL if (warnings or any_unc) else ToolStatus.OK,
                           data=data, evidence=outcome.evidence, warnings=tuple(warnings), provenance_id=provenance)
 
-    def _run(self, tool: str, inv: Any, render: Callable[[FigureAnalysis], Dict[str, Any]],
+    def _run(self, tool: str, inv: Any, render: Callable[[FigureAnalysis], dict[str, Any]],
              kinds: Sequence[SourceKind] = _FIG_KINDS) -> ToolResult:
         try:
             paper = self._load(inv, kinds)
@@ -271,12 +275,12 @@ class VisionToolset:
             return _failure(tool, exc)
 
     @staticmethod
-    def _head(f: FigureAnalysis) -> Dict[str, Any]:
+    def _head(f: FigureAnalysis) -> dict[str, Any]:
         return {"figure_id": f.figure_id, "page": f.page, "locator": f.locator.model_dump(exclude_none=True),
                 "geometry": f.geometry, "text_layer": {"status": f.text_status, "n_spans": f.n_text_spans},
                 "uncertainties": [u.as_dict() for u in f.uncertainties]}
 
-    def _panels(self, f: FigureAnalysis, inv: Any, pick: Callable[[Any], Dict[str, Any]]) -> Dict[str, Any]:
+    def _panels(self, f: FigureAnalysis, inv: Any, pick: Callable[[Any], dict[str, Any]]) -> dict[str, Any]:
         want = inv.args.get("panel")
         rows = [{"panel_id": p.panel_id, "label": p.label or None, "label_source": p.label_source,
                  "locator": p.locator.model_dump(exclude_none=True), **pick(p)}
@@ -290,7 +294,7 @@ class VisionToolset:
 
     def classify_figure(self, inv: Any) -> ToolResult:
         """``vision_classify_figure``: figure verdict, panel verdicts and the units a consumer should act on."""
-        def render(f: FigureAnalysis) -> Dict[str, Any]:
+        def render(f: FigureAnalysis) -> dict[str, Any]:
             row = self._panels(f, inv, lambda p: {"classification": p.classification})
             return {**row, "classification": f.classification,
                     "classification_units": list(f.classification_units)}
@@ -298,13 +302,13 @@ class VisionToolset:
 
     def read_scale(self, inv: Any) -> ToolResult:
         """``vision_read_scale``."""
-        def pick(p: Any) -> Dict[str, Any]:
+        def pick(p: Any) -> dict[str, Any]:
             return {"scale": p.scale.as_dict() if p.scale else None}
         return self._run(VISION_TOOL_NAMES[2], inv, lambda f: self._panels(f, inv, pick))
 
     def read_qrange(self, inv: Any) -> ToolResult:
         """``vision_read_qrange``."""
-        def pick(p: Any) -> Dict[str, Any]:
+        def pick(p: Any) -> dict[str, Any]:
             return {"q_range": p.qrange.as_dict() if p.qrange else None}
         return self._run(VISION_TOOL_NAMES[3], inv, lambda f: self._panels(f, inv, pick))
 
@@ -325,7 +329,7 @@ class VisionToolset:
             for fig in figs:
                 fid = figure_id_of(fig)
                 loc = locator(fig.page, fid)
-                stmts: List[OrientationStatement] = find_statements(fig.caption, loc, "caption")
+                stmts: list[OrientationStatement] = find_statements(fig.caption, loc, "caption")
                 m = _FIGNUM.match(fig.caption or "")
                 if m:
                     cite = re.compile(rf"\bfig(?:ure)?s?\.?\s*{m.group(1)}\b", re.IGNORECASE)

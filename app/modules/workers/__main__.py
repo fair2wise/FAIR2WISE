@@ -13,7 +13,7 @@ import re
 import signal
 import sys
 import threading
-from typing import Optional, Sequence
+from typing import Sequence
 
 from .executor import WorkerExecutor
 
@@ -28,7 +28,7 @@ def load_factory(spec: str):
     return getattr(importlib.import_module(module), name)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run a worker until signalled (or idle with ``--once``)."""
     parser = argparse.ArgumentParser(prog="python -m app.modules.workers")
     parser.add_argument("--db", required=True)

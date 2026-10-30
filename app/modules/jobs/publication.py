@@ -24,10 +24,10 @@ Guarantees (plan 11, T10 acceptance):
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from datetime import UTC, datetime
+import logging
+from typing import Any, Callable, Sequence
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..contracts.context import ActorKind, RequestContext
@@ -96,7 +96,7 @@ class PublicationDeps:
     audit: AuditRecorder
     ctx_for: Callable[[JobRecord], RequestContext]
     clock: Callable[[], float]
-    packages: Optional[PackageCheck] = None
+    packages: PackageCheck | None = None
     verify_approval: ApprovalVerifier = default_approval_verifier
     owner: str = "publisher"
 
@@ -119,7 +119,7 @@ class Publication:
 
     # --- stages ----------------------------------------------------------------------------
 
-    def _specs(self) -> List[StageSpec]:
+    def _specs(self) -> list[StageSpec]:
         return [
             StageSpec("plan", self._plan, phase="validation", relevant=("source_sha256", "params")),
             StageSpec("review", self._review, phase="review", depends_on=("plan",)),
@@ -137,7 +137,7 @@ class Publication:
         ]
 
     @staticmethod
-    def _params(sc: StageContext) -> Dict[str, Any]:
+    def _params(sc: StageContext) -> dict[str, Any]:
         return dict(sc.inputs.params)
 
     def _snapshot(self, sc: StageContext) -> FrozenSnapshot:
@@ -210,7 +210,7 @@ class Publication:
     def _effect_id(record: Any) -> str:
         return f"apply:{record.plan.plan_sha256}" if record is not None else "apply:none"
 
-    def _freshness(self, sc: StageContext, record: Any, *, check_target: bool) -> List[str]:
+    def _freshness(self, sc: StageContext, record: Any, *, check_target: bool) -> list[str]:
         """Reasons the plan no longer matches the world (empty when fresh)."""
         plan, reasons = record.plan, []
         ref = str(self._params(sc)["snapshot_ref"])
@@ -230,7 +230,7 @@ class Publication:
             reasons.append("target_revision_changed")
         return reasons
 
-    def _stale(self, sc: StageContext, reasons: List[str]) -> None:
+    def _stale(self, sc: StageContext, reasons: list[str]) -> None:
         """Invalidate approvals and everything from ``plan`` on, then re-plan in this same run (B27).
 
         Owner decision B27 (2026-10-30): the runner re-plans automatically after a stale plan or
@@ -251,7 +251,7 @@ class Publication:
         raise RestartStages(f"plan is stale ({text}); recomputing the plan for a new review")
 
     def _approval_for(self, sc: StageContext, record: Any) -> ApprovalRecord:
-        now = datetime.fromtimestamp(self.deps.clock(), tz=timezone.utc)
+        now = datetime.fromtimestamp(self.deps.clock(), tz=UTC)
         for approval in reversed(self.store.valid_approvals(sc.job.job_id, record.plan)):
             try:
                 return self.deps.verify_approval(approval, record.plan, now)
@@ -298,7 +298,7 @@ class Publication:
             sc.guard()
             sc.store.check_lease(lease)
 
-        def effect() -> Dict[str, Any]:
+        def effect() -> dict[str, Any]:
             return self.deps.audit.guard(
                 kind="import_step",
                 operation_id=op_id,
@@ -317,7 +317,7 @@ class Publication:
                 ).as_dict(),
             )
 
-        def reconcile() -> Optional[Dict[str, Any]]:
+        def reconcile() -> dict[str, Any] | None:
             landed = self.deps.step.reconcile(ctx, plan, operation_id=op_id)
             return landed.as_dict() if landed is not None and landed.complete else None
 
@@ -408,7 +408,7 @@ class Publication:
             current = self.store.pointer(plan.target)
             expected = current.version if current else 0
 
-            def switch() -> Dict[str, Any]:
+            def switch() -> dict[str, Any]:
                 sc.guard()
                 sc.store.check_lease(lease)
                 pointer = self.store.activate(
@@ -485,7 +485,7 @@ class Publication:
             raise ContractError(
                 ErrorCode.STALE_APPROVAL, "approval is for a different plan; review the current one"
             )
-        now = datetime.fromtimestamp(self.deps.clock(), tz=timezone.utc)
+        now = datetime.fromtimestamp(self.deps.clock(), tz=UTC)
         self.deps.verify_approval(approval, record.plan, now)
         probe_ctx = self.deps.ctx_for(job)
         stale = []
@@ -513,7 +513,7 @@ class Publication:
         self.store.record_approval(job_id, approval)
         return self.jobs.resume(ctx, job_id)
 
-    def pointer(self, target: str) -> Optional[Pointer]:
+    def pointer(self, target: str) -> Pointer | None:
         """The active publication pointer of ``target``."""
         return self.store.pointer(target)
 
@@ -530,7 +530,7 @@ class Publication:
             mutation=lambda: self.store.rollback(target, actor=ctx.principal.subject, reason=reason),
         )
 
-    def _on_scope_change(self, change: Dict[str, Any]) -> None:
+    def _on_scope_change(self, change: dict[str, Any]) -> None:
         """Handle a scope change or revocation.
 
         Dependent approvals are invalidated; nothing falls back to a server credential.

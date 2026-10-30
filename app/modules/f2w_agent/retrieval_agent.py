@@ -11,10 +11,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 from pathlib import Path
+import re
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 from academy.agent import Agent, action
 
@@ -128,7 +128,7 @@ def _coerce_bool(value: Any) -> bool:
     return bool(value)
 
 
-def _coerce_missing_topics(value: Any) -> List[str]:
+def _coerce_missing_topics(value: Any) -> list[str]:
     """Normalize judge ``missing_topics`` to a list of non-empty strings."""
     if isinstance(value, str):
         value = [value]
@@ -200,11 +200,11 @@ def leeway_system_for(question: str) -> str:
     return LEEWAY_SYSTEM
 
 
-def _format_history_for_judge(history: Optional[List[Dict[str, str]]]) -> str:
+def _format_history_for_judge(history: list[dict[str, str]] | None) -> str:
     """Format the last eight chat turns for the sufficiency-judge prompt."""
     if not history:
         return ""
-    lines: List[str] = []
+    lines: list[str] = []
     for message in history[-8:]:
         role = str(message.get("role") or "").strip() or "user"
         content = str(message.get("content") or "").strip()
@@ -219,7 +219,7 @@ def _format_history_for_judge(history: Optional[List[Dict[str, str]]]) -> str:
 def build_judge_prompt(
     question: str,
     ctx: str,
-    history: Optional[List[Dict[str, str]]] = None,
+    history: list[dict[str, str]] | None = None,
 ) -> str:
     """Build the sufficiency-judge user prompt."""
     if _is_numeric_claim(question):
@@ -249,7 +249,7 @@ def build_judge_prompt(
     )
 
 
-def _parse_judge(raw: str) -> Dict[str, Any]:
+def _parse_judge(raw: str) -> dict[str, Any]:
     """Tolerantly parse the judge's JSON object from LLM output."""
     if not raw:
         return {"sufficient": False, "answer": None, "missing_topics": []}
@@ -300,7 +300,7 @@ def _has_direct_evidence(kg: Any, node_info: Any) -> bool:
     return False
 
 
-def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> List[Any]:
+def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> list[Any]:
     """Call ``retrieve_nodes`` with hops/max_nodes, falling back if the signature is older."""
     try:
         return krag.retrieve_nodes(question, kg, hops=hops, max_nodes=max_nodes)
@@ -308,9 +308,9 @@ def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> L
         return krag.retrieve_nodes(question, kg)
 
 
-def _beam_path_nodeinfos(kg: Any) -> List[Any]:
+def _beam_path_nodeinfos(kg: Any) -> list[Any]:
     """Promote documented beam-path stages so layout answers can list them in order."""
-    indexed: List[Tuple[int, str, Dict[str, Any]]] = []
+    indexed: list[tuple[int, str, dict[str, Any]]] = []
     nodes = getattr(kg, "nodes", {}) or {}
     for nid, raw in nodes.items():
         if not isinstance(raw, dict):
@@ -324,7 +324,7 @@ def _beam_path_nodeinfos(kg: Any) -> List[Any]:
             continue
     if not indexed:
         # Walk directed successors from nodes that emit beam_path_next.
-        ordered_ids: List[str] = []
+        ordered_ids: list[str] = []
         seen = set()
         starts = [
             nid
@@ -357,7 +357,7 @@ def _beam_path_nodeinfos(kg: Any) -> List[Any]:
             for i, nid in enumerate(ordered_ids, start=1)
             if isinstance(nodes.get(nid), dict)
         ]
-    infos: List[Any] = []
+    infos: list[Any] = []
     for index, nid, raw in sorted(indexed, key=lambda item: item[0]):
         infos.append(
             SimpleNamespace(
@@ -378,16 +378,16 @@ class RetrievalAgent(Agent):
     def __init__(
         self,
         *,
-        graph_file: Optional[str] = None,
-        graph_files: Optional[List[str]] = None,
+        graph_file: str | None = None,
+        graph_files: list[str] | None = None,
         graph_source: str = "json",
-        backend: Optional[str] = None,
-        model: Optional[str] = None,
+        backend: str | None = None,
+        model: str | None = None,
         kg_query_hops: int = DEFAULT_KG_QUERY_HOPS,
         kg_query_max_nodes: int = DEFAULT_KG_QUERY_MAX_NODES,
-        source_rag: Optional[bool] = None,
-        live_tiled: Optional[bool] = None,
-        tiled_uri: Optional[str] = None,
+        source_rag: bool | None = None,
+        live_tiled: bool | None = None,
+        tiled_uri: str | None = None,
     ) -> None:
         """Configure graph paths, LLM backend, query caps, hybrid RAG, and live Tiled."""
         super().__init__()
@@ -404,15 +404,15 @@ class RetrievalAgent(Agent):
         self._kg_query_hops = clamp_kg_query_hops(kg_query_hops)
         self._kg_query_max_nodes = clamp_kg_query_max_nodes(kg_query_max_nodes)
         self._kg = None
-        self._graphs: Dict[str, Any] = {}
-        self._skipped: List[Dict[str, str]] = []
+        self._graphs: dict[str, Any] = {}
+        self._skipped: list[dict[str, str]] = []
         self._source_rag = hybrid_rag_enabled() if source_rag is None else bool(source_rag)
         self._hybrid = HybridSourceRAG.from_env()
         cfg = load_tiled_config(uri=tiled_uri, enabled=live_tiled)
         self._live_tiled = cfg.enabled
         self._tiled_uri = cfg.uri
-        self._last_tiled_meta: Dict[str, Any] = cfg.snapshot()
-        self._last_mp_meta: Dict[str, Any] = {}
+        self._last_tiled_meta: dict[str, Any] = cfg.snapshot()
+        self._last_mp_meta: dict[str, Any] = {}
         self._last_intent: str = "general"
 
     def _build_kg(self):
@@ -424,8 +424,8 @@ class RetrievalAgent(Agent):
         kg: Any,
         path: str,
         *,
-        existing: Optional[Dict[str, Any]] = None,
-        graph_id: Optional[str] = None,
+        existing: dict[str, Any] | None = None,
+        graph_id: str | None = None,
     ) -> str:
         """Stamp *kg* with graph_id/label/schema/path, disambiguating collisions in *existing*."""
         gid = graph_id or graph_id_for_path(path)
@@ -441,7 +441,7 @@ class RetrievalAgent(Agent):
         kg.graph_path = str(path)
         return gid
 
-    def _skip_reason(self, path: str) -> Optional[str]:
+    def _skip_reason(self, path: str) -> str | None:
         """Return why *path* cannot be loaded, or None if the file looks usable."""
         candidate = Path(path)
         if not candidate.exists():
@@ -453,10 +453,10 @@ class RetrievalAgent(Agent):
             return str(exc)
         return None
 
-    def _build_kgs(self) -> Dict[str, Any]:
+    def _build_kgs(self) -> dict[str, Any]:
         """Load each configured JSON KG, skipping missing/empty/broken files."""
-        graphs: Dict[str, Any] = {}
-        skipped: List[Dict[str, str]] = []
+        graphs: dict[str, Any] = {}
+        skipped: list[dict[str, str]] = []
         for path in self._graph_files:
             reason = self._skip_reason(path)
             if reason:
@@ -478,7 +478,7 @@ class RetrievalAgent(Agent):
         self._skipped = skipped
         return graphs
 
-    def set_query_limits(self, *, hops: Optional[int] = None, max_nodes: Optional[int] = None) -> None:
+    def set_query_limits(self, *, hops: int | None = None, max_nodes: int | None = None) -> None:
         """Clamp and store neighborhood hops / max nodes for the next retrieve."""
         if hops is not None:
             self._kg_query_hops = clamp_kg_query_hops(hops)
@@ -489,7 +489,7 @@ class RetrievalAgent(Agent):
         """Enable or disable hybrid literature/ops source RAG for later queries."""
         self._source_rag = bool(enabled)
 
-    def set_live_tiled(self, enabled: bool, *, uri: Optional[str] = None) -> None:
+    def set_live_tiled(self, enabled: bool, *, uri: str | None = None) -> None:
         """Toggle live Tiled Graph lookup and optionally replace the Tiled URI."""
         cfg = load_tiled_config(uri=uri if uri is not None else self._tiled_uri, enabled=enabled)
         self._live_tiled = cfg.enabled
@@ -499,10 +499,10 @@ class RetrievalAgent(Agent):
     @action
     async def reload_kg(
         self,
-        graph_file: Optional[str] = None,
-        graph_source: Optional[str] = None,
-        graph_files: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        graph_file: str | None = None,
+        graph_source: str | None = None,
+        graph_files: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Rebuild the in-memory KG(s). Missing/empty files are skipped."""
         if graph_source:
             self._graph_source = graph_source
@@ -540,7 +540,7 @@ class RetrievalAgent(Agent):
             "graph_source_used": getattr(primary, "graph_source_used", self._graph_source),
         }
 
-    def _active_graphs(self) -> Dict[str, Any]:
+    def _active_graphs(self) -> dict[str, Any]:
         """Return loaded graphs, wrapping a legacy single ``_kg`` if needed."""
         if self._graphs:
             return self._graphs
@@ -551,7 +551,7 @@ class RetrievalAgent(Agent):
             return {gid: self._kg}
         return {}
 
-    async def _ensure_graphs(self) -> Dict[str, Any]:
+    async def _ensure_graphs(self) -> dict[str, Any]:
         """Load graphs on first use; raise if none can be opened."""
         graphs = self._active_graphs()
         if graphs:
@@ -580,7 +580,7 @@ class RetrievalAgent(Agent):
             )
         return result
 
-    def _source_meta(self, graphs: Dict[str, Any]) -> Dict[str, Any]:
+    def _source_meta(self, graphs: dict[str, Any]) -> dict[str, Any]:
         """Metadata block describing graph source, query caps, Tiled, intent, and MP."""
         primary = next(iter(graphs.values()), self._kg)
         return {
@@ -599,9 +599,9 @@ class RetrievalAgent(Agent):
     def _merge_live_tiled(
         self,
         question: str,
-        graphs: Dict[str, Any],
-        kg_hits: List[ScoredHit],
-    ) -> Tuple[Dict[str, Any], List[ScoredHit]]:
+        graphs: dict[str, Any],
+        kg_hits: list[ScoredHit],
+    ) -> tuple[dict[str, Any], list[ScoredHit]]:
         """Merge live Tiled identity hits into *graphs*/*kg_hits* when the question needs them."""
         if not self._live_tiled:
             self._last_tiled_meta = load_tiled_config(
@@ -634,13 +634,13 @@ class RetrievalAgent(Agent):
             return active, merged
         return active, kg_hits
 
-    async def search_node_scores(self, query: str, limit: int = 10) -> Dict[str, Any]:
+    async def search_node_scores(self, query: str, limit: int = 10) -> dict[str, Any]:
         """Rank nodes across selected KGs without invoking the answer-generation workflow."""
         loop = asyncio.get_event_loop()
         graphs = await self._ensure_graphs()
-        kg_hits: List[ScoredHit] = []
+        kg_hits: list[ScoredHit] = []
         graphs, tiled_hits = self._merge_live_tiled(query, graphs, kg_hits)
-        matches: List[Dict[str, Any]] = []
+        matches: list[dict[str, Any]] = []
         backend = "lexical"
         for hit in tiled_hits:
             matches.append(
@@ -676,11 +676,11 @@ class RetrievalAgent(Agent):
     def _parallel_retrieve(
         self,
         question: str,
-        graphs: Dict[str, Any],
+        graphs: dict[str, Any],
         hops: int,
         max_nodes: int,
         layout: bool,
-    ) -> List[ScoredHit]:
+    ) -> list[ScoredHit]:
         """Fan out retrieval across *graphs* and return unmerged :class:`ScoredHit` objects.
 
         Implementation note
@@ -702,10 +702,10 @@ class RetrievalAgent(Agent):
         if not graphs:
             return []
 
-        raw_hits: List[ScoredHit] = []
+        raw_hits: list[ScoredHit] = []
         for gid, kg in graphs.items():
             try:
-                infos: List[Any] = list(_call_retrieve_nodes(question, kg, hops, max_nodes))
+                infos: list[Any] = list(_call_retrieve_nodes(question, kg, hops, max_nodes))
             except (AttributeError, TypeError):
                 raise
             except Exception as exc:  # pragma: no cover
@@ -743,9 +743,9 @@ class RetrievalAgent(Agent):
     @staticmethod
     def _substring_device_fallback(
         question: str,
-        graphs: Dict[str, Any],
+        graphs: dict[str, Any],
         limit: int = 10,
-    ) -> List[ScoredHit]:
+    ) -> list[ScoredHit]:
         """Return KG nodes whose *name* appears verbatim (case-insensitive) in *question*.
 
         Used as a last-resort supplement when embedding/BM25 retrieval misses a
@@ -754,7 +754,7 @@ class RetrievalAgent(Agent):
         short abbreviations.
         """
         q_lower = question.lower()
-        hits: List[ScoredHit] = []
+        hits: list[ScoredHit] = []
         seen: set = set()
         for gid, kg in graphs.items():
             nodes = getattr(kg, "nodes", {}) or {}
@@ -793,7 +793,7 @@ class RetrievalAgent(Agent):
         return hits
 
     @staticmethod
-    def _rsoxs_popular_nodes(kg: Any, graph_id: str, max_n: int) -> List[ScoredHit]:
+    def _rsoxs_popular_nodes(kg: Any, graph_id: str, max_n: int) -> list[ScoredHit]:
         """Return the most evidence-rich nodes from a science/RSoXS KG.
 
         When BM25 returns few rsoxs hits for a literature-intent query (because
@@ -820,7 +820,7 @@ class RetrievalAgent(Agent):
             graph_id,
             max_n,
         )
-        candidates: List[Tuple[int, str, Dict[str, Any]]] = []
+        candidates: list[tuple[int, str, dict[str, Any]]] = []
         for nid, raw in nodes.items():
             if not isinstance(raw, dict):
                 continue
@@ -837,7 +837,7 @@ class RetrievalAgent(Agent):
         candidates.sort(key=lambda x: x[0], reverse=True)
 
         graph_label = getattr(kg, "graph_label", graph_label_for_id(graph_id))
-        hits: List[ScoredHit] = []
+        hits: list[ScoredHit] = []
         for count, nid, raw in candidates[:max_n]:
             score = 0.3 + count / 100.0
             entity_type = str(
@@ -868,11 +868,11 @@ class RetrievalAgent(Agent):
     def _intent_routed_retrieve(
         self,
         question: str,
-        graphs: Dict[str, Any],
+        graphs: dict[str, Any],
         hops: int,
         max_nodes: int,
         intent: str,
-    ) -> List[ScoredHit]:
+    ) -> list[ScoredHit]:
         """Fan out retrieval with intent-based candidate allocation.
 
         Primary KG matching the intent gets 60% of candidate slots; remaining
@@ -938,7 +938,7 @@ class RetrievalAgent(Agent):
 
         return raw_hits
 
-    def _fanout_hits(self, question: str, graphs: Dict[str, Any]) -> List[ScoredHit]:
+    def _fanout_hits(self, question: str, graphs: dict[str, Any]) -> list[ScoredHit]:
         """Retrieve hits from all active graphs and merge by evidence rank.
 
         Intent router rules
@@ -1005,9 +1005,9 @@ class RetrievalAgent(Agent):
 
         return merge_hits(raw_hits, limit=max_nodes)
 
-    def _kg_work_ids(self, hits: Sequence[ScoredHit], graphs: Dict[str, Any]) -> List[str]:
+    def _kg_work_ids(self, hits: Sequence[ScoredHit], graphs: dict[str, Any]) -> list[str]:
         """Collect source-paper filenames and DOIs from hit nodes for hybrid RAG."""
-        ids: List[str] = []
+        ids: list[str] = []
         seen: set[str] = set()
         for hit in hits:
             kg = graphs.get(hit.graph_id)
@@ -1027,9 +1027,9 @@ class RetrievalAgent(Agent):
                     ids.append(token)
         return ids
 
-    def _build_kg_context(self, question: str, hits: Sequence[ScoredHit], graphs: Dict[str, Any]) -> str:
+    def _build_kg_context(self, question: str, hits: Sequence[ScoredHit], graphs: dict[str, Any]) -> str:
         """Build per-graph context blocks, giving the intent-primary graph the budget first."""
-        by_graph: Dict[str, List[Any]] = {}
+        by_graph: dict[str, list[Any]] = {}
         for hit in hits:
             if hit.payload is None:
                 continue
@@ -1057,7 +1057,7 @@ class RetrievalAgent(Agent):
                 by_graph = {gid: by_graph[gid] for gid in ordered_ids if gid in by_graph}
             # "general" intent: keep original score-based insertion order.
 
-        parts: List[str] = []
+        parts: list[str] = []
         remaining = krag.CTX_SOFT_LIMIT
         for gid, infos in by_graph.items():
             if remaining <= 0:
@@ -1066,7 +1066,7 @@ class RetrievalAgent(Agent):
             if kg is None:
                 continue
             label = getattr(kg, "graph_label", graph_label_for_id(gid))
-            cite_tokens: List[str] = []
+            cite_tokens: list[str] = []
             nodes_index = getattr(kg, "nodes", None) or {}
             if isinstance(nodes_index, list):
                 nodes_index = {
@@ -1076,7 +1076,7 @@ class RetrievalAgent(Agent):
                 }
             for info in infos:
                 nid = str(getattr(info, "id", "") or "")
-                raw: Dict[str, Any] = {}
+                raw: dict[str, Any] = {}
                 if isinstance(nodes_index, dict) and nid:
                     raw = nodes_index.get(nid) or {}
                 name = str(
@@ -1121,7 +1121,7 @@ class RetrievalAgent(Agent):
         self,
         question: str,
         hits: Sequence[ScoredHit],
-        graphs: Dict[str, Any],
+        graphs: dict[str, Any],
         source_context: str = "",
     ) -> str:
         """Concatenate KG context with optional PDF/ops/MP source context."""
@@ -1133,8 +1133,8 @@ class RetrievalAgent(Agent):
         self,
         question: str,
         hits: Sequence[ScoredHit],
-        graphs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        graphs: dict[str, Any],
+    ) -> dict[str, Any]:
         """Invoke the HybridSourceRAG pipeline and return a source-context pack dict."""
         empty = {
             "intent": "factual",
@@ -1168,9 +1168,9 @@ class RetrievalAgent(Agent):
     async def query(
         self,
         question: str,
-        history: Optional[List[Dict[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-    ) -> Dict[str, Any]:
+        history: list[dict[str, str]] | None = None,
+        source_rag: bool | None = None,
+    ) -> dict[str, Any]:
         """Retrieve context for ``question`` and judge whether it suffices to answer."""
         loop = asyncio.get_event_loop()
         graphs = await self._ensure_graphs()
@@ -1183,7 +1183,7 @@ class RetrievalAgent(Agent):
 
         meta = self._source_meta(graphs)
         primary = next(iter(graphs.values()), self._kg)
-        hits: List[ScoredHit] = []
+        hits: list[ScoredHit] = []
         if graphs:
             try:
                 hits = await loop.run_in_executor(
@@ -1403,12 +1403,12 @@ class RetrievalAgent(Agent):
         question: str,
         *,
         hits: Sequence[ScoredHit],
-        meta: Dict[str, Any],
-        hybrid_meta: Dict[str, Any],
+        meta: dict[str, Any],
+        hybrid_meta: dict[str, Any],
         sufficient: bool,
         no_evidence: bool,
         direct_evidence_count: int,
-        missing_topics: List[str],
+        missing_topics: list[str],
     ) -> None:
         """Copy retrieval internals onto the active turn trace. Never raises."""
         try:
@@ -1451,9 +1451,9 @@ class RetrievalAgent(Agent):
         cli: Any,
         question: str,
         ctx: str,
-        history: Optional[List[Dict[str, str]]],
-        missing: List[str],
-    ) -> Optional[str]:
+        history: list[dict[str, str]] | None,
+        missing: list[str],
+    ) -> str | None:
         """Second-pass LLM answer that discloses graph gaps then still teaches from context."""
         history_block = _format_history_for_judge(history)
         missing_text = ", ".join(missing) if missing else (

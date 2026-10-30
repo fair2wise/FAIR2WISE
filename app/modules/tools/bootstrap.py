@@ -12,7 +12,7 @@ passed in by the caller. Real retrieval/QA tools arrive in T03.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from ..agent_runtime.registry import ToolRegistry, ToolRegistryError
 from ..agent_runtime.skills import Skill, SkillRegistry
@@ -56,7 +56,7 @@ DEMO_SKILL = Skill(
 )
 
 
-def _demo_tools(corpus: Mapping[str, Mapping[str, str]]) -> Sequence[Tuple[ToolSpec, Callable[..., Any]]]:
+def _demo_tools(corpus: Mapping[str, Mapping[str, str]]) -> Sequence[tuple[ToolSpec, Callable[..., Any]]]:
     papers = {str(k): dict(v) for k, v in corpus.items()}
 
     def search(inv: Any) -> ToolResult:
@@ -81,8 +81,8 @@ def build_registry(
     ctx_or_config: Any = None,
     *,
     include: Iterable[str] = (DEMO_LITERATURE,),
-    demo_corpus: Optional[Mapping[str, Mapping[str, str]]] = None,
-    extra: Iterable[Tuple[ToolSpec, Callable[..., Any]]] = (),
+    demo_corpus: Mapping[str, Mapping[str, str]] | None = None,
+    extra: Iterable[tuple[ToolSpec, Callable[..., Any]]] = (),
     name: str = "f2w",
     freeze: bool = True,
 ) -> ToolRegistry:
@@ -130,5 +130,5 @@ def build_skill_registry(
     return out.freeze(require_coverage=require_coverage)
 
 
-__all__: Tuple[str, ...] = ("DEMO_LITERATURE", "DEMO_READ", "DEMO_SEARCH", "DEMO_SKILL", "build_registry",
+__all__: tuple[str, ...] = ("DEMO_LITERATURE", "DEMO_READ", "DEMO_SEARCH", "DEMO_SKILL", "build_registry",
                             "build_skill_registry")

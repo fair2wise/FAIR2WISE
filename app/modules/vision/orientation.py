@@ -21,9 +21,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_orientation.py
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+import re
+from typing import Any, Sequence
 
 from ..contracts.evidence import SourceLocator
 from .classification import ChatAdapter
@@ -88,16 +88,16 @@ class OrientationStatement:
     hedged: bool = False
     subject: str = ""
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form (``kind`` marks it as source-supported)."""
         return {"kind": "source_statement", "term": self.term, "subject": self.subject,
                 "sentence": self.sentence[:400], "origin": self.origin, "hedged": self.hedged,
                 "locator": self.locator.model_dump(exclude_none=True)}
 
 
-def find_statements(text: str, locator: SourceLocator, origin: str) -> List[OrientationStatement]:
+def find_statements(text: str, locator: SourceLocator, origin: str) -> list[OrientationStatement]:
     """Orientation statements in ``text``; sentences needing a subject AND a term, hedging flagged."""
-    out: List[OrientationStatement] = []
+    out: list[OrientationStatement] = []
     for sentence in _SENTENCE.split(text or ""):
         subject, terms = _SUBJECT.search(sentence), {_norm_term(m.group(1)) for m in _TERM.finditer(sentence)}
         if not subject or not terms:
@@ -115,12 +115,12 @@ class OrientationFinding:
 
     figure_id: str
     source_statements: Sequence[OrientationStatement] = ()
-    inference_candidates: Sequence[Dict[str, Any]] = ()
-    reported: Optional[str] = None
+    inference_candidates: Sequence[dict[str, Any]] = ()
+    reported: str | None = None
     withheld_reason: str = ""
     uncertainties: Sequence[str] = field(default_factory=tuple)
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form; ``reported`` derives from source statements only."""
         return {
             "figure_id": self.figure_id, "reported": self.reported, "withheld_reason": self.withheld_reason,
@@ -135,15 +135,15 @@ def read_orientation(
     statements: Sequence[OrientationStatement],
     *,
     caption: str = "",
-    verdict: Optional[Dict[str, Any]] = None,
-    model: Optional[ChatAdapter] = None,
-    locator: Optional[SourceLocator] = None,
+    verdict: dict[str, Any] | None = None,
+    model: ChatAdapter | None = None,
+    locator: SourceLocator | None = None,
 ) -> OrientationFinding:
     """Combine source statements with (optional) inference candidates, never upgrading the latter."""
-    unc: List[str] = []
+    unc: list[str] = []
     firm = [s for s in statements if not s.hedged]
     terms = {s.term for s in firm}
-    reported: Optional[str] = None
+    reported: str | None = None
     reason = ""
     if not statements:
         reason = "no_source_statement"
@@ -153,7 +153,7 @@ def read_orientation(
         reason, unc = "conflicting_source_statements", ["conflicting_terms:" + ",".join(sorted(terms))]
     else:
         reported = next(iter(terms))
-    candidates: List[Dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
     classes = verdict_classes(verdict or {})
     if model is not None and (not classes or classes & set(USABLE_CLASSES)):
         raw = model.ask(f"{ORIENTATION_PROMPT}\nCaption: {caption[:800]}", label="vision.orientation")

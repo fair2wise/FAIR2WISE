@@ -29,7 +29,7 @@ not changed by this module.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from .loading import load_schema_view
 from .registry import RegistryError, SchemaEntry
@@ -59,16 +59,16 @@ class MappingRow:
 
     ops_class: str
     target_class: str
-    instrument_category: Optional[str] = None
+    instrument_category: str | None = None
 
 
-def _annotation(cls, tag: str) -> Optional[str]:
+def _annotation(cls, tag: str) -> str | None:
     ann = (cls.annotations or {}).get(tag)
     value = getattr(ann, "value", ann)
     return str(value) if value is not None else None
 
 
-def mapping_table(entry: SchemaEntry, *, allow_pending_review: bool = False) -> Dict[str, MappingRow]:
+def mapping_table(entry: SchemaEntry, *, allow_pending_review: bool = False) -> dict[str, MappingRow]:
     """The mapping rows declared by ``entry`` (a bl1101 overlay), keyed by ops class name.
 
     Raises:
@@ -80,7 +80,7 @@ def mapping_table(entry: SchemaEntry, *, allow_pending_review: bool = False) -> 
         raise RegistryError(f"{entry.path} is pending owner review; pass allow_pending_review=True")
     view = load_schema_view(entry)
     classes = view.all_classes()
-    rows: Dict[str, MappingRow] = {}
+    rows: dict[str, MappingRow] = {}
     for name, cls in classes.items():
         target = _annotation(cls, CLASS_ANNOTATION)
         if target is None:
@@ -96,13 +96,13 @@ def mapping_table(entry: SchemaEntry, *, allow_pending_review: bool = False) -> 
     return rows
 
 
-def map_ops_node(node: Mapping[str, Any], rows: Mapping[str, MappingRow], entry: SchemaEntry) -> Dict[str, Any]:
+def map_ops_node(node: Mapping[str, Any], rows: Mapping[str, MappingRow], entry: SchemaEntry) -> dict[str, Any]:
     """One ops node as a 0.3.x record, or an unchanged copy when its class has no mapping row."""
     out = dict(node)
     row = rows.get(str(node.get("category")))
     if row is None or PROVENANCE_KEY in node:
         return out
-    added: List[str] = []
+    added: list[str] = []
     if row.target_class == "Sample" and "sample_label" not in node and node.get("name"):
         out["sample_label"] = node["name"]
         added.append("sample_label")
@@ -112,7 +112,7 @@ def map_ops_node(node: Mapping[str, Any], rows: Mapping[str, MappingRow], entry:
     out["category"] = row.target_class
     out["type"] = f"matkg:{row.target_class}"
     out["raw_category"] = row.ops_class
-    provenance: Dict[str, Any] = {
+    provenance: dict[str, Any] = {
         "schema": entry.schema_id, "schema_version": entry.version, "schema_sha256": entry.sha256,
         "mapping_version": MAPPING_VERSION, "decision": DECISION, "category": row.ops_class, "added": added,
     }
@@ -124,7 +124,7 @@ def map_ops_node(node: Mapping[str, Any], rows: Mapping[str, MappingRow], entry:
     return out
 
 
-def unmap_ops_node(node: Mapping[str, Any]) -> Dict[str, Any]:
+def unmap_ops_node(node: Mapping[str, Any]) -> dict[str, Any]:
     """The ops record a mapped node came from (exact), or an unchanged copy of an unmapped node."""
     out = dict(node)
     provenance = out.pop(PROVENANCE_KEY, None)
@@ -148,20 +148,20 @@ def unmap_ops_node(node: Mapping[str, Any]) -> Dict[str, Any]:
 
 def map_ops_nodes(
     nodes: Iterable[Mapping[str, Any]], *, entry: SchemaEntry, allow_pending_review: bool = False
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Map every ``Sample``/``Detector``/``Endstation`` node under ``entry``'s table; other nodes pass through."""
     rows = mapping_table(entry, allow_pending_review=allow_pending_review)
     return [map_ops_node(n, rows, entry) for n in nodes]
 
 
-def unmap_ops_nodes(nodes: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+def unmap_ops_nodes(nodes: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Reverse :func:`map_ops_nodes`; nodes without mapping provenance pass through."""
     return [unmap_ops_node(n) for n in nodes]
 
 
 def map_ops_graph(
     payload: Mapping[str, Any], *, entry: SchemaEntry, allow_pending_review: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """A json2kg payload with its ops nodes mapped; edges and other keys are copied as they are."""
     nodes_key = "things" if "things" in payload else "nodes"
     out = dict(payload)
@@ -169,7 +169,7 @@ def map_ops_graph(
     return out
 
 
-def unmap_ops_graph(payload: Mapping[str, Any]) -> Dict[str, Any]:
+def unmap_ops_graph(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Reverse :func:`map_ops_graph`."""
     nodes_key = "things" if "things" in payload else "nodes"
     out = dict(payload)

@@ -57,9 +57,9 @@ interrupt-id map, so the interrupt simply stays pending.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+import json
+from typing import Any, Callable, Mapping
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
@@ -69,7 +69,6 @@ from langgraph.runtime import get_runtime
 from langgraph.types import interrupt
 
 from ..contracts import ApprovalRecord, ChangePlan, ContractError, ErrorCode, RequestContext, ToolStatus
-
 from .admission import ensure_admission
 from .checkpointer import owner_key
 from .executor import RuntimeLimits, ToolExecutor, ToolOutcome, TurnLedger, _fail, call_key
@@ -107,19 +106,19 @@ APPROVAL_PLACEHOLDER_PREFIX = "f2w_approval_pending:"
 EXPIRED_KEY = "f2w_expired"
 
 #: ``PlanResolver(ctx, tool_name, args) -> ChangePlan | None``: looks up the plan a write would apply.
-PlanResolver = Callable[[RequestContext, str, Mapping[str, Any]], Optional[ChangePlan]]
+PlanResolver = Callable[[RequestContext, str, Mapping[str, Any]], ChangePlan | None]
 
 _FAILING = {ToolStatus.DENIED, ToolStatus.INVALID, ToolStatus.UNAVAILABLE, ToolStatus.ERROR}
 
 
-def tool_definition(spec: Any) -> Dict[str, Any]:
+def tool_definition(spec: Any) -> dict[str, Any]:
     """OpenAI-style function definition for ``bind_tools`` from a ``ToolSpec``."""
     description = f"{spec.description}\nWhen to use: {spec.when_to_use}\nWhen not to use: {spec.when_not_to_use}"
     return {"type": "function",
             "function": {"name": spec.name, "description": description, "parameters": spec.input_schema}}
 
 
-def ledger_from_messages(messages: List[BaseMessage]) -> TurnLedger:
+def ledger_from_messages(messages: list[BaseMessage]) -> TurnLedger:
     """Rebuild the current turn's ledger from tool-message artifacts (donor ``_already_called`` idea)."""
     from ..contracts import ToolResult
 
@@ -161,7 +160,7 @@ def _refused(record: Mapping[str, Any], code: ErrorCode, message: str) -> ToolOu
     return ToolOutcome(result=_fail(record["tool"], code, message), key=call_key(record["tool"], record["args"]))
 
 
-def _parse_approval(value: Any) -> Optional[ApprovalRecord]:
+def _parse_approval(value: Any) -> ApprovalRecord | None:
     if isinstance(value, ApprovalRecord):
         return value
     if isinstance(value, Mapping):
@@ -177,14 +176,14 @@ def build_literature_supervisor(
     registry: ToolRegistry,
     chat_model: Any,
     checkpointer: Any = None,
-    event_sink: Optional[EventSink] = None,
-    limits: Optional[RuntimeLimits] = None,
+    event_sink: EventSink | None = None,
+    limits: RuntimeLimits | None = None,
     system_prompt: str = PLACEHOLDER_SYSTEM_PROMPT,
-    skills: Optional[SkillRegistry] = None,
+    skills: SkillRegistry | None = None,
     admission: Any = None,
     provider: str = "default",
-    approval_check: Optional[ApprovalCheck] = None,
-    plan_resolver: Optional[PlanResolver] = None,
+    approval_check: ApprovalCheck | None = None,
+    plan_resolver: PlanResolver | None = None,
     artifact_store: Any = None,
     clock: Callable[[], datetime] = utcnow,
 ) -> Any:
@@ -227,24 +226,24 @@ def build_literature_supervisor(
     def run_ctx() -> RunContext:
         return as_run_context(get_runtime().context)
 
-    def thread_id() -> Optional[str]:
+    def thread_id() -> str | None:
         return (get_config().get("configurable") or {}).get("thread_id")
 
-    def owner_update(state: LiteratureState, rc: RunContext) -> Dict[str, Any]:
+    def owner_update(state: LiteratureState, rc: RunContext) -> dict[str, Any]:
         key = owner_key(rc.request)
         current = state.get("owner")
         if current and current != key:
             raise ContractError(ErrorCode.DENIED, "this thread belongs to another principal or session")
         return {} if current else {"owner": key}
 
-    def resolve_plan(ctx: RequestContext, name: str, args: Any) -> Optional[ChangePlan]:
+    def resolve_plan(ctx: RequestContext, name: str, args: Any) -> ChangePlan | None:
         if plan_resolver is None or not isinstance(args, Mapping):
             return None
         return plan_resolver(ctx, name, args)
 
     # -- supervisor ---------------------------------------------------------------
 
-    def prepare_call(state: LiteratureState) -> Tuple[Dict[str, Any], Any, List[BaseMessage], Optional[AIMessage]]:
+    def prepare_call(state: LiteratureState) -> tuple[dict[str, Any], Any, list[BaseMessage], AIMessage | None]:
         rc = run_ctx()
         update = owner_update(state, rc)
         update.update(approvals={})  # open_approvals deliberately survive the new turn (T02B)
@@ -271,7 +270,7 @@ def build_literature_supervisor(
         update["messages"] = list(repairs)
         return update, bound, messages, stop
 
-    def supervisor(state: LiteratureState) -> Dict[str, Any]:
+    def supervisor(state: LiteratureState) -> dict[str, Any]:
         update, bound, messages, stop = prepare_call(state)
         if stop is None:
             with admission.slot(provider):
@@ -281,7 +280,7 @@ def build_literature_supervisor(
         update["messages"].append(reply)
         return update
 
-    async def asupervisor(state: LiteratureState) -> Dict[str, Any]:
+    async def asupervisor(state: LiteratureState) -> dict[str, Any]:
         update, bound, messages, stop = prepare_call(state)
         if stop is None:
             async with admission.aslot(provider):
@@ -307,12 +306,12 @@ def build_literature_supervisor(
     def placeholder_id(tool_call_id: str) -> str:
         return f"{APPROVAL_PLACEHOLDER_PREFIX}{tool_call_id}"
 
-    def request_approval(state: LiteratureState) -> Dict[str, Any]:
+    def request_approval(state: LiteratureState) -> dict[str, Any]:
         rc = run_ctx()
         owner_update(state, rc)
         ctx, caps, tid = rc.request, effective_capabilities(rc.request, rc.scope), thread_id()
-        opened: Dict[str, Dict[str, Any]] = {}
-        placeholders: List[BaseMessage] = []
+        opened: dict[str, dict[str, Any]] = {}
+        placeholders: list[BaseMessage] = []
         now = clock()
         ttl = limits.approval_request_ttl_s
         for call in getattr(state["messages"][-1], "tool_calls", None) or []:
@@ -344,7 +343,7 @@ def build_literature_supervisor(
                 pass
         return {"open_approvals": opened, "messages": placeholders}
 
-    def unanswered_calls(state: LiteratureState) -> List[Mapping[str, Any]]:
+    def unanswered_calls(state: LiteratureState) -> list[Mapping[str, Any]]:
         answered = {getattr(m, "tool_call_id", None) for m in state["messages"]
                     if getattr(m, "type", None) == "tool"}
         calls = getattr(state["messages"][-1], "tool_calls", None) or []
@@ -360,14 +359,14 @@ def build_literature_supervisor(
         expires = record.get("expires_at")
         return expires is not None and now >= datetime.fromisoformat(expires)
 
-    def await_approval(state: LiteratureState) -> Dict[str, Any]:
+    def await_approval(state: LiteratureState) -> dict[str, Any]:
         # LangGraph re-runs this node from its start on resume (langgraph.types.interrupt), so nothing
         # before interrupt() has effects; expired requests are closed here (no interrupt) or after it.
         open_ = state.get("open_approvals") or {}
         now = clock()
         live = {k: v for k, v in open_.items() if not is_expired(v, now)}
         expired = [k for k in open_ if k not in live]
-        decided: Dict[str, Optional[Dict[str, Any]]] = {}
+        decided: dict[str, dict[str, Any] | None] = {}
         if live:
             shown = ("plan_id", "plan_sha256", "target", "corpus_scope", "base_revision", "creates", "links",
                      "supersessions")
@@ -444,8 +443,8 @@ def build_literature_supervisor(
         return rc, jobs, thread_id()
 
     def finish_apply(state: LiteratureState,
-                     results: List[Tuple[Mapping[str, Any], ToolMessage]]) -> Dict[str, Any]:
-        msgs: List[BaseMessage] = []
+                     results: list[tuple[Mapping[str, Any], ToolMessage]]) -> dict[str, Any]:
+        msgs: list[BaseMessage] = []
         tail = isinstance(state["messages"][-1], ToolMessage)
         notes = []
         for call, message in results:
@@ -461,7 +460,7 @@ def build_literature_supervisor(
         return {"messages": msgs, "approvals": {},
                 "open_approvals": {call["id"]: None for call, _ in results}}
 
-    def apply_approvals(state: LiteratureState) -> Dict[str, Any]:
+    def apply_approvals(state: LiteratureState) -> dict[str, Any]:
         rc, jobs, tid = approval_outcomes(state)
         results = []
         for call, plan, approval, refused in jobs:
@@ -471,7 +470,7 @@ def build_literature_supervisor(
             results.append((call, tool_message(call, outcome)))
         return finish_apply(state, results)
 
-    async def aapply_approvals(state: LiteratureState) -> Dict[str, Any]:
+    async def aapply_approvals(state: LiteratureState) -> dict[str, Any]:
         rc, jobs, tid = approval_outcomes(state)
         results = []
         for call, plan, approval, refused in jobs:
@@ -502,7 +501,7 @@ def build_literature_supervisor(
             prepared.append((call, plan, None))  # approved writes run in apply_approvals, never here
         return rc, ledger, prepared, thread_id()
 
-    def execute_tools(state: LiteratureState) -> Dict[str, Any]:
+    def execute_tools(state: LiteratureState) -> dict[str, Any]:
         rc, ledger, prepared, tid = tool_calls_with_context(state)
         out = []
         for call, plan, approval in prepared:
@@ -512,7 +511,7 @@ def build_literature_supervisor(
             out.append(tool_message(call, outcome))
         return {"messages": out}
 
-    async def aexecute_tools(state: LiteratureState) -> Dict[str, Any]:
+    async def aexecute_tools(state: LiteratureState) -> dict[str, Any]:
         rc, ledger, prepared, tid = tool_calls_with_context(state)
         out = []
         for call, plan, approval in prepared:

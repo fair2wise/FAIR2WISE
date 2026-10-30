@@ -1,7 +1,7 @@
 """EvidenceRanker: one ranker over mixed, tagged evidence objects."""
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import Sequence
 
 from .evidence import INTENT_WEIGHTS, Evidence
 
@@ -16,11 +16,11 @@ class EvidenceRanker:
         *,
         intent: str = "factual",
         limit: int = 24,
-    ) -> List[Evidence]:
+    ) -> list[Evidence]:
         """Re-score items by source kind, query overlap and `intent`; return the top `limit`, unique by source_id."""
         weights = INTENT_WEIGHTS.get(intent) or INTENT_WEIGHTS["factual"]
         q = (query or "").casefold()
-        ranked: List[Evidence] = []
+        ranked: list[Evidence] = []
         for item in items:
             kind_w = float(weights.get(item.source_kind, 0.2))
             score = float(item.score) * kind_w
@@ -58,7 +58,7 @@ class EvidenceRanker:
         ranked.sort(key=lambda ev: ev.score, reverse=True)
         # Keep distinct objects; drop exact duplicate source_ids only.
         seen: set[str] = set()
-        uniq: List[Evidence] = []
+        uniq: list[Evidence] = []
         for item in ranked:
             if item.source_id in seen:
                 continue

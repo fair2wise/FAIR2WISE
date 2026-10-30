@@ -8,7 +8,7 @@ can switch extraction away from the current behaviour.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Protocol, Type
+from typing import Any, Iterable, Protocol
 
 from ..contract import ExtractionResult, ExtractionSource
 from .forge_paper import ForgePaperStrategy
@@ -19,7 +19,7 @@ from .term_extractor_agent import TermExtractorAgentStrategy
 DEFAULT_STRATEGY = LegacyF2WStrategy.name
 OPTIONAL_STRATEGIES = (ForgePaperStrategy.name, PaperStructureStrategy.name, TermExtractorAgentStrategy.name)
 
-_REGISTRY: Dict[str, Type[Any]] = {
+_REGISTRY: dict[str, type[Any]] = {
     LegacyF2WStrategy.name: LegacyF2WStrategy,
     ForgePaperStrategy.name: ForgePaperStrategy,
     PaperStructureStrategy.name: PaperStructureStrategy,
@@ -37,7 +37,7 @@ class ExtractionStrategy(Protocol):
         """Extract from one source version."""
 
 
-def strategy_class(name: str = DEFAULT_STRATEGY, *, allow_optional: bool = False) -> Type[Any]:
+def strategy_class(name: str = DEFAULT_STRATEGY, *, allow_optional: bool = False) -> type[Any]:
     """Return the strategy class for ``name``; optional strategies need explicit opt-in.
 
     Raises:
@@ -51,7 +51,7 @@ def strategy_class(name: str = DEFAULT_STRATEGY, *, allow_optional: bool = False
     return _REGISTRY[name]
 
 
-def run_strategies(strategies: Iterable[ExtractionStrategy], source: ExtractionSource) -> List[ExtractionResult]:
+def run_strategies(strategies: Iterable[ExtractionStrategy], source: ExtractionSource) -> list[ExtractionResult]:
     """Run several strategies on the identical source, for side-by-side comparison."""
     return [strategy.extract(source) for strategy in strategies]
 

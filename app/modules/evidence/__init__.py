@@ -15,13 +15,25 @@ from __future__ import annotations
 from .bundle import BundledEvidence, BundledQuantity, LiteratureEvidenceBundle, build_bundle, bundle_work_ids
 from .grounding import SUPPORT_VERDICTS, source_support
 from .persistence import (
-    CandidateFileEvidenceSink, EvidenceSink, InMemoryEvidenceSink, build_evidence,
-    locate_in_any_section, record_evidence, record_reported_quantities, stable_evidence_id,
+    CandidateFileEvidenceSink,
+    EvidenceSink,
+    InMemoryEvidenceSink,
+    build_evidence,
+    locate_in_any_section,
+    record_evidence,
+    record_reported_quantities,
+    stable_evidence_id,
 )
 from .quote_location import NORMALIZATION_PROFILE, QuoteLocation, locate_quote
 from .records import (
-    EvidenceRecord, EvidenceSource, MeasuredUncertainty, MissingData, QuantityRecord,
-    ReportedQuantity, TagDecision, UncertaintyKind,
+    EvidenceRecord,
+    EvidenceSource,
+    MeasuredUncertainty,
+    MissingData,
+    QuantityRecord,
+    ReportedQuantity,
+    TagDecision,
+    UncertaintyKind,
 )
 from .units import NormalizedQuantity, normalize_quantity
 

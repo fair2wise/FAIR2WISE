@@ -30,14 +30,14 @@ compared before and after.
 
 from __future__ import annotations
 
-import hashlib
-import json
-import re
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
+import hashlib
+import json
 from pathlib import Path
-from typing import Any, Callable, Collection, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
+import re
+from typing import Any, Callable, Collection, Iterator, Mapping, Sequence, Union
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext
@@ -121,12 +121,12 @@ class SourceSnapshot:
     graph_sha256: str
     manifest_sha256: str
     graph_id: str
-    nodes: Dict[str, Dict[str, Any]]
-    edges: List[Tuple[str, Dict[str, Any]]]
-    data_commit: Optional[str] = None
+    nodes: dict[str, dict[str, Any]]
+    edges: list[tuple[str, dict[str, Any]]]
+    data_commit: str | None = None
 
     @property
-    def lineage(self) -> List[str]:
+    def lineage(self) -> list[str]:
         """The snapshot and its recorded parent."""
         ids = [self.manifest.snapshot_id]
         if self.manifest.parent:
@@ -200,20 +200,20 @@ class TargetState:
     """Complete scan of the target, classified for one graph."""
 
     graph_id: str
-    rows: Dict[str, Dict[str, Any]]
-    link_rows: Dict[str, Dict[str, Any]]
-    final: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    pending: Dict[str, Dict[str, Dict[str, Any]]] = field(default_factory=dict)   # tag -> node -> row
-    retired: Dict[str, Dict[str, Dict[str, Any]]] = field(default_factory=dict)
-    active_links: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)  # edge id -> rows
-    foreign: Dict[str, str] = field(default_factory=dict)
+    rows: dict[str, dict[str, Any]]
+    link_rows: dict[str, dict[str, Any]]
+    final: dict[str, dict[str, Any]] = field(default_factory=dict)
+    pending: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)   # tag -> node -> row
+    retired: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    active_links: dict[str, list[dict[str, Any]]] = field(default_factory=dict)  # edge id -> rows
+    foreign: dict[str, str] = field(default_factory=dict)
     revision: str = "none"
 
-    def pending_for(self, tag: Optional[str]) -> Dict[str, Dict[str, Any]]:
+    def pending_for(self, tag: str | None) -> dict[str, dict[str, Any]]:
         """Return the in-flight rows of plan ``tag`` by node id (empty when ``tag`` is ``None`` or unknown)."""
         return self.pending.get(tag or "", {})
 
-    def retired_for(self, tag: Optional[str]) -> Dict[str, Dict[str, Any]]:
+    def retired_for(self, tag: str | None) -> dict[str, dict[str, Any]]:
         """Return the rows retired by plan ``tag`` by node id (empty when ``tag`` is ``None`` or unknown)."""
         return self.retired.get(tag or "", {})
 
@@ -238,10 +238,10 @@ def read_state(client: TiledMutationClient, graph_id: str, *, double_read: bool 
     return classify_state(graph_id, entities, links)
 
 
-def classify_state(graph_id: str, entities: List[Dict[str, Any]], links: List[Dict[str, Any]]) -> TargetState:
+def classify_state(graph_id: str, entities: list[dict[str, Any]], links: list[dict[str, Any]]) -> TargetState:
     """Split scanned rows into this graph's owned records and everything else."""
     st = TargetState(graph_id, {e["id"]: e for e in entities}, {lk["id"]: lk for lk in links})
-    owned: List[Any] = []
+    owned: list[Any] = []
     for row in entities:
         try:
             kind = lw.classify_entity(row, graph_id)
@@ -283,7 +283,7 @@ class Op:
 
     kind: str
     key: str
-    old_id: Optional[str] = None
+    old_id: str | None = None
 
     @property
     def token(self) -> str:
@@ -298,11 +298,11 @@ class Op:
 
 
 def compute_ops(src: SourceSnapshot, st: TargetState,
-                tag: Optional[str] = None) -> Tuple[List[Op], Dict[str, int]]:
+                tag: str | None = None) -> tuple[list[Op], dict[str, int]]:
     """Diff the snapshot against the scanned target. ``tag`` (a plan tag) recognizes in-flight revisions."""
-    ops: List[Op] = []
+    ops: list[Op] = []
     counts = {"unchanged_entities": 0, "unchanged_links": 0}
-    kept: Dict[str, str] = {}
+    kept: dict[str, str] = {}
     graph_id = src.graph_id
     pend, ret = st.pending_for(tag), st.retired_for(tag)
     for node_id, node in src.nodes.items():
@@ -345,7 +345,7 @@ def compute_ops(src: SourceSnapshot, st: TargetState,
     return ops, counts
 
 
-def dangling_edges(src: SourceSnapshot) -> List[Dict[str, Any]]:
+def dangling_edges(src: SourceSnapshot) -> list[dict[str, Any]]:
     """Edges whose endpoint is not a node of the snapshot (json2kg stubs): reported, never dropped silently."""
     out = []
     for eid, edge in src.edges:
@@ -357,7 +357,7 @@ def dangling_edges(src: SourceSnapshot) -> List[Dict[str, Any]]:
 
 
 def _plan_body(detail: Mapping[str, Any], *, snapshot_id: str, input_sha256: str, target: str,
-               scope: Sequence[str], base_revision: str, validation_sha256: str) -> Dict[str, Any]:
+               scope: Sequence[str], base_revision: str, validation_sha256: str) -> dict[str, Any]:
     ops = [Op(*o) for o in detail["ops"]]
     new_entities = sum(1 for o in ops if o.kind in ("create_node", "supersede_node"))
     return {
@@ -387,10 +387,10 @@ class ImportPlan:
     """
 
     change: ChangePlan
-    detail: Dict[str, Any]
+    detail: dict[str, Any]
 
     @property
-    def ops(self) -> List[Op]:
+    def ops(self) -> list[Op]:
         """Return the planned operations decoded from ``detail``."""
         return [Op(*o) for o in self.detail["ops"]]
 
@@ -405,7 +405,7 @@ class ImportPlan:
         return self.change.plan_sha256[:16]
 
     @property
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Dry-run report (counts, affected ids, dangling stubs)."""
         return {"plan_sha256": self.change.plan_sha256, "target": self.change.target,
                 "creates": self.change.creates, "links": self.change.links,
@@ -425,17 +425,17 @@ class ImportPlan:
         if expect != c:
             raise ContractError(ErrorCode.STALE_APPROVAL, "import plan was modified after it was computed")
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         """Return the JSON-serializable form that :meth:`from_json` reads."""
         return {"change": self.change.model_dump(mode="json"), "detail": self.detail}
 
     @classmethod
-    def from_json(cls, data: Mapping[str, Any]) -> "ImportPlan":
+    def from_json(cls, data: Mapping[str, Any]) -> ImportPlan:
         """Rebuild a plan from :meth:`to_json` output; call :meth:`verify_integrity` before trusting it."""
         return cls(ChangePlan.model_validate(data["change"]), json.loads(_canon(data["detail"])))
 
 
-def target_for(client: TiledMutationClient, namespace: Optional[str] = None) -> str:
+def target_for(client: TiledMutationClient, namespace: str | None = None) -> str:
     """Contract target: normalized base URL, plus ``#namespace`` when given."""
     base = normalize_tiled_target(client.base_url)
     if namespace is None:
@@ -456,9 +456,9 @@ def _check_client(client: TiledMutationClient, settings: DeploymentSettings, tar
 
 
 def plan_import(source: Source, *, client: TiledMutationClient, settings: DeploymentSettings,
-                supported_schema_fingerprints: Collection[str], namespace: Optional[str] = None,
-                access_blob: Optional[Mapping[str, Any]] = None,
-                edit_journal: Optional[ej.EditJournal] = None,
+                supported_schema_fingerprints: Collection[str], namespace: str | None = None,
+                access_blob: Mapping[str, Any] | None = None,
+                edit_journal: ej.EditJournal | None = None,
                 resolutions: Sequence[ej.ConflictResolution] = (), lineage: Sequence[str] = ()) -> ImportPlan:
     """Dry-run: preflight the snapshot, read the whole target, and return the exact plan. No writes.
 
@@ -499,7 +499,7 @@ class ImportOutcome:
 
     status: str            # applied | noop | already_applied
     receipt: ReceiptArtifact
-    receipt_path: Optional[Path]
+    receipt_path: Path | None
     resumed: bool = False
 
 
@@ -508,13 +508,13 @@ def _slug(text: str) -> str:
     return head + "-" + hashlib.sha256(text.encode()).hexdigest()[:10]
 
 
-def verify_projection(src: SourceSnapshot, st: TargetState, foreign_before: Mapping[str, str]) -> List[str]:
+def verify_projection(src: SourceSnapshot, st: TargetState, foreign_before: Mapping[str, str]) -> list[str]:
     """Compare the readback to the snapshot and return mismatch descriptions (empty when it matches).
 
     Checks every node and edge by content rather than count, that nothing extra or in flight remains,
     and that every pre-existing foreign record is untouched.
     """
-    bad: List[str] = []
+    bad: list[str] = []
     gid = src.graph_id
     for node_id, node in src.nodes.items():
         row = st.final.get(node_id)
@@ -546,10 +546,10 @@ def verify_projection(src: SourceSnapshot, st: TargetState, foreign_before: Mapp
     return bad[:50]
 
 
-def apply_import(ctx: RequestContext, plan: ImportPlan, approval: Optional[ApprovalRecord], *,
+def apply_import(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord | None, *,
                  source: Source, client: TiledMutationClient, settings: DeploymentSettings,
                  supported_schema_fingerprints: Collection[str], state_dir: Path, clock: Clock,
-                 lease_seconds: float = 120.0, fault: Optional[FaultHook] = None) -> ImportOutcome:
+                 lease_seconds: float = 120.0, fault: FaultHook | None = None) -> ImportOutcome:
     """Apply an approved plan, verify it by readback, and write the per-target receipt.
 
     Order of refusals (nothing is written to Tiled or to ``state_dir`` before they pass): capability
@@ -641,7 +641,7 @@ def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock
                    base_revision=change.base_revision, already_applied=already, executed_as=approval.executed_as,
                    requested_by=approval.requested_by, approved_by=approval.approved_by)
 
-    ids: Dict[str, str] = {n: r["id"] for n, r in state.final.items()
+    ids: dict[str, str] = {n: r["id"] for n, r in state.final.items()
                            if n in src.nodes and lw.entity_matches(r, lw.entity_spec(graph_id, src.nodes[n]))}
     done = journal.done_ids()
     tag = plan.tag
@@ -732,7 +732,7 @@ def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock
 
 
 def _supersede(client: TiledMutationClient, state: TargetState, spec: lw.EntitySpec, graph_id: str, tag: str,
-               access: Mapping[str, Any], ids: Dict[str, str], fault: FaultHook, i: int) -> None:
+               access: Mapping[str, Any], ids: dict[str, str], fault: FaultHook, i: int) -> None:
     """Create-new / retire-old for one changed node, resuming from any intermediate state."""
     node = spec.node_id
     pend, ret = state.pending_for(tag).get(node), state.retired_for(tag).get(node)

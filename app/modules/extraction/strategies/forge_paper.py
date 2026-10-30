@@ -29,13 +29,13 @@ als_knowledge_agent/src/als_knowledge_agent/graph/pdf_extraction.py
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field, replace
 import json
 import logging
 import re
+from typing import Any, Mapping, Pattern, Protocol, Sequence
 import unicodedata
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field, replace
-from typing import Any, Dict, List, Mapping, Optional, Pattern, Protocol, Sequence, Tuple
 
 from ...literature.parsed_document import without_embedded_images
 from ..contract import ChunkCoverage, ExtractedMention, ExtractionResult, ExtractionSource
@@ -71,7 +71,7 @@ class Hit:
     taxon: str
     slug: str
     name: str
-    span: Tuple[int, int]
+    span: tuple[int, int]
     snippet: str
 
 
@@ -79,14 +79,14 @@ class Hit:
 class RefinedExtraction:
     """Model refinement of one chunk. ``ok`` separates "said nothing" from "never reached"."""
 
-    techniques: List[str] = field(default_factory=list)
-    analyses: List[Dict[str, Any]] = field(default_factory=list)
-    instruments: List[str] = field(default_factory=list)
-    materials: List[str] = field(default_factory=list)
+    techniques: list[str] = field(default_factory=list)
+    analyses: list[dict[str, Any]] = field(default_factory=list)
+    instruments: list[str] = field(default_factory=list)
+    materials: list[str] = field(default_factory=list)
     ok: bool = False
     error: str = ""
     confidence: float = 0.5
-    executed_model: Optional[str] = None
+    executed_model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -98,9 +98,9 @@ class ResolvedTerm:
     surface: str
     canonical: bool
     category: str
-    software: Optional[str] = None
-    extracted_by: Optional[str] = None
-    chunk_id: Optional[str] = None
+    software: str | None = None
+    extracted_by: str | None = None
+    chunk_id: str | None = None
     identity: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -108,8 +108,8 @@ class ResolvedTerm:
 class SectionEntities:
     """What one section yielded."""
 
-    terms: List[ResolvedTerm] = field(default_factory=list)
-    chunks: List[Dict[str, Any]] = field(default_factory=list)
+    terms: list[ResolvedTerm] = field(default_factory=list)
+    chunks: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def llm_ok(self) -> bool:
@@ -121,23 +121,23 @@ class SectionEntities:
 class PaperExtraction:
     """Aggregates plus the per-section truth."""
 
-    techniques: List[str] = field(default_factory=list)
-    analyses: List[Dict[str, Any]] = field(default_factory=list)
-    instruments: List[str] = field(default_factory=list)
-    materials: List[str] = field(default_factory=list)
-    per_section: Dict[str, List[Hit]] = field(default_factory=dict)
+    techniques: list[str] = field(default_factory=list)
+    analyses: list[dict[str, Any]] = field(default_factory=list)
+    instruments: list[str] = field(default_factory=list)
+    materials: list[str] = field(default_factory=list)
+    per_section: dict[str, list[Hit]] = field(default_factory=dict)
     llm_ok: bool = False
-    by_section: Dict[str, SectionEntities] = field(default_factory=dict)
+    by_section: dict[str, SectionEntities] = field(default_factory=dict)
 
 
 #: ``{taxon: [(slug, compiled pattern), ...]}``; injected, empty by default.
-KeywordTaxonomy = Mapping[str, Sequence[Tuple[str, Pattern[str]]]]
+KeywordTaxonomy = Mapping[str, Sequence[tuple[str, Pattern[str]]]]
 
 
 class TermResolver(Protocol):
     """Resolve one free-text term to a canonical or candidate :class:`ResolvedTerm`."""
 
-    def __call__(self, surface: str, category: str, *, software: Optional[str] = None) -> Optional[ResolvedTerm]:
+    def __call__(self, surface: str, category: str, *, software: str | None = None) -> ResolvedTerm | None:
         """Return the resolved term, or ``None`` for a surface that slugs to nothing."""
 
 
@@ -150,7 +150,7 @@ def simple_slug(text: str) -> str:
 class CandidateOnlyResolver:
     """Default resolver: no vocabulary, so every term is a candidate (never canonical)."""
 
-    def __call__(self, surface: str, category: str, *, software: Optional[str] = None) -> Optional[ResolvedTerm]:
+    def __call__(self, surface: str, category: str, *, software: str | None = None) -> ResolvedTerm | None:
         """Return a non-canonical ``ResolvedTerm`` for `surface`, or ``None`` if it is blank or has no usable slug.
 
         An explicit SMILES surface in the ``material`` category is recorded unverified.
@@ -174,10 +174,10 @@ def _snippet(text: str, start: int, end: int, window: int = 40) -> str:
     return text[max(0, start - window):min(len(text), end + window)]
 
 
-def extract_keywords(section_text: str, taxonomy: Optional[KeywordTaxonomy] = None) -> List[Hit]:
+def extract_keywords(section_text: str, taxonomy: KeywordTaxonomy | None = None) -> list[Hit]:
     """One :class:`Hit` per slug per taxon (first match), from an injected taxonomy."""
     seen: set = set()
-    hits: List[Hit] = []
+    hits: list[Hit] = []
     for taxon, patterns in (taxonomy or {}).items():
         for slug, pattern in patterns:
             if slug in seen:
@@ -223,7 +223,7 @@ def build_refine_prompt(section_text: str, candidate_hits: Sequence[Hit]) -> str
     return f"{SYSTEM_PROMPT}\n\n{user}"
 
 
-def _validated(data: Dict[str, Any]) -> Dict[str, Any]:
+def _validated(data: dict[str, Any]) -> dict[str, Any]:
     for key in ("techniques", "instruments", "materials"):
         values = data.get(key) or []
         if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
@@ -272,8 +272,8 @@ def llm_refine(
         return RefinedExtraction(error=type(exc).__name__)
 
 
-def _chunks(text: str) -> List[Tuple[int, int, str]]:
-    out: List[Tuple[int, int, str]] = []
+def _chunks(text: str) -> list[tuple[int, int, str]]:
+    out: list[tuple[int, int, str]] = []
     for start in range(0, len(text), CHUNK_STEP):
         chunk = text[start:start + CHUNK_CHARS]
         if chunk.strip():
@@ -284,7 +284,7 @@ def _chunks(text: str) -> List[Tuple[int, int, str]]:
 
 
 def _refine_with_split(text: str, hits: Sequence[Hit], adapter: TextCompletionAdapter,
-                       taxonomy: Optional[KeywordTaxonomy]) -> RefinedExtraction:
+                       taxonomy: KeywordTaxonomy | None) -> RefinedExtraction:
     answer = llm_refine(text, hits, adapter)
     if answer.ok or len(text) <= SPLIT_MIN_CHARS or answer.error not in _RETRYABLE_ERRORS:
         return answer
@@ -294,8 +294,8 @@ def _refine_with_split(text: str, hits: Sequence[Hit], adapter: TextCompletionAd
     if not all(p.ok for p in pieces):
         return answer
 
-    def merged(name: str) -> List[Any]:
-        unique: Dict[str, Any] = {}
+    def merged(name: str) -> list[Any]:
+        unique: dict[str, Any] = {}
         for piece in pieces:
             for value in getattr(piece, name):
                 unique.setdefault(json.dumps(value, sort_keys=True), value)
@@ -312,8 +312,8 @@ def extract_paper(
     sections: Mapping[str, str],
     adapter: TextCompletionAdapter,
     *,
-    taxonomy: Optional[KeywordTaxonomy] = None,
-    resolver: Optional[TermResolver] = None,
+    taxonomy: KeywordTaxonomy | None = None,
+    resolver: TermResolver | None = None,
     max_workers: int = 1,
 ) -> PaperExtraction:
     """Extract technique/analysis/instrument/material mentions from every section.
@@ -327,9 +327,9 @@ def extract_paper(
     """
     resolve: TermResolver = resolver or CandidateOnlyResolver()
     sections = {name: without_embedded_images(text) for name, text in sections.items()}
-    by_section: Dict[str, SectionEntities] = {}
-    per_section: Dict[str, List[Hit]] = {}
-    tasks: List[Tuple[str, int, int, str, List[Hit]]] = []
+    by_section: dict[str, SectionEntities] = {}
+    per_section: dict[str, list[Hit]] = {}
+    tasks: list[tuple[str, int, int, str, list[Hit]]] = []
     for name, text in sections.items():
         by_section[name] = SectionEntities()
         if _BIBLIOGRAPHY.fullmatch(name):
@@ -350,7 +350,7 @@ def extract_paper(
     else:
         refined = [_refine_with_split(t[3], t[4], adapter, taxonomy) for t in tasks]
 
-    aggregates: Dict[str, Dict[str, Any]] = {taxon: {} for taxon in TAXA}
+    aggregates: dict[str, dict[str, Any]] = {taxon: {} for taxon in TAXA}
     for (section_name, start, end, _text, hits), answer in zip(tasks, refined):
         chunk_id = f"{section_name}:{start}:{end}"
         method = "llm" if answer.ok else "keyword"
@@ -361,7 +361,7 @@ def extract_paper(
             "confidence": answer.confidence if answer.ok else None,
             "needs_review": (not answer.ok) or answer.confidence < REVIEW_CONFIDENCE,
         })
-        terms: List[Optional[ResolvedTerm]] = []
+        terms: list[ResolvedTerm | None] = []
         if answer.ok:
             terms += [resolve(t, "technique") for t in answer.techniques]
             terms += [resolve(str(a.get("method", "")), "analysis", software=a.get("software") or None)
@@ -400,8 +400,8 @@ class ForgePaperStrategy:
     name = STRATEGY_NAME
     version = STRATEGY_VERSION
 
-    def __init__(self, adapter: TextCompletionAdapter, *, taxonomy: Optional[KeywordTaxonomy] = None,
-                 resolver: Optional[TermResolver] = None, max_workers: int = 1) -> None:
+    def __init__(self, adapter: TextCompletionAdapter, *, taxonomy: KeywordTaxonomy | None = None,
+                 resolver: TermResolver | None = None, max_workers: int = 1) -> None:
         self.adapter = adapter
         self.taxonomy = taxonomy
         self.resolver = resolver
@@ -415,8 +415,8 @@ class ForgePaperStrategy:
         paper = extract_paper(sections, self.adapter, taxonomy=self.taxonomy, resolver=self.resolver,
                               max_workers=self.max_workers)
         pages = {name: s.page for name, s in zip(sections, source.document.sections)}
-        mentions: List[ExtractedMention] = []
-        coverage: List[ChunkCoverage] = []
+        mentions: list[ExtractedMention] = []
+        coverage: list[ChunkCoverage] = []
         for name, entities in paper.by_section.items():
             for chunk in entities.chunks:
                 coverage.append(ChunkCoverage(

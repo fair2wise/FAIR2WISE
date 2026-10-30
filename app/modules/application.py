@@ -37,22 +37,21 @@ imports (they load when an instance is built or a delegated task runs).
 from __future__ import annotations
 
 import asyncio
-import logging
-import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, FrozenSet, Iterator, List, Mapping, Optional, Sequence, Tuple
+from datetime import UTC, datetime
+import logging
+from typing import Any, Callable, Iterator, Mapping, Sequence
+import uuid
 
 from .contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
 from .security.authorization import DeploymentSettings, local_operator_context, resolve_context
-
 
 logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -74,11 +73,11 @@ class DelegatedOutcome:
 
     thread_id: str
     final_text: str
-    reads: Tuple[Any, ...]
-    tool_results: Tuple[ToolResult, ...]
+    reads: tuple[Any, ...]
+    tool_results: tuple[ToolResult, ...]
     interrupted: bool = False
-    stopped: Optional[str] = None
-    open_approvals: Tuple[str, ...] = ()
+    stopped: str | None = None
+    open_approvals: tuple[str, ...] = ()
     blocked: bool = False
 
     @property
@@ -87,9 +86,9 @@ class DelegatedOutcome:
         return not self.blocked and self.stopped is None
 
     @property
-    def evidence_ids(self) -> List[str]:
+    def evidence_ids(self) -> list[str]:
         """Evidence IDs across this turn's read calls, in order, without repeats."""
-        out: List[str] = []
+        out: list[str] = []
         for read in self.reads:
             for eid in read.evidence_ids:
                 if eid not in out:
@@ -111,9 +110,9 @@ class SupervisedRead:
     """
 
     read: Any
-    delegated: Optional[DelegatedOutcome]
-    fallback: Optional[str] = None
-    operation: Optional[str] = None
+    delegated: DelegatedOutcome | None
+    fallback: str | None = None
+    operation: str | None = None
 
 
 class F2WApplication:
@@ -158,7 +157,7 @@ class F2WApplication:
         admission: Any = None,
         limits: Any = None,
         provider: str = "cborg",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         identity_port: Any = None,
         clock: Callable[[], datetime] = _utcnow,
         name: str = "f2w",
@@ -238,7 +237,7 @@ class F2WApplication:
             self._owned_checkpointer.close()
             self._owned_checkpointer = None
 
-    def __enter__(self) -> "F2WApplication":
+    def __enter__(self) -> F2WApplication:
         return self
 
     def __exit__(self, *exc: Any) -> None:
@@ -247,8 +246,8 @@ class F2WApplication:
     # -- request context -------------------------------------------------------------
 
     def context(
-        self, credential: Any = None, *, request_id: Optional[str] = None, session_id: Optional[str] = None,
-        actor_kind: ActorKind = ActorKind.INTERACTIVE, run_id: Optional[str] = None, require_fresh: bool = False,
+        self, credential: Any = None, *, request_id: str | None = None, session_id: str | None = None,
+        actor_kind: ActorKind = ActorKind.INTERACTIVE, run_id: str | None = None, require_fresh: bool = False,
     ) -> RequestContext:
         """Resolve the acting context through ``security.resolve_context``.
 
@@ -260,8 +259,8 @@ class F2WApplication:
                                clock=self.clock, require_fresh=require_fresh, run_id=run_id)
 
     def local_context(
-        self, *, request_id: Optional[str] = None, session_id: Optional[str] = None,
-        actor_kind: ActorKind = ActorKind.INTERACTIVE, run_id: Optional[str] = None,
+        self, *, request_id: str | None = None, session_id: str | None = None,
+        actor_kind: ActorKind = ActorKind.INTERACTIVE, run_id: str | None = None,
     ) -> RequestContext:
         """The trusted local-operator context (``:local`` only; DENIED elsewhere)."""
         return local_operator_context(self.settings, request_id=request_id or uuid.uuid4().hex,
@@ -270,9 +269,9 @@ class F2WApplication:
     # -- direct read call (no planning) ----------------------------------------------
 
     @staticmethod
-    def _read_args(question: str, history: Optional[Sequence[Mapping[str, str]]], source_rag: Optional[bool],
-                   use_live_tiled: Optional[bool]) -> Dict[str, Any]:
-        args: Dict[str, Any] = {"question": question}
+    def _read_args(question: str, history: Sequence[Mapping[str, str]] | None, source_rag: bool | None,
+                   use_live_tiled: bool | None) -> dict[str, Any]:
+        args: dict[str, Any] = {"question": question}
         if history is not None:
             args["history"] = [dict(m) for m in history]
         if source_rag is not None:
@@ -286,9 +285,9 @@ class F2WApplication:
         ctx: RequestContext,
         question: str,
         *,
-        history: Optional[Sequence[Mapping[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        history: Sequence[Mapping[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
     ) -> Any:
         """Answer ``question`` with the existing F2W QA path, bypassing planning.
 
@@ -324,7 +323,7 @@ class F2WApplication:
                                 "delegated tasks need a chat model; this application was built without one")
         return self.supervisor
 
-    def _config(self, ctx: RequestContext, thread_id: str) -> Dict[str, Any]:
+    def _config(self, ctx: RequestContext, thread_id: str) -> dict[str, Any]:
         from .agent_runtime.checkpointer import thread_config
 
         return thread_config(ctx, thread_id, recursion_limit=self.limits.recursion_limit)
@@ -338,8 +337,8 @@ class F2WApplication:
             yield
 
     async def delegate(
-        self, ctx: RequestContext, task: str, *, thread_id: str, scope: Optional[FrozenSet[str]] = None,
-        tools: Optional[FrozenSet[str]] = None,
+        self, ctx: RequestContext, task: str, *, thread_id: str, scope: frozenset[str] | None = None,
+        tools: frozenset[str] | None = None,
     ) -> DelegatedOutcome:
         """Run one delegated literature task through the supervisor on ``thread_id``.
 
@@ -371,8 +370,8 @@ class F2WApplication:
 
         messages = list(state.get("messages") or [])
         turn = messages[current_turn_start(messages):]
-        results: List[ToolResult] = []
-        reads: List[Any] = []
+        results: list[ToolResult] = []
+        reads: list[Any] = []
         for message in turn:
             art = getattr(message, "artifact", None)
             if getattr(message, "type", None) != "tool" or not isinstance(art, dict) or not art.get("result"):
@@ -399,10 +398,10 @@ class F2WApplication:
         ctx: RequestContext,
         question: str,
         *,
-        history: Optional[Sequence[Mapping[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
-        thread_id: Optional[str] = None,
+        history: Sequence[Mapping[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
+        thread_id: str | None = None,
         keep_thread: bool = False,
     ) -> SupervisedRead:
         """Answer ``question`` through the planning supervisor (T03B).
@@ -421,15 +420,16 @@ class F2WApplication:
         """
         from .runtime_bridge.operation_answer import operation_verdict
         from .runtime_bridge.qa_route import pin_args, unpin_args
-        from .runtime_bridge.qa_tool import TOOL_NAME as READ_TOOL, ReadOutcome
+        from .runtime_bridge.qa_tool import ReadOutcome
+        from .runtime_bridge.qa_tool import TOOL_NAME as READ_TOOL
 
         self._require_supervisor()
         args = self._read_args(question, history, source_rag, use_live_tiled)
         tid = thread_id or f"qa-{uuid.uuid4().hex}"
         token = pin_args(args)
-        delegated: Optional[DelegatedOutcome] = None
-        fallback: Optional[str] = None
-        operation: Optional[str] = None
+        delegated: DelegatedOutcome | None = None
+        fallback: str | None = None
+        operation: str | None = None
         offered = {READ_TOOL}
         if self.knowledge is not None:
             offered.update(self.knowledge.operation_names())
@@ -474,11 +474,11 @@ class F2WApplication:
         except Exception:  # noqa: BLE001 - best-effort cleanup of a finished one-turn thread
             logger.debug("could not delete QA thread %s", scoped, exc_info=True)
 
-    async def thread_messages(self, ctx: RequestContext, thread_id: str) -> List[Any]:
+    async def thread_messages(self, ctx: RequestContext, thread_id: str) -> list[Any]:
         """Checkpointed messages of ``thread_id`` for ``ctx``'s principal/session."""
         graph = self._require_supervisor()
         snapshot = await graph.aget_state(self._config(ctx, thread_id))
         return list((snapshot.values or {}).get("messages") or [])
 
 
-__all__: Tuple[str, ...] = ("DelegatedOutcome", "F2WApplication", "SupervisedRead")
+__all__: tuple[str, ...] = ("DelegatedOutcome", "F2WApplication", "SupervisedRead")

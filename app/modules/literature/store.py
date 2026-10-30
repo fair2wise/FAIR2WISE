@@ -30,17 +30,17 @@ manifest/duplicate handling) (BSD-3-Clause).
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from enum import Enum
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import tempfile
 import threading
 import time
-from dataclasses import dataclass, field
-from enum import Enum
-from pathlib import Path
-from typing import Any, BinaryIO, Callable, Dict, Iterable, Iterator, Mapping, Optional, Tuple
+from typing import Any, BinaryIO, Callable, Iterable, Iterator, Mapping
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -108,7 +108,7 @@ class StoredAsset:
     size: int
     media_type: str
     kind: str
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
     created_at: float = 0.0
     mode: str = "copy"
 
@@ -166,8 +166,8 @@ def atomic_write_json(path: Path, payload: Any) -> None:
             os.unlink(tmp)
 
 
-def _check_metadata(metadata: Mapping[str, str]) -> Dict[str, str]:
-    out: Dict[str, str] = {}
+def _check_metadata(metadata: Mapping[str, str]) -> dict[str, str]:
+    out: dict[str, str] = {}
     for key, value in (metadata or {}).items():
         if not isinstance(key, str) or not _META_KEY_RE.match(key):
             raise StoreError(ErrorCode.INVALID_INPUT, f"invalid metadata key {key!r}", retryable=False)
@@ -223,15 +223,15 @@ class FileDocumentStore:
         return self.put_stream(ctx, [bytes(data)], media_type=media_type, metadata=metadata).ref
 
     def put_file(self, ctx: RequestContext, path: Path, *, media_type: str,
-                 metadata: Mapping[str, str] = (), max_bytes: Optional[int] = None) -> StoredAsset:
+                 metadata: Mapping[str, str] = (), max_bytes: int | None = None) -> StoredAsset:
         """Copy a local file into the store by streaming it."""
         with Path(path).open("rb") as handle:
             return self.put_stream(ctx, iter(lambda: handle.read(_CHUNK), b""), media_type=media_type,
                                    metadata=dict(metadata or {}), max_bytes=max_bytes)
 
     def put_stream(self, ctx: RequestContext, chunks: Iterable[bytes], *, media_type: str,
-                   metadata: Mapping[str, str] = (), max_bytes: Optional[int] = None,
-                   prefix_check: Optional[Callable[[bytes], bool]] = None) -> StoredAsset:
+                   metadata: Mapping[str, str] = (), max_bytes: int | None = None,
+                   prefix_check: Callable[[bytes], bool] | None = None) -> StoredAsset:
         """Stream ``chunks`` into the store, hashing as they arrive.
 
         Args:
@@ -286,7 +286,7 @@ class FileDocumentStore:
             tmp.unlink(missing_ok=True)
 
     def _commit(self, tmp: Path, hexdigest: str, size: int, media_type: str, kind: str,
-                meta: Dict[str, str], *, external: Optional[Path] = None) -> StoredAsset:
+                meta: dict[str, str], *, external: Path | None = None) -> StoredAsset:
         target = self._object_path(hexdigest)
         meta_path = self._meta_path(hexdigest)
         with self._lock:
@@ -336,11 +336,11 @@ class FileDocumentStore:
 
     # -- reads ----------------------------------------------------------------------------------
 
-    def _read_meta(self, hexdigest: str) -> Optional[StoredAsset]:
+    def _read_meta(self, hexdigest: str) -> StoredAsset | None:
         record = self._read_meta_record(hexdigest)
         return self._asset_from(record) if record is not None else None
 
-    def _read_meta_record(self, hexdigest: str) -> Optional[Dict[str, Any]]:
+    def _read_meta_record(self, hexdigest: str) -> dict[str, Any] | None:
         try:
             return json.loads(self._meta_path(hexdigest).read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -354,7 +354,7 @@ class FileDocumentStore:
             created_at=float(record.get("created_at") or 0.0), mode=str(record.get("mode") or "copy"),
         )
 
-    def _bytes_path(self, hexdigest: str) -> Optional[Path]:
+    def _bytes_path(self, hexdigest: str) -> Path | None:
         target = self._object_path(hexdigest)
         if target.exists():
             return target
@@ -438,7 +438,7 @@ class FileDocumentStore:
                 refs.append(ref)
         return iter(refs)
 
-    def list_assets(self, ctx: RequestContext, *, kind: Optional[AssetKind] = None) -> Tuple[StoredAsset, ...]:
+    def list_assets(self, ctx: RequestContext, *, kind: AssetKind | None = None) -> tuple[StoredAsset, ...]:
         """All stored assets, optionally of one kind."""
         out = []
         for ref in self.list_refs(ctx):

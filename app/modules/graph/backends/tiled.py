@@ -38,7 +38,7 @@ src/forge/kg/paging.py (BSD-3-Clause).
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Iterator, Sequence
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext
@@ -95,7 +95,7 @@ class TiledGraphBackend:
         batch: Entities per batched traversal request.
     """
 
-    def __init__(self, client: TiledGraphClient, *, ledger: Optional[IdentityLedger] = None,
+    def __init__(self, client: TiledGraphClient, *, ledger: IdentityLedger | None = None,
                  page_size: int = 500, max_scan: int = 100_000, link_limit: int = 500, batch: int = 25) -> None:
         if min(page_size, max_scan, link_limit, batch) < 1:
             raise ContractError(ErrorCode.INVALID_INPUT, "page_size, max_scan, link_limit and batch must be >= 1")
@@ -112,12 +112,12 @@ class TiledGraphBackend:
 
     # -- records -----------------------------------------------------------
     @staticmethod
-    def _record(row: Dict[str, Any], graph_id: str, node_id: str) -> Dict[str, Any]:
+    def _record(row: dict[str, Any], graph_id: str, node_id: str) -> dict[str, Any]:
         return entity_record(graph_id, node_id, strip_reserved(row.get("properties")), backend=BACKEND,
                              name=str(row.get("name") or ""), category=str(row.get("entityType") or ""),
                              extra={"tiled_id": row.get("id")})
 
-    def _scan(self) -> Iterator[Dict[str, Any]]:
+    def _scan(self) -> Iterator[dict[str, Any]]:
         """Yield raw entity rows page by page; stop at the end or raise at ``max_scan``."""
         offset = 0
         while True:
@@ -130,14 +130,14 @@ class TiledGraphBackend:
                 return
             offset += len(rows)
 
-    def _scoped_rows(self, graph_id: str) -> Iterator[Tuple[Dict[str, Any], str]]:
+    def _scoped_rows(self, graph_id: str) -> Iterator[tuple[dict[str, Any], str]]:
         for row in self._scan():
             key = literature_entity_key(row)
             if key is not None and key[0] == graph_id:
                 yield row, key[1]
 
     # -- GraphPort ---------------------------------------------------------
-    def _resolve(self, graph_id: str, entity_id: str) -> Optional[Dict[str, Any]]:
+    def _resolve(self, graph_id: str, entity_id: str) -> dict[str, Any] | None:
         known = self.ledger.tiled_id(graph_id, entity_id)
         if known:
             row = self.client.query(_ENTITY_Q, {"i": known}).get("entity")
@@ -157,7 +157,7 @@ class TiledGraphBackend:
             return matches[0]
         return None
 
-    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> Optional[Dict[str, Any]]:
+    def get_entity(self, ctx: RequestContext, graph_id: str, entity_id: str) -> dict[str, Any] | None:
         """Return one in-scope entity, ``None`` only after a complete scan found nothing."""
         require_scope(ctx, graph_id)
         row = self._resolve(graph_id, entity_id)
@@ -165,13 +165,13 @@ class TiledGraphBackend:
 
     def find_entities(
         self, ctx: RequestContext, graph_id: str, query: str, *, limit: int
-    ) -> Tuple[Sequence[Dict[str, Any]], bool]:
+    ) -> tuple[Sequence[dict[str, Any]], bool]:
         """Substring match on name or F2W id; ``complete`` is False if capped or the scan bound hit."""
         require_scope(ctx, graph_id)
         if limit < 1:
             raise ContractError(ErrorCode.INVALID_INPUT, "limit must be >= 1")
         needle = (query or "").lower()
-        hits: List[Dict[str, Any]] = []
+        hits: list[dict[str, Any]] = []
         total = 0
         try:
             for row, node_id in self._scoped_rows(graph_id):
@@ -186,7 +186,7 @@ class TiledGraphBackend:
     def neighborhood(
         self, ctx: RequestContext, graph_id: str, entity_id: str, *, hops: int, max_nodes: int,
         direction: str = "both",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Bounded neighborhood via nested links, one batched query per hop (depth cap 10)."""
         require_scope(ctx, graph_id)
         if direction not in DIRECTIONS:
@@ -195,12 +195,12 @@ class TiledGraphBackend:
         root = self._resolve(graph_id, entity_id)
         if root is None:
             raise ContractError(ErrorCode.NOT_FOUND, f"no entity {entity_id!r} in graph {graph_id!r}")
-        nodes: Dict[str, Dict[str, Any]] = {root["id"]: dict(self._record(root, graph_id, entity_id), depth=0)}
-        edges: Dict[str, Dict[str, Any]] = {}
+        nodes: dict[str, dict[str, Any]] = {root["id"]: dict(self._record(root, graph_id, entity_id), depth=0)}
+        edges: dict[str, dict[str, Any]] = {}
         frontier = [root["id"]]
         truncated = False
         for depth in range(1, hops + 1):
-            nxt: List[str] = []
+            nxt: list[str] = []
             for start in range(0, len(frontier), self.batch):
                 chunk = frontier[start:start + self.batch]
                 for link, other, capped in self._one_hop(chunk, direction):
@@ -231,8 +231,8 @@ class TiledGraphBackend:
                 "missing": [], "truncated": truncated}
 
     @staticmethod
-    def _edge(link: Dict[str, Any], graph_id: str, edge_key: str,
-              nodes: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _edge(link: dict[str, Any], graph_id: str, edge_key: str,
+              nodes: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
         subject, obj = nodes.get(link.get("subjectId")), nodes.get(link.get("objectId"))
         if subject is None or obj is None:
             return None
@@ -241,7 +241,7 @@ class TiledGraphBackend:
         return edge_record(graph_id, edge_key, data, backend=BACKEND, extra={"tiled_id": link.get("id")})
 
     def _one_hop(self, tiled_ids: Sequence[str], direction: str
-                 ) -> Iterator[Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]], bool]]:
+                 ) -> Iterator[tuple[dict[str, Any] | None, dict[str, Any] | None, bool]]:
         parts, variables = [], {}
         for n, tid in enumerate(tiled_ids):
             variables[f"i{n}"] = tid
@@ -285,6 +285,6 @@ class TiledGraphBackend:
         """No owner-checked deletion on 0.2.18 without an access policy."""
         raise CapabilityError("owned_deletion", BACKEND)
 
-    def list_complete(self, ctx: RequestContext, graph_id: str) -> List[Dict[str, Any]]:
+    def list_complete(self, ctx: RequestContext, graph_id: str) -> list[dict[str, Any]]:
         """A provably complete listing (needed by repair planning) is not available."""
         raise CapabilityError("complete_listing", BACKEND)

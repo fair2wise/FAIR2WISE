@@ -18,11 +18,14 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_resolver.py (``resolve``
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from .openalex import (
-    OpenAlexClient, abstract_from_inverted_index, is_not_found, is_quota_paused,
+    OpenAlexClient,
+    abstract_from_inverted_index,
+    is_not_found,
+    is_quota_paused,
 )
 
 _RE_OPENALEX_WID = re.compile(r"W(\d{5,})")
@@ -53,13 +56,13 @@ class WorkNotFound(ResolverError):
 class ResolverUnavailable(ResolverError):
     """OpenAlex did not answer (transport/5xx/rejected) or its quota is paused."""
 
-    def __init__(self, identifier: str, reason: str, resume_at: Optional[float] = None) -> None:
+    def __init__(self, identifier: str, reason: str, resume_at: float | None = None) -> None:
         super().__init__(ErrorCode.UNAVAILABLE, f"could not resolve {identifier!r} ({reason})", retryable=True)
         self.reason = reason
         self.resume_at = resume_at
 
 
-def classify_identifier(identifier: str) -> Dict[str, str]:
+def classify_identifier(identifier: str) -> dict[str, str]:
     """``{"kind": "openalex"|"doi"|"arxiv", "value": ...}`` or raise :class:`UnrecognisedIdentifier`."""
     text = identifier.strip()
     if "openalex.org" in text:
@@ -83,7 +86,7 @@ def classify_identifier(identifier: str) -> Dict[str, str]:
     raise UnrecognisedIdentifier(identifier)
 
 
-def resolve(client: OpenAlexClient, identifier: str) -> Dict[str, Any]:
+def resolve(client: OpenAlexClient, identifier: str) -> dict[str, Any]:
     """Resolve ``identifier`` to a normalized OpenAlex works record.
 
     Raises:
@@ -113,13 +116,13 @@ def resolve(client: OpenAlexClient, identifier: str) -> Dict[str, Any]:
     return record
 
 
-def normalise_abstract(record: Dict[str, Any]) -> None:
+def normalise_abstract(record: dict[str, Any]) -> None:
     """Reconstruct ``abstract`` from the inverted index when missing (in place)."""
     if not record.get("abstract") and record.get("abstract_inverted_index"):
         record["abstract"] = abstract_from_inverted_index(record.get("abstract_inverted_index"))
 
 
-def normalise_bibliographic(record: Dict[str, Any]) -> None:
+def normalise_bibliographic(record: dict[str, Any]) -> None:
     """Lift ``authors``, ``journal`` and ``abstract_snippet`` to the top level, never overwriting.
 
     Author ids are bare (``A123``), never URLs, so a graph writer cannot mint a
@@ -144,7 +147,7 @@ def normalise_bibliographic(record: Dict[str, Any]) -> None:
         record["abstract_snippet"] = str(record.get("abstract") or "")[:_SNIPPET_CHARS]
 
 
-def ensure_oa_fields(record: Dict[str, Any]) -> None:
+def ensure_oa_fields(record: dict[str, Any]) -> None:
     """Ensure ``is_oa``, ``oa_url`` and ``pdf_url`` exist at the top level (in place)."""
     oa_block = record.get("open_access") or {}
     record.setdefault("is_oa", bool(oa_block.get("is_oa", False)))

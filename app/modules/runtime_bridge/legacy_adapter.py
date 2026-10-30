@@ -40,14 +40,13 @@ from __future__ import annotations
 
 import logging
 import os
-import re
-import uuid
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional
+import re
+from typing import Any, Callable, Mapping
+import uuid
 
 from ..contracts import ActorKind, RequestContext
 from ..security.authorization import DeploymentSettings
-
 from .mode import RuntimeConfigError
 from .qa_route import QaRoute, TracedPlanningModel, pipeline_planning_model, qa_route
 from .retrieval import LegacyRetrievalService
@@ -61,7 +60,7 @@ DEFAULT_WRITER_IDENTITY = "f2w-writer"
 _SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
-def legacy_deployment_settings(environ: Optional[Mapping[str, str]] = None) -> DeploymentSettings:
+def legacy_deployment_settings(environ: Mapping[str, str] | None = None) -> DeploymentSettings:
     """Startup settings for the legacy service in langgraph mode.
 
     Raises:
@@ -71,7 +70,7 @@ def legacy_deployment_settings(environ: Optional[Mapping[str, str]] = None) -> D
     env = os.environ if environ is None else environ
     keys = ("F2W_DEPLOYMENT_PROFILE", "F2W_AUTHORIZATION_MODE", "F2W_TILED_URL", "F2W_TILED_WRITER_IDENTITY",
             "F2W_LOCAL_BIND", "F2W_ROLE_CHECK_MAX_AGE", "F2W_CORPUS_SCOPE")
-    values: Dict[str, str] = {k: str(env.get(k) or "") for k in keys}
+    values: dict[str, str] = {k: str(env.get(k) or "") for k in keys}
     values["F2W_DEPLOYMENT_PROFILE"] = values["F2W_DEPLOYMENT_PROFILE"].strip() or "local"
     values["F2W_TILED_WRITER_IDENTITY"] = values["F2W_TILED_WRITER_IDENTITY"].strip() or DEFAULT_WRITER_IDENTITY
     settings = DeploymentSettings.from_mapping(values)
@@ -104,9 +103,9 @@ class LegacyReadPath:
         self,
         question: str,
         *,
-        history: Optional[List[Dict[str, str]]] = None,
-        source_rag: Optional[bool] = None,
-        use_live_tiled: Optional[bool] = None,
+        history: list[dict[str, str]] | None = None,
+        source_rag: bool | None = None,
+        use_live_tiled: bool | None = None,
     ) -> Any:
         """Answer ``question`` with the same contract as ``AgentPipelineService._query_retrieval``'s agent call.
 
@@ -127,7 +126,7 @@ class LegacyReadPath:
 planning_model_provider: Callable[[Any], Callable[[], Any]] = pipeline_planning_model
 
 
-def active_json_graph_files(pipeline: Any) -> List[str]:
+def active_json_graph_files(pipeline: Any) -> list[str]:
     """The JSON graph files of ``pipeline``'s active runtime (T25D per-user selection), existing ones only.
 
     Empty when the active graph source is not ``json`` (Splash/Tiled mode has no JSON snapshot
@@ -138,7 +137,7 @@ def active_json_graph_files(pipeline: Any) -> List[str]:
         return []
     paths_fn = getattr(pipeline, "_runtime_json_paths", None)
     raw = list(paths_fn() if callable(paths_fn) else (getattr(runtime, "json_graph_paths", None) or []))
-    out: List[str] = []
+    out: list[str] = []
     for path in raw:
         candidate = Path(str(path))
         if not candidate.is_absolute():
@@ -148,8 +147,8 @@ def active_json_graph_files(pipeline: Any) -> List[str]:
     return out
 
 
-def build_knowledge_operations(pipeline: Any, settings: Optional[DeploymentSettings] = None,
-                               environ: Optional[Mapping[str, str]] = None) -> Any:
+def build_knowledge_operations(pipeline: Any, settings: DeploymentSettings | None = None,
+                               environ: Mapping[str, str] | None = None) -> Any:
     """``KnowledgeOperations`` following ``pipeline``'s active graph selection and ``storage/terminology``.
 
     The deployment's Tiled graphs are served beside the JSON selection (D3.17) when the
@@ -178,7 +177,7 @@ def build_knowledge_operations(pipeline: Any, settings: Optional[DeploymentSetti
     return knowledge
 
 
-def build_legacy_read_path(pipeline: Any, environ: Optional[Mapping[str, str]] = None) -> LegacyReadPath:
+def build_legacy_read_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> LegacyReadPath:
     """Build the langgraph-mode read path for one ``AgentPipelineService`` instance.
 
     Raises:

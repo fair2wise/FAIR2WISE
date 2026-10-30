@@ -21,16 +21,16 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/reso
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 import json
 import logging
+from pathlib import Path
 import re
 import sqlite3
 import threading
 import time
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple, Union
+from typing import Any, Callable, Iterable, Protocol, Sequence, Union
 
 import httpx
 
@@ -107,7 +107,7 @@ class Resolved:
 
     key: str
     source: str
-    record: Optional[Dict[str, Any]]
+    record: dict[str, Any] | None
     fetched_at: str
     cost_usd: float = 0.0
 
@@ -130,7 +130,7 @@ class ResolverCache:
         self.con.execute("CREATE TABLE IF NOT EXISTS resolved(key TEXT PRIMARY KEY, source TEXT NOT NULL, "
                          "record TEXT, fetched_at TEXT NOT NULL, cost_usd REAL NOT NULL DEFAULT 0)")
 
-    def get(self, key: str) -> Optional[Resolved]:
+    def get(self, key: str) -> Resolved | None:
         """The live row for ``key``, or ``None`` when absent or expired."""
         with self.lock:
             row = self.con.execute("SELECT source, record, fetched_at, cost_usd FROM resolved WHERE key=?",
@@ -139,7 +139,7 @@ class ResolverCache:
             return None
         source, record, fetched_at, cost = row
         try:
-            age = datetime.now(timezone.utc) - datetime.fromisoformat(fetched_at)
+            age = datetime.now(UTC) - datetime.fromisoformat(fetched_at)
         except ValueError:
             return None
         if age > (self.negative_ttl if record is None else self.positive_ttl):
@@ -153,7 +153,7 @@ class ResolverCache:
             self.con.execute("INSERT OR REPLACE INTO resolved VALUES(?,?,?,?,?)",
                              (resolved.key, resolved.source, record, resolved.fetched_at, resolved.cost_usd))
 
-    def count(self, *, negative: Optional[bool] = None) -> int:
+    def count(self, *, negative: bool | None = None) -> int:
         """Rows in the cache; ``negative=True`` counts only verified negatives."""
         clause = {None: "", True: " WHERE record IS NULL", False: " WHERE record IS NOT NULL"}[negative]
         with self.lock:
@@ -166,7 +166,7 @@ class ResolverCache:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 class ReferenceLike(Protocol):
@@ -174,7 +174,7 @@ class ReferenceLike(Protocol):
 
     index: int
     title: str
-    year: Optional[int]
+    year: int | None
     journal: str
     volume: str
     first_page: str
@@ -214,7 +214,7 @@ def _title_year_agree(ref: ReferenceLike, title: str, year: object) -> bool:
         return True
 
 
-def _crossref_year(item: Dict[str, Any]) -> Any:
+def _crossref_year(item: dict[str, Any]) -> Any:
     for name in ("issued", "published-print", "published-online"):
         parts = (item.get(name) or {}).get("date-parts") or [[None]]
         if parts and parts[0] and parts[0][0]:
@@ -238,9 +238,9 @@ class BatchResolver:
         buckets: ``(openalex, s2, crossref)`` token buckets.
     """
 
-    def __init__(self, openalex: OpenAlexClient, *, cache: Optional[ResolverCache] = None,
-                 http: Optional[httpx.Client] = None, sleep: Callable[[float], None] = time.sleep,
-                 buckets: Optional[Tuple[TokenBucket, TokenBucket, TokenBucket]] = None) -> None:
+    def __init__(self, openalex: OpenAlexClient, *, cache: ResolverCache | None = None,
+                 http: httpx.Client | None = None, sleep: Callable[[float], None] = time.sleep,
+                 buckets: tuple[TokenBucket, TokenBucket, TokenBucket] | None = None) -> None:
         self.openalex = openalex
         self.cache = cache if cache is not None else ResolverCache()
         self.http = http or openalex.http
@@ -249,15 +249,15 @@ class BatchResolver:
         self._sleep = sleep
         self.oa_bucket, self.s2_bucket, self.cr_bucket = buckets or (
             TokenBucket(8.0, 8), TokenBucket(0.9, 1), TokenBucket(2.5, 3))
-        self.requests: Dict[str, int] = {"openalex": 0, "semantic_scholar": 0, "crossref": 0}
+        self.requests: dict[str, int] = {"openalex": 0, "semantic_scholar": 0, "crossref": 0}
         self.cost_usd = 0.0
 
     # -- OpenAlex -------------------------------------------------------------------------------
 
-    def _oa_params(self, **extra: Any) -> Dict[str, Any]:
+    def _oa_params(self, **extra: Any) -> dict[str, Any]:
         return {"select": OA_SELECT, **extra, **self.openalex.settings.auth_params()}
 
-    def _oa_get(self, path: str, params: Dict[str, Any]) -> httpx.Response:
+    def _oa_get(self, path: str, params: dict[str, Any]) -> httpx.Response:
         breaker = self.openalex.breaker
         for attempt in range(3):
             if breaker.state() is not None:
@@ -283,9 +283,9 @@ class BatchResolver:
             raise _Unanswered(f"openalex HTTP {resp.status_code}")
         raise _Unanswered("openalex retries exhausted")
 
-    def openalex_singletons(self, dois: Sequence[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+    def openalex_singletons(self, dois: Sequence[str]) -> dict[str, dict[str, Any] | None]:
         """Free; one call per DOI. Absent from the result means could not ask."""
-        out: Dict[str, Optional[Dict[str, Any]]] = {}
+        out: dict[str, dict[str, Any] | None] = {}
         for doi in dois:
             try:
                 resp = self._oa_get(f"works/https://doi.org/{doi}", self._oa_params())
@@ -296,9 +296,9 @@ class BatchResolver:
             out[doi] = resp.json() if resp.status_code == 200 else None
         return out
 
-    def openalex_batch(self, dois: Sequence[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+    def openalex_batch(self, dois: Sequence[str]) -> dict[str, dict[str, Any] | None]:
         """$0.0001 per 50 DOIs. A DOI the batch answered without is a verified negative."""
-        out: Dict[str, Optional[Dict[str, Any]]] = {}
+        out: dict[str, dict[str, Any] | None] = {}
         safe = [d for d in dois if "|" not in d and "," not in d]
         for start in range(0, len(safe), OA_BATCH):
             chunk = safe[start:start + OA_BATCH]
@@ -322,9 +322,9 @@ class BatchResolver:
 
     # -- Semantic Scholar -----------------------------------------------------------------------
 
-    def s2_batch(self, ids: Sequence[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+    def s2_batch(self, ids: Sequence[str]) -> dict[str, dict[str, Any] | None]:
         """500 ids per POST (``DOI:10...``); S2 answers ``null`` for unknown ids."""
-        out: Dict[str, Optional[Dict[str, Any]]] = {}
+        out: dict[str, dict[str, Any] | None] = {}
         headers = {"x-api-key": self.s2_key} if self.s2_key else {}
         for start in range(0, len(ids), S2_BATCH):
             chunk = list(ids[start:start + S2_BATCH])
@@ -351,10 +351,10 @@ class BatchResolver:
 
     # -- Crossref -------------------------------------------------------------------------------
 
-    def _crossref_params(self, **extra: Any) -> Dict[str, Any]:
+    def _crossref_params(self, **extra: Any) -> dict[str, Any]:
         return {**extra, **({"mailto": self.mailto} if self.mailto else {})}
 
-    def crossref_doi(self, doi: str) -> Optional[Dict[str, Any]]:
+    def crossref_doi(self, doi: str) -> dict[str, Any] | None:
         """The Crossref record, ``None`` for a 404; raises :class:`_Unanswered` otherwise."""
         self.cr_bucket.take()
         try:
@@ -368,7 +368,7 @@ class BatchResolver:
             return None
         raise _Unanswered(f"crossref HTTP {resp.status_code}")
 
-    def crossref_bibliographic(self, ref: ReferenceLike) -> Optional[Dict[str, Any]]:
+    def crossref_bibliographic(self, ref: ReferenceLike) -> dict[str, Any] | None:
         """DOI-less references: ``query.bibliographic`` plus a title/year agreement check."""
         query = " ".join(filter(None, [ref.title, ref.journal, str(ref.year or ""), ref.volume, ref.first_page]))
         self.cr_bucket.take()
@@ -386,7 +386,7 @@ class BatchResolver:
                 return item
         return None
 
-    def s2_title_match(self, ref: ReferenceLike) -> Optional[Dict[str, Any]]:
+    def s2_title_match(self, ref: ReferenceLike) -> dict[str, Any] | None:
         """S2 ``paper/search/match`` best hit, accepted only if title and year agree."""
         self.s2_bucket.take()
         try:
@@ -407,15 +407,15 @@ class BatchResolver:
     # -- orchestration --------------------------------------------------------------------------
 
     def resolve_dois(self, dois: Iterable[str], *,
-                     prefer_batch_above: int = PREFER_BATCH_ABOVE) -> Dict[str, Resolved]:
+                     prefer_batch_above: int = PREFER_BATCH_ABOVE) -> dict[str, Resolved]:
         """``{doi: Resolved}`` for every DOI with an answer, cached or new.
 
         A DOI absent from the result could not be asked (quota, transport) and is
         retried next time; ``record=None`` is a verified negative.
         """
         wanted = sorted({d for d in (normalise_doi(x) for x in dois) if d})
-        results: Dict[str, Resolved] = {}
-        todo: List[str] = []
+        results: dict[str, Resolved] = {}
+        todo: list[str] = []
         for doi in wanted:
             hit = self.cache.get("doi:" + doi)
             if hit is not None:
@@ -456,7 +456,7 @@ class BatchResolver:
                 self.cache.put(results[doi])
         return results
 
-    def resolve_references(self, refs: Sequence[ReferenceLike]) -> Dict[int, Resolved]:
+    def resolve_references(self, refs: Sequence[ReferenceLike]) -> dict[int, Resolved]:
         """Reference index -> positive resolution (DOI path first, then title match)."""
         by_doi = {r.index: normalise_doi(r.doi) for r in refs if normalise_doi(r.doi)}
         resolved = self.resolve_dois(by_doi.values())
@@ -469,7 +469,7 @@ class BatchResolver:
                 if hit.record:
                     out[ref.index] = hit
                 continue
-            rec: Optional[Dict[str, Any]] = None
+            rec: dict[str, Any] | None = None
             source = "none"
             answered = True
             try:

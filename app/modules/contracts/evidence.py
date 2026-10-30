@@ -8,7 +8,6 @@ when it matches the retained source version (plan section 4.8, D19).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -44,17 +43,17 @@ class SourceLocator(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    page: Optional[int] = Field(default=None, ge=1)
-    section: Optional[str] = None
-    char_span: Optional[Tuple[int, int]] = None
-    figure: Optional[str] = None
-    panel: Optional[str] = None
-    bbox: Optional[Tuple[float, float, float, float]] = None
-    bbox_units: Optional[str] = None
-    bbox_origin: Optional[str] = None
+    page: int | None = Field(default=None, ge=1)
+    section: str | None = None
+    char_span: tuple[int, int] | None = None
+    figure: str | None = None
+    panel: str | None = None
+    bbox: tuple[float, float, float, float] | None = None
+    bbox_units: str | None = None
+    bbox_origin: str | None = None
 
     @model_validator(mode="after")
-    def _bbox_has_frame(self) -> "SourceLocator":
+    def _bbox_has_frame(self) -> SourceLocator:
         """Require units and origin whenever a bounding box is given."""
         if self.bbox is not None and not (self.bbox_units and self.bbox_origin):
             raise ValueError("bbox requires bbox_units and bbox_origin")
@@ -88,16 +87,16 @@ class EvidenceRef(BaseModel):
     evidence_id: str
     work_id: str
     source_version: str
-    source_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     locator: SourceLocator
     match_type: MatchType = MatchType.NONE
-    quote: Optional[str] = None
-    parser_revision: Optional[str] = None
-    normalization_profile: Optional[str] = None
-    citation: Optional[str] = None
+    quote: str | None = None
+    parser_revision: str | None = None
+    normalization_profile: str | None = None
+    citation: str | None = None
 
     @model_validator(mode="after")
-    def _quote_matches_type(self) -> "EvidenceRef":
+    def _quote_matches_type(self) -> EvidenceRef:
         """An exact or normalized match must carry the quoted text."""
         if self.match_type in (MatchType.EXACT, MatchType.NORMALIZED) and not self.quote:
             raise ValueError(f"match_type {self.match_type.value} requires a quote")

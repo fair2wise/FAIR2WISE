@@ -25,11 +25,11 @@ claim trust (``X-Local-Trusted`` and similar) are logged and ignored.
 
 from __future__ import annotations
 
-import logging
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Mapping, Optional, Protocol
+from datetime import UTC, datetime
+import logging
+from typing import Any, Callable, Mapping, Protocol
+import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 #: Opaque, HttpOnly session cookie scoped to /fair2wise (access_contract.md section 5.1).
 SESSION_COOKIE = "f2w_session"
 
-_STATUS: Dict[ErrorCode, int] = {
+_STATUS: dict[ErrorCode, int] = {
     ErrorCode.INVALID_INPUT: 422,
     ErrorCode.DENIED: 403,
     ErrorCode.UNAVAILABLE: 503,
@@ -76,14 +76,14 @@ _STATUS: Dict[ErrorCode, int] = {
 class CredentialStore(Protocol):
     """Server-side session store: opaque session id -> the user's Tiled credential."""
 
-    def get(self, session_token: str) -> Optional[TiledCredential]:
+    def get(self, session_token: str) -> TiledCredential | None:
         """Return the credential for ``session_token``, or ``None`` if signed out/unknown."""
         ...
 
 
 def _utcnow() -> datetime:
     """Return the current UTC time."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass
@@ -100,15 +100,15 @@ class AccessRuntime:
     """
 
     settings: DeploymentSettings
-    identity_port: Optional[TiledIdentityPort] = None
-    credential_store: Optional[CredentialStore] = None
+    identity_port: TiledIdentityPort | None = None
+    credential_store: CredentialStore | None = None
     surface: str = AGENT_SURFACE
     clock: Callable[[], datetime] = _utcnow
-    role_cache: Optional[RoleCheckCache] = field(default=None)
+    role_cache: RoleCheckCache | None = field(default=None)
     #: Called with ``{"subject", "reason"}`` when an ALS caller signs out or loses admin (T14).
-    scope_listeners: List[Callable[[Mapping[str, Any]], None]] = field(default_factory=list)
+    scope_listeners: list[Callable[[Mapping[str, Any]], None]] = field(default_factory=list)
     #: Last verified admin flag per ALS subject (bounded), to detect a role downgrade.
-    _admin_seen: Dict[str, bool] = field(default_factory=dict, init=False, repr=False)
+    _admin_seen: dict[str, bool] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.role_cache is None:
@@ -126,13 +126,13 @@ class AccessRuntime:
             except Exception:  # noqa: BLE001 - one listener must not hide the change from the rest
                 logger.exception("scope-change listener failed")
 
-    def bind_session_subject(self, session_token: Optional[str], ctx: RequestContext) -> None:
+    def bind_session_subject(self, session_token: str | None, ctx: RequestContext) -> None:
         """Index a verified ALS session by its subject, so workers can look the credential up (AUD-01)."""
         bind = getattr(self.credential_store, "bind_subject", None)
         if session_token and callable(bind) and not self.settings.is_local:
             bind(session_token, ctx.principal.subject)
 
-    def credential_lookup(self) -> Optional[Callable[[str], Optional[TiledCredential]]]:
+    def credential_lookup(self) -> Callable[[str], TiledCredential | None] | None:
         """``subject -> current credential`` over the session store, or ``None`` when it has no subject index."""
         lookup = getattr(self.credential_store, "credential_for_subject", None)
         return lookup if callable(lookup) else None
@@ -152,7 +152,7 @@ class AccessRuntime:
             self.notify_scope_change({"subject": subject, "reason": "role_downgraded"})
 
 
-def warn_if_exposed(app: Any, host: Any) -> Optional[str]:
+def warn_if_exposed(app: Any, host: Any) -> str | None:
     """Log and return the AUD-16 warning when ``app`` (``:local``) is about to serve beyond loopback.
 
     Called by both ``run_api`` entry points with the uvicorn bind host. Apps without an
@@ -190,7 +190,7 @@ def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
     return app
 
 
-def lookup_policy(method: str, path: str, surface: str) -> Optional[RoutePolicy]:
+def lookup_policy(method: str, path: str, surface: str) -> RoutePolicy | None:
     """Return the declared policy of a route on ``surface``, or ``None`` (default-deny on ALS).
 
     The T14 ``/v1`` routes are declared once for the app factory (``API_SURFACE``); they
@@ -202,7 +202,7 @@ def lookup_policy(method: str, path: str, surface: str) -> Optional[RoutePolicy]
     return policy
 
 
-def undeclared_routes(app: FastAPI, surface: Optional[str] = None) -> List[str]:
+def undeclared_routes(app: FastAPI, surface: str | None = None) -> list[str]:
     """Return ``"METHOD path"`` for app routes without a declared policy (DEP-19).
 
     A mounted sub-application is inspected recursively when it is a FastAPI app that carries
@@ -245,7 +245,7 @@ def _runtime(request: Request) -> AccessRuntime:
     return runtime
 
 
-def _policy(request: Request, runtime: AccessRuntime) -> Optional[RoutePolicy]:
+def _policy(request: Request, runtime: AccessRuntime) -> RoutePolicy | None:
     """Return the declared policy for the matched route, if any."""
     route = request.scope.get("route")
     path = getattr(route, "path", None)
@@ -261,7 +261,7 @@ def _log_trust_claims(request: Request) -> None:
         logger.warning("ignored request trust claims: %s", ", ".join(claimed))
 
 
-def _resolve(request: Request, policy: Optional[RoutePolicy], *, fresh: bool = False) -> RequestContext:
+def _resolve(request: Request, policy: RoutePolicy | None, *, fresh: bool = False) -> RequestContext:
     """Resolve the context for ``request`` and check the route's entry capabilities.
 
     ``fresh`` forces a new ALS role check (privileged boundary inside a handler).
@@ -271,7 +271,7 @@ def _resolve(request: Request, policy: Optional[RoutePolicy], *, fresh: bool = F
     _log_trust_claims(request)
     if policy is not None and not policy.exposed_on(settings):
         raise ContractError(ErrorCode.DENIED, "route is not exposed on this deployment profile")
-    credential: Optional[TiledCredential] = None
+    credential: TiledCredential | None = None
     if not settings.is_local:
         token = request.cookies.get(SESSION_COOKIE)
         if token and runtime.credential_store is not None:
@@ -311,7 +311,7 @@ def fresh_request_context(request: Request) -> RequestContext:
     return _resolve(request, _policy(request, _runtime(request)), fresh=True)
 
 
-def session_credential(request: Request) -> Optional[TiledCredential]:
+def session_credential(request: Request) -> TiledCredential | None:
     """Return the ALS caller's own credential from the server-side session store (never sent out).
 
     ``create_approval`` re-verifies the approver with it (fresh whoami with the approver's
@@ -324,7 +324,7 @@ def session_credential(request: Request) -> Optional[TiledCredential]:
     return runtime.credential_store.get(token) if token else None
 
 
-def current_subject(request: Request) -> Optional[str]:
+def current_subject(request: Request) -> str | None:
     """Return the verified ALS subject of the request's session, or ``None`` (best effort).
 
     Used by sign-out to name the subject whose approvals depend on the session. Uses the
@@ -346,7 +346,7 @@ def current_subject(request: Request) -> Optional[str]:
     return ctx.principal.subject
 
 
-async def optional_request_context(request: Request) -> Optional[RequestContext]:
+async def optional_request_context(request: Request) -> RequestContext | None:
     """FastAPI dependency for public routes: ``None`` for a signed-out ALS caller.
 
     On a non-public route this behaves exactly like :func:`request_context`.

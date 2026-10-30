@@ -18,11 +18,11 @@ structure identifier exists (H3 binary cases).
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .gates import authorize_vocabulary_change
 from .merge_safety import check_merge, is_acronym_of
@@ -31,9 +31,9 @@ from .vocabulary import CATEGORIES, VocabEntry, Vocabulary, VocabularyApproval, 
 _BRACKETED = re.compile(r"\(([A-Z][A-Za-z0-9-]{1,11})\)")
 
 
-def definitions(text: str) -> List[Tuple[str, str]]:
+def definitions(text: str) -> list[tuple[str, str]]:
     """``(acronym, expansion)`` pairs where the words before ``(ACR)`` spell the acronym."""
-    found: List[Tuple[str, str]] = []
+    found: list[tuple[str, str]] = []
     for match in _BRACKETED.finditer(text or ""):
         acronym = match.group(1)
         words = re.findall(r"[A-Za-z0-9\-]+", text[: match.start()])
@@ -52,7 +52,7 @@ class Observation:
     label: str
     category: str
     publication: str
-    aliases: Tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
     quote: str = ""
     document_hash: str = ""
 
@@ -72,8 +72,8 @@ class VocabularyProposal:
     """Reviewable additions to one base revision, with every withheld promotion preserved."""
 
     base_revision: str
-    entries: Tuple[VocabEntry, ...]
-    withheld: Tuple[WithheldPromotion, ...]
+    entries: tuple[VocabEntry, ...]
+    withheld: tuple[WithheldPromotion, ...]
     min_publications: int
     revision: str = ""
 
@@ -95,7 +95,7 @@ class VocabularyProposal:
 class ObservationLog:
     """Append-only observations; the only thing staging does."""
 
-    observations: List[Observation] = field(default_factory=list)
+    observations: list[Observation] = field(default_factory=list)
 
     def observe(self, obs: Observation) -> None:
         """Append an observation; nothing is promoted by staging."""
@@ -106,7 +106,7 @@ class ObservationLog:
         return json.dumps([o.__dict__ for o in self.observations], sort_keys=True, default=list)
 
     @staticmethod
-    def from_json(text: str) -> "ObservationLog":
+    def from_json(text: str) -> ObservationLog:
         """Rebuild a log from ``to_json`` output (alias lists become tuples)."""
         return ObservationLog(
             [Observation(**{**o, "aliases": tuple(o.get("aliases") or ())}) for o in json.loads(text)]
@@ -115,11 +115,11 @@ class ObservationLog:
 
 def propose_promotion(base: Vocabulary, log: ObservationLog, *, min_publications: int = 3) -> VocabularyProposal:
     """Group observations by (category, slug) and propose well-supported, collision-free entries."""
-    groups: Dict[Tuple[str, str], List[Observation]] = {}
+    groups: dict[tuple[str, str], list[Observation]] = {}
     for obs in log.observations:
         groups.setdefault((obs.category, entity_slug(obs.label)), []).append(obs)
-    entries: List[VocabEntry] = []
-    withheld: List[WithheldPromotion] = []
+    entries: list[VocabEntry] = []
+    withheld: list[WithheldPromotion] = []
     working = list(base.entries)
     for (category, slug), observed in sorted(groups.items()):
         label = observed[0].label
@@ -164,7 +164,7 @@ def propose_promotion(base: Vocabulary, log: ObservationLog, *, min_publications
     return VocabularyProposal(base.revision, tuple(entries), tuple(withheld), min_publications)
 
 
-def promote(base: Vocabulary, proposal: VocabularyProposal, approval: Optional[VocabularyApproval]) -> Vocabulary:
+def promote(base: Vocabulary, proposal: VocabularyProposal, approval: VocabularyApproval | None) -> Vocabulary:
     """Gated promotion: a new CANDIDATE vocabulary (version + 1) containing the proposal's entries.
 
     Raises:
@@ -182,7 +182,7 @@ def promote(base: Vocabulary, proposal: VocabularyProposal, approval: Optional[V
     )
 
 
-def observation_summary(log: ObservationLog) -> Dict[str, Any]:
+def observation_summary(log: ObservationLog) -> dict[str, Any]:
     """Counts for reports: observations and distinct labels (candidate counts, not canonical entities)."""
     return {
         "observations": len(log.observations),

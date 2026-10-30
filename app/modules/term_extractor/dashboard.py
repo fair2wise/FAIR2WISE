@@ -10,10 +10,7 @@ import threading
 import time
 from typing import Any
 
-from flask import Flask
-from flask import request
-from flask import Response
-from flask import send_from_directory
+from flask import Flask, Response, request, send_from_directory
 
 from .message import Log, Registration, Stats, UserPrompt
 

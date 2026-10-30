@@ -11,9 +11,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -30,15 +30,15 @@ class ReceiptExtras(BaseModel):
     manifest_sha256: str
     snapshot_id: str
     graph_id: str
-    corpus_scope: List[str]
+    corpus_scope: list[str]
     requested_by: str
     approved_by: str
     profile: str
     authorization_mode: str
     base_revision: str
     resulting_revision: str
-    data_commit: Optional[str] = None
-    operation_counts: Dict[str, int] = {}
+    data_commit: str | None = None
+    operation_counts: dict[str, int] = {}
     dangling_unimported: int = 0
 
 
@@ -113,7 +113,7 @@ class ReceiptStore:
             raise ContractError(ErrorCode.INTERNAL, f"receipt {receipt_id!r} fails its own hash")
         return artifact
 
-    def all(self) -> List[ReceiptArtifact]:
+    def all(self) -> list[ReceiptArtifact]:
         """Every readable, self-consistent receipt."""
         out = []
         for path in sorted(self.root.glob("*.json")) if self.root.exists() else []:
@@ -123,7 +123,7 @@ class ReceiptStore:
                 continue
         return out
 
-    def find(self, **match: Any) -> List[ReceiptArtifact]:
+    def find(self, **match: Any) -> list[ReceiptArtifact]:
         """Receipts whose receipt/extras fields equal ``match`` (for example ``plan_sha256=...``)."""
         out = []
         for art in self.all():

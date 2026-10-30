@@ -8,8 +8,8 @@ Precedence for callers should be:
 """
 from __future__ import annotations
 
-import os
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Any, Callable, Iterable
 

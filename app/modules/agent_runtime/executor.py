@@ -29,14 +29,14 @@ injected, an artifact reference.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
+from datetime import datetime
 import inspect
 import json
 import logging
 import sys
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, FrozenSet, Mapping, Optional, Tuple
+from typing import Any, Awaitable, Callable, Mapping
 
 from ..contracts import (
     ApprovalRecord,
@@ -49,7 +49,6 @@ from ..contracts import (
     ToolSpec,
     ToolStatus,
 )
-
 from .admission import ensure_admission
 from .policies import (
     ApprovalCheck,
@@ -103,7 +102,7 @@ class RuntimeLimits:
     retry_backoff_s: float = 0.5
     stale_tool_result_chars: int = 120_000
     recursion_limit: int = 64
-    approval_request_ttl_s: Optional[float] = 86_400.0
+    approval_request_ttl_s: float | None = 86_400.0
 
 
 @dataclass
@@ -112,7 +111,7 @@ class TurnLedger:
 
     calls_used: int = 0
     cost_used: int = 0
-    seen: Dict[str, ToolResult] = field(default_factory=dict)
+    seen: dict[str, ToolResult] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -135,14 +134,14 @@ class ToolInvocation:
 
     ctx: RequestContext
     spec: ToolSpec
-    args: Dict[str, Any]
+    args: dict[str, Any]
     admission: Any
     artifact_store: Any = None
-    deadline: Optional[datetime] = None
+    deadline: datetime | None = None
     attempt: int = 1
-    tool_call_id: Optional[str] = None
-    plan: Optional[ChangePlan] = None
-    approval: Optional[ApprovalRecord] = None
+    tool_call_id: str | None = None
+    plan: ChangePlan | None = None
+    approval: ApprovalRecord | None = None
 
 
 @dataclass(frozen=True)
@@ -226,10 +225,10 @@ class ToolExecutor:
         self,
         registry: ToolRegistry,
         *,
-        approval_check: Optional[ApprovalCheck] = None,
-        event_sink: Optional[EventSink] = None,
+        approval_check: ApprovalCheck | None = None,
+        event_sink: EventSink | None = None,
         admission: Any = None,
-        limits: Optional[RuntimeLimits] = None,
+        limits: RuntimeLimits | None = None,
         artifact_store: Any = None,
         clock: Callable[[], datetime] = utcnow,
         sleep: Callable[[float], None] = time.sleep,
@@ -257,9 +256,9 @@ class ToolExecutor:
 
     def execute_call(
         self, ctx: RequestContext, name: str, args: Mapping[str, Any], *,
-        ledger: Optional[TurnLedger] = None, plan: Optional[ChangePlan] = None,
-        approval: Optional[ApprovalRecord] = None, scope: Optional[FrozenSet[str]] = None,
-        tool_call_id: Optional[str] = None, thread_id: Optional[str] = None,
+        ledger: TurnLedger | None = None, plan: ChangePlan | None = None,
+        approval: ApprovalRecord | None = None, scope: frozenset[str] | None = None,
+        tool_call_id: str | None = None, thread_id: str | None = None,
     ) -> ToolOutcome:
         """Run one call synchronously; the counterpart of :meth:`aexecute_call`.
 
@@ -281,9 +280,9 @@ class ToolExecutor:
 
     async def aexecute_call(
         self, ctx: RequestContext, name: str, args: Mapping[str, Any], *,
-        ledger: Optional[TurnLedger] = None, plan: Optional[ChangePlan] = None,
-        approval: Optional[ApprovalRecord] = None, scope: Optional[FrozenSet[str]] = None,
-        tool_call_id: Optional[str] = None, thread_id: Optional[str] = None,
+        ledger: TurnLedger | None = None, plan: ChangePlan | None = None,
+        approval: ApprovalRecord | None = None, scope: frozenset[str] | None = None,
+        tool_call_id: str | None = None, thread_id: str | None = None,
     ) -> ToolOutcome:
         """Check, invoke (with transient retries) and record one tool call.
 
@@ -429,7 +428,7 @@ class ToolExecutor:
         return result
 
     def _should_retry(
-        self, spec: ToolSpec, result: ToolResult, attempt: int, deadline: Optional[datetime],
+        self, spec: ToolSpec, result: ToolResult, attempt: int, deadline: datetime | None,
     ) -> bool:
         if not (result.retryable and spec.idempotent):
             return False
@@ -445,7 +444,7 @@ class ToolExecutor:
     # -- completion ---------------------------------------------------------------
 
     def _finish(
-        self, prep: "_Prepared", result: ToolResult, attempts: int, ledger: Optional[TurnLedger],
+        self, prep: _Prepared, result: ToolResult, attempts: int, ledger: TurnLedger | None,
     ) -> ToolOutcome:
         result = self._bound(prep.ctx, result)
         if is_write(prep.entry.spec):
@@ -490,7 +489,7 @@ class _DeadlineExceeded(Exception):
     pass
 
 
-async def _await_with_deadline(awaitable: Any, deadline: Optional[datetime], clock: Callable[[], datetime]) -> Any:
+async def _await_with_deadline(awaitable: Any, deadline: datetime | None, clock: Callable[[], datetime]) -> Any:
     if deadline is None:
         return await awaitable
     remaining = (deadline - clock()).total_seconds()
@@ -512,7 +511,7 @@ def _close(awaitable: Any) -> None:
         close()
 
 
-def _validate(schema: Mapping[str, Any], instance: Any) -> Optional[str]:
+def _validate(schema: Mapping[str, Any], instance: Any) -> str | None:
     from jsonschema import Draft202012Validator
 
     error = next(iter(Draft202012Validator(schema).iter_errors(instance)), None)
@@ -528,11 +527,11 @@ class _Audit:
     ctx: RequestContext
     spec: ToolSpec
     args: Any
-    thread_id: Optional[str]
-    tool_call_id: Optional[str]
+    thread_id: str | None
+    tool_call_id: str | None
 
-    def emit(self, kind: AuditKind, at: datetime, code: Optional[ErrorCode], detail: str, *,
-             plan: Optional[ChangePlan] = None, approval: Optional[ApprovalRecord] = None) -> None:
+    def emit(self, kind: AuditKind, at: datetime, code: ErrorCode | None, detail: str, *,
+             plan: ChangePlan | None = None, approval: ApprovalRecord | None = None) -> None:
         args = dict(self.args) if isinstance(self.args, Mapping) else None
         self.executor.event_sink.emit(make_event(
             kind, self.ctx, at=at, spec=self.spec, args=args, plan=plan, approval=approval, error_code=code,
@@ -540,7 +539,7 @@ class _Audit:
         ))
 
     def best_effort(
-        self, kind: AuditKind, at: datetime, code: Optional[ErrorCode], detail: str, **kw: Any,
+        self, kind: AuditKind, at: datetime, code: ErrorCode | None, detail: str, **kw: Any,
     ) -> None:
         try:
             self.emit(kind, at, code, detail, **kw)
@@ -553,12 +552,12 @@ class _Prepared:
     executor: ToolExecutor
     ctx: RequestContext
     entry: RegisteredTool
-    args: Dict[str, Any]
+    args: dict[str, Any]
     key: str
     cost: int
-    plan: Optional[ChangePlan]
-    approval: Optional[ApprovalRecord]
-    tool_call_id: Optional[str]
+    plan: ChangePlan | None
+    approval: ApprovalRecord | None
+    tool_call_id: str | None
     audit: _Audit
 
     def invocation(self, attempt: int) -> ToolInvocation:
@@ -569,7 +568,7 @@ class _Prepared:
         )
 
 
-__all__: Tuple[str, ...] = (
+__all__: tuple[str, ...] = (
     "COST_UNITS", "RuntimeLimits", "ToolExecutor", "ToolInvocation", "ToolOutcome", "TurnLedger", "call_key",
     "classify_exception", "is_control_flow",
 )

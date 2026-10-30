@@ -24,10 +24,10 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/tool
 
 from __future__ import annotations
 
-import logging
-import uuid
 from datetime import timedelta
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+import logging
+from typing import Any, Callable, Sequence
+import uuid
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -57,12 +57,12 @@ def _spec(
     description: str,
     when: str,
     when_not: str,
-    props: Dict[str, Any],
+    props: dict[str, Any],
     required: Sequence[str],
     *,
     effects: frozenset,
     cost: CostClass,
-    output: Dict[str, Any],
+    output: dict[str, Any],
     evidence: str = "none",
     idempotent: bool = True,
 ) -> ToolSpec:
@@ -179,7 +179,7 @@ LIT_READ_PAPER_SECTION = _spec(
     evidence="source section with page and source_version locator",
 )
 
-LIT_TOOL_SPECS: Tuple[ToolSpec, ...] = (
+LIT_TOOL_SPECS: tuple[ToolSpec, ...] = (
     LIT_SEARCH_PAPERS,
     LIT_GET_PAPERS_BY_DOI,
     LIT_FIND_CITING_PAPERS,
@@ -264,7 +264,7 @@ def _failure(tool: str, exc: Exception) -> ToolResult:
     )
 
 
-def _papers(tool: str, papers: List[Dict[str, Any]], **extra: Any) -> ToolResult:
+def _papers(tool: str, papers: list[dict[str, Any]], **extra: Any) -> ToolResult:
     if not papers:
         return ToolResult(tool=tool, status=ToolStatus.EMPTY, warnings=tuple(extra.pop("warnings", ())))
     warnings = tuple(extra.pop("warnings", ()))
@@ -293,15 +293,15 @@ class LiteratureToolset:
     def __init__(
         self,
         client: OpenAlexClient,
-        reader: Optional[PaperReader] = None,
+        reader: PaperReader | None = None,
         *,
-        scope_provider: Optional[ScopeProvider] = None,
+        scope_provider: ScopeProvider | None = None,
     ) -> None:
         self.client = client
         self.reader = reader
         self.scope_provider = scope_provider
 
-    def registrations(self) -> Tuple[Tuple[ToolSpec, Callable[[Any], ToolResult]], ...]:
+    def registrations(self) -> tuple[tuple[ToolSpec, Callable[[Any], ToolResult]], ...]:
         """``(spec, fn)`` pairs for ``build_registry(extra=...)``."""
         fns = (
             self.search_papers,

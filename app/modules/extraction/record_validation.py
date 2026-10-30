@@ -32,9 +32,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/scientific_records.py (BSD-3-C
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple
+import re
+from typing import Any, Literal, Mapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -60,10 +60,10 @@ class EvidenceLocator(StrictRecord):
 
     section: str
     quote: str
-    page: Optional[int]
-    block_id: Optional[str]
-    table_id: Optional[str]
-    figure_panel: Optional[str]
+    page: int | None
+    block_id: str | None
+    table_id: str | None
+    figure_panel: str | None
 
 
 class SampleRecord(StrictRecord):
@@ -71,10 +71,10 @@ class SampleRecord(StrictRecord):
 
     sample_id: str
     label: str
-    composition: List[str]
-    phase: Optional[str]
-    processing_state: Optional[str]
-    preparation: List[str]
+    composition: list[str]
+    phase: str | None
+    processing_state: str | None
+    preparation: list[str]
     evidence: EvidenceLocator
 
 
@@ -82,10 +82,10 @@ class MeasurementRecord(StrictRecord):
     """One measurement associated with explicit paper-local samples."""
 
     measurement_id: str
-    sample_ids: List[str]
+    sample_ids: list[str]
     technique: str
-    instrument: Optional[str]
-    conditions: Dict[str, str]
+    instrument: str | None
+    conditions: dict[str, str]
     evidence: EvidenceLocator
 
 
@@ -93,13 +93,13 @@ class ScientificObservation(StrictRecord):
     """One reported, cited, derived or assumed result as written in the paper."""
 
     observation_id: str
-    measurement_id: Optional[str]
-    sample_ids: List[str]
+    measurement_id: str | None
+    sample_ids: list[str]
     quantity_label: str
-    value: Optional[float]
+    value: float | None
     unit: str
-    qualitative_value: Optional[str]
-    uncertainty: Optional[float] = Field(ge=0)
+    qualitative_value: str | None
+    uncertainty: float | None = Field(ge=0)
     uncertainty_kind: Literal["standard_deviation", "standard_error", "interval", "unknown"]
     status: Literal["reported", "cited", "derived", "assumed"]
     caveat: str
@@ -109,9 +109,9 @@ class ScientificObservation(StrictRecord):
 class ExperimentChunk(StrictRecord):
     """Model output for one bounded source chunk before document reconciliation."""
 
-    samples: List[SampleRecord]
-    measurements: List[MeasurementRecord]
-    observations: List[ScientificObservation]
+    samples: list[SampleRecord]
+    measurements: list[MeasurementRecord]
+    observations: list[ScientificObservation]
     confidence: float = Field(ge=0, le=1)
 
 
@@ -121,16 +121,16 @@ class ValidationIssue(StrictRecord):
     record_type: str
     record_id: str
     reason: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
 
 class ValidatedExperimentChunk(StrictRecord):
     """Accepted records plus explicit rejected/uncertain proposals."""
 
-    samples: List[SampleRecord]
-    measurements: List[MeasurementRecord]
-    observations: List[ScientificObservation]
-    issues: List[ValidationIssue]
+    samples: list[SampleRecord]
+    measurements: list[MeasurementRecord]
+    observations: list[ScientificObservation]
+    issues: list[ValidationIssue]
     confidence: float = Field(ge=0, le=1)
 
 
@@ -140,8 +140,8 @@ def _located(quote: str, source: str) -> bool:
 
 def validate_experiment_chunk(proposal: ExperimentChunk, source: str) -> ValidatedExperimentChunk:
     """Reject invented evidence and dangling sample/measurement relationships (donor rules)."""
-    issues: List[ValidationIssue] = []
-    samples: List[SampleRecord] = []
+    issues: list[ValidationIssue] = []
+    samples: list[SampleRecord] = []
     for sample in proposal.samples:
         if _located(sample.evidence.quote, source):
             samples.append(sample)
@@ -149,7 +149,7 @@ def validate_experiment_chunk(proposal: ExperimentChunk, source: str) -> Validat
             issues.append(ValidationIssue(record_type="sample", record_id=sample.sample_id,
                                           reason="evidence_quote_not_found", payload=sample.model_dump()))
     sample_ids = {s.sample_id for s in samples}
-    measurements: List[MeasurementRecord] = []
+    measurements: list[MeasurementRecord] = []
     for measurement in proposal.measurements:
         errors = []
         if not _located(measurement.evidence.quote, source):
@@ -162,7 +162,7 @@ def validate_experiment_chunk(proposal: ExperimentChunk, source: str) -> Validat
         else:
             measurements.append(measurement)
     measurement_ids = {m.measurement_id for m in measurements}
-    observations: List[ScientificObservation] = []
+    observations: list[ScientificObservation] = []
     for observation in proposal.observations:
         errors = []
         if not _located(observation.evidence.quote, source):
@@ -203,12 +203,12 @@ class Rule:
     rule_id: str
     kind: str
     name: str
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     effect: str
 
 
 #: The H3 rule table. Gates withhold a value from every graph write; tags never withhold (F2).
-RULES: Tuple[Rule, ...] = (
+RULES: tuple[Rule, ...] = (
     Rule("F8.1", "gate", "quote_located", ("missing_quote", "evidence_quote_not_found", "evidence_quote_ambiguous"),
          "withhold when the quote is absent, cannot be located in the stored section text, or is ambiguous"),
     Rule("F8.2", "gate", "number_and_unit_in_quote",
@@ -243,7 +243,7 @@ _ASSUMPTION_RE = re.compile(
 )
 
 
-def _evidence_problems(evidence: Optional[EvidenceRecord]) -> List[str]:
+def _evidence_problems(evidence: EvidenceRecord | None) -> list[str]:
     if evidence is None or MissingData.QUOTE_ABSENT in evidence.missing:
         return ["missing_quote"]
     if MissingData.QUOTE_NOT_LOCATED in evidence.missing:
@@ -253,7 +253,7 @@ def _evidence_problems(evidence: Optional[EvidenceRecord]) -> List[str]:
     return []
 
 
-def _derivation(quote: str, value: float, unit: str) -> Optional[Dict[str, Any]]:
+def _derivation(quote: str, value: float, unit: str) -> dict[str, Any] | None:
     for partner_value, partner_unit in printed_quantities(quote):
         found = reciprocal_derivation(value, unit, partner_value, partner_unit)
         if found:
@@ -262,19 +262,19 @@ def _derivation(quote: str, value: float, unit: str) -> Optional[Dict[str, Any]]
 
 
 def assess_value(
-    document: ParsedDocument, evidence: EvidenceRecord, *, label: str, value: Optional[float], unit: str,
+    document: ParsedDocument, evidence: EvidenceRecord, *, label: str, value: float | None, unit: str,
     proposed: EvidenceSource, qualitative: str = "",
-) -> Tuple[List[str], TagDecision]:
+) -> tuple[list[str], TagDecision]:
     """Apply the F8 gates and F2/F8 tag rules to one located value.
 
     Returns:
         ``(problems, decision)``: any problem withholds the value; ``decision`` is the tag
         it has (kept on withheld records too, so every value is captured with a tag).
     """
-    problems: List[str] = []
-    reasons: List[str] = []
+    problems: list[str] = []
+    reasons: list[str] = []
     tag = proposed
-    derivation: Optional[Dict[str, Any]] = None
+    derivation: dict[str, Any] | None = None
     quote = evidence.ref.quote or ""
     text = section_text_for(document, evidence.section_id)
     sentence = quote
@@ -314,12 +314,12 @@ class WithheldRecord:
 
     record_type: str
     record_id: str
-    reasons: Tuple[str, ...]
-    payload: Dict[str, Any]
-    evidence: Optional[Dict[str, Any]] = None
-    tag: Optional[Dict[str, Any]] = None
+    reasons: tuple[str, ...]
+    payload: dict[str, Any]
+    evidence: dict[str, Any] | None = None
+    tag: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {"record_type": self.record_type, "record_id": self.record_id, "reasons": list(self.reasons),
                 "payload": self.payload, "evidence": self.evidence, "tag": self.tag}
@@ -334,13 +334,13 @@ class DocumentValidation:
     mapping (:mod:`.schema_selection`); the default path never sets it.
     """
 
-    samples: List[SampleRecord] = field(default_factory=list)
-    measurements: List[MeasurementRecord] = field(default_factory=list)
-    observations: List[ScientificObservation] = field(default_factory=list)
-    evidence: Dict[str, EvidenceRef] = field(default_factory=dict)
-    withheld: List[WithheldRecord] = field(default_factory=list)
-    tags: Dict[str, TagDecision] = field(default_factory=dict)
-    confidence: Optional[float] = None
+    samples: list[SampleRecord] = field(default_factory=list)
+    measurements: list[MeasurementRecord] = field(default_factory=list)
+    observations: list[ScientificObservation] = field(default_factory=list)
+    evidence: dict[str, EvidenceRef] = field(default_factory=dict)
+    withheld: list[WithheldRecord] = field(default_factory=list)
+    tags: dict[str, TagDecision] = field(default_factory=dict)
+    confidence: float | None = None
     mapping_applied: bool = False
     rules_version: str = RULES_VERSION
 
@@ -359,12 +359,12 @@ def validate_against_document(
     """
     out = DocumentValidation(confidence=proposal.confidence)
 
-    def locate(locator: EvidenceLocator) -> Optional[EvidenceRecord]:
+    def locate(locator: EvidenceLocator) -> EvidenceRecord | None:
         return build_evidence(document, work_id=work_id, pub_path=pub_path, quote=locator.quote,
                               location_label=locator.section, strategy=strategy)
 
-    def withhold(kind: str, rid: str, reasons: Sequence[str], payload: Dict[str, Any],
-                 evidence: Optional[EvidenceRecord], tag: Optional[TagDecision] = None) -> None:
+    def withhold(kind: str, rid: str, reasons: Sequence[str], payload: dict[str, Any],
+                 evidence: EvidenceRecord | None, tag: TagDecision | None = None) -> None:
         out.withheld.append(WithheldRecord(kind, rid, tuple(reasons), payload,
                                            evidence.to_dict() if evidence else None,
                                            tag.to_dict() if tag else None))
@@ -416,16 +416,16 @@ def validate_against_document(
 
 
 #: One accepted quantity: the proposal, its located evidence and its tag decision.
-AcceptedQuantity = Tuple[ReportedQuantity, EvidenceRecord, TagDecision]
+AcceptedQuantity = tuple[ReportedQuantity, EvidenceRecord, TagDecision]
 
 
 def validate_reported_quantities(
     quantities: Sequence[ReportedQuantity], document: ParsedDocument, *, work_id: str, pub_path: str,
     strategy: str = "",
-) -> Tuple[List[AcceptedQuantity], List[WithheldRecord]]:
+) -> tuple[list[AcceptedQuantity], list[WithheldRecord]]:
     """Split strategy observations into (accepted with evidence and tag, withheld with reasons and tag)."""
-    accepted: List[AcceptedQuantity] = []
-    withheld: List[WithheldRecord] = []
+    accepted: list[AcceptedQuantity] = []
+    withheld: list[WithheldRecord] = []
     for index, quantity in enumerate(quantities):
         evidence = build_evidence(document, work_id=work_id, pub_path=pub_path, quote=quantity.quote,
                                   location_label=quantity.location_label, strategy=strategy)
@@ -445,7 +445,7 @@ def validate_reported_quantities(
     return accepted, withheld
 
 
-def _payload(quantity: ReportedQuantity) -> Dict[str, Any]:
+def _payload(quantity: ReportedQuantity) -> dict[str, Any]:
     return {
         "name": quantity.name, "raw_value": quantity.raw_value, "raw_unit": quantity.raw_unit,
         "quote": quantity.quote, "location_label": quantity.location_label,
@@ -458,7 +458,7 @@ def _payload(quantity: ReportedQuantity) -> Dict[str, Any]:
 
 
 def _structure_claims(result: ExtractionResult, document: ParsedDocument, sink: EvidenceSink, *,
-                      pub_path: str, strategy: str) -> List[Dict[str, Any]]:
+                      pub_path: str, strategy: str) -> list[dict[str, Any]]:
     """The morphology a structure strategy read, with its located supporting quote (donor drop 2).
 
     Morphology has no approved F2W slot (``Structure`` usage is pending), so this
@@ -502,19 +502,19 @@ class StageReport:
     strategy: str
     work_id: str
     accepted: int
-    withheld: List[WithheldRecord]
+    withheld: list[WithheldRecord]
     written: int
-    tags: Dict[str, int] = field(default_factory=dict)
-    retagged: List[Dict[str, Any]] = field(default_factory=list)
-    peak_slots: Dict[str, Any] = field(default_factory=dict)
-    claims: List[Dict[str, Any]] = field(default_factory=list)
-    schema_mapping: Optional[Dict[str, Any]] = None
-    gates: Dict[str, bool] = field(default_factory=dict)
+    tags: dict[str, int] = field(default_factory=dict)
+    retagged: list[dict[str, Any]] = field(default_factory=list)
+    peak_slots: dict[str, Any] = field(default_factory=dict)
+    claims: list[dict[str, Any]] = field(default_factory=list)
+    schema_mapping: dict[str, Any] | None = None
+    gates: dict[str, bool] = field(default_factory=dict)
     rules_version: str = RULES_VERSION
     mapping_applied: bool = False
     published: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {
             "strategy": self.strategy, "work_id": self.work_id, "rules_version": self.rules_version,
@@ -527,7 +527,7 @@ class StageReport:
 
 def run_validation_stage(
     result: ExtractionResult, document: ParsedDocument, sink: EvidenceSink, *, pub_path: str,
-    prompt_version: str = "", schema_set: Optional[str] = None, allow_pending_review: bool = False,
+    prompt_version: str = "", schema_set: str | None = None, allow_pending_review: bool = False,
     source_paper: str = "",
 ) -> StageReport:
     """Validate a result's observations and write the accepted ones, tagged, as candidates.
@@ -560,8 +560,8 @@ def run_validation_stage(
         sink, document, [q for q, _, _ in accepted], work_id=result.work_id, pub_path=pub_path,
         strategy=strategy, prompt_version=prompt_version, tags=[d for _, _, d in accepted],
     )
-    tags: Dict[str, int] = {}
-    retagged: List[Dict[str, Any]] = []
+    tags: dict[str, int] = {}
+    retagged: list[dict[str, Any]] = []
     for quantity, _evidence, decision in accepted:
         tags[decision.tag.value] = tags.get(decision.tag.value, 0) + 1
         if decision.retagged:

@@ -18,23 +18,23 @@ from __future__ import annotations
 
 import argparse
 import ast
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import hashlib
+from html import unescape
 import json
 import logging
+from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from html import unescape
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Iterable, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-import yaml
 from lxml import html as lhtml
+import yaml
 
 from . import json2kg
 
@@ -230,14 +230,14 @@ class RepoSpec:
     name: str
     url: str
     mode: str  # full | docs | stack | readme
-    python_globs: Tuple[str, ...] = ()
-    md_globs: Tuple[str, ...] = ("README.md",)
-    yaml_globs: Tuple[str, ...] = ()
-    compose_globs: Tuple[str, ...] = ()
+    python_globs: tuple[str, ...] = ()
+    md_globs: tuple[str, ...] = ("README.md",)
+    yaml_globs: tuple[str, ...] = ()
+    compose_globs: tuple[str, ...] = ()
     readme_only: bool = False
 
 
-REPO_SPECS: Tuple[RepoSpec, ...] = (
+REPO_SPECS: tuple[RepoSpec, ...] = (
     RepoSpec(
         name="bcs2sim-ophyd",
         url="https://github.com/als-computing/bcs2sim-ophyd",
@@ -313,7 +313,7 @@ REPO_SPECS: Tuple[RepoSpec, ...] = (
 
 def utc_now() -> str:
     """Return the current UTC time as an ISO-8601 string with a ``Z`` suffix, truncated to seconds."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -358,7 +358,7 @@ def strip_tags(value: str) -> str:
 
 def next_snapshot_version(kg_dir: Path) -> int:
     """Return the next vN that does not yet exist (1 if none)."""
-    versions: List[int] = []
+    versions: list[int] = []
     if kg_dir.exists():
         for path in kg_dir.iterdir():
             match = SNAPSHOT_RE.match(path.name)
@@ -370,9 +370,9 @@ def next_snapshot_version(kg_dir: Path) -> int:
 def snapshot_paths(
     version: int,
     *,
-    kg_dir: Optional[Path] = None,
-    terms_dir: Optional[Path] = None,
-) -> Tuple[Path, Path]:
+    kg_dir: Path | None = None,
+    terms_dir: Path | None = None,
+) -> tuple[Path, Path]:
     """Return the on-disk paths of one graph snapshot version.
 
     Args:
@@ -432,8 +432,8 @@ def should_skip_file(path: Path) -> bool:
     return False
 
 
-def _rel(term_id: str, relation: str, related_id: str, evidence: str | None = None) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
+def _rel(term_id: str, relation: str, related_id: str, evidence: str | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "relation": relation,
         "related_term": related_id,
         "related_id": related_id,
@@ -449,9 +449,9 @@ def make_term(
     category: str,
     definition: str,
     source: str,
-    relations: Optional[List[Dict[str, Any]]] = None,
+    relations: list[dict[str, Any]] | None = None,
     **extra: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build one term record in the shape the ``json2kg`` graph builder expects.
 
     Args:
@@ -469,7 +469,7 @@ def make_term(
     Returns:
         The term dict.
     """
-    term: Dict[str, Any] = {
+    term: dict[str, Any] = {
         "id": term_id,
         "id_prefix": NAMESPACE,
         "term": name,
@@ -490,7 +490,7 @@ def make_term(
 # HTML / ALS / blueprint
 # ---------------------------------------------------------------------------
 
-def fetch_url(url: str, dest: Path, timeout: int = 45) -> Dict[str, Any]:
+def fetch_url(url: str, dest: Path, timeout: int = 45) -> dict[str, Any]:
     """Download ``url`` to ``dest`` and describe the result.
 
     Args:
@@ -525,10 +525,10 @@ def fetch_url(url: str, dest: Path, timeout: int = 45) -> Dict[str, Any]:
     }
 
 
-def parse_als_page(html_text: str) -> Dict[str, Any]:
+def parse_als_page(html_text: str) -> dict[str, Any]:
     """Extract fact table + technique list from the public ALS beamline page."""
     tree = lhtml.fromstring(html_text)
-    facts: Dict[str, str] = {}
+    facts: dict[str, str] = {}
     for row in tree.xpath("//tr"):
         cells = [" ".join(cell.itertext()).strip() for cell in row.xpath("./th|./td")]
         cells = [re.sub(r"\s+", " ", c) for c in cells if c]
@@ -540,7 +540,7 @@ def parse_als_page(html_text: str) -> Dict[str, Any]:
         for p in tree.xpath("//p")
         if " ".join(p.itertext()).strip()
     ]
-    techniques: List[str] = []
+    techniques: list[str] = []
     tech_blob = facts.get("Technique category") or facts.get("Techniques") or ""
     for token in re.split(r"[|\n;/]+", tech_blob):
         token = token.strip(" -")
@@ -578,14 +578,14 @@ def _email_near(text: str, index: int, name: str) -> str:
 
 
 def parse_als_contact_people(
-    facts: Dict[str, str],
+    facts: dict[str, str],
     text: str = "",
     *,
     source: str = ALS_PAGE_URL,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """Parse documented ALS 11.0.1.2 contacts. Does not invent names."""
     blob = facts.get("Primary contact(s)") or facts.get("Primary contacts") or facts.get("Contacts") or ""
-    people: List[Dict[str, str]] = []
+    people: list[dict[str, str]] = []
     seen = set()
     chunks = re.split(r"[|;]+", blob) if blob else [text]
     for chunk in chunks:
@@ -606,7 +606,7 @@ def parse_als_contact_people(
     return people
 
 
-def parse_blueprint_people(blueprint: Dict[str, Any], html_text: str = "") -> List[Dict[str, str]]:
+def parse_blueprint_people(blueprint: dict[str, Any], html_text: str = "") -> list[dict[str, str]]:
     """Names the Gabe blueprint actually writes (e.g. reviewed with Thomas Ferron)."""
     header = blueprint.get("header") or {}
     blobs = [
@@ -614,7 +614,7 @@ def parse_blueprint_people(blueprint: Dict[str, Any], html_text: str = "") -> Li
         " ".join(str(v) for v in header.values()),
         html_text,
     ]
-    people: List[Dict[str, str]] = []
+    people: list[dict[str, str]] = []
     seen = set()
     for blob in blobs:
         if not blob:
@@ -687,10 +687,10 @@ class BlueprintStage:
     what: str
     does: str
     range_text: str
-    device_ids: List[str] = field(default_factory=list)
+    device_ids: list[str] = field(default_factory=list)
 
 
-def _ophyd_name_from_handle(handle: str, fallback: str) -> Tuple[str, str]:
+def _ophyd_name_from_handle(handle: str, fallback: str) -> tuple[str, str]:
     match = re.search(r'd\.(\w+)\[\s*["\']([^"\']+)["\']\s*\]', handle or "")
     if match:
         return match.group(2), match.group(1)
@@ -714,9 +714,9 @@ def _svg_coord(el: Any, attr: str) -> float:
         return 0.0
 
 
-def parse_sheet_a_svg_order(tree: Any) -> List[str]:
+def parse_sheet_a_svg_order(tree: Any) -> list[str]:
     """Sheet A SVG left-to-right, top-to-bottom. This is beam order, not A′ DOM."""
-    labels: List[Tuple[float, float, str]] = []
+    labels: list[tuple[float, float, str]] = []
     for text_el in tree.xpath("//section[@id='sheet-a']//figure//svg//text[contains(@class,'big')]"):
         name = canonical_stage_name(re.sub(r"\s+", " ", " ".join(text_el.itertext())).strip())
         if not name:
@@ -726,7 +726,7 @@ def parse_sheet_a_svg_order(tree: Any) -> List[str]:
             continue
         labels.append((_svg_coord(text_el, "y"), _svg_coord(text_el, "x"), name))
     labels.sort(key=lambda item: (item[0], item[1]))
-    ordered: List[str] = []
+    ordered: list[str] = []
     seen = set()
     for _, _, name in labels:
         if name in seen:
@@ -736,7 +736,7 @@ def parse_sheet_a_svg_order(tree: Any) -> List[str]:
     return ordered
 
 
-def parse_arrow_sequence(text: str) -> List[str]:
+def parse_arrow_sequence(text: str) -> list[str]:
     """Pull a documented A → B → C beam-path chain out of prose or a figcaption."""
     blob = re.sub(r"\s+", " ", unescape(text or ""))
     blob = blob.replace("->", "→").replace("⟶", "→")
@@ -745,7 +745,7 @@ def parse_arrow_sequence(text: str) -> List[str]:
     match = re.search(r"((?:[^→]{1,60}→\s*){2,}[^→.]{1,60})", blob)
     if not match:
         return []
-    names: List[str] = []
+    names: list[str] = []
     seen = set()
     for token in match.group(1).split("→"):
         name = canonical_stage_name(token.strip(" :;,"))
@@ -756,14 +756,14 @@ def parse_arrow_sequence(text: str) -> List[str]:
     return names
 
 
-def parse_figcaption_beam_path(tree: Any) -> List[str]:
+def parse_figcaption_beam_path(tree: Any) -> list[str]:
     """Return the beam-path chain documented in the Sheet A figcaptions, or ``[]`` if none."""
     captions = tree.xpath("//section[@id='sheet-a']//figcaption")
     text = " ".join(re.sub(r"\s+", " ", " ".join(el.itertext())) for el in captions)
     return parse_arrow_sequence(text)
 
 
-def parse_bcs2sim_beam_path(root: Optional[Path]) -> List[str]:
+def parse_bcs2sim_beam_path(root: Path | None) -> list[str]:
     """Reuse Gabe's map if bcs2sim checked in the same knowledge/blueprint text."""
     if root is None or not root.exists():
         return []
@@ -792,7 +792,7 @@ def _index_ci(names: Sequence[str], needle: str) -> int:
     return -1
 
 
-def ensure_m103_before_exit_slits(names: Sequence[str]) -> List[str]:
+def ensure_m103_before_exit_slits(names: Sequence[str]) -> list[str]:
     """Prose puts M103 between mono and the exit slits; A.5 before A.6 is not optical order."""
     ordered = list(names)
     i_m = _index_ci(ordered, "m103")
@@ -803,13 +803,13 @@ def ensure_m103_before_exit_slits(names: Sequence[str]) -> List[str]:
     return ordered
 
 
-def finalize_beam_path(names: Sequence[str]) -> List[str]:
+def finalize_beam_path(names: Sequence[str]) -> list[str]:
     """Prefix source/EPU/M101, replace a trailing Chamber with sample → detector."""
     ordered = ensure_m103_before_exit_slits(names)
     if not ordered:
         return []
     lowered = [n.casefold() for n in ordered]
-    prefix: List[str] = []
+    prefix: list[str] = []
     for name in BEAM_PATH_PREFIX:
         if name.casefold() not in lowered:
             prefix.append(name)
@@ -823,7 +823,7 @@ def finalize_beam_path(names: Sequence[str]) -> List[str]:
         if name.casefold() not in lowered:
             ordered.append(name)
     seen = set()
-    unique: List[str] = []
+    unique: list[str] = []
     for name in ordered:
         key = name.casefold()
         if key in seen:
@@ -839,7 +839,7 @@ def resolve_beam_path_order(
     caption_names: Sequence[str],
     bcs2sim_names: Sequence[str] = (),
     stage_names: Sequence[str] = (),
-) -> List[str]:
+) -> list[str]:
     """Prefer Sheet A SVG, then figcaption / bcs2sim. Never A′ DOM order as the path."""
     if svg_names:
         return finalize_beam_path(svg_names)
@@ -852,10 +852,10 @@ def resolve_beam_path_order(
     return []
 
 
-def parse_blueprint_html(html_text: str) -> Dict[str, Any]:
+def parse_blueprint_html(html_text: str) -> dict[str, Any]:
     """Parse Gabe's BL 11.0.1.2 device blueprint (titleblock, stages, sheet E, beam path)."""
     tree = lhtml.fromstring(html_text)
-    header: Dict[str, str] = {}
+    header: dict[str, str] = {}
     for block in tree.xpath("//header[contains(@class,'titleblock')]/div"):
         key = " ".join(block.xpath(".//*[contains(@class,'k')]/text()")).strip()
         val = " ".join(block.xpath(".//*[contains(@class,'v')]/text()")).strip()
@@ -864,7 +864,7 @@ def parse_blueprint_html(html_text: str) -> Dict[str, Any]:
     sources = " ".join(tree.xpath("//*[contains(@class,'sources')]//text()"))
     header["sources"] = re.sub(r"\s+", " ", sources).strip()
 
-    devices: Dict[str, BlueprintDevice] = {}
+    devices: dict[str, BlueprintDevice] = {}
     for row in tree.xpath("//table[@id='corr']//tr[@id]"):
         dev_id = (row.get("id") or "").replace("dev-", "")
         tds = row.xpath("./td")
@@ -908,7 +908,7 @@ def parse_blueprint_html(html_text: str) -> Dict[str, Any]:
             collection=collection,
         )
 
-    stages: List[BlueprintStage] = []
+    stages: list[BlueprintStage] = []
     for stage_el in tree.xpath("//*[contains(@class,'stage')]"):
         name = " ".join(stage_el.xpath(".//*[contains(@class,'stage-name')]/text()")).strip()
         if not name:
@@ -976,7 +976,7 @@ def git_sha(path: Path) -> str:
     return result.stdout.strip()
 
 
-def _run_git(args: Sequence[str], cwd: Optional[Path] = None) -> subprocess.CompletedProcess[str]:
+def _run_git(args: Sequence[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         list(args),
         cwd=str(cwd) if cwd else None,
@@ -987,7 +987,7 @@ def _run_git(args: Sequence[str], cwd: Optional[Path] = None) -> subprocess.Comp
     )
 
 
-def sync_repo(spec: RepoSpec, dest: Path) -> Dict[str, Any]:
+def sync_repo(spec: RepoSpec, dest: Path) -> dict[str, Any]:
     """Clone or update ``spec`` into ``dest`` and report the outcome.
 
     An existing clone is fetched and hard-reset to ``FETCH_HEAD``. A new clone is
@@ -1049,16 +1049,16 @@ def sync_repo(spec: RepoSpec, dest: Path) -> Dict[str, Any]:
         }
 
 
-def expand_globs(root: Path, patterns: Sequence[str]) -> List[Path]:
+def expand_globs(root: Path, patterns: Sequence[str]) -> list[Path]:
     """Expand ``patterns`` under ``root`` into a de-duplicated list of ingestable files.
 
     Directories, secret files and skipped paths are dropped. Order follows the
     pattern order, sorted within each pattern.
     """
-    found: List[Path] = []
+    found: list[Path] = []
     for pattern in patterns:
         found.extend(sorted(root.glob(pattern)))
-    unique: List[Path] = []
+    unique: list[Path] = []
     seen = set()
     for path in found:
         if not path.is_file() or should_skip_file(path):
@@ -1111,7 +1111,7 @@ def _is_plan_function(node: ast.FunctionDef) -> bool:
     return node.name in {"count", "scan", "rel_scan", "grid_scan"} or "scan" in node.name.lower()
 
 
-def extract_python_symbols(path: Path, repo_name: str, commit: str = "") -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def extract_python_symbols(path: Path, repo_name: str, commit: str = "") -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Return (terms-like symbol records, curated code snippets) from one Python file."""
     try:
         source = path.read_text(encoding="utf-8")
@@ -1121,10 +1121,10 @@ def extract_python_symbols(path: Path, repo_name: str, commit: str = "") -> Tupl
         return [], []
     lines = source.splitlines()
     rel = path.name
-    snippets: List[Dict[str, Any]] = []
-    symbols: List[Dict[str, Any]] = []
+    snippets: list[dict[str, Any]] = []
+    symbols: list[dict[str, Any]] = []
 
-    def snippet_for(node: ast.AST, kind: str, function_name: str) -> Optional[Dict[str, Any]]:
+    def snippet_for(node: ast.AST, kind: str, function_name: str) -> dict[str, Any] | None:
         start = getattr(node, "lineno", 1)
         end = getattr(node, "end_lineno", start)
         chunk = lines[start - 1 : end]
@@ -1198,7 +1198,7 @@ def extract_python_symbols(path: Path, repo_name: str, commit: str = "") -> Tupl
     return symbols, snippets
 
 
-def parse_compose_services(path: Path) -> List[Dict[str, str]]:
+def parse_compose_services(path: Path) -> list[dict[str, str]]:
     """List the service names defined in a docker-compose file.
 
     Uses the YAML ``services`` mapping. If the file is not valid YAML or has no
@@ -1214,7 +1214,7 @@ def parse_compose_services(path: Path) -> List[Dict[str, str]]:
         LOGGER.warning("YAML parse failed for %s: %s", path, exc)
         data = {}
     services = data.get("services") if isinstance(data, dict) else None
-    names: List[str] = []
+    names: list[str] = []
     if isinstance(services, dict):
         names = [str(k) for k in services.keys()]
     else:
@@ -1246,7 +1246,7 @@ def extract_markdown_software(path: Path, repo_name: str, limit: int = 400) -> s
         return ""
     # First heading + following paragraph; never dump whole READMEs into nodes.
     lines = text.splitlines()
-    kept: List[str] = []
+    kept: list[str] = []
     for line in lines[:80]:
         if line.startswith("#") or kept:
             kept.append(line)
@@ -1256,7 +1256,7 @@ def extract_markdown_software(path: Path, repo_name: str, limit: int = 400) -> s
     return re.sub(r"\s+", " ", blob)[:limit]
 
 
-def extract_ts_fences(path: Path, repo_name: str, commit: str = "") -> List[Dict[str, Any]]:
+def extract_ts_fences(path: Path, repo_name: str, commit: str = "") -> list[dict[str, Any]]:
     """Extract the first Finch-config TypeScript fence from a Markdown file.
 
     Only a ```` ```ts ````, ```` ```tsx ```` or ```` ```typescript ```` fence that mentions
@@ -1307,7 +1307,7 @@ def extract_ts_fences(path: Path, repo_name: str, commit: str = "") -> List[Dict
 # Graph assembly
 # ---------------------------------------------------------------------------
 
-def _energy_from_sources(als: Dict[str, Any], blueprint: Dict[str, Any]) -> Tuple[str, str]:
+def _energy_from_sources(als: dict[str, Any], blueprint: dict[str, Any]) -> tuple[str, str]:
     facts = als.get("facts") or {}
     lo = facts.get("Minimum energy (eV)") or "165"
     hi = facts.get("Maximum energy (eV)") or "1,500"
@@ -1320,7 +1320,7 @@ def _energy_from_sources(als: Dict[str, Any], blueprint: Dict[str, Any]) -> Tupl
     return f"{lo}–{hi} eV", definition
 
 
-def terms_from_als(als: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
+def terms_from_als(als: dict[str, Any], source: str) -> list[dict[str, Any]]:
     """Build the term records that come from the public ALS beamline page.
 
     Covers the fixed technique, polarization, scattering-geometry, absorption-edge
@@ -1336,7 +1336,7 @@ def terms_from_als(als: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
         The list of term dicts.
     """
     facts = als.get("facts") or {}
-    terms: List[Dict[str, Any]] = []
+    terms: list[dict[str, Any]] = []
     techniques = [
         ("RSoXS", "Resonant soft X-ray scattering; primary technique at BL 11.0.1.2."),
         ("SAXS", "Small-angle X-ray scattering listed on the ALS 11.0.1.2 page."),
@@ -1400,16 +1400,16 @@ def terms_from_als(als: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
 
 
 def _beam_path_stage_terms(
-    blueprint: Dict[str, Any],
+    blueprint: dict[str, Any],
     source: str,
-    stage_ids: Dict[str, str],
-) -> List[Dict[str, Any]]:
+    stage_ids: dict[str, str],
+) -> list[dict[str, Any]]:
     """Directed topology along the optical beam path (not Sheet E inventory order)."""
     path = [name for name in (blueprint.get("beam_path") or []) if canonical_stage_name(name)]
     if len(path) < 2:
         return []
-    terms: List[Dict[str, Any]] = []
-    ids: List[str] = []
+    terms: list[dict[str, Any]] = []
+    ids: list[str] = []
     for index, name in enumerate(path, start=1):
         sid = stage_ids.get(name.casefold()) or beam_id("stage", name)
         ids.append(sid)
@@ -1454,7 +1454,7 @@ def _beam_path_stage_terms(
     return terms
 
 
-def terms_from_blueprint(blueprint: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
+def terms_from_blueprint(blueprint: dict[str, Any], source: str) -> list[dict[str, Any]]:
     """Build term records from the parsed blueprint.
 
     Emits the reflectometer endstation, one term per stage, the directed beam-path
@@ -1469,7 +1469,7 @@ def terms_from_blueprint(blueprint: Dict[str, Any], source: str) -> List[Dict[st
         The list of term dicts. Duplicate IDs are expected and are merged later by
         :func:`merge_terms`.
     """
-    terms: List[Dict[str, Any]] = []
+    terms: list[dict[str, Any]] = []
     header = blueprint.get("header") or {}
     drawing = header.get("Drawing") or "BL 11.0.1.2 RSOXS · Reflectometer endstation"
     terms.append(
@@ -1482,8 +1482,8 @@ def terms_from_blueprint(blueprint: Dict[str, Any], source: str) -> List[Dict[st
             relations=[_rel(BEAMLINE_ID, "part_of", BEAMLINE_ID, source)],
         )
     )
-    stage_id_by_dev: Dict[str, str] = {}
-    stage_ids: Dict[str, str] = {}
+    stage_id_by_dev: dict[str, str] = {}
+    stage_ids: dict[str, str] = {}
     for stage in blueprint.get("stages") or []:
         sid = beam_id("stage", stage.name)
         stage_ids[stage.name.casefold()] = sid
@@ -1584,7 +1584,7 @@ def terms_from_blueprint(blueprint: Dict[str, Any], source: str) -> List[Dict[st
     return terms
 
 
-def beamline_seed(als: Dict[str, Any], blueprint: Dict[str, Any], als_source: str, bp_source: str) -> Dict[str, Any]:
+def beamline_seed(als: dict[str, Any], blueprint: dict[str, Any], als_source: str, bp_source: str) -> dict[str, Any]:
     """Build the root beamline term that links to the other top-level terms.
 
     Args:
@@ -1646,7 +1646,7 @@ def beamline_seed(als: Dict[str, Any], blueprint: Dict[str, Any], als_source: st
     )
 
 
-def software_catalog() -> List[Dict[str, Any]]:
+def software_catalog() -> list[dict[str, Any]]:
     """Return the fixed catalog of software terms (Bluesky, Tiled, Finch and related components)."""
     items = [
         ("Bluesky", "Bluesky RunEngine / queueserver plans for BL 11.0.1.2."),
@@ -1670,11 +1670,11 @@ def attach_repo_terms(
     spec: RepoSpec,
     root: Path,
     sha: str,
-    symbols: List[Dict[str, Any]],
-    snippets: List[Dict[str, Any]],
-    compose_services: List[Dict[str, str]],
-    md_summaries: List[Tuple[str, str]],
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    symbols: list[dict[str, Any]],
+    snippets: list[dict[str, Any]],
+    compose_services: list[dict[str, str]],
+    md_summaries: list[tuple[str, str]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Turn one repo's extracted payload into term records.
 
     Args:
@@ -1691,7 +1691,7 @@ def attach_repo_terms(
         include the repo term, symbols, compose services and Markdown docs, plus
         documented data-path or config terms for a few specific repos.
     """
-    terms: List[Dict[str, Any]] = []
+    terms: list[dict[str, Any]] = []
     software_id = beam_id("Software", SOFTWARE_ALIAS.get(spec.name, spec.name))
     terms.append(
         make_term(
@@ -1794,7 +1794,7 @@ def attach_repo_terms(
     return terms, snippets
 
 
-def merge_terms(batches: Iterable[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+def merge_terms(batches: Iterable[list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """Merge term batches into one list with unique IDs.
 
     On an ID collision the first record is kept and extended in place: the longer
@@ -1807,7 +1807,7 @@ def merge_terms(batches: Iterable[List[Dict[str, Any]]]) -> List[Dict[str, Any]]
     Returns:
         The merged terms sorted by ID.
     """
-    merged: Dict[str, Dict[str, Any]] = {}
+    merged: dict[str, dict[str, Any]] = {}
     for batch in batches:
         for term in batch:
             tid = term["id"]
@@ -1835,7 +1835,7 @@ def merge_terms(batches: Iterable[List[Dict[str, Any]]]) -> List[Dict[str, Any]]
     return [merged[k] for k in sorted(merged)]
 
 
-def sort_graph(graph: Dict[str, Any]) -> Dict[str, Any]:
+def sort_graph(graph: dict[str, Any]) -> dict[str, Any]:
     """Sort ``things`` by ID and ``associations`` by (subject, predicate, object) for deterministic output.
 
     Mutates ``graph`` and returns it.
@@ -1852,14 +1852,14 @@ def sort_graph(graph: Dict[str, Any]) -> Dict[str, Any]:
 # v4 motor → stage linking (JSON-first; mapping file is the source of truth)
 # ---------------------------------------------------------------------------
 
-def load_motor_stage_map(path: Optional[Path] = None) -> Dict[str, Any]:
+def load_motor_stage_map(path: Path | None = None) -> dict[str, Any]:
     """Load ophyd_name → stage assignments. Missing file → empty map."""
     dest = path or MOTOR_STAGE_MAP_PATH
     if not dest.exists():
         LOGGER.warning("Motor-stage map missing: %s", dest)
         return {"version": 0, "motors": {}, "aliases": {}, "leave_on_beamline": {}}
     data = yaml.safe_load(dest.read_text(encoding="utf-8")) or {}
-    motors: Dict[str, str] = {}
+    motors: dict[str, str] = {}
     for key, value in (data.get("motors") or {}).items():
         if isinstance(value, dict):
             stage = value.get("stage") or ""
@@ -1884,8 +1884,8 @@ def load_motor_stage_map(path: Optional[Path] = None) -> Dict[str, Any]:
     }
 
 
-def _stage_id_by_name(nodes: Iterable[Dict[str, Any]]) -> Dict[str, str]:
-    ids: Dict[str, str] = {}
+def _stage_id_by_name(nodes: Iterable[dict[str, Any]]) -> dict[str, str]:
+    ids: dict[str, str] = {}
     for node in nodes:
         if node.get("category") != "BeamlineStage":
             continue
@@ -1899,8 +1899,8 @@ def _stage_id_by_name(nodes: Iterable[Dict[str, Any]]) -> Dict[str, str]:
     return ids
 
 
-def _motor_by_ophyd(nodes: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    found: Dict[str, Dict[str, Any]] = {}
+def _motor_by_ophyd(nodes: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
     for node in nodes:
         if node.get("category") != "Motor":
             continue
@@ -1913,16 +1913,16 @@ def _motor_by_ophyd(nodes: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, Any]
 def _stage_of_motor(
     motor_id: str,
     *,
-    part_of: Dict[str, List[str]],
+    part_of: dict[str, list[str]],
     stage_ids: set[str],
-) -> Optional[str]:
+) -> str | None:
     for obj in part_of.get(motor_id, []):
         if obj in stage_ids:
             return obj
     return None
 
 
-def _append_term_rel(term: Dict[str, Any], relation: str, related_id: str, evidence: str) -> bool:
+def _append_term_rel(term: dict[str, Any], relation: str, related_id: str, evidence: str) -> bool:
     rels = term.setdefault("relations", [])
     seen = {(r.get("relation"), r.get("related_id") or r.get("related_term")) for r in rels}
     key = (relation, related_id)
@@ -1933,8 +1933,8 @@ def _append_term_rel(term: Dict[str, Any], relation: str, related_id: str, evide
 
 
 def apply_motor_stage_map_to_terms(
-    terms: List[Dict[str, Any]],
-    mapping: Optional[Dict[str, Any]] = None,
+    terms: list[dict[str, Any]],
+    mapping: dict[str, Any] | None = None,
     *,
     evidence: str = "bl1101_motor_stage_map.yaml",
 ) -> int:
@@ -1985,11 +1985,11 @@ def apply_motor_stage_map_to_terms(
 
 
 def apply_motor_stage_map_to_graph(
-    graph: Dict[str, Any],
-    mapping: Optional[Dict[str, Any]] = None,
+    graph: dict[str, Any],
+    mapping: dict[str, Any] | None = None,
     *,
     evidence: str = "bl1101_motor_stage_map.yaml",
-) -> Tuple[Dict[str, Any], Dict[str, int]]:
+) -> tuple[dict[str, Any], dict[str, int]]:
     """JSON-first: add `rel:part_of` (and alias `rel:related_to`) on an ops KG."""
     mapping = mapping or load_motor_stage_map()
     things = list(graph.get("things") or [])
@@ -1998,7 +1998,7 @@ def apply_motor_stage_map_to_graph(
     stage_ids_map = _stage_id_by_name(things)
     stage_id_set = set(stage_ids_map.values())
     motors = _motor_by_ophyd(things)
-    part_of: Dict[str, List[str]] = {}
+    part_of: dict[str, list[str]] = {}
     for edge in assocs:
         if edge.get("predicate") == "rel:part_of":
             part_of.setdefault(edge["subject"], []).append(edge["object"])
@@ -2078,10 +2078,10 @@ def _terms_snapshot_for_kg(kg_path: Path) -> Path:
 
 
 def write_kg_snapshot(
-    graph: Dict[str, Any],
+    graph: dict[str, Any],
     version: int,
     *,
-    kg_dir: Optional[Path] = None,
+    kg_dir: Path | None = None,
 ) -> Path:
     """Write ``graph`` as the ``matkg_bl1101_v<version>.json`` snapshot.
 
@@ -2125,11 +2125,11 @@ def write_kg_snapshot(
 def run_motor_link_promote(
     *,
     source_kg: Path,
-    version: Optional[int] = None,
-    map_path: Optional[Path] = None,
-    kg_dir: Optional[Path] = None,
-    terms_dir: Optional[Path] = None,
-) -> Dict[str, Any]:
+    version: int | None = None,
+    map_path: Path | None = None,
+    kg_dir: Path | None = None,
+    terms_dir: Path | None = None,
+) -> dict[str, Any]:
     """Copy an existing ops KG, apply the motor-stage map, write vN. Does not touch literature."""
     source_kg = source_kg.resolve()
     if not source_kg.exists():
@@ -2189,13 +2189,13 @@ def run_motor_link_promote(
 
 
 def terms_from_people(
-    als: Dict[str, Any],
-    blueprint: Dict[str, Any],
+    als: dict[str, Any],
+    blueprint: dict[str, Any],
     als_source: str,
     blueprint_source: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Typed Person / BeamlineScientist nodes in beamline: only. No science-KG hubs."""
-    people: List[Dict[str, str]] = []
+    people: list[dict[str, str]] = []
     seen = set()
     for raw in list(als.get("people") or []) + list(blueprint.get("people") or []):
         name = _clean_person_name(raw.get("name") or "")
@@ -2213,7 +2213,7 @@ def terms_from_people(
     if not people:
         return []
     role_id = beam_id("Role", "BeamlineScientist")
-    terms: List[Dict[str, Any]] = [
+    terms: list[dict[str, Any]] = [
         make_term(
             role_id,
             "Beamline scientist",
@@ -2255,12 +2255,12 @@ def terms_from_people(
 
 def ingest_records(
     *,
-    als: Dict[str, Any],
-    blueprint: Dict[str, Any],
+    als: dict[str, Any],
+    blueprint: dict[str, Any],
     als_source: str = "als.lbl.gov/beamlines/11-0-1-2",
     blueprint_source: str = "blueprint_bl11012_version09092026.html",
-    repo_payloads: Optional[List[Dict[str, Any]]] = None,
-) -> Dict[str, Any]:
+    repo_payloads: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Build terms + snippets from already-parsed sources (network-free)."""
     blueprint = dict(blueprint)
     if not blueprint.get("beam_path"):
@@ -2283,7 +2283,7 @@ def ingest_records(
         *terms_from_blueprint(blueprint, blueprint_source),
         *terms_from_people(als, blueprint, als_source, blueprint_source),
     ]
-    snippets: List[Dict[str, Any]] = []
+    snippets: list[dict[str, Any]] = []
     for payload in repo_payloads or []:
         extra_terms, extra_snips = attach_repo_terms(
             payload["spec"],
@@ -2317,7 +2317,7 @@ def ingest_records(
     }
 
 
-def records_to_graph(records: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
+def records_to_graph(records: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     """Convert term records to a graph with ``json2kg``.
 
     Args:
@@ -2338,7 +2338,7 @@ def records_to_graph(records: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[
     return graph
 
 
-def ingest_fixture(html: str, python_files: Sequence[Path]) -> Dict[str, Any]:
+def ingest_fixture(html: str, python_files: Sequence[Path]) -> dict[str, Any]:
     """Tiny deterministic ingest used by unit tests."""
     als = parse_als_page(html) if "<table" in html and "Minimum energy" in html else {
         "title": "Beamline 11.0.1.2",
@@ -2389,10 +2389,10 @@ def _clear_work(from_scratch: bool) -> None:
     READMES_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _ingest_repos(offline: bool) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
-    landed: List[Dict[str, Any]] = []
-    skipped: List[Dict[str, Any]] = []
-    payloads: List[Dict[str, Any]] = []
+def _ingest_repos(offline: bool) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    landed: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    payloads: list[dict[str, Any]] = []
     for spec in REPO_SPECS:
         dest = (READMES_DIR if spec.readme_only else REPOS_DIR) / spec.name
         if offline and not dest.exists():
@@ -2412,8 +2412,8 @@ def _ingest_repos(offline: bool) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
             skipped.append(info)
             continue
         landed.append(info)
-        symbols: List[Dict[str, Any]] = []
-        snippets: List[Dict[str, Any]] = []
+        symbols: list[dict[str, Any]] = []
+        snippets: list[dict[str, Any]] = []
         for py in expand_globs(dest, spec.python_globs):
             py_symbols, py_snips = extract_python_symbols(py, repo_name=spec.name, commit=info.get("sha") or "")
             for item in py_symbols:
@@ -2432,7 +2432,7 @@ def _ingest_repos(offline: bool) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
         compose = []
         for yml in expand_globs(dest, spec.compose_globs):
             compose.extend(parse_compose_services(yml))
-        markdown: List[Tuple[str, str]] = []
+        markdown: list[tuple[str, str]] = []
         for md in expand_globs(dest, spec.md_globs):
             markdown.append((str(md.relative_to(dest)), extract_markdown_software(md, spec.name)))
             if spec.name == "bl11012-finch" and md.name.lower().startswith("readme"):
@@ -2451,7 +2451,7 @@ def _ingest_repos(offline: bool) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
     return landed, skipped, payloads
 
 
-def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> Dict[str, Any]:
+def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> dict[str, Any]:
     """Run the full BL 11.0.1.2 ingest and write the next snapshot.
 
     Fetches (or reads from cache) the ALS page, parses the blueprint, syncs the
@@ -2472,10 +2472,10 @@ def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> Dict[str
         FileNotFoundError: If the blueprint file is missing.
     """
     _clear_work(from_scratch)
-    sources_landed: List[Dict[str, Any]] = []
-    sources_skipped: List[Dict[str, Any]] = []
+    sources_landed: list[dict[str, Any]] = []
+    sources_skipped: list[dict[str, Any]] = []
 
-    als_snapshot: Dict[str, Any]
+    als_snapshot: dict[str, Any]
     als_html = ""
     als_dest = PAGES_DIR / "als_11-0-1-2.html"
     if offline and als_dest.exists():
@@ -2483,7 +2483,7 @@ def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> Dict[str
         als_snapshot = {
             "url": ALS_PAGE_URL,
             "status": "ok",
-            "fetched_at": datetime.fromtimestamp(als_dest.stat().st_mtime, timezone.utc).date().isoformat(),
+            "fetched_at": datetime.fromtimestamp(als_dest.stat().st_mtime, UTC).date().isoformat(),
             "path": str(als_dest.relative_to(REPO_ROOT)),
             "sha256": sha256_file(als_dest),
             "offline": True,
@@ -2618,7 +2618,7 @@ def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> Dict[str
     }
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments for the ingest CLI.
 
     Args:
@@ -2658,7 +2658,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run the ingest CLI: a full ingest, or a motor-stage promote with ``--from-graph``.
 
     Args:

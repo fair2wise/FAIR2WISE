@@ -18,7 +18,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_text_layer.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
 from .kernels.geometry import FigureFrame, spans_inside
@@ -54,7 +54,7 @@ class PageGeometry:
                 "rotation": self.rotation, "units": "pt", "origin": "top-left"}
 
 
-def page_geometry(doc: Any, page_number: int, info: Optional[PageInfo] = None) -> PageGeometry:
+def page_geometry(doc: Any, page_number: int, info: PageInfo | None = None) -> PageGeometry:
     """Geometry of 1-based ``page_number``; PyMuPDF's own size wins over the parser's."""
     page = doc[page_number - 1]
     rect = page.rect
@@ -74,10 +74,10 @@ def to_topleft(bbox: BoundingBox, page_height: float) -> Box:
     raise ValueError(f"unsupported bbox origin {bbox.coord_origin!r}")
 
 
-def page_spans(doc: Any, page_number: int) -> List[TextSpan]:
+def page_spans(doc: Any, page_number: int) -> list[TextSpan]:
     """Every text-layer span on a page, verbatim, boxed in top-left points."""
     page = doc[page_number - 1]
-    spans: List[TextSpan] = []
+    spans: list[TextSpan] = []
     for block in page.get_text("dict").get("blocks", []):
         for line in block.get("lines", []):
             for span in line.get("spans", []):
@@ -87,7 +87,7 @@ def page_spans(doc: Any, page_number: int) -> List[TextSpan]:
     return spans
 
 
-def locate_figure_on_page(doc: Any, page_number: int) -> Optional[Box]:
+def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
     """Fallback localization from embedded raster images when the parser gave no bbox.
 
     Returns the union of image boxes only when they form ONE cluster of area; several
@@ -121,16 +121,16 @@ class FigureTextLayer:
 
     figure_id: str
     page: PageGeometry
-    region: Optional[Box]            # top-left points; None when unlocated
-    frame: Optional[FigureFrame]
+    region: Box | None            # top-left points; None when unlocated
+    frame: FigureFrame | None
     scale: float
     scale_source: str                # "parser" | "default"
     region_source: str               # "parser_bbox" | "page_images" | "none"
     source_origin: str               # origin the parser recorded for its bbox ("" when none)
-    spans: Tuple[TextSpan, ...] = ()
+    spans: tuple[TextSpan, ...] = ()
     outside_spans: int = 0           # page spans NOT inside the figure (caption, body)
-    size_px: Optional[Tuple[int, int]] = None
-    uncertainties: Tuple[Uncertainty, ...] = field(default_factory=tuple)
+    size_px: tuple[int, int] | None = None
+    uncertainties: tuple[Uncertainty, ...] = field(default_factory=tuple)
 
     @property
     def sufficient(self) -> bool:
@@ -154,15 +154,15 @@ class FigureTextLayer:
         }
 
 
-def text_layer_for(doc: Any, figure: ParsedFigure, info: Optional[PageInfo] = None,
+def text_layer_for(doc: Any, figure: ParsedFigure, info: PageInfo | None = None,
                    *, default_scale: float = DEFAULT_RENDER_SCALE) -> FigureTextLayer:
     """Locate one parsed figure on its page and collect the text-layer spans inside it."""
     fid = figure.figure_id or f"fig-p{figure.page:03d}-{figure.index:02d}"
     geo = page_geometry(doc, figure.page, info)
-    issues: List[Uncertainty] = []
+    issues: list[Uncertainty] = []
     if geo.rotation:
         issues.append(Uncertainty("page_rotated", f"page rotation {geo.rotation} is not applied", blocking=True))
-    region: Optional[Box] = None
+    region: Box | None = None
     region_source, source_origin = "none", ""
     if figure.bbox is not None:
         try:

@@ -10,12 +10,11 @@ import queue as _queue
 import socket
 from typing import Any
 
+from academy.agent import Agent, action
 import academy.exception
+from academy.handle import Handle
 import psutil
 import requests
-from academy.agent import action
-from academy.agent import Agent
-from academy.handle import Handle
 
 from .message import Log, Message, Registration, Stats, UserPrompt
 

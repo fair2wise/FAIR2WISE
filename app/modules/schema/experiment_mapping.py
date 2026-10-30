@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..contracts.evidence import EvidenceRef, MatchType
 from ..evidence.units import normalize_quantity
@@ -78,7 +78,7 @@ def technique_class(technique: str, classes) -> str:
         else "ExperimentalTechnique"
 
 
-def normalized_slots(value: Optional[float], unit: Optional[str]) -> Dict[str, Any]:
+def normalized_slots(value: float | None, unit: str | None) -> dict[str, Any]:
     """The four 0.3.1 slot values for a printed ``value unit``, or ``{}`` when no conversion is possible.
 
     Uses :func:`~app.modules.evidence.units.normalize_quantity` (closed tables, profile recorded); an unknown
@@ -93,7 +93,7 @@ def normalized_slots(value: Optional[float], unit: Optional[str]) -> Dict[str, A
             "conversion_factor": normalized.factor, "conversion_profile": normalized.profile}
 
 
-def _condition_number(text: str) -> Tuple[Optional[float], Optional[str]]:
+def _condition_number(text: str) -> tuple[float | None, str | None]:
     match = _NUMBER_UNIT.match(text or "")
     if not match or not match.group(2):
         return None, None
@@ -103,8 +103,8 @@ def _condition_number(text: str) -> Tuple[Optional[float], Optional[str]]:
 class _Builder:
     def __init__(self, source_paper: str) -> None:
         self.source_paper = source_paper
-        self.things: Dict[str, Dict[str, Any]] = {}
-        self.edges: List[Dict[str, Any]] = []
+        self.things: dict[str, dict[str, Any]] = {}
+        self.edges: list[dict[str, Any]] = []
         self._edge_keys: set = set()
 
     def node(self, node_id: str, category: str, name: str, **slots: Any) -> str:
@@ -115,7 +115,7 @@ class _Builder:
             self.things[node_id] = body
         return node_id
 
-    def edge(self, subject: str, slot: str, obj: str, evidence: Optional[str] = None) -> None:
+    def edge(self, subject: str, slot: str, obj: str, evidence: str | None = None) -> None:
         key = (subject, slot, obj)
         if key in self._edge_keys:
             return
@@ -159,7 +159,7 @@ def map_validated_records(
     source_paper: str,
     entry: SchemaEntry,
     allow_pending_review: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """json2kg-shaped payload for the accepted records of ``validation`` under ``entry``.
 
     Raises:
@@ -173,7 +173,7 @@ def map_validated_records(
     if not REQUIRED_CLASSES <= classes:
         raise MappingError(f"{entry.path} lacks {sorted(REQUIRED_CLASSES - classes)} (needs schema set 0.3.0)")
     fill_normalized = set(NORMALIZED_SLOTS) <= set(view.all_slots())
-    evidence: Dict[str, EvidenceRef] = validation.evidence
+    evidence: dict[str, EvidenceRef] = validation.evidence
     b = _Builder(source_paper)
 
     def support(node_id: str, kind: str, record_id: str) -> None:
@@ -182,7 +182,7 @@ def map_validated_records(
             raise MappingError(f"{kind} {record_id} has no located evidence")
         b.edge(node_id, "supporting_quote", _quote(b, document, ref, work_id), ref.quote)
 
-    samples: Dict[str, str] = {}
+    samples: dict[str, str] = {}
     for s in validation.samples:
         node = b.node(_local("sample", work_id, s.sample_id), "Sample", s.label, sample_label=s.label,
                       sample_composition=list(s.composition), sample_phase=s.phase,
@@ -192,7 +192,7 @@ def map_validated_records(
         for component in s.composition:
             b.edge(node, "made_of_material", b.node(make_id(component), "Material", component))
 
-    runs: Dict[str, str] = {}
+    runs: dict[str, str] = {}
     for m in validation.measurements:
         run = b.node(_local("run", work_id, m.measurement_id), "MeasurementRun", f"{m.technique} run {m.measurement_id}")
         runs[m.measurement_id] = run

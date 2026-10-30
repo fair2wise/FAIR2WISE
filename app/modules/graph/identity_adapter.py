@@ -40,10 +40,10 @@ different key). T08B should persist it in the import receipt (``id_mapping_sha25
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import json
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+from typing import Any, Iterable, Mapping
 from urllib.parse import quote, unquote
 
 from .ports import ContractError, ErrorCode
@@ -58,7 +58,7 @@ EDGE_KEY = "f2w_edge_id"
 #: Reserved property keys added by the mapping; stripped from ``data`` on read.
 RESERVED_KEYS = frozenset({OWNER_KEY, GRAPH_KEY, ENTITY_KEY, EDGE_KEY})
 
-EntityKey = Tuple[str, str]
+EntityKey = tuple[str, str]
 
 
 def _check(value: str, what: str) -> str:
@@ -73,7 +73,7 @@ def entity_uri(graph_id: str, node_id: str) -> str:
             f"/node/{quote(_check(node_id, 'node_id'), safe='')}")
 
 
-def parse_entity_uri(uri: Optional[str]) -> Optional[EntityKey]:
+def parse_entity_uri(uri: str | None) -> EntityKey | None:
     """Inverse of :func:`entity_uri`; ``None`` for any other URI."""
     if not isinstance(uri, str) or not uri.startswith(URI_PREFIX):
         return None
@@ -83,7 +83,7 @@ def parse_entity_uri(uri: Optional[str]) -> Optional[EntityKey]:
     return unquote(parts[0]), unquote(parts[2])
 
 
-def entity_properties(graph_id: str, node_id: str, data: Mapping[str, Any]) -> Dict[str, Any]:
+def entity_properties(graph_id: str, node_id: str, data: Mapping[str, Any]) -> dict[str, Any]:
     """Properties T08B writes for a node: the node payload plus reserved markers."""
     clash = RESERVED_KEYS & set(data)
     if clash:
@@ -91,7 +91,7 @@ def entity_properties(graph_id: str, node_id: str, data: Mapping[str, Any]) -> D
     return {**dict(data), OWNER_KEY: LITERATURE_OWNER, GRAPH_KEY: graph_id, ENTITY_KEY: node_id}
 
 
-def link_properties(graph_id: str, edge_key: str, data: Mapping[str, Any]) -> Dict[str, Any]:
+def link_properties(graph_id: str, edge_key: str, data: Mapping[str, Any]) -> dict[str, Any]:
     """Properties T08B writes for an edge (payload minus endpoints, plus reserved markers)."""
     body = {k: v for k, v in data.items() if k not in ("subject", "predicate", "object")}
     clash = RESERVED_KEYS & set(body)
@@ -106,9 +106,9 @@ def edge_id(subject: Any, predicate: Any, obj: Any, occurrence: int = 0) -> str:
     return f"e:{digest}" if occurrence == 0 else f"e:{digest}#{occurrence}"
 
 
-def assign_edge_ids(edges: Iterable[Mapping[str, Any]]) -> Iterable[Tuple[str, Mapping[str, Any]]]:
+def assign_edge_ids(edges: Iterable[Mapping[str, Any]]) -> Iterable[tuple[str, Mapping[str, Any]]]:
     """Yield ``(edge_id, edge)`` in file order, numbering repeated triples."""
-    seen: Dict[Tuple[str, str, str], int] = {}
+    seen: dict[tuple[str, str, str], int] = {}
     for edge in edges:
         triple = tuple(json.dumps(edge.get(k)) for k in ("subject", "predicate", "object"))
         n = seen.get(triple, 0)
@@ -116,7 +116,7 @@ def assign_edge_ids(edges: Iterable[Mapping[str, Any]]) -> Iterable[Tuple[str, M
         yield edge_id(edge.get("subject"), edge.get("predicate"), edge.get("object"), n), edge
 
 
-def literature_entity_key(entity: Mapping[str, Any]) -> Optional[EntityKey]:
+def literature_entity_key(entity: Mapping[str, Any]) -> EntityKey | None:
     """Return ``(graph_id, node_id)`` for an owned F2W literature entity, else ``None``."""
     props = entity.get("properties")
     if not isinstance(props, Mapping) or props.get(OWNER_KEY) != LITERATURE_OWNER:
@@ -127,7 +127,7 @@ def literature_entity_key(entity: Mapping[str, Any]) -> Optional[EntityKey]:
     return key
 
 
-def literature_link_key(link: Mapping[str, Any]) -> Optional[Tuple[str, str]]:
+def literature_link_key(link: Mapping[str, Any]) -> tuple[str, str] | None:
     """Return ``(graph_id, edge_id)`` for an owned F2W literature link, else ``None``."""
     props = link.get("properties")
     if not isinstance(props, Mapping) or props.get(OWNER_KEY) != LITERATURE_OWNER:
@@ -138,7 +138,7 @@ def literature_link_key(link: Mapping[str, Any]) -> Optional[Tuple[str, str]]:
     return graph_id, key
 
 
-def strip_reserved(props: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+def strip_reserved(props: Mapping[str, Any] | None) -> dict[str, Any]:
     """Return ``props`` without the reserved mapping markers."""
     return {k: v for k, v in (props or {}).items() if k not in RESERVED_KEYS}
 
@@ -147,8 +147,8 @@ def strip_reserved(props: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
 class IdentityLedger:
     """Bidirectional ``(graph_id, node_id) <-> Tiled entity UUID`` map; never rebinds."""
 
-    _forward: Dict[EntityKey, str] = field(default_factory=dict)
-    _reverse: Dict[str, EntityKey] = field(default_factory=dict)
+    _forward: dict[EntityKey, str] = field(default_factory=dict)
+    _reverse: dict[str, EntityKey] = field(default_factory=dict)
 
     def bind(self, graph_id: str, node_id: str, tiled_id: str) -> None:
         """Record a mapping; raise ``CONFLICT`` if either side is already bound elsewhere."""
@@ -160,15 +160,15 @@ class IdentityLedger:
         self._forward[key] = tiled_id
         self._reverse[tiled_id] = key
 
-    def tiled_id(self, graph_id: str, node_id: str) -> Optional[str]:
+    def tiled_id(self, graph_id: str, node_id: str) -> str | None:
         """Tiled UUID for an F2W node, if known."""
         return self._forward.get((graph_id, node_id))
 
-    def f2w_key(self, tiled_id: str) -> Optional[EntityKey]:
+    def f2w_key(self, tiled_id: str) -> EntityKey | None:
         """F2W key for a Tiled UUID, if known."""
         return self._reverse.get(tiled_id)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         """Deterministic serializable form (sorted) for receipts."""
         rows = sorted([g, n, t] for (g, n), t in self._forward.items())
         return {"version": 1, "entities": rows}
@@ -179,7 +179,7 @@ class IdentityLedger:
         return hashlib.sha256(text.encode()).hexdigest()
 
     @classmethod
-    def from_json(cls, payload: Mapping[str, Any]) -> "IdentityLedger":
+    def from_json(cls, payload: Mapping[str, Any]) -> IdentityLedger:
         """Load a ledger written by :meth:`to_json`."""
         if payload.get("version") != 1:
             raise ContractError(ErrorCode.INVALID_INPUT, "unsupported identity ledger version")

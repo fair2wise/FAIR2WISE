@@ -5,9 +5,9 @@ import asyncio
 import json
 import logging
 import os
-import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+import re
+from typing import Any
 
 from academy.agent import Agent, action
 
@@ -26,7 +26,7 @@ def _tokens(text: Any) -> set[str]:
     }
 
 
-def _parse_json_object(raw: str) -> Dict[str, Any]:
+def _parse_json_object(raw: str) -> dict[str, Any]:
     """Extract the first JSON object from ``raw``, or ``{}`` on failure."""
     match = re.search(r"\{[\s\S]*\}", str(raw or ""))
     if not match:
@@ -38,7 +38,7 @@ def _parse_json_object(raw: str) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _manifest_entry(manifest_path: Path, filename: str) -> Dict[str, Any]:
+def _manifest_entry(manifest_path: Path, filename: str) -> dict[str, Any]:
     """Load the extraction-manifest record for ``filename``, raising if missing."""
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -51,7 +51,7 @@ def _manifest_entry(manifest_path: Path, filename: str) -> Dict[str, Any]:
     return entry
 
 
-def _eligible_pages(entry: Dict[str, Any], page_count: int) -> Tuple[str, List[int]]:
+def _eligible_pages(entry: dict[str, Any], page_count: int) -> tuple[str, list[int]]:
     """Return extraction mode and 1-based pages the manifest marks as eligible."""
     state = str(entry.get("extraction_state") or "")
     if state == "full":
@@ -85,14 +85,14 @@ def _claims_are_cited(answer: str, filename: str, eligible: set[int]) -> bool:
     return not _citation_errors(answer, filename, eligible)
 
 
-def _citation_errors(answer: str, filename: str, eligible: set[int]) -> List[str]:
+def _citation_errors(answer: str, filename: str, eligible: set[int]) -> list[str]:
     """Explain why an answer fails the paper-evidence citation contract."""
     if not answer.strip():
         return ["answer is empty"]
     citations = re.findall(r"\[PDF:\s*([^]]+?)\s+p\.(\d+)\]", answer)
     if not citations:
         return ["answer contains no page citations"]
-    errors: List[str] = []
+    errors: list[str] = []
     for name, page_text in citations:
         if Path(name.strip()).name != filename:
             errors.append(f"citation uses wrong filename: {name.strip()}")
@@ -101,7 +101,7 @@ def _citation_errors(answer: str, filename: str, eligible: set[int]) -> List[str
 
     # Require every factual sentence or bullet-fragment to carry its own
     # citation. Markdown headings and short labels are presentation, not claims.
-    claims: List[str] = []
+    claims: list[str] = []
     for raw_line in answer.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or (line.endswith(":") and "[PDF:" not in line):
@@ -126,9 +126,9 @@ def summarize_extracted_terms(
     *,
     max_terms: int = 16,
     query: str = "",
-    missing_topics: Optional[List[str]] = None,
-    relevant_node_names: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    missing_topics: list[str] | None = None,
+    relevant_node_names: list[str] | None = None,
+) -> dict[str, Any]:
     """Build a deterministic, page-cited summary from extracted term records.
 
     When query context is provided, directly matching extracted terms rank
@@ -160,7 +160,7 @@ def summarize_extracted_terms(
             if str(page).isdigit() and int(page) > 0
         }
 
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for term in raw.get("terms") or []:
         if not isinstance(term, dict) or filename not in (term.get("source_papers") or []):
             continue
@@ -295,7 +295,7 @@ def summarize_extracted_terms(
 class PaperEvidenceAgent(Agent):
     """Answer only from pages that the extraction manifest marks eligible."""
 
-    def __init__(self, *, backend: Optional[str] = None, model: Optional[str] = None) -> None:
+    def __init__(self, *, backend: str | None = None, model: str | None = None) -> None:
         """Store chat backend/model used for page-grounded answering."""
         super().__init__()
         self._backend = backend or os.environ.get("KG_RAG_BACKEND", "cborg")
@@ -313,7 +313,7 @@ class PaperEvidenceAgent(Agent):
         )
         return str(client.chat(prompt, temperature=0.0, timeout=120, trace_label="paper-evidence") or "")
 
-    def _query(self, question: str, pdf_path: str, manifest_path: str) -> Dict[str, Any]:
+    def _query(self, question: str, pdf_path: str, manifest_path: str) -> dict[str, Any]:
         """Answer from eligible PDF pages, repairing or rejecting uncited claims."""
         # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
         # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
@@ -450,7 +450,7 @@ class PaperEvidenceAgent(Agent):
         }
 
     @action
-    async def query(self, question: str, pdf_path: str, manifest_path: str) -> Dict[str, Any]:
+    async def query(self, question: str, pdf_path: str, manifest_path: str) -> dict[str, Any]:
         """Run ``_query`` in an executor so the Academy action stays non-blocking."""
         loop = asyncio.get_event_loop()
         from .trace import bind_context
