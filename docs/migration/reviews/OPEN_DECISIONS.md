@@ -206,10 +206,10 @@ Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
 | D2.4 | Registry name, owner and package visibility | `ghcr.io/fair2wise/fair2wise`, private | **Decided 2026-10-30 (O-O6): ghcr.io/fair2wise/fair2wise, public (snippet exposure accepted).**
 | D2.5 | Tag forms (full or short commit) | Full commit | **Decided 2026-10-30 (O-O6): full commit.**
 | D2.6 | Stop publishing the legacy `agent` image | Yes | **Decided 2026-10-30 (O-O6): stop publishing it.**
-| D2.7 | Retention | Images 30 days, manifests 90 |
-| D2.8 | Platforms | amd64 only until O08 |
-| D2.9 | Pin base images by digest | Yes |
-| D2.10 | Require a binary report reference in each release | Record it; never gating (H3 B) |
+| D2.7 | Retention | Images 30 days, manifests 90 | **Decided 2026-10-30 (O-O6): keep everything.**
+| D2.8 | Platforms | amd64 only until O08 | **Decided 2026-10-30 (O-O6): amd64 only.**
+| D2.9 | Pin base images by digest | Yes | **Decided 2026-10-30 (O-O6): tags, record digests.**
+| D2.10 | Require a binary report reference in each release | Record it; never gating (H3 B) | **Decided 2026-10-30 (O-O6): record, never gating.**
 
 ### D3. Audit 2026-10-29 (plan_addenda.md A5)
 

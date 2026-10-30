@@ -396,3 +396,16 @@ frozen-UI pin is updated in that change (as O-U1).
   `vX.Y.Z-<variant>` on release tags).
 - **D2.6:** stop publishing the legacy `agent` image; `compose.splash.yaml` may still build
   it locally.
+
+## Register walk-through, batch 18: D2.7-D2.10 (2026-10-30, O-O6 part 3; closes the O06 tag rules)
+
+- **D2.7:** keep everything; no registry or artifact expiry.
+- **D2.8:** amd64 only for now; multi-arch later under O08.
+- **D2.9:** base images stay tag-referenced; CI records the resolved digests in the manifest.
+- **D2.10:** record the binary report reference when one exists; never gating (H3 B).
+
+The O06 tag rules are now owner-decided (D2.1-D2.10). `o06_tag_rules_proposal.md` is to be
+rewritten as the approved rules and the publish workflow updated: publish all three channels
+on merge to `main`, owner sole reviewer with self-approval, any tested digest may reach prod,
+public `ghcr.io/fair2wise/fair2wise`, full-commit tags, no `agent` image, no expiry, amd64,
+tags with recorded digests, report recorded not gating. `O06_APPROVED` may then be set.
