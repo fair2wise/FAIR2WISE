@@ -424,3 +424,18 @@ tags with recorded digests, report recorded not gating. `O06_APPROVED` may then 
   integrator may prune dangling images and build cache and delete the 2026-10-29 `f2w:local`
   image and the exited `f2w-local` container to make room for the T24E container checks; the
   other tagged images and volumes stay.
+
+## Register walk-through, batch 20: D3.19, D3.20, T26A Q2-Q4 (2026-10-30, O-X5 / O-R1)
+
+- **D3.19:** "Use Traefik for the edge": the T24E handoff keeps the `fair2wise_` variable
+  prefix, the `/srv/fair2wise/<profile>/{state,secrets,backups,releases.json}` host layout,
+  the `f2w.state/v1` label and no papers/KG volumes on ALS, but the ALS edge proxy is
+  Traefik, not nginx (the in-container gateway stays nginx). Work item: `deploy/` role and
+  the C8 `X-Forwarded-Proto` overwrite expressed for Traefik.
+- **D3.20:** the staging reader/admin sign-in check runs after the first CI image build,
+  by the owner with their own ALS account; the integrator prepares the exact commands.
+- **T26A Q2 (O-R1):** "Adopt them": the existing flat KG release files get descriptors so they
+  become promotable releases.
+- **T26A Q3 and Q4 (O-R1):** both approved: `.gitignore` negation plus `-text` attributes for
+  the KG release paths; T23B stops writing `metadata.graph_snapshot` into promoted payloads
+  (the descriptor carries it).
