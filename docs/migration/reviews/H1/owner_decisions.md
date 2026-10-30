@@ -324,3 +324,15 @@ frozen-UI pin is updated in that change (as O-U1).
   `writer_unauthorized`); an unreadable or badly permissioned secret is refused at startup.
 - **B24 / D3.13:** the sibling hashed-lock layout is accepted (images `--require-hashes`;
   developers and CI keep the plain lists).
+
+## Register walk-through, batch 12: B25-B29 (2026-10-30, O-X3)
+
+- **B25 / D3.10:** raise `click` to 8.4.2 in the runtime lock (hashed lock regenerated;
+  full suite rerun). Work item.
+- **B26:** covered by Q15 (reviewed resolution required).
+- **B27:** the runner re-plans automatically after a stale approval and then waits for
+  approval of the new plan (one fewer manual step; the approver still sees the new plan).
+  Work item in T10B.
+- **B28:** rollback as a toggle between the last two pointers is accepted and documented.
+- **B29:** switch the legacy `DownloadAgent` to the hardened T05 downloader behind a
+  parity test on the existing download fixtures. Work item (T29 scope).
