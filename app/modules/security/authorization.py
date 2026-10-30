@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import ipaddress
 import threading
 from dataclasses import dataclass, field
 import uuid
@@ -64,6 +65,14 @@ NETWORK_HOST = "0.0.0.0"
 NETWORK_EXPOSURE_WARNING = (
     "every user who can reach this address has full application access, "
     "including publication to local Tiled."
+)
+#: AUD-16. On ``:local`` every caller holds ``trace.read_any`` (owner decision 2026-10-12), so
+#: ``GET /traces/{turn_id}`` returns the unprojected record: full prompts with source page text
+#: (content-disclosure ADR 1.2). Fine for one trusted operator on loopback; a wider bind serves
+#: those traces to everyone who can reach the address. The policy is unchanged; this is the note.
+LOCAL_RAW_TRACE_WARNING = (
+    "On the local profile every caller also reads raw traces (full prompts with source page text); "
+    "do not bind the local profile beyond loopback without accepting that."
 )
 DEFAULT_ROLE_CHECK_MAX_AGE = timedelta(seconds=60)
 #: Upper bound for the role cache: tiled 0.2.18's default access-token lifetime
@@ -254,6 +263,31 @@ class DeploymentSettings:
     def exposure_warning(self) -> Optional[str]:
         """Warning to log and show in ``/health`` and the UI when ``:local`` is network-exposed."""
         return NETWORK_EXPOSURE_WARNING if self.is_local and self.local_bind == "network" else None
+
+
+def is_loopback_host(host: Any) -> bool:
+    """``True`` for ``localhost`` and loopback IP literals (``127.0.0.0/8``, ``::1``)."""
+    name = str(host or "").strip().strip("[]").lower()
+    if name == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
+
+
+def local_bind_warning(settings: DeploymentSettings, host: Any) -> Optional[str]:
+    """The warning to log when a server binds ``settings`` at ``host`` beyond loopback (AUD-16).
+
+    ``None`` on the ALS profiles (sign-in and the gateway apply) and for loopback hosts.
+    Otherwise the network-exposure warning plus :data:`LOCAL_RAW_TRACE_WARNING`. No policy
+    changes here: ``:local`` keeps full access and raw traces for every caller; the operator
+    accepts that by binding wider.
+    """
+    if not settings.is_local or is_loopback_host(host):
+        return None
+    return (f"F2W local profile bound to {str(host)!r}, beyond loopback: "
+            f"{NETWORK_EXPOSURE_WARNING} {LOCAL_RAW_TRACE_WARNING}")
 
 
 # --- resolution ----------------------------------------------------------------

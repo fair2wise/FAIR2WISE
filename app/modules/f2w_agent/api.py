@@ -95,7 +95,7 @@ from ..tiled_graph import (
 )
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
-from ...api.auth import undeclared_routes
+from ...api.auth import undeclared_routes, warn_if_exposed
 from ...api.legacy_ui import build_guard, ui_context, ui_optional_context
 from ...api.origin_gate import OriginGateMiddleware
 from ...api.sessions import TiledSessionStore, install_session_routes
@@ -7389,4 +7389,6 @@ def run_api(cfg: CoordinatorConfig, *, host: str, port: int, cors_origins: Optio
     from ..deployment.gateway import layout_from_env, uvicorn_options
 
     options = uvicorn_options(layout_from_env(os.environ))
-    uvicorn.run(create_app(cfg, cors_origins=cors_origins), host=host, port=port, **options)
+    app = create_app(cfg, cors_origins=cors_origins)
+    warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
+    uvicorn.run(app, host=host, port=port, **options)

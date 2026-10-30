@@ -101,6 +101,21 @@ def test_role_check_max_age_is_bounded():
             staging_settings(role_check_max_age=bad)
 
 
+def test_local_bind_warning_names_raw_traces_beyond_loopback():
+    """AUD-16: the note, not a policy change."""
+    from app.modules.security.authorization import (
+        LOCAL_RAW_TRACE_WARNING, is_loopback_host, local_bind_warning)
+
+    assert all(is_loopback_host(h) for h in ("127.0.0.1", "127.0.0.2", "localhost", "::1", "[::1]"))
+    assert not any(is_loopback_host(h) for h in ("0.0.0.0", "::", "10.0.0.5", "f2w.example", "", None))
+    s = local_settings()
+    assert local_bind_warning(s, "127.0.0.1") is None and local_bind_warning(s, "localhost") is None
+    warning = local_bind_warning(s, "0.0.0.0")
+    assert warning and NETWORK_EXPOSURE_WARNING in warning and LOCAL_RAW_TRACE_WARNING in warning
+    assert "raw traces" in warning and "'0.0.0.0'" in warning
+    assert local_bind_warning(staging_settings(), "0.0.0.0") is None  # ALS: sign-in and gateway apply
+
+
 def test_local_bind_defaults_to_loopback_and_network_warns():
     """LOCAL-08."""
     s = DeploymentSettings.from_mapping({"F2W_DEPLOYMENT_PROFILE": "local", "F2W_TILED_WRITER_IDENTITY": WRITER})

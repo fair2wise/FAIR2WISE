@@ -57,7 +57,7 @@ All 31 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 
 - A route whose effect needs one fixed capability declares it, so the dependency refuses the caller first and, for an admin capability, re-runs the ALS role check.
 - Routes whose capability depends on the job kind or on ownership declare no entry capability (signed-in on ALS) and rely on `JobService`; their mutating handlers re-run the ALS role check (`fresh_request_context`).
-- On `:local` the caller is the local operator with every capability (D34); no identity call is made.
+- On `:local` the caller is the local operator with every capability (D34); no identity call is made. That includes `trace.read_any`, so `GET /traces/{turn_id}` returns the **raw** trace (full prompts with source page text) to every caller (owner decision 2026-10-12, AUD-16). This is fine for one trusted operator on loopback. Do not bind `:local` beyond loopback (`F2W_LOCAL_BIND=network`, or `--host` other than a loopback address) without accepting that everyone who can reach the address reads those traces; both `run_api` entry points log a WARNING when they do (`app.api.auth.warn_if_exposed`), and startup logs it when `F2W_LOCAL_BIND=network`. The policy itself is unchanged.
 
 | ID | Route | Entry capability | Notes |
 | --- | --- | --- | --- |

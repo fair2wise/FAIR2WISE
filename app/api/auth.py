@@ -38,11 +38,13 @@ from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.security.authorization import (
     AGENT_SURFACE,
+    LOCAL_RAW_TRACE_WARNING,
     TRUST_CLAIM_HEADERS,
     DeploymentSettings,
     RoleCheckCache,
     RoutePolicy,
     Unauthenticated,
+    local_bind_warning,
     require,
     resolve_context,
     route_capabilities,
@@ -149,6 +151,22 @@ class AccessRuntime:
             self.notify_scope_change({"subject": subject, "reason": "role_downgraded"})
 
 
+def warn_if_exposed(app: Any, host: Any) -> Optional[str]:
+    """Log and return the AUD-16 warning when ``app`` (``:local``) is about to serve beyond loopback.
+
+    Called by both ``run_api`` entry points with the uvicorn bind host. Apps without an
+    access runtime (test doubles) produce nothing.
+    """
+    runtime = getattr(getattr(app, "state", None), "f2w_access", None)
+    settings = getattr(runtime, "settings", None)
+    if not isinstance(settings, DeploymentSettings):
+        return None
+    warning = local_bind_warning(settings, host)
+    if warning:
+        logger.warning("%s", warning)
+    return warning
+
+
 def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
     """Attach ``runtime`` to ``app`` and register the access error handlers.
 
@@ -163,7 +181,8 @@ def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
     app.add_exception_handler(Unauthenticated, _unauthenticated_handler)
     app.add_exception_handler(ContractError, _contract_error_handler)
     if runtime.settings.exposure_warning:
-        logger.warning("F2W local network exposure: %s", runtime.settings.exposure_warning)
+        logger.warning("F2W local network exposure: %s %s", runtime.settings.exposure_warning,
+                       LOCAL_RAW_TRACE_WARNING)
     if runtime.settings.disposable_target:
         logger.warning("F2W %s is bound to a disposable test Tiled at %s (test fixture override)",
                        runtime.settings.profile.value, runtime.settings.tiled_target)
