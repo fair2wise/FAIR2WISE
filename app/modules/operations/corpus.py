@@ -9,18 +9,24 @@ value). Keys are grouped into Works with the rule of
 ``scripts/harvest_rsoxs.py:works_same_identity`` (the H3 K1 reference), applied as a
 transitive closure (union-find):
 
+0. equal content hash (sha256 of the PDF bytes, when the metadata carries one) -> same
+   Work (``work-identity/2``, owner decision D1.9 / O-S3, 2026-10-30: byte-identical
+   files count once even when renamed and otherwise unidentified);
 1. equal DOI -> same Work; two *different* non-preprint DOIs -> never the same Work;
 2. equal arXiv id (version suffix stripped) -> same Work;
 3. otherwise same Work only when the titles are near-duplicates (token Jaccard >= 0.82
    after a small stopword list) and the first-author surnames do not disagree.
 
 Identifiers come from bibliographic metadata when present (``source_metadata`` ``doi``,
-``paper_title``, ``authors``) and otherwise from the key itself: F2W DOI stems
-(``10.1021_acs.macromol.0c01782.pdf``; the first ``_`` after the registrant is the ``/``)
-and arXiv ids (``2306.07295v1.pdf``). A key with no DOI, arXiv id or title is its own
-Work and is counted under ``works_identified_by_key_only``. Candidate title pairs come
-from an exact prefix-filter join, so the rule is applied to every qualifying pair
-without an all-pairs scan.
+``paper_title``, ``authors``; the content hash from ``sha256``, ``content_sha256``,
+``source_sha256`` or a ``source_ref`` of the form ``sha256:<hex>``) and otherwise from the
+key itself: F2W DOI stems (``10.1021_acs.macromol.0c01782.pdf``; the first ``_`` after
+the registrant is the ``/``) and arXiv ids (``2306.07295v1.pdf``). A key with no content
+hash, DOI, arXiv id or title is its own Work and is counted under
+``works_identified_by_key_only``. Candidate title pairs come from an exact prefix-filter
+join, so the rule is applied to every qualifying pair without an all-pairs scan.
+``WorkIndex.build(..., use_content_hash=False)`` reproduces ``work-identity/1`` for parity
+tests; on a population without hashes the two methods agree.
 
 **Corpus audit (OP02,** ``curate_audit_corpus`` **).** Runs the ``scripts/corpus_qa.py``
 sections over one extracted-terms file, read-only:
@@ -85,13 +91,22 @@ from .reports import (
 # Work identity (H3 K1)
 # =====================================================================================
 
-WORK_IDENTITY_METHOD = "work-identity/1"
+WORK_IDENTITY_METHOD = "work-identity/2"
+#: The previous method (no content-hash step); ``WorkIndex.build(use_content_hash=False)``.
+WORK_IDENTITY_METHOD_V1 = "work-identity/1"
+_SHA256_HEX = re.compile(r"^(?:sha256:)?([0-9a-f]{64})$", re.IGNORECASE)
 TITLE_THRESHOLD = 0.82
 _STOPWORDS = frozenset({"a", "an", "the", "and", "for", "of", "in", "on", "with", "by"})
 _F2W_DOI_STEM = re.compile(r"^(10\.\d{4,9})_(.+)$")
 _ARXIV_NEW = re.compile(r"^(?:arxiv[_:.-]?)?(\d{4}\.\d{4,5})(?:v\d+)?$", re.IGNORECASE)
 _ARXIV_OLD = re.compile(r"^([a-z][a-z.-]*)[_/](\d{7})(?:v\d+)?$", re.IGNORECASE)
 _ARXIV_DOI = re.compile(r"^10\.48550/arxiv\.(.+)$", re.IGNORECASE)
+
+
+def content_hash_key(value: Any) -> str:
+    """Lowercased 64-hex sha256 from ``<hex>`` or ``sha256:<hex>``; ``""`` for anything else."""
+    match = _SHA256_HEX.match(str(value or "").strip())
+    return match.group(1).lower() if match else ""
 
 
 def paper_key(value: Any) -> str:
@@ -174,6 +189,7 @@ class PaperRecord:
     title: str = ""
     first_author: str = ""
     years: Tuple[int, ...] = ()
+    content_sha256: str = ""
 
     @property
     def is_preprint(self) -> bool:
@@ -182,13 +198,16 @@ class PaperRecord:
 
     @property
     def identified(self) -> bool:
-        """Has a DOI, arXiv id or title (otherwise the key alone identifies it)."""
-        return bool(self.doi or self.arxiv_id or title_tokens(self.title))
+        """Has a content hash, DOI, arXiv id or title (otherwise the key alone identifies it)."""
+        return bool(self.content_sha256 or self.doi or self.arxiv_id or title_tokens(self.title))
 
 
-def same_work(left: PaperRecord, right: PaperRecord) -> bool:
-    """Pairwise rule of ``harvest_rsoxs.works_same_identity`` (without stored ``versions``)."""
+def same_work(left: PaperRecord, right: PaperRecord, *, use_content_hash: bool = True) -> bool:
+    """Pairwise rule of ``harvest_rsoxs.works_same_identity`` (without stored ``versions``),
+    preceded by the content-hash step of ``work-identity/2`` unless ``use_content_hash`` is off."""
     if left.key == right.key:
+        return True
+    if use_content_hash and left.content_sha256 and left.content_sha256 == right.content_sha256:
         return True
     if left.doi and right.doi:
         if left.doi == right.doi:
@@ -219,11 +238,13 @@ def record_for(key: str, metadata: Iterable[Mapping[str, Any]] = ()) -> PaperRec
     """
     key = paper_key(key)
     doi, arxiv = identifiers_from_key(key)
-    title = author = ""
+    title = author = digest = ""
     years: List[int] = []
     for meta in metadata:
         if not isinstance(meta, Mapping):
             continue
+        digest = digest or next((h for h in (content_hash_key(meta.get(f)) for f in
+                                             ("sha256", "content_sha256", "source_sha256", "source_ref")) if h), "")
         mdoi = doi_key(meta.get("doi"))
         if mdoi and not doi:
             doi = mdoi
@@ -235,7 +256,8 @@ def record_for(key: str, metadata: Iterable[Mapping[str, Any]] = ()) -> PaperRec
         year = _valid_year(meta.get("publication_year"))
         if year is not None:
             years.append(year)
-    return PaperRecord(key=key, doi=doi, arxiv_id=arxiv, title=title, first_author=author, years=tuple(years))
+    return PaperRecord(key=key, doi=doi, arxiv_id=arxiv, title=title, first_author=author, years=tuple(years),
+                       content_sha256=digest)
 
 
 class _UnionFind:
@@ -273,24 +295,32 @@ class WorkIndex:
     members: Dict[str, List[str]] = field(default_factory=dict)
 
     @classmethod
-    def build(cls, records: Iterable[PaperRecord], *, threshold: float = TITLE_THRESHOLD) -> "WorkIndex":
-        """Group ``records`` (one per key; later duplicates of a key are ignored)."""
+    def build(cls, records: Iterable[PaperRecord], *, threshold: float = TITLE_THRESHOLD,
+              use_content_hash: bool = True) -> "WorkIndex":
+        """Group ``records`` (one per key; later duplicates of a key are ignored).
+
+        ``use_content_hash=False`` applies ``work-identity/1`` (no step 0) for parity tests.
+        """
         recs: Dict[str, PaperRecord] = {}
         for rec in records:
             if rec.key and rec.key not in recs:
                 recs[rec.key] = rec
         uf = _UnionFind(recs)
+        by_hash: Dict[str, str] = {}
         by_doi: Dict[str, str] = {}
         by_arxiv: Dict[str, str] = {}
         for key, rec in recs.items():
-            for index, ident in ((by_doi, rec.doi), (by_arxiv, rec.arxiv_id)):
+            idents = ((by_doi, rec.doi), (by_arxiv, rec.arxiv_id))
+            if use_content_hash:
+                idents = ((by_hash, rec.content_sha256),) + idents
+            for index, ident in idents:
                 if ident:
                     if ident in index:
                         uf.union(index[ident], key)
                     else:
                         index[ident] = key
         for a, b in _title_candidates(recs, threshold):
-            if uf.find(a) != uf.find(b) and same_work(recs[a], recs[b]):
+            if uf.find(a) != uf.find(b) and same_work(recs[a], recs[b], use_content_hash=use_content_hash):
                 uf.union(a, b)
         groups: Dict[str, List[str]] = defaultdict(list)
         for key in recs:
@@ -298,7 +328,7 @@ class WorkIndex:
         index = cls(records=recs)
         for keys in groups.values():
             keys.sort()
-            work_id = _work_id([recs[k] for k in keys])
+            work_id = _work_id([recs[k] for k in keys], use_content_hash=use_content_hash)
             index.members[work_id] = keys
             for key in keys:
                 index.work_of[key] = work_id
@@ -342,7 +372,7 @@ class WorkIndex:
         return None
 
 
-def _work_id(records: Sequence[PaperRecord]) -> str:
+def _work_id(records: Sequence[PaperRecord], *, use_content_hash: bool = True) -> str:
     journal = sorted(r.doi for r in records if r.doi and not r.is_preprint)
     if journal:
         return f"doi:{journal[0]}"
@@ -352,6 +382,9 @@ def _work_id(records: Sequence[PaperRecord]) -> str:
     dois = sorted(r.doi for r in records if r.doi)
     if dois:
         return f"doi:{dois[0]}"
+    hashes = sorted(r.content_sha256 for r in records if r.content_sha256) if use_content_hash else []
+    if hashes and not any(title_tokens(r.title) for r in records):
+        return f"sha256:{hashes[0]}"
     return f"key:{sorted(r.key for r in records)[0]}"
 
 
@@ -1039,6 +1072,7 @@ class CorpusAuditTool:
 __all__: Tuple[str, ...] = (
     "AUDIT_LITERATURE_CORPUS_SKILL", "AUDIT_METHOD", "CORPUS_SECTIONS", "CURATE_AUDIT_CORPUS", "CorpusAuditTool",
     "CorpusResolver", "CorpusSource", "EXCLUDED_SECTIONS", "PaperRecord", "TOOL_AUDIT", "WORK_IDENTITY_METHOD",
+    "WORK_IDENTITY_METHOD_V1", "content_hash_key",
     "WorkIndex", "audit_corpus", "doi_key", "identifiers_from_key", "load_terms", "mapping_corpus_resolver",
     "paper_key", "record_for", "same_work", "title_tokens", "titles_near_duplicate", "work_index_for_terms",
 )

@@ -133,10 +133,10 @@
       "family": "OPS",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "07f05fb3d8c48240caa01a6fadc4d5668c9deb56ed79fe7f848ca905a88c0f88",
-        "config_sha256": "a6711e0fafa270ce2e1008ea835a0a12fdb0bbb64ef6efd524be00f7fd16f735",
+        "case_sha256": "30da66ad498e72c7720cc1ce0a82821ce0aa7c3b323096b34de9eb5f1a6a3995",
+        "config_sha256": "6ee2126c3f543fac7e7f25f3f52a48e0b76864bf902d721c2fe49c2510ff1d61",
         "model_sha256": null,
-        "oracle_source_sha256": "41021b11363d2787a64520bbe49946efc072a8fa2f82ffb617250850a1b42370",
+        "oracle_source_sha256": "d659d385d43880284a52dc7608857d156de31e93cd95fb8b420cfe8a1abb34a3",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -146,7 +146,7 @@
       ],
       "model_ref": "fake_or_none",
       "oracle": {
-        "covers": "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed; T19D: executable on synthetic repeated-paper populations (preprint/published pairs by DOI label or by title and first author, later arXiv versions, the 10.48550 stem, one file under several directories, renamed byte-identical copies with identical metadata, byte-identical duplicate records, a Work reappearing in a later graph version) in graph statistics, subgraphs, growth and the corpus audit, at 60k scale; a renamed copy with no identifier stays a disclosed key-only Work (no content-hash rule in work-identity/1)",
+        "covers": "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under work-identity/2 (H3 K1 + D1.9); duplicate triples collapse; the legacy histogram overcount is disclosed; T19D: executable on synthetic repeated-paper populations (preprint/published pairs by DOI label or by title and first author, later arXiv versions, the 10.48550 stem, one file under several directories, renamed byte-identical copies with identical metadata, byte-identical duplicate records, a Work reappearing in a later graph version) in graph statistics, subgraphs, growth and the corpus audit, at 60k scale; a renamed copy with no identifier stays a disclosed key-only Work unless its metadata carries the file sha256 (content-hash step, work-identity/2, owner decision D1.9); work-identity/2 agrees with /1 on a population without hashes (parity test)",
         "kind": "pytest_nodes",
         "rubric_ref": null,
         "selectors": [
@@ -163,10 +163,12 @@
           "tests/operations/test_repeated_works.py::test_renamed_copy_without_any_identifier_is_disclosed_not_merged",
           "tests/operations/test_repeated_works.py::test_byte_identical_duplicate_records_collapse_by_their_unit",
           "tests/operations/test_repeated_works.py::test_a_work_reappearing_as_its_preprint_is_not_a_new_work",
-          "tests/operations/test_repeated_works.py::test_repeated_reference_population_at_scale_counts_each_work_once"
+          "tests/operations/test_repeated_works.py::test_repeated_reference_population_at_scale_counts_each_work_once",
+          "tests/operations/test_repeated_works.py::test_renamed_copy_with_the_same_content_hash_is_one_work",
+          "tests/operations/test_repeated_works.py::test_work_identity_2_agrees_with_1_on_a_population_without_hashes"
         ],
         "supporting_selectors": [],
-        "uncovered": "Owner review of work-identity/1 on a real repeated-paper population (waits for the H3 B4 pilot labels)"
+        "uncovered": "Owner review of work-identity/2 on a real repeated-paper population (waits for the H3 B4 pilot labels)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {

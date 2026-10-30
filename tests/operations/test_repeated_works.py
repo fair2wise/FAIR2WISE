@@ -1,9 +1,9 @@
 """T19D / OPS-02: repeated Work references count as one Work under the approved rule (H3 K1).
 
 H3 K1 (approved "as recommended"): Tool output counts **distinct Works**
-(``work-identity/1``: equal DOI, equal arXiv id, or near-duplicate title with agreeing
-first author; two different journal DOIs never merge); the legacy CLIs keep their
-filename-key units. These tests make the rule executable on synthetic repeated-paper
+(``work-identity/2``: equal content hash, equal DOI, equal arXiv id, or near-duplicate
+title with agreeing first author; two different journal DOIs never merge); the legacy
+CLIs keep their filename-key units. These tests make the rule executable on synthetic repeated-paper
 populations for every operation that counts papers:
 
 * the preprint / published pair (arXiv file labelled with the journal DOI, or sharing the
@@ -13,9 +13,11 @@ populations for every operation that counts papers:
   and term records;
 * the same Work cited by two versions of a graph is not a new Work.
 
-The one case the rule does not merge is a renamed copy with no DOI, arXiv id or title:
-work-identity/1 has no content-hash rule, so it stays a separate key-only Work and is
-disclosed as ``works_identified_by_key_only`` (an open question for the owner).
+A renamed copy with no DOI, arXiv id or title merges only when its metadata carries the
+file's sha256 (the content-hash step added by owner decision D1.9, work-identity/2); a copy
+with no hash either stays a separate key-only Work and is disclosed as
+``works_identified_by_key_only``. ``use_content_hash=False`` reproduces work-identity/1 and
+the parity test shows both methods agree on a population without hashes.
 
 Real-paper review of the rule waits for the H3 B4 pilot labels (papers A-C, owner-run
 labelling then human review); these synthetic populations do not stand in for it.
@@ -24,6 +26,7 @@ labelling then human review); these synthetic populations do not stand in for it
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -133,12 +136,46 @@ def test_renamed_byte_identical_copy_with_the_same_metadata_is_one_work(tmp_path
 
 
 def test_renamed_copy_without_any_identifier_is_disclosed_not_merged(tmp_path):
-    """work-identity/1 has no content-hash rule: an unlabelled renamed copy stays a separate key-only Work."""
+    """Without a content hash an unlabelled renamed copy stays a separate key-only Work (as in work-identity/1)."""
     names = ["scan_0001.pdf", "scan_0001 (1).pdf"]
     report = _corpus(tmp_path, [_term(i, [n], {}) for i, n in enumerate(names)])
     dup = report.metrics["duplicate_works"]
     assert (dup["distinct_works"], dup["works_identified_by_key_only"]) == (2, 2)
-    assert "work-identity/1" in report.counting_units["duplicate_works.distinct_works"]
+    assert "work-identity/2" in report.counting_units["duplicate_works.distinct_works"]
+
+
+def test_renamed_copy_with_the_same_content_hash_is_one_work(tmp_path):
+    """D1.9 (O-S3): byte-identical files count once when their metadata carries the sha256 (work-identity/2)."""
+    from app.modules.operations.corpus import WorkIndex, record_for
+
+    names = ["scan_0001.pdf", "scan_0001 (1).pdf", "Downloads/scan_0001 copy.pdf"]
+    digest = "ab" * 32
+    metas = [{"sha256": digest}, {"source_ref": "sha256:" + digest.upper()}, {"content_sha256": digest}]
+    report = _corpus(tmp_path, [_term(i, [n], {n: dict(m, publication_year=2021)}) for i, (n, m) in
+                                enumerate(zip(names, metas))])
+    dup = report.metrics["duplicate_works"]
+    assert (dup["paper_keys"], dup["distinct_works"], dup["works_identified_by_key_only"]) == (3, 1, 0)
+    assert report.metrics["summary"]["papers_per_year_v2"] == {"2021": 1}
+    records = [record_for(n, [m]) for n, m in zip(names, metas)]
+    assert {r.content_sha256 for r in records} == {digest}
+    v2, v1 = WorkIndex.build(records), WorkIndex.build(records, use_content_hash=False)
+    assert (len(v2), len(v1)) == (1, 3) and list(v2.members) == ["sha256:" + digest]
+    other = record_for("scan_0002.pdf", [{"sha256": "cd" * 32}])
+    assert len(WorkIndex.build(records + [other])) == 2  # a different hash is a different Work
+
+
+def test_work_identity_2_agrees_with_1_on_a_population_without_hashes(big_corpus):
+    """Parity (D1.9 versioned rule change): without content hashes step 0 never fires, so both methods group alike."""
+    from app.modules.operations.corpus import WorkIndex, record_for
+
+    terms = json.loads(Path(big_corpus.path).read_text())["terms"]
+    meta = {}
+    for term in terms:
+        for key, m in (term.get("source_metadata") or {}).items():
+            meta.setdefault(key, []).append(m)
+    records = [record_for(k, v) for k, v in meta.items()]
+    assert records and not any(r.content_sha256 for r in records)
+    assert WorkIndex.build(records).members == WorkIndex.build(records, use_content_hash=False).members
 
 
 def test_byte_identical_duplicate_records_collapse_by_their_unit(tmp_path):

@@ -530,16 +530,20 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_byte_identical_duplicate_records_collapse_by_their_unit",
             "test_a_work_reappearing_as_its_preprint_is_not_a_new_work",
             "test_repeated_reference_population_at_scale_counts_each_work_once",
+            "test_renamed_copy_with_the_same_content_hash_is_one_work",
+            "test_work_identity_2_agrees_with_1_on_a_population_without_hashes",
         ),
         "partial",
         "Repeated Work references (journal PDF, arXiv preprint, path copies) count as one distinct Work under"
-        " work-identity/1 (H3 K1); duplicate triples collapse; the legacy histogram overcount is disclosed; T19D:"
+        " work-identity/2 (H3 K1 + D1.9); duplicate triples collapse; the legacy histogram overcount is disclosed; T19D:"
         " executable on synthetic repeated-paper populations (preprint/published pairs by DOI label or by title"
         " and first author, later arXiv versions, the 10.48550 stem, one file under several directories, renamed"
         " byte-identical copies with identical metadata, byte-identical duplicate records, a Work reappearing in a"
         " later graph version) in graph statistics, subgraphs, growth and the corpus audit, at 60k scale; a"
-        " renamed copy with no identifier stays a disclosed key-only Work (no content-hash rule in work-identity/1)",
-        "Owner review of work-identity/1 on a real repeated-paper population (waits for the H3 B4 pilot labels)",
+        " renamed copy with no identifier stays a disclosed key-only Work unless its metadata carries the file sha256"
+        " (content-hash step, work-identity/2, owner decision D1.9); work-identity/2 agrees with /1 on a population"
+        " without hashes (parity test)",
+        "Owner review of work-identity/2 on a real repeated-paper population (waits for the H3 B4 pilot labels)",
         supporting=n(OS, "test_duplicate_labels_count_as_separate_records"),
         fixtures=["tests/operations/scale_population.py"],
     ),

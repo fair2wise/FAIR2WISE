@@ -1,4 +1,4 @@
-"""T19C / H3 K1: distinct-Work identity (work-identity/1) and its parity with the harvest identity rule."""
+"""T19C / H3 K1: distinct-Work identity (work-identity/2; the /1 rule plus the D1.9 content-hash step) and its parity with the harvest identity rule."""
 
 from __future__ import annotations
 

@@ -15,7 +15,7 @@ or joined by label). *Entities* are distinct node ids. *Relations* are distinct
 records and dangling triples (an endpoint with no node) are reported separately so the
 legacy collapse is visible. *Papers* are **distinct Works** (H3 K1) built from the paper
 keys entities cite (``source_papers``/``papers``, plus ``publications`` DOIs), with
-:mod:`.corpus`'s ``work-identity/1``; distinct paper keys are reported alongside. The
+:mod:`.corpus`'s ``work-identity/2``; distinct paper keys are reported alongside. The
 ``legacy`` block of ``kg_compute_statistics`` reproduces
 ``analyze_kgs.calculate_structural_metrics`` exactly (parity-tested against the script);
 ``kg_compare_snapshots`` reproduces ``calculate_growth_metrics`` but takes its paper

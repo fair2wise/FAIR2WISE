@@ -117,7 +117,7 @@ T19C implements the graph and corpus operations after H3 (K1 distinct Works; K2 
 
 | Tool | Method | Counting unit | Complete / partial | Backends |
 | --- | --- | --- | --- | --- |
-| `kg_compute_statistics` (OP03, RT-03) | `kg-statistics/1` | distinct node ids; distinct (s,p,o) triples; distinct Works (`work-identity/1`) | `ScanControl` bound/deadline -> `partial` + `ToolStatus.PARTIAL` | JSON (snapshot), Tiled (live, unisolated) |
+| `kg_compute_statistics` (OP03, RT-03) | `kg-statistics/1` | distinct node ids; distinct (s,p,o) triples; distinct Works (`work-identity/2`) | `ScanControl` bound/deadline -> `partial` + `ToolStatus.PARTIAL` | JSON (snapshot), Tiled (live, unisolated) |
 | `kg_compare_snapshots` (OP03, RT-07) | `kg-growth/1` | as above; legacy growth with distinct-Work denominators | unread graphs listed; partial | JSON, Tiled |
 | `kg_paper_subgraph` (K-10, RT-59) | `kg-paper-subgraph/1` | node ids citing one Work; internal/boundary triples | absent paper after a partial scan is `UNAVAILABLE`, not `NOT_FOUND` | JSON, Tiled |
 | `kg_recent_entities` (K-11, RT-08) | `kg-recent/1` | node ids created after `since` | as above | Tiled (`createdAt`); JSON: `UNSUPPORTED_CAPABILITY` |
@@ -140,7 +140,7 @@ Measured (Apple laptop, one process, no model, no socket): `kg_compute_statistic
 
 Change made for scale: `curate_audit_corpus` §1 arXiv x journal near-duplicate check was O(arXiv x journal) at ~0.5 ms per pair (over 4 minutes for 3 000 keys); it now prunes by exact lower bounds and a banded edit distance (same pairs, order and scores as `corpus_qa`, parity-tested). It is still quadratic in pairs (~30 us/pair on adversarial titles).
 
-Open: work-identity/1 does not merge a renamed copy with no DOI, arXiv id or title (no content-hash rule; disclosed as `works_identified_by_key_only`); operations count figure/table-derived records by their existing citation fields (`source_papers`, pages, snippets) and report no per-modality breakdown; a T09 EvidenceRef whose Work is cited only through `evidence[].work_id` is not counted. Real-paper review of K1 waits for the H3 B4 pilot labels.
+Closed 2026-10-30 (D1.9, O-S3): work-identity/2 adds a content-hash step, so a renamed byte-identical copy whose metadata carries the file sha256 counts once; a copy with no hash, DOI, arXiv id or title is still disclosed as `works_identified_by_key_only`. Open: operations count figure/table-derived records by their existing citation fields (`source_papers`, pages, snippets) and report no per-modality breakdown; a T09 EvidenceRef whose Work is cited only through `evidence[].work_id` is not counted. Real-paper review of K1 waits for the H3 B4 pilot labels.
 
 ## 10. T19E access closure: legacy CLI to new entry points (agent, API, SDK, CLI)
 
