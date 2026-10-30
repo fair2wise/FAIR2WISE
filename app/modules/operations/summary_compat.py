@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable
+from typing import Any, Callable, cast
 import uuid
 
 from ..contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus
@@ -68,7 +68,7 @@ def session_paper_resolver(pipeline: Any) -> PaperScopeResolver:
         filename = str(paper.get("filename") or "") if isinstance(paper, dict) else ""
         if not filename:
             return None
-        paper_id = str(paper.get("paper_id") or "") or None
+        paper_id = str(cast(dict[str, Any], paper).get("paper_id") or "") or None
         return PaperScope(str(pipeline.coord.session_terms), str(pipeline.coord.extraction_manifest), filename,
                           paper_id=paper_id)
 
@@ -136,7 +136,7 @@ class LegacySummaryPath:
         if entry is not None and entry.error is not None:
             raise entry.error
         if entry is not None and entry.ran:
-            return entry.legacy
+            return cast(dict[str, Any], entry.legacy)
         if result.status is ToolStatus.INVALID:
             from ..f2w_agent.paper_evidence_agent import summarize_extracted_terms
 

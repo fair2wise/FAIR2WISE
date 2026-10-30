@@ -34,7 +34,7 @@ from pathlib import Path
 import re
 import threading
 import time
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ErrorCode
@@ -172,7 +172,7 @@ class LegacyIndex:
     def read(self) -> dict[str, Any]:
         """The index, or an empty one when absent. A corrupt index raises; it is never guessed."""
         try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
+            data: dict[str, Any] = json.loads(self.path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             return self._empty()
         except ValueError as exc:
@@ -267,11 +267,11 @@ class LegacyIndex:
         key = self.key(root_id, relpath)
         files = self.read()["files"]
         if key in files:
-            return files[key]["ref"]
+            return cast(str, files[key]["ref"])  # Any: untyped JSON index row
         lowered = key.lower()
         for name, row in files.items():
             if name.lower() == lowered:
-                return row["ref"]
+                return cast(str, row["ref"])  # Any: untyped JSON index row
         return None
 
     def refs_for_doi(self, doi: str) -> list[str]:
@@ -292,7 +292,7 @@ class LegacyIndex:
             return None
         for name, row in self.read()["files"].items():
             if name.rsplit("/", 1)[-1].lower() in wanted:
-                return row["ref"]
+                return cast(str, row["ref"])  # Any: untyped JSON index row
         return None
 
     def names_for(self, ref: str) -> list[str]:
@@ -325,7 +325,7 @@ class LegacyIndex:
         self.register_root(root_id, root)
         report = AdoptReport(root_id=root_id, mode=mode)
         indexed = self.read()["files"]
-        pending: list[tuple] = []
+        pending: list[tuple[str, StoredAsset]] = []
         for path in sorted(root.rglob(pattern)):
             rel = path.relative_to(root).as_posix()
             key = self.key(root_id, rel)
@@ -376,7 +376,7 @@ class LegacyIndex:
         for paper in manifest.get("papers") or []:
             rows.append(paper)
             rows.extend(v for v in (paper.get("versions") or []) if isinstance(v, Mapping))
-        seen: set = set()
+        seen: set[str] = set()
         for row in rows:
             rel = str(row.get("pdf_path") or "").strip()
             if not rel or rel in seen:

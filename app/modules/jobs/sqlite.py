@@ -69,7 +69,7 @@ class OperationalDB:
             self._depth = 0
             self._con.execute("COMMIT")
 
-    def query(self, sql: str, params: Sequence[Any] = ()) -> list:
+    def query(self, sql: str, params: Sequence[Any] = ()) -> list[Any]:  # Any: sqlite3 row objects
         """Run a read-only statement and return all rows."""
         with self._lock:
             return self._con.execute(sql, tuple(params)).fetchall()

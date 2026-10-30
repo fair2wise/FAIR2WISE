@@ -1,13 +1,19 @@
 """LangGraph agent/tool loop used by the term-extractor orchestrator."""
+from collections.abc import Sequence
 import logging
+from typing import Any
 
 from langgraph.graph import END, MessagesState, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
 logger = logging.getLogger(__name__)
 
 
-def build_graph(llm=None, tools=None):
+def build_graph(
+    llm: Any = None,  # Any: LangChain chat model
+    tools: Sequence[Any] | None = None,  # Any: LangChain tools
+) -> CompiledStateGraph[MessagesState, None, MessagesState, MessagesState]:
     """Compile a LangGraph that alternates an LLM agent node with a tool node.
 
     The agent runs first; while its reply requests tool calls the tools run and
@@ -23,7 +29,7 @@ def build_graph(llm=None, tools=None):
     """
     tool_node = ToolNode(tools or [])
 
-    def agent_node(state: MessagesState) -> dict:
+    def agent_node(state: MessagesState) -> dict[str, list[Any]]:
         response = llm.invoke(state["messages"])
         tool_calls = getattr(response, "tool_calls", [])
         logger.debug("agent_node: %d tool call(s) requested", len(tool_calls))

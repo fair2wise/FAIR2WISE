@@ -16,7 +16,7 @@ import copy
 from dataclasses import dataclass, field
 import hashlib
 import json
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, cast
 
 from .loading import closure_fingerprint, load_helper, pre_s4_fingerprint
 from .registry import (
@@ -101,7 +101,7 @@ def check_binding(
 
 def normalize_term(helper: Any, term: Mapping[str, Any]) -> dict[str, Any]:
     """Run the existing ``validate_and_fix_term`` on a deep copy of ``term`` and return the result."""
-    return helper.validate_and_fix_term(copy.deepcopy(dict(term)))
+    return cast(dict[str, Any], helper.validate_and_fix_term(copy.deepcopy(dict(term))))  # Any: untyped helper
 
 
 def relation_is_valid(helper: Any, subject_class: str, predicate: str, object_class: str) -> bool:
@@ -149,11 +149,11 @@ class GraphValidationReport:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
-def _top(counter: Counter) -> dict[str, int]:
+def _top(counter: Counter[str]) -> dict[str, int]:
     return dict(sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))[:_TOP_N])
 
 
-def _lists(payload: Mapping[str, Any]):
+def _lists(payload: Mapping[str, Any]) -> tuple[Any, Any]:  # Any: node/edge lists are unvalidated payload
     nodes = payload.get("things") if "things" in payload else payload.get("nodes")
     edges = payload.get("associations") if "associations" in payload else payload.get("edges")
     return nodes, edges
@@ -203,7 +203,7 @@ def validate_graph(
             nodes, edges = raw_nodes, raw_edges
 
     ids = set()
-    bad_categories: Counter = Counter()
+    bad_categories: Counter[str] = Counter()
     unknown_nodes = 0
     incomplete = 0
     no_source = 0
@@ -224,7 +224,7 @@ def validate_graph(
         if str(node.get("description") or "N/A") == "N/A" and category != "CodeSnippet":
             incomplete += 1
 
-    bad_predicates: Counter = Counter()
+    bad_predicates: Counter[str] = Counter()
     unknown_edges = 0
     domain_range = 0
     dangling = 0

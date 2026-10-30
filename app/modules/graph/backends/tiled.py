@@ -38,7 +38,7 @@ src/forge/kg/paging.py (BSD-3-Clause).
 
 from __future__ import annotations
 
-from typing import Any, Iterator, Sequence
+from typing import Any, Iterator, Sequence, cast
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext
@@ -140,7 +140,7 @@ class TiledGraphBackend:
     def _resolve(self, graph_id: str, entity_id: str) -> dict[str, Any] | None:
         known = self.ledger.tiled_id(graph_id, entity_id)
         if known:
-            row = self.client.query(_ENTITY_Q, {"i": known}).get("entity")
+            row: dict[str, Any] | None = self.client.query(_ENTITY_Q, {"i": known}).get("entity")
             if row is not None:
                 if literature_entity_key(row) != (graph_id, entity_id):
                     raise ContractError(ErrorCode.CONFLICT,
@@ -233,7 +233,7 @@ class TiledGraphBackend:
     @staticmethod
     def _edge(link: dict[str, Any], graph_id: str, edge_key: str,
               nodes: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
-        subject, obj = nodes.get(link.get("subjectId")), nodes.get(link.get("objectId"))
+        subject, obj = nodes.get(cast(str, link.get("subjectId"))), nodes.get(cast(str, link.get("objectId")))
         if subject is None or obj is None:
             return None
         data = {"subject": subject["id"], "predicate": link.get("predicate"), "object": obj["id"],

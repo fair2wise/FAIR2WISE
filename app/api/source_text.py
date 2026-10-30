@@ -194,11 +194,11 @@ class TurnSources:
             key = (ref.work_id, ref.locator.page)
             if ref.source_version == PAGE_VERSION and key in pages:
                 path, page = pages[key], int(ref.locator.page or 0)
-                table[(ref.source_version, ref.locator.page)] = self._cached(lambda p=path, n=page:
+                table[(ref.source_version, ref.locator.page)] = self._cached(lambda p=path, n=page:  # type: ignore[misc]  # mypy cannot infer a lambda with default-bound args
                                                                              self._page_reader(p, n))
             elif key in chunks:
                 text = chunks[key]
-                table[(ref.source_version, ref.locator.page)] = lambda t=text: t
+                table[(ref.source_version, ref.locator.page)] = lambda t=text: t  # type: ignore[misc]  # mypy cannot infer a lambda with default-bound args
 
         def read(source_version: str, locator: SourceLocator) -> str | None:
             loader = table.get((source_version, locator.page))

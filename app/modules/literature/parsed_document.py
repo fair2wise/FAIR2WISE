@@ -25,7 +25,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 #: Version of the serialized document record.
 DOCUMENT_SCHEMA_VERSION = 1
@@ -367,7 +367,7 @@ def extract_sections(markdown: str) -> dict[str, str]:
     Names are lowercased; a repeated name gets `` [2]``, `` [3]`` ...
     """
     sections: dict[str, str] = {}
-    current, content, in_fence = "preamble", [], False
+    current, content, in_fence = "preamble", cast(list[str], []), False
 
     def flush() -> None:
         text = "\n".join(content).strip()

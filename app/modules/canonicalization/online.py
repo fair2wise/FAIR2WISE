@@ -14,7 +14,7 @@ Candidate (non-approved) vocabularies never produce an accepted mapping.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Any, Mapping
 
 from ..extraction.contract import ExtractedMention
 from .adjudication import Judge, MentionVerdict, adjudicate_mention
@@ -139,7 +139,7 @@ def resolve_mention(
         return Resolution(mention, UNRESOLVED, None, "none", "no plausible existing entity", shortlist)
     exact = [c for c in shortlist.candidates if "exact" in c.channels]
     if len(exact) == 1:
-        verdict = check_merge(
+        verdict: Any = check_merge(  # Any: the name is reused for a MentionVerdict below
             exact[0].label,
             surface,
             canonical_class=exact[0].category or None,

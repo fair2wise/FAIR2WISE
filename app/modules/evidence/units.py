@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import Any
 
 __all__ = [
     "ANGLE_TO_DEG",
@@ -382,7 +383,7 @@ def quantity_unit_mismatch(name: str, unit: str) -> str:
 RECIPROCAL_DERIVATION_REL_TOL = 0.02
 
 
-def reciprocal_derivation(value: float, unit: str, partner_value: float, partner_unit: str) -> dict | None:
+def reciprocal_derivation(value: float, unit: str, partner_value: float, partner_unit: str) -> dict[str, Any] | None:
     """Provenance when ``value unit`` equals ``2*pi / (partner_value partner_unit)``, else ``None``.
 
     Covers d-spacing from q and q from d. Both sides are converted through the
@@ -447,7 +448,7 @@ class NormalizedQuantity:
         """Whether a normalized value exists."""
         return self.value is not None
 
-    def provenance(self) -> dict:
+    def provenance(self) -> dict[str, Any]:
         """Conversion provenance as a plain dict for evidence records."""
         return {
             "raw_value": self.raw_value, "raw_unit": self.raw_unit, "dimension": self.dimension,

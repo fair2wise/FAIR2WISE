@@ -28,7 +28,7 @@ import inspect
 import json
 import re
 import threading
-from typing import Any, Protocol
+from typing import Any, Mapping, Protocol
 
 
 class SyncChatClient(Protocol):
@@ -74,7 +74,7 @@ class TextCompletionAdapter:
         self.trace_label = trace_label
         self.limiter = limiter
         try:
-            params = inspect.signature(client.chat).parameters
+            params: Mapping[str, inspect.Parameter] = inspect.signature(client.chat).parameters
         except (TypeError, ValueError):  # pragma: no cover - builtins
             params = {}
         self._accepts_trace = "trace_label" in params

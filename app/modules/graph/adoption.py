@@ -32,14 +32,14 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence, cast
 import uuid
 
 from app.modules import json2kg
 from app.modules.f2w_agent.multi_kg import graph_id_for_path
 from app.modules.resources import resource_root
 from app.modules.schema.loading import closure_fingerprint
-from app.modules.schema.registry import DEFAULT_SCHEMA_ID, SchemaRegistry
+from app.modules.schema.registry import DEFAULT_SCHEMA_ID, SchemaEntry, SchemaRegistry
 from app.modules.schema.validation import validate_graph
 
 from .releases import (
@@ -140,7 +140,7 @@ def derive_identity(flat_name: str) -> tuple[str, str]:
     return corpus, "v1"
 
 
-def _choose_schema(registry: SchemaRegistry, flat_name: str, allow_pending_review_schema: bool):
+def _choose_schema(registry: SchemaRegistry, flat_name: str, allow_pending_review_schema: bool) -> tuple[SchemaEntry, str]:
     entry = registry.for_graph(flat_name)
     source = "filename_pattern"
     if entry is None:
@@ -270,16 +270,16 @@ def adopt_legacy_flat_file(
         parent=Parent(snapshot_id=flat.name[:-len(".json")], graph_sha256=graph_sha, relation="legacy_adoption"),
         created=Created(at=utc_iso(now or datetime.now(UTC)), tool=ADOPTION_TOOL, code_commit=code_commit,
                         json2kg_sha256=sha256_bytes(Path(json2kg.__file__).read_bytes()), run_id=run_id,
-                        profile=profile),
+                        profile=cast(Literal["local", "als-dev", "als-prod", "ci"] | None, profile)),  # checked by the model
         schema=SchemaBlock(name=entry.schema_id, path=entry.path, sha256=entry.sha256, version=entry.version,
                            import_fingerprint=fingerprint),
         extraction=ExtractionBlock(revisions=[ExtractionRevision(extractor="unknown", version="unknown",
                                                                  unknown=True)]),
         corpus_revision=CorpusRevision(id=LEGACY_CORPUS_REVISION_ID, source_count=0, sources_checksum=checksum),
         inputs=[],
-        validation=ValidationBlock(status=report.status, report_sha256=report.sha256,
+        validation=ValidationBlock(status=cast(Literal["pass", "fail"], report.status), report_sha256=report.sha256,
                                    report_ref=f"{rel_base}/validation.json", suite=VALIDATION_SUITE),
-        disclosure=DisclosureBlock(check_version=disclosure.check_version, status=disclosure.status,
+        disclosure=DisclosureBlock(check_version=disclosure.check_version, status=cast(Literal["pass", "fail", "owner_waiver"], disclosure.status),
                                    report_sha256=disclosure.sha256),
     )
     corpus_dir.mkdir(parents=True, exist_ok=True)
@@ -336,7 +336,7 @@ def descriptor_schema(repo: Path | None = None) -> dict[str, Any]:
     base = Path(repo) if repo is not None else resource_root()
     if base is None:
         raise SnapshotError("no repository root: pass repo")
-    return json.loads((base / _SCHEMA_FILE).read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads((base / _SCHEMA_FILE).read_text(encoding="utf-8")))  # Any: JSON schema
 
 
 def validate_descriptor(descriptor: Mapping[str, Any], repo: Path | None = None) -> list[str]:

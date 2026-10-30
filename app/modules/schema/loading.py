@@ -53,7 +53,9 @@ def load_schema_view(entry: SchemaEntry, *, allow_known_broken: bool = False) ->
     return SchemaView(str(entry.abs_path))
 
 
-def load_helper(entry: SchemaEntry, *, implementation: str = NORMALIZER_TERM_EXTRACTOR, fuzzy_cutoff: int = 80):
+def load_helper(
+    entry: SchemaEntry, *, implementation: str = NORMALIZER_TERM_EXTRACTOR, fuzzy_cutoff: int = 80
+) -> Any:  # Any: either of two SchemaHelper implementations
     """Construct the existing ``SchemaHelper`` for ``entry``.
 
     Args:
@@ -71,7 +73,8 @@ def load_helper(entry: SchemaEntry, *, implementation: str = NORMALIZER_TERM_EXT
     if implementation == NORMALIZER_TERM_EXTRACTOR:
         from ..term_extractor.schema import SchemaHelper
     elif implementation == NORMALIZER_LEGACY:
-        from ..extract_terms import SchemaHelper  # heavy import: only on the legacy path
+        # heavy import: only on the legacy path
+        from ..extract_terms import SchemaHelper  # type: ignore[assignment]  # legacy copy (T22A F4)
     else:
         raise RegistryError(f"unknown normalizer implementation {implementation!r}")
     return SchemaHelper(str(entry.abs_path), fuzzy_cutoff=fuzzy_cutoff)

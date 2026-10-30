@@ -25,6 +25,7 @@ Changed for F2W:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 from typing import Any, Iterable, Sequence
 
@@ -173,7 +174,7 @@ def _text_of(content: Any) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def _describe_call(call: dict[str, Any]) -> str:
+def _describe_call(call: Mapping[str, Any]) -> str:
     args = json.dumps(call.get("args", {}), sort_keys=True, default=str)
     if len(args) > _ORPHAN_ARGS_CAP_CHARS:
         args = args[: _ORPHAN_ARGS_CAP_CHARS - 3] + "..."

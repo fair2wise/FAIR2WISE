@@ -22,7 +22,7 @@ import re
 import subprocess
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence, cast
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -657,7 +657,7 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> dict[str, Any
             graph_ids.append(graph_id)
         if len(graph_ids) == 3:
             break
-    ui_settings = request.get("ui_settings") if isinstance(request.get("ui_settings"), Mapping) else {}
+    ui_settings = cast(Mapping[str, Any], request.get("ui_settings") if isinstance(request.get("ui_settings"), Mapping) else {})
     return {
         "turn_id": payload.get("turn_id"),
         "session_id": payload.get("session_id"),

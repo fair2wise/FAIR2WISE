@@ -92,9 +92,9 @@ def load_harvest_papers(manifest_path: Path) -> list[dict[str, Any]]:
     return []
 
 
-def _gold_score(paper: dict[str, Any]) -> tuple:
+def _gold_score(paper: dict[str, Any]) -> tuple[int, int, int, float, str]:
     title = str(paper.get("title") or "").lower()
-    seed = paper.get("kg_seed_rank")
+    seed: Any = paper.get("kg_seed_rank")  # Any: raw JSON value; int() failures are handled below
     try:
         seed_i = int(seed)
     except (TypeError, ValueError):
@@ -142,7 +142,7 @@ def select_literature_docs(
         )
     mode_l = (mode or "gold").lower()
     if mode_l == "gold":
-        def _key(doc: dict[str, Any]) -> tuple:
+        def _key(doc: dict[str, Any]) -> tuple[int, int, int, float, str]:
             paperish = {
                 "title": doc.get("title"),
                 "kg_seed_rank": doc.get("kg_seed_rank"),

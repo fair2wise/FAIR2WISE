@@ -40,7 +40,7 @@ import re
 import tempfile
 import threading
 import time
-from typing import Any, BinaryIO, Callable, Iterable, Iterator, Mapping
+from typing import Any, BinaryIO, Callable, Iterable, Iterator, Mapping, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -223,14 +223,14 @@ class FileDocumentStore:
         return self.put_stream(ctx, [bytes(data)], media_type=media_type, metadata=metadata).ref
 
     def put_file(self, ctx: RequestContext, path: Path, *, media_type: str,
-                 metadata: Mapping[str, str] = (), max_bytes: int | None = None) -> StoredAsset:
+                 metadata: Mapping[str, str] | tuple[()] = (), max_bytes: int | None = None) -> StoredAsset:
         """Copy a local file into the store by streaming it."""
         with Path(path).open("rb") as handle:
             return self.put_stream(ctx, iter(lambda: handle.read(_CHUNK), b""), media_type=media_type,
                                    metadata=dict(metadata or {}), max_bytes=max_bytes)
 
     def put_stream(self, ctx: RequestContext, chunks: Iterable[bytes], *, media_type: str,
-                   metadata: Mapping[str, str] = (), max_bytes: int | None = None,
+                   metadata: Mapping[str, str] | tuple[()] = (), max_bytes: int | None = None,
                    prefix_check: Callable[[bytes], bool] | None = None) -> StoredAsset:
         """Stream ``chunks`` into the store, hashing as they arrive.
 
@@ -270,13 +270,13 @@ class FileDocumentStore:
                     if not checked:
                         head += chunk[: 1024 - len(head)]
                         if len(head) >= 1024 or size >= 1024:
-                            if not prefix_check(head):
+                            if not cast(Callable[[bytes], bool], prefix_check)(head):
                                 raise StoreError(ErrorCode.INVALID_INPUT, "content signature check failed",
                                                  retryable=False)
                             checked = True
                     digest.update(chunk)
                     out.write(chunk)
-                if not checked and not prefix_check(head):
+                if not checked and not cast(Callable[[bytes], bool], prefix_check)(head):
                     raise StoreError(ErrorCode.INVALID_INPUT, "content signature check failed", retryable=False)
                 out.flush()
                 os.fsync(out.fileno())
@@ -314,7 +314,7 @@ class FileDocumentStore:
             return self._asset_from(record)
 
     def reference_file(self, ctx: RequestContext, path: Path, *, media_type: str,
-                       metadata: Mapping[str, str] = ()) -> StoredAsset:
+                       metadata: Mapping[str, str] | tuple[()] = ()) -> StoredAsset:
         """Register a file that stays in its durable legacy root (no copy).
 
         The checksum is computed now and verified on every read; a later edit of
@@ -342,7 +342,7 @@ class FileDocumentStore:
 
     def _read_meta_record(self, hexdigest: str) -> dict[str, Any] | None:
         try:
-            return json.loads(self._meta_path(hexdigest).read_text(encoding="utf-8"))
+            return cast(dict[str, Any], json.loads(self._meta_path(hexdigest).read_text(encoding="utf-8")))
         except (OSError, ValueError):
             return None
 

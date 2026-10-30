@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence, Union
+from typing import Any, Callable, Iterable, Mapping, Sequence, Union, cast
 import uuid
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan
@@ -306,7 +306,7 @@ class F2WOperations:
                    limit: int = 100) -> list[dict[str, Any]]:
         """Bounded case summaries within the caller's scope."""
         require(ctx, "curation.approve")
-        return self._curation().list_cases(self._case_scope(ctx), state=state, route=route, limit=limit)
+        return cast(list[dict[str, Any]], self._curation().list_cases(self._case_scope(ctx), state=state, route=route, limit=limit))
 
     def get_case(self, ctx: RequestContext, case_id: str) -> dict[str, Any]:
         """One case with its attempts and history (``revision`` is what a decision binds to)."""
@@ -358,11 +358,11 @@ class F2WOperations:
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        return pub.submit(ctx, snapshot_ref, target)
+        return cast(JobHandle, pub.submit(ctx, snapshot_ref, target))
 
     def current_plan(self, ctx: RequestContext, job_id: str) -> ChangePlan:
         """The plan a reviewer is asked to approve."""
-        return self._publication().current_plan(ctx, job_id)
+        return cast(ChangePlan, self._publication().current_plan(ctx, job_id))
 
     def approve_publication(self, ctx: RequestContext, job_id: str, plan_sha256: str, *,
                             approver_credential: TiledCredential | None = None,
@@ -413,7 +413,7 @@ class F2WOperations:
         if not approval.authorizes(plan, self.clock()):
             raise ContractError(ErrorCode.STALE_APPROVAL, "the approval does not cover this plan (or has expired)")
         self.gate.check(plan.target, self.settings)
-        return pub.submit_approval(ctx, approval.operation_id, approval)
+        return cast(JobHandle, pub.submit_approval(ctx, approval.operation_id, approval))
 
     def publication_pointer(self, ctx: RequestContext, target: str) -> dict[str, Any] | None:
         """The active publication pointer of ``target`` (``None`` when nothing is active)."""
@@ -446,7 +446,7 @@ class F2WOperations:
         request deadline stopped it (never ``OK``). Reads need ``chat.ask``; the scope rule is the
         T19C one (a graph outside a non-empty ``ctx.corpus_scope`` is ``DENIED``).
         """
-        return self._knowledge().result(ctx, operation, args)
+        return cast(ToolResult, self._knowledge().result(ctx, operation, args))
 
     def graph_statistics(self, ctx: RequestContext, graph_id: str) -> ToolResult:
         """``kg_compute_statistics`` of one graph."""

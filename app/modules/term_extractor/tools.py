@@ -7,7 +7,7 @@ import re
 import threading
 from typing import Callable
 
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 
 from .merge_index import TermMergeIndex, build_merge_prompt, clean_term
 from .models import ContextSnippet, RelationRecord, TermRecord
@@ -60,7 +60,7 @@ class ToolState:
         return paper, getattr(self._tls, "page", None)
 
 
-def build_tools(state: ToolState) -> list:
+def build_tools(state: ToolState) -> list[BaseTool]:
     """Build the agent tool list as closures over ``state``.
 
     Args:

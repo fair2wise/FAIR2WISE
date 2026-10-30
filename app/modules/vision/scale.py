@@ -50,7 +50,7 @@ class ScaleFinding:
         }
 
 
-def caption_length_for(caption: str, label: str, n_panels: int) -> tuple:
+def caption_length_for(caption: str, label: str, n_panels: int) -> tuple[float | None, str]:
     """``(nm | None, reason)``: the bar length the caption assigns to this panel, or why it cannot."""
     pairs = pair_lengths_to_panels(caption)
     if label and label.lower() in pairs:

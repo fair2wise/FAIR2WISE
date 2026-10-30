@@ -8,7 +8,7 @@ source-text export). A decision binds to the case ``revision`` the reviewer was 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,7 +66,7 @@ def install(app: FastAPI) -> FastAPI:
     @router.get("/summary")
     def summary(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Review queue counts by state and route, and the remote-cost ledger summary."""
-        return project(request, operations(request).curation_summary(ctx))
+        return cast(dict[str, Any], project(request, operations(request).curation_summary(ctx)))
 
     @router.get("/cases")
     def list_cases(request: Request, state: str | None = Query(default=None, max_length=40),
@@ -75,13 +75,13 @@ def install(app: FastAPI) -> FastAPI:
                    ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Case summaries within the caller's corpus scope."""
         cases = operations(request).list_cases(ctx, state=state, route=route, limit=limit)
-        return project(request, {"cases": [_summary(c) for c in cases]})
+        return cast(dict[str, Any], project(request, {"cases": [_summary(c) for c in cases]}))
 
     @router.get("/cases/{case_id}")
     def get_case(request: Request, case_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """One case, its attempts and history."""
         found = operations(request).get_case(ctx, case_id)
-        return project(request, {**found, "case": _excerpt(found["case"])})
+        return cast(dict[str, Any], project(request, {**found, "case": _excerpt(found["case"])}))
 
     @router.post("/cases/{case_id}/review")
     def review(request: Request, case_id: str, body: ReviewRequest,
@@ -90,7 +90,7 @@ def install(app: FastAPI) -> FastAPI:
         result = operations(request).review_case(ctx, case_id, bound_revision=body.bound_revision,
                                                  accept=body.accept, resolution=body.resolution,
                                                  reason=body.reason)
-        return project(request, {"case": _excerpt(result)})
+        return cast(dict[str, Any], project(request, {"case": _excerpt(result)}))
 
     @router.post("/cost-approvals")
     def create_cost_approval(request: Request, body: CostApprovalRequest,
@@ -98,13 +98,13 @@ def install(app: FastAPI) -> FastAPI:
         """Record a human's remote-cost approval."""
         approval = operations(request).create_cost_approval(ctx, scope=body.scope, models=body.models,
                                                             cap_usd=body.cap_usd, expires_at=body.expires_at)
-        return project(request, dump(approval))
+        return cast(dict[str, Any], project(request, dump(approval)))
 
     @router.post("/cost-approvals/{approval_id}/revoke")
     def revoke_cost_approval(request: Request, approval_id: str,
                              ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Revoke a cost approval; later reservations under it are refused."""
-        return project(request, operations(request).revoke_cost_approval(ctx, approval_id))
+        return cast(dict[str, Any], project(request, operations(request).revoke_cost_approval(ctx, approval_id)))
 
     return app
 

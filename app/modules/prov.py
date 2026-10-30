@@ -117,7 +117,7 @@ def extraction_activity(
     model: str,
     started_at: str,
     ended_at: str | None = None,
-) -> dict:
+) -> dict[str, str]:
     """Return a PROV-O Activity node dict for an extraction run.
 
     The returned dict is compatible with the KG ``nodes`` list format used
@@ -140,7 +140,7 @@ def extraction_activity(
         >>> act["entityType"]
         'prov:Activity'
     """
-    node: dict = {
+    node: dict[str, str] = {
         "id": f"prov:Activity-{run_id}",
         "entityType": PROV_ACTIVITY,
         "type": PROV_ACTIVITY,
@@ -158,7 +158,7 @@ def work_entity(
     doi: str,
     title: str,
     pdf_path: str | None = None,
-) -> dict:
+) -> dict[str, str]:
     """Return a PROV-O Entity node dict for a Work (paper).
 
     Args:
@@ -177,7 +177,7 @@ def work_entity(
         'prov:Entity'
     """
     safe_doi = doi.replace("/", "_").replace(":", "_")
-    node: dict = {
+    node: dict[str, str] = {
         "id": f"prov:Entity-Work-{safe_doi}",
         "entityType": PROV_ENTITY,
         "type": PROV_ENTITY,
@@ -190,7 +190,7 @@ def work_entity(
     return node
 
 
-def kg_snapshot_entity(path: str, corpus_revision: str) -> dict:
+def kg_snapshot_entity(path: str, corpus_revision: str) -> dict[str, str]:
     """Return a PROV-O Entity node dict for a KG snapshot file.
 
     Args:
@@ -210,7 +210,7 @@ def kg_snapshot_entity(path: str, corpus_revision: str) -> dict:
     """
     # Derive a stable node ID from the file path
     safe_path = path.replace("/", "-").replace(".", "-").strip("-")
-    node: dict = {
+    node: dict[str, str] = {
         "id": f"prov:Entity-KGSnapshot-{safe_path}",
         "entityType": PROV_ENTITY,
         "type": PROV_ENTITY,
@@ -226,7 +226,7 @@ def extraction_provenance_edges(
     activity_id: str,
     work_id: str,
     terms_entity_id: str,
-) -> list[dict]:
+) -> list[dict[str, str]]:
     """Return the three canonical PROV-O edges for an extraction pass.
 
     The three edges encode:

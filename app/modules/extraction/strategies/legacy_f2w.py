@@ -136,7 +136,7 @@ def mentions_for_term(term: dict[str, Any], filename: str, *, extracted_by: str 
         attributes["relations"] = frozen_copy(term["relations"])
     if term.get("properties"):
         attributes["properties"] = frozen_copy(term["properties"])
-    base = dict(surface=str(term.get("term", "")), category=str(term.get("category") or "Thing"),
+    base: dict[str, Any] = dict(surface=str(term.get("term", "")), category=str(term.get("category") or "Thing"),
                 canonical=False, slug=str(term.get("term", "")).strip().lower(), extracted_by=extracted_by,
                 attributes=attributes)
     if not snippets:

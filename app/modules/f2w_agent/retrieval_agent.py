@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 import re
 from types import SimpleNamespace
-from typing import Any, Sequence
+from typing import Any, Sequence, cast
 
 from academy.agent import Agent, action
 
@@ -403,7 +403,7 @@ class RetrievalAgent(Agent):
         self._model = model
         self._kg_query_hops = clamp_kg_query_hops(kg_query_hops)
         self._kg_query_max_nodes = clamp_kg_query_max_nodes(kg_query_max_nodes)
-        self._kg = None
+        self._kg: krag.KnowledgeGraph | None = None
         self._graphs: dict[str, Any] = {}
         self._skipped: list[dict[str, str]] = []
         self._source_rag = hybrid_rag_enabled() if source_rag is None else bool(source_rag)
@@ -415,7 +415,7 @@ class RetrievalAgent(Agent):
         self._last_mp_meta: dict[str, Any] = {}
         self._last_intent: str = "general"
 
-    def _build_kg(self):
+    def _build_kg(self) -> krag.KnowledgeGraph:
         """Build a KnowledgeGraph honoring the configured source (json/splash)."""
         return krag.KnowledgeGraph(str(self._graph_file), graph_source=self._graph_source)
 
@@ -755,7 +755,7 @@ class RetrievalAgent(Agent):
         """
         q_lower = question.lower()
         hits: list[ScoredHit] = []
-        seen: set = set()
+        seen: set[str] = set()
         for gid, kg in graphs.items():
             nodes = getattr(kg, "nodes", {}) or {}
             for nid, raw in nodes.items():
@@ -1149,7 +1149,7 @@ class RetrievalAgent(Agent):
             return empty
         try:
             layout = _is_ops_layout_question(question)
-            return hybrid.pack(
+            return cast(dict[str, Any], hybrid.pack(
                 question,
                 kg_hits=hits,
                 include_literature=not layout,
@@ -1158,7 +1158,7 @@ class RetrievalAgent(Agent):
                 numeric=_is_numeric_claim(question),
                 kg_work_ids=self._kg_work_ids(hits, graphs),
                 kg_entity_ids=[hit.id for hit in hits],
-            )
+            ))
         except Exception as exc:
             logger.warning("Hybrid source RAG skipped for %r: %s", question, exc)
             note_error("RetrievalAgent._hybrid_pack", exc)
@@ -1179,7 +1179,7 @@ class RetrievalAgent(Agent):
         self._trace_raw_judge = None
         self._trace_parsed_verdict = None
         self._trace_leeway_used = False
-        self._trace_leeway_prompt = None
+        self._trace_leeway_prompt: str | None = None
 
         meta = self._source_meta(graphs)
         primary = next(iter(graphs.values()), self._kg)

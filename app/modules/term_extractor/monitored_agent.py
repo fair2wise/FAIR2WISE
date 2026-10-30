@@ -8,7 +8,7 @@ import os
 import platform
 import queue as _queue
 import socket
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from academy.agent import Agent, action
 import academy.exception
@@ -17,6 +17,9 @@ import psutil
 import requests
 
 from .message import Log, Message, Registration, Stats, UserPrompt
+
+if TYPE_CHECKING:
+    from .user_agent import UserAgent
 
 _FORWARDED_LOGGER_SKIP_PREFIXES = (
     # 'academy',
@@ -129,14 +132,14 @@ class MonitoredAgent(Agent):
 
         Note: This call will block until the user has supplied a response.
         """
-        return await self.user_agent.prompt_user(
+        return cast(str, await self.user_agent.prompt_user(
             self._agent_uid_str,
             UserPrompt(
                 agent_id=str(self.agent_id.uid),
                 prompt=prompt,
                 responses=responses,
             ),
-        )
+        ))
 
     async def _report_stats(self, report_period_s: int = 30) -> None:
         """Gather current process stats and push them to the UserAgent dashboard."""
@@ -164,7 +167,7 @@ class MonitoredAgent(Agent):
             )
             resp.raise_for_status()
             data = resp.json()
-            return data
+            return cast(dict[str, Any], data)
         except Exception:
             return {}
 

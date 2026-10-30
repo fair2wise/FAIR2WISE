@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode
@@ -52,7 +52,7 @@ SCHEMA = (
 )
 
 #: Allowed lifecycle transitions. Terminal states have none except an explicit operator retry.
-TRANSITIONS: Mapping[JobState, frozenset] = {
+TRANSITIONS: Mapping[JobState, frozenset[JobState]] = {
     JobState.QUEUED: frozenset({JobState.RUNNING, JobState.CANCELLED}),
     JobState.RUNNING: frozenset(
         {
@@ -637,7 +637,7 @@ class JobStore:
         )
         if row is None or row["status"] != "done" or row["unit_key"] != unit_key or row["result"] is None:
             return None
-        return json.loads(row["result"])
+        return cast(dict[str, Any], json.loads(row["result"]))  # Any: JSON payload
 
     def save_unit(
         self,

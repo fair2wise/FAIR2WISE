@@ -63,7 +63,7 @@ class ModelListing:
         """True when the provider answered (an empty answer is still a live answer)."""
         return self.source == "live"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """JSON-ready form."""
         return {"backend": self.backend, "source": self.source, "models": list(self.models),
                 "listed_at": self.listed_at, "error": self.error}

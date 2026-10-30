@@ -57,9 +57,10 @@ interrupt-id map, so the interrupt simply stays pending.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 import json
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
@@ -84,7 +85,7 @@ from .policies import (
     needs_approval,
     utcnow,
 )
-from .registry import ToolRegistry, effective_capabilities
+from .registry import RegisteredTool, ToolRegistry, effective_capabilities
 from .skills import SkillRegistry
 from .state import LiteratureState, RunContext, as_run_context
 
@@ -391,7 +392,7 @@ def build_literature_supervisor(
                 if is_expired(record, now):
                     expired.append(key)
                     continue
-                entry = registry.get(record["tool"])
+                entry = cast(RegisteredTool, registry.get(record["tool"]))
                 plan = ChangePlan.model_validate(record["plan"])
                 approval = _parse_approval(supplied.get(key))
                 verdict = check(ctx, entry.spec, record["args"], plan=plan, approval=approval, now=now)
@@ -412,11 +413,17 @@ def build_literature_supervisor(
             return "apply_approvals"
         return "await_approval" if state.get("open_approvals") else END
 
-    def approval_outcomes(state: LiteratureState):
+    def approval_outcomes(
+        state: LiteratureState,
+    ) -> tuple[
+        RunContext,
+        list[tuple[dict[str, Any], ChangePlan | None, ApprovalRecord | None, ToolOutcome | None]],
+        str | None,
+    ]:
         rc = run_ctx()
         owner_update(state, rc)
         open_ = state.get("open_approvals") or {}
-        jobs = []
+        jobs: list[tuple[dict[str, Any], ChangePlan | None, ApprovalRecord | None, ToolOutcome | None]] = []
         for key, raw in (state.get("approvals") or {}).items():
             record = open_.get(key)
             if record is None:
@@ -443,14 +450,14 @@ def build_literature_supervisor(
         return rc, jobs, thread_id()
 
     def finish_apply(state: LiteratureState,
-                     results: list[tuple[Mapping[str, Any], ToolMessage]]) -> dict[str, Any]:
+                     results: Sequence[tuple[Mapping[str, Any], ToolMessage]]) -> dict[str, Any]:
         msgs: list[BaseMessage] = []
         tail = isinstance(state["messages"][-1], ToolMessage)
         notes = []
         for call, message in results:
             message.id = placeholder_id(call["id"])  # replace the placeholder in place
             msgs.append(message)
-            body = json.loads(message.content)
+            body = json.loads(cast(str, message.content))
             notes.append(f"{call['name']} (plan {call['args'].get('plan_id', '?')}): {body.get('status')}"
                          + (f" ({body.get('error_code')})" if body.get("error_code") else ""))
         if notes and not tail:
@@ -488,11 +495,13 @@ def build_literature_supervisor(
 
     # -- tool execution -------------------------------------------------------------
 
-    def tool_calls_with_context(state: LiteratureState):
+    def tool_calls_with_context(
+        state: LiteratureState,
+    ) -> tuple[RunContext, TurnLedger, list[tuple[Mapping[str, Any], ChangePlan | None, None]], str | None]:
         rc = run_ctx()
         owner_update(state, rc)
         ledger = ledger_from_messages(state["messages"])
-        prepared = []
+        prepared: list[tuple[Mapping[str, Any], ChangePlan | None, None]] = []
         for call in unanswered_calls(state):
             entry = registry.get(call.get("name", ""))
             plan = None

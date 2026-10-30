@@ -20,7 +20,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 import uuid
 
 from ..ports import ContractError, ErrorCode
@@ -53,7 +53,7 @@ class Lease:
 
     def _read(self) -> dict[str, Any] | None:
         try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
+            return cast(dict[str, Any], json.loads(self.path.read_text(encoding="utf-8")))  # Any: JSON payload
         except FileNotFoundError:
             return None
         except ValueError:
@@ -128,6 +128,6 @@ class ImportJournal:
         """Whether a run for this plan has begun (resume rather than base-revision check)."""
         return any(r.get("event") == "run_started" for r in self.records())
 
-    def done_ids(self) -> set:
+    def done_ids(self) -> set[str]:
         """Operation ids journaled ``done``."""
         return {r["op_id"] for r in self.records() if r.get("event") == "done"}

@@ -124,7 +124,7 @@ def make_event(
     event_id: str | None = None,
 ) -> AuditEvent:
     """Build an :class:`AuditEvent` from runtime objects."""
-    fields = dict(
+    fields: dict[str, Any] = dict(
         kind=kind, at=at, request_id=ctx.request_id, run_id=ctx.run_id, thread_id=thread_id,
         subject=ctx.principal.subject, profile=ctx.profile.value, tool_call_id=tool_call_id,
         tool=spec.name if spec else None,

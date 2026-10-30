@@ -52,7 +52,7 @@ import json
 from pathlib import Path
 import re
 import threading
-from typing import Any, Callable, Iterator, Literal, Mapping, Sequence
+from typing import Any, Callable, Final, Iterator, Literal, Mapping, Sequence
 import uuid
 
 from pydantic import BaseModel, ConfigDict
@@ -74,7 +74,7 @@ from ..contracts import (
 )
 from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
 
-TOOL_NAME = "lit_summarize_extracted_terms"
+TOOL_NAME: Final = "lit_summarize_extracted_terms"
 OPERATION_VERSION = "1.0.0"
 
 #: Largest ``max_terms`` the Tool accepts: the legacy default (api.py report flow).
@@ -372,7 +372,8 @@ def summarize_paper_terms(
     base: dict[str, Any] = {"legacy_status": status, "source_paper": scope.filename, "paper_id": scope.paper_id,
                             "max_terms": max(1, int(max_terms))}
     if status != "success":
-        outcome = "unreadable" if status == "manifest_error" else "insufficient"
+        outcome: Literal["summarized", "insufficient", "unreadable"] = (
+            "unreadable" if status == "manifest_error" else "insufficient")
         return SummaryOutcome(PaperTermSummary(outcome=outcome, scan_complete=outcome == "insufficient",
                                                summary_text=answer, summary_chars=len(answer), **base), legacy)
     total = _int(legacy.get("term_count"))

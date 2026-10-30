@@ -24,10 +24,12 @@ The T09 ``vision_*`` paper-figure tools (``app.modules.vision.tools.VisionToolse
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from ..agent_runtime.registry import ToolRegistry
 from ..agent_runtime.skills import Skill, SkillRegistry
+from ..contracts.tools import ToolSpec
 from ..literature.skill import LITERATURE_RESEARCH_SKILL
 from ..operations.corpus import AUDIT_LITERATURE_CORPUS_SKILL
 from ..operations.graph import ANALYZE_KNOWLEDGE_GRAPH_SKILL
@@ -78,7 +80,7 @@ def build_read_registry(
     The T02 demo tools are not included. ``paper_summary`` (an
     ``operations.papers.PaperSummaryTool``) opts in the T19B ``lit_summarize_extracted_terms`` tool.
     """
-    extra = [(ANSWER_FROM_KNOWLEDGE, make_answer_tool(service, ledger))]
+    extra: list[tuple[ToolSpec, Callable[..., Any]]] = [(ANSWER_FROM_KNOWLEDGE, make_answer_tool(service, ledger))]
     if paper_summary is not None:  # T19B: explicit registration; absent unless the caller passes it
         extra.append(paper_summary.registration())
     if literature is not None:  # T05: the six lit_* tools; absent unless the caller passes a LiteratureToolset

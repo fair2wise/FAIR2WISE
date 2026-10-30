@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import random
 import re
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence, cast
 from urllib.parse import urlparse
 import uuid
 
@@ -272,7 +272,7 @@ def write_fixture(fixture: dict[str, Any], path: Path | None = None) -> Path:
 def load_fixture(path: Path | None = None) -> dict[str, Any]:
     """Read a fixture JSON file into a dict."""
     dest = path or FIXTURE_PATH
-    return json.loads(dest.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(dest.read_text(encoding="utf-8")))
 
 
 def _load_repo_env() -> None:
@@ -482,14 +482,14 @@ def _index_existing_entities(
 def _existing_link_keys(
     graphql: Callable[..., dict[str, Any]],
     by_uri: dict[str, str],
-) -> set:
+) -> set[tuple[str, str, str]]:
     """Collect existing identity links as ``(subjectId, predicate, objectId)`` keys."""
     keys = set()
     predicates = sorted(set(GRAPHQL_IDENTITY_RELS.values()))
     for predicate in predicates:
         for row in _page_all(graphql, _PAGE_LINKS, "links", {"predicate": predicate}):
-            subject = row.get("subject") if isinstance(row.get("subject"), dict) else {}
-            obj = row.get("object") if isinstance(row.get("object"), dict) else {}
+            subject = cast(dict[str, Any], row.get("subject") if isinstance(row.get("subject"), dict) else {})
+            obj = cast(dict[str, Any], row.get("object") if isinstance(row.get("object"), dict) else {})
             subject_id = str(subject.get("id") or "").strip()
             object_id = str(obj.get("id") or "").strip()
             if subject_id and object_id:
@@ -954,7 +954,7 @@ def promote_rsoxs_snapshot(
     if dest.exists() and output_kg is None:
         raise FileExistsError(dest)
     data = json.loads(terms_snapshot.read_text(encoding="utf-8"))
-    terms = data.get("terms") if isinstance(data, dict) else data
+    terms = cast(list[dict[str, Any]], data.get("terms") if isinstance(data, dict) else data)
     snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
     meta = dict(data.get("metadata") or {}) if isinstance(data, dict) else {}
     graph = json2kg.build_graph(terms, code_snippets=snippets, default_id_prefix="matkg")

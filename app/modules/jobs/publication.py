@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..contracts.context import ActorKind, RequestContext
@@ -530,7 +530,7 @@ class Publication:
             mutation=lambda: self.store.rollback(target, actor=ctx.principal.subject, reason=reason),
         )
 
-    def _on_scope_change(self, change: dict[str, Any]) -> None:
+    def _on_scope_change(self, change: Mapping[str, Any]) -> None:
         """Handle a scope change or revocation.
 
         Dependent approvals are invalidated; nothing falls back to a server credential.

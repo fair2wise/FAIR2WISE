@@ -12,9 +12,10 @@ import functools
 import logging
 import os
 import re
+from typing import Any
 
 from mp_api.client import MPRester
-from pymatgen.core import Composition
+from pymatgen.core.composition import Composition
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class ChemicalFormulaValidator:
 
     # -------------------------- public helpers --------------------------- #
 
-    def validate(self, raw: str) -> dict:
+    def validate(self, raw: str) -> dict[str, Any]:
         """Validate *raw* formula text.
 
         Returns:

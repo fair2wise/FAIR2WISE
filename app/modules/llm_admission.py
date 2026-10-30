@@ -16,7 +16,7 @@ semaphores while the flag is off.
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AbstractAsyncContextManager, AbstractContextManager, asynccontextmanager, contextmanager
 import os
 import threading
 import time
@@ -186,10 +186,10 @@ def reset_controllers() -> None:
 class ProviderAdmission:
     """Facade passed to runtimes and tools: ``slot(provider)`` / ``aslot(provider)``."""
 
-    def slot(self, provider: str):
+    def slot(self, provider: str) -> AbstractContextManager[None]:
         """Return a sync context manager holding one slot for ``provider``."""
         return get_controller(provider).slot()
 
-    def aslot(self, provider: str):
+    def aslot(self, provider: str) -> AbstractAsyncContextManager[None]:
         """Return an async context manager holding one slot for ``provider``."""
         return get_controller(provider).aslot()

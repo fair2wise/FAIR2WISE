@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from app.modules.f2w_agent.multi_kg import graph_id_for_path
 
@@ -134,7 +134,7 @@ def load_snapshot(path: Path, *, graph_id: str | None = None) -> GraphSnapshot:
 
 def export_payload(snap: GraphSnapshot) -> dict[str, Any]:
     """The stored document, rebuilt from the loaded snapshot (round-trip check)."""
-    return json.loads(json.dumps(snap.raw, ensure_ascii=False))
+    return cast(dict[str, Any], json.loads(json.dumps(snap.raw, ensure_ascii=False)))
 
 
 def serialize_like_json2kg(payload: Mapping[str, Any]) -> bytes:

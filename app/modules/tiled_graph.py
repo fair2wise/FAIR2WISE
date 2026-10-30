@@ -727,10 +727,10 @@ class TiledGraphQLError(RuntimeError):
     structurally instead of pattern-matching on the string representation.
     """
 
-    def __init__(self, errors: list) -> None:
+    def __init__(self, errors: list[Any]) -> None:  # Any: raw GraphQL error payloads
         """Store the GraphQL ``errors`` list and a readable message."""
         super().__init__(f"Tiled GraphQL error: {errors}")
-        self.errors: list = errors
+        self.errors: list[Any] = errors
 
     def mentions_field(self, field: str) -> bool:
         """Return True if any error's message or path mentions *field*."""
@@ -747,12 +747,12 @@ class TiledGraphQLError(RuntimeError):
 
 def tiled_graphql(
     query: str,
-    variables: dict | None = None,
+    variables: dict[str, Any] | None = None,
     *,
     uri: str | None = None,
     api_key: str | None = None,
     timeout: float = REQUEST_TIMEOUT,
-) -> dict:
+) -> dict[str, Any]:
     """POST *query* to Tiled GraphQL and return ``data``, or raise :class:`TiledGraphQLError`."""
     url = graphql_url(uri or _env("TILED_URI") or DEFAULT_TILED_URI)
     resp = requests.post(
@@ -884,7 +884,7 @@ def _catalog_runs(
 ) -> tuple[list[dict[str, Any]], str | None]:
     """Walk the Tiled catalog tree for BlueskyRun entries when GraphQL returns none."""
     try:
-        from tiled.client import from_uri as tiled_from_uri  # type: ignore
+        from tiled.client import from_uri as tiled_from_uri
     except Exception:
         return [], "tiled.client not installed; GraphQL-only lookup"
     kwargs: dict[str, Any] = {}

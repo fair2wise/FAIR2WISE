@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
 from ..growth import ObservationLog
 from ..migration import PlanDraft, sha256_json
@@ -111,7 +111,7 @@ class CampaignRun:
         return path
 
 
-def _count(items) -> dict[str, int]:
+def _count(items: Iterable[str]) -> dict[str, int]:
     out: dict[str, int] = {}
     for item in items:
         out[item] = out.get(item, 0) + 1

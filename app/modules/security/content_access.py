@@ -33,7 +33,7 @@ import hashlib
 import hmac
 import secrets
 import threading
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Any, Callable, Iterable, NoReturn, TypeVar
 import uuid
 
 from ..contracts.context import RequestContext
@@ -118,7 +118,7 @@ class InternalReadGrant:
     expires_at: datetime
     _seal: bytes = field(default=b"", repr=False, compare=False)
 
-    def __reduce__(self):
+    def __reduce__(self) -> NoReturn:
         raise TypeError("InternalReadGrant is a live object and cannot be serialized")
 
     def payload(self) -> bytes:
@@ -149,10 +149,10 @@ class SourceAccessAuthority:
         self._key = secrets.token_bytes(32)
         self._max_ttl = max_ttl
         self._clock = clock or _now
-        self._revoked: set = set()
+        self._revoked: set[str] = set()
         self._lock = threading.Lock()
 
-    def __reduce__(self):
+    def __reduce__(self) -> NoReturn:
         raise TypeError("SourceAccessAuthority cannot be serialized")
 
     def _sign(self, grant: InternalReadGrant) -> bytes:
@@ -290,7 +290,7 @@ class SourceAccessScope:
         self._context = context
         self._grant = grant
 
-    def __reduce__(self):
+    def __reduce__(self) -> NoReturn:
         raise TypeError("SourceAccessScope cannot be serialized")
 
     def __repr__(self) -> str:

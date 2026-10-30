@@ -1824,7 +1824,7 @@ def merge_terms(batches: Iterable[list[dict[str, Any]]]) -> list[dict[str, Any]]
             rels = existing.setdefault("relations", [])
             seen = {(r.get("relation"), r.get("related_id") or r.get("related_term")) for r in rels}
             for rel in term.get("relations") or []:
-                key = (rel.get("relation"), rel.get("related_id") or rel.get("related_term"))
+                key: Any = (rel.get("relation"), rel.get("related_id") or rel.get("related_term"))  # Any: `key` is reused as a str below
                 if key not in seen:
                     rels.append(rel)
                     seen.add(key)

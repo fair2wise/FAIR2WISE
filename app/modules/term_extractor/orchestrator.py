@@ -13,6 +13,7 @@ from typing import Any, Sequence
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
 import fitz
 from langchain_core.messages import HumanMessage
+from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 
 from . import provenance, source_repos
@@ -218,7 +219,7 @@ class Orchestrator:
         self.graph = build_graph(llm=llm_base.bind_tools(tools), tools=tools)
         logger.debug("Orchestrator ready: %d tools bound", len(tools))
 
-    def _build_tools(self, llm_base: ChatOpenAI) -> list:
+    def _build_tools(self, llm_base: ChatOpenAI) -> list[BaseTool]:
         def _llm_invoke(prompt: str) -> str:
             from langchain_core.messages import HumanMessage
             return llm_base.invoke([HumanMessage(content=prompt)]).content or ""
@@ -703,7 +704,7 @@ def run_extraction(
     chebi_obo_path: str | None = None,
     merge_top_k: int = DEFAULT_MERGE_TOP_K,
     merge_embed_model: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Drop-in replacement for extract_terms.run_extraction."""
     logger.info("run_extraction: dir=%s output=%s model=%s backend=%s", pdf_dir, output_json, model, backend)
     o = Orchestrator(

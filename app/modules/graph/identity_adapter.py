@@ -106,9 +106,9 @@ def edge_id(subject: Any, predicate: Any, obj: Any, occurrence: int = 0) -> str:
     return f"e:{digest}" if occurrence == 0 else f"e:{digest}#{occurrence}"
 
 
-def assign_edge_ids(edges: Iterable[Mapping[str, Any]]) -> Iterable[tuple[str, Mapping[str, Any]]]:
+def assign_edge_ids[E: Mapping[str, Any]](edges: Iterable[E]) -> Iterable[tuple[str, E]]:
     """Yield ``(edge_id, edge)`` in file order, numbering repeated triples."""
-    seen: dict[tuple[str, str, str], int] = {}
+    seen: dict[tuple[str, ...], int] = {}
     for edge in edges:
         triple = tuple(json.dumps(edge.get(k)) for k in ("subject", "predicate", "object"))
         n = seen.get(triple, 0)

@@ -18,7 +18,8 @@ from academy.manager import Manager
 from ..term_extractor.user_agent import UserAgent
 
 try:
-    from academy.logging import init_logging
+    # Older Academy versions lack init_logging (fallback below), so mypy sees no such attribute.
+    from academy.logging import init_logging  # type: ignore[attr-defined]
 except ImportError:
 
     def init_logging() -> None:

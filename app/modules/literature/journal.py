@@ -157,7 +157,7 @@ class IngestJournal:
             "pending": pending,
         }
 
-    def _job(self, sql: str, params: tuple) -> dict[str, Any] | None:
+    def _job(self, sql: str, params: tuple[Any, ...]) -> dict[str, Any] | None:
         with self._lock:
             row = self._con.execute(sql, params).fetchone()
         if not row:

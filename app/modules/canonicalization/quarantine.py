@@ -53,7 +53,7 @@ MAX_SURFACE_CHARS = 200
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 
-def _fold_all(values: Iterable[str]) -> set:
+def _fold_all(values: Iterable[str]) -> set[str]:
     folded = {" ".join(str(v).split()).casefold() for v in values}
     folded.discard("")
     return folded

@@ -55,7 +55,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence, Union
+from typing import Any, Callable, Mapping, Sequence, Union, cast
 from urllib.parse import urlsplit
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolSpec
@@ -120,7 +120,7 @@ class DynamicJsonGraphs:
 
     def graph_ids(self) -> list[str]:
         """Graph ids of the current selection."""
-        return self._current().graph_ids()
+        return cast(list[str], self._current().graph_ids())  # Any: backend is created lazily
 
     def snapshot(self, ctx: RequestContext, graph_id: str) -> Any:
         """The loaded snapshot of ``graph_id`` (scope-checked; ``NOT_FOUND`` outside the selection)."""

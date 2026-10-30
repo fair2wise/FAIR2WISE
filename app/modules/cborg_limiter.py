@@ -27,7 +27,10 @@ from typing import AsyncIterator, Iterator
 try:
     from .llm_admission import get_controller, shared_admission_enabled
 except ImportError:  # pragma: no cover - legacy top-level import style (scripts/)
-    from llm_admission import get_controller, shared_admission_enabled
+    from llm_admission import (  # type: ignore[import-not-found, no-redef]  # legacy top-level import style, resolved only when run from scripts/
+        get_controller,
+        shared_admission_enabled,
+    )
 
 
 def _read_cap() -> int:

@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup
@@ -55,7 +55,7 @@ class ChatJudge:
 
     def __call__(self, prompt: str) -> str:
         """Send `prompt` to the chat client and return its reply."""
-        return self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout)
+        return cast(str, self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout))
 
 
 _GROUP_PROMPT = """You are consolidating a controlled vocabulary for a scattering \
@@ -94,7 +94,7 @@ class GroupVerdict:
     aliases: list[str] = field(default_factory=list)
     separate: list[str] = field(default_factory=list)
     #: Aliases the model accepted but the deterministic check refused: (alias, reason).
-    held_for_review: list[tuple] = field(default_factory=list)
+    held_for_review: list[tuple[str, str]] = field(default_factory=list)
     same_thing: bool = False
     confidence: float = 0.0
     reason: str = ""
@@ -199,7 +199,7 @@ def adjudicate_group(
         return _keep(group, "canonical_not_in_group", f"model chose {canonical!r}, which is not a clustered form")
     separate = [s for s in _strings(payload.get("separate")) if s in members]
     accepted: list[str] = []
-    held: list[tuple] = []
+    held: list[tuple[str, str]] = []
     for alias in _strings(payload.get("aliases")):
         if alias not in members or alias == canonical or alias in separate:
             continue

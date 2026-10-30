@@ -20,7 +20,7 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 # Precompile regex pattern for performance
 _CLEAN_PATTERN = re.compile(r"[^A-Za-z0-9\-]")
@@ -265,7 +265,7 @@ def build_graph(
     *,
     default_id_prefix: str = "matkg",
     strict_snippets: bool = True,
-) -> dict[str, list[dict[str, Any]]]:
+) -> dict[str, Any]:
     """Build a MatKG-compatible graph from raw term records.
 
     Optionally also consumes code_snippets produced by the code snippet
@@ -467,7 +467,9 @@ def convert_terms_to_graph(input_json: Path, output_json: Path) -> dict[str, Any
     with input_json.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
-    terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
+    terms = cast(
+        list[dict[str, Any]], data.get("terms") if isinstance(data, dict) and "terms" in data else data
+    )
     snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
     meta = data.get("metadata") if isinstance(data, dict) else None
     prefix = "matkg"
@@ -510,7 +512,9 @@ def main() -> None:
     try:
         with args.input_json.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        terms = data.get("terms") if isinstance(data, dict) and "terms" in data else data
+        terms = cast(
+        list[dict[str, Any]], data.get("terms") if isinstance(data, dict) and "terms" in data else data
+    )
         snippets = data.get("code_snippets", []) if isinstance(data, dict) else []
         meta = data.get("metadata") if isinstance(data, dict) else None
         prefix = "matkg"
@@ -539,21 +543,21 @@ if __name__ == "__main__":
 # ----------------------- Pytest Test Suite -----------------------
 # To run: pytest test_json2kg.py
 
-def test_make_id_simple():
+def test_make_id_simple() -> None:
     """Check IDs get the prefix and lose spaces, keeping hyphens."""
     assert make_id("P3HT") == "matkg:P3HT"
     assert make_id("Bulk Heterojunction OPV") == "matkg:BulkHeterojunctionOPV"
     assert make_id("pAQM-2TV") == "matkg:pAQM-2TV"
 
 
-def test_ensure_list():
+def test_ensure_list() -> None:
     """Check None, scalars and lists are normalized to lists."""
     assert ensure_list(None) == []
     assert ensure_list(5) == [5]
     assert ensure_list([1, 2, 3]) == [1, 2, 3]
 
 
-def test_build_graph_fields():
+def test_build_graph_fields() -> None:
     """Check formula, formula_validation and properties are copied onto the node."""
     raw = [{
         "term": "X",
@@ -570,7 +574,7 @@ def test_build_graph_fields():
     assert node['properties'][0]['property'] == "density"
 
 
-def test_build_graph_minimal(tmp_path):
+def test_build_graph_minimal(tmp_path: Path) -> None:
     """Check a single relation yields two nodes and one prefixed edge."""
     raw = [{"term": "A", "relations": [{"related_term": "B", "relation": "TEST"}]}]
     graph = build_graph(raw)
@@ -581,7 +585,7 @@ def test_build_graph_minimal(tmp_path):
     assert edge["has_evidence"] is None
 
 
-def test_code_snippet_node():
+def test_code_snippet_node() -> None:
     """CodeSnippet nodes built from code_snippets and wired to term nodes from same paper."""
     terms = [{
         "term": "peak detection",
@@ -620,7 +624,7 @@ def test_code_snippet_node():
     assert any(e["object"] == snippet["id"] for e in has_code_edges)
 
 
-def test_cli(tmp_path):
+def test_cli(tmp_path: Path) -> None:
     """Check main() reads the input JSON and writes the graph JSON."""
     in_json = tmp_path / "in.json"
     out_json = tmp_path / "out.json"

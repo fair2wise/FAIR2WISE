@@ -499,7 +499,7 @@ class PropertyNormalizer:
 # ----------------------------------------
 # Unit Tests
 # ----------------------------------------
-def test_extractor_basic_bandgap():
+def test_extractor_basic_bandgap() -> None:
     """Extract a band gap value and unit when material and property are adjacent."""
     text = "The Na3Bi film exhibited a band gap of 1.9 eV at room temperature."
     extractor = PhysicalPropertyExtractor()
@@ -512,7 +512,7 @@ def test_extractor_basic_bandgap():
     assert e["raw_unit"] == "eV"
     assert e["verified"] is True
 
-def test_extractor_no_value_but_pattern():
+def test_extractor_no_value_but_pattern() -> None:
     """Return an unverified entry when the pattern matches but no value is present."""
     text = "Measured_property: band gap of Na3Bi."
     extractor = PhysicalPropertyExtractor()
@@ -522,7 +522,7 @@ def test_extractor_no_value_but_pattern():
     assert e["raw_value"] is None
     assert e["verified"] is False
 
-def test_extractor_out_of_proximity():
+def test_extractor_out_of_proximity() -> None:
     """Reject a property mention that is far from the material."""
     text = (
         "The PL quenching efficiency of PM6: Y6-2O blends is 30.2%, which indicates that "
@@ -534,7 +534,7 @@ def test_extractor_out_of_proximity():
     # Should be empty, because “EQE” and “efficiency” are far apart (not proximal/pattern-matched).
     assert len(entries) == 0
 
-def test_extractor_density():
+def test_extractor_density() -> None:
     """Extract a density value with a compound unit."""
     text = "The density of Na3Bi is 6.7 g/cm3 at 300 K."
     extractor = PhysicalPropertyExtractor()
@@ -546,7 +546,7 @@ def test_extractor_density():
     assert e["raw_unit"] == "g/cm3"
     assert e["verified"] is True
 
-def test_extract_from_relations():
+def test_extract_from_relations() -> None:
     """Pull only measured_property relations from a term record."""
     term_record = {
         "term": "Na3Bi",
@@ -563,7 +563,7 @@ def test_extract_from_relations():
     assert "band_gap" in props
     assert "mobility" in props
 
-def test_normalizer_ev_to_ev():
+def test_normalizer_ev_to_ev() -> None:
     """Leave an eV band gap unchanged and flag no conversion failure."""
     entries = [{
         "material": "Na3Bi",
@@ -580,7 +580,7 @@ def test_normalizer_ev_to_ev():
     assert ne["normalized_unit"] == "eV"
     assert ne["unit_conversion_failed"] is False
 
-def test_normalizer_density():
+def test_normalizer_density() -> None:
     """Convert density from g/cm3 to kg/m3, scaling the uncertainty too."""
     entries = [{
         "material": "Na3Bi",
@@ -598,7 +598,7 @@ def test_normalizer_density():
     assert ne["normalized_unit"] == "kg/m3"
     assert abs(ne["uncertainty_value"] - 100.0) < 1e-6
 
-def test_normalizer_efficiency_plausibility():
+def test_normalizer_efficiency_plausibility() -> None:
     """Flag out-of-range efficiency values as failed conversions."""
     # Efficiency = -20% (invalid)
     entries = [{
@@ -627,7 +627,7 @@ def test_normalizer_efficiency_plausibility():
     ne2 = normalizer.normalize(entries2)[0]
     assert ne2["unit_conversion_failed"] is True
 
-def test_normalizer_bulk_modulus():
+def test_normalizer_bulk_modulus() -> None:
     """Normalize GPa and MPa bulk moduli to GPa."""
     entries = [{
         "material": "Na3Bi",
@@ -651,7 +651,7 @@ def test_normalizer_bulk_modulus():
     assert ne1["normalized_unit"] == "GPa" and abs(ne1["normalized_value"] - 200.0) < 1e-6
     assert ne2["normalized_unit"] == "GPa" and abs(ne2["normalized_value"] - 200.0) < 1e-6
 
-def test_normalizer_failed_unit():
+def test_normalizer_failed_unit() -> None:
     """Flag unparseable values and units as failed conversions."""
     entries = [{
         "material": "Unknown",

@@ -21,6 +21,7 @@ if __name__ == "__main__" and not __package__:
     raise SystemExit(0)
 from abc import ABC, abstractmethod
 import argparse
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime
 import functools
@@ -31,7 +32,7 @@ from pathlib import Path
 import re
 import sys
 import threading
-from typing import Any, Union
+from typing import Any, TypeVar, Union, cast
 
 # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
 # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
@@ -86,7 +87,7 @@ class OllamaChatClient(ChatClient):
 
     def chat(self, prompt: str, *, temperature: float = 0.0, timeout: int = 240) -> str:
         """Send a prompt to Ollama and return the response text."""
-        payload = {
+        payload: dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
@@ -170,7 +171,7 @@ class _AnsiColorFormatter(logging.Formatter):
     }
     _RESET = "\033[0m"
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         """Format log record with colour-coded level and message."""
         level = record.levelname
         color = self._COLORS.get(level)
@@ -264,21 +265,24 @@ if not logger.handlers:
 # ----------------------------------------
 
 
+_F = TypeVar("_F", bound=Callable[..., Any])
+
+
 def retry_on_exception(
-    exceptions: Union[tuple[type, ...], type],
+    exceptions: Union[tuple[type[BaseException], ...], type[BaseException]],
     retries: int = 2,
     delay_seconds: float = 1.0,
-) -> Any:
+) -> Callable[[_F], _F]:
     """Retry a function up to `retries` times if one of `exceptions` is raised.
 
     Sleeps `delay_seconds * 2^attempt` between attempts.
     """
-    def decorator(fn):
+    def decorator(fn: _F) -> _F:
         """Wrap function with retry logic."""
         @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             """Execute fn with retry on specified exceptions."""
-            last_exc = None
+            last_exc: BaseException | None = None
             for attempt in range(retries + 1):
                 try:
                     return fn(*args, **kwargs)
@@ -293,8 +297,8 @@ def retry_on_exception(
                         threading.Event().wait(sleep_time)
                         continue
                     break
-            raise last_exc
-        return wrapper
+            raise cast(BaseException, last_exc)
+        return cast(_F, wrapper)
     return decorator
 
 # ----------------------------------------
@@ -635,7 +639,7 @@ class LLMTermExtractor:
         self.terms_dict: dict[str, dict[str, Any]] = {}
         self._bk_terms: dict[str, str] = {}  # display_text → key
         self.code_snippets: list[dict[str, Any]] = []
-        self._snippet_seen: set = set()  # dedup keys for code snippets
+        self._snippet_seen: set[tuple[str, str, str]] = set()  # dedup keys for code snippets
 
         # If no chat_client provided, use OllamaChatClient by default
         self.chat_client = chat_client or OllamaChatClient(
@@ -649,7 +653,7 @@ class LLMTermExtractor:
         # Attempt to load ChEBI ontology
         chebi_obo_path = chebi_obo_path or os.environ.get("CHEBI_OBO_PATH") or "storage/ontologies/chebi.obo"
         try:
-            self.chebi_lookup = ChebiOboLookup(chebi_obo_path)
+            self.chebi_lookup: ChebiOboLookup | None = ChebiOboLookup(chebi_obo_path)
         except Exception as e:
             logger.error(f"Failed to load ChEBI ontology: {e}")
             self.chebi_lookup = None
@@ -1085,7 +1089,7 @@ Output JSON:
         *,
         source_paper: str = "",
         page: int = 0,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Extract code snippets from a page.
 
         Strategy:
@@ -1108,9 +1112,9 @@ Output JSON:
             re.MULTILINE,
         )
 
-        regex_results: list[dict] = []
-        seen_fn_names: set = set()
-        seen_bodies: set = set()
+        regex_results: list[dict[str, Any]] = []
+        seen_fn_names: set[str] = set()
+        seen_bodies: set[str] = set()
 
         for dm in named_block_re.finditer(page_text):
             fn_name = dm.group(2)
@@ -1138,7 +1142,7 @@ Output JSON:
 
         # ── Step 2: LLM extracts schema-driven domain context (no code bodies)
         prompt = self._prepare_code_snippet_prompt(page_text, schema_helper)
-        llm_context: dict[str, dict] = {}  # function_name.lower() → context dict
+        llm_context: dict[str, dict[str, Any]] = {}  # function_name.lower() → context dict
         try:
             response = client.chat(prompt, temperature=self.temperature, timeout=120)
             data = self._extract_snippets_json_from_text(response)
@@ -1155,7 +1159,7 @@ Output JSON:
             logger.warning(f"LLM context extraction failed ({source_paper} p.{page}): {e} — using regex only")
 
         # ── Step 3: Merge regex code + LLM context ────────────────────────────
-        results: list[dict] = []
+        results: list[dict[str, Any]] = []
         for r in regex_results:
             fn_key = (r["function_name"] or "").lower()
             ctx = llm_context.get(fn_key) or llm_context.get("__anonymous__") or {}
@@ -1354,7 +1358,7 @@ Output JSON:
 
             # 2) Ensure formula & validation
             snippet = self.get_context_snippet(raw_text, name, filename, page_num)
-            validated_term = self._postprocess_term(fixed_term, snippet["text"])
+            validated_term = self._postprocess_term(fixed_term, cast(str, snippet["text"]))
 
             # maybe only do this if it's a material or chemical...
             # it found an entry for Fill Factor (FF)
@@ -1452,7 +1456,7 @@ Output JSON:
             else:
                 new_key = self._register_new_term(name)
                 _pm = pub_meta or {}
-                entry: dict[str, Any] = {
+                entry = {
                     "term": name,
                     "definition": validated_term.get("definition", ""),
                     "category": validated_term.get("category", "Thing"),
@@ -1933,7 +1937,7 @@ def run_extraction(
     max_workers: int = 4,
     merge_top_k: int = DEFAULT_MERGE_TOP_K,
     merge_embed_model: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Run term extraction on a folder of PDFs and write the results JSON.
 
     Args:

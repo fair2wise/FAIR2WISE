@@ -32,7 +32,7 @@ from .record_validation import StageReport
 STAGE_ARTIFACT_VERSION = 1
 
 
-def _coverage(result: ExtractionResult) -> list:
+def _coverage(result: ExtractionResult) -> list[dict[str, Any]]:
     return [{"chunk_id": c.chunk_id, "section": c.section, "start": c.start, "end": c.end, "ok": c.ok,
              "extracted_by": c.extracted_by, "error": c.error, "reason": c.reason, "settings": dict(c.settings)}
             for c in result.coverage]

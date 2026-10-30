@@ -30,7 +30,7 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, Callable, Iterable, Protocol, Sequence, Union
+from typing import Any, Callable, Iterable, Protocol, Sequence, Union, cast
 
 import httpx
 
@@ -190,7 +190,7 @@ def _fold(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (text or "").lower())
 
 
-def _shingles(text: str, n: int = 6) -> set:
+def _shingles(text: str, n: int = 6) -> set[str]:
     return {text[i:i + n] for i in range(max(0, len(text) - n + 1))} or {text}
 
 
@@ -209,7 +209,7 @@ def _title_year_agree(ref: ReferenceLike, title: str, year: object) -> bool:
     if ref.year is None or year in (None, ""):
         return True
     try:
-        return abs(int(ref.year) - int(year)) <= 1  # type: ignore[arg-type]
+        return abs(int(ref.year) - int(cast(int | str, year))) <= 1
     except (TypeError, ValueError):
         return True
 
@@ -363,7 +363,7 @@ class BatchResolver:
         except httpx.HTTPError as exc:
             raise _Unanswered(f"crossref {type(exc).__name__}") from exc
         if resp.status_code == 200:
-            return resp.json().get("message")
+            return cast(dict[str, Any] | None, resp.json().get("message"))
         if resp.status_code == 404:
             return None
         raise _Unanswered(f"crossref HTTP {resp.status_code}")
@@ -383,7 +383,7 @@ class BatchResolver:
             raise _Unanswered(f"crossref HTTP {resp.status_code}")
         for item in (resp.json().get("message") or {}).get("items") or []:
             if _title_year_agree(ref, " ".join(item.get("title") or []), _crossref_year(item)):
-                return item
+                return cast(dict[str, Any], item)
         return None
 
     def s2_title_match(self, ref: ReferenceLike) -> dict[str, Any] | None:
@@ -401,7 +401,7 @@ class BatchResolver:
             raise _Unanswered(f"s2 HTTP {resp.status_code}")
         data = resp.json().get("data") or []
         if data and _title_year_agree(ref, data[0].get("title", ""), data[0].get("year")):
-            return data[0]
+            return cast(dict[str, Any], data[0])
         return None
 
     # -- orchestration --------------------------------------------------------------------------
@@ -424,7 +424,7 @@ class BatchResolver:
                 todo.append(doi)
         if not todo:
             return results
-        failed: set = set()
+        failed: set[str] = set()
         batched = len(todo) > prefer_batch_above
         oa = self.openalex_batch(todo) if batched else self.openalex_singletons(todo)
         per_doi_cost = 0.0001 / OA_BATCH if batched else 0.0

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
-from typing import Callable
+from typing import Callable, Iterable
 
 from ..adjudication import clamp_confidence, parse_json_object
 from ..candidate_search import estimate_tokens
@@ -110,7 +110,16 @@ class StructuredTermResolver:
         sha = hashlib.sha256(prompt.encode()).hexdigest()
         tokens = estimate_tokens(prompt)
 
-        def verdict(kind, slug=None, reject=None, quote="", conf=0.0, reason="", accepted=False, errors=()):
+        def verdict(
+            kind: str,
+            slug: str | None = None,
+            reject: str | None = None,
+            quote: str = "",
+            conf: float = 0.0,
+            reason: str = "",
+            accepted: bool = False,
+            errors: Iterable[str] = (),
+        ) -> TermVerdict:
             return TermVerdict(
                 ev.term_key,
                 round_key,

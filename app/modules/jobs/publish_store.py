@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, cast
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.errors import ContractError, ErrorCode
@@ -234,7 +234,7 @@ class PublishStore:
 
     def quarantined(self, job_id: str | None = None) -> list[dict[str, Any]]:
         """Quarantine entries, newest last."""
-        sql, params = "SELECT * FROM pub_quarantine", ()
+        sql, params = "SELECT * FROM pub_quarantine", cast(tuple[str, ...], ())
         if job_id is not None:
             sql, params = sql + " WHERE job_id=?", (job_id,)
         return [

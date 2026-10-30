@@ -400,7 +400,7 @@ def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any]
         ledger.put(provenance_id, LegacyEntry(verdict=verdict))
         return verdict_to_result(verdict, provenance_id=provenance_id)
 
-    answer_from_knowledge.service = service  # type: ignore[attr-defined] - for parity tests
+    answer_from_knowledge.service = service  # type: ignore[attr-defined]  # for parity tests
     return answer_from_knowledge
 
 

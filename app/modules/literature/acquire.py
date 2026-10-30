@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import logging
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import httpx
 
@@ -166,7 +166,7 @@ class PaperAcquirer:
             rewritten = dl.rewrite_oa_pdf_url(url) or dl.listed_oa_pdf_url(url) or ""
             if rewritten and rewritten not in mapped:
                 mapped.append(rewritten)
-        return dl.prefer_repository_pdfs(mapped)
+        return cast(list[str], dl.prefer_repository_pdfs(mapped))
 
     def acquire(self, ctx: RequestContext, doi: str, *, work: Mapping[str, Any] | None = None) -> AcquireResult:
         """Return a stored source for ``doi``, downloading an OA copy if needed.

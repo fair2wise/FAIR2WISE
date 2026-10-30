@@ -7,7 +7,7 @@ import logging
 import os
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, cast
 
 from academy.agent import Agent, action
 
@@ -63,7 +63,7 @@ def _eligible_pages(entry: dict[str, Any], page_count: int) -> tuple[str, list[i
 
     selected = entry.get("selected_pages")
     if str(entry.get("extraction_state") or "") == "full" and not selected:
-        full = entry.get("full") if isinstance(entry.get("full"), dict) else {}
+        full: Any = entry.get("full") if isinstance(entry.get("full"), dict) else {}
         selected = full.get("selected_pages")
     if not isinstance(selected, list):
         partials = entry.get("partials")
@@ -165,7 +165,7 @@ def summarize_extracted_terms(
         if not isinstance(term, dict) or filename not in (term.get("source_papers") or []):
             continue
         snippet_pages = {
-            int(snippet.get("page"))
+            int(cast(int, snippet.get("page")))  # guarded by the isdigit() filter below
             for snippet in (term.get("context_snippets") or [])
             if isinstance(snippet, dict)
             and Path(str(snippet.get("source_paper") or "")).name == filename
@@ -388,7 +388,7 @@ class PaperEvidenceAgent(Agent):
 
         sufficient = bool(result.get("sufficient"))
         answer = str(result.get("answer") or "").strip()
-        requested_pages = result.get("used_pages") if isinstance(result.get("used_pages"), list) else []
+        requested_pages: Any = result.get("used_pages") if isinstance(result.get("used_pages"), list) else []
         used_pages = []
         chosen_pages = {page for page, _ in chosen}
         for value in requested_pages:

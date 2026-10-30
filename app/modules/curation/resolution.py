@@ -31,7 +31,7 @@ from datetime import UTC, datetime
 import hashlib
 import json
 import threading
-from typing import Any, Callable, Iterable, Protocol
+from typing import Any, Callable, Iterable, Protocol, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode
@@ -40,7 +40,7 @@ from ..provenance.recorder import AuditRecorder
 from .approval import CostApproval, check_cost_approval
 from .control import ResolverSettings
 from .cost_ledger import CallOutcome, parse_cost_header, settle_outcome
-from .model_port import ModelCallError, ModelPort, ModelRef
+from .model_port import ModelCallError, ModelPort, ModelRef, ModelReply
 from .models import CaseState, ResolutionAttempt, Route
 from .review_schema import ReviewParseError, parse_review_response, validate_resolution
 from .store import CurationStore
@@ -66,7 +66,7 @@ class OutboundPolicy(Protocol):
 class AllowListOutboundPolicy:
     """Allow evidence only for listed corpora and up to ``max_chars`` of text."""
 
-    corpora: frozenset
+    corpora: frozenset[str]
     max_chars: int = 4000
 
     def refusal(self, case: dict[str, Any], ref: ModelRef) -> str | None:
@@ -246,7 +246,7 @@ class ModelResolver:
                     cost_usd=parse_cost_header(error.cost_header), served=error.served, failed=True
                 )
             else:
-                outcome = CallOutcome(cost_usd=reply.cost_usd, served=True, failed=False)
+                outcome = CallOutcome(cost_usd=cast(ModelReply, reply).cost_usd, served=True, failed=False)
             settle_outcome(self.store.ledger, reservation, outcome)
         self._note(case, reply, error, reservation)
         if error is not None:

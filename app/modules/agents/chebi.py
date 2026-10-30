@@ -6,7 +6,7 @@ from typing import Any
 import obonet
 
 
-def load_chebi_obo(obo_path: str):
+def load_chebi_obo(obo_path: str) -> Any:  # Any: networkx graph (untyped)
     """Load the ChEBI OBO into a networkx graph using obonet.
 
     Each node is keyed by its OBO ID (e.g. 'CHEBI:15377'),
@@ -93,7 +93,7 @@ class ChebiOboLookup:
 
         # ── parse property_value triples ──
         # ChEBI uses PURLs like http://purl.obolibrary.org/obo/chebi/formula, /mass, /charge, /inchi, /inchikey, /smiles, /monoisotopicmass, etc.
-        prop_map: dict[str, str] = {
+        prop_map: dict[str, str | None] = {
             "formula": None,
             "mass": None,
             "charge": None,
@@ -163,7 +163,7 @@ class ChebiOboLookup:
         return data
 
 # ──────────────────────────────────────────────────────────────────────────────
-def main():
+def main() -> None:
     """Run an interactive ChEBI lookup prompt for the OBO file given as argv[1]."""
     if len(sys.argv) != 2:
         print("Usage: python chebi.py <path/to/chebi.obo>", file=sys.stderr)

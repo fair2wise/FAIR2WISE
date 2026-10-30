@@ -60,7 +60,7 @@ def _spec(
     props: dict[str, Any],
     required: Sequence[str],
     *,
-    effects: frozenset,
+    effects: frozenset[Effect],
     cost: CostClass,
     output: dict[str, Any],
     evidence: str = "none",

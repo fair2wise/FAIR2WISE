@@ -31,7 +31,7 @@ import json
 import logging
 from pathlib import Path
 import threading
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from .contracts.context import RequestContext
 from .contracts.errors import ContractError, ErrorCode
@@ -148,7 +148,7 @@ class JudgeModelService:
 
 def read_judge_model(workdir: Path) -> str | None:
     """The stored judge id under ``workdir`` (no context: for the trusted validation CLI only)."""
-    return JudgeModelStore(judge_settings_path(workdir)).read()["judge_model"]
+    return cast(str | None, JudgeModelStore(judge_settings_path(workdir)).read()["judge_model"])
 
 
 __all__ = ("JUDGE_CAPABILITY", "JUDGE_SCOPE", "JudgeModelService", "JudgeModelStore", "judge_settings_path",

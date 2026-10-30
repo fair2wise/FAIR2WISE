@@ -36,7 +36,7 @@ class TermStore:
         self._records: dict[str, TermRecord] = {}
         self._display_to_key: dict[str, str] = {}
         self.code_snippets: list[dict[str, Any]] = []
-        self._snippet_seen: set = set()
+        self._snippet_seen: set[tuple[str, str, str]] = set()
         self._state_lock = threading.Lock()
         self._save_lock = threading.Lock()
         self._tl = threading.local()

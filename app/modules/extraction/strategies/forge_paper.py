@@ -176,7 +176,7 @@ def _snippet(text: str, start: int, end: int, window: int = 40) -> str:
 
 def extract_keywords(section_text: str, taxonomy: KeywordTaxonomy | None = None) -> list[Hit]:
     """One :class:`Hit` per slug per taxon (first match), from an injected taxonomy."""
-    seen: set = set()
+    seen: set[str] = set()
     hits: list[Hit] = []
     for taxon, patterns in (taxonomy or {}).items():
         for slug, pattern in patterns:

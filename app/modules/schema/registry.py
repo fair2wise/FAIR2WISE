@@ -28,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import hashlib
 from pathlib import Path
-from typing import Iterator, Mapping, Sequence
+from typing import Any, Iterator, Mapping, Sequence, cast
 
 import yaml
 
@@ -278,7 +278,7 @@ class RegistryError(LookupError):
     """An asset is unknown, unregistered or not selectable."""
 
 
-def _classify(stem: str, doc: Mapping) -> str:
+def _classify(stem: str, doc: Mapping[str, Any]) -> str:
     if stem in _NON_LINKML:
         return _NON_LINKML[stem]
     if "id" in doc and "name" in doc and ("classes" in doc or "imports" in doc or "slots" in doc):
@@ -429,7 +429,7 @@ class SchemaRegistry:
         if entry.pending_review and not allow_pending_review:
             raise RegistryError(
                 f"{entry.path} belongs to schema set {entry.schema_set}, which is pending owner review "
-                f"({SCHEMA_SET_DOCS.get(entry.schema_set, 'review doc')}); select it explicitly with "
+                f"({SCHEMA_SET_DOCS.get(cast(str, entry.schema_set), 'review doc')}); select it explicitly with "
                 "allow_pending_review=True"
             )
         if entry.known_broken:

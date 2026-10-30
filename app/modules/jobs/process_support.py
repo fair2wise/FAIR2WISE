@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from typing import Sequence
+from typing import Sequence, cast
 
 TAIL_BYTES = 64 * 1024
 TAIL_LINE_CHARS = 400
@@ -74,7 +74,7 @@ def pid_command(pid: int) -> str:
 
 def is_our_worker(pid: object, marker: str = WORKER_MODULE) -> bool:
     """A live pid whose command line names the worker module (guards against pid reuse)."""
-    return pid_alive(pid) and marker in pid_command(int(pid))  # type: ignore[arg-type]
+    return pid_alive(pid) and marker in pid_command(int(cast(int, pid)))  # pid_alive vetted it as an int-like pid
 
 
 def scrub(line: str) -> str:

@@ -19,7 +19,7 @@ from .review_schema import ReviewAnswer, ReviewParseError, validate_resolution
 from .store import CurationStore
 
 
-def _scope(ctx: RequestContext, store: CurationStore, case_id: str) -> set:
+def _scope(ctx: RequestContext, store: CurationStore, case_id: str) -> set[str]:
     if ctx.principal.subject == LOCAL_OPERATOR and ctx.mode.value == "local_trusted":
         row = store.db.one("SELECT corpus FROM uncertainty_cases WHERE id=?", (case_id,))
         return {row[0]} if row else set()

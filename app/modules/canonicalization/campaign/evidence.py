@@ -119,7 +119,7 @@ def assemble(rows: GraphRows, key: str, slot: Mapping[str, Any], vocab: Vocabula
     variants = slot["variants"]
     surface = sorted(variants.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
     nodes = slot["nodes"]
-    seen: set = set()
+    seen: set[str] = set()
     snippets: list[Snippet] = []
     for node in sorted(nodes, key=lambda n: (str(n.get("publication_id")), str(n.get("node_id")))):
         pub = str(node.get("publication_id") or "")

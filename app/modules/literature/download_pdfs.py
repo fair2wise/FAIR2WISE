@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 from urllib.parse import parse_qs, quote, urlparse
 
 import requests
@@ -284,7 +284,7 @@ def pmcid_from_openalex_work(work: dict[str, Any]) -> str | None:
     Checks the work's ``ids``/``pmcid`` fields, then the PDF and landing-page
     URLs of its OA, primary and other locations.
     """
-    ids = work.get("ids") if isinstance(work.get("ids"), dict) else {}
+    ids: Any = work.get("ids") if isinstance(work.get("ids"), dict) else {}  # Any: untyped OpenAlex JSON
     for value in (ids.get("pmcid"), work.get("pmcid")):
         pmcid = _pmcid_from_text(str(value or ""))
         if pmcid:
@@ -301,7 +301,7 @@ def pmcid_from_openalex_work(work: dict[str, Any]) -> str | None:
 
 def _iter_openalex_locations(work: dict[str, Any]) -> list[dict[str, Any]]:
     locs: list[dict[str, Any]] = []
-    seen: set[tuple] = set()
+    seen: set[tuple[Any, ...]] = set()
     for loc in [work.get("best_oa_location"), work.get("primary_location"), *(work.get("locations") or [])]:
         if not isinstance(loc, dict):
             continue
@@ -333,7 +333,7 @@ def select_openalex_oa_pdfs(work: dict[str, Any]) -> tuple[list[str], str | None
         listed = listed_oa_pdf_url(str(loc.get("pdf_url") or ""), osti_biblio_ok=osti_ok)
         if listed:
             sourced.append((listed, "openalex"))
-    oa = work.get("open_access") if isinstance(work.get("open_access"), dict) else {}
+    oa: Any = work.get("open_access") if isinstance(work.get("open_access"), dict) else {}
     if oa.get("is_oa") is True:
         oa_url = str(oa.get("oa_url") or "")
         rewritten = rewrite_oa_pdf_url(oa_url)
@@ -506,7 +506,7 @@ def _json_headers() -> dict[str, str]:
     wait=wait_exponential(multiplier=1, min=1, max=45),
     retry=retry_if_exception_type((requests.RequestException,)),
 )
-def _oa_get(url: str, **kwargs):
+def _oa_get(url: str, **kwargs: Any) -> requests.Response:
     _respect_rate_limit(url)
     timeout = kwargs.pop("timeout", 15.0)
     response = requests.get(url, timeout=timeout, **kwargs)
@@ -521,7 +521,7 @@ def _oa_get(url: str, **kwargs):
     wait=wait_exponential(multiplier=1, min=1, max=45),
     retry=retry_if_exception_type((requests.RequestException,)),
 )
-def _oa_post(url: str, **kwargs):
+def _oa_post(url: str, **kwargs: Any) -> requests.Response:
     _respect_rate_limit(url)
     timeout = kwargs.pop("timeout", 30.0)
     response = requests.post(url, timeout=timeout, **kwargs)
@@ -534,7 +534,7 @@ def select_semantic_scholar_oa_pdfs(paper: dict[str, Any] | None) -> tuple[list[
     """Allowlisted OA PDF from a Semantic Scholar paper object."""
     if not isinstance(paper, dict):
         return [], []
-    oa = paper.get("openAccessPdf") if isinstance(paper.get("openAccessPdf"), dict) else {}
+    oa: Any = paper.get("openAccessPdf") if isinstance(paper.get("openAccessPdf"), dict) else {}
     return _trusted_oa_urls([str(oa.get("url") or "")], "semantic-scholar")
 
 
@@ -707,7 +707,7 @@ def select_europepmc_search_oa_pdfs(payload: dict[str, Any]) -> tuple[list[str],
     """Europe PMC search JSON → PMC render URLs (and other allowlisted PDFs)."""
     if not isinstance(payload, dict):
         return [], []
-    result_list = payload.get("resultList") if isinstance(payload.get("resultList"), dict) else {}
+    result_list: Any = payload.get("resultList") if isinstance(payload.get("resultList"), dict) else {}
     results = result_list.get("result") or []
     if isinstance(results, dict):
         results = [results]
@@ -718,7 +718,7 @@ def select_europepmc_search_oa_pdfs(payload: dict[str, Any]) -> tuple[list[str],
         pmcid = _pmcid_from_text(str(record.get("pmcid") or ""))
         if pmcid:
             candidates.append(europepmc_pdf_url(pmcid))
-        full_text = record.get("fullTextUrlList") if isinstance(record.get("fullTextUrlList"), dict) else {}
+        full_text: Any = record.get("fullTextUrlList") if isinstance(record.get("fullTextUrlList"), dict) else {}
         for item in full_text.get("fullTextUrl") or []:
             if not isinstance(item, dict):
                 continue
@@ -764,7 +764,7 @@ def select_crossref_tdm_pdfs(payload: dict[str, Any]) -> tuple[list[str], list[s
     """Mine Crossref `link` for text-mining PDFs. Allowlist still gates hosts."""
     if not isinstance(payload, dict):
         return [], []
-    message = payload.get("message") if isinstance(payload.get("message"), dict) else payload
+    message: Any = payload.get("message") if isinstance(payload.get("message"), dict) else payload
     links = message.get("link") or []
     candidates: list[str] = []
     for link in links:
@@ -805,7 +805,7 @@ def fetch_crossref_tdm_pdfs(doi: str, *, timeout: float = 15.0) -> tuple[list[st
     return select_crossref_tdm_pdfs(body)
 
 
-def search_arxiv(keyword: str, max_results: int):
+def search_arxiv(keyword: str, max_results: int) -> Iterable[Any]:  # Any: arxiv.Result (imported lazily)
     """Search arXiv using arxiv.py wrapper.
 
     Returns a list of arxiv.Result objects.
@@ -819,17 +819,17 @@ def search_arxiv(keyword: str, max_results: int):
         sort_by=arxiv.SortCriterion.Relevance,
         sort_order=arxiv.SortOrder.Descending
     )
-    return client.results(search)
+    return cast(Iterable[Any], client.results(search))
 
 
-def _cleanup_partial(path: Path):
+def _cleanup_partial(path: Path) -> None:
     try:
         path.unlink()
     except FileNotFoundError:
         pass
 
 
-def download_pdf(url: str, dest: str, retries=3):
+def download_pdf(url: str, dest: str, retries: int = 3) -> bool:
     """Download PDF from URL and save to dest file.
 
     Handles retries, timeout, streaming, and rejects non-PDF payloads.
@@ -894,7 +894,7 @@ def download_pdf(url: str, dest: str, retries=3):
     return False
 
 
-def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int):
+def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int) -> None:
     """Search arXiv for `keyword` and download each result into `target_dir`.
 
     Files are named ``[DOI].pdf`` (slashes replaced by underscores); existing
@@ -913,7 +913,7 @@ def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int):
         time.sleep(3)  # respect rate limits
 
 
-def run_openalex_workflow(keyword: str, target_dir: str, max_results: int):
+def run_openalex_workflow(keyword: str, target_dir: str, max_results: int) -> None:
     """Search OpenAlex titles for `keyword` and download each result into `target_dir`.
 
     Works without a DOI or primary-location PDF URL are skipped, as are
@@ -936,7 +936,7 @@ def run_openalex_workflow(keyword: str, target_dir: str, max_results: int):
         time.sleep(1)
 
 
-def main():
+def main() -> None:
     """Parse command-line arguments and run the selected download workflow."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--keyword', required=True)

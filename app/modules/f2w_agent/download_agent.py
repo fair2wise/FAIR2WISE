@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any
+from typing import Any, Callable
 
 from academy.agent import Agent, action
 
@@ -71,7 +71,7 @@ def _reconstruct_abstract(inverted_index: dict[str, list[int]] | None) -> str:
     """Rebuild abstract text from an OpenAlex abstract_inverted_index."""
     if not inverted_index:
         return ""
-    positions: list[tuple] = []
+    positions: list[tuple[int, str]] = []
     for word, idxs in inverted_index.items():
         for i in idxs:
             positions.append((i, word))
@@ -395,7 +395,7 @@ class DownloadAgent(Agent):
         )
 
     # ------------------------------------------------------------------
-    def _search_one(self, works, search_text: str, pool: int) -> list[dict[str, Any]]:
+    def _search_one(self, works: Callable[[], Any], search_text: str, pool: int) -> list[dict[str, Any]]:
         """Search OpenAlex for ``search_text``, retrying without the OA filter on failure."""
         try:
             results = (

@@ -41,7 +41,7 @@ import hashlib
 import re
 import threading
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence, cast
 import uuid
 
 from ..contracts.context import RequestContext
@@ -439,7 +439,7 @@ class QuoteVerifier:
                         covered.setdefault(i + k, hits[0] + k)
             region = _region(ref.work_id, ref.source_version, ref.locator)
             run: list[int] = []
-            for i in sorted(covered) + [None]:  # type: ignore[list-item]
+            for i in cast(list[Any], sorted(covered) + [None]):  # None is a flush sentinel; `i` is int | None
                 if run and (i is None or i != run[-1] + 1):
                     start, end = words[run[0]][0], words[run[-1]][1]
                     if end - start >= min_chars:
@@ -496,12 +496,12 @@ def _union_length(intervals: Iterable[tuple[int, int]]) -> int:
     for s, e in sorted(intervals):
         if cur_e is None or s > cur_e:
             if cur_e is not None:
-                total += cur_e - cur_s
+                total += cur_e - cast(int, cur_s)  # cur_s is set whenever cur_e is
             cur_s, cur_e = s, e
         else:
             cur_e = max(cur_e, e)
     if cur_e is not None:
-        total += cur_e - cur_s
+        total += cur_e - cast(int, cur_s)  # cur_s is set whenever cur_e is
     return total
 
 

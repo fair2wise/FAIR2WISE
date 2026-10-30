@@ -37,7 +37,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
-from typing import Any, Collection, Iterable, Iterator, Mapping, Sequence
+from typing import Any, Collection, Iterable, Iterator, Mapping, Sequence, cast
 
 from .snapshot_manifest import CORPUS_RE, KGManifest, parse_manifest
 
@@ -392,7 +392,7 @@ def _git(repo: Path, *args: str, stdin: bytes | None = None, ok_codes: tuple[int
         raise ReleaseVerificationError("git", f"git could not run: {type(exc).__name__}") from None
     if done.returncode not in ok_codes:
         raise ReleaseVerificationError("git", f"git {args[0]} failed")
-    return done.stdout
+    return cast(bytes, done.stdout)
 
 
 @dataclass(frozen=True)
@@ -503,7 +503,7 @@ def verify_git_release(
     for art in loaded.get("compat_copy", []):
         if art.data != graph.data or declared.get(art.path) != art.sha256:
             raise ReleaseVerificationError("manifest_mismatch", f"compat copy {art.path} is not the graph bytes")
-    validation = (loaded.get("validation") or [None])[0]
+    validation = (loaded.get("validation") or cast(list[VerifiedArtifact | None], [None]))[0]
     if validation is not None and (validation.path != graph.path.rsplit("/", 1)[0] + "/validation.json"
                                    or validation.sha256 != manifest.validation.report_sha256):
         raise ReleaseVerificationError("manifest_mismatch",
@@ -614,11 +614,11 @@ def _index_blobs(repo: Path, paths: Sequence[str]) -> dict[str, str]:
     return out
 
 
-def _tracked(repo: Path, paths: Sequence[str]) -> set:
+def _tracked(repo: Path, paths: Sequence[str]) -> set[str]:
     return set(_nul_split(_git(repo, "ls-files", "-z", "--", *paths))) if paths else set()
 
 
-def _ignored(repo: Path, paths: Sequence[str]) -> set:
+def _ignored(repo: Path, paths: Sequence[str]) -> set[str]:
     """Paths Git would ignore (tracked files are never reported: ``check-ignore`` consults the index)."""
     if not paths:
         return set()
@@ -901,9 +901,9 @@ class EvidenceReport:
         return sha256_bytes(canonical_json_bytes(self.to_dict()))
 
 
-def _locators(graph: Mapping[str, Any]) -> tuple[Counter, int]:
+def _locators(graph: Mapping[str, Any]) -> tuple[Counter[str], int]:
     """Locator counts per source id, and the number of snippets that carry no source."""
-    counts: Counter = Counter()
+    counts: Counter[str] = Counter()
     unlocated = 0
     nodes = graph.get("things") if "things" in graph else graph.get("nodes")
     edges = graph.get("associations") if "associations" in graph else graph.get("edges")
@@ -1086,7 +1086,7 @@ def bind_binary_report(report_bytes: bytes, *, ref: str, corpus: str, snapshot_i
         raise ReleaseRefused("binary_report_invalid", "the binary report is not JSON") from None
     if not isinstance(report, Mapping) or report.get("report_kind") != BINARY_REPORT_KIND:
         raise ReleaseRefused("binary_report_invalid", "not an evals.binary report (report_kind)")
-    gate = report.get("gate") if isinstance(report.get("gate"), Mapping) else {}
+    gate = cast(Mapping[str, Any], report.get("gate") if isinstance(report.get("gate"), Mapping) else {})
     status = gate.get("status")
     if status not in BINARY_VERDICTS:
         raise ReleaseRefused("binary_report_invalid", f"unknown gate status {status!r}")
@@ -1110,7 +1110,7 @@ def bind_binary_report(report_bytes: bytes, *, ref: str, corpus: str, snapshot_i
         verdict = _lower(verdict, "NOT_PASS")
         reasons.append("required_case_not_completed_pass")
     reasons += [str(x) for x in gate.get("gate_reasons") or []]
-    source = report.get("source") if isinstance(report.get("source"), Mapping) else {}
+    source = cast(Mapping[str, Any], report.get("source") if isinstance(report.get("source"), Mapping) else {})
     version = report.get("manifest_version")
     return BinaryReportBinding(
         sha256=sha256_bytes(report_bytes), ref=ref, suite=f"evals.binary/{version or 'unknown'}",

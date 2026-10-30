@@ -149,7 +149,7 @@ class Pipeline:
         names = [s.name for s in specs]
         if len(set(names)) != len(names):
             raise ValueError("duplicate stage names")
-        seen: set = set()
+        seen: set[str] = set()
         for spec in specs:
             for dep in spec.depends_on:
                 if dep not in seen:

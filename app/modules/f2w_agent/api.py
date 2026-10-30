@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Awaitable, Callable, Sequence
+from typing import Any, AsyncIterator, Awaitable, Callable, Iterator, Sequence, cast
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -29,7 +29,7 @@ from ...api.origin_gate import OriginGateMiddleware
 from ...api.sessions import TiledSessionStore, install_session_routes
 from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
-from ..contracts.context import RequestContext
+from ..contracts.context import DeploymentProfile, RequestContext
 from ..hybrid_rag.pipeline import hybrid_rag_enabled
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
@@ -118,7 +118,7 @@ _CHAT_LABEL: contextvars.ContextVar[str] = contextvars.ContextVar(
 
 
 @contextlib.contextmanager
-def _chat_label(label: str):
+def _chat_label(label: str) -> Iterator[None]:
     """Name the next ``_chat_completion`` for the trace without changing its signature."""
     token = _CHAT_LABEL.set(label)
     try:
@@ -551,7 +551,7 @@ _SETTINGS_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar("f2w_
 
 
 @contextlib.contextmanager
-def settings_scope(key: str | None):
+def settings_scope(key: str | None) -> Iterator[None]:
     """Run the enclosed service calls with ``key``'s effective settings (T25D)."""
     token = _SETTINGS_KEY.set(key)
     try:
@@ -1387,7 +1387,7 @@ def _snippet_thing_payload(
     }
 
 
-def _kg_raw_parts(data: dict[str, Any]) -> tuple[list, list]:
+def _kg_raw_parts(data: dict[str, Any]) -> tuple[list[Any], list[Any]]:
     """Return (raw_nodes, raw_edges) for old and new MatKG JSON formats.
 
     Reads ``things``/``associations`` (old) or ``nodes``/``edges`` (new).
@@ -1702,14 +1702,18 @@ def query_graph_payload(
     nodes = [nodes_by_display[node_id] for node_id in ordered_ids if node_id in nodes_by_display]
     unique_sources = unique_graph_paths(source_names) or [str(graph_path)]
     source_path = unique_sources[0] if len(unique_sources) == 1 else f"query:{','.join(unique_sources)}"
-    return GraphPayload(nodes=nodes, edges=edges, source_path=source_path)
+    return GraphPayload(
+        nodes=cast(list[GraphNode], nodes),  # plain dicts: pydantic validates them into GraphNode
+        edges=cast(list[GraphEdge], edges),  # plain dicts: pydantic validates them into GraphEdge
+        source_path=source_path,
+    )
 
 
 def _model_to_jsonable(model: BaseModel) -> dict[str, Any]:
     """Dump a Pydantic model to a JSON-serializable dict."""
     if hasattr(model, "model_dump"):
-        return model.model_dump(mode="json")  # type: ignore[attr-defined]
-    return json.loads(model.json())
+        return model.model_dump(mode="json")
+    return cast(dict[str, Any], json.loads(model.json()))
 
 
 def _sse(event: str, data: dict[str, Any]) -> str:
@@ -2832,7 +2836,7 @@ class AgentPipelineService:
             await self._reload_retrieval(path, graph_source="splash", graph_files=[path])
 
     @contextlib.contextmanager
-    def runtime_view(self, key: str | None):
+    def runtime_view(self, key: str | None) -> Iterator[None]:
         """T25D: read ``key``'s effective settings synchronously, without rebuilding agents.
 
         For reads outside a turn (settings, graph view); the body must not ``await``.
@@ -3642,20 +3646,20 @@ class AgentPipelineService:
         )
         read_path = getattr(self, "_read_path", None)
         if read_path is not None:
-            return note_retrieval(self.retrieval, await read_path.query(
+            return cast(dict[str, Any], note_retrieval(self.retrieval, await read_path.query(
                 question, history=history, source_rag=enabled, use_live_tiled=tiled_enabled
-            ))
+            )))
         tiled_setter = getattr(self.retrieval, "set_live_tiled", None)
         if callable(tiled_setter):
             tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
         query = self.retrieval.query
         try:
-            return note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled))
+            return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled)))
         except TypeError:
             try:
-                return note_retrieval(self.retrieval, await query(question, history=history))
+                return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question, history=history)))
             except TypeError:
-                return note_retrieval(self.retrieval, await query(question))
+                return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question)))
 
     def _trace_env(self) -> dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""
@@ -4290,7 +4294,7 @@ class AgentPipelineService:
         """
         path = getattr(self, "_summary_path", None)
         if path is not None and summarize_extracted_terms is _LEGACY_SUMMARIZE_EXTRACTED_TERMS:
-            return path.summarize_extracted_terms(*args, **kwargs)
+            return cast(dict[str, Any], path.summarize_extracted_terms(*args, **kwargs))
         return summarize_extracted_terms(*args, **kwargs)
 
     async def _handle_pending_message(
@@ -5917,7 +5921,7 @@ class AgentPipelineService:
         """Return the recommended candidate index that has not failed."""
         pending = self.pending or {}
         if "recommended_candidate_index" in pending:
-            value = pending.get("recommended_candidate_index")
+            value: Any = pending.get("recommended_candidate_index")
             try:
                 index = int(value)
             except (TypeError, ValueError):
@@ -6844,7 +6848,7 @@ def create_app(
     allowed_origins = effective_cors_origins(cors_origins, is_local=guard.is_local)
     if not allowed_origins:
         logger.info("CORS: no origins configured on %s; browser callers must be same-origin (C7)",
-                    guard.settings.profile.value)
+                    cast(DeploymentProfile, guard.settings.profile).value)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
@@ -6883,7 +6887,7 @@ def create_app(
     async def get_settings(ctx: RequestContext = Depends(ui_context)) -> AgentSettingsResponse:
         """Return the current agent settings."""
         payload = service.settings_response_for(guard.settings_key(ctx))
-        return guard.project_settings(ctx, _model_to_jsonable(payload))
+        return cast(AgentSettingsResponse, guard.project_settings(ctx, _model_to_jsonable(payload)))
 
     @app.put("/settings", response_model=AgentSettingsResponse)
     async def update_settings(
@@ -6898,7 +6902,7 @@ def create_app(
                 ignored = {name for name in ignored
                            if sent.get(name) != getattr(service.deployment_runtime, name, None)}
             response.headers.update(guard.setting_warning_headers(ignored))
-            return guard.project_settings(ctx, _model_to_jsonable(await service.apply_settings_for(key, req)))
+            return cast(AgentSettingsResponse, guard.project_settings(ctx, _model_to_jsonable(await service.apply_settings_for(key, req))))
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -6908,8 +6912,8 @@ def create_app(
     ) -> SessionResetResponse:
         """Clear the requested chat session."""
         guard.session_access(request, ctx, req.session_id if req else None, claim=True)
-        return guard.project_paths(_model_to_jsonable(
-            await service.reset_session_context(req.session_id if req else None)))
+        return cast(SessionResetResponse, guard.project_paths(_model_to_jsonable(
+            await service.reset_session_context(req.session_id if req else None))))
 
     @app.delete("/session/{session_id}")
     async def delete_session(
@@ -6920,7 +6924,7 @@ def create_app(
             guard.session_access(request, ctx, session_id, claim=False)
             result = await service.delete_session_context(session_id)
             guard.session_deleted(session_id)
-            return guard.project_paths(result)
+            return cast(dict[str, str], guard.project_paths(result))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -6929,7 +6933,7 @@ def create_app(
         """Return the current graph payload."""
         with service.runtime_view(guard.settings_key(ctx)):
             payload = service.graph_payload()
-        return guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(payload))
+        return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph", _model_to_jsonable(payload)))
 
     @app.post("/graph/nodes/search", response_model=GraphNodeSearchResponse)
     async def search_graph_nodes(
@@ -6943,7 +6947,7 @@ def create_app(
         except Exception as exc:
             raise HTTPException(status_code=502,
                                 detail=f"Node search failed: {guard.error_detail(ctx, exc)}") from exc
-        return guard.project_route(ctx, "POST", "/graph/nodes/search", _model_to_jsonable(found))
+        return cast(GraphNodeSearchResponse, guard.project_route(ctx, "POST", "/graph/nodes/search", _model_to_jsonable(found)))
 
     @app.get("/graph/neighborhood/{node_id:path}", response_model=GraphPayload)
     async def graph_neighborhood(
@@ -6955,7 +6959,7 @@ def create_app(
             raise HTTPException(status_code=400, detail="Node id is required")
         payload = await asyncio.to_thread(service.tiled_neighborhood_payload, cleaned)
         if payload.nodes:
-            return guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload))
+            return cast(GraphPayload, guard.project_route(ctx, "GET", "/graph/neighborhood/" + cleaned, _model_to_jsonable(payload)))
         raise HTTPException(status_code=404, detail=f"Neighborhood not found: {cleaned}")
 
     def _tiled_graph_node(node_id: str) -> GraphNode | None:
@@ -6985,7 +6989,7 @@ def create_app(
     ) -> GraphNode:
         """Return one graph node by id from Tiled or a JSON graph file."""
         node = await _graph_node(node_id, json_graph_path, guard.settings_key(ctx))
-        return guard.project_route(ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(node))
+        return cast(GraphNode, guard.project_route(ctx, "GET", "/graph/node/" + node_id, _model_to_jsonable(node)))
 
     async def _graph_node(node_id: str, json_graph_path: str | None, key: str | None) -> GraphNode:
         """Resolve one node; ``json_graph_path`` may be an opaque ``f2w://`` id (T18B)."""
@@ -7037,7 +7041,7 @@ def create_app(
         except Exception as exc:
             raise HTTPException(status_code=502,
                                 detail=f"Splash update failed: {guard.error_detail(ctx, exc)}") from exc
-        return guard.project_route(ctx, "PATCH", "/graph/node/" + node_id, _model_to_jsonable(node))
+        return cast(GraphNode, guard.project_route(ctx, "PATCH", "/graph/node/" + node_id, _model_to_jsonable(node)))
 
     @app.post("/graph/upload", response_model=GraphUploadResponse)
     async def upload_graph(
@@ -7048,7 +7052,7 @@ def create_app(
             saved = service.save_uploaded_graph(req.filename, req.graph)
         except Exception as exc:
             raise HTTPException(status_code=400, detail=guard.error_detail(ctx, exc)) from exc
-        return guard.project_route(ctx, "POST", "/graph/upload", _model_to_jsonable(saved))
+        return cast(GraphUploadResponse, guard.project_route(ctx, "POST", "/graph/upload", _model_to_jsonable(saved)))
 
     async def _withhold_pending(ctx: RequestContext, session_id: str | None, payload: dict[str, Any]) -> None:
         """Drop a download/extraction offer the caller may not act on (AUTH-03)."""
@@ -7082,8 +7086,8 @@ def create_app(
         guard.claim_turn(ctx, response.turn_id)
         payload = _model_to_jsonable(response)
         await _withhold_pending(ctx, req.session_id, payload)
-        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id,
-                                  sources=sources)
+        return cast(ChatResponse, guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id,
+                                  sources=sources))
 
     @app.post("/chat/action", response_model=ChatResponse)
     async def chat_action(
@@ -7108,8 +7112,8 @@ def create_app(
         guard.claim_turn(ctx, response.turn_id)
         payload = _model_to_jsonable(response)
         await _withhold_pending(ctx, req.session_id, payload)
-        return guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id,
-                                  sources=sources)
+        return cast(ChatResponse, guard.project_chat(ctx, payload, session_id=req.session_id, turn_id=response.turn_id,
+                                  sources=sources))
 
     @app.post("/publications/search", response_model=PublicationSearchResponse)
     async def publication_search(
@@ -7124,7 +7128,7 @@ def create_app(
             )
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return guard.project_route(ctx, "POST", "/publications/search", _model_to_jsonable(found))
+        return cast(PublicationSearchResponse, guard.project_route(ctx, "POST", "/publications/search", _model_to_jsonable(found)))
 
     @app.post("/chat/stream")
     async def chat_stream(
@@ -7139,7 +7143,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         settings_key = guard.settings_key(ctx)
 
-        async def events():
+        async def events() -> AsyncIterator[str]:
             """Yield SSE progress events then the final chat result."""
             _SETTINGS_KEY.set(settings_key)  # T25D: this generator's own context
             collector = open_turn(
@@ -7248,7 +7252,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         settings_key = guard.settings_key(ctx)
 
-        async def events():
+        async def events() -> AsyncIterator[str]:
             """Yield SSE progress events then the final action result."""
             _SETTINGS_KEY.set(settings_key)  # T25D: this generator's own context
             collector = open_turn(
@@ -7353,7 +7357,7 @@ def create_app(
         record = load_detail(turn_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Trace not found: {turn_id}")
-        return guard.project_trace(ctx, record)
+        return cast(dict[str, Any], guard.project_trace(ctx, record))
 
     @app.post("/telemetry/ui")
     async def telemetry_ui(req: UiTelemetryBatch, ctx: RequestContext = Depends(ui_context)) -> dict[str, Any]:

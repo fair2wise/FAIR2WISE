@@ -10,14 +10,9 @@ app/modules/f2w_agent/api.py F402 import 'field' shadowed by loop variable
 app/modules/f2w_agent/api.py F402 import 'field' shadowed by loop variable
 app/modules/f2w_agent/api.py F821 undefined name 'history'
 app/modules/f2w_agent/api.py F841 local variable 'publication' is assigned to but never used
-app/modules/f2w_agent/coordinator.py F401 '.debate_agent.EvidenceDebateAgent' imported but unused
-app/modules/f2w_agent/coordinator.py F401 '.download_agent.DownloadAgent' imported but unused
-app/modules/f2w_agent/coordinator.py F401 '.extractor_agent.ExtractorAgent' imported but unused
-app/modules/f2w_agent/coordinator.py F401 '.retrieval_agent.RetrievalAgent' imported but unused
 app/modules/f2w_agent/session_memory.py F841 local variable 'current_id' is assigned to but never used
 app/modules/graph/adoption.py F401 '.snapshots.graph_id_for_snapshot' imported but unused
 app/modules/term_extractor/academy_agent.py F401 'academy.agent.Agent' imported but unused
-app/modules/term_extractor/monitored_agent.py F821 undefined name 'UserAgent'
 app/modules/term_extractor/orchestrator.py F401 '.services.Services' imported but unused
 app/modules/term_extractor/provenance.py F541 f-string is missing placeholders
 app/modules/tiled_sim.py F401 '.bl1101_ingest.sha256_file' imported but unused

@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import re
-from typing import Any, Iterable, Protocol
+from typing import Any, Iterable, Protocol, cast
 import unicodedata
 import uuid
 
@@ -64,7 +64,7 @@ def terminology_group(case: dict[str, Any], vocabulary: Vocabulary) -> str:
     """Group controlled aliases across papers for review; never merges verdicts."""
     payload = case["payload"]
     if case["case_type"] != "unresolved_term" or payload.get("category") == "material":
-        return case["id"]
+        return cast(str, case["id"])  # Any: untyped case row
     surface = str(payload.get("surface") or "")
     entry = vocabulary.match(surface)
     normal = re.sub(r"\s*[-‐-―−]\s*", "-", _normal(unicodedata.normalize("NFKC", surface)))

@@ -161,7 +161,7 @@ class JsonGraphBackend:
         seen: dict[str, int] = {entity_id: 0}
         order: list[str] = [entity_id]
         edge_idx: list[int] = []
-        edge_seen: set = set()
+        edge_seen: set[int] = set()
         frontier = [entity_id]
         truncated = False
         for depth in range(1, hops + 1):

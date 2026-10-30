@@ -20,16 +20,17 @@ import argparse
 import json
 from pathlib import Path
 import sys
+from typing import NoReturn, Sequence
 
 EXIT_UNSUPPORTED_VERSION = 3
 EXIT_CONFIG = 4
 
 
-def _read(path):
+def _read(path: str | Path) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     """Validate the version, load configuration and secrets, and serve until terminated."""
     parser = argparse.ArgumentParser(prog="f2w-tiled-entry")
     parser.add_argument("--config")
@@ -91,11 +92,11 @@ def main(argv=None):
     return 0
 
 
-def _compile_tags(source, tags_db):
+def _compile_tags(source: str | Path, tags_db: str | Path) -> int:
     from tiled.access_control.access_tags import AccessTagsCompiler
     from tiled.access_control.scopes import ALL_SCOPES
 
-    def no_groups(name):
+    def no_groups(name: str) -> NoReturn:
         raise KeyError(name)
 
     Path(tags_db).unlink(missing_ok=True)

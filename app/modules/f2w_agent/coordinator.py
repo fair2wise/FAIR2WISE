@@ -233,7 +233,14 @@ class Coordinator:
                 else:
                     print("[approval required] Approve extraction in a later ask/chat turn.")
 
-    async def _answer(self, question: str, retrieval, download, extractor, debate=None) -> None:
+    async def _answer(
+        self,
+        question: str,
+        retrieval: RetrievalAgent,
+        download: DownloadAgent,
+        extractor: ExtractorAgent,
+        debate: EvidenceDebateAgent | None = None,
+    ) -> None:
         """Legacy retrieve-download-extract loop; delegates to agentic when configured."""
         # Retained only as a low-level legacy test/helper. Public CLI/API entry
         # points use ``run`` and therefore the canonical orchestrator service.
@@ -340,7 +347,14 @@ class Coordinator:
 
         print(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
 
-    async def _answer_agentic(self, question: str, retrieval, download, extractor, debate) -> None:
+    async def _answer_agentic(
+        self,
+        question: str,
+        retrieval: RetrievalAgent,
+        download: DownloadAgent,
+        extractor: ExtractorAgent,
+        debate: EvidenceDebateAgent,
+    ) -> None:
         """Debate-gated retrieve, search, download, extract, and KG rebuild loop."""
         print(f"\n=== Question: {question} ===")
         for round_no in range(1, self.cfg.max_rounds + 1):

@@ -24,7 +24,7 @@ import functools
 import inspect
 import ipaddress
 import threading
-from typing import Any, Callable, Iterable, Mapping, Sequence, TypeVar, Union
+from typing import Any, Callable, Iterable, Mapping, Sequence, TypeVar, Union, cast
 import uuid
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, RoleCheckEvidence
@@ -360,7 +360,8 @@ def local_operator_context(settings: DeploymentSettings, *, request_id: str, ses
     if not settings.is_local:
         raise ContractError(ErrorCode.DENIED, "local-operator context is only valid on the local profile")
     return RequestContext(
-        profile=settings.profile, mode=settings.mode, principal=Principal(subject=LOCAL_OPERATOR),
+        profile=cast(DeploymentProfile, settings.profile), mode=cast(AuthorizationMode, settings.mode),
+        principal=Principal(subject=LOCAL_OPERATOR),
         capabilities=CAPABILITIES, corpus_scope=settings.corpus_scope, request_id=request_id,
         session_id=session_id, tiled_target=settings.tiled_target, actor_kind=actor_kind, run_id=run_id,
     )
@@ -375,7 +376,8 @@ def _als_context(settings: DeploymentSettings, identity: VerifiedIdentity, *, re
         roles=identity.roles, credential_expires_at=identity.credential_expires_at,
     )
     return RequestContext(
-        profile=settings.profile, mode=settings.mode, principal=principal,
+        profile=cast(DeploymentProfile, settings.profile), mode=cast(AuthorizationMode, settings.mode),
+        principal=principal,
         capabilities=capabilities_for(identity), corpus_scope=settings.corpus_scope, request_id=request_id,
         session_id=session_id, tiled_target=settings.tiled_target, actor_kind=actor_kind, run_id=run_id,
     )
@@ -415,17 +417,17 @@ def verify_identity(settings: DeploymentSettings, credential: Union[TiledCredent
     now = clock()
     if credential.expires_at is not None and now + CLOCK_SKEW_TOLERANCE >= credential.expires_at:
         if role_cache is not None:
-            role_cache.invalidate(settings.tiled_target, credential)
+            role_cache.invalidate(cast(str, settings.tiled_target), credential)
         raise Unauthenticated("expired")
     identity = None
     if role_cache is not None and not require_fresh:
-        identity = role_cache.get(settings.tiled_target, credential, now)
+        identity = role_cache.get(cast(str, settings.tiled_target), credential, now)
     if identity is None:
         try:
             identity = identity_port.whoami(credential, now=now)
         except IdentityRejected as exc:
             if role_cache is not None:
-                role_cache.invalidate(settings.tiled_target, credential)
+                role_cache.invalidate(cast(str, settings.tiled_target), credential)
             raise Unauthenticated(exc.reason) from None
         except IdentityUnavailable:
             raise ContractError(ErrorCode.UNAVAILABLE, "Tiled identity check unavailable; retry later") from None
@@ -537,7 +539,7 @@ def require_any(ctx: RequestContext | None, *capabilities: str) -> RequestContex
 def _find_context(args: tuple[Any, ...], kwargs: Mapping[str, Any], name: str) -> RequestContext | None:
     """Return the ``RequestContext`` passed as ``name=`` or positionally."""
     if isinstance(kwargs.get(name), RequestContext):
-        return kwargs[name]
+        return cast(RequestContext, kwargs[name])
     return next((a for a in args if isinstance(a, RequestContext)), None)
 
 
@@ -571,7 +573,7 @@ def requires(*capabilities: str, ctx_arg: str = "ctx") -> Callable[[F], F]:
                 return func(*args, **kwargs)
             wrapper = sync_wrapper
         wrapper.required_capabilities = needed
-        return wrapper  # type: ignore[return-value]
+        return cast(F, wrapper)
 
     return decorate
 
@@ -1047,7 +1049,7 @@ def target_in_deployment(target: str, settings: DeploymentSettings) -> bool:
         normalized = normalize_tiled_target(parts[0])
     except ValueError:
         return False
-    return normalized == base or normalized.startswith(base + "/")
+    return normalized == base or normalized.startswith(cast(str, base) + "/")
 
 
 def _check_binding(settings: DeploymentSettings, ctx: RequestContext, target: str) -> None:
@@ -1137,7 +1139,7 @@ def verify_approval(approval: ApprovalRecord, plan: ChangePlan, settings: Deploy
     """
     if approval.profile is not settings.profile or approval.mode is not settings.mode:
         raise ContractError(ErrorCode.DENIED, f"approval from profile {approval.profile.value} is not valid on "
-                                              f"{settings.profile.value}")
+                                              f"{cast(DeploymentProfile, settings.profile).value}")
     if not target_in_deployment(approval.target, settings):
         raise ContractError(ErrorCode.DENIED, "approval target is not on this deployment's Tiled")
     if not settings.is_local and approval.approver_issuer != settings.tiled_target:

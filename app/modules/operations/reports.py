@@ -38,13 +38,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import json
 import re
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
+from typing import Any, Callable, Final, Iterable, Literal, Mapping, Sequence, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolStatus
 
-REPORT_SCHEMA = "f2w-operation-report/1"
+REPORT_SCHEMA: Final = "f2w-operation-report/1"
 #: Bound on ``len(json.dumps(ToolResult.data))``; below the executor's 8000-character inline bound.
 MAX_RESULT_CHARS = 7000
 #: Upper bound of any preview list returned inline.
@@ -271,9 +271,9 @@ def store_report_artifact(store: Any, ctx: RequestContext, report: OperationRepo
     payload = report.to_data()
     check_no_source_material(payload)
     body = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
-    return store.put(ctx, body, media_type="application/json",
-                     metadata={"kind": "other", "content": "operation_report", "operation": report.operation,
-                               "method": report.method, "disclosure": "internal"})
+    return cast(str, store.put(ctx, body, media_type="application/json",  # Any: duck-typed store
+                               metadata={"kind": "other", "content": "operation_report", "operation": report.operation,
+                                         "method": report.method, "disclosure": "internal"}))
 
 
 # -- scan control --------------------------------------------------------------------
@@ -345,7 +345,7 @@ def operation_dispatch(*suites: Any) -> OperationFn:
         suite = table.get(operation)
         if suite is None:
             raise ContractError(ErrorCode.INVALID_INPUT, f"unknown operation {operation!r}")
-        return suite.compute_operation(ctx, operation, args, control)
+        return cast(OperationReport, suite.compute_operation(ctx, operation, args, control))  # Any: duck-typed suite
 
     return run
 

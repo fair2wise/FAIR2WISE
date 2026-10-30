@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import threading
-from typing import Callable, Sequence
+from typing import Any, Callable, Sequence
 
 import numpy as np
 
@@ -87,13 +87,13 @@ class _NumpyIPIndex:
         return sims.astype(np.float32), idx.astype(np.int64)
 
 
-def _open_faiss_index(dim: int):
+def _open_faiss_index(dim: int) -> Any:  # Any: faiss.IndexFlatIP or the numpy fallback (faiss is untyped)
     """Return FAISS IndexFlatIP, or numpy inner-product if FAISS is unsafe/missing."""
     if os.environ.get("F2W_MERGE_FAISS", "1").strip().lower() in {"0", "false", "no", "off"}:
         logger.info("F2W_MERGE_FAISS disabled; using numpy inner-product search")
         return _NumpyIPIndex(dim)
     try:
-        import faiss  # type: ignore
+        import faiss
     except ImportError:
         logger.warning("faiss not installed; using numpy inner-product search for term merge")
         return _NumpyIPIndex(dim)
@@ -120,7 +120,7 @@ class TermMergeIndex:
         self._lock = threading.Lock()
         self._names: list[str] = []
         self._seen: set[str] = set()
-        self._index = None
+        self._index: Any = None  # Any: faiss index or numpy fallback
         self._dim: int | None = None
 
     @property
@@ -219,7 +219,7 @@ class TermMergeIndex:
         self._dim = int(vecs.shape[1])
         return np.ascontiguousarray(vecs, dtype=np.float32)
 
-    def _load_model_unlocked(self):
+    def _load_model_unlocked(self) -> Any:  # Any: SentenceTransformer (untyped)
         if self._embed_model is not None:
             return self._embed_model
         from sentence_transformers import SentenceTransformer

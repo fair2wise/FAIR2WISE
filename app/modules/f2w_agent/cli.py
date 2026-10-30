@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 import sys
 
@@ -155,7 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv=None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run status, ask, chat, or the HTTP API; return a process exit code."""
     args = build_parser().parse_args(argv)
     cfg = _cfg(args)
@@ -185,7 +186,7 @@ def main(argv=None) -> int:
             if getattr(args, "jobs_api", False):
                 from ...api.main import run_api
             else:
-                from .api import run_api
+                from .api import run_api  # type: ignore[assignment]  # variant with a typed cfg
 
             run_api(cfg, host=args.host, port=args.port, cors_origins=args.cors_origin)
         elif args.command == "chat":

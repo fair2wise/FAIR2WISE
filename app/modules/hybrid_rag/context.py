@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from .evidence import Evidence
 
@@ -124,7 +124,7 @@ class ContextBuilder:
         hint: str,
         items: Sequence[Evidence],
         *,
-        cite,
+        cite: Callable[[Evidence], str],
         budget: int,
     ) -> str:
         if not items or budget <= 0:

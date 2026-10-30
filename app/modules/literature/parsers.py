@@ -31,7 +31,7 @@ import logging
 from pathlib import Path
 import re
 import time
-from typing import Any, Protocol, Sequence, runtime_checkable
+from typing import Any, Protocol, Sequence, cast, runtime_checkable
 
 from .parsed_document import (
     BoundingBox,
@@ -226,7 +226,7 @@ class PyMuPDFParser:
     def _sections(self, lines: list[dict[str, Any]]) -> tuple[list[ParsedSection], str]:
         if not lines:
             return [], ""
-        weights: Counter = Counter()
+        weights: Counter[float] = Counter()
         for line in lines:
             weights[line["size"]] += len(line["text"])
         body = weights.most_common(1)[0][0]
@@ -245,7 +245,7 @@ class PyMuPDFParser:
         levels = {size: i + 1 for i, size in enumerate(heading_sizes)}
         sections: list[ParsedSection] = []
         markdown: list[str] = []
-        name, level, page, bbox, parts, last_page = "preamble", 0, lines[0]["page"], None, [], lines[0]["page"]
+        name, level, page, bbox, parts, last_page = "preamble", 0, lines[0]["page"], None, cast(list[str], []), lines[0]["page"]
 
         def flush() -> None:
             text = "\n".join(parts).strip()

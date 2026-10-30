@@ -17,7 +17,7 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/kg/mutations.py (BSD-3
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import requests
 
@@ -79,7 +79,7 @@ class TiledMutationClient(TiledGraphClient):
     # -- complete reads -------------------------------------------------------------------
     def _scan(self, document: str, key: str, page_size: int, max_rows: int) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
-        seen: set = set()
+        seen: set[str] = set()
         while True:
             limit = min(page_size, max_rows - len(rows))
             if limit <= 0:
@@ -108,7 +108,7 @@ class TiledMutationClient(TiledGraphClient):
         data = self.mutate(_CREATE_ENTITY, {"i": {"entityType": entity_type, "name": name, "uri": uri,
                                                   "properties": dict(properties),
                                                   "accessBlob": dict(access_blob)}})
-        return data["createEntity"]["id"]
+        return cast(str, data["createEntity"]["id"])
 
     def create_link(self, *, subject_id: str, predicate: str, object_id: str, properties: Mapping[str, Any],
                     access_blob: Mapping[str, Any]) -> str:
@@ -116,7 +116,7 @@ class TiledMutationClient(TiledGraphClient):
         data = self.mutate(_CREATE_LINK, {"i": {"subjectId": subject_id, "predicate": predicate,
                                                 "objectId": object_id, "properties": dict(properties),
                                                 "accessBlob": dict(access_blob)}})
-        return data["createLink"]["id"]
+        return cast(str, data["createLink"]["id"])
 
     def set_entity_uri(self, row: Mapping[str, Any], graph_id: str, uri: str,
                        access_blob: Mapping[str, Any]) -> None:

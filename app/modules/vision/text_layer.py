@@ -48,7 +48,7 @@ class PageGeometry:
     height_pt: float
     rotation: int = 0
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         """JSON-safe form."""
         return {"page": self.page, "width": self.width_pt, "height": self.height_pt,
                 "rotation": self.rotation, "units": "pt", "origin": "top-left"}
@@ -137,7 +137,7 @@ class FigureTextLayer:
         """True when the text layer has enough spans inside the figure to read."""
         return len(self.spans) >= MIN_TEXT_SPANS
 
-    def geometry(self) -> dict:
+    def geometry(self) -> dict[str, Any]:
         """The explicit geometry record (page frame, source bbox origin, render transform)."""
         return {
             "page": self.page.as_dict(),

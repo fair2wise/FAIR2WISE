@@ -326,16 +326,25 @@ def apply_scoped_plan(
     return ApplyResult(False, plan.plan_id, tuple(o.term_key for o in plan.ops), tuple(done))
 
 
-def apply_migration(plan, approval, target, vocabulary, *, dry_run: bool = True, now=None) -> ApplyResult:
+def apply_migration(
+    plan: ScopedMergePlan, approval: ApprovalRecord | None, target: MergeTarget | None, vocabulary: Vocabulary, *,
+    dry_run: bool = True, now: datetime | None = None,
+) -> ApplyResult:
     """Apply a migration plan (gate ``apply_migration``)."""
     return apply_scoped_plan("apply_migration", plan, approval, target, vocabulary, dry_run=dry_run, now=now)
 
 
-def apply_cleanup(plan, approval, target, vocabulary, *, dry_run: bool = True, now=None) -> ApplyResult:
+def apply_cleanup(
+    plan: ScopedMergePlan, approval: ApprovalRecord | None, target: MergeTarget | None, vocabulary: Vocabulary, *,
+    dry_run: bool = True, now: datetime | None = None,
+) -> ApplyResult:
     """Apply a cleanup plan (gate ``apply_cleanup``)."""
     return apply_scoped_plan("apply_cleanup", plan, approval, target, vocabulary, dry_run=dry_run, now=now)
 
 
-def apply_campaign(plan, approval, target, vocabulary, *, dry_run: bool = True, now=None) -> ApplyResult:
+def apply_campaign(
+    plan: ScopedMergePlan, approval: ApprovalRecord | None, target: MergeTarget | None, vocabulary: Vocabulary, *,
+    dry_run: bool = True, now: datetime | None = None,
+) -> ApplyResult:
     """Apply a campaign plan (gate ``apply_merge``)."""
     return apply_scoped_plan("apply_merge", plan, approval, target, vocabulary, dry_run=dry_run, now=now)

@@ -36,7 +36,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Awaitable, Callable, Mapping
+from typing import Any, Awaitable, Callable, Mapping, cast
 
 from ..contracts import (
     ApprovalRecord,
@@ -312,7 +312,11 @@ class ToolExecutor:
 
     # -- preflight ----------------------------------------------------------------
 
-    def _prepare(self, ctx, name, args, ledger, plan, approval, scope, tool_call_id, thread_id):
+    def _prepare(
+        self, ctx: RequestContext, name: str, args: Mapping[str, Any], ledger: TurnLedger | None,
+        plan: ChangePlan | None, approval: ApprovalRecord | None, scope: frozenset[str] | None,
+        tool_call_id: str | None, thread_id: str | None,
+    ) -> ToolOutcome | _Prepared:
         key = call_key(name, args)
         now = self.clock()
         entry = self.registry.get(name)
@@ -391,7 +395,7 @@ class ToolExecutor:
                 raise
             if isinstance(exc, _DeadlineExceeded):
                 return _fail(entry.name, ErrorCode.BUDGET_EXHAUSTED, "request deadline reached during the call")
-            return classify_exception(entry.name, exc)
+            return classify_exception(entry.name, cast(Exception, exc))  # control-flow BaseExceptions re-raised above
         return self._normalize(entry.spec, raw)
 
     async def _invoke_async(self, entry: RegisteredTool, inv: ToolInvocation) -> ToolResult:
@@ -408,7 +412,7 @@ class ToolExecutor:
                 raise
             if isinstance(exc, _DeadlineExceeded):
                 return _fail(entry.name, ErrorCode.BUDGET_EXHAUSTED, "request deadline reached during the call")
-            return classify_exception(entry.name, exc)
+            return classify_exception(entry.name, cast(Exception, exc))  # control-flow BaseExceptions re-raised above
         return self._normalize(entry.spec, raw)
 
     def _normalize(self, spec: ToolSpec, raw: Any) -> ToolResult:
@@ -439,7 +443,7 @@ class ToolExecutor:
         return deadline is None or self.clock() < deadline
 
     def _backoff(self, attempt: int) -> float:
-        return self.limits.retry_backoff_s * (2 ** (attempt - 1))
+        return cast(float, self.limits.retry_backoff_s * (2 ** (attempt - 1)))
 
     # -- completion ---------------------------------------------------------------
 

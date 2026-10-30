@@ -16,16 +16,16 @@ from datetime import UTC, datetime
 import hashlib
 import json
 import re
-from typing import Literal, Sequence
+from typing import Any, Final, Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.contracts.changes import SnapshotManifest
 
-MANIFEST_VERSION = "1"
-ARTIFACT_TYPE = "f2w.kg_snapshot"
-GRAPH_FORMAT = "f2w.json2kg.things_associations.v1"
-SERIALIZATION = "json.dumps(indent=2, ensure_ascii=False); utf-8; no trailing newline"
+MANIFEST_VERSION: Final = "1"
+ARTIFACT_TYPE: Final = "f2w.kg_snapshot"
+GRAPH_FORMAT: Final = "f2w.json2kg.things_associations.v1"
+SERIALIZATION: Final = "json.dumps(indent=2, ensure_ascii=False); utf-8; no trailing newline"
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
@@ -253,7 +253,7 @@ class KGManifest(_Strict):
             raise ValueError("snapshot_id must be v<N>")
         return value
 
-    def to_json_dict(self) -> dict:
+    def to_json_dict(self) -> dict[str, Any]:
         """Schema-shaped dict (``schema`` key, absent optionals dropped)."""
         body = self.model_dump(mode="json", by_alias=True, exclude_none=True)
         body.setdefault("parent", None)  # required by the schema; null for a first snapshot

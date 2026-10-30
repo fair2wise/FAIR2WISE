@@ -17,6 +17,7 @@ from __future__ import annotations
 from functools import lru_cache
 import hashlib
 import re
+from typing import cast
 
 from .merge_safety import MergeVerdict
 
@@ -42,7 +43,7 @@ def canonical_smiles(smiles: str) -> str | None:
         return None
     for atom in molecule.GetAtoms():
         atom.SetAtomMapNum(0)
-    return Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True)
+    return cast(str, Chem.MolToSmiles(molecule, canonical=True, isomericSmiles=True))
 
 
 def structure_slug(smiles: str) -> str | None:
@@ -56,7 +57,7 @@ _FORMULA_TOKEN = re.compile(r"(?:[A-Z][a-z]?\d*(?:\.\d+)?|\([A-Za-z0-9.]+\)\d*)+
 _QUALIFIER = re.compile(r"\[[0-9\-\s]+\]|\([0-9\-\s]{2,5}\)|\b(?:alpha|beta|gamma|delta)\b[-\s]*", re.IGNORECASE)
 
 
-def formula_counts(text: str) -> dict | None:
+def formula_counts(text: str) -> dict[str, int] | None:
     """Element counts of a written formula (``PbI2``, ``(NH4)2SO4``), or ``None``."""
     text = text.strip()
     if not re.fullmatch(r"[A-Za-z0-9()]+", text) or not re.match(r"[A-Z(]", text):
@@ -73,7 +74,7 @@ def formula_counts(text: str) -> dict | None:
         flat = new
     if not re.fullmatch(r"(?:[A-Z][a-z]?\d*)+", flat):
         return None
-    counts: dict = {}
+    counts: dict[str, int] = {}
     for symbol, number in re.findall(r"([A-Z][a-z]?)(\d*)", flat):
         counts[symbol] = counts.get(symbol, 0) + int(number or 1)
     return counts
@@ -85,7 +86,7 @@ def looks_chemical(text: str) -> bool:
     return bool(core) and formula_counts(core) is not None and bool(re.search(r"[A-Z][a-z]?\d|[A-Z][a-z]", core))
 
 
-def _split(text: str) -> tuple:
+def _split(text: str) -> tuple[str, str]:
     qualifier = "".join(sorted(m.group(0).lower().strip() for m in _QUALIFIER.finditer(text)))
     core = _QUALIFIER.sub("", text).strip()
     return core, qualifier

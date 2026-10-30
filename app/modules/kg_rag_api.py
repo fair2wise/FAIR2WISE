@@ -6,6 +6,8 @@ Provides semantic/lexical retrieval over a JSON knowledge graph, LLM chat client
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 if __name__ == "__main__" and not __package__:
     # Checkout script launch (`python3 app/modules/kg_rag_api.py ...`, documented in
     # README.md): re-run as the package module `app.modules.kg_rag_api` so its
@@ -36,7 +38,7 @@ from pathlib import Path
 import re
 import sys
 import time
-from typing import Any, Callable, Protocol, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Protocol, Sequence, Union, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -67,7 +69,7 @@ _SEMANTIC_REQUESTED = os.environ.get("KG_RAG_RETRIEVAL_BACKEND", "").lower() not
 
 if _SEMANTIC_REQUESTED:
     try:
-        import faiss  # type: ignore
+        import faiss
     except ImportError:  # Optional semantic-retrieval dependency.
         faiss = None  # type: ignore[assignment]
 
@@ -88,6 +90,9 @@ else:
 from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
 from .cborg_limiter import async_slot  # noqa: E402
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 
 if __name__ == "__main__":
     # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):
@@ -114,9 +119,9 @@ def _load_kg_deps() -> None:
 
 # ───────────────────── optional noun-phrase extraction ─────────────────────
 _NLTK_OK = False
-word_tokenize = None
-pos_tag = None
-RegexpParser = None
+word_tokenize: Any = None  # Any: optional NLTK callables, never bound in this module
+pos_tag: Any = None
+RegexpParser: Any = None
 
 
 # ───────────────────── configuration ─────────────────────
@@ -221,7 +226,7 @@ _PDF_SNIPPETS: contextvars.ContextVar[list[tuple[str, str]] | None] = contextvar
 
 
 @contextlib.contextmanager
-def capture_pdf_snippets():
+def capture_pdf_snippets() -> Iterator[list[tuple[str, str]]]:
     """Collect the PDF snippets rendered into the prompt while the block runs (D19 sources)."""
     captured: list[tuple[str, str]] = []
     token = _PDF_SNIPPETS.set(captured)
@@ -489,7 +494,7 @@ def create_fastapi_app(
 
 
 def run_fastapi(graph_file: str, backend: str = LLM_BACKEND, model: str | None = None, *,
-                host: str | None = None, port: int = DEFAULT_API_PORT):
+                host: str | None = None, port: int = DEFAULT_API_PORT) -> None:
     """Launch the FastAPI KG-RAG server (default ``127.0.0.1:11435``).
 
     Args:
@@ -645,7 +650,7 @@ def cuda_warmup(device: str) -> None:
     if torch.cuda.is_available():
         try:
             torch.cuda.set_device(0)
-            torch.cuda.init()
+            torch.cuda.init()  # type: ignore[no-untyped-call]  # torch.cuda.init is untyped upstream
             a = torch.empty((4096, 4096), device=device).normal_()
             _ = a @ a.t()
         except Exception as exc:  # pragma: no cover
@@ -797,7 +802,7 @@ def _splash_base_url(uri: str) -> str:
     raise ValueError(f"Unsupported splash-links URI scheme {parsed.scheme!r}")
 
 
-def _splash_graphql(uri: str, query: str, variables: dict | None = None) -> dict:
+def _splash_graphql(uri: str, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
     """Execute one splash-links GraphQL request and return data payload."""
     url = f"{_splash_base_url(uri)}/splash_links/graphql"
     resp = requests.post(
@@ -809,7 +814,7 @@ def _splash_graphql(uri: str, query: str, variables: dict | None = None) -> dict
     body = resp.json()
     if body.get("errors"):
         raise RuntimeError(f"splash-links GraphQL error: {body['errors']}")
-    return body["data"]
+    return cast(dict[str, Any], body["data"])
 
 
 _SPLASH_ENTITIES_QUERY = """
@@ -840,7 +845,7 @@ query Links($limit: Int, $offset: Int) {
 def _splash_node_id(entity: dict[str, Any]) -> str:
     """Stable node id from Splash URI, matkg_id property, or GraphQL entity id."""
     props = entity.get("properties") or {}
-    return entity.get("uri") or props.get("matkg_id") or entity["id"]
+    return cast(str, entity.get("uri") or props.get("matkg_id") or entity["id"])
 
 
 def _splash_entity_to_node(entity: dict[str, Any]) -> dict[str, Any]:
@@ -1053,8 +1058,8 @@ class KnowledgeGraph:
                 self._build_semantic_index(texts, embed_model)
             else:
                 logger.warning("KG has no nodes; semantic retrieval will return no hits.")
-                self.embed_model = None
-                self.index = None
+                self.embed_model: SentenceTransformer | None = None
+                self.index: Any = None  # Any: faiss CPU/GPU index variants are untyped
                 self.id_map = np.asarray([], dtype=object)
         elif self.retrieval_backend != "lexical":
             raise ValueError(f"Unknown KG_RAG_RETRIEVAL_BACKEND: {self.retrieval_backend}")
@@ -1130,7 +1135,7 @@ class KnowledgeGraph:
                 self.index = faiss.index_cpu_to_gpu(res, 0, cpu_index)
                 try:
                     self.index.train(emb)
-                except faiss.FaissException:
+                except faiss.FaissException:  # type: ignore[attr-defined]  # missing from faiss stubs
                     self.index = faiss.GpuIndexFlatIP(res, dim)
                 self.index.add(emb)
                 self.index.nprobe = min(32, nlist // 4)
@@ -1139,12 +1144,12 @@ class KnowledgeGraph:
                 logger.error("GPU FAISS build failed (%s) → CPU.", exc)
         try:
             cpu_index.train(emb)
-        except faiss.FaissException:
+        except faiss.FaissException:  # type: ignore[attr-defined]  # missing from faiss stubs
             cpu_index = faiss.IndexFlatIP(dim)
         cpu_index.add(emb)
         self.index = cpu_index
         if hasattr(self.index, "nprobe"):
-            self.index.nprobe = min(32, nlist // 4)  # type: ignore[attr-defined]
+            self.index.nprobe = min(32, nlist // 4)
 
     #  Semantic search ------------------------------------------------------
     # @annotate('KnowledgeGraph::_norm')
@@ -1628,7 +1633,7 @@ class OllamaClient:
             )
             r.raise_for_status()
             js = await r.json()
-        return js.get("message", {}).get("content", "")
+        return cast(str, js.get("message", {}).get("content", ""))
 
 
 class CBorgClient:
@@ -1660,7 +1665,7 @@ class CBorgClient:
                 # stream=True avoids the CBORG gateway's 300s cutoff on non-streaming calls.
                 resp = await self.client.chat.completions.create(
                     model=self.model,
-                    messages=list(messages),
+                    messages=cast("list[ChatCompletionMessageParam]", list(messages)),
                     temperature=LLM_TEMPERATURE,
                     timeout=LLM_TIMEOUT,
                     stream=True,
@@ -1897,7 +1902,7 @@ async def answer(
         gap_tracker.log(mn)
 
 
-async def main_async(args) -> None:
+async def main_async(args: argparse.Namespace) -> None:
     """Async entry point: interactive loop, one-shot question, or competency batch."""
     # ap = argparse.ArgumentParser()
     # ap.add_argument("--graph", type=Path, default=GRAPH_FILE)
@@ -1934,7 +1939,7 @@ async def main_async(args) -> None:
 
 
 # @annotate('main')
-def main(args) -> None:  # pragma: no cover
+def main(args: argparse.Namespace) -> None:  # pragma: no cover
     """CLI entry point — wraps main_async with KeyboardInterrupt handling."""
     try:
         asyncio.run(main_async(args))

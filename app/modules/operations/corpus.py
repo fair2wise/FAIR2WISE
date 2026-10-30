@@ -318,7 +318,7 @@ class WorkIndex:
         by_doi: dict[str, str] = {}
         by_arxiv: dict[str, str] = {}
         for key, rec in recs.items():
-            idents = ((by_doi, rec.doi), (by_arxiv, rec.arxiv_id))
+            idents: tuple[tuple[dict[str, str], str], ...] = ((by_doi, rec.doi), (by_arxiv, rec.arxiv_id))
             if use_content_hash:
                 idents = ((by_hash, rec.content_sha256),) + idents
             for index, ident in idents:
@@ -347,7 +347,7 @@ class WorkIndex:
 
     def year_of(self, work_id: str) -> tuple[int | None, bool]:
         """``(year, conflicting)``: the most frequent recorded year (ties: earliest) over the Work's keys."""
-        counts: Counter = Counter()
+        counts: Counter[int] = Counter()
         for key in self.members.get(work_id, ()):
             counts.update(self.records[key].years)
         if not counts:
@@ -399,7 +399,7 @@ def _work_id(records: Sequence[PaperRecord], *, use_content_hash: bool = True) -
 def _title_candidates(recs: Mapping[str, PaperRecord], threshold: float) -> Iterable[tuple[str, str]]:
     """Pairs of keys whose title token sets *may* reach Jaccard ``threshold`` (exact prefix filter)."""
     tokens = {k: title_tokens(r.title) for k, r in recs.items()}
-    freq: Counter = Counter(t for toks in tokens.values() for t in toks)
+    freq: Counter[str] = Counter(t for toks in tokens.values() for t in toks)
     index: dict[str, list[str]] = defaultdict(list)
     seen: set[tuple[str, str]] = set()
     for key in sorted(tokens, key=lambda k: (len(tokens[k]), k)):
@@ -468,7 +468,7 @@ def _set_overlap(wa: set[str], wb: set[str]) -> float:
     return len(wa & wb) / len(wa | wb)
 
 
-def _bag_distance(ca: Counter, cb: Counter) -> int:
+def _bag_distance(ca: Counter[str], cb: Counter[str]) -> int:
     """Character-multiset distance: a lower bound of the Levenshtein distance (one edit moves it by <= 1)."""
     return max(sum((ca - cb).values()), sum((cb - ca).values()))
 
@@ -525,7 +525,7 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
     itself is banded (:func:`_levenshtein_within`): only distances below 10 matter.
     """
     words: dict[int, set[str]] = {}
-    bags: dict[int, Counter] = {}
+    bags: dict[int, Counter[str]] = {}
 
     def word_set(title: Any) -> set[str]:
         key = id(title)
@@ -533,7 +533,7 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
             words[key] = set(_normalise(title).split())
         return words[key]
 
-    def bag(prefix: str) -> Counter:
+    def bag(prefix: str) -> Counter[str]:
         key = id(prefix)
         if key not in bags:
             bags[key] = Counter(prefix)
@@ -595,7 +595,7 @@ def _rels(t: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 
 def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex, *,
-                            near_duplicates: bool = True) -> tuple[dict, dict]:
+                            near_duplicates: bool = True) -> tuple[dict[str, Any], dict[str, Any]]:
     """§1: legacy filename-key figures (corpus_qa ``audit_duplicate_works``) plus distinct Works.
 
     ``near_duplicates=False`` skips the arXiv x journal title check (D1.10: deferred to a job);
@@ -644,7 +644,7 @@ def section_duplicate_works(terms: Sequence[Mapping[str, Any]], works: WorkIndex
     return metrics, preview
 
 
-def section_stubs(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
+def section_stubs(terms: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
     """§2 (corpus_qa ``audit_stubs``): term entries with stub signals."""
     stubs: list[tuple[str, list[str]]] = []
     for t in terms:
@@ -667,7 +667,7 @@ def section_stubs(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     return metrics, preview
 
 
-def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
+def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
     """§4 (corpus_qa ``audit_numeric_values``): photon-energy slots and absorption-edge heuristics."""
     suspicious: list[list[Any]] = []
     strings: list[list[Any]] = []
@@ -702,7 +702,7 @@ def section_numeric_values(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, di
     return metrics, preview
 
 
-def section_aliases(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
+def section_aliases(terms: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
     """§6 (corpus_qa ``audit_aliases``); the under-merge figure compares adjacent sorted labels only."""
     counts: list[tuple[str, int]] = []
     total = 0
@@ -729,7 +729,7 @@ def section_aliases(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     return metrics, preview
 
 
-def section_relations(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
+def section_relations(terms: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
     """§7 (corpus_qa ``audit_relations``): per-term relation dicts (not deduplicated KG edges)."""
     total = 0
     self_refs: list[list[str]] = []
@@ -762,12 +762,12 @@ def section_relations(terms: Sequence[Mapping[str, Any]]) -> tuple[dict, dict]:
     return metrics, preview
 
 
-def section_summary(terms: Sequence[Mapping[str, Any]], works: WorkIndex) -> tuple[dict, dict]:
+def section_summary(terms: Sequence[Mapping[str, Any]], works: WorkIndex) -> tuple[dict[str, Any], dict[str, Any]]:
     """§8: legacy figures (corpus_qa ``audit_summary_stats``) plus the distinct-Work histogram (K2)."""
-    cats: Counter = Counter()
+    cats: Counter[str] = Counter()
     keys: set[str] = set()
     edges = 0
-    legacy_years: Counter = Counter()
+    legacy_years: Counter[int] = Counter()
     unparseable = 0
     for t in terms:
         cats[t.get("category") or "UNKNOWN"] += 1
@@ -780,7 +780,7 @@ def section_summary(terms: Sequence[Mapping[str, Any]], works: WorkIndex) -> tup
                     legacy_years[int(meta["publication_year"])] += 1
                 except (TypeError, ValueError):
                     unparseable += 1
-    per_year: Counter = Counter()
+    per_year: Counter[int] = Counter()
     unknown = conflicting = 0
     for wid in works.members:
         year, conflict = works.year_of(wid)
@@ -905,7 +905,7 @@ def load_terms(source: CorpusSource) -> tuple[list[dict[str, Any]], str, int | N
     return [t for t in terms if isinstance(t, dict)], hashlib.sha256(raw).hexdigest(), size
 
 
-_SECTION_FUNCS = {
+_SECTION_FUNCS: dict[str, Callable[..., tuple[dict[str, Any], dict[str, Any]]]] = {
     "duplicate_works": lambda terms, works, **kw: section_duplicate_works(terms, works, **kw),
     "stubs": lambda terms, works: section_stubs(terms),
     "numeric_values": lambda terms, works: section_numeric_values(terms),

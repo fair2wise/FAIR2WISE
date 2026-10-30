@@ -28,14 +28,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import logging
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol, cast
 import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.routing import Mount
 
-from ..modules.contracts.context import RequestContext
+from ..modules.contracts.context import DeploymentProfile, RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.security.authorization import (
     AGENT_SURFACE,
@@ -186,7 +186,7 @@ def install_access_control(app: FastAPI, runtime: AccessRuntime) -> FastAPI:
                        LOCAL_RAW_TRACE_WARNING)
     if runtime.settings.disposable_target:
         logger.warning("F2W %s is bound to a disposable test Tiled at %s (test fixture override)",
-                       runtime.settings.profile.value, runtime.settings.tiled_target)
+                       cast(DeploymentProfile, runtime.settings.profile).value, runtime.settings.tiled_target)
     return app
 
 
@@ -212,7 +212,7 @@ def undeclared_routes(app: FastAPI, surface: str | None = None) -> list[str]:
     ``UNINSPECTABLE`` (fail closed).
     """
     surface = surface or app.state.f2w_access.surface
-    missing = []
+    missing: list[str] = []
     for route in app.routes:
         if isinstance(route, Mount):
             inner: Any = route.app
@@ -232,8 +232,8 @@ def undeclared_routes(app: FastAPI, surface: str | None = None) -> list[str]:
         for method in sorted(getattr(route, "methods", None) or ()):
             if method in {"HEAD", "OPTIONS"}:
                 continue
-            if lookup_policy(method, route.path, surface) is None:
-                missing.append(f"{method} {route.path}")
+            if lookup_policy(method, cast(Any, route).path, surface) is None:
+                missing.append(f"{method} {cast(Any, route).path}")  # Any: BaseRoute has no .path; str-ness checked above
     return missing
 
 

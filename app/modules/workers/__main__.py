@@ -8,24 +8,25 @@ the queue. ``--once`` exits when no job is queued or running (used by tests and 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import importlib
 import re
 import signal
 import sys
 import threading
-from typing import Sequence
+from typing import Any, Sequence, cast
 
 from .executor import WorkerExecutor
 
 _FACTORY = re.compile(r"^app\.modules(\.[A-Za-z_][A-Za-z0-9_]*)+:[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def load_factory(spec: str):
+def load_factory(spec: str) -> Callable[[str], Any]:  # Any: the job service a worker factory builds
     """Import ``module:callable`` after validating it lies under ``app.modules``."""
     if not _FACTORY.match(spec):
         raise SystemExit("factory must be 'app.modules.<package>:<callable>'")
     module, name = spec.split(":")
-    return getattr(importlib.import_module(module), name)
+    return cast(Callable[[str], Any], getattr(importlib.import_module(module), name))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

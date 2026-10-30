@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 import logging
 import time
+from typing import Any, Callable
 
 import openai
 import requests
@@ -14,7 +15,7 @@ from ..f2w_agent.trace import record_llm_call
 logger = logging.getLogger(__name__)
 
 
-def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int, call):
+def _traced_chat(model: str, prompt: str, trace_label: str | None, timeout: int, call: Callable[[], str]) -> str:
     """Run ``call`` and record the rendered prompt when a turn trace is active."""
     label = trace_label or "chat"
     started = time.perf_counter()
@@ -89,7 +90,7 @@ class OllamaChatClient(ChatClient):
         logger.debug("OllamaClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
 
         def call() -> str:
-            payload = {
+            payload: dict[str, Any] = {
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": False,

@@ -37,10 +37,10 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Callable, Collection, Iterator, Mapping, Sequence, Union
+from typing import Any, Callable, Collection, Iterator, Mapping, Sequence, Union, cast
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
-from app.modules.contracts.context import RequestContext
+from app.modules.contracts.context import DeploymentProfile, RequestContext
 from app.modules.security.authorization import (
     DeploymentSettings,
     require,
@@ -134,7 +134,7 @@ class SourceSnapshot:
         return ids
 
 
-def default_supported_schema_fingerprints(registry: Any = None) -> frozenset:
+def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str]:
     """Import fingerprints of every selectable registered schema in use (computed, not hard-coded).
 
     Includes each base schema's fingerprint from before the H3 S4 licence-line change, so a snapshot built
@@ -189,7 +189,10 @@ def load_source(source: Source, *, supported_schema_fingerprints: Collection[str
     except (ValueError, AttributeError):
         raise ContractError(ErrorCode.INVALID_INPUT, "graph.json is not a KG document") from None
     nodes = {n["id"]: n for n in raw_nodes if isinstance(n, dict) and n.get("id")}
-    edges = list(assign_edge_ids(e for e in raw_edges if isinstance(e, dict)))
+    edges = cast(
+        list[tuple[str, dict[str, Any]]],  # Any: untyped KG edge payload; the generator yields only dicts
+        list(assign_edge_ids(e for e in raw_edges if isinstance(e, dict))),
+    )
     return SourceSnapshot(manifest, graph_sha, manifest_sha, manifest.graph_id, nodes, edges, commit)
 
 
@@ -306,7 +309,7 @@ def compute_ops(src: SourceSnapshot, st: TargetState,
     graph_id = src.graph_id
     pend, ret = st.pending_for(tag), st.retired_for(tag)
     for node_id, node in src.nodes.items():
-        spec = lw.entity_spec(graph_id, node)
+        spec: Any = lw.entity_spec(graph_id, node)  # Any: the name is reused for a LinkSpec below
         final = st.final.get(node_id)
         if final is not None and lw.entity_matches(final, spec):
             kept[node_id] = final["id"]
@@ -450,7 +453,7 @@ def _check_client(client: TiledMutationClient, settings: DeploymentSettings, tar
         raise ContractError(ErrorCode.DENIED, "target is not on this deployment's Tiled")
     if normalize_tiled_target(client.base_url) != target.split("#", 1)[0]:
         raise ContractError(ErrorCode.INVALID_INPUT, "client is not connected to the plan target")
-    allowed = {settings.profile.value} | ({"test"} if settings.is_local else set())
+    allowed = {cast(DeploymentProfile, settings.profile).value} | ({"test"} if settings.is_local else set())
     if client.profile not in allowed:
         raise ContractError(ErrorCode.DENIED, "client profile does not match the deployment profile")
 
@@ -608,8 +611,9 @@ def apply_import(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord
     return outcome
 
 
-def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock, fault,
-         existing) -> ImportOutcome:
+def _run(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord, src: SourceSnapshot,
+         client: TiledMutationClient, store: ReceiptStore, journal: ImportJournal, lease: Lease,
+         run_dir: Path, clock: Clock, fault: FaultHook, existing: list[ReceiptArtifact]) -> ImportOutcome:
     change, detail = plan.change, plan.detail
     graph_id, access = detail["graph_id"], detail["access_blob"]
     resumed = journal.started()
@@ -658,7 +662,7 @@ def _run(ctx, plan, approval, src, client, store, journal, lease, run_dir, clock
 
     by_stage = {s: [o for o in ops if o.stage == s] for s in STAGES}
     for i, op in enumerate(by_stage["entities"]):
-        spec = lw.entity_spec(graph_id, src.nodes[op.key])
+        spec: Any = lw.entity_spec(graph_id, src.nodes[op.key])  # Any: the name is reused for a LinkSpec below
         oid = step("entities", i, op)
         if op.kind == "create_node":
             ids[op.key] = client.create_entity(entity_type=spec.entity_type, name=spec.name, uri=spec.uri,

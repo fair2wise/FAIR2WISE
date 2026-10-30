@@ -145,7 +145,7 @@ class CandidateSearch:
         key = fold(mention)
         if not key:
             return Shortlist(mention, category or "", "empty")
-        scores: dict[int, tuple[float, set, str]] = {}
+        scores: dict[int, tuple[float, set[str], str]] = {}
 
         def bump(i: int, score: float, channel: str, text: str) -> None:
             cur = scores.get(i)

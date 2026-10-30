@@ -29,14 +29,14 @@ import os
 from pathlib import Path
 import shutil
 import threading
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence, cast
 import uuid
 
 from app.modules import json2kg
 from app.modules.contracts.changes import SnapshotManifest
 from app.modules.resources import resource_root
 from app.modules.schema.loading import closure_fingerprint, load_helper
-from app.modules.schema.registry import DEFAULT_SCHEMA_ID, SchemaRegistry
+from app.modules.schema.registry import DEFAULT_SCHEMA_ID, SchemaEntry, SchemaRegistry
 from app.modules.schema.validation import validate_graph
 
 from .releases import (
@@ -230,7 +230,7 @@ def _existing_numbers(corpus_dir: Path, storage_kg: Path, corpus: str) -> list[i
     return numbers
 
 
-def _choose_schema(request: SnapshotRequest, registry: SchemaRegistry):
+def _choose_schema(request: SnapshotRequest, registry: SchemaRegistry) -> tuple[SchemaEntry, str]:
     if request.schema_id:
         entry, source = registry.get(request.schema_id), "caller"
     else:
@@ -303,7 +303,9 @@ def _verified_parent(corpus_dir: Path, request: SnapshotRequest) -> Parent | Non
     except ReleaseVerificationError as exc:
         raise SnapshotError(f"parent snapshot {request.parent_snapshot_id} does not verify: {exc}") from None
     return Parent(snapshot_id=request.parent_snapshot_id, graph_sha256=parent.graph_sha256,
-                  data_commit=request.parent_data_commit, relation=request.parent_relation)
+                  data_commit=request.parent_data_commit, relation=cast(
+                      Literal["rebuild", "edit_reconciliation", "repair", "disclosure_split", "legacy_adoption"],
+                      request.parent_relation))
 
 
 def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
@@ -393,12 +395,13 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
                 parent=parent,
                 created=Created(at=utc_iso(now), tool=TOOL, code_commit=code_commit,
                                 json2kg_sha256=sha256_bytes(Path(json2kg.__file__).read_bytes()),
-                                run_id=request.run_id, profile=request.profile),
+                                run_id=request.run_id,
+                                profile=cast(Literal["local", "als-dev", "als-prod", "ci"] | None, request.profile)),
                 schema=schema_block, extraction=extraction, corpus_revision=corpus_revision,
                 inputs=[InputRef(role="terms_snapshot", sha256=sha256_bytes(terms_bytes), ref=terms_ref)],
-                validation=ValidationBlock(status=report.status, report_sha256=report.sha256,
+                validation=ValidationBlock(status=cast(Literal["pass", "fail"], report.status), report_sha256=report.sha256,
                                            report_ref=f"{rel_base}/validation.json", suite=VALIDATION_SUITE),
-                disclosure=DisclosureBlock(check_version=disclosure.check_version, status=disclosure.status,
+                disclosure=DisclosureBlock(check_version=disclosure.check_version, status=cast(Literal["pass", "fail", "owner_waiver"], disclosure.status),
                                            report_sha256=disclosure.sha256, waiver_ref=disclosure.waiver_ref),
             )
             contract = to_contract_manifest(manifest)

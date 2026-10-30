@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 from academy.agent import Agent, action
 
@@ -196,7 +196,7 @@ class WorkflowOrchestratorAgent(Agent):
                     return _decision(
                         "download_selected",
                         "A matching one-use download approval is present.",
-                        candidate_index=approved.get("candidate_index"),
+                        candidate_index=cast(dict[str, Any], approved).get("candidate_index"),
                     )
                 return _decision("request_download_approval", "A paper download requires explicit approval.")
             if kind == "extraction":

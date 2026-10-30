@@ -35,7 +35,7 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence, Union
+from typing import Any, Callable, Mapping, Sequence, Union, cast
 
 import httpx
 
@@ -119,7 +119,7 @@ class OpenAlexQuotaPaused(ProviderUnavailable):
         return datetime.fromtimestamp(self.resume_at, UTC).isoformat(timespec="seconds")
 
 
-class OpenAlexNoData(dict):
+class OpenAlexNoData(dict[str, Any]):
     """An empty dict that says why it is empty (donor contract: falsy and ``== {}``)."""
 
     def __init__(self, reason: str, *, resume_at: float | None = None, detail: str = "") -> None:
@@ -181,7 +181,7 @@ def abstract_from_inverted_index(inv_idx: dict[str, list[int]] | None) -> str:
     """Rebuild a readable abstract from OpenAlex's ``{word: [positions]}`` index."""
     if not inv_idx or not isinstance(inv_idx, dict):
         return ""
-    word_pos: list[tuple] = []
+    word_pos: list[tuple[int, str]] = []
     for word, positions in inv_idx.items():
         if isinstance(positions, list):
             for pos in positions:
@@ -356,7 +356,7 @@ class ResponseCache:
         if row is None or self._clock() - float(row[1]) > ttl:
             return None
         try:
-            return json.loads(row[0])
+            return cast(dict[str, Any], json.loads(row[0]))  # Any: cached JSON payload
         except ValueError:
             return None
 
@@ -524,7 +524,7 @@ class OpenAlexClient:
                 self.requests["openalex"] += 1
                 resp = self.http.get(url, params=request_params, timeout=timeout)
                 if resp.status_code == 200:
-                    data = resp.json()
+                    data: dict[str, Any] = resp.json()
                     self.cache.put(key, data)
                     return data
                 if resp.status_code == 404 and singleton:
@@ -631,7 +631,7 @@ class OpenAlexClient:
             asked, and ``stopped`` (``quota_paused``/``unreachable``) when a batch failed.
         """
         wanted: list[str] = []
-        seen: set = set()
+        seen: set[str] = set()
         for raw in dois:
             doi = bare_doi(raw)
             if doi and doi not in seen:

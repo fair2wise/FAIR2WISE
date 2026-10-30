@@ -13,6 +13,7 @@ import asyncio
 import logging
 import os
 import pickle
+from typing import TYPE_CHECKING
 
 from academy.exchange.cloud.client import HttpExchangeFactory
 from academy.handle import Handle
@@ -21,6 +22,8 @@ from globus_compute_sdk import Executor as GlobusComputeExecutor
 
 from ..term_extractor.academy_agent import TermExtractorAgent
 
+if TYPE_CHECKING:
+    from ..term_extractor.user_agent import UserAgent
 if __name__ == "__main__":
     # CLI entry only: load .env explicitly. Library imports never load .env.
     from ..dotenv_entry import load_entrypoint_dotenv
@@ -41,7 +44,7 @@ def _configure_logging() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-def _load_user_agent_handle() -> Handle:
+def _load_user_agent_handle() -> "Handle[UserAgent]":
     """Load the UserAgent handle written by the user-agent launcher."""
     try:
         with open("user_agent_handle.pkl", "rb") as handle:

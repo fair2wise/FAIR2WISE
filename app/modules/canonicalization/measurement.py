@@ -31,7 +31,7 @@ import json
 from pathlib import Path
 import re
 from statistics import mean
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 from ..term_extractor.merge_index import TermMergeIndex, build_merge_prompt, clean_term
 from .adjudication import Judge
@@ -69,12 +69,12 @@ def make_judges(mode: str) -> dict[str, Callable[[str], str]]:
     """Two prompt-format adapters over one decision rule: legacy (bare name) and JSON (entity_id)."""
 
     def legacy(prompt: str) -> str:
-        term = re.search(r'new term:\s+"(.*?)"', prompt).group(1)
+        term = cast(re.Match[str], re.search(r'new term:\s+"(.*?)"', prompt)).group(1)
         labels = re.findall(r"^- (.*)$", prompt.split("Below is")[1].split("You must decide")[0], re.M)
         return _pick(term, labels, mode) or "NO_MATCH"
 
     def modern(prompt: str) -> str:
-        term = re.search(r'extracted: "(.*?)"', prompt).group(1)
+        term = cast(re.Match[str], re.search(r'extracted: "(.*?)"', prompt)).group(1)
         rows = re.findall(r"^- (\S+): (.*)$", prompt.split("this list only:")[1].split("Answer with")[0], re.M)
         label = _pick(term, [lab for _, lab in rows], mode)
         ident = next((i for i, lab in rows if lab == label), None)
@@ -116,7 +116,7 @@ def _classify(m: FixtureMention, merged_to: str | None, held: bool) -> str:
     return "false_split_held" if held else "false_split_no_match"
 
 
-def run_baseline(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntity], judge: Judge) -> list[dict]:
+def run_baseline(mentions: Sequence[FixtureMention], ents: Sequence[IndexedEntity], judge: Judge) -> list[dict[str, Any]]:
     """Full-list prompt over every display name (the 222b1e7 behaviour)."""
     names = [clean_term(e.label) for e in ents]
     by_label = {clean_term(e.label): e.entity_id for e in ents}
@@ -146,7 +146,7 @@ def run_shortlist(
     *,
     top_k: int,
     with_index: bool = True,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """The pre-migration FAISS shortlist (real ``TermMergeIndex``); no index -> ``no_match``, no judge call."""
     names = [clean_term(e.label) for e in ents]
     by_label = {clean_term(e.label): e.entity_id for e in ents}
@@ -184,7 +184,7 @@ def run_candidate_search(
     token_budget: int,
     with_index: bool = True,
     use_vocabulary: bool = True,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """This package's online path; the vocabulary is approved in memory for the measurement only."""
     search = CandidateSearch(
         ents,

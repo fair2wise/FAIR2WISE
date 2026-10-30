@@ -14,12 +14,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..extraction import H3_GATES as _EXTRACTION_GATES
 
-_GATES: dict = {
+_GATES: dict[str, Any] = {
     "apply_merge": False,
     "apply_cleanup": False,
     "apply_migration": False,
@@ -92,7 +92,7 @@ def authorize_apply(
         raise ApplyRefused("stale_source", "source revision changed since the plan was made")
     if plan.vocabulary_revision != current_vocabulary_revision:
         raise ApplyRefused("stale_vocabulary", "vocabulary revision changed since the plan was made")
-    return change_plan
+    return cast(ChangePlan, change_plan)
 
 
 def authorize_vocabulary_change(gate: str, subject_revision: str, approval: Any, *, current_revision: str) -> None:

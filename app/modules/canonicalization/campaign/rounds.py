@@ -13,12 +13,12 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign.py (BSD-3-Clause
 from __future__ import annotations
 
 from collections import Counter
-from typing import Sequence
+from typing import Protocol, Sequence, cast
 
 from ..quarantine import check_context_row, classify_surface
 from ..vocabulary import Vocabulary
 from .evidence import GraphRows, assemble, fold_terms
-from .models import Decision, ParkedTerm, QuarantineRecord, RoundRecord, Vote, term_key
+from .models import Decision, ParkedTerm, QuarantineRecord, RoundRecord, TermEvidence, TermVerdict, Vote, term_key
 from .runner import CampaignRun
 
 _ESCALATION_FRAMINGS = frozenset({"max_escalation", "cborg"})
@@ -143,14 +143,20 @@ def run_route(
     )
 
 
-def run_round(run: CampaignRun, resolver, number: int) -> RoundRecord:
+class _TermResolver(Protocol):
+    """The one resolver method ``run_round`` needs (``StructuredTermResolver`` or a test double)."""
+
+    def resolve(self, ev: TermEvidence, *, round_key: str, framing: str = ...) -> TermVerdict: ...
+
+
+def run_round(run: CampaignRun, resolver: _TermResolver, number: int) -> RoundRecord:
     """One bounded round: framing menu_first, then evidence_first for later rounds; retains every vote.
 
     At most ``run.max_terms_per_round`` terms are asked; the rest wait (still pending, still visible).
     """
     framing = "menu_first" if number % 2 == 1 else "evidence_first"
     round_key = f"{run.campaign_id}:round{number}:{framing}"
-    asked, undecided, outcome = 0, [], Counter()
+    asked, undecided, outcome = 0, [], cast(Counter[str], Counter())
     for key in run.pending:
         if asked >= run.max_terms_per_round:
             undecided.append(key)

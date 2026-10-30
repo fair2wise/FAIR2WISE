@@ -52,7 +52,7 @@ class RapidOcrEngine:
 
     def __init__(self) -> None:
         try:
-            from rapidocr_onnxruntime import RapidOCR  # type: ignore
+            from rapidocr_onnxruntime import RapidOCR
         except ImportError as exc:
             raise VisionUnavailable("OCR engine", "install rapidocr-onnxruntime to enable use_ocr") from exc
         self._engine = RapidOCR()
@@ -86,7 +86,7 @@ class OcrReading:
         """Lowest confidence kept, or ``None`` when nothing was read."""
         return min(self.confidences) if self.confidences else None
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         """Provenance summary (counts and confidences, not text or pixels)."""
         return {"engine": self.engine, "method": self.method, "n_spans": len(self.spans),
                 "min_confidence": self.min_confidence}

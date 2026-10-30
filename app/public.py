@@ -46,7 +46,7 @@ LangGraph code. Construction opens no network connection.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union, cast
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult
@@ -211,7 +211,7 @@ class F2WClient:
 
         if not isinstance(scope, PaperScope):
             raise TypeError("scope must be an operations.papers.PaperScope")
-        args: dict = {}
+        args: dict[str, Any] = {}
         if max_terms is not None:
             args["max_terms"] = max_terms
         if query:
@@ -224,7 +224,7 @@ class F2WClient:
         with pinned_paper_scope(scope):
             result = await executor.aexecute(ctx, TOOL_NAME, args)
         tool.ledger.pop(result.provenance_id)  # the client returns the typed result only
-        return result
+        return cast(ToolResult, result)
 
     # -- jobs and publication: forwarded to the shared F2WOperations (same policy as /v1) -----
 
@@ -333,7 +333,7 @@ class F2WClient:
         answered with nothing, ``UNAVAILABLE`` that it could not answer (``retryable``).
         """
         name = self._literature_tool("search_literature", "lit_search_papers")
-        args: dict = {"query": query, "max_results": limit}
+        args: dict[str, Any] = {"query": query, "max_results": limit}
         if technique:
             args["technique"] = technique
         if material:
@@ -537,7 +537,7 @@ def create_literature_agent(
     checkpointer: Any = None,
     sync_model: Any = None,
     async_model: Any = None,
-    **options: Mapping[str, Any],
+    **options: Any,  # Any: forwarded F2WApplication keyword arguments
 ) -> LiteratureAgent:
     """Return a :class:`LiteratureAgent` over ``client`` or over a new client.
 

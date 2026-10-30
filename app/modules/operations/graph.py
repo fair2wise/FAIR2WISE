@@ -49,7 +49,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Literal, Mapping, Sequence, cast
 import uuid
 
 from ..agent_runtime.executor import is_control_flow
@@ -141,7 +141,7 @@ class GraphScan:
         """Coverage of this scan."""
         reasons = list(self.reasons)
         return Coverage.of(scan_complete=self.scan_complete, records_scanned=self.records_scanned,
-                           exactness=self.exactness, reasons=reasons)
+                           exactness=cast(Literal["snapshot", "live_unisolated"], self.exactness), reasons=reasons)
 
 
 def _row_from_data(node_id: str, name: str, category: str, data: Mapping[str, Any],
@@ -363,8 +363,8 @@ def graph_statistics(scan: GraphScan, works: WorkIndex | None = None) -> tuple[d
     works = works or work_index([scan])
     ids = set(scan.entities)
     distinct, complete_records = triples(scan)
-    preds: Counter = Counter(p for _s, p, _o in distinct)
-    cats: Counter = Counter(row.category or "UNKNOWN" for row in scan.entities.values())
+    preds: Counter[str] = Counter(p for _s, p, _o in distinct)
+    cats: Counter[str] = Counter(row.category or "UNKNOWN" for row in scan.entities.values())
     in_rel = {s for s, _p, _o in distinct} | {o for _s, _p, o in distinct}
     keys = {k for row in scan.entities.values() for k in row.citations}
     dangling = [(s, p, o) for s, p, o in distinct if s not in ids or o not in ids]
@@ -405,7 +405,7 @@ def _scope_and_revisions(scans: Sequence[GraphScan]) -> tuple[dict[str, Any], di
 
 def _combined_coverage(scans: Sequence[GraphScan]) -> Coverage:
     complete = all(s.scan_complete for s in scans)
-    exact = "snapshot" if all(s.exactness == "snapshot" for s in scans) else "live_unisolated"
+    exact: Literal["snapshot", "live_unisolated"] = "snapshot" if all(s.exactness == "snapshot" for s in scans) else "live_unisolated"
     reasons = [f"{s.graph_id}: {r}" for s in scans for r in s.reasons]
     return Coverage.of(scan_complete=complete, records_scanned=sum(s.records_scanned for s in scans),
                        exactness=exact, reasons=reasons)
@@ -518,12 +518,12 @@ def paper_subgraph(port: Any, ctx: RequestContext, graph_id: str, paper: str, *,
     internal = sorted(((s, p, o) for s, p, o in distinct if s in members and o in members), key=str)
     boundary = [(s, p, o) for s, p, o in distinct if (s in members) != (o in members)]
     neighbours = {o if s in members else s for s, _p, o in boundary} & set(scan.entities)
-    degree: Counter = Counter()
+    degree: Counter[str] = Counter()
     for s, _p, o in internal:
         degree[s] += 1
         degree[o] += 1
     ordered = sorted(members, key=lambda n: (-degree[n], n))
-    cats: Counter = Counter(scan.entities[n].category or "UNKNOWN" for n in members)
+    cats: Counter[str] = Counter(scan.entities[n].category or "UNKNOWN" for n in members)
     metrics = {
         "work_id": work_id, "paper_keys": sorted(keys)[:20], "paper_key_count": len(keys),
         "entities": len(members), "internal_relations": len(internal), "boundary_relations": len(boundary),
@@ -572,7 +572,7 @@ def recent_entities(port: Any, ctx: RequestContext, graph_id: str, *, since: str
                             "use kg_compare_snapshots to see what a newer version added")
     stamped = [(_parse_time(row.created_at or ""), n) for n, row in scan.entities.items()]
     chosen = sorted(((t, n) for t, n in stamped if floor is None or t > floor), key=lambda x: (-x[0].timestamp(), x[1]))
-    cats: Counter = Counter(scan.entities[n].category or "UNKNOWN" for _t, n in chosen)
+    cats: Counter[str] = Counter(scan.entities[n].category or "UNKNOWN" for _t, n in chosen)
     metrics = {"entities_created": len(chosen), "entities_total": len(scan.entities),
                "newest": chosen[0][0].isoformat() if chosen else None,
                "oldest_in_window": chosen[-1][0].isoformat() if chosen else None,

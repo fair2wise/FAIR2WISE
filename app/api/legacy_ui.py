@@ -46,13 +46,13 @@ import logging
 import os
 from pathlib import Path
 import threading
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ..modules.contracts.context import ADMIN_CAPABILITIES, RequestContext
+from ..modules.contracts.context import ADMIN_CAPABILITIES, DeploymentProfile, RequestContext
 from ..modules.security.authorization import (
     DeploymentSettings,
     StartupConfigError,
@@ -256,7 +256,7 @@ class PersonalSettingsStore:
     def get(self, key: str) -> dict[str, Any]:
         """Return a copy of ``key``'s saved personal fields (empty when never saved)."""
         with self._lock:
-            return json.loads(json.dumps(self._data.get(key) or {}))
+            return cast(dict[str, Any], json.loads(json.dumps(self._data.get(key) or {})))
 
     def update(self, key: str, values: Mapping[str, Any]) -> None:
         """Merge ``values`` into ``key``'s personal fields and persist."""
@@ -476,7 +476,7 @@ class LegacyUiGuard:
             if update.json_graph_paths is not None:
                 changes["json_graph_paths"] = self.paths.decode_all(update.json_graph_paths)
         if ignored:
-            logger.info("ignored settings fields not writable on %s: %s", self.settings.profile.value,
+            logger.info("ignored settings fields not writable on %s: %s", cast(DeploymentProfile, self.settings.profile).value,
                         ", ".join(sorted(ignored)))
         return update.model_copy(update=changes), ignored
 
@@ -494,7 +494,7 @@ class LegacyUiGuard:
                        tiled_error=None)
             out["available_graphs"] = [{k: v for k, v in g.items() if k != "path"}
                                        for g in out.get("available_graphs") or [] if isinstance(g, Mapping)]
-        return out
+        return cast(dict[str, Any], out)
 
     # ------------------------------------------------------------------ projections
 
@@ -506,7 +506,7 @@ class LegacyUiGuard:
             out = {"status": payload.get("status")}
         if self.settings.exposure_warning:
             out["exposure_warning"] = self.settings.exposure_warning
-        return out
+        return cast(dict[str, Any], out)
 
     def project_paths(self, payload: Any) -> Any:
         """Session reset/delete bodies: only local paths are internal."""
@@ -546,7 +546,7 @@ class LegacyUiGuard:
         except SourceAccessDenied as exc:
             logger.warning("quote verification grant refused: %s", exc.reason)
             return self.projector, [], None
-        verifier = QuoteVerifier(sources.reader_for(refs), self._source_authority.scope(ctx, grant))
+        verifier = QuoteVerifier(cast(TurnSources, sources).reader_for(refs), self._source_authority.scope(ctx, grant))
         base = self.projector
         projector = DisclosureProjector(budget=base.budget, verifier=verifier, ledger=base.ledger,
                                         roots=base.roots, citation_resolver=base.citation_resolver)
@@ -566,8 +566,8 @@ class LegacyUiGuard:
         """R12/R13 body; ``sources`` are the turn's retrieved regions for quote verification."""
         viewer = self.viewer(ctx, session_id=session_id, correlation_id=turn_id)
         body = self.withhold_ingestion(ctx, payload)
-        return self._with_turn(ctx, sources, lambda projector, refs: projector.project_chat_response(
-            body, viewer, sources=refs))
+        return cast(dict[str, Any], self._with_turn(ctx, sources, lambda projector, refs: projector.project_chat_response(
+            body, viewer, sources=refs)))
 
     def project_sse(self, ctx: RequestContext, event: str, data: dict[str, Any], *, session_id: str | None,
                     turn_id: str | None, sources: TurnSources | None = None) -> dict[str, Any] | None:
@@ -576,11 +576,11 @@ class LegacyUiGuard:
         if event == "progress":
             if not chat_offers_ingestion(ctx) and data.get("phase") in _PENDING_PHASES:
                 return None
-            return self.projector.project_sse_event(event, data, viewer)
+            return cast(dict[str, Any] | None, self.projector.project_sse_event(event, data, viewer))
         if data.get("status") != "stream_error":
             data = self.withhold_ingestion(ctx, data)
-        return self._with_turn(ctx, sources, lambda projector, refs: projector.project_sse_event(
-            event, data, viewer, sources=refs))
+        return cast(dict[str, Any] | None, self._with_turn(ctx, sources, lambda projector, refs: projector.project_sse_event(
+            event, data, viewer, sources=refs)))
 
     def stream_error(self, ctx: RequestContext, exc: BaseException, *, turn_id: str) -> str:
         """User-safe ``stream_error`` message (``project_exception``; the turn id is the reference)."""
@@ -643,7 +643,7 @@ def build_guard(workdir: Any, *, session_key: Callable[[str | None], str],
     settings = deployment if deployment is not None else deployment_settings_from(startup_config)
     if not settings.is_local:
         if identity_port is None or credential_store is None:
-            raise StartupConfigError(f"config_rejected: {settings.profile.value} needs a Tiled identity port and "
+            raise StartupConfigError(f"config_rejected: {cast(DeploymentProfile, settings.profile).value} needs a Tiled identity port and "
                                      "a server-side session store; refusing to start unprotected")
         if getattr(identity_port, "tiled_target", None) != settings.tiled_target:
             raise StartupConfigError(f"config_rejected: identity port is not bound to {settings.tiled_target}")

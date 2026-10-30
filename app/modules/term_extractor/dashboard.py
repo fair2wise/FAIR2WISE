@@ -8,7 +8,7 @@ import os as _os
 import queue
 import threading
 import time
-from typing import Any
+from typing import Any, cast
 
 from flask import Flask, Response, request, send_from_directory
 
@@ -1207,7 +1207,7 @@ class Dashboard:
             self._prompts.append(entry)
             self._prompt_events[entry['id']] = event
         self._broadcast('prompt', entry)
-        return entry['id']
+        return cast(str, entry['id'])
 
     def submit_response(self, prompt_id: str, response: str) -> None:
         """Record the response to a prompt, remove it from the queue and wake any waiter."""

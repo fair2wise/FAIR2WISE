@@ -36,8 +36,8 @@ class ResolverSettings:
 
     remote_enabled: bool = False
     budget_cap_usd: float | None = None
-    local_model: tuple | None = None
-    remote_model: tuple | None = None
+    local_model: tuple[str, str] | None = None
+    remote_model: tuple[str, str] | None = None
     reserve_usd_per_call: float = 0.05
     timeout_seconds: float = 180.0
     max_attempts: int = 3

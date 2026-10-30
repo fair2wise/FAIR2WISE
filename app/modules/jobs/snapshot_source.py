@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 from pathlib import Path
 from typing import Sequence
@@ -46,7 +47,7 @@ class DirectorySnapshotSource:
         )
 
 
-def staged_packages_check(root: Path):
+def staged_packages_check(root: Path) -> Callable[[FrozenSnapshot], Sequence[PackageProblem]]:
     """A ``PackageCheck`` over staged packages: every ``package_keys`` entry must be a complete ``paper.json``."""
 
     def check(snapshot: FrozenSnapshot) -> Sequence[PackageProblem]:

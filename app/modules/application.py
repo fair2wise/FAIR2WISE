@@ -41,11 +41,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import Any, Callable, Iterator, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Mapping, Sequence
 import uuid
 
 from .contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
 from .security.authorization import DeploymentSettings, local_operator_context, resolve_context
+
+if TYPE_CHECKING:
+    from .agent_runtime.checkpointer import ManagedCheckpointer
 
 logger = logging.getLogger(__name__)
 
@@ -197,8 +200,8 @@ class F2WApplication:
         self.skills = build_read_skills(self.registry)
         self.executor = ToolExecutor(self.registry, event_sink=self.event_sink, admission=self.admission,
                                      limits=self.limits, clock=clock)
-        self._owned_checkpointer = None
-        self._managed = None
+        self._owned_checkpointer: ManagedCheckpointer | None = None
+        self._managed: ManagedCheckpointer | None = None
         self._saver = None
         self.chat_model = chat_model
         self.supervisor = None

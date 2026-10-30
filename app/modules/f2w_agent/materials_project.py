@@ -220,7 +220,7 @@ def _element_count(token: str) -> int:
 def _parse_ok(token: str) -> bool:
     """True if pymatgen accepts *token* as a Composition."""
     try:
-        from pymatgen.core import Composition
+        from pymatgen.core.composition import Composition
 
         Composition(token)
         return True

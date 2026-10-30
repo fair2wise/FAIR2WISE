@@ -67,7 +67,7 @@ def require_scope(ctx: RequestContext, graph_id: str) -> None:
         raise ContractError(ErrorCode.DENIED, f"graph {graph_id!r} is outside the request scope")
 
 
-def clamp_bounds(hops: int, max_nodes: int) -> tuple:
+def clamp_bounds(hops: int, max_nodes: int) -> tuple[int, int]:
     """Validate traversal bounds; raise ``INVALID_INPUT`` for non-positive values."""
     try:
         hops_i, nodes_i = int(hops), int(max_nodes)

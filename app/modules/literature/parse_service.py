@@ -102,7 +102,7 @@ class ParseService:
         self.state_dir = Path(state_dir) if state_dir is not None else store.root / "parses"
         self._clock = clock
 
-    def _paths(self, source_ref: str, key: str) -> tuple:
+    def _paths(self, source_ref: str, key: str) -> tuple[Path, Path]:
         hexdigest = parse_ref(source_ref)
         base = self.state_dir / hexdigest
         return base / f"{key}.json", base / f"{key}.state.json"
@@ -244,7 +244,7 @@ class ParseService:
         finally:
             shutil.rmtree(work_dir, ignore_errors=True)
 
-    def _store_assets(self, ctx: RequestContext, parsed: ParsedDocument, key: str) -> tuple:
+    def _store_assets(self, ctx: RequestContext, parsed: ParsedDocument, key: str) -> tuple[ParsedDocument, list[str]]:
         refs: list[str] = []
         base = {"source_ref": parsed.source_ref, "parser_key": key}
 

@@ -32,7 +32,7 @@ def _probe_global_ipv6() -> str | None:
     try:
         sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         sock.connect(("2001:4860:4860::8888", 53))
-        addr = sock.getsockname()[0]
+        addr: str = sock.getsockname()[0]
         if _is_global_ipv6(addr):
             return addr
         if addr:
@@ -168,7 +168,7 @@ def openai_http_kwargs(*, asynchronous: bool) -> dict[str, Any]:
     if local_address is None:
         return {}
     if asynchronous:
-        transport = httpx.AsyncHTTPTransport(local_address=local_address)
+        transport: Any = httpx.AsyncHTTPTransport(local_address=local_address)  # Any: reused for the sync transport below
         return {"http_client": httpx.AsyncClient(transport=transport)}
     transport = httpx.HTTPTransport(local_address=local_address)
     return {"http_client": httpx.Client(transport=transport)}

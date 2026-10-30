@@ -35,7 +35,7 @@ class BM25Index:
         self.doc_len = [len(doc) or 1 for doc in self.docs]
         self.avgdl = (sum(self.doc_len) / self.n) if self.n else 1.0
         df: dict[str, int] = defaultdict(int)
-        self.tf: list[Counter] = []
+        self.tf: list[Counter[str]] = []
         for doc in self.docs:
             counts = Counter(doc)
             self.tf.append(counts)

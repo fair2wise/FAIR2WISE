@@ -34,7 +34,7 @@ from enum import Enum
 import json
 import os
 import time
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence, cast
 
 from .mode import RuntimeConfigError
 
@@ -100,12 +100,12 @@ class PinnedArgsService:
                                       use_live_tiled=use_live_tiled)
 
 
-def pin_args(args: dict[str, Any]) -> contextvars.Token:
+def pin_args(args: dict[str, Any]) -> contextvars.Token[dict[str, Any] | None]:
     """Pin ``args`` for tool calls made in the current context; reset with :func:`unpin_args`."""
     return _PINNED.set(dict(args))
 
 
-def unpin_args(token: contextvars.Token) -> None:
+def unpin_args(token: contextvars.Token[dict[str, Any] | None]) -> None:
     """Restore the pinned arguments saved by the :func:`pin_args` call that returned `token`."""
     _PINNED.reset(token)
 
@@ -229,7 +229,7 @@ def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
                 ollama_url=str(getattr(cfg, "ollama_url", None) or "http://localhost:11434"),
             )
             cache.clear()
-            cache[key] = Orchestrator._build_llm(spec)
+            cache[key] = Orchestrator._build_llm(cast(Orchestrator, spec))  # duck-typed self: reads only these attributes
         return cache[key]
 
     return current

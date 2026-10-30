@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from academy.agent import Agent, action
 from academy.handle import Handle
@@ -89,28 +89,28 @@ class TermExtractorAgent(MonitoredAgent):
     async def process_pdf(self, pdf_path: str) -> int:
         """Process a single PDF and return the number of pages that yielded terms."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._orchestrator.process_pdf, pdf_path)
+        return await loop.run_in_executor(None, cast(Orchestrator, self._orchestrator).process_pdf, pdf_path)
 
     @action
     async def process_directory(self, data_dir: str) -> dict[str, Any]:
         """Process all PDFs in data_dir and return extraction summary."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self._orchestrator.process_directory, data_dir)
+        return await loop.run_in_executor(None, cast(Orchestrator, self._orchestrator).process_directory, data_dir)
 
     @action
     async def process_page(self, text: str, filename: str, page_num: int) -> bool:
         """Process a single page of text. Returns True if terms were added/updated."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, self._orchestrator.process_page, text, filename, page_num
+            None, cast(Orchestrator, self._orchestrator).process_page, text, filename, page_num
         )
 
     @action
     async def get_term_count(self) -> int:
         """Return the number of unique terms currently in the store."""
-        return len(self._orchestrator.store)
+        return len(cast(Orchestrator, self._orchestrator).store)
 
     @action
     async def get_status(self) -> dict[str, Any]:
         """Return current extraction metadata/progress."""
-        return dict(self._orchestrator.store.metadata)
+        return dict(cast(Orchestrator, self._orchestrator).store.metadata)

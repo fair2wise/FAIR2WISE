@@ -37,12 +37,12 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any
+from typing import Any, Container
 
 from ..contracts.evidence import EvidenceRef, MatchType
 from ..evidence.units import normalize_quantity
 from ..json2kg import make_id
-from ..literature.parsed_document import ParsedDocument
+from ..literature.parsed_document import ParsedDocument, ParsedSection
 from ..term_extractor.schema import GENERAL_CATEGORY_ALIASES
 from .loading import load_schema_view
 from .registry import RegistryError, SchemaEntry
@@ -67,7 +67,7 @@ def _local(kind: str, work_id: str, local_id: str) -> str:
     return make_id(f"{kind}-{hashlib.sha256(work_id.encode()).hexdigest()[:12]}-{local_id}")
 
 
-def technique_class(technique: str, classes) -> str:
+def technique_class(technique: str, classes: Container[str]) -> str:
     """Map a technique spelling to a schema class (F6 table).
 
     RSoXS spellings (the existing alias table, exact keys only) give ``RSoXSMeasurement``, else
@@ -105,7 +105,7 @@ class _Builder:
         self.source_paper = source_paper
         self.things: dict[str, dict[str, Any]] = {}
         self.edges: list[dict[str, Any]] = []
-        self._edge_keys: set = set()
+        self._edge_keys: set[tuple[str, str, str]] = set()
 
     def node(self, node_id: str, category: str, name: str, **slots: Any) -> str:
         if node_id not in self.things:
@@ -124,7 +124,7 @@ class _Builder:
                            "has_evidence": evidence})
 
 
-def _section(document: ParsedDocument, ref: EvidenceRef):
+def _section(document: ParsedDocument, ref: EvidenceRef) -> ParsedSection | None:
     for section in document.sections:
         if section.name == ref.locator.section:
             return section

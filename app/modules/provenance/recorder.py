@@ -19,13 +19,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import threading
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, TypeVar, cast
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.keys import digest
 from ..jobs.sqlite import OperationalDB
 from .events import GraphWriteEvent
 
+_T = TypeVar("_T")
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS audit_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, "
     "event_id TEXT UNIQUE NOT NULL, "
@@ -79,7 +80,7 @@ class AuditLog:
         with self.db.tx() as con:
             existing = con.execute("SELECT seq FROM audit_events WHERE event_id=?", (event.event_id,)).fetchone()
             if existing is not None:
-                return existing[0]
+                return cast(int, existing[0])  # Any: sqlite3 row value
             row = con.execute("SELECT hash FROM audit_events ORDER BY seq DESC LIMIT 1").fetchone()
             prev = row[0] if row else GENESIS
             body = event.model_dump_json()
@@ -89,7 +90,7 @@ class AuditLog:
             )
             seq = cur.lastrowid
             con.execute("INSERT INTO projection_outbox (seq, updated_at) VALUES (?, ?)", (seq, self._clock()))
-        return int(seq)
+        return int(cast(int, seq))  # lastrowid is always set after a successful INSERT
 
     def probe(self) -> None:
         """Check the log is writable without leaving a row behind (insert, then roll back)."""
@@ -235,10 +236,10 @@ class AuditRecorder:
         operation_id: str,
         actor: str,
         target: str,
-        mutation: Callable[[], Any],
+        mutation: Callable[[], _T],
         payload: Mapping[str, Any] | None = None,
         run_id: str | None = None,
-    ) -> Any:
+    ) -> _T:
         """Run a critical ``mutation`` with write-ahead audit.
 
         1. Make the ``intent`` event durable (and the log healthy): otherwise raise
@@ -275,7 +276,7 @@ class AuditRecorder:
 
 def events_payload(event: GraphWriteEvent) -> dict[str, Any]:
     """JSON-ready dict of an event (for projection sinks)."""
-    return json.loads(event.model_dump_json())
+    return cast(dict[str, Any], json.loads(event.model_dump_json()))  # Any: JSON payload
 
 
 __all__ = ("AuditLog", "AuditRecorder", "AuditStatus", "AuditUnavailable", "GENESIS", "events_payload")

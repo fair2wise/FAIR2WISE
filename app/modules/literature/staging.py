@@ -34,7 +34,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Callable, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -171,7 +171,7 @@ def _write_ordered(path: Path, payload: dict[str, Any]) -> None:
 def load_package(ctx: RequestContext, store: FileDocumentStore, path: Path) -> dict[str, Any]:
     """Validate a complete package and every asset checksum; return its payload."""
     try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        payload: dict[str, Any] = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise PackageInvalid("package unreadable") from exc
     if payload.get("schema_version") != PACKAGE_SCHEMA_VERSION:
@@ -259,7 +259,7 @@ def _receipt_matches(path: Path) -> bool:
     if not receipt.is_file():
         return False
     try:
-        return json.loads(receipt.read_text(encoding="utf-8")).get("package_sha256") == _file_sha(path)
+        return cast(bool, json.loads(receipt.read_text(encoding="utf-8")).get("package_sha256") == _file_sha(path))  # Any: JSON payload
     except (OSError, ValueError):
         return False
 

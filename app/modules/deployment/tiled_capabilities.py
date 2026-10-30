@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 import hashlib
 import json
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 from .tiled_config import (
     PINNED_TILED_VERSION,
@@ -204,7 +204,7 @@ def check_health(base_url: str, *, session: Any = None, timeout: float = 2.0) ->
     except TiledTargetUnavailable:
         return False
     try:
-        return resp.status_code == 200 and resp.json().get("status") == "ready"
+        return cast(bool, resp.status_code == 200 and resp.json().get("status") == "ready")
     except ValueError:
         return False
 

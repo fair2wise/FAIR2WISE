@@ -227,8 +227,8 @@ def extract_code_snippets(
     )
 
     regex_results: list[dict[str, Any]] = []
-    seen_fn_names: set = set()
-    seen_bodies: set = set()
+    seen_fn_names: set[str] = set()
+    seen_bodies: set[str] = set()
 
     for dm in named_block_re.finditer(page_text):
         fn_name = dm.group(2)

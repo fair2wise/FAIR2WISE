@@ -23,6 +23,7 @@ from ..security.content_access import SourceAccessDenied, SourceAccessScope, Sou
 from .acquire import PaperAcquirer
 from .legacy import LegacyIndex, doi_key, doi_only
 from .parse_service import ParseService
+from .parsed_document import ParsedDocument
 from .store import FileDocumentStore
 
 DEFAULT_SECTION_CHARS = 6000
@@ -109,7 +110,7 @@ class PaperReader:
             raise SourceAccessDenied("reading a paper needs a trusted source-access scope")
         scope.require(kind, work_id=doi_key(doi))
 
-    def _source(self, ctx: RequestContext, doi: str, work: Mapping[str, Any] | None) -> tuple:
+    def _source(self, ctx: RequestContext, doi: str, work: Mapping[str, Any] | None) -> tuple[str, str]:
         if self.acquirer is not None:
             result = self.acquirer.acquire(ctx, doi, work=work)
             if result.ok:
@@ -120,7 +121,7 @@ class PaperReader:
             return ref, "cached"
         raise NoSourceAvailable(doi_only(doi), "not stored")
 
-    def _document(self, ctx: RequestContext, doi: str, work: Mapping[str, Any] | None) -> tuple:
+    def _document(self, ctx: RequestContext, doi: str, work: Mapping[str, Any] | None) -> tuple[ParsedDocument, str]:
         if not doi_key(doi):
             raise ContractError(ErrorCode.INVALID_INPUT, "not a DOI", retryable=False)
         ref, status = self._source(ctx, doi, work)

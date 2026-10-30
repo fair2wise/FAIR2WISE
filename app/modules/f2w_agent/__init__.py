@@ -12,6 +12,8 @@ Academy agents coordinate a retrieve -> (download -> extract -> update KG)
 """
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = [
     "RetrievalAgent",
     "DownloadAgent",
@@ -22,7 +24,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):  # lazy exports to keep import light
+def __getattr__(name: str) -> Any:  # lazy exports to keep import light; Any: the lazily imported class
     """Load Academy agent classes on first attribute access."""
     if name == "RetrievalAgent":
         from .retrieval_agent import RetrievalAgent

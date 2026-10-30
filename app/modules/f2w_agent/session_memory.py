@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 import json
 from pathlib import Path
 import re
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, cast
 import uuid
 
 MAX_SUMMARY_CHARS = 3000
@@ -164,7 +164,7 @@ def _round_growth_event(
     kg = round_info.get("kg")
     if not isinstance(extraction, dict) and not isinstance(kg, dict):
         return None
-    retrieval = round_info.get("retrieval") if isinstance(round_info.get("retrieval"), dict) else {}
+    retrieval: Any = round_info.get("retrieval") if isinstance(round_info.get("retrieval"), dict) else {}
     event = {
         "timestamp": _now(),
         "query": _clip(query, 300),
@@ -291,7 +291,7 @@ class SessionMemory:
             )
             current["turn_count"] = int(current.get("turn_count") or 0) + 1
             self.data["current_topic_id"] = current["id"]
-            return current["id"]
+            return cast(str, current["id"])  # Any: topics are untyped JSON dicts
 
         topic_id = f"topic-{uuid.uuid4().hex[:12]}"
         topics.append(

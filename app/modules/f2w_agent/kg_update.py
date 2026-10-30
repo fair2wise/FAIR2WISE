@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Any
+from typing import Any, cast
 from urllib import request
 from urllib.parse import urlparse
 
@@ -204,7 +204,7 @@ def splash_reimport(
             "message": proc.stderr.strip()[-2000:] or "import_kg.py failed",
             "db_path": db_path_display,
         }
-    result = {
+    result: dict[str, Any] = {
         "status": "success",
         "stdout": proc.stdout.strip()[-2000:],
         "db_path": db_path_display,
@@ -237,7 +237,7 @@ def splash_find_entity_by_matkg_id(
     if not matkg_id:
         return None
 
-    by_id = _splash_graphql(
+    by_id: dict[str, Any] | None = _splash_graphql(
         uri,
         f"query Entity($id: ID!) {{ entity(id: $id) {{ {_ENTITY_FIELDS} }} }}",
         {"id": matkg_id},
@@ -252,7 +252,7 @@ def splash_find_entity_by_matkg_id(
     }}
     """
     while True:
-        batch = (
+        batch: list[dict[str, Any]] = (
             _splash_graphql(
                 uri, list_query, {"limit": page_size, "offset": offset}
             ).get("entities")
@@ -324,7 +324,7 @@ def splash_create_entity(
             }
         },
     )
-    entity = data.get("createEntity")
+    entity: dict[str, Any] | None = data.get("createEntity")
     if not entity:
         raise RuntimeError("splash createEntity returned null")
     return entity
@@ -356,7 +356,7 @@ def splash_create_link(
             }
         },
     )
-    link = data.get("createLink")
+    link: dict[str, Any] | None = data.get("createLink")
     if not link:
         raise RuntimeError("splash createLink returned null")
     return link
@@ -405,7 +405,7 @@ def splash_delete_link(link_id: str, *, splash_uri: str | None = None) -> bool:
 def _splash_node_id(entity: dict[str, Any]) -> str:
     """Prefer uri/matkg_id as the MatKG node id, else the splash UUID."""
     props = entity.get("properties") or {}
-    return entity.get("uri") or props.get("matkg_id") or entity["id"]
+    return cast(str, entity.get("uri") or props.get("matkg_id") or entity["id"])  # Any: untyped GraphQL payload
 
 
 def _splash_entity_to_node(entity: dict[str, Any]) -> dict[str, Any]:
