@@ -181,8 +181,8 @@ logs/
 .run/
 *.pid
 
-# All KGs in storage/kg are committed (owner decision 2026-10-12); terminology harvest JSON stays ignored.
-storage/terminology/*.json
+# All KGs in storage/kg are committed (owner decision 2026-10-12). Terminology harvest JSON is
+# tracked and shipped in every image too (owner decision PC-1 / D3.1, O-D3, 2026-10-30).
 storage/terminology/*.json.bak
 
 # Hybrid source-RAG indexes (rebuild with scripts/index_source_rag.py)

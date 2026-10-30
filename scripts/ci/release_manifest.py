@@ -17,8 +17,9 @@ a build or a publication (owner decision H3 B).
 
 ``shipped_untracked_files`` (T28C, A5-1) lists files the Dockerfile ships from the build
 context that are not in the commit's tree, so the images would depend on the builder's disk.
-It is recorded and reported as a ``WARNING: `` entry in ``problems`` until owner decision PC-1;
-flipping :data:`REFUSE_SHIPPED_UNTRACKED_FILES` makes it a refusal.
+Since owner decision PC-1 (D3.1, O-D3, 2026-10-30: the terminology harvest files are tracked
+and shipped) it is a refusal (:data:`REFUSE_SHIPPED_UNTRACKED_FILES`); before that it was a
+``WARNING: `` entry in ``problems``.
 
 Standard library only; never imports the application (no ``load_dotenv`` side effects).
 """
@@ -71,11 +72,11 @@ DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 # Problems that start with this prefix are recorded but do not stop a candidate (T28C).
 WARNING_PREFIX = "WARNING: "
 # A5-1 / PC-1 (owner decision pending): files the Dockerfile COPY lines ship from the build
-# context that are not tracked at the commit (today: the gitignored storage/terminology/*.json
-# harvest files on a developer's disk) make the image depend on the builder's disk. Until the
-# owner decides PC-1 this is a WARNING in ``problems``; the decision flips it to a refusal by
-# setting this to True (``verify`` then refuses the candidate like any other problem).
-REFUSE_SHIPPED_UNTRACKED_FILES = False
+# context that are not tracked at the commit make the image depend on the builder's disk.
+# Owner decision PC-1 (D3.1, O-D3, 2026-10-30) tracked the storage/terminology/*.json harvest
+# files and made this a refusal: ``verify`` refuses the candidate like any other problem.
+# (Pass ``refuse_shipped_untracked=False`` to ``build_manifest`` to get the pre-PC-1 warning.)
+REFUSE_SHIPPED_UNTRACKED_FILES = True
 
 
 class ManifestError(Exception):

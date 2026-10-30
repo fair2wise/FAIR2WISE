@@ -199,7 +199,7 @@ def _manifest(tmp: Path, **kw: Any) -> Dict[str, Any]:
     manifest = rm.build_manifest(root=REPO, commit=head, ref="refs/heads/main", event=kw.pop("event", "push"),
                                  repository="fair2wise/fair2wise", image_repository=REPO_IMG, run_id="42",
                                  run_attempt="1", server_url="https://github.com", checks=checks,
-                                 base_images={"python:3.12-slim": "python@" + digest("9")})
+                                 base_images={"python:3.12-slim": "python@" + digest("9")}, **kw)
     return manifest
 
 
@@ -306,11 +306,12 @@ def test_context_copy_sources_follow_the_final_lineages_of_the_real_dockerfile()
 
 @needs_git
 def test_shipped_untracked_files_warn_until_pc1_then_refuse(tmp_path: Path, monkeypatch) -> None:
-    """Recorded in the manifest and as a WARNING in problems; the candidate still passes.
-    PC-1 (REFUSE_SHIPPED_UNTRACKED_FILES / refuse_shipped_untracked) turns it into a refusal."""
+    """Pre-PC-1 behaviour (``refuse_shipped_untracked=False``): recorded in the manifest and as a
+    WARNING in problems, the candidate still passes. Since PC-1 (2026-10-30) the module default
+    ``REFUSE_SHIPPED_UNTRACKED_FILES`` is True and the same condition refuses the candidate."""
     planted = ["storage/terminology/extracted_terms_private.json", "storage/terminology/other.json"]
     monkeypatch.setattr(rm, "shipped_untracked_files", lambda root, commit: planted)
-    m = _manifest(tmp_path)
+    m = _manifest(tmp_path, refuse_shipped_untracked=False)  # the pre-PC-1 warning behaviour
     assert m["shipped_untracked_files"] == planted
     warnings = [p for p in m["problems"] if p.startswith(rm.WARNING_PREFIX)]
     assert len(warnings) == 1 and "2 file(s)" in warnings[0] and planted[0] in warnings[0]
@@ -330,7 +331,9 @@ def test_shipped_untracked_files_warn_until_pc1_then_refuse(tmp_path: Path, monk
     assert any("not tracked" in p and not p.startswith(rm.WARNING_PREFIX) for p in strict["problems"])
     with pytest.raises(rm.ManifestError, match="did not pass"):
         rm.verify_manifest(strict, commit=head)
-    assert rm.REFUSE_SHIPPED_UNTRACKED_FILES is False  # PC-1 pending: flip when the owner decides
+    assert rm.REFUSE_SHIPPED_UNTRACKED_FILES is True  # PC-1 decided 2026-10-30 (O-D3): refusal by default
+    default = _manifest(tmp_path)  # the module default now refuses
+    assert default["candidate_ok"] is False and not any(p.startswith(rm.WARNING_PREFIX) for p in default["problems"])
 
 
 def test_manifest_without_untracked_files_records_an_empty_list(tmp_path: Path, monkeypatch) -> None:
