@@ -165,14 +165,18 @@ class SkillRegistry:
             if orphans:
                 raise SkillRegistryError(f"{len(orphans)} registered tool(s) belong to no skill: {orphans}")
 
-    def visible_to(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None) -> List[Skill]:
+    def visible_to(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None,
+                   tools: Optional[FrozenSet[str]] = None) -> List[Skill]:
         """Skills a turn may see: required capabilities held and at least one tool visible.
 
-        Each returned skill lists only the tools visible to ``ctx``; registration
-        order is kept so the rendered prompt reads as a capability map.
+        Each returned skill lists only the tools visible to ``ctx`` (narrowed further to
+        ``tools`` when a turn pins its tool set); registration order is kept so the rendered
+        prompt reads as a capability map.
         """
         caps = effective_capabilities(ctx, scope)
         visible_tools = {e.name for e in self._tools.visible_to(ctx, scope=scope)}
+        if tools is not None:
+            visible_tools &= set(tools)
         out = []
         for skill in self._skills.values():
             if not skill.required_capabilities <= caps:
@@ -183,9 +187,10 @@ class SkillRegistry:
                                  skill.required_capabilities))
         return out
 
-    def render_prompt_section(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None) -> str:
+    def render_prompt_section(self, ctx: RequestContext, *, scope: Optional[FrozenSet[str]] = None,
+                              tools: Optional[FrozenSet[str]] = None) -> str:
         """Prompt text for the skills visible to ``ctx``; empty when none are visible."""
-        return render_prompt_section(self.visible_to(ctx, scope=scope))
+        return render_prompt_section(self.visible_to(ctx, scope=scope, tools=tools))
 
 
 def render_prompt_section(skills: List[Skill]) -> str:

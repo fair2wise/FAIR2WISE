@@ -65,10 +65,14 @@ class RunContext:
     Attributes:
         request: The server-built request context.
         scope: Optional per-turn capability narrowing (never widening).
+        tools: Optional per-turn tool narrowing (never widening): only these registered tool
+            names are offered to the model and listed in the skills section. ``None`` offers
+            every tool the context may use. The legacy UI QA turn pins ``answer_from_knowledge``.
     """
 
     request: RequestContext
     scope: Optional[FrozenSet[str]] = None
+    tools: Optional[FrozenSet[str]] = None
 
 
 def as_run_context(value: Any) -> RunContext:

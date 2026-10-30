@@ -13,6 +13,11 @@ server-side active-paper resolver), so the default read registry is unchanged.
 The six T05 ``lit_*`` tools (``app.modules.literature.tools.LiteratureToolset``)
 are registered the same way, only when the caller passes ``literature``.
 
+The five T19C Knowledge Operations (``kg_compute_statistics``, ``kg_compare_snapshots``,
+``kg_paper_subgraph``, ``kg_recent_entities``, ``curate_audit_corpus``;
+``app.modules.operations.knowledge.KnowledgeOperations``) are registered only when the caller
+passes ``knowledge`` (T19E); they need a graph port bound to the caller's graph selection.
+
 The T09 ``vision_*`` paper-figure tools (``app.modules.vision.tools.VisionToolset``) and the three pure
 ``science_*`` helpers are registered only when the caller passes ``vision``; the toolset is never imported here.
 """
@@ -26,6 +31,8 @@ from ..agent_runtime.skills import Skill, SkillRegistry
 from ..tools.bootstrap import build_registry, build_skill_registry
 from ..literature.skill import LITERATURE_RESEARCH_SKILL
 from ..vision.skill import PAPER_FIGURES_SKILL
+from ..operations.corpus import AUDIT_LITERATURE_CORPUS_SKILL
+from ..operations.graph import ANALYZE_KNOWLEDGE_GRAPH_SKILL
 from ..operations.papers import SUMMARIZE_LITERATURE_SKILL, TOOL_NAME as SUMMARY_TOOL_NAME
 
 from .qa_tool import ANSWER_FROM_KNOWLEDGE, TOOL_NAME, LegacyResultLedger, make_answer_tool
@@ -60,7 +67,7 @@ QA_DELEGATION_PROMPT = (
 
 def build_read_registry(
     service: Any, ledger: LegacyResultLedger, *, name: str = "f2w", freeze: bool = True,
-    paper_summary: Any = None, literature: Any = None, vision: Any = None,
+    paper_summary: Any = None, literature: Any = None, vision: Any = None, knowledge: Any = None,
 ) -> ToolRegistry:
     """Fresh registry holding ``answer_from_knowledge`` bound to ``service`` and ``ledger``.
 
@@ -77,6 +84,8 @@ def build_read_registry(
 
         extra.extend(vision.registrations())
         extra.extend(science_registrations())
+    if knowledge is not None:  # T19E: the five T19C operations; absent unless the caller passes a bundle
+        extra.extend(knowledge.registrations())
     return build_registry(None, include=(), extra=extra, name=name, freeze=freeze)
 
 
@@ -87,6 +96,9 @@ def build_read_skills(registry: ToolRegistry) -> SkillRegistry:
         skills.append(LITERATURE_RESEARCH_SKILL)
     if all(name in registry for name in PAPER_FIGURES_SKILL.tools):
         skills.append(PAPER_FIGURES_SKILL)
+    for skill in (ANALYZE_KNOWLEDGE_GRAPH_SKILL, AUDIT_LITERATURE_CORPUS_SKILL):  # T19E
+        if all(name in registry for name in skill.tools):
+            skills.append(skill)
     return build_skill_registry(registry, skills=skills, require_coverage=True)
 
 
