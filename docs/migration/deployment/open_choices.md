@@ -1,12 +1,22 @@
 # Open choices O06, O07, O08 (T24A)
 
-**Status: all three are UNRESOLVED.** The options and recommendations below are inputs for the owner at H1 (O06) and H1/H7 (O07, O08). None of them is a decision. Nothing in the repository was changed to implement any of them.
+**Status: O06 is DECIDED (2026-10-30, O-O6); O07 and O08 remain UNRESOLVED.** The O06 options below are kept as the record of what the owner chose from; the rules in force are in `docs/migration/reviews/H6/o06_tag_rules_proposal.md` (APPROVED 2026-10-30) and the decisions D2.1-D2.10 in `docs/migration/reviews/H1/owner_decisions.md` batches 16-18. The O07 and O08 sections are still inputs for the owner at H1/H7; none of them is a decision.
 
 ---
 
 ## O06: Which events move each image tag
 
-### Facts from the source
+**Decided 2026-10-30 (O-O6, D2.1-D2.10).** A push to `main` (PR merge) publishes the tested images under
+`sha-<40-hex commit>-<variant>` (plus `vX.Y.Z-<variant>` on release tags) to the public
+`ghcr.io/fair2wise/fair2wise` and moves all three channels `:local`, `:als-dev`, `:als-prod` to the new digest;
+any tested digest may reach `:als-prod`; the owner is the sole reviewer of both publish environments with
+self-approval; the legacy `agent` image is not published; nothing expires; amd64 only; base images stay
+tag-referenced with CI-recorded digests; the binary report is recorded, never gating. None of the options
+below was taken as written: the owner chose "all three on merge to main" (closest to option D for `main`,
+with the immutable-tag, serialization and monotonic-move rules of option A). Implemented in
+`.github/workflows/publish-image.yml` and `build-app.yml` (T24D follow-up).
+
+### Facts from the source (as of T24A)
 
 - The only existing image workflow publishes on `push` to `main` and on tags matching `v*` (`.github/workflows/publish-image.yml:3-6`).
 - It builds only `target: agent` (`:43`).
@@ -25,9 +35,9 @@
 | C. All manual | Dispatch | Dispatch | Protected dispatch | Most control. Easy to forget, so channels drift. |
 | D. Keep `main`/`v*` | `main` push | `main` push | `v*` | Matches today. `forge_merge` never produces images until merged, which conflicts with the plan's `forge_merge` CI requirement. |
 
-### Recommendation (unresolved)
+### Recommendation (superseded by the decision above)
 
-**Option A.** Add these rules:
+**Option A** was recommended, with these rules (the rules survived; the trigger did not):
 
 - Every publish also writes an immutable `sha-<commit>-<variant>` reference and a release manifest with the digests.
 - Moves of the same tag are serialized with a `concurrency` group per tag.

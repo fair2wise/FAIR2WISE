@@ -11,7 +11,7 @@
 | Workflow | Triggers | What it does | Problem for forge_merge |
 |---|---|---|---|
 | `.github/workflows/build-app.yml` | `push` and `pull_request` on `main` only (`:3-7`) | Python 3.12, `pip install -r requirements/dev.txt`, `pip check` (`:15-24`); `black --check` on 3 paths (`:25-30`); flake8 hard-fail subset `E9,F63,F7,F82` (`:31-36`); `pytest` over the whole tree (`:37-38`); `mkdocs build --strict` (`:39-40`); **main push only:** `mkdocs gh-deploy --force` (`:41-43`) and `scripts/update_readme_tree.py` (`:44-46`) | Never runs for forge_merge pushes or PRs targeting forge_merge. Plain `pytest` would fail on the H0 baseline errors (15 `test_bl1101_ingest` errors from untracked data, 2 CBORG-credential tests, 1 pixi-order test; `docs/migration/reviews/H0/baseline_tests.md`). No frontend job at all. |
-| `.github/workflows/publish-image.yml` | `push` to `main`, tags `v*` (`:3-6`) | Builds `Dockerfile` target `agent` and pushes to GHCR with `packages: write` (`:13-46`) | Out of scope. Must not be triggered from forge_merge until T24/O06 approves. |
+| `.github/workflows/publish-image.yml` | `push` to `main`, tags `v*` (`:3-6`) | At T25A: built `Dockerfile` target `agent` and pushed to GHCR with `packages: write` (`:13-46`). Since T24D (O06 approved 2026-10-30): publishes the three tested variants and moves the channels. | Out of scope here. Never triggered from forge_merge: it runs on `main`/`v*` only (`reviews/H6/o06_tag_rules_proposal.md`). |
 
 Nothing in either workflow runs Vitest, `vite build`, or Playwright, although the frozen UI has 10 Vitest files and 9 Playwright specs (FRONTEND_COMPATIBILITY.md section 8).
 

@@ -45,7 +45,7 @@ Each row gives the location, what the source does now, and the change task that 
 
 | # | File:line | Current behavior | Required change (task) |
 | --- | --- | --- | --- |
-| W1 | `.github/workflows/publish-image.yml:3-6` | Triggers on push to `main` and tags `v*`. | O06 (see `open_choices.md`) (T24D). |
+| W1 | `.github/workflows/publish-image.yml:3-6` | Triggers on push to `main` and tags `v*`. | O06 decided 2026-10-30 (D2.1-D2.10, `reviews/H6/o06_tag_rules_proposal.md`): push to `main`/`v*` publishes the three tested variants and moves all three channels; the `agent` image is no longer published (T24D). |
 | W2 | `.github/workflows/publish-image.yml:13-17` | `permissions: contents: read, packages: write` for the whole job. Fine for a trusted job. | Split build, test and publish jobs; PRs never get write access (T24D). |
 | W3 | `.github/workflows/publish-image.yml:10,36` | Image name is `ghcr.io/${{ github.repository }}`. | The normalized name `ghcr.io/fair2wise/fair2wise` is still a proposal; confirm the registry (T24D). |
 | W4 | `.github/workflows/publish-image.yml:38-46` | `build-push-action` with `target: agent`, `push: true`. No `platforms:`, no `setup-qemu`/`setup-buildx` step. | Matrix over `local`/`als-dev`/`als-prod`, with digest capture and a platforms decision (O08) (T24D). |

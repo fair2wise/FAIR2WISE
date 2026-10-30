@@ -114,29 +114,36 @@ changes, and known issues.
 Two workflows handle the FAIR2WISE images (T24D):
 
 - `.github/workflows/build-app.yml` builds the `local`, `als-dev` and `als-prod`
-  targets from one commit on pushes and pull requests to `main` and
-  `forge_merge` and on `v*` tags. It runs the `tests/images` checks and the
-  post-build image checks from `docker/profiles/README.md` on each image,
-  without network. These include a preflight run with state mounted (and, on
-  the ALS images, `F2W_CORS_ORIGINS` set) that must render the gateway on port
-  8080, and the exit-78 refusals. Each run writes a
-  `release-manifest` artifact with the commit, each variant's image id and
-  layers, the lock hashes, the Tiled wheel hash and the frozen UI tree. It
-  never logs in to a registry.
-- `.github/workflows/publish-image.yml` runs only on manual dispatch, from the
-  protected default branch or a protected `vX.Y.Z` tag, inside the
-  `ghcr-publish` / `ghcr-als-prod` environments.
+  targets (linux/amd64) from one commit on pushes to `forge_merge`, on pull
+  requests to `main` and `forge_merge`, and, through a `workflow_call` from the
+  publish workflow, on every push to `main` or `v*` tag. It runs the
+  `tests/images` checks and the post-build image checks from
+  `docker/profiles/README.md` on each image, without network. These include a
+  preflight run with state mounted (and, on the ALS images, `F2W_CORS_ORIGINS`
+  set) that must render the gateway on port 8080, and the exit-78 refusals.
+  Each run writes a `release-manifest` artifact with the commit, each variant's
+  image id and layers, the lock hashes, the Tiled wheel hash, the frozen UI
+  tree, the resolved base-image digests and a reference to the newest binary
+  evaluation report (information only). It never logs in to a registry.
+- `.github/workflows/publish-image.yml` runs on every push to `main` (a merged
+  pull request) and on a protected `vX.Y.Z` tag, inside the `ghcr-publish` /
+  `ghcr-als-prod` environments, which the owner reviews.
     - It pushes the tested images without rebuilding them as
-      `sha-<commit>-<variant>` (and `vX.Y.Z-<variant>`).
-    - It moves the `:local`, `:als-dev` and `:als-prod` channel tags by
-      re-tagging an already published digest.
+      `sha-<full commit>-<variant>` (and `vX.Y.Z-<variant>`) to the public
+      `ghcr.io/fair2wise/fair2wise`. An existing commit tag is never
+      overwritten.
+    - It then moves all three channel tags `:local`, `:als-dev` and
+      `:als-prod` to the digests it just published.
+    - A manual dispatch moves one channel to an already published digest
+      (promotion or, with a reason, rollback).
 
-!!! important "Not active yet"
+!!! note "Tag rules (O06) approved 2026-10-30"
 
-    The tag rules (O06) are a proposal awaiting owner approval
-    (`docs/migration/reviews/H6/o06_tag_rules_proposal.md`). Until the
-    repository variable `O06_APPROVED` is `true`, every publish run fails before
-    it writes anything.
+    The rules are recorded in
+    `docs/migration/reviews/H6/o06_tag_rules_proposal.md` (owner decisions
+    O-O6 D2.1 to D2.10). The repository variable `O06_APPROVED` is the owner's
+    switch: until it is `true`, every publish run fails before it writes
+    anything.
 
 Publishing a tag is not a deployment. Hosts are rolled out by digest through
 Ansible, which is a separate, approved step. The legacy compose `agent` target

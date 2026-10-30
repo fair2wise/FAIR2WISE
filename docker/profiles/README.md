@@ -94,6 +94,12 @@ docker build --target als-dev  -t ghcr.io/fair2wise/fair2wise:als-dev .
 docker build --target als-prod -t ghcr.io/fair2wise/fair2wise:als-prod .
 ```
 
+Published images come only from CI: a push to `main` (PR merge) or a `vX.Y.Z` tag runs
+`.github/workflows/publish-image.yml`, which pushes the tested bytes as `sha-<full commit>-<variant>`
+(and `vX.Y.Z-<variant>`) to the public `ghcr.io/fair2wise/fair2wise` and moves all three channel
+tags; nobody pushes by hand (O06 tag rules, approved 2026-10-30,
+`docs/migration/reviews/H6/o06_tag_rules_proposal.md`). The legacy `agent` target is never published.
+
 Static checks on the built images:
 
 ```sh

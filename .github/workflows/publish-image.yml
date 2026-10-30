@@ -1,69 +1,71 @@
-# Publish tested FAIR2WISE candidates to GHCR and move channel tags (T24D).
+# Publish tested FAIR2WISE images to GHCR and move the channel tags (T24D).
 #
-# NOT ACTIVE UNTIL THE OWNER APPROVES O06. The tag rules are a proposal
-# (docs/migration/reviews/H6/o06_tag_rules_proposal.md). Every run fails in the `gate` job
-# unless the repository variable O06_APPROVED is exactly "true"; the publish and promote jobs
-# check it again. There is no push, tag or schedule trigger: a person with write access must
-# dispatch it, from the protected default branch or a protected vX.Y.Z tag, and a reviewer of
-# the job's GitHub environment must approve it.
+# The O06 image tag rules are APPROVED (2026-10-30, owner decisions O-O6 D2.1-D2.10,
+# docs/migration/reviews/H1/owner_decisions.md batches 16-18; the rules are written up in
+# docs/migration/reviews/H6/o06_tag_rules_proposal.md). What runs here:
 #
-#   operation=publish  push the three tested images of a build-app.yml run of this same commit
-#                      under immutable sha-<commit>-<variant> (and vX.Y.Z-<variant> on a tag).
-#                      Nothing is rebuilt: the saved images are loaded and their ids and layers
-#                      must equal the release manifest.
-#   operation=promote  move :local / :als-dev (environment ghcr-publish) or :als-prod
-#                      (environment ghcr-als-prod) to an already published digest by a
-#                      registry-side re-tag. Never backwards unless rollback=true with a reason.
+#   push to main, push of a vX.Y.Z tag (D2.1)
+#       gate -> candidate (build-app.yml called with publish_candidate=true: the three images
+#       are built, checked and saved in this same run) -> publish (environment ghcr-publish:
+#       push the tested bytes as immutable sha-<40-hex commit>-<variant> tags, plus
+#       vX.Y.Z-<variant> on a release tag (D2.5); then move :local and :als-dev to the new
+#       digests) -> publish-als-prod (environment ghcr-als-prod: move :als-prod to the same
+#       run's als-prod digest). All three channels follow every merge to main; there is no
+#       dev-before-prod rule and no manual production promotion step (D2.1, D2.3).
+#   workflow_dispatch (promote / rollback)
+#       move one channel to an already published digest of that variant by a registry-side
+#       re-tag: forward to any tested digest (D2.3), or back to an older one with
+#       rollback=true and a reason. :local and :als-dev run in ghcr-publish, :als-prod in
+#       ghcr-als-prod.
 #
-# Credentials: only the job's GITHUB_TOKEN with packages: write, for ghcr.io. No repository or
-# environment secret is referenced, so CBORG, Tiled and other runtime credentials never reach
-# these jobs. Nothing here deploys to a host: Ansible rollout by digest is T24E/H7.
-name: Publish and promote images (O06 gated)
+# Nothing is rebuilt at publication: the saved images are loaded and their ids and layers must
+# equal the release manifest. Commit tags are immutable: an existing sha-* tag that resolves to
+# other bytes refuses the publication, it is never overwritten. Only linux/amd64 is published
+# (D2.8); the legacy compose `agent` image is not published at all (D2.6). Nothing expires
+# (D2.7): no GHCR retention policy, workflow artifacts at GitHub's 90-day maximum.
+#
+# Safety switch: every run fails in the `gate` job unless the repository variable O06_APPROVED
+# is exactly "true", and every writer job checks it again before it logs in. The rules are
+# approved; the owner sets the variable (a repository admin action) once the two environments
+# exist. GitHub environment configuration (not YAML): the owner is the sole required reviewer of
+# ghcr-publish and ghcr-als-prod and may approve their own runs (D2.2); both environments limit
+# deployment branches/tags to main and v*.
+#
+# Credentials: only the job's GITHUB_TOKEN with packages: write, for ghcr.io
+# (ghcr.io/fair2wise/fair2wise, public, D2.4). No repository or environment secret is
+# referenced, so CBORG, Tiled and other runtime credentials never reach these jobs. Nothing here
+# deploys to a host: Ansible rollout by digest is T24E/H7.
+name: Publish images and move channels (O06)
 
 on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
-      operation:
-        description: "publish (push a tested build-app run) or promote (move a channel tag)"
+      variant:
+        description: "promote/rollback: channel to move"
         type: choice
         required: true
-        options: [ publish, promote ]
-      build_run_id:
-        description: "publish: id of the successful build-app.yml run of this commit"
-        type: string
-        default: ""
-      binary_report:
-        description: "publish (optional): repository path of a binary evaluation report to record (information only)"
-        type: string
-        default: ""
-      variant:
-        description: "promote: channel to move"
-        type: choice
-        options: [ none, local, als-dev, als-prod ]
-        default: none
+        options: [ local, als-dev, als-prod ]
       digest:
-        description: "promote: sha256:... of the published variant image"
+        description: "sha256:... of an already published image of that variant"
         type: string
-        default: ""
+        required: true
       rollback:
-        description: "promote: move the channel back to an older published digest"
+        description: "move the channel back to an older published digest"
         type: boolean
         default: false
       reason:
-        description: "promote: change or rollback reason (required for a rollback)"
+        description: "change or rollback reason (required for a rollback)"
         type: string
         default: ""
 
 permissions: {}
 
-# One registry writer at a time; a running publication or promotion is never cancelled.
-concurrency:
-  group: publish-image-ghcr
-  cancel-in-progress: false
-
 jobs:
   gate:
-    name: O06 approval, protected ref and inputs
+    name: O06 switch, protected ref and inputs
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -72,12 +74,12 @@ jobs:
       semver: ${{ steps.ref.outputs.semver }}
       image_repository: ${{ steps.ref.outputs.image_repository }}
     steps:
-      - name: O06 tag rules approved by the owner (fails closed)
+      - name: O06 switch set by the owner (rules approved 2026-10-30, O-O6; fails closed)
         env:
           O06_APPROVED: ${{ vars.O06_APPROVED }}
         run: |
           if [ "$O06_APPROVED" != "true" ]; then
-            echo "::error::O06 image tag rules are not owner-approved (repository variable O06_APPROVED is not 'true'). Nothing is published."
+            echo "::error::repository variable O06_APPROVED is not 'true'. The O06 rules are approved (2026-10-30, O-O6); the owner sets the variable once the ghcr-publish and ghcr-als-prod environments exist. Nothing is published."
             exit 1
           fi
       - name: Protected default branch or protected vX.Y.Z tag
@@ -112,9 +114,7 @@ jobs:
           echo "image_repository=$(printf 'ghcr.io/%s/fair2wise' "$OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
       - name: Validate the inputs
         env:
-          OPERATION: ${{ inputs.operation }}
-          BUILD_RUN_ID: ${{ inputs.build_run_id }}
-          BINARY_REPORT: ${{ inputs.binary_report }}
+          EVENT: ${{ github.event_name }}
           VARIANT: ${{ inputs.variant }}
           DIGEST: ${{ inputs.digest }}
           ROLLBACK: ${{ inputs.rollback }}
@@ -122,28 +122,37 @@ jobs:
         run: |
           set -eu
           fail() { echo "::error::$1"; exit 1; }
-          case "$OPERATION" in
-            publish)
-              printf '%s' "$BUILD_RUN_ID" | grep -Eq '^[0-9]{1,20}$' || fail "build_run_id must be a run id"
-              if [ -n "$BINARY_REPORT" ]; then
-                printf '%s' "$BINARY_REPORT" | grep -Eq '^[A-Za-z0-9_./-]+\.json$' || fail "binary_report must be a repository path"
-                case "$BINARY_REPORT" in /*|*..*) fail "binary_report must be repository-relative" ;; esac
-              fi
-              [ "$VARIANT" = "none" ] && [ -z "$DIGEST" ] || fail "publish takes no variant or digest" ;;
-            promote)
+          case "$EVENT" in
+            push)
+              [ -z "$VARIANT" ] && [ -z "$DIGEST" ] || fail "a push publishes the build; it takes no variant or digest" ;;
+            workflow_dispatch)
               case "$VARIANT" in local|als-dev|als-prod) ;; *) fail "promote needs a variant" ;; esac
               printf '%s' "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$' || fail "digest must be sha256:<64 hex>"
               if [ "$ROLLBACK" = "true" ] && [ -z "$REASON" ]; then fail "a rollback needs a reason"; fi ;;
-            *) fail "unknown operation" ;;
+            *) fail "unsupported event $EVENT" ;;
           esac
 
-  publish:
-    name: Publish the tested candidate (immutable tags only)
+  candidate:
+    name: Build, check and save the three candidates of this commit (build-app.yml)
     needs: gate
-    if: inputs.operation == 'publish'
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/build-app.yml
+    with:
+      publish_candidate: true
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish the tested candidate (immutable tags) and move :local and :als-dev
+    needs: [ gate, candidate ]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     environment: ghcr-publish
+    # One registry writer at a time; a running publication or promotion is never cancelled.
+    concurrency:
+      group: publish-image-ghcr
+      cancel-in-progress: false
     permissions:
       contents: read
       actions: read
@@ -152,47 +161,18 @@ jobs:
       IMAGE_REPOSITORY: ${{ needs.gate.outputs.image_repository }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
-        with: { persist-credentials: false }
+        with: { fetch-depth: 0, persist-credentials: false }
       - name: O06 still approved
         env:
           O06_APPROVED: ${{ vars.O06_APPROVED }}
         run: test "$O06_APPROVED" = "true"
-      - name: The build run is a successful trusted build-app run of this commit
+      - name: Download this run's manifest and tested images (built by the candidate job)
         env:
           GH_TOKEN: ${{ github.token }}
-          BUILD_RUN_ID: ${{ inputs.build_run_id }}
-          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" > "$RUNNER_TEMP/build-run.json"
-          python3 - "$RUNNER_TEMP/build-run.json" <<'EOF'
-          import json, os, sys
-          run = json.load(open(sys.argv[1]))
-          want = {
-              "path": ".github/workflows/build-app.yml",
-              "conclusion": "success",
-              "head_sha": os.environ["GITHUB_SHA"],
-              "head_branch": os.environ["REF_NAME"],
-          }
-          problems = [f"{k}={run.get(k)!r}, expected {v!r}" for k, v in want.items() if run.get(k) != v]
-          if run.get("event") not in ("push", "workflow_dispatch"):
-              problems.append(f"event={run.get('event')!r}: only push or workflow_dispatch builds are published")
-          for key in ("repository", "head_repository"):
-              if (run.get(key) or {}).get("full_name") != os.environ["GITHUB_REPOSITORY"]:
-                  problems.append(f"{key} is not {os.environ['GITHUB_REPOSITORY']}")
-          if problems:
-              print("::error::build run refused: " + "; ".join(problems))
-              sys.exit(1)
-          print("build run ok:", run.get("html_url"))
-          EOF
-      - name: Download the manifest and the tested images
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BUILD_RUN_ID: ${{ inputs.build_run_id }}
-        run: |
-          set -euo pipefail
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-manifest -D candidate/manifest
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-images -D candidate/images
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-manifest -D candidate/manifest
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-images -D candidate/images
       - name: Verify the manifest, then load and verify the images
         run: |
           set -euo pipefail
@@ -210,15 +190,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-      - name: Push immutable tags and record the digests
+      - name: Push immutable tags and record the digests (never overwrites an existing sha-* tag)
         env:
           SEMVER: ${{ needs.gate.outputs.semver }}
-          BINARY_REPORT: ${{ inputs.binary_report }}
         run: |
           set -euo pipefail
           python3 scripts/ci/publish_candidate.py \
             --manifest candidate/manifest/release-manifest.json --repository "$IMAGE_REPOSITORY" \
-            --commit "$GITHUB_SHA" --semver "$SEMVER" --binary-report "$BINARY_REPORT" \
+            --commit "$GITHUB_SHA" --semver "$SEMVER" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --actor "$GITHUB_ACTOR" \
             --out publication/release-publication.json
           {
@@ -227,6 +206,17 @@ jobs:
             python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(json.dumps(p["variants"], indent=2))' publication/release-publication.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Move :local and :als-dev to the digests just published (re-tag, no rebuild; D2.1)
+        run: |
+          set -euo pipefail
+          for variant in local als-dev; do
+            digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["variants"][sys.argv[2]]["digest"])' \
+              publication/release-publication.json "$variant")"
+            python3 scripts/ci/promote_channel.py --repository "$IMAGE_REPOSITORY" --variant "$variant" \
+              --digest "$digest" --rollback false --reason "publish $GITHUB_SHA" --actor "$GITHUB_ACTOR" \
+              --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              --out "publication/channel-$variant.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
       - name: Log out
         if: always()
         run: docker logout ghcr.io
@@ -237,13 +227,69 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+  publish-als-prod:
+    name: Move :als-prod to this run's published als-prod digest (production environment)
+    needs: [ gate, publish ]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ghcr-als-prod
+    concurrency:
+      group: publish-image-ghcr
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      IMAGE_REPOSITORY: ${{ needs.gate.outputs.image_repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: O06 still approved
+        env:
+          O06_APPROVED: ${{ vars.O06_APPROVED }}
+        run: test "$O06_APPROVED" = "true"
+      - name: Download this run's publication record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" -n release-publication -D publication
+      - name: Log in to ghcr.io with the job token
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Move :als-prod to the tested als-prod digest of this commit (re-tag, no rebuild; D2.1, D2.3)
+        run: |
+          set -euo pipefail
+          digest="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["variants"]["als-prod"]["digest"])' \
+            publication/release-publication.json)"
+          python3 scripts/ci/promote_channel.py --repository "$IMAGE_REPOSITORY" --variant als-prod \
+            --digest "$digest" --rollback false --reason "publish $GITHUB_SHA" --actor "$GITHUB_ACTOR" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --out promotion/promotion.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: promotion-als-prod
+          path: promotion/
+          retention-days: 90
+          if-no-files-found: error
+
   promote:
-    name: Move :local or :als-dev to a published digest
+    name: Dispatch, move :local or :als-dev to a published digest (promote or rollback)
     needs: gate
-    if: inputs.operation == 'promote' && (inputs.variant == 'local' || inputs.variant == 'als-dev')
+    if: github.event_name == 'workflow_dispatch' && (inputs.variant == 'local' || inputs.variant == 'als-dev')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ghcr-publish
+    concurrency:
+      group: publish-image-ghcr
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
@@ -261,7 +307,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-      - name: Re-tag the tested digest (no rebuild)
+      - name: Re-tag the published digest (no rebuild)
         env:
           VARIANT: ${{ inputs.variant }}
           DIGEST: ${{ inputs.digest }}
@@ -284,12 +330,15 @@ jobs:
           if-no-files-found: error
 
   promote-als-prod:
-    name: Move :als-prod to the tested digest (production approval)
+    name: Dispatch, move :als-prod to a published digest (promote or rollback, production environment)
     needs: gate
-    if: inputs.operation == 'promote' && inputs.variant == 'als-prod'
+    if: github.event_name == 'workflow_dispatch' && inputs.variant == 'als-prod'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ghcr-als-prod
+    concurrency:
+      group: publish-image-ghcr
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
@@ -307,7 +356,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ACTOR: ${{ github.actor }}
         run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
-      - name: Re-tag the tested als-prod digest staged with :als-dev (no rebuild)
+      - name: Re-tag the published als-prod digest (any tested digest, D2.3; no rebuild)
         env:
           VARIANT: ${{ inputs.variant }}
           DIGEST: ${{ inputs.digest }}

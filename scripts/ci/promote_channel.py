@@ -3,8 +3,8 @@
 
 Used only by ``.github/workflows/publish-image.yml`` inside an approved GitHub environment.
 Promotion is a registry-side re-tag of the exact tested bytes; nothing is built or pushed
-from the runner. The O06 proposal (docs/migration/reviews/H6/o06_tag_rules_proposal.md)
-describes the rules; this script enforces them and fails closed:
+from the runner. The approved O06 tag rules (docs/migration/reviews/H6/o06_tag_rules_proposal.md,
+APPROVED 2026-10-30, owner decisions O-O6 D2.1-D2.10) are enforced here and fail closed:
 
 1. the target ``REPO@sha256:...`` is a single-platform manifest whose ``f2w.profile`` label is
    the channel and whose ``org.opencontainers.image.revision`` label is a full commit;
@@ -13,9 +13,12 @@ describes the rules; this script enforces them and fails closed:
 3. a forward promotion never moves a channel backwards: the channel's current revision must
    be an ancestor of (or equal to) the target revision; a rollback is explicit, needs a
    reason, and must move to an ancestor;
-4. ``:als-prod`` forward promotion requires ``:als-dev`` to currently carry the same commit:
-   prod gets the sibling digest of the release that is staged on dev, never a rebuild;
-5. after ``docker buildx imagetools create`` the channel must resolve to the target digest.
+4. after ``docker buildx imagetools create`` the channel must resolve to the target digest.
+
+Any tested, published digest may reach ``:als-prod`` (D2.3): the former "same commit must be
+on ``:als-dev`` first" rule was dropped by the owner. On a push to ``main`` the publish
+workflow moves all three channels to the new digests (D2.1); the manual dispatch path uses
+this same script for rollbacks and for moving a channel to an older published digest.
 
 Prints a JSON promotion record (previous and new digest) for the run summary and rollback.
 """
@@ -145,12 +148,6 @@ def promote(reg: Registry, *, variant: str, digest: str, rollback: bool, reason:
                                    "a stale build must not move the channel backwards (use rollback)")
     elif rollback:
         raise PromotionRefused("nothing to roll back: the channel does not exist yet")
-
-    if variant == "als-prod" and not rollback:
-        dev_digest = reg.digest(f"{repo}:als-dev")
-        dev_revision = reg.labels(f"{repo}@{dev_digest}").get("org.opencontainers.image.revision") if dev_digest else None
-        if dev_revision != revision:
-            raise PromotionRefused(f":als-dev carries {dev_revision!r}; promote {revision} to :als-dev first")
 
     reg.retag(channel_ref, target_ref)
     moved = reg.digest(channel_ref)

@@ -1,18 +1,23 @@
 """Static rules for the image workflows (T24D). CI runs this in build-app.yml.
 
 build-app.yml builds and checks the three variants of one commit and records them in a
-release manifest; publish-image.yml publishes and promotes them. These tests keep the
-security properties from drifting:
+release manifest; publish-image.yml publishes and promotes them under the approved O06 tag
+rules (2026-10-30, owner decisions O-O6 D2.1-D2.10). These tests keep the security
+properties from drifting:
 
 * no pull_request_target or workflow_run, no secrets (not even ``secrets: inherit``),
   read-only pull requests, every action a reviewed full-SHA pin (no placeholders);
-* publishing only by manual dispatch, from a protected default branch or vX.Y.Z tag, inside
-  the literal GitHub environments ghcr-publish / ghcr-als-prod, after an O06_APPROVED check
-  that fails closed and cannot be bypassed with always()/failure()/continue-on-error, with
-  only the job's GITHUB_TOKEN and ``packages: write``;
-* promotion is a re-tag, never a rebuild; nothing deploys to a host;
+* publishing only on a push to the protected default branch or a protected vX.Y.Z tag (the
+  candidates are built in the same run through a workflow_call of build-app.yml), and
+  channel moves by dispatch, inside the literal GitHub environments ghcr-publish /
+  ghcr-als-prod, after an O06_APPROVED check that fails closed and cannot be bypassed with
+  always()/failure()/continue-on-error, with only the job's GITHUB_TOKEN and
+  ``packages: write``;
+* all three channels follow a push to main (D2.1); promotion is a re-tag, never a rebuild,
+  and any published digest may reach :als-prod (D2.3); nothing deploys to a host;
 * every built variant gets the tests/images and docker/profiles/README.md checks and its
-  identity goes into the release manifest.
+  identity, the base-image digests (D2.9) and the binary report reference (D2.10) go into
+  the release manifest.
 
 Only the YAML is parsed; nothing here talks to GitHub or Docker.
 """
@@ -180,9 +185,12 @@ def test_checkouts_do_not_persist_credentials_where_not_needed(path: Path) -> No
 # ---------------------------------------------------------------- build-app.yml ----------
 def test_build_runs_for_prs_with_read_only_permissions(build: Dict[str, Any]) -> None:
     on = triggers(build)
-    assert set(on) == {"push", "pull_request", "workflow_dispatch"}
+    assert set(on) == {"push", "pull_request", "workflow_dispatch", "workflow_call"}
     assert set(on["pull_request"]["branches"]) == {"main", "forge_merge"}
     assert set(on["push"]["branches"]) == {"main", "forge_merge"}
+    assert "tags" not in on["push"], "v* tags are built inside publish-image.yml's call"
+    assert on["workflow_call"]["inputs"]["publish_candidate"]["type"] == "boolean"
+    assert on["workflow_call"].get("secrets") is None
     assert build["permissions"] == {"contents": "read"}
     for job_id, job in build["jobs"].items():
         scopes = write_scopes(job.get("permissions"))
@@ -192,6 +200,17 @@ def test_build_runs_for_prs_with_read_only_permissions(build: Dict[str, Any]) ->
             assert "github.event_name == 'push'" in cond and "refs/heads/main" in cond, job_id
         assert "environment" not in job, f"{job_id}: build jobs need no environment"
         assert "id-token" not in (job.get("permissions") or {})
+
+
+def test_main_commits_are_built_once_inside_the_publish_call(build: Dict[str, Any]) -> None:
+    """D2.1: a push to main publishes; the images are built by publish-image.yml's workflow_call
+    (publish_candidate=true) and the standalone main run keeps only the legacy test/docs jobs."""
+    static = build["jobs"]["image-static-tests"]["if"]
+    assert "github.event_name != 'push'" in static and "github.ref != 'refs/heads/main'" in static
+    assert "inputs.publish_candidate" in static
+    assert "if" not in build["jobs"]["build-candidates"], "inherits the skip through needs"
+    for job_id in ("test", "docs-deploy"):
+        assert "!inputs.publish_candidate" in build["jobs"][job_id]["if"], job_id
 
 
 def test_build_never_logs_in_pushes_or_publishes(build: Dict[str, Any]) -> None:
@@ -239,12 +258,17 @@ def test_every_variant_gets_the_post_build_checks(build: Dict[str, Any]) -> None
 
 def test_release_manifest_artifact_and_trusted_only_images(build: Dict[str, Any]) -> None:
     job = build["jobs"]["build-candidates"]
-    manifest = next(s for s in job["steps"] if s.get("name") == "Release manifest")
+    manifest = next(s for s in job["steps"] if s.get("name", "").startswith("Release manifest"))
     for variant in VARIANTS:
         assert f"checks-{variant}.json" in manifest["run"]
+    # D2.9: the resolved base-image references go into the manifest; D2.10: the newest binary
+    # report is referenced (information only).
+    assert '--base-image "$BASE_PYTHON_IMAGE=$PYTHON_REF" --base-image "$BASE_NODE_IMAGE=$NODE_REF"' in manifest["run"]
+    assert "--binary-report latest" in manifest["run"]
     uploads = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/upload-artifact@")]
     by_name = {s["with"]["name"]: s for s in uploads}
     assert set(by_name) == {"release-manifest", "release-images"}
+    assert all(s["with"]["retention-days"] == 90 for s in uploads), "D2.7: GitHub's maximum, nothing shorter"
     assert by_name["release-images"]["if"] == "github.event_name != 'pull_request'"
     save = next(s for s in job["steps"] if s.get("name", "").startswith("Save the tested images"))
     assert save["if"] == "github.event_name != 'pull_request'"
@@ -253,16 +277,39 @@ def test_release_manifest_artifact_and_trusted_only_images(build: Dict[str, Any]
 
 def test_main_side_effects_stay_main_only(build: Dict[str, Any]) -> None:
     deploy = build["jobs"]["docs-deploy"]
-    assert deploy["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    assert deploy["if"] == ("github.event_name == 'push' && github.ref == 'refs/heads/main' "
+                            "&& !inputs.publish_candidate")
     test_job = build["jobs"]["test"]
     assert "gh-deploy" not in "\n".join(s.get("run", "") for s in test_job["steps"])
 
 
 # ---------------------------------------------------------------- publish-image.yml ------
-def test_publish_is_manual_dispatch_only(publish: Dict[str, Any]) -> None:
-    assert set(triggers(publish)) == {"workflow_dispatch"}
+WRITERS = ("publish", "publish-als-prod", "promote", "promote-als-prod")
+
+
+def test_publish_runs_on_main_and_release_tags_and_promotes_by_dispatch(publish: Dict[str, Any]) -> None:
+    """D2.1: a push to main (or a v* tag) publishes; dispatch only moves a channel."""
+    on = triggers(publish)
+    assert set(on) == {"push", "workflow_dispatch"}
+    assert on["push"] == {"branches": ["main"], "tags": ["v*"]}
+    assert set(on["workflow_dispatch"]["inputs"]) == {"variant", "digest", "rollback", "reason"}
+    assert "pull_request" not in on and "schedule" not in on
     assert publish["permissions"] == {}
-    assert publish["concurrency"]["cancel-in-progress"] is False
+    for job_id in WRITERS:
+        # One registry writer at a time; a running publication or promotion is never cancelled.
+        assert publish["jobs"][job_id]["concurrency"] == {"group": "publish-image-ghcr", "cancel-in-progress": False}
+
+
+def test_candidates_are_built_in_the_same_run_by_build_app(publish: Dict[str, Any]) -> None:
+    job = publish["jobs"]["candidate"]
+    assert job["uses"] == "./.github/workflows/build-app.yml"
+    assert job["with"] == {"publish_candidate": True}
+    assert job["needs"] == "gate" and job["if"] == "github.event_name == 'push'"
+    assert job["permissions"] == {"contents": "read"} and "secrets" not in job
+    assert publish["jobs"]["publish"]["needs"] == ["gate", "candidate"]
+    assert publish["jobs"]["publish-als-prod"]["needs"] == ["gate", "publish"]
+    for job_id in ("publish", "publish-als-prod"):
+        assert publish["jobs"][job_id]["if"] == "github.event_name == 'push'"
 
 
 def test_gate_fails_closed_on_o06_and_protected_ref(publish: Dict[str, Any]) -> None:
@@ -278,10 +325,11 @@ def test_gate_fails_closed_on_o06_and_protected_ref(publish: Dict[str, Any]) -> 
 
 
 def test_every_writer_job_is_gated_and_in_an_environment(publish: Dict[str, Any]) -> None:
-    writers = {k: j for k, j in publish["jobs"].items() if k != "gate"}
-    assert set(writers) == {"publish", "promote", "promote-als-prod"}
+    writers = {k: j for k, j in publish["jobs"].items() if k not in ("gate", "candidate")}
+    assert set(writers) == set(WRITERS)
     for job_id, job in writers.items():
-        assert job["needs"] == "gate", job_id
+        needs = job["needs"] if isinstance(job["needs"], list) else [job["needs"]]
+        assert "gate" in needs, job_id
         assert job["environment"] in ("ghcr-publish", "ghcr-als-prod"), job_id
         assert write_scopes(job["permissions"]) == ["packages"], job_id
         assert set(job["permissions"]) <= {"contents", "actions", "packages"}, job_id
@@ -290,8 +338,11 @@ def test_every_writer_job_is_gated_and_in_an_environment(publish: Dict[str, Any]
                    and s.get("run") == 'test "$O06_APPROVED" = "true"' for s in job["steps"]), job_id
     assert writers["promote-als-prod"]["environment"] == "ghcr-als-prod"
     assert "inputs.variant == 'als-prod'" in writers["promote-als-prod"]["if"]
+    assert "workflow_dispatch" in writers["promote-als-prod"]["if"] and "workflow_dispatch" in writers["promote"]["if"]
     assert writers["promote"]["environment"] == "ghcr-publish"
     assert "als-prod" not in writers["promote"]["if"].replace("inputs.variant == 'als-dev'", "")
+    # The gate job itself never writes and has no token-bearing step.
+    assert write_scopes(publish["jobs"]["gate"].get("permissions")) == []
 
 
 def test_the_gate_cannot_be_bypassed(publish: Dict[str, Any]) -> None:
@@ -304,6 +355,8 @@ def test_the_gate_cannot_be_bypassed(publish: Dict[str, Any]) -> None:
         # A writer that ran on always()/failure() would start although the gate failed.
         assert not GATE_BYPASS.search(str(job.get("if", ""))), job_id
         assert "continue-on-error" not in job, job_id
+        if "uses" in job:
+            continue  # the reusable build call has no steps and no registry access
         for step in job["steps"]:
             if step.get("run") == 'test "$O06_APPROVED" = "true"':
                 assert "if" not in step and "continue-on-error" not in step, job_id
@@ -316,15 +369,15 @@ def test_the_gate_cannot_be_bypassed(publish: Dict[str, Any]) -> None:
 
 def test_environments_are_the_two_named_approval_boundaries(publish: Dict[str, Any]) -> None:
     envs = {job_id: job.get("environment") for job_id, job in publish["jobs"].items()}
-    assert envs == {"gate": None, "publish": "ghcr-publish", "promote": "ghcr-publish",
-                    "promote-als-prod": "ghcr-als-prod"}
+    assert envs == {"gate": None, "candidate": None, "publish": "ghcr-publish", "publish-als-prod": "ghcr-als-prod",
+                    "promote": "ghcr-publish", "promote-als-prod": "ghcr-als-prod"}
     # Literal names: an expression could pick an unprotected environment at run time.
     assert all(e is None or "${{" not in e for e in envs.values())
 
 
 def test_only_the_job_token_logs_in_to_ghcr(publish: Dict[str, Any]) -> None:
     logins = [(j, s) for j, s in steps(publish) if "docker login" in s.get("run", "")]
-    assert {j for j, _ in logins} == {"publish", "promote", "promote-als-prod"}
+    assert {j for j, _ in logins} == set(WRITERS)
     for _, step in logins:
         assert step["env"]["GH_TOKEN"] == "${{ github.token }}"
         assert step["run"] == 'printf \'%s\' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin'
@@ -338,18 +391,34 @@ def test_publish_never_rebuilds_and_verifies_the_tested_bytes(publish: Dict[str,
         assert word not in text, word
     job = publish["jobs"]["publish"]
     run = "\n".join(s.get("run", "") for s in job["steps"])
-    assert '"path": ".github/workflows/build-app.yml"' in run
-    assert '"head_sha": os.environ["GITHUB_SHA"]' in run
-    assert '("push", "workflow_dispatch")' in run, "pull_request builds are never published"
+    # Only this run's own artifacts (built by the candidate job of the same commit) are published.
+    assert 'gh run download "$GITHUB_RUN_ID"' in run and "build_run_id" not in PUBLISH.read_text(encoding="utf-8")
+    assert "-n release-manifest" in run and "-n release-images" in run
+    assert '--commit "$GITHUB_SHA"' in run
     assert run.index("release_manifest.py verify") < run.index("docker load") < run.index("--inspect")
-    assert run.index("--inspect") < run.index("publish_candidate.py")
+    assert run.index("--inspect") < run.index("publish_candidate.py") < run.index("promote_channel.py")
+
+
+def test_all_three_channels_follow_a_push_to_main(publish: Dict[str, Any]) -> None:
+    """D2.1 and D2.3: :local and :als-dev move in ghcr-publish, :als-prod in ghcr-als-prod, all from
+    the digests this run published; no dev-before-prod precondition anywhere."""
+    publish_run = "\n".join(s.get("run", "") for s in publish["jobs"]["publish"]["steps"])
+    assert "for variant in local als-dev; do" in publish_run
+    assert '["variants"][sys.argv[2]]["digest"]' in publish_run and "--rollback false" in publish_run
+    prod_run = "\n".join(s.get("run", "") for s in publish["jobs"]["publish-als-prod"]["steps"])
+    assert "-n release-publication" in prod_run
+    assert '["variants"]["als-prod"]["digest"]' in prod_run and "--variant als-prod" in prod_run
+    for text in (PUBLISH.read_text(encoding="utf-8"), (REPO / "scripts/ci/promote_channel.py").read_text(encoding="utf-8")):
+        assert "als-dev first" not in text and "staged with :als-dev" not in text
 
 
 def test_promotion_is_a_retag_of_a_published_digest(publish: Dict[str, Any]) -> None:
-    for job_id in ("promote", "promote-als-prod"):
+    for job_id in WRITERS:
         job = publish["jobs"][job_id]
         run = "\n".join(s.get("run", "") for s in job["steps"])
-        assert "scripts/ci/promote_channel.py" in run and '--digest "$DIGEST"' in run
+        assert "scripts/ci/promote_channel.py" in run
+        # Dispatch takes the digest from the validated input; a push from this run's publication record.
+        assert ('--digest "$DIGEST"' in run) if job_id.startswith("promote") else ('--digest "$digest"' in run)
         checkout = next(s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/checkout@"))
         assert checkout["with"]["fetch-depth"] == 0, "ancestry checks need history"
 
@@ -357,19 +426,25 @@ def test_promotion_is_a_retag_of_a_published_digest(publish: Dict[str, Any]) -> 
 def test_inputs_are_validated_before_any_writer(publish: Dict[str, Any]) -> None:
     validate = next(s for s in publish["jobs"]["gate"]["steps"] if s.get("name") == "Validate the inputs")
     assert "^sha256:[0-9a-f]{64}$" in validate["run"]
-    assert "^[0-9]{1,20}$" in validate["run"]
     assert "a rollback needs a reason" in validate["run"]
+    assert validate["env"]["EVENT"] == "${{ github.event_name }}"
+    assert "takes no variant or digest" in validate["run"], "a push ignores stray inputs"
 
 
-# ---------------------------------------------------------------- O06 proposal ----------
-def test_o06_rules_are_a_proposal_and_publishing_waits_for_them() -> None:
+# ---------------------------------------------------------------- O06 rules -------------
+def test_o06_rules_are_approved_and_the_workflow_says_so() -> None:
     text = PROPOSAL.read_text(encoding="utf-8")
-    assert "PROPOSAL" in text and "not approved" in text.lower()
+    assert "APPROVED 2026-10-30" in text and "O-O6" in text and "owner_decisions.md" in text
+    assert "not approved" not in text.lower().replace("not approved by", "")
     assert "O06_APPROVED" in text
     for topic in ("sha-<commit>-<variant>", "v<MAJOR>.<MINOR>.<PATCH>-<variant>", ":als-prod", "Rollback",
-                  "imagetools create", "T24E"):
+                  "imagetools create", "T24E", "ghcr.io/fair2wise/fair2wise", "amd64"):
         assert topic in text, topic
-    assert "NOT ACTIVE UNTIL THE OWNER APPROVES O06" in PUBLISH.read_text(encoding="utf-8")
+    for decision in (f"D2.{n}" for n in range(1, 11)):
+        assert decision in text, decision
+    workflow = PUBLISH.read_text(encoding="utf-8")
+    assert "APPROVED (2026-10-30, owner decisions O-O6" in workflow
+    assert "NOT ACTIVE UNTIL" not in workflow and "the owner sets the variable" in workflow
 
 
 # ---------------------------------------------------------------- forge-merge-ci.yml ------

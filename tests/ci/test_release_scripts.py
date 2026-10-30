@@ -3,7 +3,8 @@
 * scripts/ci/image_checks.py   - post-build checks per variant
 * scripts/ci/release_manifest.py - release manifest build and verification
 * scripts/ci/publish_candidate.py - immutable-tag publication of the tested bytes
-* scripts/ci/promote_channel.py  - channel re-tag rules (forward, rollback, prod after dev)
+* scripts/ci/promote_channel.py  - channel re-tag rules (forward, rollback; any published digest
+  may reach :als-prod, owner decision O-O6 D2.3)
 """
 
 from __future__ import annotations
@@ -219,9 +220,55 @@ def test_manifest_records_commit_digests_locks_tiled_and_ui_tree(tmp_path: Path)
     assert m["frozen_ui_tree"]["pinned"] == rm.frozen_ui_pin(REPO)
     assert m["frozen_ui_tree"]["matches"] is (m["frozen_ui_tree"]["actual"] == m["frozen_ui_tree"]["pinned"])
     assert m["platforms_tested"] == ["linux/amd64"]
+    # D2.9: the base images stay tag-referenced; the resolved digests are recorded.
+    assert m["base_images"] == {"python:3.12-slim": "python@" + digest("9")}
+    assert m["base_image_digests"] == {"python:3.12-slim": digest("9")}
+    assert m["binary_report"] is None  # none asked for in this build
     if m["frozen_ui_tree"]["matches"]:
         assert m["candidate_ok"] and not m["problems"]
         rm.verify_manifest(m, commit=m["commit"])
+
+
+@needs_git
+def test_manifest_refuses_an_unresolved_base_image(tmp_path: Path) -> None:
+    """D2.9: a base image CI could not resolve to a digest is a refusal, not a silent gap."""
+    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+    checks = rm.load_checks(_checks(tmp_path))
+    for entry in checks.values():
+        entry["identity"]["labels"]["org.opencontainers.image.revision"] = head
+    m = rm.build_manifest(root=REPO, commit=head, ref="refs/heads/main", event="push",
+                          repository="fair2wise/fair2wise", image_repository=REPO_IMG, run_id="42",
+                          run_attempt="1", server_url="https://github.com", checks=checks,
+                          base_images={"python:3.12-slim": "python:3.12-slim", "node:20-bookworm-slim": "node@" + digest("8")})
+    assert m["base_image_digests"] == {"node:20-bookworm-slim": digest("8"), "python:3.12-slim": None}
+    assert m["candidate_ok"] is False
+    assert any("python:3.12-slim was not resolved to a digest" in p for p in rm.refusals(m["problems"]))
+
+
+@needs_git
+def test_manifest_references_the_newest_binary_report_without_gating(tmp_path: Path) -> None:
+    """D2.10: the newest committed report is referenced in the manifest; its verdict never decides."""
+    latest = rm.latest_binary_report(REPO)
+    assert latest and latest.startswith("docs/migration/reviews/") and latest.endswith(".json")
+    assert "binary_report" in Path(latest).name
+    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+    checks = rm.load_checks(_checks(tmp_path))
+    for entry in checks.values():
+        entry["identity"]["labels"]["org.opencontainers.image.revision"] = head
+    m = rm.build_manifest(root=REPO, commit=head, ref="refs/heads/main", event="push",
+                          repository="fair2wise/fair2wise", image_repository=REPO_IMG, run_id="42",
+                          run_attempt="1", server_url="https://github.com", checks=checks,
+                          base_images={}, binary_report=latest)
+    assert m["binary_report"]["path"] == latest and m["binary_report"]["gating"] is False
+    assert len(m["binary_report"]["sha256"]) == 64
+    assert not any("binary" in p.lower() for p in m["problems"]), "a NOT_PASS verdict is recorded, never a problem"
+    # The publication record carries the manifest's reference unless another is given.
+    m.update(candidate_ok=True, problems=[])
+    m["frozen_ui_tree"]["matches"] = True
+    record = rm.build_publication(m, digests={v: digest("4") for v in rm.VARIANTS}, tags={}, run_url="u", actor="a")
+    assert record["binary_report"] == m["binary_report"]
 
 
 @needs_git
@@ -449,15 +496,18 @@ def test_stale_build_cannot_move_a_channel_backwards_but_rollback_can() -> None:
         promote(reg, "local", digest("3"), rollback=True, reason="wrong way")
 
 
-def test_als_prod_needs_the_same_commit_staged_on_als_dev() -> None:
+def test_any_published_als_prod_digest_can_be_promoted_regardless_of_als_dev() -> None:
+    """D2.3: any tested digest may reach :als-prod; :als-dev carrying another commit is no bar."""
     reg = FakeRegistry()
     reg.add(digest("1"), "als-dev", OLDER, None, f"sha-{OLDER}-als-dev", "als-dev")
     reg.add(digest("2"), "als-prod", COMMIT, None, f"sha-{COMMIT}-als-prod")
-    with pytest.raises(pr.PromotionRefused, match="als-dev first"):
-        promote(reg, "als-prod", digest("2"))
-    reg.add(digest("3"), "als-dev", COMMIT, None, f"sha-{COMMIT}-als-dev", "als-dev")
-    promote(reg, "als-prod", digest("2"))
-    assert reg.tags[f"{REPO_IMG}:als-prod"] == digest("2")
+    record = promote(reg, "als-prod", digest("2"))
+    assert record["changed"] and reg.tags[f"{REPO_IMG}:als-prod"] == digest("2")
+    assert reg.tags[f"{REPO_IMG}:als-dev"] == digest("1"), "moving prod never touches dev"
+    # The other rules still hold for prod: only a published digest of the als-prod variant.
+    reg.add(digest("3"), "als-prod", NEWER, None)
+    with pytest.raises(pr.PromotionRefused, match="only digests written by the publish job"):
+        promote(reg, "als-prod", digest("3"))
 
 
 @pytest.mark.parametrize("case", ["unknown", "wrong-profile", "not-published", "index", "retag-drift", "bad-digest"])

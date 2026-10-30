@@ -4,16 +4,19 @@
 ``build`` (``.github/workflows/build-app.yml``) writes ``release-manifest.json`` after the
 three candidates of one commit were built and checked by ``scripts/ci/image_checks.py``:
 the commit, the identity of each variant (image id, rootfs layer digests, platform, labels,
-check results), the dependency lock hashes, the pinned Tiled wheel hash, the frozen UI tree
-and the base images that were used. Nothing in it is a credential.
+check results), the dependency lock hashes, the pinned Tiled wheel hash, the frozen UI tree,
+the base images that were used with their resolved digests (owner decision O-O6 D2.9: base
+images stay tag-referenced in the Dockerfile, CI records the digests) and, when the
+repository holds one, a reference to the newest binary evaluation report (O-O6 D2.10:
+recorded for information, never gating). Nothing in it is a credential.
 
 ``verify`` (``.github/workflows/publish-image.yml``) refuses a manifest that is not a passed
 candidate of the expected commit, or images whose identity differs from what was tested.
 
 :func:`build_publication` (used by ``publish_candidate.py``) records what the publish job
-pushed: per variant the registry manifest digest and the tags written. It may reference a
-binary evaluation report and its verdict for information; a verdict never gates
-a build or a publication (owner decision H3 B).
+pushed: per variant the registry manifest digest and the tags written, plus the manifest's
+binary report reference. A report verdict never gates a build or a publication (owner
+decisions H3 B and O-O6 D2.10).
 
 ``shipped_untracked_files`` (T28C, A5-1) lists files the Dockerfile ships from the build
 context that are not in the commit's tree, so the images would depend on the builder's disk.
@@ -67,6 +70,8 @@ FROZEN_UI_SOURCE = ".github/workflows/forge-merge-ci.yml"
 TILED_CONFIG = "app/modules/deployment/tiled_config.py"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+# Where the binary evaluation reports live (H3 B); the newest committed one is referenced.
+BINARY_REPORT_GLOB = "docs/migration/reviews/**/binary_report*.json"
 
 # Problems that start with this prefix are recorded but do not stop a candidate (T28C).
 WARNING_PREFIX = "WARNING: "
@@ -267,19 +272,61 @@ def load_checks(paths: Sequence[Path]) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def base_image_digests(base_images: Mapping[str, str]) -> Dict[str, Optional[str]]:
+    """``{tag: sha256 digest}`` from the resolved ``NAME=REPO@sha256:...`` references (D2.9).
+
+    A reference without a digest maps to ``None``; :func:`build_manifest` records that as a
+    refusal, because an unresolved base image makes the build unreproducible.
+    """
+    out: Dict[str, Optional[str]] = {}
+    for name, resolved in base_images.items():
+        _, sep, digest = resolved.partition("@")
+        out[name] = digest if sep and DIGEST_RE.match(digest) else None
+    return out
+
+
+def latest_binary_report(root: Path) -> Optional[str]:
+    """Repository-relative path of the most recently committed binary evaluation report, if any (D2.10).
+
+    Reports are matched by :data:`BINARY_REPORT_GLOB`; the newest commit date wins, then the
+    path (so the choice is deterministic). Untracked files are never chosen.
+    """
+    candidates = sorted(p.relative_to(root).as_posix() for p in root.glob(BINARY_REPORT_GLOB) if p.is_file())
+    newest: Optional[str] = None
+    newest_time = -1
+    for rel in candidates:
+        stamp = git(root, "log", "-1", "--format=%ct", "--", rel)
+        if not stamp:
+            continue  # untracked or never committed
+        when = int(stamp)
+        if when > newest_time or (when == newest_time and newest is not None and rel > newest):
+            newest, newest_time = rel, when
+    return newest
+
+
 def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository: str, image_repository: str,
                    run_id: str, run_attempt: str, server_url: str, checks: Mapping[str, Mapping[str, Any]],
-                   base_images: Mapping[str, str],
+                   base_images: Mapping[str, str], binary_report: Optional[str] = None,
                    refuse_shipped_untracked: bool = REFUSE_SHIPPED_UNTRACKED_FILES) -> Dict[str, Any]:
     """Assemble the manifest; ``candidate_ok`` says whether it may ever be published.
 
     ``problems`` holds refusals and, prefixed :data:`WARNING_PREFIX`, warnings that are recorded
     without stopping the candidate. Today's only warning is ``shipped_untracked_files`` (A5-1);
     ``refuse_shipped_untracked`` (PC-1) turns it into a refusal.
+
+    ``base_images`` maps each tag the Dockerfile names to the reference CI resolved it to
+    (``repo@sha256:...``); the digests are recorded separately (D2.9). ``binary_report`` is a
+    repository-relative report path to reference, or ``None`` for none (D2.10); its verdict is
+    recorded and never consulted.
     """
     if not COMMIT_RE.match(commit):
         raise ManifestError(f"commit must be a full 40-hex object id, got {commit!r}")
     problems: List[str] = []
+    digests = base_image_digests(base_images)
+    for name, digest in digests.items():
+        if digest is None:
+            problems.append(f"base image {name} was not resolved to a digest ({base_images[name]!r})")
+    binary = binary_reference(root, binary_report) if binary_report else None
     untracked = shipped_untracked_files(root, commit)
     if untracked:
         text = (f"{len(untracked)} file(s) the Dockerfile ships from the build context are not tracked at "
@@ -341,8 +388,10 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
         "shipped_untracked_files": untracked,
         "tiled": tiled,
         "base_images": dict(sorted(base_images.items())),
+        "base_image_digests": dict(sorted(digests.items())),
         "platforms_tested": platforms,
         "variants": variants,
+        "binary_report": binary,
         "data_release": None,
         "notes": [
             "Image identity only. Graph snapshots and their binary reports are released separately (D31, T26B).",
@@ -420,7 +469,10 @@ def binary_reference(root: Path, rel_path: str) -> Dict[str, Any]:
 
 
 def build_publication(manifest: Mapping[str, Any], *, digests: Mapping[str, str], tags: Mapping[str, List[str]],
-                      run_url: str, actor: str, binary: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+                      run_url: str, actor: str, binary: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """The publication record; ``binary`` defaults to the manifest's own report reference (D2.10)."""
+    if binary is None:
+        binary = manifest.get("binary_report")
     for variant in VARIANTS:
         if not DIGEST_RE.match(str(digests.get(variant))):
             raise ManifestError(f"{variant}: published digest {digests.get(variant)!r} is not a sha256 digest")
@@ -470,7 +522,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     b.add_argument("--run-attempt", default="")
     b.add_argument("--server-url", default="https://github.com")
     b.add_argument("--checks", type=Path, nargs="+", required=True)
-    b.add_argument("--base-image", action="append", default=[], help="NAME=RESOLVED_REFERENCE")
+    b.add_argument("--base-image", action="append", default=[], help="NAME=RESOLVED_REFERENCE (repo@sha256:...)")
+    b.add_argument("--binary-report", default="latest",
+                   help="repository path of a binary evaluation report to reference, 'latest' (default: the "
+                        "newest committed report under docs/migration/reviews) or 'none'; information only")
     b.add_argument("--out", type=Path, required=True)
 
     v = sub.add_parser("verify")
@@ -482,10 +537,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "build":
+            if args.binary_report == "latest":
+                binary_report = latest_binary_report(args.root)
+            elif args.binary_report in ("", "none"):
+                binary_report = None
+            else:
+                binary_report = args.binary_report
             manifest = build_manifest(
                 root=args.root, commit=args.commit, ref=args.ref, event=args.event, repository=args.repository,
                 image_repository=args.image_repository, run_id=args.run_id, run_attempt=args.run_attempt,
-                server_url=args.server_url, checks=load_checks(args.checks), base_images=_pairs(args.base_image))
+                server_url=args.server_url, checks=load_checks(args.checks), base_images=_pairs(args.base_image),
+                binary_report=binary_report)
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             for problem in manifest["problems"]:

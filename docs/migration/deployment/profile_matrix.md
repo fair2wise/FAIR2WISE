@@ -47,7 +47,7 @@
 | Local Tiled data `/var/lib/fair2wise/tiled` | **Required**, read-write, persistent | Must be absent; startup fails if Tiled config is present | Must be absent |
 | `storage/` in the image (E3) | kg/terminology/schema allowed; optional catalog seed (see ADR section 4.2) | kg/terminology/schema allowed; **no catalog DB** | same as als-dev |
 | Central-outage behavior | Not applicable | `target_unavailable`; never starts local Tiled | same |
-| Tag promotion | O06 (unresolved) | O06 | O06, behind protection |
+| Tag promotion | moves on every push to `main` (O06 decided 2026-10-30, D2.1) | same push, same digest set | same push, environment `ghcr-als-prod` (any tested digest, D2.3) |
 | Platforms | O08 (unresolved). Host for local use is arm64 macOS. | ALS host architecture is not yet known (O08) | same |
 
 ## 2. Invariants (each needs a binary check in T24B/T24E)
