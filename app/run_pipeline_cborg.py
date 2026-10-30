@@ -14,7 +14,6 @@ Organization:
 import argparse
 import logging
 from datetime import datetime, timezone
-from dotenv import load_dotenv
 from pathlib import Path
 from typing import List
 import shutil
@@ -27,7 +26,8 @@ from modules.json2kg import convert_terms_to_graph
 # -----------------------------------------------------------------------------
 # Configuration for evaluation
 # -----------------------------------------------------------------------------
-load_dotenv()
+# The repo .env is loaded by the __main__ block below through app.modules.dotenv_entry
+# (F2W_DOTENV governs it; AUD-02). Importing this module never loads a dotenv file.
 
 EVALUATION_MODELS = [
     "google/gemini-flash-lite",
@@ -44,7 +44,6 @@ PAPER_FOLDERS = {
 DEFAULT_PDF_ROOT = Path("papers")
 DEFAULT_OLLAMA_URL = "http://localhost:11434"  # unused for cborg but harmless
 DEFAULT_CBORG_BASE = os.environ.get("CBORG_BASE_URL", "https://api.cborg.lbl.gov")
-print("Using CBORG_BASE_URL =", DEFAULT_CBORG_BASE)
 # -----------------------------------------------------------------------------
 # Helper: Organize papers into 4 folders of 25 each
 # -----------------------------------------------------------------------------
@@ -156,6 +155,14 @@ def run_checkpoint_pipeline(
 # Main
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
+    # Entry point only: load the checkout .env (or F2W_DOTENV) before reading configuration,
+    # then re-read the one module default that depends on it.
+    from modules.dotenv_entry import load_entrypoint_dotenv
+
+    load_entrypoint_dotenv(__file__)
+    DEFAULT_CBORG_BASE = os.environ.get("CBORG_BASE_URL", DEFAULT_CBORG_BASE)
+    print("Using CBORG_BASE_URL =", DEFAULT_CBORG_BASE)
+
     parser = argparse.ArgumentParser(description="Run FAIR2WISE checkpoint evaluation")
     parser.add_argument("--pdf-root", type=Path, default=DEFAULT_PDF_ROOT)
     parser.add_argument("--source-dir", type=Path, help="Source directory with all PDFs (for --organize)")

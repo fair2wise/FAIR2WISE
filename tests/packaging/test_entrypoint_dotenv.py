@@ -21,6 +21,11 @@ FORMER_IMPORT_LOADERS = [
     "app.modules.launchers.f2w_agent",
 ]
 
+# Legacy entry points that still called load_dotenv() at import after T04 (AUD-02). They are
+# imported by file path below: app/run_pipeline_cborg.py needs app/ on sys.path for its
+# ``modules.*`` imports, and scripts/ is not a package.
+LEGACY_ENTRY_POINTS = ["app/run_pipeline_cborg.py", "scripts/run.py"]
+
 
 def _clean_env(**extra):
     env = {k: v for k, v in os.environ.items() if not k.startswith(("KG_RAG_", "F2W_", "CBORG_"))}
@@ -45,6 +50,72 @@ def test_library_import_never_loads_dotenv(module):
     out = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, check=True,
                          cwd="/", env=_clean_env())
     assert json.loads(out.stdout.strip().splitlines()[-1]) == []
+
+
+@pytest.mark.parametrize("script", LEGACY_ENTRY_POINTS)
+def test_legacy_entry_point_import_loads_no_dotenv(tmp_path, script):
+    """AUD-02: importing the two legacy entry points reads no .env, even one next to the cwd,
+    next to the script, or named by F2W_DOTENV; only their __main__ block loads it."""
+    (tmp_path / ".env").write_text("T28C_SENTINEL=leaked\nCBORG_BASE_URL=https://leaked.invalid\n")
+    code = (
+        "import importlib.util, json, os, sys\n"
+        f"sys.path.insert(0, {str(REPO)!r}); sys.path.insert(0, {str(REPO / 'app')!r})\n"
+        "import dotenv, dotenv.main\n"
+        "calls = []\n"
+        "def rec(*a, **k):\n"
+        "    calls.append(sys._getframe(1).f_code.co_filename)\n"
+        "dotenv.load_dotenv = dotenv.main.load_dotenv = rec\n"
+        "dotenv.find_dotenv = dotenv.main.find_dotenv = rec\n"
+        f"spec = importlib.util.spec_from_file_location('legacy_entry', {str(REPO / script)!r})\n"
+        "mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)\n"
+        "print(json.dumps({'calls': calls, 'sentinel': os.environ.get('T28C_SENTINEL'),\n"
+        "                  'base': getattr(mod, 'DEFAULT_CBORG_BASE', None)}))\n"
+    )
+    out = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, cwd=tmp_path,
+                         env=_clean_env(F2W_DOTENV=str(tmp_path / ".env")), timeout=180)
+    assert out.returncode == 0, out.stderr[-2000:]
+    seen = json.loads(out.stdout.strip().splitlines()[-1])
+    assert seen["calls"] == []
+    assert seen["sentinel"] is None
+    assert seen["base"] in (None, "https://api.cborg.lbl.gov")
+
+
+def _run_legacy(script, tmp_path, args, **env):
+    # As documented (README): plain ``python <script>``, so the script directory is sys.path[0].
+    return subprocess.run([sys.executable, str(REPO / script), *args], capture_output=True, text=True,
+                          cwd=tmp_path, env=_clean_env(**env), timeout=180)
+
+
+def test_scripts_run_main_reads_dotenv_under_f2w_dotenv(tmp_path):
+    """``python scripts/run.py --dry-run`` needs CBORG_API_KEY: it comes from the F2W_DOTENV file,
+    and F2W_DOTENV=none leaves it unset (the former import-time load_dotenv() found the repo .env)."""
+    pdfs = tmp_path / "pdfs"
+    pdfs.mkdir()
+    (pdfs / "one.pdf").write_bytes(b"%PDF-1.4\n")
+    env_file = tmp_path / "custom.env"
+    env_file.write_text("CBORG_API_KEY=from-dotenv\n")
+    args = ["--pdf-dir", str(pdfs), "--dry-run", "--log-file", str(tmp_path / "run.log")]
+    ok = _run_legacy("scripts/run.py", tmp_path, args, F2W_DOTENV=str(env_file))
+    assert ok.returncode == 0, ok.stderr[-2000:]
+    assert "Dry-run complete" in ok.stderr + ok.stdout
+    assert "from-dotenv" not in ok.stderr + ok.stdout  # the key is never logged
+    off = _run_legacy("scripts/run.py", tmp_path, args, F2W_DOTENV="none")
+    assert off.returncode == 1
+    assert "requires CBORG_API_KEY" in off.stderr + off.stdout
+
+
+def test_run_pipeline_cborg_main_reads_dotenv_under_f2w_dotenv(tmp_path):
+    (tmp_path / "paper_25").mkdir()
+    env_file = tmp_path / "custom.env"
+    env_file.write_text("CBORG_API_KEY=from-dotenv\nCBORG_BASE_URL=https://cborg.example.invalid\n")
+    args = ["--pdf-root", str(tmp_path), "--dry-run"]
+    ok = _run_legacy("app/run_pipeline_cborg.py", tmp_path, args, F2W_DOTENV=str(env_file))
+    assert ok.returncode == 0, ok.stderr[-2000:]
+    assert "[DRY-RUN] Checkpoint=25" in ok.stdout
+    assert "Using CBORG_BASE_URL = https://cborg.example.invalid" in ok.stdout  # read after the dotenv load
+    off = _run_legacy("app/run_pipeline_cborg.py", tmp_path, args, F2W_DOTENV="none")
+    assert off.returncode != 0
+    assert "CBORG_API_KEY is not set" in off.stderr
 
 
 def test_checkout_lookup_walks_up_from_the_entry_point(tmp_path, monkeypatch):
