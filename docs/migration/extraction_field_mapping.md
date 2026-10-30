@@ -138,7 +138,7 @@ Code: `app/modules/extraction/record_validation.py` (`RULES`, `assess_value`, `r
 | E-02 references resolve | gate | withhold: unknown sample/measurement | donor tests |
 | F8.4 attributing sentence | tag | reported (or derived) -> `cited` | attributing-previous-reports, attributing-et-al, cited-never-upgraded |
 | F8.5 assumed instrument value | tag | -> `assumed` when proposed assumed or the sentence states an assumption; never shown as a measurement | assumed-detector-distance, assumption-cue-retags-reported, reported-photon-energy (stays reported) |
-| F2.3 derived | tag | value = 2*pi/x for a printed x (d from q, q from d, 1 % tolerance) -> `derived`, derivation recorded | derived-d-from-q |
+| F2.3 derived | tag | value = 2*pi/x for a printed x (d from q, q from d, 2 % tolerance, D1.5) -> `derived`, derivation recorded | derived-d-from-q |
 
 Tags only move away from `reported`. Withheld records keep their tag. Each quantity record carries
 `evidence_source`, `proposed_evidence_source`, `tag_reasons`, `derivation`, `paper_measurement`

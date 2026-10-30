@@ -377,8 +377,10 @@ def quantity_unit_mismatch(name: str, unit: str) -> str:
     return f"{base_quantity_name(name)} is a {expected} quantity but its unit {unit!r} is {actual}"
 
 
-#: Relative tolerance for recognising ``d = 2*pi/q`` against a printed partner (rounding of both numbers).
-RECIPROCAL_DERIVATION_REL_TOL = 0.01
+#: Relative tolerance for recognising ``d = 2*pi/q`` against a printed partner (rounding of both
+#: numbers). 2% since owner decision D1.5/D3.12 (O-S2, 2026-10-30): pilot paper A prints 34.3 nm
+#: against a computed 34.9 nm (1.7%).
+RECIPROCAL_DERIVATION_REL_TOL = 0.02
 
 
 def reciprocal_derivation(value: float, unit: str, partner_value: float, partner_unit: str) -> Optional[dict]:

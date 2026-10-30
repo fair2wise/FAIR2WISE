@@ -93,6 +93,18 @@ def test_derived_value_records_its_derivation():
     assert decision.derivation["computed_value"] == pytest.approx(2.0944, abs=1e-4)
 
 
+def test_reciprocal_derivation_tolerance_is_two_percent():
+    """D1.5 / D3.12 (O-S2, 2026-10-30): pilot paper A prints d = 34.3 nm against q = 0.18 nm^-1
+    (2*pi/0.18 = 34.9 nm, a 1.7% difference); 2% accepts it, 1% did not. 3% off is still refused."""
+    from app.modules.evidence.units import RECIPROCAL_DERIVATION_REL_TOL, reciprocal_derivation
+
+    assert RECIPROCAL_DERIVATION_REL_TOL == 0.02
+    paper_a = reciprocal_derivation(34.3, "nm", 0.18, "nm^-1")
+    assert paper_a is not None and paper_a["rel_tol"] == 0.02
+    assert paper_a["computed_value"] == pytest.approx(34.907, abs=1e-3)
+    assert reciprocal_derivation(33.8, "nm", 0.18, "nm^-1") is None  # 3.2% off: not a derivation
+
+
 def test_cited_and_assumed_values_are_never_presented_as_the_papers_measurement():
     report, sink = _report()
     records = [q.to_dict() for q in sink.quantities.values()]
