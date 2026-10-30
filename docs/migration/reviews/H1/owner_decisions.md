@@ -306,3 +306,12 @@ frozen-UI pin is updated in that change (as O-U1).
   (single-process ALS images until then).
 - **B13:** the 0.2.18 revocation window (up to 15 min for tokens held outside F2W) is
   accepted for the interim pin; revisit at 0.2.19.
+
+## Register walk-through, batch 10: B15-B17, B20 (2026-10-30, O-T3)
+
+- **B15:** loopback binding is enough for the managed `:local` Tiled; no access policy
+  unless `:local` is ever exposed.
+- **B16:** `executed_as = single-user-api-key` accepted for `:local` audit.
+- **B17:** pin SQLAlchemy 2.0.x in the Tiled lock to match upstream's bound; regenerate
+  the lock and rerun the Tiled suites (work item).
+- **B20:** the Compose developer stack at `http://127.0.0.1:5175/fair2wise/` is accepted.

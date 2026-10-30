@@ -130,9 +130,9 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 
 | # | Decision | Context | Recommendation |
 |---|---|---|---|
-| B15 | **Anonymous listing on managed `:local` Tiled** | A single-user Tiled lists graph records to anonymous callers. It binds only to loopback inside the container. | Loopback binding is enough on `:local`; add an access policy only if `:local` is ever exposed |
-| B16 | **`executed_as` on `:local`** | Single-user Tiled has no principal, so the audit can only record `single-user-api-key` as the writer. `approved_by` is still the local operator. | Accept for `:local` audit |
-| B17 | **SQLAlchemy in the Tiled lock** | The 0.2.18 lock resolved SQLAlchemy 2.1.4, outside the rc2 bound (`<2.1`). All tests pass on 2.1.4. | Pin 2.0.x to match upstream's bound, unless 0.2.19 lifts it |
+| B15 | **Anonymous listing on managed `:local` Tiled** | A single-user Tiled lists graph records to anonymous callers. It binds only to loopback inside the container. | Loopback binding is enough on `:local`; add an access policy only if `:local` is ever exposed | **Decided 2026-10-30 (O-T3): loopback is enough.**
+| B16 | **`executed_as` on `:local`** | Single-user Tiled has no principal, so the audit can only record `single-user-api-key` as the writer. `approved_by` is still the local operator. | Accept for `:local` audit | **Decided 2026-10-30 (O-T3): accept.**
+| B17 | **SQLAlchemy in the Tiled lock** | The 0.2.18 lock resolved SQLAlchemy 2.1.4, outside the rc2 bound (`<2.1`). All tests pass on 2.1.4. | Pin 2.0.x to match upstream's bound, unless 0.2.19 lifts it | **Decided 2026-10-30 (O-T3): pin 2.0.x.**
 
 ### Deployment (T24B and T24C)
 
@@ -140,7 +140,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 |---|---|---|---|
 | B18 | **Run `nginx -t` in a network-less container** | The gateway config has been checked only by a Python model of nginx. `docker run --rm --network none nginx:1.27-alpine-slim nginx -t` uses an image already on this machine; nothing is built or pushed. | Approve |
 | B19 | **Image builds** | No image has been built. Commands and post-build checks are in `docker/profiles/README.md`. A build alone confirms that nginx 1.22 accepts the config, that non-root nginx can bind port 80, and that the Tiled constraints resolve on Linux. | You run them, or authorize a local build (no push) |
-| B20 | **Compose URL** | The `compose.yaml` stack now serves at `http://127.0.0.1:5175/fair2wise/`, and `/` redirects there. Dev paths (`vite dev`, `:8090`) are unchanged. | Accept |
+| B20 | **Compose URL** | The `compose.yaml` stack now serves at `http://127.0.0.1:5175/fair2wise/`, and `/` redirects there. Dev paths (`vite dev`, `:8090`) are unchanged. | Accept | **Decided 2026-10-30 (O-T3): accept.**
 | B21 | **Supervisor** | A small standard-library Python supervisor under tini, instead of s6-overlay. H1 left this open. | Accept (no extra dependency, tested) |
 | B22 | **Managed Tiled failure on `:local`** | If the bundled Tiled fails, it restarts up to 3 times. After that it is marked failed and the container keeps serving JSON workflows instead of exiting. | Accept |
 | B23 | **Unset writer secret on ALS** | An ALS image starts with no writer secret; graph writes then fail at the first write. A secret that is set but unreadable is refused at startup. | Accept (reader-only ALS deployments are valid) |
