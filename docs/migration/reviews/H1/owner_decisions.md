@@ -315,3 +315,12 @@ frozen-UI pin is updated in that change (as O-U1).
 - **B17:** pin SQLAlchemy 2.0.x in the Tiled lock to match upstream's bound; regenerate
   the lock and rerun the Tiled suites (work item).
 - **B20:** the Compose developer stack at `http://127.0.0.1:5175/fair2wise/` is accepted.
+
+## Register walk-through, batch 11: B21-B24, D3.13 (2026-10-30, O-X2)
+
+- **B21:** the standard-library Python supervisor under tini is accepted (no s6-overlay).
+- **B22:** a failed bundled Tiled on `:local` leaves the container serving JSON workflows.
+- **B23:** an ALS image may start without a writer secret (writes fail with
+  `writer_unauthorized`); an unreadable or badly permissioned secret is refused at startup.
+- **B24 / D3.13:** the sibling hashed-lock layout is accepted (images `--require-hashes`;
+  developers and CI keep the plain lists).

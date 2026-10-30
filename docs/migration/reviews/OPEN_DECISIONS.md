@@ -141,10 +141,10 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | B18 | **Run `nginx -t` in a network-less container** | The gateway config has been checked only by a Python model of nginx. `docker run --rm --network none nginx:1.27-alpine-slim nginx -t` uses an image already on this machine; nothing is built or pushed. | Approve |
 | B19 | **Image builds** | No image has been built. Commands and post-build checks are in `docker/profiles/README.md`. A build alone confirms that nginx 1.22 accepts the config, that non-root nginx can bind port 80, and that the Tiled constraints resolve on Linux. | You run them, or authorize a local build (no push) |
 | B20 | **Compose URL** | The `compose.yaml` stack now serves at `http://127.0.0.1:5175/fair2wise/`, and `/` redirects there. Dev paths (`vite dev`, `:8090`) are unchanged. | Accept | **Decided 2026-10-30 (O-T3): accept.**
-| B21 | **Supervisor** | A small standard-library Python supervisor under tini, instead of s6-overlay. H1 left this open. | Accept (no extra dependency, tested) |
-| B22 | **Managed Tiled failure on `:local`** | If the bundled Tiled fails, it restarts up to 3 times. After that it is marked failed and the container keeps serving JSON workflows instead of exiting. | Accept |
-| B23 | **Unset writer secret on ALS** | An ALS image starts with no writer secret; graph writes then fail at the first write. A secret that is set but unreadable is refused at startup. | Accept (reader-only ALS deployments are valid) |
-| B24 | **Hash-locked Tiled dependencies** | Only the tiled wheel itself is hash-checked. Its dependencies are pinned but not hashed, and the pins come from macOS. A full `--require-hashes` lock needs network access (`uv pip compile`). | Authorize one lock-generation run with network, or do it yourself |
+| B21 | **Supervisor** | A small standard-library Python supervisor under tini, instead of s6-overlay. H1 left this open. | Accept (no extra dependency, tested) | **Decided 2026-10-30 (O-X2): accept.**
+| B22 | **Managed Tiled failure on `:local`** | If the bundled Tiled fails, it restarts up to 3 times. After that it is marked failed and the container keeps serving JSON workflows instead of exiting. | Accept | **Decided 2026-10-30 (O-X2): keep serving.**
+| B23 | **Unset writer secret on ALS** | An ALS image starts with no writer secret; graph writes then fail at the first write. A secret that is set but unreadable is refused at startup. | Accept (reader-only ALS deployments are valid) | **Decided 2026-10-30 (O-X2): accept.**
+| B24 | **Hash-locked Tiled dependencies** | Only the tiled wheel itself is hash-checked. Its dependencies are pinned but not hashed, and the pins come from macOS. A full `--require-hashes` lock needs network access (`uv pip compile`). | Authorize one lock-generation run with network, or do it yourself | **Decided 2026-10-30 (O-X2): sibling layout.**
 | B25 | **`pip check` conflict** | The app environment fails `pip check` (huggingface-hub 1.33 needs click>=8.4.2; the lock has 8.3.3) because `requirements/semantic.in` is unpinned. | Pin `huggingface-hub` below 1.33 or raise click in the lock: a reviewed lock change |
 
 ### Other
@@ -247,7 +247,7 @@ Recorded for the owner; nothing below is answered here.
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D3.13 | Hashed-lock layout: sibling `requirements/runtime.lock.txt` and `docker/profiles/tiled-server/constraints.lock.txt` (images install with `--require-hashes`; plain lists kept for developers and CI) vs hashing `runtime.txt` in place, which changes how CI and developers install | Keep the sibling layout |
+| D3.13 | Hashed-lock layout: sibling `requirements/runtime.lock.txt` and `docker/profiles/tiled-server/constraints.lock.txt` (images install with `--require-hashes`; plain lists kept for developers and CI) vs hashing `runtime.txt` in place, which changes how CI and developers install | Keep the sibling layout | **Decided 2026-10-30 (O-X2): keep the sibling layout.**
 | D3.14 | Switch the CI Tiled job to `constraints.lock.txt` for parity with the image | Yes, in T24E |
 | D3.15 | `tests/images/test_images_supervisor.py` backoff/health-order tests flaked once each under a loaded full run (pass alone and in other runs) | Relax their timing in T24E; add to known failures only if CI reproduces it |
 
