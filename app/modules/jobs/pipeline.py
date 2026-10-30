@@ -58,6 +58,21 @@ class AwaitReview(StagePause):
     state = JobState.AWAITING_REVIEW
 
 
+class RestartStages(Exception):
+    """The stage invalidated earlier stages; re-run the pipeline from the first pending stage now.
+
+    Raised by a stage that found its inputs stale and reset upstream stages (for example the
+    publication review stage after the schema, vocabulary or target moved: owner decision B27,
+    2026-10-30, the runner re-plans automatically and then waits for approval of the new plan).
+    The runner restarts its stage loop within the same lease at most once per run; a second
+    restart ends the run as a pause so a stage cannot loop.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 class JobStopped(Exception):
     """A stop or cancel was requested; the job ends ``cancelled`` at this boundary."""
 
@@ -298,6 +313,7 @@ class PipelineRunner:
         keys = self.pipeline.keys(job.inputs)
         stored = {s.stage: s for s in self.store.stages(job_id)}
         stage_name = "job"
+        current: Dict[str, str] = {"stage": "job"}  # the stage a pause or stop is attributed to
         # A per-run authority (``JobAuthority.for_job``) keeps its stop across the run's stages.
         authority = self._authority
         begin = getattr(authority, "for_job", None)
@@ -305,34 +321,17 @@ class PipelineRunner:
             authority = begin(job)
         try:
             self._invalidate_incompatible(lease, job, keys, stored)
-            for position, spec in enumerate(self.pipeline.specs):
-                stage_name = spec.name
-                self.store.check_lease(lease)
-                if self._interrupt is not None and self._interrupt.is_set():
-                    raise JobInterrupted("worker shutting down")
-                if self.store.stop_requested(job_id):
-                    raise JobStopped("stop requested")
-                row = self.store.stage(job_id, spec.name)
-                if (
-                    not spec.always_run
-                    and row is not None
-                    and row.op_key == keys[spec.name]
-                    and row.status in (StageOutcome.COMPLETED, StageOutcome.SKIPPED_COMPATIBLE)
-                ):
-                    if row.status is StageOutcome.COMPLETED:
-                        self.store.complete_stage(
-                            lease,
-                            job_id,
-                            spec.name,
-                            row.op_key,
-                            effects=row.effects,
-                            artifact_refs=row.artifact_refs,
-                            progress=row.progress,
-                            result=row.result,
-                            outcome=StageOutcome.SKIPPED_COMPATIBLE,
-                        )
-                    continue
-                self._run_stage(lease, job, spec, position, keys[spec.name], authority)
+            restarts = 0
+            while True:
+                try:
+                    self._run_stages(lease, job, keys, authority, current)
+                    break
+                except RestartStages as restart:
+                    stage_name = current["stage"]
+                    if restarts >= 1:
+                        raise AwaitReview(f"{restart.reason}; a second restart in one run is not attempted") from None
+                    restarts += 1
+                    logger.info("job %s: %s; re-running the invalidated stages", job_id, restart.reason)
             blockers = self.publication_blockers(job_id)
             if blockers:
                 self.store.set_state(
@@ -347,9 +346,11 @@ class PipelineRunner:
         except _Ended as ended:
             return ended.state
         except JobInterrupted as exc:
+            stage_name = current["stage"]
             self.store.set_state(lease, job_id, JobState.QUEUED, stage=stage_name, reason=str(exc))
             return JobState.QUEUED
         except JobStopped as exc:
+            stage_name = current["stage"]
             self.store.set_state(
                 lease,
                 job_id,
@@ -360,6 +361,7 @@ class PipelineRunner:
             )
             return JobState.CANCELLED
         except StagePause as pause:
+            stage_name = current["stage"]
             self.store.mark_stage(
                 lease,
                 job_id,
@@ -375,6 +377,44 @@ class PipelineRunner:
             )
             self.store.set_state(lease, job_id, pause.state, stage=stage_name, reason=pause.reason)
             return pause.state
+
+    def _run_stages(self, lease: Lease, job: JobRecord, keys: Dict[str, str],
+                    authority: Optional[Callable[[JobRecord, Sequence[str]], Any]],
+                    current: Dict[str, str]) -> None:
+        """One pass over the stages: reuse compatible completed ones, run the rest in order."""
+        job_id = job.job_id
+        for position, spec in enumerate(self.pipeline.specs):
+            current["stage"] = spec.name
+            self.store.check_lease(lease)
+            if self._interrupt is not None and self._interrupt.is_set():
+                raise JobInterrupted("worker shutting down")
+            if self.store.stop_requested(job_id):
+                raise JobStopped("stop requested")
+            row = self.store.stage(job_id, spec.name)
+            if (
+                not spec.always_run
+                and row is not None
+                and row.op_key == keys[spec.name]
+                and row.status in (StageOutcome.COMPLETED, StageOutcome.SKIPPED_COMPATIBLE)
+            ):
+                if row.status is StageOutcome.COMPLETED:
+                    self.store.complete_stage(
+                        lease,
+                        job_id,
+                        spec.name,
+                        row.op_key,
+                        effects=row.effects,
+                        artifact_refs=row.artifact_refs,
+                        progress=row.progress,
+                        result=row.result,
+                        outcome=StageOutcome.SKIPPED_COMPATIBLE,
+                    )
+                continue
+            try:
+                self._run_stage(lease, job, spec, position, keys[spec.name], authority)
+            except RestartStages as restart:
+                self.store.mark_stage(lease, job_id, spec.name, StageOutcome.PENDING, error=restart.reason)
+                raise
 
     def _invalidate_incompatible(
         self, lease: Lease, job: JobRecord, keys: Mapping[str, str], stored: Mapping[str, Any]
@@ -424,7 +464,7 @@ class PipelineRunner:
                 progress=result.progress,
                 result=dict(result.data),
             )
-        except (StagePause, JobStopped, JobInterrupted, LeaseLost):
+        except (StagePause, JobStopped, JobInterrupted, LeaseLost, RestartStages):
             raise
         except _IncompleteCoverage as exc:
             self.store.mark_stage(
@@ -554,6 +594,7 @@ __all__ = (
     "Pipeline",
     "PipelineRunner",
     "QuarantineStage",
+    "RestartStages",
     "StageContext",
     "StagePause",
     "StageResult",

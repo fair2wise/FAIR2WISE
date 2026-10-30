@@ -121,11 +121,13 @@ def test_approval_arriving_after_schema_or_vocabulary_change_is_stale(w, attr, v
         w.pub.submit_approval(w.ctx, job_id, approval_for(w.pub.current_plan(w.ctx, job_id)))
     assert err.value.code is ErrorCode.STALE_APPROVAL and label in str(err.value)
     assert w.tiled.writes == []
-    # a new review is required: resume re-plans under the new revisions, and only then can it be approved
-    w.pub.jobs.resume(w.ctx, job_id)
-    assert w.work() == (job_id, JobState.AWAITING_REVIEW)  # stale detected, plan invalidated
-    w.pub.jobs.resume(w.ctx, job_id)
-    assert w.work() == (job_id, JobState.AWAITING_REVIEW)  # re-planned, waiting for the NEW approval
+    # B27 (owner decision 2026-10-30): the stale approval re-queues the job; one run detects the staleness,
+    # re-plans under the new revisions in the same run and waits for the approval of the NEW plan.
+    assert w.state(job_id) is JobState.QUEUED
+    assert w.work() == (job_id, JobState.AWAITING_REVIEW)
+    record = w.pubstore.current_plan(job_id)
+    assert (record.schema_fingerprint if attr == "schema" else record.vocabulary_revision) == value
+    assert w.work() is None  # nothing more to do until a human approves the new plan
     w.approve(job_id, approval_id="appr-2")
     assert w.work() == (job_id, JobState.SUCCEEDED)
 
@@ -138,6 +140,11 @@ def test_candidate_changed_after_approval_invalidates_it_before_import(w):
     assert w.tiled.writes == [] and w.step.apply_calls == 0
     assert w.pubstore.approval_status("appr-1")[0] == "invalidated"
     assert "vocabulary_changed" in w.pubstore.approval_status("appr-1")[1]
+    # B27: the same run re-planned under the new vocabulary; the new plan now awaits its own approval
+    assert w.pubstore.current_plan(job_id).vocabulary_revision == "vocab-2"
+    assert w.work() is None
+    w.approve(job_id, approval_id="appr-2")
+    assert w.work() == (job_id, JobState.SUCCEEDED)
 
 
 def test_target_changed_by_someone_else_makes_the_plan_stale(w):

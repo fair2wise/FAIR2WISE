@@ -32,10 +32,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..contracts.context import ActorKind, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
-from ..contracts.jobs import JobHandle
+from ..contracts.jobs import JobHandle, JobState
 from ..provenance.recorder import AuditRecorder
 from .keys import OperationInputs, digest
-from .pipeline import AwaitReview, Pipeline, QuarantineStage, StageContext, StageResult, StageSpec
+from .pipeline import AwaitReview, Pipeline, QuarantineStage, RestartStages, StageContext, StageResult, StageSpec
 from .publish_ports import (
     ApplyOutcome,
     FrozenSnapshot,
@@ -226,7 +226,12 @@ class Publication:
         return reasons
 
     def _stale(self, sc: StageContext, reasons: List[str]) -> None:
-        """Invalidate approvals and everything downstream of ``plan`` and wait for a fresh review."""
+        """Invalidate approvals and everything from ``plan`` on, then re-plan in this same run (B27).
+
+        Owner decision B27 (2026-10-30): the runner re-plans automatically after a stale plan or
+        approval and then waits for approval of the new plan, instead of pausing for a manual
+        re-run first. A changed snapshot is still quarantined, never re-planned.
+        """
         text = ", ".join(reasons)
         if "snapshot_changed" in reasons:
             self.store.quarantine(
@@ -238,7 +243,7 @@ class Publication:
             raise QuarantineStage("frozen snapshot bytes changed after planning")
         self.store.invalidate_approvals(reason=f"stale: {text}", job_id=sc.job.job_id)
         sc.store.invalidate(sc.lease, sc.job.job_id, PUBLISH_STAGES, f"stale: {text}")
-        raise AwaitReview(f"plan is stale ({text}); re-run to recompute the plan, then request a new review")
+        raise RestartStages(f"plan is stale ({text}); recomputing the plan for a new review")
 
     def _approval_for(self, sc: StageContext, record: Any) -> ApprovalRecord:
         now = datetime.fromtimestamp(self.deps.clock(), tz=timezone.utc)
@@ -454,7 +459,9 @@ class Publication:
 
         Raises:
             ContractError: ``DENIED``; ``NOT_FOUND``; ``STALE_APPROVAL`` when the approval is for another plan
-                or when the snapshot, schema, vocabulary or target revision moved since the plan.
+                or when the snapshot, schema, vocabulary or target revision moved since the plan. In the
+                latter case the job is re-queued first, so the runner recomputes the plan and waits for the
+                approval of the new one (B27); the approver reviews that plan next.
         """
         if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI):
             raise ContractError(ErrorCode.DENIED, "approvals are recorded by a human, not a worker or model")
@@ -490,9 +497,13 @@ class Publication:
         ):
             stale.append("target_revision_changed")
         if stale:
+            self.store.invalidate_approvals(reason=f"stale: {', '.join(stale)}", job_id=job_id)
+            if job.state is JobState.AWAITING_REVIEW:
+                self.jobs.resume(ctx, job_id)  # B27: the runner re-plans and waits for the new approval
             raise ContractError(
                 ErrorCode.STALE_APPROVAL,
-                f"candidate changed since planning ({', '.join(stale)}); a new review is required",
+                f"candidate changed since planning ({', '.join(stale)}); the plan is being recomputed, "
+                "review and approve the new plan",
             )
         self.store.record_approval(job_id, approval)
         return self.jobs.resume(ctx, job_id)
