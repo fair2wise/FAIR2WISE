@@ -207,3 +207,14 @@ frozen-UI pin is updated in that change (as O-U1).
 - **D1.1 / D1.2 (O-S1).** Schema set 0.3.0 approved; name `MeasurementRun` (and
   `RunCondition`) accepted. 0.3.0 becomes selectable for extraction and builds; the
   default schema stays as is until the pilot.
+
+## Register walk-through, batch 2 (2026-10-30)
+
+- **B1 (O-P2).** "Yes, and switch default": port Docling behind the pluggable parser
+  interface and make it the default parser once its parity tests pass on the pilot
+  papers; PyMuPDF stays available (and default until then). New task T29 (parsing).
+- **B2 (O-P2).** Licensing / open-access metadata is recorded at intake as part of the
+  same T29 parsing task (OpenAlex/Crossref fields plus the PDF's own notice); required
+  before any H5 publication.
+- **Tiled graph editing plan Q1-Q16:** owner chose to answer one by one (recorded below
+  as they are answered). **B3 exceptions:** owner chose to pick individually.
