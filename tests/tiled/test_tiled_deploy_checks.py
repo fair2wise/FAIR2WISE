@@ -276,4 +276,4 @@ def test_status_reports_stale_manifest(tmp_path):
 def test_entry_script_is_stdlib_only_at_import():
     source = (REPO / "app/modules/deployment/_tiled_entry.py").read_text()
     top_imports = [line for line in source.splitlines() if line.startswith(("import ", "from "))]
-    assert top_imports == ["import argparse", "import json", "import sys", "from pathlib import Path"]
+    assert top_imports == ["import argparse", "import json", "from pathlib import Path", "import sys"]
