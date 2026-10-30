@@ -132,7 +132,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 |---|---|---|---|
 | B15 | **Anonymous listing on managed `:local` Tiled** | A single-user Tiled lists graph records to anonymous callers. It binds only to loopback inside the container. | Loopback binding is enough on `:local`; add an access policy only if `:local` is ever exposed | **Decided 2026-10-30 (O-T3): loopback is enough.**
 | B16 | **`executed_as` on `:local`** | Single-user Tiled has no principal, so the audit can only record `single-user-api-key` as the writer. `approved_by` is still the local operator. | Accept for `:local` audit | **Decided 2026-10-30 (O-T3): accept.**
-| B17 | **SQLAlchemy in the Tiled lock** | The 0.2.18 lock resolved SQLAlchemy 2.1.4, outside the rc2 bound (`<2.1`). All tests pass on 2.1.4. | Pin 2.0.x to match upstream's bound, unless 0.2.19 lifts it | **Decided 2026-10-30 (O-T3): pin 2.0.x.**
+| B17 | **SQLAlchemy in the Tiled lock** | The 0.2.18 lock resolved SQLAlchemy 2.1.4, outside the rc2 bound (`<2.1`). All tests pass on 2.1.4. | Pin 2.0.x to match upstream's bound, unless 0.2.19 lifts it | **Decided 2026-10-30 (O-T3): pin 2.0.x.** Applied `76e6f28` (SQLAlchemy 2.0.55).
 
 ### Deployment (T24B and T24C)
 
@@ -145,7 +145,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | B22 | **Managed Tiled failure on `:local`** | If the bundled Tiled fails, it restarts up to 3 times. After that it is marked failed and the container keeps serving JSON workflows instead of exiting. | Accept | **Decided 2026-10-30 (O-X2): keep serving.**
 | B23 | **Unset writer secret on ALS** | An ALS image starts with no writer secret; graph writes then fail at the first write. A secret that is set but unreadable is refused at startup. | Accept (reader-only ALS deployments are valid) | **Decided 2026-10-30 (O-X2): accept.**
 | B24 | **Hash-locked Tiled dependencies** | Only the tiled wheel itself is hash-checked. Its dependencies are pinned but not hashed, and the pins come from macOS. A full `--require-hashes` lock needs network access (`uv pip compile`). | Authorize one lock-generation run with network, or do it yourself | **Decided 2026-10-30 (O-X2): sibling layout.**
-| B25 | **`pip check` conflict** | The app environment fails `pip check` (huggingface-hub 1.33 needs click>=8.4.2; the lock has 8.3.3) because `requirements/semantic.in` is unpinned. | Pin `huggingface-hub` below 1.33 or raise click in the lock: a reviewed lock change | **Decided 2026-10-30 (O-X3): raise click to 8.4.2.**
+| B25 | **`pip check` conflict** | The app environment fails `pip check` (huggingface-hub 1.33 needs click>=8.4.2; the lock has 8.3.3) because `requirements/semantic.in` is unpinned. | Pin `huggingface-hub` below 1.33 or raise click in the lock: a reviewed lock change | **Decided 2026-10-30 (O-X3): raise click to 8.4.2.** Verified `76e6f28`: click 8.4.2 already pinned with complete hashes.
 
 ### Other
 
@@ -202,16 +202,16 @@ owner sets `O06_APPROVED=true` after creating the two environments (a switch, no
 
 | # | Decision | Proposal |
 |---|---|---|
-| D2.1 | Events per channel: do `:local`/`:als-dev` follow `forge_merge` pushes? | No: manual dispatch only | **Decided 2026-10-30 (O-O6): publish on PR merge to main (all three channels).**
-| D2.2 | Reviewers for `ghcr-publish` and `ghcr-als-prod`; block self-review? | Owner plus one; block self-review on prod | **Decided 2026-10-30 (O-O6): owner alone, self-approval allowed.**
-| D2.3 | Condition for promotion to `:als-prod` | Same digest already on `:als-dev` | **Decided 2026-10-30 (O-O6): any tested digest.**
-| D2.4 | Registry name, owner and package visibility | `ghcr.io/fair2wise/fair2wise`, private | **Decided 2026-10-30 (O-O6): ghcr.io/fair2wise/fair2wise, public (snippet exposure accepted).**
-| D2.5 | Tag forms (full or short commit) | Full commit | **Decided 2026-10-30 (O-O6): full commit.**
-| D2.6 | Stop publishing the legacy `agent` image | Yes | **Decided 2026-10-30 (O-O6): stop publishing it.**
-| D2.7 | Retention | Images 30 days, manifests 90 | **Decided 2026-10-30 (O-O6): keep everything.**
-| D2.8 | Platforms | amd64 only until O08 | **Decided 2026-10-30 (O-O6): amd64 only.**
-| D2.9 | Pin base images by digest | Yes | **Decided 2026-10-30 (O-O6): tags, record digests.**
-| D2.10 | Require a binary report reference in each release | Record it; never gating (H3 B) | **Decided 2026-10-30 (O-O6): record, never gating.**
+| D2.1 | Events per channel: do `:local`/`:als-dev` follow `forge_merge` pushes? | No: manual dispatch only | **Decided 2026-10-30 (O-O6): publish on PR merge to main (all three channels).** Applied `76e6f28`.
+| D2.2 | Reviewers for `ghcr-publish` and `ghcr-als-prod`; block self-review? | Owner plus one; block self-review on prod | **Decided 2026-10-30 (O-O6): owner alone, self-approval allowed.** Applied `76e6f28`.
+| D2.3 | Condition for promotion to `:als-prod` | Same digest already on `:als-dev` | **Decided 2026-10-30 (O-O6): any tested digest.** Applied `76e6f28`.
+| D2.4 | Registry name, owner and package visibility | `ghcr.io/fair2wise/fair2wise`, private | **Decided 2026-10-30 (O-O6): ghcr.io/fair2wise/fair2wise, public (snippet exposure accepted).** Applied `76e6f28`.
+| D2.5 | Tag forms (full or short commit) | Full commit | **Decided 2026-10-30 (O-O6): full commit.** Applied `76e6f28`.
+| D2.6 | Stop publishing the legacy `agent` image | Yes | **Decided 2026-10-30 (O-O6): stop publishing it.** Applied `76e6f28`.
+| D2.7 | Retention | Images 30 days, manifests 90 | **Decided 2026-10-30 (O-O6): keep everything.** Applied `76e6f28`.
+| D2.8 | Platforms | amd64 only until O08 | **Decided 2026-10-30 (O-O6): amd64 only.** Applied `76e6f28`.
+| D2.9 | Pin base images by digest | Yes | **Decided 2026-10-30 (O-O6): tags, record digests.** Applied `76e6f28`.
+| D2.10 | Require a binary report reference in each release | Record it; never gating (H3 B) | **Decided 2026-10-30 (O-O6): record, never gating.** Applied `76e6f28`.
 
 ### D3. Audit 2026-10-29 (plan_addenda.md A5)
 
@@ -233,7 +233,7 @@ Recorded for the owner; nothing below is answered here.
 |---|---|---|
 | D3.8 | **Approval TTL: code and register disagree** | `app/api/operations.py:58` sets `DEFAULT_APPROVAL_TTL = timedelta(hours=1)` and applies it on every profile, including `:local`. B14 described the code as a "24 h placeholder" (corrected above) and recommends no expiry on `:local` and 24 h on ALS; D3.5 repeats that recommendation. Until the owner answers, a `:local` publication approval becomes `STALE_APPROVAL` after one hour, which is not the baseline behaviour B14 promises to keep. Pending owner decision (OPEN_DECISIONS D3.5); the code is not changed by T28D. | **Decided 2026-10-30 (O-T2).** Applied `120ef06`.
 | D3.9 | **T26A release-contract questions Q2-Q6** | Copied verbatim from `docs/migration/data_releases/release_contract.md` section 10 (Q1 was resolved by O-D1). Each is pending owner decision (OPEN_DECISIONS D3.9). |
-| D3.10 | **B25 lock change still pending** | `pip check` fails in the app environment (huggingface-hub vs click, `requirements/semantic.in` unpinned). B25 asks for a reviewed lock change (pin `huggingface-hub` below 1.33 or raise click in the lock). Not applied; T28C owns the requirements files. Pending owner decision (OPEN_DECISIONS B25). | **Decided 2026-10-30 (O-X3).**
+| D3.10 | **B25 lock change still pending** | `pip check` fails in the app environment (huggingface-hub vs click, `requirements/semantic.in` unpinned). B25 asks for a reviewed lock change (pin `huggingface-hub` below 1.33 or raise click in the lock). Not applied; T28C owns the requirements files. Pending owner decision (OPEN_DECISIONS B25). | **Decided 2026-10-30 (O-X3).** Verified `76e6f28`.
 | D3.11 | **May the integrator run `docker build` / `docker run` locally for the T24E container tests?** | B19 authorized the owner to build or to approve a local build (no push). `:local` was built and run once on 2026-10-29 (A5 section 1). T24E's container-level tests (supervisor, preflight, gateway on a real image) need repeated local builds and runs on the integrator's machine. No image is pushed and no registry login happens. Pending owner decision (OPEN_DECISIONS D3.11). | **Decided 2026-10-30 (O-X1): yes, build and run locally.**
 | D3.12 | **D1.5 derived-value tolerance is still 1% in code** | `app/modules/evidence/units.py:381` `RECIPROCAL_DERIVATION_REL_TOL = 0.01`; D1.5 recommends 2% (paper A, 1.7% mismatch) and `extraction_field_mapping.md` says "1 % tolerance". The constant and the doc change together once D1.5 is decided (AUD-17; owner T06B). Pending owner decision (OPEN_DECISIONS D1.5). | **Decided 2026-10-30 (O-S2): 2%.** Applied `8b9ab77`.
 
@@ -267,7 +267,7 @@ Recorded for the owner; nothing below is answered here.
 |---|---|---|
 | D3.19 | Deployment handoff choices (O07 inputs): role variable prefix `fair2wise_`, host layout `/srv/fair2wise/<profile>/{state,secrets,backups,releases.json}`, state-schema label `f2w.state/v1`, nginx as the edge proxy (not Traefik), papers and KG volumes not mounted on ALS for now | Accept as the T24E baseline |
 | D3.20 | ALS reader/admin sessions against the real staging Tiled from inside the `:als-dev` image are owner-run only (ALS images lock `F2W_TILED_URL`); when, and with which test account? | Schedule after D3.11 and the first CI image build |
-| D3.21 | **ALS `api` service has no identity wiring in `run_api`** (found during B7) | `create_api_app(cfg, cors_origins)` is called without an identity port or session store, so `build_guard` refuses every ALS profile at startup; `als_identity_wiring` is test-only. Integrator work item for T24E/T25C before the first ALS container run. | Wire `als_identity_wiring` into `run_api` for ALS profiles | open (integrator fix; owner informed) |
+| D3.21 | **ALS `api` service has no identity wiring in `run_api`** (found during B7) | `create_api_app(cfg, cors_origins)` is called without an identity port or session store, so `build_guard` refuses every ALS profile at startup; `als_identity_wiring` is test-only. Integrator work item for T24E/T25C before the first ALS container run. | Wire `als_identity_wiring` into `run_api` for ALS profiles | **Fixed `62738e0`** (run_api wires als_identity_wiring on ALS profiles; owner informed) |
 
 ---
 

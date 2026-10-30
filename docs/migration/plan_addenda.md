@@ -507,6 +507,8 @@ changes the deployment contract).
 | D1.9 (O-S3) content-hash step, `work-identity/2` | `b3f14f3` | parity switch `use_content_hash=False` |
 | D1.10 (O-S4) near-duplicate check as a job above 2,000 keys | `e59c9c1` | `ScanControl(job=True)` marks job runs |
 | D1.7 (O-S3) `--figures multimodal` labelling flag | `f6934d7` | guide version 2; off by default |
+| O06 D2.1-D2.10 (O-O6) publish workflow and approved tag rules; B17 SQLAlchemy 2.0.55; B25 click verified | `76e6f28` | owner still sets `O06_APPROVED` and the two GitHub environments (rules file section 6); `companion/CI_CD_CONTRACT.md` left as supplied |
+| D3.21 ALS `api` service identity wiring | `62738e0` | `run_api` builds the Tiled identity port and session store off `:local` |
 | B7 (O-A9) model API on ALS for signed-in users | `bad6c39` | mounted in the API process; D-T8 (non-browser sign-in) still open; worker found `run_api` wires no identity port on ALS (see A7 note) |
 
 ## Order after H2
