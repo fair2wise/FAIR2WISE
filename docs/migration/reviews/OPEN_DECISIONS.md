@@ -243,6 +243,14 @@ Recorded for the owner; nothing below is answered here.
 > 5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3.
 > 6. Where descriptors live: the release system, or a later commit under `docs/migration/data_releases/releases/`.
 
+### D3 additions by T28C (2026-10-29)
+
+| # | Decision | Recommendation |
+|---|---|---|
+| D3.13 | Hashed-lock layout: sibling `requirements/runtime.lock.txt` and `docker/profiles/tiled-server/constraints.lock.txt` (images install with `--require-hashes`; plain lists kept for developers and CI) vs hashing `runtime.txt` in place, which changes how CI and developers install | Keep the sibling layout |
+| D3.14 | Switch the CI Tiled job to `constraints.lock.txt` for parity with the image | Yes, in T24E |
+| D3.15 | `tests/images/test_images_supervisor.py` backoff/health-order tests flaked once each under a loaded full run (pass alone and in other runs) | Relax their timing in T24E; add to known failures only if CI reproduces it |
+
 ---
 
 ## Already settled (for reference)
