@@ -128,7 +128,7 @@ A request with neither header (curl, SDK, tests) passes: it is not a browser CSR
 ## 8. Deferred and open questions
 
 - **Q1 (owner, T08B).** `app/modules/graph/imports` has no `writer_unauthorized` mapping for a writer 401/403 from Tiled (access contract section 12 asks for it). Not changed here (outside T14 ownership); the `/v1` routes would pass it through as a typed error once it exists.
-- **Q2 (T04).** `app/public.py` `F2WClient.get_job`/`cancel_job`/`submit_ingest`/`plan_publication`/`approve_plan` still raise `NotImplementedError`. They can forward to `F2WOperations` without new logic; that file is T04's.
+- **Q2 (closed, C2 `083be8a`).** `app/public.py` `F2WClient.get_job`/`cancel_job`/`submit_ingest`/`plan_publication`/`approve_plan` forward to the shared `F2WOperations` (passed as `F2WClient(..., operations=...)`), so the same authorization runs as over HTTP; without operations they raise `UNSUPPORTED_CAPABILITY`. `tests/api_v1/test_v1_sdk_client.py` mirrors the HTTP permission tests. Only `create_literature_agent(sync_model=..., async_model=...)` still raises `NotImplementedError` (spec section 6).
 - **Q3 (owner).** Should the 19 legacy UI routes also get the origin gate (access contract section 9)? It changes frozen behaviour for cross-origin dev setups.
 - **Q4 (owner).** Should the legacy `POST /graph/upload` get a body cap (I-05)? It is uncapped today.
 - **Q5 (T15/T17).** Remaining I-01 paper/graph routes need their services first; their dispositions belong in the T17 ledger.
