@@ -201,9 +201,11 @@ def create_api_app(
                                                   ).model_api_root_path
         # The legacy app's body cap (128 MiB) and browser-origin gate wrap every path of this app,
         # the mount included (AUD-04); the gateway applies the same client_max_body_size.
+        # The missing-node JSONL goes under the session workdir (writable in the images); the app root is read-only.
+        gaps_dir = Path(cfg.workdir) / "knowledge_gaps" if getattr(cfg, "workdir", None) else None
         model_app = create_model_api_app(str(cfg.graph), backend=cfg.backend, model=cfg.model, deployment=settings,
                                          identity_port=runtime.identity_port,
-                                         credential_store=runtime.credential_store, clock=clock)
+                                         credential_store=runtime.credential_store, clock=clock, gaps_dir=gaps_dir)
         app.mount(MODEL_API_MOUNT, PublicRootPath(model_app, model_api_root_path), name="model-api")
         app.state.f2w_model_api = model_app
 

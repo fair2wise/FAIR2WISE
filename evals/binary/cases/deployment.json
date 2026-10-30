@@ -104,7 +104,7 @@
         "case_sha256": "fafd0885e53c8ceb7f3961caa2e37b3ab1d148e240fac85da4a8c842093d6492",
         "config_sha256": "102ce2c12b2dda015baf5d140991448af3c16edef9f9ccb3778c16b03561c4b9",
         "model_sha256": null,
-        "oracle_source_sha256": "e5959a2457f5e87976dbefb146405d8ef08ae4806a06a799fc065913a8ed6913",
+        "oracle_source_sha256": "c51049bd539ede2279a09847ea459bfcd2ca48b1b6f7f49a37174ea22245e9cb",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -249,7 +249,7 @@
         "case_sha256": "6536cfd86e6b60a89131a94603c4b9bbb0dd19e2050e7ca62975706b6f41a7f3",
         "config_sha256": "4128af66df735e323199e2940b9032553d404d772914c18983d8707fe60ecfa4",
         "model_sha256": null,
-        "oracle_source_sha256": "b9b7173b944030ac36d1f6ba535fe870b821a0449cc5ecd93b91fdcd6e239411",
+        "oracle_source_sha256": "2f0ebc764b2e686a532ca866e138c0d585e798486ad39233a85f4665cd2391b8",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -325,7 +325,7 @@
         "case_sha256": "1247ed0be00605b0191975006bbf5d23752391fd4ea7f5307b0f5de83a1f66f4",
         "config_sha256": "ffab621d58cc418cde63bda8e64c5ebf15fe83a80a7e02e370313cd0c4b03f8f",
         "model_sha256": null,
-        "oracle_source_sha256": "108f82ac2afad1f92ed2b47824d702fae4f5ff0005b170ce0b557fec32a25cee",
+        "oracle_source_sha256": "43354516442283e759a7bd4b5759b35839b002b49a69b55e228ffb3710945bc1",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -395,8 +395,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "a7dd7cdc7a1b4fab6d3c8c68bd56a2f858edaf43819a73efcec0e869cb880719",
-        "config_sha256": "715be72b70063f8e49ca8e0f668c5964d6be1b7d10eb144eacd5bf892a6d0013",
+        "case_sha256": "50a738232d5e13dc8121403ca05c7b2b0724add76410589cc080cd21dccf0da1",
+        "config_sha256": "a4431b888dd5e876c7df72b4892b1e2eac21f664ac964e5d8cf32e18cb39d961",
         "model_sha256": null,
         "oracle_source_sha256": "a7edbff7550b8a99d3eb8d731f8a965e2b8ee7be5274d21aa3ea4d6492a6d0a2",
         "schema_sha256": null
@@ -414,7 +414,7 @@
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_route_set_is_the_frozen_19",
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_model_route_set_is_the_frozen_6",
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_ui_openapi_matches_baseline",
-          "tests/gateway/test_gateway_prefix.py::test_exactly_one_prefix_stripping_boundary",
+          "tests/gateway/test_gateway_prefix.py::test_the_gateway_is_the_only_prefix_stripping_boundary",
           "tests/gateway/test_gateway_prefix.py::test_api_prefix_is_stripped_exactly_once_and_the_suffix_is_raw",
           "tests/gateway/test_gateway_prefix.py::test_every_recorded_legacy_flow_is_unchanged_under_the_prefix",
           "tests/gateway/test_gateway_prefix.py::test_unprefixed_direct_api_still_works",
@@ -470,7 +470,7 @@
         "case_sha256": "5b90bd4ecc4337ac3a057da4fe021ebfc325b20018ac2dcf42c262f0a3db592f",
         "config_sha256": "dfacb9824971e80865bced7a9709102b9797f6f89ee511ba5bd7555ecde9c7a7",
         "model_sha256": null,
-        "oracle_source_sha256": "94dd453ee21cdcf4b7ca08a7e2690c28223353fa762ce08d0af28cb12387bfba",
+        "oracle_source_sha256": "b00f8e7052f802249bb7e1c0647f96ddbc46d31ed74aa037105e973b8e0e589f",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -542,8 +542,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "13cd856f288ab0b6b9199f8095c6e673e8faed645250ee70a1c3f5ae66aa9152",
-        "config_sha256": "438c20ff9ad82695722a9a6ddef926bad310ec380982ded2be7c70d0206729b4",
+        "case_sha256": "92460b876799ee313622456d9fed10495236ce971f80f22f4de702482febfa34",
+        "config_sha256": "03f115c362e6a2cb96fb3f7d647b421bcd87ab2cc0b2c04287bd4b6cbb2ff96a",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -562,7 +562,7 @@
         "supporting_selectors": [
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_framing_and_event_order",
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_survives_client_fragmentation",
-          "tests/gateway/test_gateway_prefix.py::test_api_location_streams_without_buffering_and_keeps_long_streams_open",
+          "tests/gateway/test_gateway_prefix.py::test_api_locations_stream_without_buffering_and_keep_long_streams_open",
           "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end",
           "tests/deployment/test_deploy_static.py::test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged",
           "tests/deployment/test_deploy_static.py::test_edge_template_renders_for_the_example_inventory"
@@ -969,7 +969,7 @@
         "case_sha256": "a5d5f942991b68cb764ec2e236bf24d46e5e989aee5e4efbe20b77492470f016",
         "config_sha256": "66a1bf4d8108d0af197c5c685eeaf2580475a0e237ba636fb3079ddb6e0f45f0",
         "model_sha256": null,
-        "oracle_source_sha256": "516a56b606e70256aca667a3e90923da02029de6012b6b1894cabc9fc37e8a29",
+        "oracle_source_sha256": "004cc2c041371207696d5c757b53b847ca2564fdbff44a250b4813e506fda7d7",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -1042,8 +1042,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "f783b75ef4b3bb1e80c882519e8d2b887a16ffc476eaea0202d09cbececfe283",
-        "config_sha256": "911d962132f843931c36b8688d58cb3f2c02704db245810f9e0cda9fa04061d4",
+        "case_sha256": "b3f1e1ad18b9edcecfee1da9aafed13f6bfc0574c829deaa66d75c63210fa51b",
+        "config_sha256": "e7a601cf4969d768937f6518cb39468cc3fdc3f6589ced91caafced70cca0251",
         "model_sha256": null,
         "oracle_source_sha256": "553af0e2547e6fc0fbf3df307958caaadd41b631e4baee5207c87615dc97425d",
         "schema_sha256": null
@@ -1058,13 +1058,13 @@
           "tests/ci/test_workflows.py::test_build_runs_for_prs_with_read_only_permissions",
           "tests/ci/test_workflows.py::test_build_never_logs_in_pushes_or_publishes",
           "tests/ci/test_workflows.py::test_no_secret_is_referenced",
-          "tests/ci/test_workflows.py::test_publish_is_manual_dispatch_only",
+          "tests/ci/test_workflows.py::test_publish_runs_on_main_and_release_tags_and_promotes_by_dispatch",
           "tests/ci/test_workflows.py::test_gate_fails_closed_on_o06_and_protected_ref",
           "tests/ci/test_workflows.py::test_every_writer_job_is_gated_and_in_an_environment",
           "tests/ci/test_workflows.py::test_the_gate_cannot_be_bypassed",
           "tests/ci/test_workflows.py::test_only_the_job_token_logs_in_to_ghcr",
           "tests/ci/test_workflows.py::test_promotion_is_a_retag_of_a_published_digest",
-          "tests/ci/test_release_scripts.py::test_als_prod_needs_the_same_commit_staged_on_als_dev",
+          "tests/ci/test_release_scripts.py::test_any_published_als_prod_digest_can_be_promoted_regardless_of_als_dev",
           "tests/ci/test_release_scripts.py::test_promotion_refusals",
           "tests/ci/test_release_scripts.py::test_publish_pushes_immutable_and_release_tags_never_channels",
           "tests/ci/test_release_scripts.py::test_stale_build_cannot_move_a_channel_backwards_but_rollback_can"
@@ -1681,7 +1681,7 @@
         "case_sha256": "6433e81deefe800d90f73fbf0ebe094708ec9c314cd7ca05d3bd921a8c6b4da1",
         "config_sha256": "b5bafb86686c70dc186a0943ed8e5b3134fb9ff2968b0424f6bbed2671e73c7c",
         "model_sha256": null,
-        "oracle_source_sha256": "a723135df1163552f8b1ef658e476af14ccceeed2047b861642949a89e2b8b6e",
+        "oracle_source_sha256": "649eb28738e4337c16449ba50d1931caa3d3ffa7962f8a8d1a2421a86ecaebe4",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -2031,7 +2031,7 @@
         "case_sha256": "cfeace47d2ff566334c2ed558ffbd2158cf59a672e74f64d4f2160b0f394d21d",
         "config_sha256": "6fd1bb04b5701922d8c8cc9bd7df28bd7f1ca36ec9983047ebcdd8ef23c5abac",
         "model_sha256": null,
-        "oracle_source_sha256": "329e238a9e7dd18ecba300179378c510b8bb6fc087b5102c385a77bb33a779d5",
+        "oracle_source_sha256": "b77622d875bed062c220054d6f3f9a1c094da91a7a701d6c0597b78d50df1e3a",
         "schema_sha256": null
       },
       "input_fixture_refs": [

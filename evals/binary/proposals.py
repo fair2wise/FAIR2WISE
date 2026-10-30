@@ -1269,7 +1269,7 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         )
         + n(
             GWP,
-            "test_exactly_one_prefix_stripping_boundary",
+            "test_the_gateway_is_the_only_prefix_stripping_boundary",
             "test_api_prefix_is_stripped_exactly_once_and_the_suffix_is_raw",
             "test_every_recorded_legacy_flow_is_unchanged_under_the_prefix",
             "test_unprefixed_direct_api_still_works",
@@ -1298,7 +1298,7 @@ ORACLES: Dict[str, Dict[str, Any]] = {
     "DEP-08": blocked(
         [T24E],
         n(CU, "test_sse_framing_and_event_order", "test_sse_survives_client_fragmentation")
-        + n(GWP, "test_api_location_streams_without_buffering_and_keeps_long_streams_open")
+        + n(GWP, "test_api_locations_stream_without_buffering_and_keep_long_streams_open")
         + n(V1L, "test_job_stream_is_legacy_sse_with_ids_and_a_single_end")
         + n(DST, "test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged",
             "test_edge_template_renders_for_the_example_inventory"),
@@ -1408,7 +1408,7 @@ ORACLES: Dict[str, Dict[str, Any]] = {
             "test_build_runs_for_prs_with_read_only_permissions",
             "test_build_never_logs_in_pushes_or_publishes",
             "test_no_secret_is_referenced",
-            "test_publish_is_manual_dispatch_only",
+            "test_publish_runs_on_main_and_release_tags_and_promotes_by_dispatch",
             "test_gate_fails_closed_on_o06_and_protected_ref",
             "test_every_writer_job_is_gated_and_in_an_environment",
             "test_the_gate_cannot_be_bypassed",
@@ -1417,7 +1417,7 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         )
         + n(
             CIR,
-            "test_als_prod_needs_the_same_commit_staged_on_als_dev",
+            "test_any_published_als_prod_digest_can_be_promoted_regardless_of_als_dev",
             "test_promotion_refusals",
             "test_publish_pushes_immutable_and_release_tags_never_channels",
             "test_stale_build_cannot_move_a_channel_backwards_but_rollback_can",

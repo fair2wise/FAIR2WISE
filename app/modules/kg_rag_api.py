@@ -36,7 +36,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 import time
-from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Sequence, Tuple, Union
 from urllib.parse import urlparse
 import aiohttp
 import openai
@@ -286,6 +286,7 @@ def create_fastapi_app(
     identity_port: Optional[Any] = None,
     credential_store: Optional[Any] = None,
     clock: Optional[Callable[[], Any]] = None,
+    gaps_dir: Optional[Union[str, Path]] = None,
 ) -> FastAPI:
     """Create a FastAPI app that proxies chat requests through the KG-RAG pipeline.
 
@@ -347,7 +348,7 @@ def create_fastapi_app(
 
     rag_c = Conversation(RAG_SYSTEM)
     # base_c = Conversation(BASELINE_SYSTEM)
-    gap_tracker = MissingNodeTracker(graph_file)
+    gap_tracker = MissingNodeTracker(graph_file, out_dir=gaps_dir)  # disabled when the directory is read-only
 
     def _project(ctx: RequestContext, payload: Dict[str, Any], sources: ModelTurnSources) -> Any:
         """Project a chat body for ``ctx`` with the turn's PDF windows as verifiable source regions."""
@@ -510,23 +511,43 @@ class MissingNode:
     timestamp: float
 
 
+#: Default directory of the missing-node JSONL files (relative to the working directory).
+DEFAULT_GAPS_DIR = Path("storage/knowledge_gaps")
+
+
 class MissingNodeTracker:
-    """Tracks entities queried but not found in the KG, persisted as JSONL."""
+    """Tracks entities queried but not found in the KG, persisted as JSONL.
 
-    def __init__(self, kg_file: str) -> None:
+    Args:
+        kg_file: The KG file; its stem names the JSONL file.
+        out_dir: Directory for the JSONL file (default :data:`DEFAULT_GAPS_DIR` under the working
+            directory). When the directory cannot be created or written (for example the read-only
+            application root of the images, found by the T24E container checks), the tracker is
+            disabled: ``path`` is ``None``, ``log`` keeps nothing, and a warning is logged once.
+    """
+
+    def __init__(self, kg_file: str, out_dir: Optional[Union[str, Path]] = None) -> None:
         """Initialize tracker with output path derived from KG filename."""
-        # derive file name from KG file
         kg_name = Path(kg_file).stem
-        out_dir = Path("storage/knowledge_gaps")
-        out_dir.mkdir(parents=True, exist_ok=True)
-        self.path = out_dir / f"missing_nodes_{kg_name}.jsonl"
+        directory = Path(out_dir) if out_dir is not None else DEFAULT_GAPS_DIR
+        self.path: Optional[Path] = directory / f"missing_nodes_{kg_name}.jsonl"
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            if not self.path.exists():
+                self.path.touch()
+        except OSError as exc:
+            logger.warning("missing-node tracking disabled: %s is not writable (%s)", directory, type(exc).__name__)
+            self.path = None
 
-        # touch file if it doesn't exist
-        if not self.path.exists():
-            self.path.touch()
+    @property
+    def enabled(self) -> bool:
+        """Whether records are written."""
+        return self.path is not None
 
     def log(self, node: MissingNode) -> None:
-        """Append a missing node record as JSONL."""
+        """Append a missing node record as JSONL (no-op when the tracker is disabled)."""
+        if self.path is None:
+            return
         rec = {
             "query": node.query,
             "entity": node.entity,

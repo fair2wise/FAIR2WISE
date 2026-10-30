@@ -636,9 +636,10 @@
       "title": "Schema 0.3.1 and the bl1101 reconciliation",
       "source": "plan_addenda.md A7",
       "gate": "H4",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "8066633225d8b7f82817f40e20e4c03a95522619",
+      "note": "owner review of the schema diff pending before 0.3.1 is used (docs/migration/reviews/H3/schema_diff_T22D.md)",
+      "merge_commit_subject": "Merge T22D: schema set 0.3.1 (normalized-value slots, D1.4) and bl1101 v3 mapping (D1.3)"
     },
     {
       "id": "T30",

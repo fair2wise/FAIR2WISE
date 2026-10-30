@@ -509,6 +509,10 @@ changes the deployment contract).
 | D1.7 (O-S3) `--figures multimodal` labelling flag | `f6934d7` | guide version 2; off by default |
 | O06 D2.1-D2.10 (O-O6) publish workflow and approved tag rules; B17 SQLAlchemy 2.0.55; B25 click verified | `76e6f28` | owner still sets `O06_APPROVED` and the two GitHub environments (rules file section 6); `companion/CI_CD_CONTRACT.md` left as supplied |
 | D3.21 ALS `api` service identity wiring | `62738e0` | `run_api` builds the Tiled identity port and session store off `:local` |
+| D3.16 (O-X4) UI chat turn may answer figure questions with the knowledge operations | `f21a745` | rendered report as the answer text; no UI change |
+| B27 (O-X3) automatic re-plan after a stale plan or approval | `45df5ea` | `RestartStages` in the runner |
+| T22D (O-S2) schema 0.3.1 and bl1101 v3 | `8066633` | owner review of `docs/migration/reviews/H3/schema_diff_T22D.md` before 0.3.1 is used to build or publish |
+| T24E container check finding: model-API mount wrote under the read-only app root | this record | `MissingNodeTracker` now writes under the workdir and disables itself on a read-only directory |
 | B7 (O-A9) model API on ALS for signed-in users | `bad6c39` | mounted in the API process; D-T8 (non-browser sign-in) still open; worker found `run_api` wires no identity port on ALS (see A7 note) |
 
 ## Order after H2

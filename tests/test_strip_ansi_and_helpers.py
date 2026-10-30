@@ -321,6 +321,25 @@ class TestMissingNodeTracker:
         assert record["entity"] == "ent"
         assert record["reason"] == "reason"
 
+    def test_explicit_directory_and_read_only_root_disable_instead_of_crashing(self, tmp_path, monkeypatch):
+        """T24E container check 2026-10-30: the model API mounted in the image called the tracker under the
+        read-only app root and the api service died with PermissionError. An explicit out_dir (the session
+        workdir in the images) is used when given; an unwritable directory disables the tracker."""
+        monkeypatch.chdir(tmp_path)
+        explicit = kg_rag_api.MissingNodeTracker("graphs/test.json", out_dir=tmp_path / "work" / "gaps")
+        assert explicit.enabled and explicit.path == tmp_path / "work" / "gaps" / "missing_nodes_test.jsonl"
+        explicit.log(kg_rag_api.MissingNode("q", "e", "r", time.time()))
+        assert len(explicit.path.read_text().splitlines()) == 1
+        locked = tmp_path / "locked"
+        locked.mkdir()
+        locked.chmod(0o500)
+        try:
+            disabled = kg_rag_api.MissingNodeTracker("graphs/test.json", out_dir=locked / "gaps")
+            assert not disabled.enabled and disabled.path is None
+            disabled.log(kg_rag_api.MissingNode("q", "e", "r", time.time()))  # no-op, no exception
+        finally:
+            locked.chmod(0o700)
+
     def test_appends_multiple_entries(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         tracker = kg_rag_api.MissingNodeTracker("graphs/test.json")

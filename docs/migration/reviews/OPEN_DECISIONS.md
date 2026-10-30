@@ -152,7 +152,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | # | Decision | Context | Recommendation |
 |---|---|---|---|
 | B26 | **Snapshot rollback after an edit was carried forward** (T18C F4) | Re-importing a snapshot older than the one that absorbed a UI edit is not refused. The edit stays in the newer JSON but disappears from Tiled. | Require a reviewed conflict resolution for that rollback | **Covered by Q15 (O-E1).**
-| B27 | **Re-plan after a stale approval** (T10) | When the plan changed before approval, resuming takes two steps: re-plan, then approve the new plan. | Keep it manual, so the approver sees the new plan | **Decided 2026-10-30 (O-X3): re-plan automatically.**
+| B27 | **Re-plan after a stale approval** (T10) | When the plan changed before approval, resuming takes two steps: re-plan, then approve the new plan. | Keep it manual, so the approver sees the new plan | **Decided 2026-10-30 (O-X3): re-plan automatically.** Applied `45df5ea`.
 | B28 | **Second rollback** (T10) | A second publication rollback undoes the first, because it steps back one pointer-history entry. | Accept, and document it | **Decided 2026-10-30 (O-X3): accept.**
 | B29 | **Legacy DownloadAgent fetch path** | T05 added a hardened downloader: per-hop redirect checks, private-address refusal, size, signature and timeout limits. The legacy `DownloadAgent` used by the UI still fetches with its own code; T05 only records its results in the new store. | Switch DownloadAgent to the hardened downloader behind a parity test | **Decided 2026-10-30 (O-X3): switch to the hardened downloader.**
 | B30 | **FORGE consumer (T15)** | FORGE importing F2W agents and services needs changes in the FORGE repo, coordinated with Alex. Nothing on the FORGE side has been touched. | Tell me when Alex is ready; until then I can build only the F2W-side package surface | **Decided 2026-10-30 (O-P5): F2W side now; FORGE side with Alex later.**
@@ -184,8 +184,8 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 |---|---|---|---|
 | D1.1 | Approve schema set 0.3.0 (`reviews/H3/schema_diff_T22C.md`) | Until approved, builds and publishing refuse 0.3.0; the pilot cannot extract samples or runs | Approve | **Decided 2026-10-30 (O-S1): approved.**
 | D1.2 | Class name `MeasurementRun` (and `RunCondition`) | `Measurement` already exists (123 nodes in the rsoxs graphs) and keeps its meaning | Accept | **Decided 2026-10-30 (O-S1): MeasurementRun accepted.**
-| D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change | **Decided 2026-10-30 (O-S2): reconcile now (bl1101 v3).**
-| D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release | **Decided 2026-10-30 (O-S2): add the slot (0.3.1).**
+| D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change | **Decided 2026-10-30 (O-S2): reconcile now (bl1101 v3).** Applied `8066633` (bl1101 v3, owner review pending: docs/migration/reviews/H3/schema_diff_T22D.md).
+| D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release | **Decided 2026-10-30 (O-S2): add the slot (0.3.1).** Applied `8066633` (0.3.1).
 | D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% | **Decided 2026-10-30 (O-S2): 2%.** Applied `8b9ab77`.
 | D1.6 | A value both derived and in an attributing sentence | Tagged cited today | Keep cited | **Decided 2026-10-30 (O-S3): cited wins.**
 | D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag | **Decided 2026-10-30 (O-S3): opt-in multimodal flag.** Applied `f6934d7`.
@@ -257,7 +257,7 @@ Recorded for the owner; nothing below is answered here.
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D3.16 | Surface knowledge-operation results in the frozen UI chat (needs a DTO decision and a UI change; today they reach chat only via the SDK/`delegate` path, since the T03B contract offers the UI turn only `answer_from_knowledge`) | Decide at the T19E frontend step; a UI change needs O-U3 | **Decided 2026-10-30 (O-X4): UI turn offers the operation tools; no UI change.**
+| D3.16 | Surface knowledge-operation results in the frozen UI chat (needs a DTO decision and a UI change; today they reach chat only via the SDK/`delegate` path, since the T03B contract offers the UI turn only `answer_from_knowledge`) | Decide at the T19E frontend step; a UI change needs O-U3 | **Decided 2026-10-30 (O-X4): UI turn offers the operation tools; no UI change.** Applied `f21a745`.
 | D3.17 | Should `create_api_app` build a default Tiled graph backend for the operations from `settings.tiled_target` + the writer credential, or stay JSON-only unless injected? | Build it on ALS profiles, JSON-only on `:local` by default | **Decided 2026-10-30 (O-X4): build on all profiles incl. :local.**
 | D3.18 | Corpus names for `/v1/operations/corpus-audit` and the CLI default to file stems under `storage/terminology` (e.g. `extracted_terms_xray_papers_cborg_chat`) | Accept for now; a configured corpus map with PC-1 | **Decided 2026-10-30 (O-X4): file stems for now.**
 
