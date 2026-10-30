@@ -1,0 +1,30 @@
+---
+- name: Backup timestamp
+  ansible.builtin.set_fact:
+    fair2wise_backup_stamp: "{{ lookup('ansible.builtin.pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
+
+- name: Current container (if any) for the manifest
+  community.docker.docker_container_info:
+    name: "{{ fair2wise_container_name }}"
+  register: fair2wise_running
+
+- name: Archive the state tree (consistent SQLite copies, manifest, sha256 sidecar)
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ fair2wise_tools_dir }}/f2w_state_archive.py"
+      - backup
+      - --state-root
+      - "{{ fair2wise_state_host_path }}"
+      - --archive
+      - "{{ fair2wise_backup_dir }}/state-{{ fair2wise_profile }}-{{ fair2wise_backup_stamp }}.tar.gz"
+      - --profile
+      - "{{ fair2wise_profile }}"
+      - --note
+      - "{{ fair2wise_backup_note | default('pre-rollout') }}"
+  register: fair2wise_backup_result
+  changed_when: true
+
+- name: Backup receipt
+  ansible.builtin.debug:
+    msg: "{{ fair2wise_backup_result.stdout | from_json }}"

@@ -1,0 +1,12 @@
+---
+- name: Edge nginx site for {{ fair2wise_fqdn }}
+  ansible.builtin.template:
+    src: edge-nginx.conf.j2
+    dest: "{{ fair2wise_edge_conf_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: fair2wise edge changed
+
+- name: Apply the edge configuration now
+  ansible.builtin.meta: flush_handlers

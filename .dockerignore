@@ -50,3 +50,6 @@ scripts/app
 
 # graphify output and caches (local analysis only)
 **/graphify-out
+
+# T24E: Ansible handoff and host tools are never image content.
+deploy

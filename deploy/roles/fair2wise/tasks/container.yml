@@ -1,0 +1,37 @@
+---
+- name: Pull the approved digest
+  community.docker.docker_image:
+    name: "{{ fair2wise_image_ref }}"
+    source: pull
+
+- name: Stop the running container within its drain timeout (jobs return to queued)
+  community.docker.docker_container:
+    name: "{{ fair2wise_container_name }}"
+    state: stopped
+    stop_timeout: "{{ fair2wise_stop_timeout }}"
+
+- name: Start the container from the digest
+  community.docker.docker_container:
+    name: "{{ fair2wise_container_name }}"
+    image: "{{ fair2wise_image_ref }}"
+    state: started
+    recreate: true
+    pull: false
+    restart_policy: "{{ fair2wise_restart_policy }}"
+    stop_timeout: "{{ fair2wise_stop_timeout }}"
+    published_ports:
+      - "{{ fair2wise_gateway_bind }}:{{ fair2wise_gateway_host_port }}:{{ fair2wise_container_port }}"
+    volumes: "{{ fair2wise_mounts }}"
+    env: "{{ fair2wise_env }}"
+    memory: "{{ fair2wise_memory }}"
+    cpus: "{{ fair2wise_cpus }}"
+    read_only: false
+    init: false
+    labels:
+      org.fair2wise.profile: "{{ fair2wise_profile }}"
+      org.fair2wise.digest: "{{ fair2wise_image_digest }}"
+      org.fair2wise.base_path: "{{ fair2wise_base_path }}"
+    comparisons:
+      image: strict
+      env: strict
+      volumes: strict

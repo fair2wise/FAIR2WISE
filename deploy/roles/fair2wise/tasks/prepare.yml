@@ -1,0 +1,62 @@
+---
+- name: Instance directories exist and belong to the container uid
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ fair2wise_container_uid }}"
+    group: "{{ fair2wise_container_gid }}"
+    mode: "0700"
+  loop:
+    - "{{ fair2wise_instance_root }}"
+    - "{{ fair2wise_state_host_path }}"
+    - "{{ fair2wise_backup_dir }}"
+
+- name: Managed Tiled data directory (local profile only)
+  ansible.builtin.file:
+    path: "{{ fair2wise_tiled_host_path }}"
+    state: directory
+    owner: "{{ fair2wise_container_uid }}"
+    group: "{{ fair2wise_container_gid }}"
+    mode: "0700"
+  when: fair2wise_profile == 'local'
+
+- name: Host tools directory
+  ansible.builtin.file:
+    path: "{{ fair2wise_tools_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the state archive and release record tools
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../scripts/{{ item }}"
+    dest: "{{ fair2wise_tools_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - f2w_state_archive.py
+    - f2w_release_record.py
+
+- name: Secret directory (container uid only)
+  ansible.builtin.file:
+    path: "{{ fair2wise_secret_host_path | dirname }}"
+    state: directory
+    owner: "{{ fair2wise_container_uid }}"
+    group: "{{ fair2wise_container_gid }}"
+    mode: "0700"
+  when: fair2wise_profile != 'local'
+
+# The writer secret file is what preflight and tiled_config.check_private_file accept: a
+# regular file, mode 0600, owned by the uid that runs F2W (10001). The value comes from the
+# operator's secret backend through fair2wise_tiled_writer_secret; it is never logged.
+- name: Tiled writer secret file (0600, owned by uid {{ fair2wise_container_uid }})
+  ansible.builtin.copy:
+    content: "{{ fair2wise_tiled_writer_secret }}"
+    dest: "{{ fair2wise_secret_host_path }}"
+    owner: "{{ fair2wise_container_uid }}"
+    group: "{{ fair2wise_container_gid }}"
+    mode: "0600"
+  no_log: true
+  when: fair2wise_profile != 'local'

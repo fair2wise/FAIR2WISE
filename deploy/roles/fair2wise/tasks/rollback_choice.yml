@@ -1,0 +1,44 @@
+---
+# Pick the digest to roll back to from the host's release record and make it this run's
+# fair2wise_image_digest (playbooks/rollback.yml). The record entry carries both digests.
+- name: Choose the rollback digest from the host's release record
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ fair2wise_tools_dir }}/f2w_release_record.py"
+      - --record-file
+      - "{{ fair2wise_release_record }}"
+      - rollback
+      - --profile
+      - "{{ fair2wise_profile }}"
+      - --state-schema
+      - "{{ fair2wise_state_schema }}"
+      - --reason
+      - "{{ fair2wise_rollback_reason }}"
+      - --actor
+      - "{{ ansible_user_id | default('ansible') }}"
+      - "{{ '--to-digest' if fair2wise_rollback_to is defined else omit }}"
+      - "{{ fair2wise_rollback_to if fair2wise_rollback_to is defined else omit }}"
+  register: fair2wise_rollback_choice
+  changed_when: fair2wise_rollback_choice.rc == 0
+  failed_when: fair2wise_rollback_choice.rc not in [0, 3]
+
+- name: Rollback entry (previous and new digest)
+  ansible.builtin.set_fact:
+    fair2wise_rollback_entry: "{{ fair2wise_rollback_choice.stdout | from_json }}"
+
+- name: Refuse when the record refused
+  ansible.builtin.assert:
+    that:
+      - fair2wise_rollback_choice.rc == 0
+      - fair2wise_rollback_entry.kind == 'rollback'
+      - fair2wise_rollback_entry.digest is match('^sha256:[0-9a-f]{64}$')
+    fail_msg: "rollback refused: {{ fair2wise_rollback_entry.reason | default('no previous digest') }}"
+
+- name: Use the recorded previous digest for this run
+  ansible.builtin.set_fact:
+    fair2wise_image_digest: "{{ fair2wise_rollback_entry.digest }}"
+
+- name: Rollback
+  ansible.builtin.debug:
+    msg: "re-pointing {{ fair2wise_profile }} from {{ fair2wise_rollback_entry.previous_digest }} to {{ fair2wise_rollback_entry.digest }}"

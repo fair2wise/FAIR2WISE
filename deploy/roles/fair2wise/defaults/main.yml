@@ -1,0 +1,84 @@
+---
+# Role defaults for the FAIR2WISE container (T24E). Non-secret, host-independent values.
+# Everything an operator must supply (FQDN, digest, origins, secret reference, TLS files)
+# has NO default here: see ../../inventory.example.yml. Variable names follow
+# ANSIBLE_HANDOFF.md ("may be prefixed fair2wise_ in the existing role").
+
+# Image: always the bare repository plus an immutable digest; the role never runs a tag
+# (DEPLOYMENT_STRATEGY.md section 7). The friendly tag is kept for humans only.
+fair2wise_image_repository: ghcr.io/fair2wise/fair2wise
+fair2wise_image_ref: "{{ fair2wise_image_repository }}@{{ fair2wise_image_digest }}"
+
+# Public prefix shared by the UI build, gateway and API (D26). Not configurable per host
+# without a rebuilt frontend; kept as a variable so validate.yml can refuse a mismatch.
+fair2wise_base_path: /fair2wise
+fair2wise_health_path: "{{ fair2wise_base_path }}/healthz"
+fair2wise_api_health_path: "{{ fair2wise_base_path }}/api/health"
+
+fair2wise_container_name: "fair2wise-{{ fair2wise_profile }}"
+fair2wise_container_uid: 10001
+fair2wise_container_gid: 10001
+fair2wise_container_port: 8080
+# The gateway is reachable from this host only; the edge proxy is the public ingress.
+fair2wise_gateway_bind: 127.0.0.1
+fair2wise_gateway_host_port: 8080
+# docker/profiles/README.md: SIGTERM -> ordered stop (gateway, worker 45 s, api, tiled).
+fair2wise_stop_timeout: 120
+fair2wise_restart_policy: unless-stopped
+fair2wise_memory: 8g
+fair2wise_cpus: "4"
+
+# Host layout (O07: actual host mount roots are an owner input; this is the proposal).
+fair2wise_host_root: /srv/fair2wise
+fair2wise_instance_root: "{{ fair2wise_host_root }}/{{ fair2wise_profile }}"
+fair2wise_state_host_path: "{{ fair2wise_instance_root }}/state"
+fair2wise_tiled_host_path: "{{ fair2wise_instance_root }}/tiled"
+fair2wise_secret_host_path: "{{ fair2wise_instance_root }}/secrets/tiled_writer"
+fair2wise_backup_dir: "{{ fair2wise_instance_root }}/backups"
+fair2wise_release_record: "{{ fair2wise_instance_root }}/releases.json"
+fair2wise_tools_dir: /usr/local/lib/fair2wise
+
+# Mounts. ALS: the state volume and the read-only writer secret, nothing else (no papers,
+# tiled or cache mounts are proposed for ALS; central Tiled is not a filesystem). :local adds
+# the managed Tiled data directory.
+fair2wise_mounts_common:
+  - "{{ fair2wise_state_host_path }}:/var/lib/fair2wise/state:rw"
+fair2wise_mounts_als:
+  - "{{ fair2wise_secret_host_path }}:/run/secrets/tiled_writer:ro"
+fair2wise_mounts_local:
+  - "{{ fair2wise_tiled_host_path }}:/var/lib/fair2wise/tiled:rw"
+fair2wise_mounts: >-
+  {{ fair2wise_mounts_common
+     + (fair2wise_mounts_local if fair2wise_profile == 'local' else fair2wise_mounts_als) }}
+
+# Container environment. The profile JSON baked in the image fixes everything else and the
+# supervisor exits 78 if a locked value is contradicted (docker/profiles/README.md).
+fair2wise_env_als:
+  F2W_CORS_ORIGINS: "{{ fair2wise_cors_origins }}"
+  F2W_TILED_WRITER_SECRET_FILE: /run/secrets/tiled_writer
+fair2wise_env_local: {}
+# Operator additions (model endpoint settings etc.). Never put a secret value in inventory
+# in clear text; reference your approved secret backend.
+fair2wise_extra_env: {}
+fair2wise_env: >-
+  {{ (fair2wise_env_local if fair2wise_profile == 'local' else fair2wise_env_als)
+     | combine(fair2wise_extra_env) }}
+
+# Edge proxy (nginx) in front of the gateway: TLS termination, /fair2wise forwarded
+# unchanged, X-Forwarded-Proto overwritten with the real scheme.
+fair2wise_manage_edge: true
+fair2wise_edge_conf_path: /etc/nginx/conf.d/fair2wise.conf
+fair2wise_edge_client_max_body_size: 128m
+fair2wise_edge_stream_timeout: 900s
+
+# Health checks after start (seconds between tries x tries).
+fair2wise_health_retries: 36
+fair2wise_health_delay: 5
+
+# Rollout bookkeeping.
+fair2wise_backup_before_rollout: true
+fair2wise_record_rollout: true
+fair2wise_rollout_reason: "ansible rollout"
+# Label of the state format this digest was approved for; a rollback refuses a target
+# recorded for a different label (DEP-21: state-version compatibility is validated, not assumed).
+fair2wise_state_schema: "f2w.state/v1"

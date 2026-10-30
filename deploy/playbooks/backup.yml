@@ -1,0 +1,19 @@
+---
+# Consistent backup of the mounted state tree with a manifest and a sha256 sidecar.
+# The archive stays on the host under fair2wise_backup_dir; the owner's backup integration
+# (O07: destination, retention, RPO/RTO) copies it off-host. Mounting is not backup.
+#
+#   ansible-playbook -i inventory.yml deploy/playbooks/backup.yml -l als_prod
+#   ansible-playbook ... -e fair2wise_backup_stop_container=true   # quiesced copy
+- name: Back up the FAIR2WISE state mount
+  hosts: fair2wise
+  become: true
+  gather_facts: false
+  vars:
+    fair2wise_backup_stop_container: false
+    fair2wise_backup_note: scheduled
+  tasks:
+    - name: Archive and verify
+      ansible.builtin.import_role:
+        name: fair2wise
+        tasks_from: backup_standalone

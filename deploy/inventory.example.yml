@@ -1,0 +1,49 @@
+---
+# EXAMPLE inventory for the fair2wise role. Copy it outside this repository, replace every
+# placeholder, and keep the real file (and any vault) in the deployment repository, never
+# here. ALS host names, FQDNs, certificate paths and the writer secret reference are
+# supplied by the operator (ANSIBLE_HANDOFF.md "Required deployment inputs"); this
+# repository does not contain them. Values below are syntactically valid placeholders only (.invalid TLD, RFC 2606).
+all:
+  children:
+    fair2wise:
+      children:
+        als_dev:
+          hosts:
+            f2w-dev-host.example.invalid:
+          vars:
+            fair2wise_profile: als-dev
+            # The public name the browser uses; NOT the Tiled URL (that is fixed in the image).
+            fair2wise_fqdn: f2w-dev.example.invalid
+            # Browser origins of the deployed UI: scheme://host[:port], comma separated, no paths.
+            fair2wise_cors_origins: "https://f2w-dev.example.invalid"
+            # The tested digest from release-publication.json ("reference": "<repo>@sha256:...").
+            # Placeholder: 64 zeros. validate.yml refuses anything that is not sha256:<64 hex>.
+            fair2wise_image_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            # Writer secret for the central Tiled of this environment: reference your approved
+            # secret backend (Ansible Vault, a lookup plugin). Never a literal value in inventory.
+            fair2wise_tiled_writer_secret: "{{ vault_fair2wise_tiled_writer_secret_als_dev }}"
+            fair2wise_tls_certificate_path: /etc/pki/tls/certs/f2w-dev.example.invalid.crt
+            fair2wise_tls_key_path: /etc/pki/tls/private/f2w-dev.example.invalid.key
+        als_prod:
+          hosts:
+            f2w-prod-host.example.invalid:
+          vars:
+            fair2wise_profile: als-prod
+            fair2wise_fqdn: f2w.example.invalid
+            fair2wise_cors_origins: "https://f2w.example.invalid"
+            fair2wise_image_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            fair2wise_tiled_writer_secret: "{{ vault_fair2wise_tiled_writer_secret_als_prod }}"
+            fair2wise_tls_certificate_path: /etc/pki/tls/certs/f2w.example.invalid.crt
+            fair2wise_tls_key_path: /etc/pki/tls/private/f2w.example.invalid.key
+      vars:
+        # Optional overrides of roles/fair2wise/defaults/main.yml (shown with their defaults).
+        fair2wise_image_repository: ghcr.io/fair2wise/fair2wise
+        fair2wise_host_root: /srv/fair2wise
+        fair2wise_gateway_host_port: 8080
+        fair2wise_stop_timeout: 120
+        fair2wise_manage_edge: true
+        fair2wise_state_schema: "f2w.state/v1"
+        # Model endpoint settings for the API go here through your secret backend, e.g.
+        # fair2wise_extra_env: { CBORG_API_KEY: "{{ vault_cborg_api_key }}" }
+        fair2wise_extra_env: {}

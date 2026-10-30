@@ -1,0 +1,27 @@
+---
+# Standalone backup (playbooks/backup.yml): optional quiesce, archive, verify, restart.
+- name: Stop the container for a quiesced copy (optional; the SQLite backup API is consistent either way)
+  community.docker.docker_container:
+    name: "{{ fair2wise_container_name }}"
+    state: stopped
+    stop_timeout: "{{ fair2wise_stop_timeout }}"
+  when: fair2wise_backup_stop_container | bool
+
+- name: Archive the state tree
+  ansible.builtin.import_tasks: backup.yml
+
+- name: Verify the archive before reporting success
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ fair2wise_tools_dir }}/f2w_state_archive.py"
+      - verify
+      - --archive
+      - "{{ (fair2wise_backup_result.stdout | from_json).archive }}"
+  changed_when: false
+
+- name: Start the container again
+  community.docker.docker_container:
+    name: "{{ fair2wise_container_name }}"
+    state: started
+  when: fair2wise_backup_stop_container | bool
