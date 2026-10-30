@@ -155,7 +155,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | B27 | **Re-plan after a stale approval** (T10) | When the plan changed before approval, resuming takes two steps: re-plan, then approve the new plan. | Keep it manual, so the approver sees the new plan | **Decided 2026-10-30 (O-X3): re-plan automatically.**
 | B28 | **Second rollback** (T10) | A second publication rollback undoes the first, because it steps back one pointer-history entry. | Accept, and document it | **Decided 2026-10-30 (O-X3): accept.**
 | B29 | **Legacy DownloadAgent fetch path** | T05 added a hardened downloader: per-hop redirect checks, private-address refusal, size, signature and timeout limits. The legacy `DownloadAgent` used by the UI still fetches with its own code; T05 only records its results in the new store. | Switch DownloadAgent to the hardened downloader behind a parity test | **Decided 2026-10-30 (O-X3): switch to the hardened downloader.**
-| B30 | **FORGE consumer (T15)** | FORGE importing F2W agents and services needs changes in the FORGE repo, coordinated with Alex. Nothing on the FORGE side has been touched. | Tell me when Alex is ready; until then I can build only the F2W-side package surface |
+| B30 | **FORGE consumer (T15)** | FORGE importing F2W agents and services needs changes in the FORGE repo, coordinated with Alex. Nothing on the FORGE side has been touched. | Tell me when Alex is ready; until then I can build only the F2W-side package surface | **Decided 2026-10-30 (O-P5): F2W side now; FORGE side with Alex later.**
 
 ---
 
@@ -184,9 +184,9 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 |---|---|---|---|
 | D1.1 | Approve schema set 0.3.0 (`reviews/H3/schema_diff_T22C.md`) | Until approved, builds and publishing refuse 0.3.0; the pilot cannot extract samples or runs | Approve | **Decided 2026-10-30 (O-S1): approved.**
 | D1.2 | Class name `MeasurementRun` (and `RunCondition`) | `Measurement` already exists (123 nodes in the rsoxs graphs) and keeps its meaning | Accept | **Decided 2026-10-30 (O-S1): MeasurementRun accepted.**
-| D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change |
-| D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release |
-| D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% |
+| D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change | **Decided 2026-10-30 (O-S2): reconcile now (bl1101 v3).**
+| D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release | **Decided 2026-10-30 (O-S2): add the slot (0.3.1).**
+| D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% | **Decided 2026-10-30 (O-S2): 2%.**
 | D1.6 | A value both derived and in an attributing sentence | Tagged cited today | Keep cited |
 | D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag |
 | D1.8 | LOCAL-02 counts as gold with one reviewed paper | It needs a real run, not labels | Accept |
@@ -233,7 +233,7 @@ Recorded for the owner; nothing below is answered here.
 | D3.9 | **T26A release-contract questions Q2-Q6** | Copied verbatim from `docs/migration/data_releases/release_contract.md` section 10 (Q1 was resolved by O-D1). Each is pending owner decision (OPEN_DECISIONS D3.9). |
 | D3.10 | **B25 lock change still pending** | `pip check` fails in the app environment (huggingface-hub vs click, `requirements/semantic.in` unpinned). B25 asks for a reviewed lock change (pin `huggingface-hub` below 1.33 or raise click in the lock). Not applied; T28C owns the requirements files. Pending owner decision (OPEN_DECISIONS B25). | **Decided 2026-10-30 (O-X3).**
 | D3.11 | **May the integrator run `docker build` / `docker run` locally for the T24E container tests?** | B19 authorized the owner to build or to approve a local build (no push). `:local` was built and run once on 2026-10-29 (A5 section 1). T24E's container-level tests (supervisor, preflight, gateway on a real image) need repeated local builds and runs on the integrator's machine. No image is pushed and no registry login happens. Pending owner decision (OPEN_DECISIONS D3.11). | **Decided 2026-10-30 (O-X1): yes, build and run locally.**
-| D3.12 | **D1.5 derived-value tolerance is still 1% in code** | `app/modules/evidence/units.py:381` `RECIPROCAL_DERIVATION_REL_TOL = 0.01`; D1.5 recommends 2% (paper A, 1.7% mismatch) and `extraction_field_mapping.md` says "1 % tolerance". The constant and the doc change together once D1.5 is decided (AUD-17; owner T06B). Pending owner decision (OPEN_DECISIONS D1.5). |
+| D3.12 | **D1.5 derived-value tolerance is still 1% in code** | `app/modules/evidence/units.py:381` `RECIPROCAL_DERIVATION_REL_TOL = 0.01`; D1.5 recommends 2% (paper A, 1.7% mismatch) and `extraction_field_mapping.md` says "1 % tolerance". The constant and the doc change together once D1.5 is decided (AUD-17; owner T06B). Pending owner decision (OPEN_DECISIONS D1.5). | **Decided 2026-10-30 (O-S2): 2%.**
 
 **D3.9 verbatim text** (`release_contract.md` section 10, items 2-6):
 

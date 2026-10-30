@@ -336,3 +336,15 @@ frozen-UI pin is updated in that change (as O-U1).
 - **B28:** rollback as a toggle between the last two pointers is accepted and documented.
 - **B29:** switch the legacy `DownloadAgent` to the hardened T05 downloader behind a
   parity test on the existing download fixtures. Work item (T29 scope).
+
+## Register walk-through, batch 13: B30, D1.3-D1.5 (2026-10-30, O-S2 / O-P5)
+
+- **B30 (O-P5):** prepare the F2W-side package surface for T15 now (import surface, a
+  consumer example, a contract test FORGE can run); the FORGE-side changes wait for the
+  owner's signal to coordinate with Alex.
+- **D1.3 (O-S2):** reconcile bl1101 now: define bl1101 v3 mapping its `Sample`, `Detector`
+  and `Endstation` onto 0.3.0's `Sample` and `Instrument` before the pilot (T22C follow-up,
+  reviewed diff).
+- **D1.4 (O-S2):** add a normalized-value slot to 0.3.0 (converted value, unit, factor and
+  conversion profile as provenance). Versioned additive change to 0.3.0 (becomes 0.3.1).
+- **D1.5 / D3.12 (O-S2):** derived-value tolerance 2% (`RECIPROCAL_DERIVATION_REL_TOL`).
