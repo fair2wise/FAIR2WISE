@@ -22,6 +22,9 @@
       - "{{ fair2wise_profile }}"
       - --note
       - "{{ fair2wise_backup_note | default('pre-rollout') }}"
+      # The digest of the container whose state this is, when one exists (for the manifest).
+      - "{{ '--image-digest' if fair2wise_running.exists else omit }}"
+      - "{{ fair2wise_running.container.Config.Labels['org.fair2wise.digest'] if fair2wise_running.exists else omit }}"
   register: fair2wise_backup_result
   changed_when: true
 

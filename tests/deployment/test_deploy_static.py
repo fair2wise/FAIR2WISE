@@ -255,7 +255,7 @@ def test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchan
     assert "location {{ fair2wise_base_path }} {" in text
     assert "proxy_buffering off;" in text and "proxy_cache off;" in text
     assert "proxy_read_timeout {{ fair2wise_edge_stream_timeout }};" in text
-    assert "listen 443 ssl;" in text and "return 301 https://$host$request_uri;" in text
+    assert "listen 443 ssl http2;" in text and "return 301 https://$host$request_uri;" in text
     assert 'proxy_set_header X-Forwarded-Host "";' in text
 
 

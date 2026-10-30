@@ -16,9 +16,8 @@ server {
 }
 
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name {{ fair2wise_fqdn }};
 
     ssl_certificate     {{ fair2wise_tls_certificate_path }};
