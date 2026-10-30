@@ -1,7 +1,8 @@
 # ADR: Preserve the existing F2W inference paths behind a thin bridge
 
-Status: Proposed (T01, gate H1)
+Status: Accepted at H1 (2026-10-12) (T01; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline)
 Date: 2026-10-12
+Superseded/amended by: item 3 approved as H1-3 (one shared CBORG admission controller for sync and async callers, 429-aware) and item 4 as H1-4 (fail closed when `CBORG_API_KEY` is unset); both applied in `1dfacd8`. O-R1 (2026-10-13): in `F2W_RUNTIME=langgraph` with `F2W_QA_ROUTE=supervisor`, a planner failure falls back to the direct `answer_from_knowledge` call. O-U2 (2026-10-16): the validation judge model is a deployment-wide setting chosen from the live model list (`/v1/validation/judge-model`, T11B), never a hardcoded model.
 
 ## Context
 

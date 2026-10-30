@@ -1,7 +1,8 @@
 # ADR: Durable jobs, profile-aware approvals and replay safety
 
-Status: Proposed (T01, gate H1)
+Status: Accepted at H1 (2026-10-12) (T01; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline)
 Date: 2026-10-12
+Superseded/amended by: item 3 approved as H1-5 (separate publication gate; Tiled import needs an `ApprovalRecord` for the exact plan) and implemented by T10 (`16e4a37`) and T14 (`/v1/publications`, H5-gated). Item 6 (expiry) is amended below. T02B (H2 Q8, option b): a pending approval stays open while new chat messages are answered. T28A (`12156d1`, AUD-01): job stages re-authorize through `JobAuthority`; an unwired required capability is a startup error.
 
 ## Context
 
@@ -40,6 +41,13 @@ The H0 baseline found that today:
 6. **Pending-action expiry** (baseline: never) is a proposed improvement for
    T10, behind an explicit owner decision, because the current UI relies on
    pending state surviving reloads.
+   *Amended 2026-10-29 (T28D, AUD-10).* Chat pending approvals still never
+   expire (T02B). Publication approvals made through the `/v1` interface do
+   expire: the code applies `DEFAULT_APPROVAL_TTL = timedelta(hours=1)` on
+   every profile, `:local` included (`app/api/operations.py:58`). The owner
+   recommendation in OPEN_DECISIONS B14/D3.5 is no expiry on `:local` and
+   24 h on ALS. The TTL is pending owner decision (OPEN_DECISIONS D3.5, D3.8);
+   this ADR does not choose a value.
 
 ## Consequences
 

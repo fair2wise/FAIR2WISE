@@ -1,7 +1,8 @@
 # ADR: Minimal import, dependency extras and the parser boundary
 
-Status: Proposed (T01, gate H1)
+Status: Accepted at H1 (2026-10-12) (T01; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline)
 Date: 2026-10-12
+Superseded/amended by: H1-2 (distribution `fair2wise`, import namespace `f2w`, T04 `ff4beac`). O-T1: the managed Tiled server environment pins 0.2.18, not 0.2.19rc2. O-A7 (2026-10-12): the MkDocs site is built into all three images. AUD-08 fix `a32e752`: every image carries CPU-only torch and the two MiniLM models offline (`HF_HUB_OFFLINE=1`); profiles default `KG_RAG_RETRIEVAL_BACKEND=lexical`. Item 6 (`pip check` passes): the app environment currently fails `pip check` (huggingface-hub vs click), pending owner decision (OPEN_DECISIONS B25). Docling (item 3 `[parser]`) is pending owner decision (OPEN_DECISIONS B1).
 
 ## Context
 

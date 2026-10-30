@@ -1,6 +1,7 @@
 # ADR: Tiled deployment modes, artifact pin and test lifecycle
 
-- **Status:** Proposed (T20A, gate H1). Not approved. No code, image or deployment changed.
+- **Status:** Accepted at H1 (2026-10-12) (T20A; `docs/migration/reviews/H1/decision.json` H1-8: the ADR set is the H1 baseline), with the H1-1/O-T1 exception below (Tiled 0.2.18 interim pin).
+- **Superseded/amended by:** O-T1 (2026-10-12): `tiled==0.2.18` replaces the D22 0.2.19 pin until a final 0.2.19 exists; T20B (`3fba36b`) implemented the managed lifecycle and disposable test server on 0.2.18, and T24B (`aafffb0`) the three supervised image targets (`:local` bundles `/opt/tiled/venv`; `:als-dev`/`:als-prod` use the central servers). O-A7: MkDocs built into every image. C6: the gateway listens on `F2W_GATEWAY_PORT` (default 8080) so nginx needs no `setcap`. Supervisor choice (B21), 0.2.18 revocation window (B13) and the SQLAlchemy pin (B17) are pending owner decision (OPEN_DECISIONS B21, B13, B17).
 - **Date:** 2026-10-09
 - **Branch / baseline:** `forge_merge`; frozen baseline `222b1e7b130567dbf4a3242697ac2b465794a38d`.
 - **Decisions this ADR must satisfy (fixed by the owner):** D13/D14 (managed and central modes; the app provisions a disposable test server), D22 (Tiled exactly 0.2.19), D23-D29 (three images, `/fair2wise`, Ansible sets the FQDN, F2W writes as an admin account, papers mounted), D30 (ALS sign-in; admins only for privileged work), D33 (owner confirms central servers run Graph-enabled 0.2.19), D34 (local full access without sign-in). H0 E3: the Tiled catalog DB stays out of every image except, optionally, `:local`.
