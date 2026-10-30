@@ -26,11 +26,33 @@ for extra in ("tests/graph_import", "tests/graph"):
     if str(REPO / extra) not in sys.path:
         sys.path.insert(0, str(REPO / extra))
 
-from tiled_server import start_tiled_instance, tiled_python  # noqa: E402
+from tiled_server import TEST_ACCESS_TAGS, start_tiled_instance, tiled_python  # noqa: E402
 
 pytestmark = pytest.mark.skipif(tiled_python() is None, reason="needs F2W_TILED_PYTHON")
 
 OBS = {}
+
+
+# The probes mutate their servers (entities, links, tags stay behind), as they did in their own
+# directory with their own session. Module-scoped instances override the session-wide fixtures of
+# tests/tiled/conftest.py so test_tiled_capabilities_0218.py and the other read-only users of the
+# shared servers never see probe leftovers.
+@pytest.fixture(scope="module")
+def tiled_session_instance(tiled_base):
+    inst = start_tiled_instance(tiled_base)
+    try:
+        yield inst
+    finally:
+        inst.destroy()
+
+
+@pytest.fixture(scope="module")
+def tiled_acl_instance(tiled_base):
+    inst = start_tiled_instance(tiled_base, auth=True, seed=False, access_tags=TEST_ACCESS_TAGS)
+    try:
+        yield inst
+    finally:
+        inst.destroy()
 CE = "mutation($i: CreateEntityInput!) { createEntity(input: $i) { id } }"
 CL = "mutation($i: CreateLinkInput!) { createLink(input: $i) { id } }"
 UE = "mutation($id: ID!, $i: UpdateEntityInput!) { updateEntity(id: $id, input: $i) { id uri name } }"
