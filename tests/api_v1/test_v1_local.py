@@ -76,6 +76,38 @@ def test_cli_jobs_api_flag_selects_the_factory(monkeypatch):
     assert cli.build_parser().parse_args(["api"]).jobs_api is False
 
 
+@pytest.mark.parametrize("entry", ["jobs_api", "legacy"])
+def test_run_api_warns_when_local_binds_beyond_loopback(monkeypatch, caplog, entry):
+    """AUD-16: both entry points log a WARNING naming raw traces; loopback binds log nothing."""
+    import logging
+    from types import SimpleNamespace
+
+    import uvicorn
+
+    from app.api import main as api_main
+    from app.modules.f2w_agent import api as legacy
+
+    from _v1_support import local_settings
+
+    app = SimpleNamespace(state=SimpleNamespace(f2w_access=SimpleNamespace(settings=local_settings())))
+    served = []
+    monkeypatch.setattr(uvicorn, "run", lambda a, **kw: served.append((a, kw["host"])))
+    monkeypatch.delenv("F2W_PUBLIC_PREFIX", raising=False)
+    if entry == "jobs_api":
+        monkeypatch.setattr(api_main, "create_api_app", lambda cfg, cors_origins=None: app)
+        run = lambda host: api_main.run_api(object(), host=host, port=1)  # noqa: E731
+    else:
+        monkeypatch.setattr(legacy, "create_app", lambda cfg, cors_origins=None: app)
+        run = lambda host: legacy.run_api(object(), host=host, port=1)  # noqa: E731
+    with caplog.at_level(logging.WARNING, logger="app.api.auth"):
+        run("127.0.0.1")
+        assert not [r for r in caplog.records if "raw traces" in r.getMessage()]
+        run("0.0.0.0")
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "raw traces" in r.getMessage()]
+    assert len(warnings) == 1 and "'0.0.0.0'" in warnings[0].getMessage()
+    assert served == [(app, "127.0.0.1"), (app, "0.0.0.0")]  # the server still starts; no policy change
+
+
 # ------------------------------------------------------------------ jobs
 
 

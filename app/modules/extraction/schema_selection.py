@@ -15,7 +15,7 @@ free of schema loading.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
 

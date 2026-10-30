@@ -68,11 +68,17 @@ def fresh_context(request: Request) -> RequestContext:
 
 
 def project(request: Request, payload: Any) -> Any:
-    """Make local paths opaque with the app's one disclosure projector (D19)."""
+    """Project a ``/v1`` body with the app's one disclosure projector (D19, AUD-06).
+
+    :meth:`~app.modules.security.disclosure.DisclosureProjector.project_api_response`:
+    private keys and served-artifact values dropped, paths opaque, secrets redacted,
+    strings clipped to the 600-character bound (B10). Without the guard (an app built
+    without ``create_app``) the body is returned as is, as before.
+    """
     guard = getattr(request.app.state, "f2w_legacy_ui", None)
     if guard is None:
         return payload
-    return guard.projector.project_paths_only(payload)
+    return guard.projector.project_api_response(payload)
 
 
 def dump(model: Any) -> Any:

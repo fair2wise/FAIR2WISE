@@ -37,7 +37,7 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import FastAPI
 
 from ..modules.security.authorization import StartupConfigError
-from .auth import undeclared_routes
+from .auth import undeclared_routes, warn_if_exposed
 from .operations import F2WOperations, PublicationGate, build_operations
 from .origin_gate import OriginGateMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
@@ -160,7 +160,9 @@ def run_api(cfg: Any, *, host: str, port: int, cors_origins: Optional[List[str]]
         options = uvicorn_options(layout_from_env(os.environ))
     else:
         options = {"root_path": root_path} if root_path else {}
-    uvicorn.run(create_api_app(cfg, cors_origins=cors_origins), host=host, port=port, **options)
+    app = create_api_app(cfg, cors_origins=cors_origins)
+    warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
+    uvicorn.run(app, host=host, port=port, **options)
 
 
 __all__ = ("GUARDED_PREFIXES", "create_api_app", "run_api")

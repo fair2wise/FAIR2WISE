@@ -80,6 +80,21 @@ or identity-aware gateway in front of the frontend, restrict source networks,
 and keep agent/Splash private. Changing the Compose binding to `0.0.0.0` without
 adding authentication exposes both the UI and its proxied control plane.
 
+### The `:local` image beyond loopback
+
+The `:local` image treats every caller as the trusted local operator (D34):
+full application access, publication to the local Tiled, and **raw traces**.
+`GET /traces/{turn_id}` returns the unprojected record, including full model
+prompts with source page text, because every `:local` caller holds
+`trace.read_any` (owner decision 2026-10-12; AUD-16). On loopback that is one
+person reading their own work. If you set `F2W_LOCAL_BIND=network` or start the
+API with a non-loopback `--host`, every machine that can reach the address
+gets the same access, traces included. The server logs a WARNING at startup
+in that case. Keep `:local` on loopback, or put it behind an SSH tunnel or an
+authenticated gateway; the ALS images (`:als-dev`, `:als-prod`) are the
+multi-user profiles, where traces are projected for everyone but verified
+Tiled admins.
+
 CORS is not authentication. The agent's default local-development origins are
 `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:5175`, and
 `http://127.0.0.1:5175`. Non-browser clients are not stopped by CORS.
