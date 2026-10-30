@@ -400,8 +400,12 @@ def test_tiled_job_installs_the_owner_pinned_wheel_into_its_own_venv(forge_ci: D
     assert f"{PINNED_TILED_WHEEL_SHA256}  $RUNNER_TEMP/tiled-wheel/{PINNED_TILED_WHEEL}" in install
     assert "sha256sum -c -" in install, "the downloaded wheel is checked before anything is installed"
     assert install.index("sha256sum -c") < install.index("python -m venv"), "check first, install second"
-    assert "--constraint docker/profiles/tiled-server/constraints.txt" in install
-    assert f"{PINNED_TILED_WHEEL}[server]" in install
+    # T24E / D3.14: the same hash-locked install as the image (Dockerfile tiled-server-build).
+    assert "--require-hashes" in install
+    assert "-r docker/profiles/tiled-server/constraints.lock.txt" in install
+    assert '--find-links "$RUNNER_TEMP/tiled-wheel"' in install, "the checked wheel is what pip installs for tiled"
+    assert "--constraint docker/profiles/tiled-server/constraints.txt" not in install, "the plain list is not the lock"
+    assert f"{PINNED_TILED_WHEEL}[server]" not in install, "no direct install outside hash checking"
     assert "pip check" in install and f"tiled.__version__ != '{PINNED_TILED_VERSION}'" in install
     # The server goes into $RUNNER_TEMP/venv-tiled only; the app environment never gets tiled.
     assert "venv-tiled" in install
@@ -409,6 +413,25 @@ def test_tiled_job_installs_the_owner_pinned_wheel_into_its_own_venv(forge_ci: D
         run = step.get("run", "")
         if "requirements.txt" in run:
             assert "tiled" not in run.lower()
+
+
+def test_tiled_job_and_dockerfile_install_the_same_hash_lock(forge_ci: Dict[str, Any]) -> None:
+    """D3.14: CI resolves the Tiled server environment from the same hash-locked file as the image."""
+    from app.modules.deployment.tiled_config import PINNED_TILED_VERSION, PINNED_TILED_WHEEL_SHA256
+
+    job = forge_ci["jobs"]["python-tiled-suites"]
+    install = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Isolated Tiled"))
+    dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
+    lock = REPO / "docker/profiles/tiled-server/constraints.lock.txt"
+    assert "--require-hashes --find-links /tmp/tiled/wheel" in dockerfile
+    assert "-r /tmp/tiled/constraints.lock.txt" in dockerfile
+    assert "COPY docker/profiles/tiled-server/constraints.lock.txt /tmp/tiled/constraints.lock.txt" in dockerfile
+    assert "-r docker/profiles/tiled-server/constraints.lock.txt" in install
+    text = lock.read_text(encoding="utf-8")
+    assert f"tiled[server]=={PINNED_TILED_VERSION}" in text and PINNED_TILED_WHEEL_SHA256 in text
+    for line in text.splitlines():
+        if line and not line.startswith(("#", " ")) and "==" in line:
+            assert line.rstrip().endswith("\\"), f"unhashed lock line: {line}"
 
 
 def test_tiled_job_runs_every_tiled_backed_suite_with_the_isolated_interpreter(forge_ci: Dict[str, Any]) -> None:
