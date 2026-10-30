@@ -23,6 +23,7 @@ Implementation: `app/modules/f2w_agent/multi_kg.py` (`graph_id_for_path`,
 | `tiled_sim_seed.yaml` | RNG seed and ESAF/proposal/sample templates for sim ingest | Tiled Graph / `scripts/ingest_tiled_sim.py` |
 | `prov_vocabulary.yaml` | W3C PROV-O *reference* (not LinkML) | See below |
 | `v0.3.0/matkg_schema.yaml`, `v0.3.0/rsoxs_schema.yaml` | Schema set 0.3.0 (T22C): additive Sample, MeasurementRun, Instrument and evidence slots | **Pending owner review**; selected only explicitly (`rsoxs_schema@0.3.0`). See below |
+| `v0.3.1/matkg_schema.yaml`, `v0.3.1/rsoxs_schema.yaml`, `v0.3.1/bl1101_schema.yaml` | Schema set 0.3.1 (T22D): 0.3.0 plus the normalized-value slots on `QuantityValue` (D1.4) and bl1101_v3 with the Sample/Detector/Endstation mapping table (D1.3) | **Pending owner review**; selected only explicitly (`rsoxs_schema@0.3.1`, `bl1101_schema@0.3.1`). See below |
 
 Do not point the RSoXS extractor at `xray_schema.yaml`, and do not harvest
 X-ray fundamentals PDFs into `papers/rsoxs/`. Synchrotron tomography PDFs go
@@ -76,6 +77,40 @@ owner review of `docs/migration/reviews/H3/schema_diff_T22C.md`. No default
 path uses them: `registry.select`, snapshot builds and the default Tiled
 supported set all refuse them unless the caller asks explicitly.
 `bl1101_schema.yaml` and the xray schemas stay on the base set.
+
+## Schema set 0.3.1 (T22D, pending owner review)
+
+`v0.3.1/` is 0.3.0 plus two owner-decided additions (`owner_decisions.md` batch 13,
+O-S2, 2026-10-30), each additive:
+
+- **D1.4, normalized value.** `QuantityValue` gets four optional slots:
+  `normalized_value`, `normalized_unit`, `conversion_factor` and
+  `conversion_profile`. `numeric_value`/`unit` stay the value exactly as printed;
+  the normalized slots are filled only from the closed conversion tables of
+  `app/modules/evidence/units.py` (`normalize_quantity`, profile
+  `forge-units-v1`) and left absent when the unit is unknown. `matkg_schema.yaml`
+  is `0.3.1`, `rsoxs_schema.yaml` is `rsoxs_v3` (same overlay on the new base).
+- **D1.3, bl1101 v3.** `v0.3.1/bl1101_schema.yaml` (`bl1101_v3`) imports the 0.3.1
+  base and adds a mapping table as class annotations: ops `Sample` ->
+  literature `Sample` (label kept as `sample_label`), `Detector` and `Endstation`
+  -> `Instrument` with `instrument_category` `detector`/`endstation`. The ops
+  classes keep their parents and slots (bl1101's own `Sample is_a Material`
+  shadows the imported one inside the bl1101 closure, so the tracked bl1101
+  graphs validate unchanged). The table is applied only by
+  `app/modules/schema/bl1101_mapping.py` on request and round-trips exactly.
+  `bl1101_motor_stage_map.yaml` and the ingest (`bl1101_v2`) are unchanged.
+
+Registry ids: `matkg_schema@0.3.1`, `rsoxs_schema@0.3.1`, `bl1101_schema@0.3.1`.
+Review doc: `docs/migration/reviews/H3/schema_diff_T22D.md`. The default schema
+stays the base set until the owner decides otherwise (pilot).
+
+## Version table
+
+| Set | `matkg_schema` | `rsoxs_schema` | `bl1101_schema` | `xray_schema` | Status |
+|---|---|---|---|---|---|
+| base (`storage/schema/`) | 0.2.0 | rsoxs_v1 | bl1101_v2 | xray_v1 | in use; every default path |
+| 0.3.0 (`v0.3.0/`, T22C) | 0.3.0 | rsoxs_v2 | (base) | (base) | pending owner review |
+| 0.3.1 (`v0.3.1/`, T22D) | 0.3.1 | rsoxs_v3 | bl1101_v3 | (base) | pending owner review |
 
 ## Licence
 

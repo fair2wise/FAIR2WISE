@@ -44,7 +44,7 @@ def _enum_values(view, name):
 # --- registration ---------------------------------------------------------------
 
 def test_schema_set_is_registered_beside_the_base_set(registry):
-    assert [s.version for s in SCHEMA_SETS] == ["0.3.0"]
+    assert [s.version for s in SCHEMA_SETS][0] == "0.3.0"  # later sets (0.3.1, T22D) register after it
     entries = registry.set_entries("0.3.0")
     assert [e.schema_id for e in entries] == list(NEW)
     for entry in entries:

@@ -9,12 +9,15 @@ Fingerprint definition (:func:`closure_fingerprint` in :mod:`.loading`): SHA-256
 ``{registry_version, linkml_runtime, files: [[filename, sha256(bytes)], ...sorted]}`` for the resolved
 import closure of the asset. Paths, the working directory and timestamps are not part of it.
 
-Schema sets (T22C). The files directly in ``storage/schema`` are the base set: the version every default
+Schema sets (T22C, T22D). The files directly in ``storage/schema`` are the base set: the version every default
 build, extraction and publish path uses. A later version of some of those files lives in its own
-subdirectory (``storage/schema/v0.3.0/``) with the same file names, so ``imports: [matkg_schema]`` resolves
-to the sibling of the same version. Its entries are registered as ``<stem>@<set version>`` and carry the
-set's review status; a set pending owner review is never chosen by default and is selectable only on
-explicit request (:meth:`SchemaRegistry.select` with ``allow_pending_review=True``).
+subdirectory (``storage/schema/v0.3.0/``, ``storage/schema/v0.3.1/``) with the same file names, so
+``imports: [matkg_schema]`` resolves to the sibling of the same version. Its entries are registered as
+``<stem>@<set version>`` and carry the set's review status; a set pending owner review is never chosen by
+default and is selectable only on explicit request (:meth:`SchemaRegistry.select` with
+``allow_pending_review=True``). Set 0.3.1 (T22D) is 0.3.0 plus the normalized-value slots (D1.4) and the
+bl1101_v3 overlay whose mapping table sends ops ``Sample``/``Detector``/``Endstation`` records onto the
+literature ``Sample``/``Instrument`` classes (D1.3, :mod:`.bl1101_mapping`).
 
 Licence line (H3 S4). Every base LinkML asset declared ``license: MIT`` until T22C replaced that one line
 with :data:`LICENCE_BLOCK`. :func:`pre_s4_bytes` reconstructs the earlier bytes exactly, so an artifact
@@ -131,9 +134,14 @@ class SchemaSet:
 
 #: T22C (H3 F2/F3/F5/F6/F7): Sample, MeasurementRun, Instrument and the evidence slots. Additive; pending the
 #: owner's review of the schema diff. bl1101 and xray stay on the base set (see the review doc).
+#: T22D (owner decisions D1.3/D1.4, O-S2 2026-10-30): 0.3.0 plus ``normalized_value``/``normalized_unit``/
+#: ``conversion_factor``/``conversion_profile`` on QuantityValue, and bl1101_v3 (mapping table onto Sample/Instrument).
+#: Additive over 0.3.0; pending the owner's review of its diff. The xray schemas stay on the base set.
 SCHEMA_SETS: Tuple[SchemaSet, ...] = (
     SchemaSet(version="0.3.0", directory="v0.3.0", members=("matkg_schema", "rsoxs_schema"),
               review_status=REVIEW_PENDING, review_doc="docs/migration/reviews/H3/schema_diff_T22C.md"),
+    SchemaSet(version="0.3.1", directory="v0.3.1", members=("matkg_schema", "rsoxs_schema", "bl1101_schema"),
+              review_status=REVIEW_PENDING, review_doc="docs/migration/reviews/H3/schema_diff_T22D.md"),
 )
 
 

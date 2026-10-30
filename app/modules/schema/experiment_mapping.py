@@ -16,7 +16,10 @@ record                 nodes and edges
                        ``RunCondition`` per condition
 ``ScientificObservation``  ``QuantityValue`` (value/unit as printed, uncertainty and its kind,
                        ``evidence_source_tag``); ``qualifier_sample`` -> ``Sample``;
-                       ``run_produced_quantity`` from its run
+                       ``run_produced_quantity`` from its run; under a schema that has the 0.3.1
+                       normalized-value slots (T22D, D1.4), ``normalized_value``/``normalized_unit``/
+                       ``conversion_factor``/``conversion_profile`` from ``normalize_quantity`` when the
+                       printed unit is in a closed conversion table (else absent, never guessed)
 every record           ``supporting_quote`` -> ``EvidenceQuote`` -> ``quote_located_in_section``
                        -> ``PaperSection``
 =====================  =========================================================================
@@ -37,6 +40,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..contracts.evidence import EvidenceRef, MatchType
+from ..evidence.units import normalize_quantity
 from ..json2kg import make_id
 from ..literature.parsed_document import ParsedDocument
 from ..term_extractor.schema import GENERAL_CATEGORY_ALIASES
@@ -46,6 +50,8 @@ from .registry import RegistryError, SchemaEntry
 MAPPING_VERSION = "1"
 REQUIRED_CLASSES = frozenset({"Sample", "MeasurementRun", "Instrument", "RunCondition", "QuantityValue",
                               "EvidenceQuote", "PaperSection"})
+#: The 0.3.1 normalized-value slots (T22D, D1.4); filled only when the selected schema declares all four.
+NORMALIZED_SLOTS = ("normalized_value", "normalized_unit", "conversion_factor", "conversion_profile")
 _NUMBER_UNIT = re.compile(r"^\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*([^\d\s].*?)?\s*$")
 
 
@@ -67,6 +73,21 @@ def technique_class(technique: str, classes) -> str:
     alias = GENERAL_CATEGORY_ALIASES.get(_key(technique))
     return "RSoXSMeasurement" if alias == "RSoXSMeasurement" and "RSoXSMeasurement" in classes \
         else "ExperimentalTechnique"
+
+
+def normalized_slots(value: Optional[float], unit: Optional[str]) -> Dict[str, Any]:
+    """The four 0.3.1 slot values for a printed ``value unit``, or ``{}`` when no conversion is possible.
+
+    Uses :func:`~app.modules.evidence.units.normalize_quantity` (closed tables, profile recorded); an unknown
+    unit, a missing number or a refused value gives ``{}`` so the record keeps only what was printed.
+    """
+    if value is None or not unit:
+        return {}
+    normalized = normalize_quantity(float(value), str(unit))
+    if not normalized.converted:
+        return {}
+    return {"normalized_value": normalized.value, "normalized_unit": normalized.unit,
+            "conversion_factor": normalized.factor, "conversion_profile": normalized.profile}
 
 
 def _condition_number(text: str) -> Tuple[Optional[float], Optional[str]]:
@@ -144,9 +165,11 @@ def map_validated_records(
     """
     if entry.pending_review and not allow_pending_review:
         raise RegistryError(f"{entry.path} is pending owner review; pass allow_pending_review=True")
-    classes = set(load_schema_view(entry).all_classes())
+    view = load_schema_view(entry)
+    classes = set(view.all_classes())
     if not REQUIRED_CLASSES <= classes:
         raise MappingError(f"{entry.path} lacks {sorted(REQUIRED_CLASSES - classes)} (needs schema set 0.3.0)")
+    fill_normalized = set(NORMALIZED_SLOTS) <= set(view.all_slots())
     evidence: Dict[str, EvidenceRef] = validation.evidence
     b = _Builder(source_paper)
 
@@ -190,7 +213,7 @@ def map_validated_records(
             quantity_label=o.quantity_label, numeric_value=o.value, unit=o.unit or None,
             qualitative_value=o.qualitative_value, uncertainty_value=o.uncertainty,
             uncertainty_kind=o.uncertainty_kind if o.uncertainty is not None else None,
-            evidence_source_tag=o.status)
+            evidence_source_tag=o.status, **(normalized_slots(o.value, o.unit) if fill_normalized else {}))
         support(value, "observation", o.observation_id)
         for sample_id in o.sample_ids:
             b.edge(value, "qualifier_sample", samples[sample_id])
@@ -200,4 +223,5 @@ def map_validated_records(
     return {"things": list(b.things.values()), "associations": b.edges}
 
 
-__all__ = ["MAPPING_VERSION", "MappingError", "REQUIRED_CLASSES", "map_validated_records", "technique_class"]
+__all__ = ["MAPPING_VERSION", "MappingError", "NORMALIZED_SLOTS", "REQUIRED_CLASSES", "map_validated_records",
+           "normalized_slots", "technique_class"]
