@@ -255,3 +255,12 @@ frozen-UI pin is updated in that change (as O-U1).
   resumable, with a recovery job for crashes that leave links half-moved. Consequences:
   Q12 acknowledgment must wait for the Tiled effect, not only the journal; Q8/Q14 apply
   to every Save; implementation task T08D grows accordingly.
+
+## Register walk-through, batch 6: Tiled editing plan Q8-Q11 (2026-10-30, O-E1 part 3)
+
+- **Q8:** a Save during a live switch is refused with the existing 502.
+- **Q9 (STOP-2):** remove only F2W-owned links; others return the existing 400.
+- **Q10 (STOP-3):** keep the implicit snippet unlink, with a stale-revision check (409 on
+  a Save from an out-of-date copy).
+- **Q11 (STOP-4):** scoped publication after extraction runs automatically on `:local`
+  when the plan is safe; on ALS it waits for admin review.
