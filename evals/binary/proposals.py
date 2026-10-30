@@ -117,6 +117,8 @@ SLW = "tests/security_live/test_live_writer.py"  # T25C
 V1A = "tests/api_v1/test_v1_als.py"  # T14
 V1C = "tests/api_v1/test_v1_cli_units.py"  # T14
 V1L = "tests/api_v1/test_v1_local.py"  # T14
+DST = "tests/deployment/test_deploy_static.py"  # T24E: Ansible handoff, no container
+DSA = "tests/deployment/test_deploy_state_archive.py"  # T24E: restore/rollback harness
 V1T = "tests/api_v1_live/test_v1_live_tiled.py"  # T14
 SCF = "tests/schema/test_schema_fingerprint.py"  # T22B
 SCR = "tests/schema/test_schema_registry.py"  # T22B
@@ -198,6 +200,7 @@ T24B = "T24B (build shared runtime and the three image finals)"
 T24C = "T24C (prefix-correct gateway and existing UI/API deployment)"
 T24D = "T24D (GitHub Actions build/publication and protected tags)"
 T24E = "T24E (three-profile container, Ansible and restore integration)"
+NOTE_D311 = "the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
 T26B = "T26B (committed artifact validation and export)"
 T26C = "T26C (exact Git snapshot promotion and rollback rehearsal)"
 T25C = "T25C (no-login local workflows and real ALS Tiled role enforcement)"
@@ -1271,9 +1274,12 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         [T24E],
         n(CU, "test_sse_framing_and_event_order", "test_sse_survives_client_fragmentation")
         + n(GWP, "test_api_location_streams_without_buffering_and_keeps_long_streams_open")
-        + n(V1L, "test_job_stream_is_legacy_sse_with_ids_and_a_single_end"),
-        "SSE framing is frozen and the gateway template streams without buffering (T24C landed); SSE through"
-        " the running container and the ALS edge proxy needs the deployed stack",
+        + n(V1L, "test_job_stream_is_legacy_sse_with_ids_and_a_single_end")
+        + n(DST, "test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged",
+            "test_edge_template_renders_for_the_example_inventory"),
+        "SSE framing is frozen, the gateway template streams without buffering (T24C) and the Ansible edge"
+        " template forwards /fair2wise unchanged, unbuffered, with X-Forwarded-Proto overwritten (T24E static);"
+        f" SSE through the running container and the edge proxy still needs the deployed stack: {NOTE_D311}",
     ),
     "DEP-09": oracle(
         n(IMC, "test_final_images_hold_no_private_content", "test_dockerignore_backstop_excludes_private_paths")
@@ -1285,7 +1291,14 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "Layer-by-layer inspection of a real build and its cache (image_checks runs in build-app.yml after the"
         " first CI build, T24E) and the untracked storage/terminology harvest files (audit A5-1, T28C)",
     ),
-    "DEP-10": blocked([T24E], note="Mount and restart behaviour needs the three-profile container integration"),
+    "DEP-10": blocked(
+        [T24E],
+        n(DST, "test_state_is_the_only_fair2wise_mount_on_als_and_local_adds_tiled")
+        + n(DSA, "test_backup_then_restore_is_byte_identical_and_the_manifest_describes_every_file"),
+        "The role mounts only the state volume (and the read-only writer secret) on ALS and adds the Tiled"
+        " data directory on :local, and the state tree restores byte for byte (T24E static/harness);"
+        f" persistence of the mounts across restart/recreate of a running container: {NOTE_D311}",
+    ),
     "DEP-11": oracle(
         n(
             SW,
@@ -1391,15 +1404,54 @@ ORACLES: Dict[str, Dict[str, Any]] = {
         "The O06 tag rules are a proposal the owner has not approved, and GitHub environment protection is"
         " server-side configuration (H6 / O06)",
     ),
-    "DEP-16": blocked([T24E], note="Ansible rollout and edge proxy are not built"),
-    "DEP-17": blocked([T24E], note="Backup/restore of mounted state needs the container integration"),
+    "DEP-16": blocked(
+        [T24E],
+        n(
+            DST,
+            "test_container_image_is_repository_at_digest_and_validated_by_regex",
+            "test_no_tag_reference_anywhere",
+            "test_no_secret_hostname_or_real_digest_is_committed",
+            "test_example_inventory_uses_placeholders_and_vault_references_only",
+            "test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged",
+            "test_als_environment_provides_cors_origins_and_the_secret_file_path",
+            "test_writer_secret_file_is_0600_owned_by_the_container_uid_and_never_logged",
+            "test_every_variable_the_plays_need_is_declared",
+        ),
+        "The Ansible handoff (deploy/) deploys repository@digest only, carries no FQDN, hostname, digest or"
+        " secret, forwards /fair2wise unchanged behind TLS with X-Forwarded-Proto overwritten, provides"
+        " F2W_CORS_ORIGINS and a 0600 uid-10001 writer secret file, and overrides no locked image value (T24E"
+        " static); the plays have never run against a host (O07 inputs, ansible-lint/syntax-check not"
+        f" installed) and the container behind the edge needs D3.11: {NOTE_D311}",
+    ),
+    "DEP-17": blocked(
+        [T24E],
+        n(
+            DSA,
+            "test_backup_then_restore_is_byte_identical_and_the_manifest_describes_every_file",
+            "test_a_database_with_an_open_writer_is_copied_consistently",
+            "test_a_tampered_member_is_refused_and_nothing_is_written",
+            "test_sidecar_mismatch_and_missing_sidecar_are_refused",
+            "test_a_rewritten_manifest_is_refused_by_hash_and_a_foreign_profile_by_policy",
+            "test_a_member_escaping_the_destination_is_refused",
+            "test_restore_refuses_a_non_empty_destination_unless_replace",
+        )
+        + n(DST, "test_backup_archives_with_manifest_and_verifies_before_success",
+            "test_restore_verifies_profile_and_owner_and_never_replaces_by_default"),
+        "The host tool archives the state mount with a manifest and sha256 sidecar (consistent SQLite copies,"
+        " real JobStore database), restores byte for byte and refuses a tampered archive, a foreign profile"
+        " or an escaping path before writing (T24E harness); restore onto a new disposable host with a"
+        f" container reading the restored volume, and central-Tiled backup ownership (O07): {NOTE_D311}",
+    ),
     "DEP-18": blocked(
         [T24E],
         n(TL, "test_recovery_after_killed_server")
         + n(JBW, "test_graceful_shutdown_requeues_running_job_and_keeps_finished_stages")
-        + n(IMS, "test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm"),
-        "Job drain on shutdown and the supervisor's ordered health/stop are covered in-process (T10, T24B"
-        " landed); container health and drain of the running images need the deployment integration",
+        + n(IMS, "test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm")
+        + n(DST, "test_stop_timeout_is_120_on_every_stop_or_recreate",
+            "test_health_checks_use_the_prefixed_health_urls_and_the_supervisor_status"),
+        "Job drain on shutdown and the supervisor's ordered health/stop are covered in-process (T10, T24B);"
+        " the role stops with --stop-timeout 120 and checks /fair2wise/healthz, /fair2wise/api/health and the"
+        f" supervisor status for every required service (T24E static); the running images: {NOTE_D311}",
     ),
     "DEP-19": oracle(
         n(
@@ -1429,10 +1481,21 @@ ORACLES: Dict[str, Dict[str, Any]] = {
     ),
     "DEP-20": blocked(
         [T24E],
-        n(PS, "test_personal_settings_persist_across_restart"),
-        "Profile-change persistence needs the deployment integration",
+        n(PS, "test_personal_settings_persist_across_restart")
+        + n(DST, "test_als_environment_provides_cors_origins_and_the_secret_file_path"),
+        "Personal settings persist across restart in-process and the role sets only F2W_CORS_ORIGINS and the"
+        " secret-file path, never a model, profile or authorization override (T24E static); persistence of"
+        f" configured model and limits across a real profile change of the running stack: {NOTE_D311}",
     ),
-    "DEP-21": blocked([T24E, T13], note="Independent image and data rollback needs rehearsal"),
+    "DEP-21": blocked(
+        [T24E, T13],
+        n(DSA, "test_release_record_keeps_previous_and_new_digest_through_rollout_and_rollback",
+            "test_release_record_refusals", "test_release_record_cli_exit_codes_and_json")
+        + n(DST, "test_rollout_records_the_digest_and_rollback_re_points_to_the_recorded_previous_one"),
+        "Image rollback re-points to a digest recorded on the host, records previous and new digest, refuses a"
+        " tag or an unrecorded digest and a state-schema label mismatch, and never touches graph data (T24E);"
+        f" the host rehearsal and the separate JSON/Tiled data rollback (T13) are still needed: {NOTE_D311}",
+    ),
     "DEP-22": oracle(
         n(GWP, "test_build_runtime_prefix_mismatch_is_refused_with_a_rebuild_hint")
         + n(IMP, "test_ui_built_for_another_prefix_is_refused")

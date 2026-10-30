@@ -30,7 +30,7 @@
         "case_sha256": "a6743d15e7416c2238e575c9d7fa726bf33bc5569d073fc45365f01bdb9b6c1b",
         "config_sha256": "ed647a46ef0c0983cd339c6ee9f6de0e4bdc20f835642ad66bca81c54aa25587",
         "model_sha256": null,
-        "oracle_source_sha256": "4c77c7556bb3146c34c90d8a45a2cc06c44ea3d37d76ff6666890ea451f32141",
+        "oracle_source_sha256": "732d9b7c487ac30efff3f3ac672d9dfc114e0965ec83ad0c5c784320afbc3aa5",
         "schema_sha256": null
       },
       "input_fixture_refs": [
@@ -542,8 +542,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "765ef31ad4a63968b1db432d1c49a10a87f86336164ae0fa646ae515e37cfdda",
-        "config_sha256": "9fa105419ab5b873f014ca4e7a2c8b140e75111708da60104b051b8d74d71f47",
+        "case_sha256": "13cd856f288ab0b6b9199f8095c6e673e8faed645250ee70a1c3f5ae66aa9152",
+        "config_sha256": "438c20ff9ad82695722a9a6ddef926bad310ec380982ded2be7c70d0206729b4",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -563,9 +563,11 @@
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_framing_and_event_order",
           "tests/contracts/legacy_ui/test_legacy_ui_contract.py::test_sse_survives_client_fragmentation",
           "tests/gateway/test_gateway_prefix.py::test_api_location_streams_without_buffering_and_keeps_long_streams_open",
-          "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+          "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end",
+          "tests/deployment/test_deploy_static.py::test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged",
+          "tests/deployment/test_deploy_static.py::test_edge_template_renders_for_the_example_inventory"
         ],
-        "uncovered": "SSE framing is frozen and the gateway template streams without buffering (T24C landed); SSE through the running container and the ALS edge proxy needs the deployed stack"
+        "uncovered": "SSE framing is frozen, the gateway template streams without buffering (T24C) and the Ansible edge template forwards /fair2wise unchanged, unbuffered, with X-Forwarded-Proto overwritten (T24E static); SSE through the running container and the edge proxy still needs the deployed stack: the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -682,8 +684,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "228dfe336a60e8686969a02499c5d0288838b11fb51762865f7ad67e36b83606",
-        "config_sha256": "51a3438fb77cc73e512d916e66b9c15e17b6bf23c520c07e8fd5256ee2306c36",
+        "case_sha256": "9ee158d668d6315723e3a9ca6fe488f084ddaf40025eec05c55941889e5c1f1f",
+        "config_sha256": "532383846bd16fc5c661d33ccf181d09c253cffee222014154006b6bf3338840",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -695,8 +697,11 @@
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Mount and restart behaviour needs the three-profile container integration"
+        "supporting_selectors": [
+          "tests/deployment/test_deploy_static.py::test_state_is_the_only_fair2wise_mount_on_als_and_local_adds_tiled",
+          "tests/deployment/test_deploy_state_archive.py::test_backup_then_restore_is_byte_identical_and_the_manifest_describes_every_file"
+        ],
+        "uncovered": "The role mounts only the state volume (and the read-only writer secret) on ALS and adds the Tiled data directory on :local, and the state tree restores byte for byte (T24E static/harness); persistence of the mounts across restart/recreate of a running container: the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1040,7 +1045,7 @@
         "case_sha256": "f783b75ef4b3bb1e80c882519e8d2b887a16ffc476eaea0202d09cbececfe283",
         "config_sha256": "911d962132f843931c36b8688d58cb3f2c02704db245810f9e0cda9fa04061d4",
         "model_sha256": null,
-        "oracle_source_sha256": "304754bdce507ccf6f28a3348176510f42a63a2567c8b85ff0045055e5c2d152",
+        "oracle_source_sha256": "8bf7ea8a2e7549b4706e9bc67f29255f545d2a4901d607965a2844180480f9e5",
         "schema_sha256": null
       },
       "input_fixture_refs": [],
@@ -1113,8 +1118,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "71e27cf86ebad0d64baff659b525d96de21c73c6d826269928f0d81760a04830",
-        "config_sha256": "766d52945769b9f22667ca7b60d89f4058564c87039fc21f6c1b4675766ab3d7",
+        "case_sha256": "eb0fd4d444119a551530c91847aacce1323ab27cbfc03bafa029fee94b1f6a54",
+        "config_sha256": "be1f1ef03fb678dcf3dc8d0a9b99e647db0fc9404bb1303eadd80226b1ade473",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -1126,8 +1131,17 @@
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Ansible rollout and edge proxy are not built"
+        "supporting_selectors": [
+          "tests/deployment/test_deploy_static.py::test_container_image_is_repository_at_digest_and_validated_by_regex",
+          "tests/deployment/test_deploy_static.py::test_no_tag_reference_anywhere",
+          "tests/deployment/test_deploy_static.py::test_no_secret_hostname_or_real_digest_is_committed",
+          "tests/deployment/test_deploy_static.py::test_example_inventory_uses_placeholders_and_vault_references_only",
+          "tests/deployment/test_deploy_static.py::test_edge_template_overwrites_forwarded_proto_and_forwards_the_prefix_unchanged",
+          "tests/deployment/test_deploy_static.py::test_als_environment_provides_cors_origins_and_the_secret_file_path",
+          "tests/deployment/test_deploy_static.py::test_writer_secret_file_is_0600_owned_by_the_container_uid_and_never_logged",
+          "tests/deployment/test_deploy_static.py::test_every_variable_the_plays_need_is_declared"
+        ],
+        "uncovered": "The Ansible handoff (deploy/) deploys repository@digest only, carries no FQDN, hostname, digest or secret, forwards /fair2wise unchanged behind TLS with X-Forwarded-Proto overwritten, provides F2W_CORS_ORIGINS and a 0600 uid-10001 writer secret file, and overrides no locked image value (T24E static); the plays have never run against a host (O07 inputs, ansible-lint/syntax-check not installed) and the container behind the edge needs D3.11: the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1175,8 +1189,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "9fcd3d77e4cf6e3dde441af3cdcd6449341a918dcf29fa11dd1c8c0690832ecc",
-        "config_sha256": "9fa64f2e135dca8ac7af14e78c2d33113d6af47dc87629a45ae963f0b3448d6c",
+        "case_sha256": "a57a97c311dd76ac586dda188c20875b5360ca439a32922880f41f1aecbcaf9b",
+        "config_sha256": "122b257b6eff3cf7069fb0b6f53de8893bb1d64c41a017795fd6194cea0627ae",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -1188,8 +1202,18 @@
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Backup/restore of mounted state needs the container integration"
+        "supporting_selectors": [
+          "tests/deployment/test_deploy_state_archive.py::test_backup_then_restore_is_byte_identical_and_the_manifest_describes_every_file",
+          "tests/deployment/test_deploy_state_archive.py::test_a_database_with_an_open_writer_is_copied_consistently",
+          "tests/deployment/test_deploy_state_archive.py::test_a_tampered_member_is_refused_and_nothing_is_written",
+          "tests/deployment/test_deploy_state_archive.py::test_sidecar_mismatch_and_missing_sidecar_are_refused",
+          "tests/deployment/test_deploy_state_archive.py::test_a_rewritten_manifest_is_refused_by_hash_and_a_foreign_profile_by_policy",
+          "tests/deployment/test_deploy_state_archive.py::test_a_member_escaping_the_destination_is_refused",
+          "tests/deployment/test_deploy_state_archive.py::test_restore_refuses_a_non_empty_destination_unless_replace",
+          "tests/deployment/test_deploy_static.py::test_backup_archives_with_manifest_and_verifies_before_success",
+          "tests/deployment/test_deploy_static.py::test_restore_verifies_profile_and_owner_and_never_replaces_by_default"
+        ],
+        "uncovered": "The host tool archives the state mount with a manifest and sha256 sidecar (consistent SQLite copies, real JobStore database), restores byte for byte and refuses a tampered archive, a foreign profile or an escaping path before writing (T24E harness); restore onto a new disposable host with a container reading the restored volume, and central-Tiled backup ownership (O07): the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1237,8 +1261,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "4b8620836a9cac54a389860037edd7bbf1be9ab06bcef4d74349fe9003013656",
-        "config_sha256": "864e1affe5eaee3d05db35bb476a531e2f3fab939ece73c27cf4ab13beeae148",
+        "case_sha256": "3fd7d7d9aa5b33e5bad43f102f85e8ccf42d3e37c066de45bcade292ebc62e46",
+        "config_sha256": "82bb994bef2032367650057b3dfd7f204f9ce52a7e2944e131f011230be58a87",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -1259,9 +1283,11 @@
         "supporting_selectors": [
           "tests/tiled/test_tiled_server_lifecycle.py::test_recovery_after_killed_server",
           "tests/jobs/test_workers.py::test_graceful_shutdown_requeues_running_job_and_keeps_finished_stages",
-          "tests/images/test_images_supervisor.py::test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm"
+          "tests/images/test_images_supervisor.py::test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm",
+          "tests/deployment/test_deploy_static.py::test_stop_timeout_is_120_on_every_stop_or_recreate",
+          "tests/deployment/test_deploy_static.py::test_health_checks_use_the_prefixed_health_urls_and_the_supervisor_status"
         ],
-        "uncovered": "Job drain on shutdown and the supervisor's ordered health/stop are covered in-process (T10, T24B landed); container health and drain of the running images need the deployment integration"
+        "uncovered": "Job drain on shutdown and the supervisor's ordered health/stop are covered in-process (T10, T24B); the role stops with --stop-timeout 120 and checks /fair2wise/healthz, /fair2wise/api/health and the supervisor status for every required service (T24E static); the running images: the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1386,8 +1412,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "83e37c7949aaaf79f979d27d7150a6969915c316418cbf1d0a02b83dd8f82261",
-        "config_sha256": "db21ccb0f1c6ef057633c328722f2567bfaf16174151a4198afb050aceb5406b",
+        "case_sha256": "c953c3abb54b25300ceb26b504f06d28840c4ea61a835fb42d817bccbaf03498",
+        "config_sha256": "ca0d0a83a8021681a74f32d47d9919ce002a3beca01319c505a1d1b373a6b5d5",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -1400,9 +1426,10 @@
         "rubric_ref": null,
         "selectors": [],
         "supporting_selectors": [
-          "tests/settings/test_personal_settings.py::test_personal_settings_persist_across_restart"
+          "tests/settings/test_personal_settings.py::test_personal_settings_persist_across_restart",
+          "tests/deployment/test_deploy_static.py::test_als_environment_provides_cors_origins_and_the_secret_file_path"
         ],
-        "uncovered": "Profile-change persistence needs the deployment integration"
+        "uncovered": "Personal settings persist across restart in-process and the role sets only F2W_CORS_ORIGINS and the secret-file path, never a model, profile or authorization override (T24E static); persistence of configured model and limits across a real profile change of the running stack: the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
@@ -1451,8 +1478,8 @@
       "family": "DEP",
       "forbidden_outcomes": [],
       "hashes": {
-        "case_sha256": "9825a325ae78d36dddcc0aa6ce4c061c2fbee9a57b01c3ddf11c46c049de5927",
-        "config_sha256": "4b33b7ed62586e99afb56e6d0c0221938feedfbc4c6d587aba747bf8342e4faf",
+        "case_sha256": "a2484d18ad5cd67253e5df0fe1e829b74fa2efd499eebfb285736c248b1fa3fc",
+        "config_sha256": "82b4a7271b140fb1f35bab3772072320b44d5cb57862902d1b2f708cb67a56d4",
         "model_sha256": null,
         "oracle_source_sha256": "310b36de0bf28a54ef46454c34b74b8c68573ff2fc092c88d30beeb78c346303",
         "schema_sha256": null
@@ -1464,8 +1491,13 @@
         "kind": null,
         "rubric_ref": null,
         "selectors": [],
-        "supporting_selectors": [],
-        "uncovered": "Independent image and data rollback needs rehearsal"
+        "supporting_selectors": [
+          "tests/deployment/test_deploy_state_archive.py::test_release_record_keeps_previous_and_new_digest_through_rollout_and_rollback",
+          "tests/deployment/test_deploy_state_archive.py::test_release_record_refusals",
+          "tests/deployment/test_deploy_state_archive.py::test_release_record_cli_exit_codes_and_json",
+          "tests/deployment/test_deploy_static.py::test_rollout_records_the_digest_and_rollback_re_points_to_the_recorded_previous_one"
+        ],
+        "uncovered": "Image rollback re-points to a digest recorded on the host, records previous and new digest, refuses a tag or an unrecorded digest and a state-schema label mismatch, and never touches graph data (T24E); the host rehearsal and the separate JSON/Tiled data rollback (T13) are still needed: the running-container part waits on owner decision D3.11 (tests/deployment/README.md lists the command)"
       },
       "oracle_type": "deterministic_assertion",
       "owner_approval": {
