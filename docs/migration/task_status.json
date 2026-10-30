@@ -294,7 +294,7 @@
       "gate": "H6",
       "status": "open",
       "merge_commit": null,
-      "note": "operation CLI/agent/SDK/API/frontend closure; depends on T15"
+      "note": "agent/API/SDK/CLI part merged at e92eac38fd849c27802f3910198639731fbb3461 (2026-10-29); frontend part and T15-dependent closure still open"
     },
     {
       "id": "T20A",

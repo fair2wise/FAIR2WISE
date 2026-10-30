@@ -251,6 +251,14 @@ Recorded for the owner; nothing below is answered here.
 | D3.14 | Switch the CI Tiled job to `constraints.lock.txt` for parity with the image | Yes, in T24E |
 | D3.15 | `tests/images/test_images_supervisor.py` backoff/health-order tests flaked once each under a loaded full run (pass alone and in other runs) | Relax their timing in T24E; add to known failures only if CI reproduces it |
 
+### D3 additions by T19E (2026-10-29)
+
+| # | Decision | Recommendation |
+|---|---|---|
+| D3.16 | Surface knowledge-operation results in the frozen UI chat (needs a DTO decision and a UI change; today they reach chat only via the SDK/`delegate` path, since the T03B contract offers the UI turn only `answer_from_knowledge`) | Decide at the T19E frontend step; a UI change needs O-U3 |
+| D3.17 | Should `create_api_app` build a default Tiled graph backend for the operations from `settings.tiled_target` + the writer credential, or stay JSON-only unless injected? | Build it on ALS profiles, JSON-only on `:local` by default |
+| D3.18 | Corpus names for `/v1/operations/corpus-audit` and the CLI default to file stems under `storage/terminology` (e.g. `extracted_terms_xray_papers_cborg_chat`) | Accept for now; a configured corpus map with PC-1 |
+
 ---
 
 ## Already settled (for reference)
