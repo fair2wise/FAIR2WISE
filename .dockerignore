@@ -53,3 +53,9 @@ scripts/app
 
 # T24E: Ansible handoff and host tools are never image content.
 deploy
+
+# T26A (owner O-R1 Q2): adopted releases keep a nested storage/kg/<corpus>/v<N>/graph.json that is a byte
+# copy of the flat file. The flat copies stay the byte source in images (release_contract.md section 7), so the
+# nested graph copies are not sent to the build context (they would duplicate ~220 MB). manifest.json and
+# validation.json stay in the context. Git stores one blob either way.
+storage/kg/*/v*/graph.json

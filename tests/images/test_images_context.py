@@ -126,3 +126,27 @@ def test_final_images_do_not_ship_the_stale_scripts_app_copy(name):
     shipped = image_paths(DF, name, CONTEXT, IGNORE)
     assert not [p for p in shipped if p.startswith("scripts/app/")]
     assert "scripts/tiled_server.py" in shipped  # the rest of scripts/ still ships
+
+
+NESTED_GRAPHS = ["storage/kg/rsoxs/v1/graph.json", "storage/kg/deepseek-r1_70b_25_20250925_103657/v1/graph.json",
+                 "storage/kg/synthetic/v12/graph.json"]
+NESTED_KEPT = ["storage/kg/rsoxs/v1/manifest.json", "storage/kg/rsoxs/v1/validation.json",
+               "storage/kg/deepseek-r1_70b_25_20250925_103657/v1/manifest.json"]
+
+
+@pytest.mark.parametrize("name", FINALS)
+def test_nested_release_graph_copies_are_excluded_but_manifests_ship(name):
+    """T26A (O-R1 Q2): nested ``<corpus>/v<N>/graph.json`` duplicates stay out of the build context; the flat
+    compat copies are the byte source in images, and manifests/validation reports are still shipped."""
+    for path in NESTED_GRAPHS:
+        assert ignored(path, IGNORE), path
+    for path in NESTED_KEPT + ["storage/kg/matkg_rsoxs_v1.json"]:
+        assert not ignored(path, IGNORE), path
+    planted = NESTED_GRAPHS + NESTED_KEPT + ["storage/kg/matkg_rsoxs_v1.json"]
+    shipped = set(image_paths(DF, name, planted, IGNORE))
+    assert shipped == set(NESTED_KEPT) | {"storage/kg/matkg_rsoxs_v1.json"}
+    # whatever nested graph copies exist in the working tree are never part of the simulated context
+    assert not [p for p in CONTEXT if re.match(r"^storage/kg/[^/]+/v[^/]+/graph\.json$", p)
+                and p not in PRIVATE]
+    assert "storage/kg" in DF.context_sources(name) or any(
+        s.rstrip("/") == "storage/kg" for s in DF.context_sources(name))  # Dockerfile still COPYs storage/kg/
