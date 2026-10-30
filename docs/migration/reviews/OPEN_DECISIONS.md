@@ -191,8 +191,8 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 | D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag | **Decided 2026-10-30 (O-S3): opt-in multimodal flag.**
 | D1.8 | LOCAL-02 counts as gold with one reviewed paper | It needs a real run, not labels | Accept | **Decided 2026-10-30 (O-S3): accept.**
 | D1.9 | Content-hash step in Work counting (K1) | A renamed copy with no DOI, arXiv id or title counts separately | Add it, as a versioned rule change | **Decided 2026-10-30 (O-S3): add the hash step.**
-| D1.10 | Near-duplicate title check | About 4.5 min at 10k keys | Run it as a job above a size limit |
-| D1.11 | Tiled scan that reaches the end of its listing | Reported complete, marked as a live read | Keep, with the warning |
+| D1.10 | Near-duplicate title check | About 4.5 min at 10k keys | Run it as a job above a size limit | **Decided 2026-10-30 (O-S4): job above a size limit.**
+| D1.11 | Tiled scan that reaches the end of its listing | Reported complete, marked as a live read | Keep, with the warning | **Decided 2026-10-30 (O-S4): keep complete + warning.**
 
 ### D2. O06 image tag rules (T24D, `reviews/H6/o06_tag_rules_proposal.md`)
 
@@ -216,9 +216,9 @@ Publishing fails closed until these are decided and `O06_APPROVED=true` is set.
 | # | Decision | Recommendation |
 |---|---|---|
 | D3.1 | PC-1: paper snippets in images (`storage/terminology/*.json`, gitignored, 321 MB, ~141k snippets) | Exclude from images; keep gitignored | **Decided 2026-10-30 (O-D3): track in Git and ship.**
-| D3.2 | PC-2: cumulative D19 budget per paper per session | Add a cap; number to be chosen |
+| D3.2 | PC-2: cumulative D19 budget per paper per session | Add a cap; number to be chosen | **Decided 2026-10-30 (O-S4): per-response only.**
 | D3.3 | PC-3: make T28A (authority wiring) a hard precondition of H4 | Yes (T28A merged `12156d1`; the precondition is now met) |
-| D3.4 | PC-5: owner records the H3 approval in the binary manifest (T28B) | Yes |
+| D3.4 | PC-5: owner records the H3 approval in the binary manifest (T28B) | Yes | **Decided 2026-10-30 (O-S4): owner runs it.**
 | D3.5 | PC-6: approval TTL (code: 1 h everywhere; B14 said 24 h placeholder) | None on `:local`, 24 h on ALS | **Decided 2026-10-30 (O-T2): none on :local, 24 h on ALS.**
 | D3.6 | Approve tasks T28A-T28D as proposed in A5 | Approve (T28A and T28B already merged as fixes; T28C/T28D pending) |
 | D3.7 | T26A release-contract questions Q2-Q6 (never recorded; see `docs/migration/companion` T26A notes) | Carried into this register by T28D as D3.9 |

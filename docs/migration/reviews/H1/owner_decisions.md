@@ -357,3 +357,14 @@ frozen-UI pin is updated in that change (as O-U1).
 - **D1.8:** LOCAL-02 counts as covered once one reviewed pilot paper exists.
 - **D1.9:** add a content-hash step to the K1 distinct-Work rule (byte-identical files count
   once) as a versioned rule change with parity tests.
+
+## Register walk-through, batch 15: D1.10, D1.11, D3.2, D3.4 (2026-10-30, O-S4)
+
+- **D1.10:** the near-duplicate title check runs inline for small corpora and as a
+  `knowledge_operation` job above a size limit (proposed 2,000 keys).
+- **D1.11:** a Tiled scan that reaches the end of its listing stays "complete" with the
+  live-read warning.
+- **D3.2 / PC-2:** keep the per-response 40% rule only; no cumulative per-session budget
+  (O-D2 stands).
+- **D3.4 / PC-5:** the owner runs `python -m evals.binary.approve --gate H3 ...` and commits
+  `evals/binary/approvals.json` and `evals/binary/cases/` personally.
