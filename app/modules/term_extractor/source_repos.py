@@ -55,20 +55,26 @@ _STOPWORDS = {
 
 @dataclass(frozen=True)
 class GitHubRepoRef:
+    """Owner/name pair identifying a GitHub repository."""
+
     owner: str
     repo: str
 
     @property
     def url(self) -> str:
+        """Return the repository web URL."""
         return f"https://github.com/{self.owner}/{self.repo}"
 
     @property
     def api_url(self) -> str:
+        """Return the GitHub REST API URL for the repository."""
         return f"{GITHUB_API}/repos/{self.owner}/{self.repo}"
 
 
 @dataclass(frozen=True)
 class SourceFile:
+    """A candidate source file in a repository tree, with its raw and web URLs."""
+
     path: str
     raw_url: str
     html_url: str
@@ -77,6 +83,8 @@ class SourceFile:
 
 @dataclass(frozen=True)
 class SourceBlock:
+    """A top-level function or class extracted from a source file, with its line span."""
+
     name: str
     kind: str
     source: str
@@ -246,6 +254,7 @@ class GitHubSourceClient:
             return None
 
     def _get_text(self, url: str) -> Optional[str]:
+        """GET ``url`` and return the response body, or None (logged) on any failure."""
         try:
             headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
             resp = self.session.get(url, headers=headers, timeout=self.timeout)
@@ -256,6 +265,12 @@ class GitHubSourceClient:
             return None
 
     def repo_metadata(self, ref: GitHubRepoRef) -> Optional[Dict[str, Any]]:
+        """Fetch default branch, head commit SHA and license for a repository.
+
+        Returns:
+            Dict with ``default_branch``, ``commit_sha`` and ``license``, or None
+            if the repository request failed.
+        """
         repo = self._get_json(ref.api_url)
         if not repo:
             return None
@@ -277,6 +292,19 @@ class GitHubSourceClient:
         hints: Sequence[str],
         paper_tokens: set[str],
     ) -> List[SourceFile]:
+        """List the highest-scoring supported source files in a repository tree.
+
+        Args:
+            ref: Repository to inspect.
+            default_branch: Branch used when ``commit_sha`` is not given.
+            commit_sha: Commit to pin the tree and URLs to, if known.
+            hints: Identifier hints extracted from the paper, used for scoring.
+            paper_tokens: Tokens from the paper text, used for scoring.
+
+        Returns:
+            At most ``MAX_SOURCE_FILES_PER_REPO`` files, best score first. Empty
+            if the tree request failed.
+        """
         tree_ref = commit_sha or default_branch
         tree = self._get_json(f"{ref.api_url}/git/trees/{tree_ref}?recursive=1") or {}
         if tree.get("truncated"):
@@ -305,6 +333,7 @@ class GitHubSourceClient:
         return [f for _, f in files[:MAX_SOURCE_FILES_PER_REPO]]
 
     def fetch_file(self, source_file: SourceFile) -> Optional[str]:
+        """Download a source file's raw text, or None if the request failed."""
         return self._get_text(source_file.raw_url)
 
 
@@ -318,6 +347,21 @@ def build_code_snippet_records(
     paper_text: str,
     hints: Sequence[str],
 ) -> List[Dict[str, Any]]:
+    """Convert scored source blocks into ``code_snippets`` records.
+
+    Args:
+        ref: Repository the file belongs to.
+        source_file: File the blocks were parsed from.
+        metadata: Output of ``GitHubSourceClient.repo_metadata``.
+        blocks: Candidate function/class blocks from the file.
+        source_paper: Name of the paper that linked the repository.
+        paper_text: Paper text, tokenized to score blocks for relevance.
+        hints: Identifier hints extracted from the paper.
+
+    Returns:
+        Up to ``MAX_SNIPPETS_PER_REPO`` records for blocks with a positive
+        score, best first.
+    """
     paper_tokens = _tokens(paper_text)
     scored = [
         (_block_score(block, source_file.path, hints, paper_tokens), block)

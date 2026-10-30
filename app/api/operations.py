@@ -147,6 +147,11 @@ class F2WOperations:
                  curation: Any = None, audit: Any = None, identity_port: Optional[TiledIdentityPort] = None,
                  publication_gate: Optional[PublicationGate] = None, clock: Clock = _utcnow,
                  approval_ttl: Optional[timedelta] = PROFILE_APPROVAL_TTL, knowledge: Any = None) -> None:
+        """Bind the services; see the class docstring for the arguments.
+
+        Raises:
+            ValueError: If ``publication`` is registered on another ``JobService``.
+        """
         if publication is not None and publication.jobs is not jobs:
             raise ValueError("publication must be registered on the same JobService")
         self.settings = settings

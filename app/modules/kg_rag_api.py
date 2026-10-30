@@ -307,9 +307,14 @@ def create_fastapi_app(
         model: Model name override; defaults to backend-specific env var.
         deployment: ``DeploymentSettings``; default built from ``startup_config``
             (``os.environ`` when ``None``, profile ``local`` when unset), as ``create_app``.
-        startup_config / identity_port / credential_store: As ``create_app`` (ALS profiles need
-            the port and the store, or startup is refused).
+        startup_config: Startup configuration mapping, as for ``create_app``; used to build
+            ``deployment`` when that is ``None``.
+        identity_port: Identity port, as for ``create_app``; required with ``credential_store``
+            on ALS profiles, otherwise startup is refused.
+        credential_store: Credential store, as for ``create_app``; see ``identity_port``.
         clock: Current time for the access runtime (tests; shared with the UI API when mounted).
+        gaps_dir: Directory for the missing-node gap reports; tracking is disabled when it is
+            read-only.
 
     Returns:
         Configured FastAPI application with /v1/chat/completions endpoint.
@@ -1292,6 +1297,7 @@ class KnowledgeGraph:
             include_structured: Whether to prepend structured KG triples.
             char_budget: Maximum character budget for the context block.
             hint_terms: Query tokens used to center PDF snippet extraction.
+            include_pdf_snippets: Whether to include PDF snippets for the nodes.
 
         Returns:
             Formatted context string with node metadata, code blocks, and relations.
@@ -1621,8 +1627,8 @@ class OllamaClient:
 
 
 class CBorgClient:
-    """
-    OpenAI-compatible CBORG client for KG-RAG chat.
+    """OpenAI-compatible CBORG client for KG-RAG chat.
+
     Env: CBORG_API_KEY, CBORG_BASE_URL or KG_RAG_CBORG_BASE_URL.
     """
 
@@ -1752,9 +1758,10 @@ def build_baseline_prompt(q: str) -> str:
 
 
 def build_rag_prompt(q: str, ctx: str) -> str:
-    """
-    Build a grounded RAG prompt that enforces: strict grounding, paired citations,
-    clear sections, and conflict/uncertainty handling.
+    """Build a grounded RAG prompt for question `q` over retrieved context `ctx`.
+
+    The prompt enforces strict grounding, paired citations, clear sections, and
+    conflict/uncertainty handling.
 
     Citations:
       - Cite KG nodes by their section heading exactly as it appears in context, e.g., '## Poly(3-hexylthiophene) (Material)' → cite as [KG: Poly(3-hexylthiophene)].

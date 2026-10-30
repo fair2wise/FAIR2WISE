@@ -205,7 +205,11 @@ def adopt_legacy_flat_file(
         storage_kg: The ``storage/kg`` directory to write into (default: the flat file's directory).
         code_commit: Full Git object id of the adopting revision (default: read from ``.git``, no process).
         now: ``created.at`` (default: UTC now). Pass it for reproducible manifests.
+        registry: Schema registry (default: discovered).
         disclosure_allowlist: Owner-reviewed R3/R4 exceptions (never created by this module).
+        allow_pending_review_schema: Permit a schema that is still pending owner review.
+        run_id: Recorded in the manifest.
+        profile: Recorded in the manifest.
         dry_run: Run every check but write nothing.
 
     Raises:

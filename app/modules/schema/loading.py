@@ -57,8 +57,13 @@ def load_helper(entry: SchemaEntry, *, implementation: str = NORMALIZER_TERM_EXT
     """Construct the existing ``SchemaHelper`` for ``entry``.
 
     Args:
+        entry: Registered LinkML schema to load; must not be known-broken.
         implementation: :data:`NORMALIZER_TERM_EXTRACTOR` (``term_extractor/schema.py``) or
             :data:`NORMALIZER_LEGACY` (the divergent copy in ``extract_terms.py``, T22A F4).
+        fuzzy_cutoff: Fuzzy-match score cutoff passed to the helper.
+
+    Raises:
+        RegistryError: not a LinkML asset, known-broken, or an unknown ``implementation``.
     """
     _require_linkml(entry)
     if entry.known_broken:
@@ -99,6 +104,7 @@ def closure_files(entry: SchemaEntry, *, pre_s4: bool = False) -> List[Tuple[str
     ``linkml:*`` imports resolve inside ``linkml_runtime`` and are covered by its version in the fingerprint.
 
     Args:
+        entry: Registered LinkML schema whose imports are hashed.
         pre_s4: Hash each file as it was before the H3 S4 licence-line change (:func:`pre_s4_bytes`).
 
     Raises:

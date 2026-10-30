@@ -267,8 +267,11 @@ def _terms_ref(request: SnapshotRequest) -> str:
 
 
 def _helper_for(entry: Any, fingerprint: str) -> Any:
-    """Existing ``SchemaHelper`` for ``entry``, reused across builds (the closure fingerprint is the cache key,
-    so any change to any imported file builds a fresh one)."""
+    """Return the existing ``SchemaHelper`` for ``entry``, reused across builds.
+
+    The closure fingerprint is the cache key, so any change to any imported file
+    builds a fresh one.
+    """
     with _HELPERS_LOCK:
         helper = _HELPERS.get(fingerprint)
         if helper is None:

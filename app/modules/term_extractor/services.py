@@ -1,3 +1,5 @@
+"""Shared service objects (formula checker, ChEBI, property extraction) for term extraction."""
+
 import logging
 import os
 from dataclasses import dataclass, field

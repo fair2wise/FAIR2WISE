@@ -29,6 +29,7 @@ class Prefixed:
     """
 
     def __init__(self, app: FastAPI, prefix: str) -> None:
+        """Bind the app and the path prefix prepended to every route."""
         self.app = app
         self.prefix = prefix
 

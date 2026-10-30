@@ -1384,8 +1384,10 @@ def _snippet_thing_payload(
 
 
 def _kg_raw_parts(data: Dict[str, Any]) -> tuple[list, list]:
-    """Return (raw_nodes, raw_edges) for both old (things/associations) and
-    new (nodes/edges) MatKG JSON formats."""
+    """Return (raw_nodes, raw_edges) for old and new MatKG JSON formats.
+
+    Reads ``things``/``associations`` (old) or ``nodes``/``edges`` (new).
+    """
     raw_nodes = data.get("things") or data.get("nodes") or []
     raw_edges = data.get("associations") or data.get("edges") or []
     return raw_nodes, raw_edges

@@ -1,0 +1,11 @@
+# T27 code-quality reporting tools (pyproject.toml [tool.ruff]/[tool.isort]/[tool.mypy]/[tool.coverage]).
+# Installed next to requirements/dev.txt (and requirements.txt, so mypy sees the runtime packages);
+# compiled with dev.txt as a constraint so the two locks never disagree.
+#   uv pip compile requirements/quality.in -c requirements/dev.txt --python-version 3.12 \
+#       --no-header --annotation-style line -o requirements/quality.txt
+mypy>=1.20
+ruff>=0.15
+isort>=7
+pytest-cov>=7
+types-PyYAML
+types-requests

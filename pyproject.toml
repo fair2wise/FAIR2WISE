@@ -127,3 +127,79 @@ packages = [
   "f2w.modules.workers",
 ]
 include-package-data = false
+
+# T27 code-quality closure (docs/migration/reviews/H7/sniff_findings.md). The tools are pinned in
+# requirements/quality.txt and run by the `python-quality` job of forge-merge-ci.yml, which only
+# reports (counts per rule, per module) until the findings are cleared; none of this alters runtime
+# behaviour. Scope follows T27: app/ without app/modules/legacy/ and generated files.
+[tool.ruff]
+target-version = "py312"
+line-length = 115
+extend-exclude = ["app/modules/legacy", "app/graphify-out", "ui", "storage", "papers", "runs", "logs"]
+
+[tool.ruff.lint]
+# UP: pyupgrade (builtin generics, X | None); T20: print(); PTH: pathlib over os.path;
+# D: pydocstyle (Google convention, ALS dev standards section 2).
+select = ["UP", "T20", "PTH", "D"]
+ignore = [
+  "D105",  # magic-method docstrings add noise
+  "D107",  # __init__ is documented on the class
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "T20"]
+"scripts/**" = ["D", "T20"]
+"examples/**" = ["D", "T20"]
+
+[tool.isort]
+# ALS section 3: stdlib, third-party, local, alphabetical inside each group (`import x` and
+# `from x import y` sorted together).
+profile = "black"
+line_length = 115
+force_sort_within_sections = true
+known_first_party = ["app", "f2w"]
+extend_skip = ["app/modules/legacy", "app/graphify-out", "ui", "storage", "papers", "runs", "logs"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+exclude = ["^app/modules/legacy/", "^app/graphify-out/"]
+namespace_packages = true
+explicit_package_bases = true
+strict = true
+show_error_codes = true
+pretty = false
+# Untyped third-party packages (no stubs, or optional extras not in the quality environment).
+[[tool.mypy.overrides]]
+module = [
+  "academy.*", "arxiv.*", "colorama.*", "faiss.*", "flask.*", "globus_sdk.*", "langchain_core.*",
+  "langchain_openai.*", "langgraph.*", "linkml_runtime.*", "mp_api.*", "obonet.*", "pyalex.*",
+  "pymatgen.*", "rapidfuzz.*", "rapidocr_onnxruntime.*", "sentence_transformers.*", "tiled.*",
+  "torch.*", "watchdog.*", "fitz.*",
+]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["app"]
+branch = false
+omit = [
+  "app/modules/legacy/*",
+  "app/graphify-out/*",
+  "*/__pycache__/*",
+  "app/run_pipeline_cborg.py",
+  "app/modules/canonicalization/migration.py",
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = false
+skip_empty = true
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+]

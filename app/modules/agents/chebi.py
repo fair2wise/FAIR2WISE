@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
+"""Look up chemical entities in a local ChEBI OBO file by label or synonym."""
 import obonet
 import sys
 from typing import Optional, Dict, Any, List, Tuple
 
 def load_chebi_obo(obo_path: str):
-    """
-    Loads the ChEBI OBO into a networkx graph using obonet.
+    """Load the ChEBI OBO into a networkx graph using obonet.
+
     Each node is keyed by its OBO ID (e.g. 'CHEBI:15377'),
     and node attributes include everything from the OBO (name, def, synonym, xref, property_value, etc.).
     """
@@ -18,6 +19,8 @@ def load_chebi_obo(obo_path: str):
 
 # ──────────────────────────────────────────────────────────────────────────────
 class ChebiOboLookup:
+    """Case-insensitive name/synonym index over a ChEBI OBO graph."""
+
     def __init__(self, obo_path: str):
         self.graph = load_chebi_obo(obo_path)
 
@@ -37,8 +40,8 @@ class ChebiOboLookup:
                     self.name_index[syn_text] = node_id
 
     def lookup(self, query: str) -> Optional[Dict[str, Any]]:
-        """
-        Lookup a chemical by exact label or synonym (case-insensitive).
+        """Look up a chemical by exact label or synonym (case-insensitive).
+
         Returns all metadata if found, else None.
         """
         q = query.strip().lower()
@@ -48,8 +51,9 @@ class ChebiOboLookup:
         return self._extract(node_id)
 
     def _extract(self, node_id: str) -> Dict[str, Any]:
-        """
-        Given a ChEBI OBO ID (e.g. 'CHEBI:15377'), extract:
+        """Extract metadata for a ChEBI OBO ID (e.g. 'CHEBI:15377').
+
+        The returned dict contains:
           - name
           - definition
           - synonyms
@@ -158,6 +162,7 @@ class ChebiOboLookup:
 
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
+    """Run an interactive ChEBI lookup prompt for the OBO file given as argv[1]."""
     if len(sys.argv) != 2:
         print("Usage: python chebi.py <path/to/chebi.obo>", file=sys.stderr)
         sys.exit(1)

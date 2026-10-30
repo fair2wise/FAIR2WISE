@@ -87,8 +87,11 @@ class ToolSpec(BaseModel):
 
 
 class ToolStatus(str, Enum):
-    """Outcome of a tool call. ``EMPTY`` is a successful call with no results;
-    it is never used for an unavailable dependency."""
+    """Outcome of a tool call.
+
+    ``EMPTY`` is a successful call with no results; it is never used for an
+    unavailable dependency.
+    """
 
     OK = "ok"
     EMPTY = "empty"

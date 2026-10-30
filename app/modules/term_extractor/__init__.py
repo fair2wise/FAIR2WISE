@@ -1,3 +1,5 @@
+"""Term-extractor package: LLM term extraction from PDFs with optional Academy and LLM-client support."""
+
 try:
     from .academy_agent import TermExtractorAgent
 except ImportError:

@@ -120,7 +120,7 @@ def crossref_search(http: httpx.Client, query: str, rows: int, *, mailto: str = 
 
 
 def arxiv_search(http: httpx.Client, query: str, max_results: int) -> List[Dict[str, str]]:
-    """arXiv Atom API search (donor ``_do_arxiv_search``); raises on failure."""
+    """Search the arXiv Atom API (donor ``_do_arxiv_search``); raises on failure."""
     query = query.strip()
     if not query:
         return []

@@ -134,8 +134,11 @@ class RequestContext(BaseModel):
 
     @model_validator(mode="after")
     def _profile_matches_mode(self) -> "RequestContext":
-        """Reject trusted-local mode outside ``:local``, unverified ALS principals and
-        capability names outside the frozen vocabulary."""
+        """Validate the context's mode, profile and capabilities together.
+
+        Rejects trusted-local mode outside ``:local``, unverified ALS principals and
+        capability names outside the frozen vocabulary.
+        """
         unknown = self.capabilities - CAPABILITIES
         if unknown:
             raise ValueError(f"unknown capabilities: {sorted(unknown)}")

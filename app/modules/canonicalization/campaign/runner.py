@@ -62,6 +62,7 @@ class CampaignRun:
     min_pubs_review: int = DEFAULT_MIN_PUBS_REVIEW
 
     def vote_objects(self, key: str) -> List[Vote]:
+        """Return the retained votes for `key` as ``Vote`` objects (empty if none)."""
         return [
             Vote(v.framing, v.verdict, v.target_slug, v.reject_kind, v.accepted) for v in self.votes.get(key, [])
         ]
@@ -84,6 +85,7 @@ class CampaignRun:
         }
 
     def report_sha256(self) -> str:
+        """Return the SHA-256 hash of :meth:`report` (via ``sha256_json``)."""
         return sha256_json(self.report())
 
     def to_json(self) -> str:
@@ -141,6 +143,8 @@ def campaign_status(run: CampaignRun) -> Dict[str, Any]:
 
 @dataclass(frozen=True)
 class CampaignOutcome:
+    """Result of :func:`run_campaign`: the run state, the scoped plan draft and the report."""
+
     run: CampaignRun
     draft: PlanDraft
     report: Dict[str, Any]
@@ -158,7 +162,7 @@ def run_campaign(
     max_rounds: int = DEFAULT_MAX_ROUNDS,
     max_terms_per_round: int = DEFAULT_MAX_TERMS_PER_ROUND,
 ) -> CampaignOutcome:
-    """contexts -> quarantine -> rounds -> park -> scoped plan. Never applies; never approves.
+    """Run contexts -> quarantine -> rounds -> park -> scoped plan. Never applies; never approves.
 
     Raises:
         IncompleteRead: the source read was partial.

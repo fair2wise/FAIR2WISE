@@ -61,6 +61,7 @@ class WorkerExecutor:
 
     @property
     def started(self) -> bool:
+        """Whether any worker thread is alive."""
         return any(t.is_alive() for t in self._threads)
 
     @property

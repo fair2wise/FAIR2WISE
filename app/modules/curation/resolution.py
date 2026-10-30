@@ -70,6 +70,7 @@ class AllowListOutboundPolicy:
     max_chars: int = 4000
 
     def refusal(self, case: Dict[str, Any], ref: ModelRef) -> Optional[str]:
+        """Return a reason to refuse unless the corpus is listed and the evidence fits `max_chars`."""
         if case["corpus"] not in self.corpora:
             return "corpus not approved for outbound content"
         if len(case["evidence"]) > self.max_chars:
@@ -163,6 +164,7 @@ class ModelResolver:
 
     @property
     def remote(self) -> bool:
+        """Whether the route sends cases to a remote model."""
         return self.route is Route.REMOTE_MODEL
 
     def run_once(self, case_limit: Optional[int] = None) -> RunResult:

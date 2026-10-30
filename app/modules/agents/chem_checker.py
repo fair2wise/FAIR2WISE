@@ -1,5 +1,4 @@
-"""
-Chemical‑formula validation helpers.
+"""Chemical‑formula validation helpers.
 
 Dependencies
 ------------
@@ -33,19 +32,18 @@ class ChemicalFormulaValidator:
     # -------------------------- public helpers --------------------------- #
 
     def validate(self, raw: str) -> dict:
-        """
-        Validate *raw* formula text.
+        """Validate *raw* formula text.
 
-        Returns
-        -------
-        dict
-            {
-              "input": original string,
-              "canonical": Hill‑ordered formula,  # None if unparsable
-              "mp_hits": int,                    # ‑1 if MP lookup skipped/failed
-              "status": "ok" | "corrected" | "invalid",
-              "error": str | None
-            }
+        Returns:
+            A dict::
+
+                {
+                  "input": original string,
+                  "canonical": Hill‑ordered formula,  # None if unparsable
+                  "mp_hits": int,                    # ‑1 if MP lookup skipped/failed
+                  "status": "ok" | "corrected" | "invalid",
+                  "error": str | None
+                }
         """
         cleaned = self._REDUCE_PATTERN.sub("", raw)
         result = {

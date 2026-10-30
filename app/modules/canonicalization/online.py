@@ -66,6 +66,7 @@ class MutableBudget:
         self.used = 0
 
     def take(self) -> bool:
+        """Consume one call from the budget; return False once ``max_calls`` is reached."""
         if self.used >= self.max_calls:
             return False
         self.used += 1

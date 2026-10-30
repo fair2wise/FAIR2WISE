@@ -1,3 +1,5 @@
+"""Drive LLM term extraction over PDFs, page by page, into a ``TermStore``."""
+
 import logging
 import os
 import json
@@ -154,6 +156,12 @@ def _looks_code_like(text: str) -> bool:
 
 
 class Orchestrator:
+    """Extract terms from PDF pages with an LLM agent and persist them via ``TermStore``.
+
+    Builds the schema helper, store, services and merge index once; pages are
+    processed on a thread pool of ``max_workers``.
+    """
+
     def __init__(
         self,
         model: str,

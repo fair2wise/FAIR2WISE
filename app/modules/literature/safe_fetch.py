@@ -137,7 +137,9 @@ def assert_public_http_url(url: str, policy: Optional[NetworkPolicy] = None) -> 
 
 @dataclass
 class FetchResult:
-    """Outcome of one guarded fetch. ``status`` is one of:
+    """Outcome of one guarded fetch.
+
+    ``status`` is one of:
 
     ``stored`` | ``blocked:<reason>`` | ``refused:too_large`` | ``refused:not_pdf`` |
     ``failed:http_<code>`` | ``failed:timeout`` | ``failed:network``.

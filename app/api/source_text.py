@@ -121,6 +121,7 @@ class TurnSources:
     """
 
     def __init__(self, page_reader: Callable[[str, int], Optional[str]] = _pdf_page_text) -> None:
+        """Start with no captured chunks or pages; ``page_reader`` reads PDF page text on demand."""
         self._lock = threading.Lock()
         self._chunks: Dict[Tuple[str, int], str] = {}
         self._pages: Dict[Tuple[str, int], str] = {}  # (filename, page) -> pdf path

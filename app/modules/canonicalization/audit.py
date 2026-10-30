@@ -33,15 +33,19 @@ class AliasVerdict:
 
 @dataclass(frozen=True)
 class AuditReport:
+    """Alias-audit findings for one vocabulary revision."""
+
     vocabulary_revision: str
     findings: Tuple[AliasVerdict, ...] = ()
     checked_aliases: int = 0
 
     @property
     def clean(self) -> bool:
+        """True when no finding is blocking."""
         return not any(f.blocking for f in self.findings)
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the report as a plain dict, findings included."""
         return {
             "vocabulary_revision": self.vocabulary_revision,
             "clean": self.clean,
@@ -54,6 +58,7 @@ def audit_aliases(vocab: Vocabulary, *, reviewed_ok: Iterable[Tuple[str, str]] =
     """Aliases that are not plausible renderings of their own entry (synonyms need a recorded review).
 
     Args:
+        vocab: Vocabulary whose entries' aliases are checked.
         reviewed_ok: ``(slug, alias)`` pairs a human already reviewed as acceptable synonyms.
     """
     ok = {(s, fold(a)) for s, a in reviewed_ok}

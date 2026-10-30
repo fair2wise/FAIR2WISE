@@ -350,12 +350,22 @@ def record_reported_quantities(
     A qualitative-only observation is kept without a numeric quantity.
 
     Args:
+        sink: Evidence sink that receives each evidence record and quantity record.
+        document: Parsed document the quotes are located in.
+        quantities: Reported quantities to record.
+        work_id: Identifier of the work the evidence belongs to.
+        pub_path: Publication path, part of the stable evidence and quantity ids.
+        strategy: Extraction strategy name recorded on the evidence.
+        prompt_version: Prompt version recorded on the evidence.
         tags: Optional validation-stage tag decision per quantity (same order). When
             given, the record's ``evidence_source`` is the decided tag and the
             proposed tag, reasons and derivation are kept beside it (T06B, H3 F2/F8).
 
     Returns:
         Number of quantity records written.
+
+    Raises:
+        ValueError: `tags` is given but not the same length as `quantities`.
     """
     if tags is not None and len(tags) != len(quantities):
         raise ValueError("tags must align with quantities")

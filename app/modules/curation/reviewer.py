@@ -40,9 +40,14 @@ def review_case(
     """Resolve (``accept=True``) or reject a case awaiting review.
 
     Args:
+        ctx: Request context; the actor must be a human with ``curation.approve``.
+        store: Curation store holding the case.
+        case_id: Case to review.
         bound_revision: The case ``revision`` the reviewer was shown.
+        accept: True to resolve the case, False to reject it.
         resolution: The verdict to apply (a ``ReviewAnswer``-shaped mapping). Omitted when accepting, the
             attached validated model proposal is used; a case without one cannot be accepted blindly.
+        reason: Free-text reason recorded with the decision.
         recorder: Audit recorder; the decision is a critical mutation and is write-ahead audited.
 
     Raises:

@@ -44,6 +44,11 @@ class NodeClass:
 
 
 def classify_node(node: Dict[str, Any], vocab: Vocabulary) -> NodeClass:
+    """Classify one candidate node against the vocabulary.
+
+    Returns a ``malformed`` class for an invalid context row, ``canonical`` or ``alias`` for a
+    vocabulary match, ``quarantine`` for a surface that fails the quarantine checks, else ``unknown``.
+    """
     problem = check_context_row(node)
     if problem:
         return NodeClass("malformed", detail=problem["code"])
@@ -74,6 +79,8 @@ def quality_report(rows: GraphRows, vocab: Vocabulary) -> Dict[str, Any]:
 
 @dataclass(frozen=True)
 class CleanupItem:
+    """The proposed cleanup action for one candidate term."""
+
     term_key: str
     surface: str
     category: str
@@ -86,6 +93,8 @@ class CleanupItem:
 
 @dataclass(frozen=True)
 class CleanupProposal:
+    """A set of cleanup items with the revisions they were computed from and their term evidence."""
+
     source_revision: str
     vocabulary_revision: str
     items: Tuple[CleanupItem, ...]

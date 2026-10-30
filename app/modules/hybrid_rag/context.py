@@ -44,6 +44,12 @@ class ContextBuilder:
         char_budget: int = DEFAULT_SOURCE_BUDGET,
         intent: str = "factual",
     ) -> str:
+        """Render evidence as prompt text within ``char_budget`` characters.
+
+        KG hits come first, then literature, ops and Tiled sections. ``intent``
+        shifts the literature/ops split of the budget: ``layout`` favors ops,
+        ``why_how`` favors literature.
+        """
         kg_items = [i for i in items if i.source_kind == "kg"]
         lit_items = [
             i for i in items if i.source_kind == "paper_chunk" and i.source_type == "literature"

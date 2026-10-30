@@ -1,5 +1,6 @@
-"""Provenance enrichment for the term-extractor: PDF-derived publication
-metadata and code-snippet extraction.
+"""Provenance enrichment for the term-extractor.
+
+Covers PDF-derived publication metadata and code-snippet extraction.
 
 Ported from the local ``app/modules/extract_terms.py`` provenance fixes so the
 copied branch extractor emits source-scoped ``source_metadata`` and top-level

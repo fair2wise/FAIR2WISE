@@ -54,6 +54,7 @@ class ChatJudge:
         self.timeout = timeout
 
     def __call__(self, prompt: str) -> str:
+        """Send `prompt` to the chat client and return its reply."""
         return self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout)
 
 
@@ -112,6 +113,7 @@ class GroupVerdict:
         )
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the judgement as a plain dict (confidence rounded to 3 places)."""
         return {
             "category": self.category,
             "canonical": self.canonical,

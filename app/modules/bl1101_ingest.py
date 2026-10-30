@@ -212,6 +212,21 @@ USER_AGENT = "FAIR2WISE-bl1101-ingest/1.0 (+https://github.com/matesuu/FAIRtoWIS
 
 @dataclass(frozen=True)
 class RepoSpec:
+    """Which upstream GitHub repo to ingest and which files to read from it.
+
+    Attributes:
+        name: Short repo name; also the on-disk clone directory name and the
+            ``repo_name`` stamped on terms and snippets.
+        url: Clone URL.
+        mode: Ingest depth label (``full``, ``docs``, ``stack`` or ``readme``);
+            recorded in the source metadata.
+        python_globs: Globs, relative to the clone root, of Python files to scan
+            for device classes and plan functions.
+        md_globs: Globs of Markdown files to summarise.
+        yaml_globs: Globs of YAML config files.
+        compose_globs: Globs of docker-compose files to list services from.
+        readme_only: If true, clone sparsely and check out only ``README.md``.
+    """
     name: str
     url: str
     mode: str  # full | docs | stack | readme
@@ -297,28 +312,47 @@ REPO_SPECS: Tuple[RepoSpec, ...] = (
 
 
 def utc_now() -> str:
+    """Return the current UTC time as an ISO-8601 string with a ``Z`` suffix, truncated to seconds."""
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def sha256_bytes(data: bytes) -> str:
+    """Return the hex SHA-256 digest of ``data``."""
     return hashlib.sha256(data).hexdigest()
 
 
 def sha256_file(path: Path) -> str:
+    """Return the hex SHA-256 digest of the file at ``path`` (read fully into memory)."""
     return sha256_bytes(path.read_bytes())
 
 
 def slug(text: str) -> str:
+    """Collapse runs of non-alphanumeric characters in ``text`` to single hyphens.
+
+    Returns:
+        The slug with leading and trailing hyphens stripped, or ``"unnamed"`` if
+        nothing alphanumeric remains.
+    """
     cleaned = re.sub(r"[^A-Za-z0-9]+", "-", (text or "").strip()).strip("-")
     return cleaned or "unnamed"
 
 
 def beam_id(*parts: str) -> str:
+    """Build a ``beamline:`` node ID from name parts.
+
+    Args:
+        *parts: Name fragments. Falsy fragments are dropped and the rest are
+            slugged and joined with hyphens.
+
+    Returns:
+        An ID of the form ``beamline:<slug>-<slug>``.
+    """
     local = "-".join(slug(p) for p in parts if p)
     return f"beamline:{local}"
 
 
 def strip_tags(value: str) -> str:
+    """Remove HTML tags and entities from ``value`` and collapse whitespace to single spaces."""
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", unescape(value or ""))).strip()
 
 
@@ -339,6 +373,17 @@ def snapshot_paths(
     kg_dir: Optional[Path] = None,
     terms_dir: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
+    """Return the on-disk paths of one graph snapshot version.
+
+    Args:
+        version: Snapshot number N.
+        kg_dir: Directory for the graph file. Defaults to ``KG_DIR``.
+        terms_dir: Directory for the extracted-terms file. Defaults to ``TERMS_DIR``.
+
+    Returns:
+        ``(kg_path, terms_path)`` for ``matkg_bl1101_vN.json`` and
+        ``extracted_terms_bl1101_vN.json``. Nothing is created or checked.
+    """
     kg_dir = kg_dir or KG_DIR
     terms_dir = terms_dir or TERMS_DIR
     return (
@@ -356,6 +401,11 @@ def _rel_to_repo(path: Path) -> str:
 
 
 def is_secret_path(path: Path) -> bool:
+    """Report whether ``path`` looks like a secrets file that must never be ingested.
+
+    Matches exact names in ``SECRET_NAMES`` and names starting with
+    ``SECRET_PREFIXES``, except ``.env.example``.
+    """
     name = path.name
     if name in SECRET_NAMES:
         return True
@@ -365,6 +415,11 @@ def is_secret_path(path: Path) -> bool:
 
 
 def should_skip_file(path: Path) -> bool:
+    """Report whether ingest must ignore ``path``.
+
+    True for secret files, skipped suffixes, and any path component that is a
+    skipped directory name or starts with a skipped directory prefix.
+    """
     if is_secret_path(path):
         return True
     if path.suffix.lower() in SKIP_SUFFIXES:
@@ -397,6 +452,23 @@ def make_term(
     relations: Optional[List[Dict[str, Any]]] = None,
     **extra: Any,
 ) -> Dict[str, Any]:
+    """Build one term record in the shape the ``json2kg`` graph builder expects.
+
+    Args:
+        term_id: Node ID, normally from :func:`beam_id`.
+        name: Display name; stored as both ``term`` and ``name``.
+        category: Ontology category. The record ``type`` becomes
+            ``beamline:<category>``.
+        definition: Free-text definition.
+        source: Provenance string stored as the single entry of ``source_papers``.
+        relations: Relation dicts from :func:`_rel`. Defaults to none.
+        **extra: Additional fields copied onto the record, except values that are
+            ``None``, ``""``, ``[]`` or ``{}``. A key that collides with a base
+            field overrides it.
+
+    Returns:
+        The term dict.
+    """
     term: Dict[str, Any] = {
         "id": term_id,
         "id_prefix": NAMESPACE,
@@ -419,6 +491,19 @@ def make_term(
 # ---------------------------------------------------------------------------
 
 def fetch_url(url: str, dest: Path, timeout: int = 45) -> Dict[str, Any]:
+    """Download ``url`` to ``dest`` and describe the result.
+
+    Args:
+        url: Page to fetch.
+        dest: File to write. Parent directories are created.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        On success, a snapshot record with ``status`` ``"ok"``, ``fetched_at``,
+        repo-relative ``path``, ``sha256``, ``http_status`` and ``bytes``. On an
+        HTTP, URL, timeout or OS error, ``{"url", "status": "failed", "reason"}``;
+        the error is logged and not raised and ``dest`` is not written.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
     try:
@@ -553,6 +638,23 @@ def parse_blueprint_people(blueprint: Dict[str, Any], html_text: str = "") -> Li
 
 @dataclass
 class BlueprintDevice:
+    """One device row from the blueprint's correspondence table.
+
+    Attributes:
+        dev_id: Row anchor ID with the ``dev-`` prefix removed.
+        name: Human-readable device name.
+        kind: Lowercased device kind (for example ``motor`` or ``detector``).
+        category: Ontology category derived from ``kind`` via ``KIND_CATEGORY``.
+        pv: EPICS process-variable name, possibly empty.
+        handle: Python handle string such as ``d.motors["x"]``.
+        ophyd_name: Device name parsed from ``handle``.
+        ophyd_class: Ophyd class name listed in the table.
+        ioc_record: IOC record text from the table.
+        mapping_file: LabVIEW mapping file text, empty if the column is absent.
+        drawn: Label of the device as drawn on the blueprint.
+        meaning: Tooltip description of the device.
+        collection: Device collection parsed from ``handle``, possibly empty.
+    """
     dev_id: str
     name: str
     kind: str
@@ -570,6 +672,16 @@ class BlueprintDevice:
 
 @dataclass
 class BlueprintStage:
+    """One beamline stage block from the blueprint.
+
+    Attributes:
+        name: Stage name.
+        section: Blueprint section label for the stage.
+        what: Description of what the stage is.
+        does: Description of what the stage does.
+        range_text: Documented operating range text.
+        device_ids: Sorted ``dev_id`` values of devices linked from the stage.
+    """
     name: str
     section: str
     what: str
@@ -645,6 +757,7 @@ def parse_arrow_sequence(text: str) -> List[str]:
 
 
 def parse_figcaption_beam_path(tree: Any) -> List[str]:
+    """Return the beam-path chain documented in the Sheet A figcaptions, or ``[]`` if none."""
     captions = tree.xpath("//section[@id='sheet-a']//figcaption")
     text = " ".join(re.sub(r"\s+", " ", " ".join(el.itertext())) for el in captions)
     return parse_arrow_sequence(text)
@@ -849,6 +962,11 @@ def parse_blueprint_html(html_text: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def git_sha(path: Path) -> str:
+    """Return the HEAD commit SHA of the git checkout at ``path``.
+
+    Raises:
+        subprocess.CalledProcessError: If ``path`` is not a git checkout or git fails.
+    """
     result = subprocess.run(
         ["git", "-C", str(path), "rev-parse", "HEAD"],
         check=True,
@@ -870,6 +988,21 @@ def _run_git(args: Sequence[str], cwd: Optional[Path] = None) -> subprocess.Comp
 
 
 def sync_repo(spec: RepoSpec, dest: Path) -> Dict[str, Any]:
+    """Clone or update ``spec`` into ``dest`` and report the outcome.
+
+    An existing clone is fetched and hard-reset to ``FETCH_HEAD``. A new clone is
+    shallow, and sparse (README only) when ``spec.readme_only`` is set.
+
+    Args:
+        spec: Repo to sync.
+        dest: Clone directory. Its parent is created.
+
+    Returns:
+        On success, a record with ``status`` ``"ok"``, ``sha``, repo-relative
+        ``path`` and ``mode``. If git fails, times out or hits an OS error (for
+        example a private repo), ``status`` ``"skipped"`` with a ``reason``; nothing
+        is raised.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
         if (dest / ".git").exists():
@@ -917,6 +1050,11 @@ def sync_repo(spec: RepoSpec, dest: Path) -> Dict[str, Any]:
 
 
 def expand_globs(root: Path, patterns: Sequence[str]) -> List[Path]:
+    """Expand ``patterns`` under ``root`` into a de-duplicated list of ingestable files.
+
+    Directories, secret files and skipped paths are dropped. Order follows the
+    pattern order, sorted within each pattern.
+    """
     found: List[Path] = []
     for pattern in patterns:
         found.extend(sorted(root.glob(pattern)))
@@ -1061,6 +1199,15 @@ def extract_python_symbols(path: Path, repo_name: str, commit: str = "") -> Tupl
 
 
 def parse_compose_services(path: Path) -> List[Dict[str, str]]:
+    """List the service names defined in a docker-compose file.
+
+    Uses the YAML ``services`` mapping. If the file is not valid YAML or has no
+    such mapping, falls back to a regex over two-space-indented keys, excluding
+    top-level section names such as ``networks`` and ``volumes``.
+
+    Returns:
+        ``{"name", "file"}`` dicts, with ``file`` the compose file's basename.
+    """
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
@@ -1079,6 +1226,20 @@ def parse_compose_services(path: Path) -> List[Dict[str, str]]:
 
 
 def extract_markdown_software(path: Path, repo_name: str, limit: int = 400) -> str:
+    """Return a short plain-text summary of a Markdown file.
+
+    Takes the first heading and the lines after it from the first 80 lines, drops
+    code fences, and collapses whitespace. Whole READMEs are deliberately never
+    copied into nodes.
+
+    Args:
+        path: Markdown file to read.
+        repo_name: Repo the file belongs to. Unused.
+        limit: Maximum characters returned.
+
+    Returns:
+        The summary, or ``""`` if the file cannot be read.
+    """
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -1096,6 +1257,20 @@ def extract_markdown_software(path: Path, repo_name: str, limit: int = 400) -> s
 
 
 def extract_ts_fences(path: Path, repo_name: str, commit: str = "") -> List[Dict[str, Any]]:
+    """Extract the first Finch-config TypeScript fence from a Markdown file.
+
+    Only a ```` ```ts ````, ```` ```tsx ```` or ```` ```typescript ```` fence that mentions
+    ``FinchConfig`` or ``ophyd`` qualifies.
+
+    Args:
+        path: Markdown file to read.
+        repo_name: Repo name stamped on the snippet.
+        commit: Commit SHA stamped on the snippet.
+
+    Returns:
+        A list with at most one snippet record (body truncated to 4000 characters),
+        or an empty list if the file is unreadable or nothing matches.
+    """
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -1146,6 +1321,20 @@ def _energy_from_sources(als: Dict[str, Any], blueprint: Dict[str, Any]) -> Tupl
 
 
 def terms_from_als(als: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
+    """Build the term records that come from the public ALS beamline page.
+
+    Covers the fixed technique, polarization, scattering-geometry, absorption-edge
+    and sample-class terms, the photon-energy term, and the EPU5 source. Names and
+    definitions of the fixed terms are hard-coded; only energy, notes, source and
+    contacts are read from the parsed page.
+
+    Args:
+        als: Output of :func:`parse_als_page`.
+        source: Provenance string stamped on every term.
+
+    Returns:
+        The list of term dicts.
+    """
     facts = als.get("facts") or {}
     terms: List[Dict[str, Any]] = []
     techniques = [
@@ -1266,6 +1455,20 @@ def _beam_path_stage_terms(
 
 
 def terms_from_blueprint(blueprint: Dict[str, Any], source: str) -> List[Dict[str, Any]]:
+    """Build term records from the parsed blueprint.
+
+    Emits the reflectometer endstation, one term per stage, the directed beam-path
+    stage terms, one term per device plus its PV and Ophyd-class terms, operating
+    rules as ``Condition`` terms, and the AXIS-SXR-40 detector.
+
+    Args:
+        blueprint: Output of :func:`parse_blueprint_html`.
+        source: Provenance string stamped on every term.
+
+    Returns:
+        The list of term dicts. Duplicate IDs are expected and are merged later by
+        :func:`merge_terms`.
+    """
     terms: List[Dict[str, Any]] = []
     header = blueprint.get("header") or {}
     drawing = header.get("Drawing") or "BL 11.0.1.2 RSOXS · Reflectometer endstation"
@@ -1382,6 +1585,20 @@ def terms_from_blueprint(blueprint: Dict[str, Any], source: str) -> List[Dict[st
 
 
 def beamline_seed(als: Dict[str, Any], blueprint: Dict[str, Any], als_source: str, bp_source: str) -> Dict[str, Any]:
+    """Build the root beamline term that links to the other top-level terms.
+
+    Args:
+        als: Output of :func:`parse_als_page`.
+        blueprint: Output of :func:`parse_blueprint_html`.
+        als_source: Provenance string for the ALS page.
+        bp_source: Provenance string for the blueprint.
+
+    Returns:
+        The term for ``BEAMLINE_ID``. Its relations point at the endstation,
+        detector, software catalog, techniques, geometries, energy and polarization
+        terms; those targets are built elsewhere. Motors, detectors and plans are
+        attached later by :func:`ingest_records`.
+    """
     facts = als.get("facts") or {}
     energy_label, energy_def = _energy_from_sources(als, blueprint)
     notes = facts.get("Additional notes") or ""
@@ -1430,6 +1647,7 @@ def beamline_seed(als: Dict[str, Any], blueprint: Dict[str, Any], als_source: st
 
 
 def software_catalog() -> List[Dict[str, Any]]:
+    """Return the fixed catalog of software terms (Bluesky, Tiled, Finch and related components)."""
     items = [
         ("Bluesky", "Bluesky RunEngine / queueserver plans for BL 11.0.1.2."),
         ("ophyd-async", "ophyd-async device layer (sim-ophyd and real IOC devices)."),
@@ -1457,6 +1675,22 @@ def attach_repo_terms(
     compose_services: List[Dict[str, str]],
     md_summaries: List[Tuple[str, str]],
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Turn one repo's extracted payload into term records.
+
+    Args:
+        spec: Repo the payload came from.
+        root: Local clone root. Unused.
+        sha: Commit SHA of the clone; may be empty.
+        symbols: Records from :func:`extract_python_symbols`.
+        snippets: Curated code snippets for the repo.
+        compose_services: Records from :func:`parse_compose_services`.
+        md_summaries: ``(relative_path, summary)`` pairs; empty summaries are skipped.
+
+    Returns:
+        ``(terms, snippets)``. ``snippets`` is the input list, unchanged. Terms
+        include the repo term, symbols, compose services and Markdown docs, plus
+        documented data-path or config terms for a few specific repos.
+    """
     terms: List[Dict[str, Any]] = []
     software_id = beam_id("Software", SOFTWARE_ALIAS.get(spec.name, spec.name))
     terms.append(
@@ -1561,6 +1795,18 @@ def attach_repo_terms(
 
 
 def merge_terms(batches: Iterable[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Merge term batches into one list with unique IDs.
+
+    On an ID collision the first record is kept and extended in place: the longer
+    definition wins, ``source_papers`` and relations are unioned (relations keyed
+    by relation and target), and other fields are filled only if absent.
+
+    Args:
+        batches: Iterables of term dicts. Colliding terms are mutated.
+
+    Returns:
+        The merged terms sorted by ID.
+    """
     merged: Dict[str, Dict[str, Any]] = {}
     for batch in batches:
         for term in batch:
@@ -1590,6 +1836,10 @@ def merge_terms(batches: Iterable[List[Dict[str, Any]]]) -> List[Dict[str, Any]]
 
 
 def sort_graph(graph: Dict[str, Any]) -> Dict[str, Any]:
+    """Sort ``things`` by ID and ``associations`` by (subject, predicate, object) for deterministic output.
+
+    Mutates ``graph`` and returns it.
+    """
     graph["things"] = sorted(graph.get("things") or [], key=lambda n: n.get("id") or "")
     graph["associations"] = sorted(
         graph.get("associations") or [],
@@ -1833,6 +2083,20 @@ def write_kg_snapshot(
     *,
     kg_dir: Optional[Path] = None,
 ) -> Path:
+    """Write ``graph`` as the ``matkg_bl1101_v<version>.json`` snapshot.
+
+    Updates ``graph['metadata']`` in place with snapshot info (name, version,
+    timestamp, repo-relative path, sha256, node and edge counts) and the ingest
+    version, then writes through a temporary file that is moved into place.
+
+    Args:
+        graph: Graph dict with ``things`` and ``associations``. Mutated.
+        version: Snapshot number N.
+        kg_dir: Output directory. Defaults to ``KG_DIR``.
+
+    Returns:
+        Path of the written file.
+    """
     kg_path, _ = snapshot_paths(version, kg_dir=kg_dir)
     kg_path.parent.mkdir(parents=True, exist_ok=True)
     meta = graph.setdefault("metadata", {})
@@ -2054,6 +2318,15 @@ def ingest_records(
 
 
 def records_to_graph(records: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert term records to a graph with ``json2kg``.
+
+    Args:
+        records: Dict with ``terms`` and optionally ``code_snippets``.
+        metadata: Metadata dict that replaces the graph's ``metadata``.
+
+    Returns:
+        The sorted graph dict.
+    """
     graph = json2kg.build_graph(
         records["terms"],
         code_snippets=records.get("code_snippets") or [],
@@ -2179,6 +2452,25 @@ def _ingest_repos(offline: bool) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
 
 
 def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> Dict[str, Any]:
+    """Run the full BL 11.0.1.2 ingest and write the next snapshot.
+
+    Fetches (or reads from cache) the ALS page, parses the blueprint, syncs the
+    configured repos, builds terms, and writes the extracted-terms file and the
+    graph as the next unused version.
+
+    Args:
+        from_scratch: Delete the work and page-snapshot directories first.
+        offline: Do not fetch or clone. Cached pages and repos are used when
+            present, otherwise the source is skipped. A missing ALS page falls back
+            to built-in ALS facts.
+
+    Returns:
+        Dict with ``kg_path``, ``terms_path``, ``version``, ``nodes``, ``edges``,
+        ``sources_landed``, ``sources_skipped`` and the ``graph``.
+
+    Raises:
+        FileNotFoundError: If the blueprint file is missing.
+    """
     _clear_work(from_scratch)
     sources_landed: List[Dict[str, Any]] = []
     sources_skipped: List[Dict[str, Any]] = []
@@ -2327,6 +2619,14 @@ def run_ingest(*, from_scratch: bool = False, offline: bool = False) -> Dict[str
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Parse command-line arguments for the ingest CLI.
+
+    Args:
+        argv: Argument list. Defaults to ``sys.argv[1:]``.
+
+    Returns:
+        The parsed namespace.
+    """
     parser = argparse.ArgumentParser(description="Ingest BL 11.0.1.2 ops knowledge graph")
     parser.add_argument(
         "--from-scratch",
@@ -2359,6 +2659,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Run the ingest CLI: a full ingest, or a motor-stage promote with ``--from-graph``.
+
+    Args:
+        argv: Argument list. Defaults to ``sys.argv[1:]``.
+
+    Returns:
+        Process exit code, always ``0``; failures surface as exceptions.
+    """
     args = parse_args(argv)
     logging.basicConfig(
         stream=sys.stdout,

@@ -59,6 +59,10 @@ class EmbeddingCache:
         return len(self._data)
 
     def get_many(self, model: str, revision: str, texts: Sequence[str]) -> Dict[int, "np.ndarray"]:
+        """Return cached vectors keyed by index into ``texts``, omitting misses.
+
+        Hits are marked most recently used.
+        """
         found: Dict[int, np.ndarray] = {}
         for i, text in enumerate(texts):
             key = self._key(model, revision, text)
@@ -68,6 +72,7 @@ class EmbeddingCache:
         return found
 
     def put_many(self, model: str, revision: str, items: Sequence[Tuple[str, "np.ndarray"]]) -> None:
+        """Store ``(text, vector)`` pairs, evicting least recently used entries beyond ``max_entries``."""
         for text, vec in items:
             self._data[self._key(model, revision, text)] = vec
         while len(self._data) > self.max_entries:
@@ -129,6 +134,7 @@ class DeterministicEncoder:
         self.ngram = ngram
 
     def __call__(self, texts: Sequence[str]) -> "np.ndarray":
+        """Return an L2-normalized ``(len(texts), dim)`` float32 matrix of hashed n-gram counts."""
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for row, text in enumerate(texts):
             folded = " " + re.sub(r"[^a-z0-9]+", " ", text.lower()).strip() + " "

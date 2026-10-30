@@ -149,6 +149,11 @@ class TermRecord:
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> TermRecord:
+        """Build a record from a dict, with defaults for absent optional fields.
+
+        Raises:
+            KeyError: If ``term`` is missing.
+        """
         return cls(
             term=d["term"],
             definition=d.get("definition", ""),

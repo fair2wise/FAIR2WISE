@@ -121,9 +121,14 @@ def stage_key(
     """Key of one stage: its relevant inputs plus the keys of the stages it consumes.
 
     Args:
+        inputs: The operation inputs the key is derived from.
+        stage: Stage name, part of the key.
         relevant: Input field names (from :data:`INPUT_FIELDS`) this stage depends on.
         upstream: ``stage name -> key`` of the stages this one consumes.
         params_keys: Parameter names that matter when ``"params"`` is relevant; empty means all.
+
+    Raises:
+        ValueError: `relevant` names a field not in :data:`INPUT_FIELDS`.
     """
     unknown = set(relevant) - set(INPUT_FIELDS)
     if unknown:

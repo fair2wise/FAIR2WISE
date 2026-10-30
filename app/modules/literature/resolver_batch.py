@@ -181,7 +181,9 @@ class ReferenceLike(Protocol):
     doi: str
 
     @property
-    def key(self) -> str: ...
+    def key(self) -> str:
+        """Cache key identifying the reference."""
+        ...
 
 
 def _fold(text: str) -> str:

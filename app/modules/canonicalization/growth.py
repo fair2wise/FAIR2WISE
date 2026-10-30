@@ -47,6 +47,8 @@ def definitions(text: str) -> List[Tuple[str, str]]:
 
 @dataclass(frozen=True)
 class Observation:
+    """One paper's use of a term: label, category, aliases, supporting quote and document hash."""
+
     label: str
     category: str
     publication: str
@@ -57,6 +59,8 @@ class Observation:
 
 @dataclass(frozen=True)
 class WithheldPromotion:
+    """A candidate entry that was not proposed, with the reason and its publication count."""
+
     label: str
     category: str
     reason: str
@@ -94,13 +98,16 @@ class ObservationLog:
     observations: List[Observation] = field(default_factory=list)
 
     def observe(self, obs: Observation) -> None:
+        """Append an observation; nothing is promoted by staging."""
         self.observations.append(obs)
 
     def to_json(self) -> str:
+        """Serialize the observations to a JSON string that ``from_json`` reads back."""
         return json.dumps([o.__dict__ for o in self.observations], sort_keys=True, default=list)
 
     @staticmethod
     def from_json(text: str) -> "ObservationLog":
+        """Rebuild a log from ``to_json`` output (alias lists become tuples)."""
         return ObservationLog(
             [Observation(**{**o, "aliases": tuple(o.get("aliases") or ())}) for o in json.loads(text)]
         )

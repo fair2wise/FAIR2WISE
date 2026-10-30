@@ -122,8 +122,10 @@ class ScaleReading:
 
     @property
     def determined(self) -> bool:
-        """True only when there is a number. An UNDETERMINABLE reading is not
-        a zero and not a pass."""
+        """True only when there is a number.
+
+        An UNDETERMINABLE reading is not a zero and not a pass.
+        """
         return self.nm_per_px is not None
 
     def to_dict(self) -> dict[str, Any]:

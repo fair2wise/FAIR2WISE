@@ -1,3 +1,5 @@
+"""Thread-safe in-memory store of extracted terms and code snippets, persisted to JSON."""
+
 import datetime
 import json
 import logging
@@ -270,8 +272,10 @@ class TermStore:
         return updated
 
     def stamp_source_metadata(self, source_paper: str, pub_meta: Optional[Dict[str, Any]]) -> bool:
-        """Merge PDF-derived ``pub_meta`` into the source-scoped metadata of every
-        term/snippet that cites ``source_paper``. Returns True if anything changed."""
+        """Merge PDF-derived ``pub_meta`` into the metadata of terms/snippets citing ``source_paper``.
+
+        Returns True if anything changed.
+        """
         if not source_paper or not pub_meta:
             return False
         updated = False

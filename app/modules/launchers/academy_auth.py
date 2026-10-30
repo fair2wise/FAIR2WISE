@@ -6,6 +6,7 @@ from academy.exchange.cloud.client import HttpExchangeFactory
 
 
 async def authenticate() -> None:
+    """Create an Academy exchange user client, which runs the Globus login and caches the token."""
     factory = HttpExchangeFactory(
         "https://exchange.academy-agents.org",
         auth_method="globus",
@@ -14,6 +15,7 @@ async def authenticate() -> None:
 
 
 def main() -> None:
+    """Run ``authenticate`` to completion."""
     asyncio.run(authenticate())
 
 

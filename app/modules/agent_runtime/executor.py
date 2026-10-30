@@ -261,8 +261,11 @@ class ToolExecutor:
         approval: Optional[ApprovalRecord] = None, scope: Optional[FrozenSet[str]] = None,
         tool_call_id: Optional[str] = None, thread_id: Optional[str] = None,
     ) -> ToolOutcome:
-        """Synchronous :meth:`aexecute_call`. An ``async`` tool is run with ``asyncio.run``
-        when no event loop is running, and refused otherwise."""
+        """Run one call synchronously; the counterpart of :meth:`aexecute_call`.
+
+        An ``async`` tool is run with ``asyncio.run`` when no event loop is running,
+        and refused otherwise.
+        """
         prep = self._prepare(ctx, name, args, ledger, plan, approval, scope, tool_call_id, thread_id)
         if isinstance(prep, ToolOutcome):
             return prep

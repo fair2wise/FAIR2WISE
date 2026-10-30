@@ -1,0 +1,18 @@
+ast-serialize==0.13.1     # via mypy
+coverage==7.17.0          # via pytest-cov
+iniconfig==2.3.0          # via pytest, -c requirements/dev.txt
+isort==9.0.2              # via -r requirements/quality.in
+librt==0.16.0             # via mypy
+mypy==2.4.1               # via -r requirements/quality.in
+mypy-extensions==1.1.0    # via isort, mypy, -c requirements/dev.txt
+packaging==26.3           # via pytest, -c requirements/dev.txt
+pathspec==1.1.1           # via mypy, -c requirements/dev.txt
+pluggy==1.6.0             # via pytest, pytest-cov, -c requirements/dev.txt
+pygments==2.20.0          # via pytest, -c requirements/dev.txt
+pytest==9.1.1             # via pytest-cov, -c requirements/dev.txt
+pytest-cov==7.1.0         # via -r requirements/quality.in
+ruff==0.17.3              # via -r requirements/quality.in
+types-pyyaml==6.0.12.20261030  # via -r requirements/quality.in
+types-requests==2.33.0.20261030  # via -r requirements/quality.in
+typing-extensions==4.16.0  # via mypy, -c requirements/dev.txt
+urllib3==2.7.0            # via types-requests, -c requirements/dev.txt

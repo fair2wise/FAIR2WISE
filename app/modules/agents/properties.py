@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""
+"""Extract and normalize physical properties with proximity and pattern checks.
+
 enhanced_properties_conflict_resolution.py
 
 Further improvements to PhysicalPropertyExtractor and PropertyNormalizer to avoid
@@ -30,9 +31,9 @@ import pytest
 
 
 class PhysicalPropertyExtractor:
-    """
-    Extracts physical property mentions from text for known materials,
-    using proximity‐based and pattern‐based matching to reduce false positives.
+    """Extracts physical property mentions from text for known materials.
+
+    Uses proximity‐based and pattern‐based matching to reduce false positives.
 
     Entry points:
       - extract(text, materials): scans free text for “<material> <property> <value><unit>”
@@ -85,8 +86,7 @@ class PhysicalPropertyExtractor:
     PROXIMITY_WINDOW = 30  # characters
 
     def __init__(self, property_keywords: Optional[Dict[str, str]] = None):
-        """
-        Initialize extractor with optional custom property keywords.
+        """Initialize extractor with optional custom property keywords.
 
         Args:
             property_keywords: override for PROPERTY_KEYWORDS mapping.
@@ -94,9 +94,7 @@ class PhysicalPropertyExtractor:
         self.keywords = property_keywords or self.PROPERTY_KEYWORDS
 
     def _is_proximal(self, material: str, prop_phrase: str, sentence: str) -> bool:
-        """
-        Returns True if material and prop_phrase appear within PROXIMITY_WINDOW characters of each other.
-        """
+        """Return True if material and prop_phrase appear within PROXIMITY_WINDOW characters."""
         mat_low = material.lower()
         prop_low = prop_phrase.lower()
         sent_low = sentence.lower()
@@ -108,9 +106,10 @@ class PhysicalPropertyExtractor:
         return False
 
     def _matches_pattern(self, material: str, prop_phrase: str, sentence: str) -> bool:
-        """
-        Enforce pattern: either “<prop_phrase> of <material>” or “<material> <prop_phrase>” 
-        (with optional words in between). Uses regex to detect these common syntaxes.
+        """Check for “<prop_phrase> of <material>” or “<material> <prop_phrase>” syntax.
+
+        Optional words may appear between material and property phrase. Uses regex
+        to detect these common syntaxes.
         """
         mat = re.escape(material)
         prop = re.escape(prop_phrase)
@@ -122,8 +121,7 @@ class PhysicalPropertyExtractor:
                     re.search(pattern2, sentence, flags=re.IGNORECASE))
 
     def extract(self, text: str, materials: List[str]) -> List[Dict[str, Any]]:
-        """
-        Extract property entries for given materials from a block of text.
+        """Extract property entries for given materials from a block of text.
 
         Args:
             text: The full paragraph or page text to scan.
@@ -194,8 +192,7 @@ class PhysicalPropertyExtractor:
         return results
 
     def extract_from_relations(self, term_record: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Extract “measured_property” relations from a term record.
+        """Extract “measured_property” relations from a term record.
 
         Args:
             term_record: A dict representing a term, containing a "relations" list,
@@ -234,8 +231,7 @@ class PhysicalPropertyExtractor:
 
 
 class PropertyNormalizer:
-    """
-    Normalize extracted property values into standard units and apply plausibility checks.
+    """Normalize extracted property values into standard units and apply plausibility checks.
 
     Usage:
         normalizer = PropertyNormalizer()
@@ -274,9 +270,9 @@ class PropertyNormalizer:
     }
 
     def normalize(self, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Convert raw values and units into canonical numeric + unit form,
-        then apply plausibility filtering.
+        """Convert raw values and units into canonical numeric + unit form.
+
+        Plausibility filtering is applied after conversion.
 
         Args:
             entries: List of dicts from PhysicalPropertyExtractor, each containing:
@@ -503,6 +499,7 @@ class PropertyNormalizer:
 # Unit Tests
 # ----------------------------------------
 def test_extractor_basic_bandgap():
+    """Extract a band gap value and unit when material and property are adjacent."""
     text = "The Na3Bi film exhibited a band gap of 1.9 eV at room temperature."
     extractor = PhysicalPropertyExtractor()
     entries = extractor.extract(text, ["Na3Bi"])
@@ -515,6 +512,7 @@ def test_extractor_basic_bandgap():
     assert e["verified"] is True
 
 def test_extractor_no_value_but_pattern():
+    """Return an unverified entry when the pattern matches but no value is present."""
     text = "Measured_property: band gap of Na3Bi."
     extractor = PhysicalPropertyExtractor()
     entries = extractor.extract(text, ["Na3Bi"])
@@ -524,6 +522,7 @@ def test_extractor_no_value_but_pattern():
     assert e["verified"] is False
 
 def test_extractor_out_of_proximity():
+    """Reject a property mention that is far from the material."""
     text = (
         "The PL quenching efficiency of PM6: Y6-2O blends is 30.2%, which indicates that "
         "results in a low EQE of the Y6-2O-based devices."
@@ -535,6 +534,7 @@ def test_extractor_out_of_proximity():
     assert len(entries) == 0
 
 def test_extractor_density():
+    """Extract a density value with a compound unit."""
     text = "The density of Na3Bi is 6.7 g/cm3 at 300 K."
     extractor = PhysicalPropertyExtractor()
     entries = extractor.extract(text, ["Na3Bi"])
@@ -546,6 +546,7 @@ def test_extractor_density():
     assert e["verified"] is True
 
 def test_extract_from_relations():
+    """Pull only measured_property relations from a term record."""
     term_record = {
         "term": "Na3Bi",
         "relations": [
@@ -562,6 +563,7 @@ def test_extract_from_relations():
     assert "mobility" in props
 
 def test_normalizer_ev_to_ev():
+    """Leave an eV band gap unchanged and flag no conversion failure."""
     entries = [{
         "material": "Na3Bi",
         "property": "band_gap",
@@ -578,6 +580,7 @@ def test_normalizer_ev_to_ev():
     assert ne["unit_conversion_failed"] is False
 
 def test_normalizer_density():
+    """Convert density from g/cm3 to kg/m3, scaling the uncertainty too."""
     entries = [{
         "material": "Na3Bi",
         "property": "density",
@@ -595,6 +598,7 @@ def test_normalizer_density():
     assert abs(ne["uncertainty_value"] - 100.0) < 1e-6
 
 def test_normalizer_efficiency_plausibility():
+    """Flag out-of-range efficiency values as failed conversions."""
     # Efficiency = -20% (invalid)
     entries = [{
         "material": "EQE",
@@ -623,6 +627,7 @@ def test_normalizer_efficiency_plausibility():
     assert ne2["unit_conversion_failed"] is True
 
 def test_normalizer_bulk_modulus():
+    """Normalize GPa and MPa bulk moduli to GPa."""
     entries = [{
         "material": "Na3Bi",
         "property": "bulk_modulus",
@@ -646,6 +651,7 @@ def test_normalizer_bulk_modulus():
     assert ne2["normalized_unit"] == "GPa" and abs(ne2["normalized_value"] - 200.0) < 1e-6
 
 def test_normalizer_failed_unit():
+    """Flag unparseable values and units as failed conversions."""
     entries = [{
         "material": "Unknown",
         "property": "band_gap",

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
+"""Convert extracted_terms JSON into a MatKG graph.json.
+
 json2kg.py -- Optimized conversion of extracted_terms JSON → MatKG graph.json
 
 Features:
@@ -83,8 +84,7 @@ def split_curie(value: str) -> Tuple[str, str] | None:
 
 
 def make_id(term: str, prefix: str = "matkg") -> str:
-    """
-    Convert a human-readable term into a graph node ID.
+    """Convert a human-readable term into a graph node ID.
 
     - Prepends ``prefix`` (default ``matkg``)
     - Preserves ``matkg:`` / ``beamline:`` CURIEs
@@ -101,11 +101,11 @@ def make_id(term: str, prefix: str = "matkg") -> str:
 
 
 def ensure_list(val: Any) -> List[Any]:
-    """
-    Guarantee that the return is a list:
-      - None     → []
-      - scalar   → [val]
-      - list     → val
+    """Guarantee that the return is a list.
+
+    - None     → []
+    - scalar   → [val]
+    - list     → val
     """
     if val is None:
         return []
@@ -202,8 +202,7 @@ def _accept_code_snippet(snip: Dict[str, Any], code_body: str, strict: bool) -> 
 
 
 def make_code_snippet_node(snip: Dict[str, Any], prefix: str = "matkg") -> Dict[str, Any]:
-    """
-    Build a CodeSnippet node from a code_snippets entry.
+    """Build a CodeSnippet node from a code_snippets entry.
 
     Node ID includes MD5 hash of code body to prevent collisions.
     """
@@ -267,9 +266,10 @@ def build_graph(
     default_id_prefix: str = "matkg",
     strict_snippets: bool = True,
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Build a MatKG-compatible graph from raw term records and (optionally)
-    code_snippets produced by the code snippet extraction pass.
+    """Build a MatKG-compatible graph from raw term records.
+
+    Optionally also consumes code_snippets produced by the code snippet
+    extraction pass.
 
     Returns a dict with keys:
       - "things": list of node dicts
@@ -455,8 +455,7 @@ def build_graph(
 
 
 def convert_terms_to_graph(input_json: Path, output_json: Path) -> Dict[str, Any]:
-    """
-    Convert extracted_terms JSON into MatKG graph JSON.
+    """Convert extracted_terms JSON into MatKG graph JSON.
 
     Args:
         input_json: Path to input terms JSON
@@ -541,18 +540,21 @@ if __name__ == "__main__":
 # To run: pytest test_json2kg.py
 
 def test_make_id_simple():
+    """Check IDs get the prefix and lose spaces, keeping hyphens."""
     assert make_id("P3HT") == "matkg:P3HT"
     assert make_id("Bulk Heterojunction OPV") == "matkg:BulkHeterojunctionOPV"
     assert make_id("pAQM-2TV") == "matkg:pAQM-2TV"
 
 
 def test_ensure_list():
+    """Check None, scalars and lists are normalized to lists."""
     assert ensure_list(None) == []
     assert ensure_list(5) == [5]
     assert ensure_list([1, 2, 3]) == [1, 2, 3]
 
 
 def test_build_graph_fields():
+    """Check formula, formula_validation and properties are copied onto the node."""
     raw = [{
         "term": "X",
         "definition": "Def",
@@ -569,6 +571,7 @@ def test_build_graph_fields():
 
 
 def test_build_graph_minimal(tmp_path):
+    """Check a single relation yields two nodes and one prefixed edge."""
     raw = [{"term": "A", "relations": [{"related_term": "B", "relation": "TEST"}]}]
     graph = build_graph(raw)
     assert len(graph["things"]) == 2
@@ -618,6 +621,7 @@ def test_code_snippet_node():
 
 
 def test_cli(tmp_path):
+    """Check main() reads the input JSON and writes the graph JSON."""
     in_json = tmp_path / "in.json"
     out_json = tmp_path / "out.json"
     data = {"terms": [{"term": "X"}]}

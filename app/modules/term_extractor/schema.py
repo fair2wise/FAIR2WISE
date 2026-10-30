@@ -1,3 +1,5 @@
+"""LinkML-schema helper that validates and repairs extracted terms and relations."""
+
 import logging
 import re
 from typing import Any, Dict, List, Optional, Union
@@ -105,8 +107,9 @@ GENERAL_RELATION_ALIASES: Dict[str, str] = {
 
 
 class SchemaHelper:
-    """
-    Loads a LinkML schema and provides:
+    """Load a LinkML schema and validate extracted terms against it.
+
+    Provides:
       - RapidFuzz indexes for class-names and slot-names
       - Exact-match + fuzzy suggestions
       - Domain/range validation
@@ -154,6 +157,7 @@ class SchemaHelper:
         logger.debug("Built fuzzy indexes for classes and slots")
 
     def get_schema_context_for_llm(self) -> str:
+        """Render the schema classes and relations as prompt text for the LLM."""
         lines: List[str] = ["=== KNOWLEDGE SCHEMA ===\n", "ENTITY TYPES (use exactly these names):"]
         for cls in sorted(self.classes):
             desc = self.classes[cls]["description"]
@@ -252,6 +256,20 @@ class SchemaHelper:
         return broad if broad in self.slots else None
 
     def validate_and_fix_term(self, term_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Coerce a raw term dict onto schema classes and relations, in place.
+
+        Unknown categories and predicates are mapped via alias tables, then fuzzy
+        matching, then fallbacks (``Thing`` / ``related_to``). Remapped values keep
+        the original in ``raw_category`` / ``raw_predicate``; a relation left under
+        its unknown name (no ``related_to`` slot) is marked ``verified=False``.
+        ``description`` and ``category`` predicates and malformed entries are dropped.
+
+        Args:
+            term_data: Raw term dict; mutated and returned.
+
+        Returns:
+            The same dict with normalized ``category`` and ``relations``.
+        """
         cat = str(term_data.get("category") or "").strip()
         if not cat:
             cat = "Thing"
@@ -335,6 +353,13 @@ class SchemaHelper:
         return self._is_subclass_of(p, parent)
 
     def check_relation_validity(self, subj_cls: str, pred: str, obj_cls: str) -> bool:
+        """Return True if ``pred`` is a schema slot whose domain/range admit the classes.
+
+        Args:
+            subj_cls: Class of the relation subject.
+            pred: Relation (slot) name.
+            obj_cls: Class of the relation object.
+        """
         if pred not in self.slots:
             return False
         slot = self.slots[pred]

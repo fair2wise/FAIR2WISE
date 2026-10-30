@@ -61,8 +61,21 @@ class BudgetLedger:
         """Atomically reserve ``amount_usd``; ``None`` when a cap would be exceeded.
 
         Args:
+            corpus: Corpus the spend is attributed to.
+            case_id: Curation case the spend is for, if any.
+            model: Model the spend is for.
+            amount_usd: Amount to reserve; must be finite and non-negative.
             cap_usd: Global ceiling over all scopes, or ``None`` when no cost limit is configured
                 (provider limits still apply through admission).
+            scope: Budget scope the per-scope cap applies to.
+            scope_cap_usd: Ceiling for ``scope``, or ``None`` for no per-scope cap.
+            owner: Free-text owner recorded on the reservation.
+
+        Returns:
+            The reservation id, or ``None`` when a cap would be exceeded.
+
+        Raises:
+            ValueError: ``scope`` is blank or ``amount_usd`` is not finite and non-negative.
         """
         if not scope.strip():
             raise ValueError("scope must be a non-empty string")

@@ -68,7 +68,8 @@ def authorize_apply(
         plan: A plan exposing ``verify_hash()``, ``to_change_plan()``, ``source_revision`` and
             ``vocabulary_revision`` (see :mod:`.migration`).
         approval: The human approval record; ``None`` always refuses.
-        current_source_revision / current_vocabulary_revision: Revisions observed now.
+        current_source_revision: Source revision observed now.
+        current_vocabulary_revision: Vocabulary revision observed now.
         now: Clock override for tests.
 
     Returns:

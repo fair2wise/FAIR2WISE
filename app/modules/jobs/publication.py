@@ -58,8 +58,13 @@ PackageCheck = Callable[[FrozenSnapshot], Sequence[PackageProblem]]
 
 
 def default_approval_verifier(approval: ApprovalRecord, plan: ChangePlan, at: datetime) -> ApprovalRecord:
-    """Binding check only (hash, target, scope, expiry). Deployments pass
-    ``security.authorization.verify_approval``."""
+    """Check only that the approval is bound to the plan (hash, target, scope, expiry).
+
+    Deployments pass ``security.authorization.verify_approval``.
+
+    Raises:
+        ContractError: ``STALE_APPROVAL`` when the approval does not authorize the plan at `at`.
+    """
     if not approval.authorizes(plan, at):
         raise ContractError(ErrorCode.STALE_APPROVAL, "approval does not cover this plan, target or time")
     return approval
@@ -526,8 +531,10 @@ class Publication:
         )
 
     def _on_scope_change(self, change: Dict[str, Any]) -> None:
-        """Scope change or revocation: dependent approvals are invalidated; nothing falls back to a
-        server credential."""
+        """Handle a scope change or revocation.
+
+        Dependent approvals are invalidated; nothing falls back to a server credential.
+        """
         reason = str(change.get("reason") or "scope changed")
         subject = change.get("subject")
         self.store.invalidate_approvals(

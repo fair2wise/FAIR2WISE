@@ -77,6 +77,7 @@ class ApplyOutcome:
     complete: bool = True
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the outcome as a plain dict (effects as a list)."""
         return {
             "created": self.created,
             "reconciled": self.reconciled,
@@ -87,6 +88,7 @@ class ApplyOutcome:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ApplyOutcome":
+        """Rebuild an outcome from :meth:`as_dict` output; missing fields take their defaults."""
         return cls(
             int(data.get("created", 0)),
             int(data.get("reconciled", 0)),

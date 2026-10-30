@@ -68,8 +68,11 @@ def _local(kind: str, work_id: str, local_id: str) -> str:
 
 
 def technique_class(technique: str, classes) -> str:
-    """F6 table: RSoXS spellings (the existing alias table, exact keys only) -> ``RSoXSMeasurement``, else
-    ``ExperimentalTechnique``. No fuzzy match, so no technique lands on an unrelated class."""
+    """Map a technique spelling to a schema class (F6 table).
+
+    RSoXS spellings (the existing alias table, exact keys only) give ``RSoXSMeasurement``, else
+    ``ExperimentalTechnique``. No fuzzy match, so no technique lands on an unrelated class.
+    """
     alias = GENERAL_CATEGORY_ALIASES.get(_key(technique))
     return "RSoXSMeasurement" if alias == "RSoXSMeasurement" and "RSoXSMeasurement" in classes \
         else "ExperimentalTechnique"

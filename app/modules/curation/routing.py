@@ -48,6 +48,7 @@ class TriageSettings:
 
     @property
     def model_route(self) -> Route:
+        """The route for a case: local model if enabled, else remote model if enabled, else review."""
         if self.local_model_enabled:
             return Route.LOCAL_MODEL
         if self.remote_model_enabled:

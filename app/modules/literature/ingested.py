@@ -37,9 +37,13 @@ _COMPLETE = re.compile(r'"complete"\s*:\s*(true|false)')
 class IngestedLookup(Protocol):
     """What a folder intake needs: ask before ingesting, record after."""
 
-    def reason(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> Optional[str]: ...
+    def reason(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> Optional[str]:
+        """Return why this paper should be skipped, or ``None`` to ingest it."""
+        ...
 
-    def record(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> None: ...
+    def record(self, doi: str, *, source_sha256: str = "", pipeline: str = "") -> None:
+        """Remember a paper that was ingested."""
+        ...
 
 
 def fold_key(value: str) -> str:

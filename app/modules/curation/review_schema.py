@@ -107,8 +107,10 @@ def _norm(value: str) -> str:
 
 
 def source_quote(evidence: str, surface: str) -> str:
-    """The complete literal mention of ``surface`` in ``evidence`` (whitespace and case may differ),
-    else ``""``."""
+    """Return the complete literal mention of ``surface`` in ``evidence``, else ``""``.
+
+    Whitespace and case may differ.
+    """
     if not surface.strip():
         return ""
     pattern = r"(?<!\w)" + r"\s+".join(re.escape(p) for p in surface.split()) + r"(?!\w)"

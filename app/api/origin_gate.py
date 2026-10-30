@@ -156,12 +156,17 @@ class OriginGateMiddleware:
 
     def __init__(self, app: ASGIApp, allowed_origins: Iterable[str] = (),
                  path_prefixes: Sequence[str] = ("/v1/",), allowed_origin_regex: Optional[str] = None) -> None:
+        """Bind the app and freeze the allowlist and guarded prefixes."""
         self.app = app
         self._allowed = frozenset(allowed_origins)
         self._prefixes = tuple(path_prefixes)
         self._regex = allowed_origin_regex
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Refuse a state-changing HTTP request to a guarded path whose browser origin is not allowed.
+
+        Other requests, and allowed ones, go to the wrapped app unchanged.
+        """
         if (scope["type"] != "http" or scope["method"] not in STATE_CHANGING_METHODS
                 or not scope["path"].startswith(self._prefixes)):
             await self.app(scope, receive, send)

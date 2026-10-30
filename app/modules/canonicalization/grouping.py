@@ -47,6 +47,7 @@ class TermGroup:
     auto_applicable: bool = True
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the group as a plain dict (similarity rounded to 4 places)."""
         return {
             "category": self.category,
             "representative": self.representative,

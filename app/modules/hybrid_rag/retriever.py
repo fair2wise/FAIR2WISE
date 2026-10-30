@@ -29,6 +29,7 @@ class PaperRetriever:
         literature_root: Optional[Path] = None,
         ops_root: Optional[Path] = None,
     ) -> "PaperRetriever":
+        """Build a retriever from optional literature and ops index roots; a missing root means no index."""
         lit = SourceIndex(Path(literature_root)) if literature_root else None
         ops = SourceIndex(Path(ops_root)) if ops_root else None
         return cls(literature=lit, ops=ops)

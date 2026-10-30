@@ -98,6 +98,11 @@ class MaxBodySizeMiddleware:
 
     def __init__(self, app: ASGIApp, max_bytes: int = DEFAULT_MAX_BODY_BYTES,
                  path_prefixes: Sequence[str] = ()) -> None:
+        """Bind the app and the limit.
+
+        Raises:
+            ValueError: If ``max_bytes`` is not positive.
+        """
         if max_bytes <= 0:
             raise ValueError("max_bytes must be positive")
         self.app = app
@@ -105,6 +110,10 @@ class MaxBodySizeMiddleware:
         self._prefixes = tuple(path_prefixes)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Answer 413 when the declared or streamed body exceeds the limit; otherwise call the wrapped app.
+
+        Only HTTP requests under ``path_prefixes`` are checked.
+        """
         if scope["type"] != "http" or (self._prefixes and not scope["path"].startswith(self._prefixes)):
             await self.app(scope, receive, send)
             return

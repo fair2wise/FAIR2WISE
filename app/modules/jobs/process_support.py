@@ -98,7 +98,7 @@ def tail_lines(
 
 
 def worker_command(db_path: str, *, factory: str, extra: Sequence[str] = ()) -> List[str]:
-    """argv for an owned worker process; refuses a factory outside ``app.modules.`` and any shell metacharacter."""
+    """Build the argv for an owned worker process; refuses a factory outside ``app.modules.`` and any shell metacharacter."""
     if not re.fullmatch(r"app\.modules(\.[A-Za-z_][A-Za-z0-9_]*)+:[A-Za-z_][A-Za-z0-9_]*", factory):
         raise ValueError("worker factory must be 'app.modules.<package>:<callable>'")
     return [sys.executable, "-m", WORKER_MODULE, "--db", str(db_path), "--factory", factory, *extra]

@@ -1,5 +1,4 @@
-"""
-run_pipeline.py -- FAIR2WISE checkpoint evaluation with incremental JSON outputs
+"""FAIR2WISE checkpoint evaluation with incremental JSON outputs.
 
 Organization:
   • Papers divided into 4 folders (25 papers each)
@@ -76,7 +75,6 @@ def run_checkpoint_pipeline(
     dry_run: bool = False
 ) -> None:
     """Run FAIR2WISE pipeline incrementally per model, retaining all JSONs with unique filenames."""
-
     cborg_api_key = os.environ.get("CBORG_API_KEY")
     if not cborg_api_key:
         raise RuntimeError("CBORG_API_KEY is not set in the environment")

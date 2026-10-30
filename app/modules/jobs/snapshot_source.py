@@ -26,6 +26,11 @@ class DirectorySnapshotSource:
         self.root = Path(storage_kg)
 
     def load(self, ref: str) -> FrozenSnapshot:
+        """Load and verify the frozen snapshot at ``<corpus>/<snapshot id>``.
+
+        Raises:
+            ContractError: ``INVALID_INPUT`` if ``ref`` is malformed or the snapshot fails verification.
+        """
         corpus, _, snapshot_id = ref.partition("/")
         if not corpus or not snapshot_id or "/" in snapshot_id or ".." in ref:
             raise ContractError(ErrorCode.INVALID_INPUT, "snapshot ref must be '<corpus>/<snapshot id>'")

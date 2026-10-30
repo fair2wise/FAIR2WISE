@@ -69,6 +69,7 @@ async def launch(port: int, token_db: Path = DEFAULT_TOKEN_DB) -> None:
 
 
 def main() -> None:
+    """Parse the command line and launch the user agent until it exits."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-p",

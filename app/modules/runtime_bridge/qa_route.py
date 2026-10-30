@@ -89,6 +89,7 @@ class PinnedArgsService:
 
     async def query(self, question: str, *, history: Any = None, source_rag: Any = None,
                     use_live_tiled: Any = None) -> Any:
+        """Run the wrapped service's query, substituting the pinned turn's arguments if one is set."""
         pinned = _PINNED.get()
         if pinned is not None:
             question = pinned["question"]
@@ -105,6 +106,7 @@ def pin_args(args: Dict[str, Any]) -> contextvars.Token:
 
 
 def unpin_args(token: contextvars.Token) -> None:
+    """Restore the pinned arguments saved by the :func:`pin_args` call that returned `token`."""
     _PINNED.reset(token)
 
 
@@ -184,15 +186,19 @@ class TracedPlanningModel:
         self._provider = provider
 
     def current(self) -> Any:
+        """Return the chat model the provider resolves right now."""
         return self._provider()
 
     def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> _BoundPlanner:
+        """Return a traced planner bound to `tools`; extra keyword arguments are ignored."""
         return _BoundPlanner(self, list(tools))
 
     def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+        """Invoke the current model on `messages` through a traced planner with no tools bound."""
         return _BoundPlanner(self, []).invoke(messages, *args, **kwargs)
 
     async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+        """Async variant of :meth:`invoke`."""
         return await _BoundPlanner(self, []).ainvoke(messages, *args, **kwargs)
 
 

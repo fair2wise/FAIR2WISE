@@ -30,6 +30,8 @@ NAMED_NEGATIVE_CONTROLS: Tuple[Tuple[str, str], ...] = (
 
 @dataclass(frozen=True)
 class FixtureMention:
+    """One surface form in the measurement fixture, its category, expected merge kind and target."""
+
     surface: str
     category: str
     kind: str

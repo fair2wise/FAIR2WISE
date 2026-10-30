@@ -79,6 +79,11 @@ class PublicRootPath:
     """
 
     def __init__(self, app: ASGIApp, public_root: str) -> None:
+        """Wrap ``app`` for ``public_root``.
+
+        Raises:
+            StartupConfigError: If ``public_root`` is not rooted or ends with a slash.
+        """
         if not public_root.startswith("/") or public_root.endswith("/"):
             raise StartupConfigError(f"config_rejected: public root must be /rooted without a trailing slash, "
                                      f"got {public_root!r}")
@@ -86,6 +91,7 @@ class PublicRootPath:
         self.public_root = public_root
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Rewrite the path keys of HTTP and WebSocket scopes, then call the wrapped app; other scopes pass through."""
         if scope["type"] in ("http", "websocket"):
             mounted_root = scope.get("root_path", "")
             path = scope["path"]
@@ -125,15 +131,23 @@ def create_api_app(
 
     Args:
         cfg: The launcher's ``CoordinatorConfig`` (as ``create_app``).
-        cors_origins / deployment / startup_config / identity_port / credential_store / clock:
-            Passed to ``create_app`` unchanged (profile selection, ALS identity, sessions).
+        cors_origins: Passed to ``create_app`` unchanged (CORS allowlist).
+        deployment: Passed to ``create_app`` unchanged (profile selection).
+        startup_config: Passed to ``create_app`` unchanged (startup configuration mapping); also the
+            source of ``F2W_PUBLIC_PREFIX`` and of the knowledge-operations configuration.
+        identity_port: Passed to ``create_app`` unchanged (ALS identity); also set on ``operations``
+            when it has none.
+        credential_store: Passed to ``create_app`` unchanged (sessions).
+        clock: Passed to ``create_app`` unchanged; also the clock of the default operations
+            (default: the current UTC time).
         operations: Prebuilt operations bound to the same ``DeploymentSettings``; default
             :func:`~app.api.operations.build_operations` under ``operations_root``.
         operations_root: Directory of the default job, curation and audit stores
             (default ``<cfg.workdir>/operations``).
         publication_gate: H5 gate for the default operations (default: no target allowed).
         max_body_bytes: Request-body cap on ``/v1/`` and ``/auth/``.
-        sse_poll_seconds / sse_max_seconds: Job event stream polling and maximum length.
+        sse_poll_seconds: Polling interval of the job event stream, in seconds.
+        sse_max_seconds: Maximum length of one job event stream, in seconds.
         judge_settings: Validation judge-model service (O-U2); default a
             :class:`~app.modules.validation_settings.JudgeModelService` over
             ``<workdir>/validation/judge_model.json`` and the live CBORG model list.

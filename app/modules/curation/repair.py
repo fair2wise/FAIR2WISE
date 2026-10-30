@@ -53,6 +53,7 @@ class ReextractionPlan:
 
     @property
     def plan_sha256(self) -> str:
+        """SHA-256 of the canonical JSON of the plan content; an approval binds to this."""
         body = {
             "corpus": self.corpus,
             "chunks": [c.__dict__ for c in self.chunks],
@@ -77,13 +78,17 @@ def plan_reextraction(
     """Plan re-extraction for ``incomplete_extraction`` cases.
 
     Args:
+        corpus: Corpus the plan covers.
+        cases: Review cases; those not of type ``incomplete_extraction`` or from another corpus are skipped.
         graph_read: ``(entities, complete)`` exactly as ``GraphPort.find_entities`` returns it.
         capabilities: The backend's :class:`GraphCapabilities`; ``complete_listing`` is required.
         valid_chunk_ids: Chunks whose cached extraction is still valid (reused, not re-run).
+        extractor_version: Extractor revision recorded in the plan.
         cost_per_chunk_usd: Estimate per chunk; ``None`` leaves the plan cost unknown (not zero).
         limit: Maximum chunks in the plan (an explicit bound; there is no whole-corpus default).
 
     Raises:
+        ValueError: ``limit`` is below 1.
         CapabilityError: The backend cannot list completely.
         IncompleteRead: The read was a page or cap.
     """

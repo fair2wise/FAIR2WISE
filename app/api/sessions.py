@@ -118,6 +118,7 @@ class TiledSessionStore:
     def __init__(self, tiled_target: str, http_client: Any, *, clock: Callable[[], datetime] = _utcnow,
                  timeout: float = 10.0, cookie_path: str = DEFAULT_COOKIE_PATH, cookie_secure: bool = True,
                  max_sessions: int = DEFAULT_MAX_SESSIONS) -> None:
+        """Bind the Tiled target (normalized) and the HTTP client; the arguments are described on the class."""
         self.tiled_target = normalize_tiled_target(tiled_target)
         self.cookie_path = cookie_path
         self.cookie_secure = cookie_secure

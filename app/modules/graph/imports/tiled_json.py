@@ -81,6 +81,7 @@ class ImportVerificationError(ContractError):
     """Readback verification failed; no receipt was written and nothing is reported published."""
 
     def __init__(self, mismatches: Sequence[str]) -> None:
+        """Record the mismatch descriptions (the message shows the first five); the error is retryable."""
         super().__init__(ErrorCode.CONFLICT, f"import verification failed: {list(mismatches)[:5]}",
                          retryable=True)
         self.mismatches = list(mismatches)
@@ -209,9 +210,11 @@ class TargetState:
     revision: str = "none"
 
     def pending_for(self, tag: Optional[str]) -> Dict[str, Dict[str, Any]]:
+        """Return the in-flight rows of plan ``tag`` by node id (empty when ``tag`` is ``None`` or unknown)."""
         return self.pending.get(tag or "", {})
 
     def retired_for(self, tag: Optional[str]) -> Dict[str, Dict[str, Any]]:
+        """Return the rows retired by plan ``tag`` by node id (empty when ``tag`` is ``None`` or unknown)."""
         return self.retired.get(tag or "", {})
 
 
@@ -284,10 +287,12 @@ class Op:
 
     @property
     def token(self) -> str:
+        """Return ``"<kind>:<key>"``, the operation's identifier."""
         return f"{self.kind}:{self.key}"
 
     @property
     def stage(self) -> str:
+        """Return the import stage (one of ``STAGES``) that applies this operation kind."""
         return {"create_node": "entities", "supersede_node": "entities", "create_link": "links",
                 "retire_link": "links", "retire_node": "retire"}[self.kind]
 
@@ -386,14 +391,17 @@ class ImportPlan:
 
     @property
     def ops(self) -> List[Op]:
+        """Return the planned operations decoded from ``detail``."""
         return [Op(*o) for o in self.detail["ops"]]
 
     @property
     def is_noop(self) -> bool:
+        """Return whether the plan has no operations, so the target already matches the snapshot."""
         return not self.detail["ops"]
 
     @property
     def tag(self) -> str:
+        """Return the plan tag: the first 16 characters of the plan hash, which marks its in-flight rows."""
         return self.change.plan_sha256[:16]
 
     @property
@@ -418,10 +426,12 @@ class ImportPlan:
             raise ContractError(ErrorCode.STALE_APPROVAL, "import plan was modified after it was computed")
 
     def to_json(self) -> Dict[str, Any]:
+        """Return the JSON-serializable form that :meth:`from_json` reads."""
         return {"change": self.change.model_dump(mode="json"), "detail": self.detail}
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> "ImportPlan":
+        """Rebuild a plan from :meth:`to_json` output; call :meth:`verify_integrity` before trusting it."""
         return cls(ChangePlan.model_validate(data["change"]), json.loads(_canon(data["detail"])))
 
 
@@ -499,8 +509,11 @@ def _slug(text: str) -> str:
 
 
 def verify_projection(src: SourceSnapshot, st: TargetState, foreign_before: Mapping[str, str]) -> List[str]:
-    """Compare the readback to the snapshot: every node and edge (content, not counts), nothing extra,
-    nothing in flight, and every pre-existing foreign record untouched. Returns mismatch descriptions."""
+    """Compare the readback to the snapshot and return mismatch descriptions (empty when it matches).
+
+    Checks every node and edge by content rather than count, that nothing extra or in flight remains,
+    and that every pre-existing foreign record is untouched.
+    """
     bad: List[str] = []
     gid = src.graph_id
     for node_id, node in src.nodes.items():

@@ -20,10 +20,13 @@ SCI_TOKEN_RE = re.compile(
 
 
 def tokenize(text: str) -> List[str]:
+    """Casefold `text` and split it into lexical tokens; None or empty yields []."""
     return [tok.casefold() for tok in TOKEN_RE.findall(text or "")]
 
 
 class BM25Index:
+    """Okapi BM25 scorer over pre-tokenized documents."""
+
     def __init__(self, documents: Sequence[Sequence[str]], k1: float = 1.5, b: float = 0.75) -> None:
         self.k1 = k1
         self.b = b
@@ -44,6 +47,7 @@ class BM25Index:
         }
 
     def scores(self, query_tokens: Sequence[str]) -> List[float]:
+        """Return one BM25 score per indexed document, in document order."""
         if not self.docs:
             return []
         qtf = Counter(query_tokens)
@@ -74,9 +78,11 @@ class SourceIndex:
 
     @property
     def available(self) -> bool:
+        """Whether both the chunks and meta files exist on disk."""
         return self.chunks_path.is_file() and self.meta_path.is_file()
 
     def meta(self) -> Dict[str, Any]:
+        """Return the index metadata, or {} if missing, unreadable or not a JSON object."""
         if not self.meta_path.is_file():
             return {}
         try:
@@ -86,6 +92,7 @@ class SourceIndex:
         return data if isinstance(data, dict) else {}
 
     def load(self) -> List[Dict[str, Any]]:
+        """Load and cache chunks (skipping blank, malformed or textless lines) and build the BM25 index."""
         if self._chunks is not None:
             return self._chunks
         chunks: List[Dict[str, Any]] = []
@@ -147,6 +154,18 @@ def write_index(
     corpus_revision: str,
     extra_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """Write `chunks` as chunks.jsonl plus meta.json under `root` and return the metadata.
+
+    Args:
+        root: Index directory; created if missing.
+        chunks: Chunk records to persist.
+        index_name: Name recorded in the metadata.
+        corpus_revision: Corpus revision recorded in the metadata.
+        extra_meta: Optional fields merged over the generated metadata.
+
+    Returns:
+        The metadata dict that was written.
+    """
     dest = Path(root)
     dest.mkdir(parents=True, exist_ok=True)
     chunks_path = dest / "chunks.jsonl"
@@ -178,6 +197,7 @@ def merge_chunks(
     *,
     replace_doc_ids: Optional[Iterable[str]] = None,
 ) -> List[Dict[str, Any]]:
+    """Return `existing` chunks minus those of `replace_doc_ids`, followed by `incoming`."""
     skip = {str(doc) for doc in (replace_doc_ids or [])}
     kept = [chunk for chunk in existing if str(chunk.get("doc_id") or "") not in skip]
     kept.extend(list(incoming))

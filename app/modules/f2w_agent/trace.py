@@ -363,6 +363,14 @@ class TurnTrace:
         parent_turn_id: Optional[str],
         enabled: bool,
     ) -> None:
+        """Create a collector for one turn. It is not active until :meth:`bind` is called.
+
+        Args:
+            turn_id: Identifier of the turn.
+            session_id: Chat session the turn belongs to, if any.
+            parent_turn_id: Turn this one follows up on, if any.
+            enabled: If false, data is still collected but :meth:`finish` writes nothing to disk.
+        """
         self.turn_id = turn_id
         self.enabled = enabled
         self.finished = False
@@ -377,6 +385,11 @@ class TurnTrace:
         self._tokens.append(_COLLECTOR.set(self))
 
     def merge_env(self, env: Optional[Mapping[str, Any]]) -> None:
+        """Copy known environment settings into the record.
+
+        Only keys in ``ENV_KEYS`` with non-``None`` values are kept; later calls
+        overwrite earlier values.
+        """
         if not env:
             return
         with self._lock:
@@ -386,6 +399,11 @@ class TurnTrace:
                     current[key] = env[key]
 
     def merge_request(self, request: Optional[Mapping[str, Any]]) -> None:
+        """Merge request fields into the record.
+
+        Only keys in ``REQUEST_KEYS`` with non-``None`` values are kept. An empty
+        ``history`` never replaces a non-empty one already recorded.
+        """
         if not request:
             return
         with self._lock:
@@ -398,9 +416,14 @@ class TurnTrace:
                 current[key] = value
 
     def note_request(self, **fields: Any) -> None:
+        """Record request fields given as keyword arguments; see :meth:`merge_request`."""
         self.merge_request(fields)
 
     def note_precheck(self, name: str, fired: bool) -> None:
+        """Record that a precheck fired.
+
+        Unknown names are ignored. A flag, once true, stays true.
+        """
         if name not in PRECHECK_KEYS:
             return
         with self._lock:
@@ -408,12 +431,18 @@ class TurnTrace:
             flags[name] = bool(flags.get(name)) or bool(fired)
 
     def note_classifier_raw(self, raw: Optional[str]) -> None:
+        """Record the classifier's raw output. Only the first non-``None`` value is kept."""
         with self._lock:
             slot = self.data["orchestration"]
             if slot.get("raw_classifier_output") is None and raw is not None:
                 slot["raw_classifier_output"] = raw
 
     def note_decision(self, decision: Mapping[str, Any]) -> None:
+        """Record the orchestration decision.
+
+        The first decision that has an ``action`` and the first non-empty
+        ``classification`` are kept; later calls do not overwrite them.
+        """
         action = decision.get("action")
         agent = decision.get("agent")
         reason = decision.get("reason")
@@ -430,6 +459,13 @@ class TurnTrace:
                 slot["classification"] = str(classification)
 
     def note_progress(self, name: str, message: str, data: Optional[Mapping[str, Any]] = None) -> None:
+        """Append a progress event stamped with milliseconds elapsed since the turn started.
+
+        Args:
+            name: Event name.
+            message: Human-readable message.
+            data: Optional extra payload, copied.
+        """
         offset_ms = int((time.monotonic() - self.started_monotonic) * 1000)
         event = {
             "name": str(name),
@@ -441,6 +477,12 @@ class TurnTrace:
             self.data["progress"].append(event)
 
     def record_retrieval(self, fields: Mapping[str, Any]) -> None:
+        """Merge retrieval details into the record.
+
+        Only keys in ``RETRIEVAL_KEYS`` with non-``None`` values are kept. Within
+        ``route_flags`` only keys in ``ROUTE_FLAG_KEYS`` are kept, ``leeway_used`` is
+        sticky once true, and an empty ``selected_hits`` never replaces a non-empty one.
+        """
         with self._lock:
             slot = self.data["retrieval"]
             for key, value in fields.items():
@@ -470,6 +512,21 @@ class TurnTrace:
         timeout: Optional[float],
         error: Optional[BaseException],
     ) -> None:
+        """Append one model call to the record.
+
+        Args:
+            label: Call-site label. The label ``orchestrator-classify`` with a response
+                also records the classifier's raw output.
+            model: Model name, if known.
+            messages: Chat messages sent, stored in full.
+            response: Response text, or ``None`` if the call produced none.
+            latency_ms: Call duration in milliseconds.
+            timeout: Timeout applied to the call in seconds, if any.
+            error: Exception raised by the call, if any.
+
+        The SHA-256 of the joined system messages is stored as
+        ``system_prompt_sha256`` (``None`` without system messages).
+        """
         system_parts = [
             str(item.get("content") or "")
             for item in messages
@@ -496,6 +553,7 @@ class TurnTrace:
             self.note_classifier_raw(response)
 
     def note_error(self, where: str, exc: BaseException) -> None:
+        """Append an error entry with exception type, message and the ``where`` location."""
         entry = {
             "type": type(exc).__name__,
             "message": str(exc),
@@ -505,6 +563,17 @@ class TurnTrace:
             self.data["errors"].append(entry)
 
     def attach_response(self, response: Any) -> None:
+        """Copy the final response into the record.
+
+        Reads ``answer``, ``publications``, ``pending``, ``status``, ``sufficient``
+        and ``confidence`` from ``response`` if present, parses citations from the
+        answer, and records elapsed seconds. If ``response`` has a ``turn_id``
+        attribute that is ``None``, it is set to this turn's ID (a failure to set it
+        is ignored).
+
+        Args:
+            response: Response object from the agent. Duck-typed; may be mutated.
+        """
         answer = getattr(response, "answer", None)
         text = answer if isinstance(answer, str) else None
         elapsed = time.monotonic() - self.started_monotonic
@@ -711,30 +780,37 @@ def finish_turn() -> None:
 
 
 def note_request(**fields: Any) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_request(**fields))
 
 
 def note_precheck(name: str, fired: bool) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_precheck(name, fired))
 
 
 def note_classifier_raw(raw: Optional[str]) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_classifier_raw(raw))
 
 
 def note_decision(decision: Mapping[str, Any]) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_decision(decision))
 
 
 def note_progress(name: str, message: str, data: Optional[Mapping[str, Any]] = None) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_progress(name, message, data))
 
 
 def record_retrieval(fields: Mapping[str, Any]) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.record_retrieval(fields))
 
 
 def note_error(where: str, exc: BaseException) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_error(where, exc))
 
 
@@ -767,6 +843,7 @@ def record_llm_call(
 
 
 def attach_response(response: Any) -> None:
+    """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.attach_response(response))
 
 

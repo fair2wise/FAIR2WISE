@@ -802,7 +802,9 @@ def check_private_dependencies(
 
 def check_schema_binding(repo: Path, manifest: KGManifest, validation_doc: Mapping[str, Any], *,
                          allow_pending_review_schema: bool = False) -> Dict[str, Any]:
-    """The manifest's schema block must name a selectable schema of the repository, by path, bytes and closure
+    """Check that the manifest's schema block binds to a schema of the repository.
+
+    The block must name a selectable schema of the repository, by path, bytes and closure
     fingerprint, and agree with ``validation.json``.
 
     Refusals: ``schema_fingerprint_missing``, ``schema_unregistered``, ``schema_mismatch`` (path or file hash),
@@ -872,8 +874,11 @@ class EvidenceReport:
 
     @property
     def status(self) -> str:
-        """``fail`` (a mismatch or invalid reference), ``incomplete`` (some unavailable, recorded) or
-        ``complete``."""
+        """Overall status of the evidence report.
+
+        ``fail`` (a mismatch or invalid reference), ``incomplete`` (some unavailable, recorded) or
+        ``complete``.
+        """
         if any(s["status"] in ("mismatch", "invalid") for s in self.sources):
             return "fail"
         return "incomplete" if any(s["status"] == "unavailable" for s in self.sources) else "complete"
@@ -950,7 +955,7 @@ def check_evidence_availability(
     inventory: Optional[Mapping[str, Any]] = None,
     evidence_root: Optional[Path] = None,
 ) -> EvidenceReport:
-    """Every evidence locator either resolves or is recorded as unavailable; nothing is fetched or rebuilt.
+    """Resolve every evidence locator or record it as unavailable; nothing is fetched or rebuilt.
 
     A locator source is classified as ``external`` (a web source: recorded, never fetched), ``available`` (a file
     tracked in the repository, or a ``private:`` inventory asset whose bytes at ``evidence_root`` hash to the
@@ -961,6 +966,9 @@ def check_evidence_availability(
     ``evidence.required_private_assets`` when the manifest model carries that optional block.
 
     Args:
+        repo: Repository root used to find tracked files; ``None`` when there is no repository.
+        graph: The graph document whose evidence locators are checked.
+        manifest: The release manifest (may carry ``evidence.required_private_assets``).
         inventory: ``{"sources": {<source id>: {"ref": "private:...", "sha256": ..., "required"?: bool}},
             "required_private_assets"?: [{"ref", "sha256"}]}`` (operator supplied; never committed).
         evidence_root: Mounted private store that ``private:`` refs resolve under (never recorded).
@@ -1240,8 +1248,11 @@ _REPOSITORY = re.compile(r"^[A-Za-z0-9.-]+(?:/[A-Za-z0-9._-]+)+$")
 
 
 def owner_commands(candidate: CommitCandidate, record_name: str, repository: str) -> List[str]:
-    """The exact commands the owner runs from the repository root. Nothing runs them automatically, and there is
-    deliberately no push: publishing the branch is a separate, reviewed owner action outside this tool."""
+    """Return the exact commands the owner runs from the repository root.
+
+    Nothing runs them automatically, and there is deliberately no push: publishing the branch is a
+    separate, reviewed owner action outside this tool.
+    """
     paths = " ".join(candidate.paths)
     manifest = candidate.manifest
     message = (f"data(kg): freeze {manifest.corpus}/{manifest.snapshot_id} "

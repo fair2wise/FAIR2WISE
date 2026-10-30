@@ -64,6 +64,7 @@ class Pointer:
     index_ref: str
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the pointer fields as a plain dict."""
         return {
             "snapshot_ref": self.snapshot_ref,
             "snapshot_sha256": self.snapshot_sha256,

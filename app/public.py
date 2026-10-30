@@ -86,6 +86,12 @@ class F2WClient:
 
     def __init__(self, application: F2WApplication, *, owns_application: bool = False,
                  operations: Optional["F2WOperations"] = None) -> None:
+        """Wrap ``application``; ``owns_application`` makes :meth:`close` close it.
+
+        Raises:
+            TypeError: If ``application`` is not an ``F2WApplication``.
+            ValueError: If ``operations`` is bound to different ``DeploymentSettings``.
+        """
         if not isinstance(application, F2WApplication):
             raise TypeError("application must be an F2WApplication")
         if operations is not None and operations.settings != application.settings:
@@ -494,6 +500,11 @@ class LiteratureAgent:
     """Delegated literature tasks through the client's LangGraph supervisor."""
 
     def __init__(self, client: F2WClient, *, owns_client: bool = False) -> None:
+        """Wrap ``client``; ``owns_client`` makes :meth:`close` close it.
+
+        Raises:
+            ValueError: If the client's application has no supervisor.
+        """
         if client.application.supervisor is None:
             raise ValueError("the client's application has no supervisor; build it with a chat_model")
         self.client = client

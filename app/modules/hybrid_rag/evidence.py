@@ -56,15 +56,28 @@ class Evidence:
 
     @property
     def corpus(self) -> str:
+        """Return the corpus name from provenance, or an empty string."""
         return str(self.provenance.get("corpus") or "")
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the hit as a dict, excluding the raw ``payload``."""
         data = asdict(self)
         data.pop("payload", None)
         return data
 
 
 def infer_intent(question: str, *, layout: bool = False, numeric: bool = False) -> str:
+    """Classify a question into a key of ``INTENT_WEIGHTS`` using keyword heuristics.
+
+    Args:
+        question: User question text.
+        layout: Force ``"layout"``; checked first.
+        numeric: Force ``"factual"``; checked after ``layout``.
+
+    Returns:
+        ``"layout"``, ``"factual"``, ``"scan"`` (run-specific wording),
+        ``"why_how"`` (methods/interpretation wording), else ``"factual"``.
+    """
     text = (question or "").strip().lower()
     if layout:
         return "layout"
@@ -91,6 +104,11 @@ def infer_intent(question: str, *, layout: bool = False, numeric: bool = False) 
 
 
 def kg_evidence_from_hit(hit: Any) -> Evidence:
+    """Wrap a knowledge-graph search hit as ``Evidence``.
+
+    Fields are read with ``getattr`` fallbacks to ``hit.payload`` (or ``hit`` itself),
+    so any hit-like object works. The description becomes the evidence text.
+    """
     payload = getattr(hit, "payload", hit)
     graph_id = str(getattr(hit, "graph_id", "") or "")
     nid = str(getattr(hit, "id", getattr(payload, "id", "")) or "")
@@ -121,6 +139,14 @@ def evidence_from_chunk(
     score: float,
     retrieval_method: str,
 ) -> Evidence:
+    """Wrap a paper/ops text chunk dict as ``Evidence``.
+
+    Args:
+        chunk: Chunk record; ``corpus == "bl1101"`` marks ops material, anything
+            else is literature. A non-integer ``page`` becomes None.
+        score: Retrieval score.
+        retrieval_method: Name of the retrieval path that produced the chunk.
+    """
     corpus = str(chunk.get("corpus") or "literature")
     source_type = "ops" if corpus == "bl1101" else "literature"
     page = chunk.get("page")
@@ -157,4 +183,5 @@ def evidence_from_chunk(
 
 
 def tagged_source_types(items: Sequence[Evidence]) -> List[str]:
+    """Return each item's ``source_type``, in order."""
     return [item.source_type for item in items]

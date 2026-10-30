@@ -108,8 +108,10 @@ class LegacyReadPath:
         source_rag: Optional[bool] = None,
         use_live_tiled: Optional[bool] = None,
     ) -> Any:
-        """Same contract as ``AgentPipelineService._query_retrieval``'s agent call: returns the
-        legacy verdict unchanged or raises the original exception."""
+        """Answer ``question`` with the same contract as ``AgentPipelineService._query_retrieval``'s agent call.
+
+        Returns the legacy verdict unchanged or raises the original exception.
+        """
         ctx = self._context_factory()
         if self.route is QaRoute.SUPERVISOR:
             supervised = await self.application.answer_via_supervisor(

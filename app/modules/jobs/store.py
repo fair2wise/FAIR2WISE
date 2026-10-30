@@ -306,7 +306,8 @@ class JobStore:
             created_by: Only jobs whose ``created_by`` is this subject; ``None`` for any creator.
             within_scope: Only jobs whose ``inputs.corpus_scope`` is a subset of these corpora (a job
                 with an empty scope always qualifies); ``None`` for any scope.
-            state / kind: Optional equality filters.
+            state: Only jobs in this state; ``None`` for any.
+            kind: Only jobs of this kind; ``None`` for any.
             limit: Maximum rows, clamped to 1..1000, applied after every filter.
         """
         clauses: List[str] = []

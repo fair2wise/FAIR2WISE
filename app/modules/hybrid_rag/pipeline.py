@@ -31,6 +31,11 @@ def _utcnow() -> str:
 
 
 def literature_index_root(root: Optional[Path] = None) -> Path:
+    """Return the literature index directory.
+
+    The HYBRID_RAG_LITERATURE_INDEX environment variable wins; otherwise the
+    default under `root` (or the repository root).
+    """
     override = os.environ.get("HYBRID_RAG_LITERATURE_INDEX")
     if override:
         return Path(override)
@@ -38,6 +43,11 @@ def literature_index_root(root: Optional[Path] = None) -> Path:
 
 
 def ops_index_root(root: Optional[Path] = None) -> Path:
+    """Return the ops index directory.
+
+    The HYBRID_RAG_OPS_INDEX environment variable wins; otherwise the default
+    under `root` (or the repository root).
+    """
     override = os.environ.get("HYBRID_RAG_OPS_INDEX")
     if override:
         return Path(override)
@@ -68,6 +78,16 @@ def build_literature_index(
     limit: int = 12,
     incremental: bool = True,
 ) -> Dict[str, Any]:
+    """Build or incrementally refresh the literature chunk index and return its metadata.
+
+    Args:
+        dest: Index directory; defaults to `literature_index_root(root)`.
+        root: Repository root used to locate documents.
+        mode: Document selection mode passed to `select_literature_docs`.
+        limit: Maximum number of documents selected.
+        incremental: Keep chunks of unchanged documents (matched by SHA-256)
+            and only re-chunk new or changed ones.
+    """
     base = Path(root or repo_root())
     out = Path(dest or literature_index_root(base))
     docs = select_literature_docs(root=base, mode=mode, limit=limit)
@@ -144,6 +164,14 @@ def build_ops_index(
     root: Optional[Path] = None,
     incremental: bool = True,
 ) -> Dict[str, Any]:
+    """Build or incrementally refresh the ops-document chunk index and return its metadata.
+
+    Args:
+        dest: Index directory; defaults to `ops_index_root(root)`.
+        root: Repository root used to locate documents.
+        incremental: Keep chunks of unchanged documents (matched by SHA-256)
+            and only re-chunk new or changed ones.
+    """
     base = Path(root or repo_root())
     out = Path(dest or ops_index_root(base))
     docs = collect_ops_docs(root=base)
@@ -225,6 +253,7 @@ class HybridSourceRAG:
 
     @classmethod
     def from_env(cls) -> "HybridSourceRAG":
+        """Create an instance using the environment-derived default index locations."""
         return cls()
 
     def retrieve_chunks(
@@ -237,6 +266,7 @@ class HybridSourceRAG:
         kg_entity_ids: Optional[Sequence[str]] = None,
         k: int = 12,
     ) -> List[Evidence]:
+        """Retrieve up to `k` evidence chunks; returns [] (and logs) if retrieval fails."""
         try:
             return self.retriever.retrieve(
                 question,
@@ -263,6 +293,12 @@ class HybridSourceRAG:
         kg_entity_ids: Optional[Sequence[str]] = None,
         char_budget: int = 6000,
     ) -> Dict[str, Any]:
+        """Retrieve, rank and pack source evidence for a question.
+
+        Returns a dict with the inferred ``intent``, ranked ``evidence``, the
+        built ``source_context`` (within `char_budget`), ``chunk_count`` and
+        the ``literature_available`` / ``ops_available`` flags.
+        """
         intent = infer_intent(question, layout=layout, numeric=numeric)
         kg_evidence = [kg_evidence_from_hit(hit) for hit in kg_hits]
         if layout:

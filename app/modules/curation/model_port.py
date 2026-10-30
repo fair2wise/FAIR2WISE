@@ -97,6 +97,11 @@ class ChatClientAdapter:
         self._probe = cost_probe
 
     def complete(self, prompt: str, *, ref: ModelRef, timeout: float) -> ModelReply:
+        """Send `prompt` to the client built for `ref` and return its reply.
+
+        Raises:
+            ModelCallError: The call failed; other exceptions are translated by ``_translate``.
+        """
         client = self._factory(ref)
         call = getattr(client, "_chat_unadmitted", None)
         try:

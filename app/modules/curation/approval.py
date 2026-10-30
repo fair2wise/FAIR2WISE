@@ -104,8 +104,11 @@ def check_cost_approval(
     amount_usd: float,
     now: Optional[datetime] = None,
 ) -> None:
-    """Refuse unless ``approval`` is valid, unexpired, covers corpus and model, and has headroom for
-    ``amount_usd``."""
+    """Refuse remote resolution unless the cost approval permits this spend.
+
+    The approval must be valid, unexpired, cover corpus and model, and have headroom for
+    ``amount_usd``.
+    """
     if approval is None:
         raise ContractError(ErrorCode.DENIED, "remote resolution requires an explicit cost approval")
     stored, status = load_cost_approval(store, approval.approval_id)

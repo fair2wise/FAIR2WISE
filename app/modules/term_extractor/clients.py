@@ -1,3 +1,5 @@
+"""Chat-completion clients (Ollama, CBORG) with LLM-call tracing."""
+
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -44,6 +46,8 @@ def _traced_chat(model: str, prompt: str, trace_label: Optional[str], timeout: i
 
 
 class ChatClient(ABC):
+    """Backend-agnostic interface for single-prompt chat completions."""
+
     @abstractmethod
     def chat(
         self,
@@ -52,10 +56,14 @@ class ChatClient(ABC):
         temperature: float = 0.0,
         timeout: int = 240,
         trace_label: Optional[str] = None,
-    ) -> str: ...
+    ) -> str:
+        """Send ``prompt`` as one user message and return the reply text."""
+        ...
 
 
 class OllamaChatClient(ChatClient):
+    """Chat client for a local Ollama server (``/api/chat``, non-streaming)."""
+
     def __init__(self, model: str, base_url: str):
         self.model = model
         self.base = base_url.rstrip("/")
@@ -68,6 +76,17 @@ class OllamaChatClient(ChatClient):
         timeout: int = 240,
         trace_label: Optional[str] = None,
     ) -> str:
+        """Send ``prompt`` as a single user message and return the reply text.
+
+        Args:
+            prompt: User message content.
+            temperature: Sampling temperature.
+            timeout: HTTP timeout in seconds.
+            trace_label: Label recorded for the LLM-call trace; defaults to "chat".
+
+        Raises:
+            requests.HTTPError: If the server returns an error status.
+        """
         logger.debug("OllamaClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
 
         def call() -> str:
@@ -87,9 +106,11 @@ class OllamaChatClient(ChatClient):
 
 
 class CBorgChatClient(ChatClient):
-    """OpenAI-compatible CBORG client (https://api.cborg.lbl.gov).
+    """OpenAI-compatible CBORG client for https://api.cborg.lbl.gov.
+
     Env: CBORG_API_KEY, CBORG_BASE_URL
     """
+
     def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
         import os
         self.model = model
@@ -107,6 +128,14 @@ class CBorgChatClient(ChatClient):
         timeout: int = 240,
         trace_label: Optional[str] = None,
     ) -> str:
+        """Send ``prompt`` as a single user message and return the streamed reply text.
+
+        Args:
+            prompt: User message content.
+            temperature: Sampling temperature.
+            timeout: Request timeout in seconds.
+            trace_label: Label recorded for the LLM-call trace; defaults to "chat".
+        """
         logger.debug("CBorgClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
 
         def call() -> str:
@@ -133,6 +162,18 @@ def make_chat_client(
     cborg_base: Optional[str] = None,
     cborg_api_key: Optional[str] = None,
 ) -> ChatClient:
+    """Create a chat client for the named backend.
+
+    Args:
+        backend: ``"ollama"`` (default when empty) or ``"cborg"`` / ``"cborg-openai"``.
+        model: Model name passed to the client.
+        ollama_url: Ollama server base URL (ollama backend only).
+        cborg_base: Override for the CBORG base URL (cborg backends only).
+        cborg_api_key: Override for the CBORG API key (cborg backends only).
+
+    Raises:
+        ValueError: If ``backend`` is not recognized.
+    """
     b = (backend or "ollama").lower()
     logger.debug("make_chat_client: backend=%s model=%s", b, model)
     if b == "ollama":

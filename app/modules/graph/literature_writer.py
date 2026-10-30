@@ -66,8 +66,10 @@ def link_spec(graph_id: str, edge_id: str, edge: Mapping[str, Any]) -> LinkSpec:
 
 
 def state_uri(graph_id: str, node_id: str, state: str, plan_tag: str) -> str:
-    """URI of an in-flight (``pending``) or superseded (``retired``) revision. Not a literature URI,
-    so the T08A readers treat such an entity as foreign and never return it."""
+    """Return the URI of an in-flight (``pending``) or superseded (``retired``) revision.
+
+    Not a literature URI, so the T08A readers treat such an entity as foreign and never return it.
+    """
     return f"{ida.URI_PREFIX}{quote(graph_id, safe='')}/{state}/{quote(node_id, safe='')}/{plan_tag}"
 
 

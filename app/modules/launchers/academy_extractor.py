@@ -63,6 +63,11 @@ async def run(
     max_workers: int,
     log_file: str | None,
 ) -> None:
+    """Launch a ``TermExtractorAgent`` on the Globus Compute endpoint and extract terms from `data_dir`.
+
+    Requires ``GLOBUS_COMPUTE_ENDPOINT_ID`` in the environment (``KeyError`` otherwise); the CBORG
+    key and base URL are read from ``CBORG_API_KEY`` / ``CBORG_BASE_URL``.
+    """
     user_agent_handle = _load_user_agent_handle()
 
     endpoint_id = os.environ["GLOBUS_COMPUTE_ENDPOINT_ID"]
@@ -108,6 +113,7 @@ async def run(
 
 
 def main() -> None:
+    """Parse command-line arguments and run :func:`run` under asyncio."""
     parser = argparse.ArgumentParser(
         description="Run term extraction on HPC via Academy"
     )

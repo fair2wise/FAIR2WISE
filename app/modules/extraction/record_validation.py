@@ -537,10 +537,16 @@ def run_validation_stage(
     peaks. Withheld proposals are returned for review and never reach the sink.
 
     Args:
+        result: Extraction result whose observations are validated.
+        document: Parsed document the observations are checked against.
+        sink: Evidence sink that receives the accepted quantities.
+        pub_path: Publication path recorded on evidence and used for the default ``source_paper``.
+        prompt_version: Prompt revision recorded on the written evidence.
         schema_set: ``None`` (default) keeps the base schema and maps nothing. ``"0.3.0"``
             also builds a candidate 0.3.0 payload (gate ``new_schema_slots``), which
             additionally needs ``allow_pending_review=True`` until the owner signs off
             the T22C schema diff.
+        allow_pending_review: Permit a schema set that is still pending owner review.
         source_paper: File name recorded on 0.3.0 nodes (defaults to the last part of ``pub_path``).
     """
     from . import H3_GATES, require_gate

@@ -125,6 +125,7 @@ class TermMergeIndex:
 
     @property
     def ntotal(self) -> int:
+        """Number of names currently indexed."""
         with self._lock:
             return len(self._names)
 

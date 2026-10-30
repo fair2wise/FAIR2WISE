@@ -1106,6 +1106,7 @@ class Dashboard:
         t.start()
 
     def agent_heartbeat(self, sender: str) -> None:
+        """Record that an agent is alive and notify dashboard subscribers."""
         with self._lock:
             if sender not in self._agents:
                 self._agents[sender] = {'last_seen': time.time()}
@@ -1113,6 +1114,7 @@ class Dashboard:
 
     def _find_facility_logo(self, org: str, fqdn: str) -> str | None:
         """Return /assets/<filename> if any logo file keyword matches org.
+
         We ignore fqdn for now.
         """
         if not _os.path.isdir(_ASSETS_DIR):
@@ -1124,6 +1126,7 @@ class Dashboard:
         return '/assets/logo-Academy-2025-200x200-dark-bg.png'
 
     def register_agent(self, sender: str, reg: Registration) -> None:
+        """Store an agent's registration details (with normalised geolocation) and broadcast them."""
         raw = dict(reg.geolocation)  # copy so we can mutate
         # ipinfo.io returns location as "lat,lon" in a single 'loc' field.
         # Normalise to separate float keys so the JS can use d.geo.lat directly.
@@ -1159,6 +1162,7 @@ class Dashboard:
         self._broadcast('registration', data)
 
     def push_log(self, sender: str, msg: Log) -> None:
+        """Append a log entry (keeping the newest 2000) and broadcast it."""
         logger.warning(f'Pushing log {msg.agent_name=}  {msg.agent_id=}')
         entry: dict[str, Any] = {
             'ts': time.strftime('%H:%M:%S'),
@@ -1174,6 +1178,7 @@ class Dashboard:
         self._broadcast('log', entry)
 
     def push_stats(self, sender: str, stats: Stats) -> None:
+        """Update an agent's resource stats and broadcast them."""
         data: dict[str, Any] = {
             'agent': sender,
             'cpu_percent': stats.cpu_percent,
@@ -1191,6 +1196,7 @@ class Dashboard:
         sender: str,
         prompt: UserPrompt,
     ) -> str:
+        """Queue a user prompt from an agent, broadcast it, and return its id."""
         agent_name = self._agents[sender]['agent_name']
         entry: dict[str, Any] = {
             'id': f'{time.time():.6f}',
@@ -1207,6 +1213,7 @@ class Dashboard:
         return entry['id']
 
     def submit_response(self, prompt_id: str, response: str) -> None:
+        """Record the response to a prompt, remove it from the queue and wake any waiter."""
         with self._lock:
             self._prompts = [p for p in self._prompts if p['id'] != prompt_id]
             self._prompt_results[prompt_id] = response
@@ -1215,6 +1222,7 @@ class Dashboard:
             event.set()
 
     def wait_for_response(self, prompt_id: str) -> str:
+        """Block until the prompt is answered; return the response (empty if dismissed or unknown)."""
         with self._lock:
             event = self._prompt_events.get(prompt_id)
         if event is not None:
@@ -1224,6 +1232,7 @@ class Dashboard:
             return self._prompt_results.pop(prompt_id, '')
 
     def dismiss_prompt(self, prompt_id: str) -> None:
+        """Dismiss a prompt by submitting an empty response."""
         self.submit_response(prompt_id, '')
 
     def set_shutdown_callback(self, callback: Any) -> None:

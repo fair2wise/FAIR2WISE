@@ -58,9 +58,11 @@ class VocabEntry:
     smiles: str = ""
 
     def compiled_patterns(self) -> List["re.Pattern[str]"]:
+        """Compile this entry's regex patterns, case-insensitively."""
         return [re.compile(p, re.IGNORECASE) for p in self.patterns]
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the entry as a plain, JSON-serializable dict (tuples become lists)."""
         return {
             "slug": self.slug,
             "display_name": self.display_name,
@@ -153,9 +155,11 @@ class Vocabulary:
 
     @property
     def approved(self) -> bool:
+        """Whether the vocabulary has been approved."""
         return self.status == "approved"
 
     def get(self, slug: str) -> Optional[VocabEntry]:
+        """Return the entry with exactly this slug, or ``None``."""
         return self._by_slug.get(slug)
 
     def match(self, term: str, category: Optional[str] = None) -> Optional[VocabEntry]:
@@ -220,6 +224,7 @@ class Vocabulary:
         return None
 
     def entries_for(self, category: str) -> List[VocabEntry]:
+        """Return the entries belonging to `category`."""
         return [e for e in self.entries if e.category == category]
 
 

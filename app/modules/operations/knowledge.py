@@ -460,6 +460,8 @@ class KnowledgeOperations:
                 here through :func:`~app.modules.deployment.tiled_config.load_tiled_settings`,
                 or a ready ``TiledSettings``.
             root: Project root (``Path.cwd()`` when ``None``) for ``storage/kg`` and ``storage/terminology``.
+            artifact_store: Optional ``DocumentStore`` for the private full report of a direct call.
+            graph_max_records: Record cap passed to the graph operations as ``max_records``.
             discovery_ttl: Seconds the discovered Tiled graph ids stay cached.
 
         On ``:local`` the managed loopback server is located by its manifest and read with the

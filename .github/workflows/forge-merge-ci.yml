@@ -95,6 +95,41 @@ jobs:
         if: always()
         with: { name: full-junit, path: full.xml }
 
+  python-quality:
+    # T27 (docs/migration/reviews/H7/sniff_findings.md): measures typing, docstring, pathlib,
+    # print, import-order and coverage findings. Report only: every tool step tolerates its own
+    # failure so the numbers are always produced; promote a step to a gate once its count is 0.
+    # Configuration lives in pyproject.toml; tool versions in requirements/quality.txt.
+    name: Code quality report (T27, not gating)
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip }
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements/dev.txt -r requirements/quality.txt
+      - name: Lint counts (ruff UP, T20, PTH, D) and import order (isort)
+        run: |
+          mkdir -p quality
+          ruff check app --statistics --exit-zero | tee quality/ruff_statistics.txt
+          ruff check app --output-format concise --exit-zero > quality/ruff_findings.txt
+          isort --check-only app > quality/isort.txt 2>&1 || true
+          echo "isort files needing changes: $(grep -c '^ERROR' quality/isort.txt || true)"
+      - name: Types (mypy --strict)
+        run: mypy 2>&1 | tee quality/mypy.txt | tail -n 3 || true
+      - name: Coverage (full suite, T27 80% target per module)
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            python -m pytest -q -p no:cacheprovider --cov --cov-report= || true
+          coverage report --skip-empty > quality/coverage.txt || true
+          tail -n 3 quality/coverage.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with: { name: quality-report, path: quality }
+
   python-tiled-suites:
     # The ~260 tests behind tests/fixtures/tiled_server.py skip without F2W_TILED_PYTHON.
     # This job gives them the same isolated tiled[server]==0.2.18 environment as the
@@ -159,6 +194,17 @@ jobs:
         run: |
           flake8 . --select=E9,F63,F7,F82 --format='%(path)s %(code)s %(text)s' | sort > lint.txt || true
           diff -u docs/migration/reviews/H0/known_lint.txt lint.txt
+      - name: Pyflakes (all F codes) on app/ vs known violations (T27)
+        # Stricter than the step above: unused imports/variables, shadowing and f-strings without
+        # placeholders in app/ (legacy/ excluded). The recorded set is the baseline at T27; a new
+        # violation fails, a fixed one fails too until it is removed from the file, so the list
+        # only shrinks. Some F401 entries are intentional re-exports (e.g. coordinator agent
+        # classes, multi_kg names in f2w_agent/api.py): clear them with `# noqa: F401` plus a
+        # reason, then drop the line. Line numbers are dropped because they shift.
+        run: |
+          flake8 app --exclude=app/modules/legacy,app/graphify-out,__pycache__ --select=F \
+            --format='%(path)s %(code)s %(text)s' | sed -E 's/ from line [0-9]+//' | sort > pyflakes.txt || true
+          diff -u docs/migration/reviews/H7/known_pyflakes.txt pyflakes.txt
       - name: Legacy entrypoints importable with unchanged signatures
         run: |
           mkdir -p "$RUNNER_TEMP/home"

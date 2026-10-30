@@ -154,8 +154,11 @@ class EditJournal:
 
 def unreconciled(journal: EditJournal, *, target: str, scope: Sequence[str],
                  lineage: Iterable[str]) -> List[EditRecord]:
-    """Edits for this target/scope that were applied or acknowledged but whose effect is not in the
-    snapshot lineage being imported (``lineage``: the snapshot id and its ancestors)."""
+    """List edits for this target/scope that are not yet reflected in the imported snapshot.
+
+    These are edits that were applied or acknowledged but whose effect is not in the
+    snapshot lineage being imported (``lineage``: the snapshot id and its ancestors).
+    """
     ancestry = set(lineage)
     wanted = set(scope)
     out = []

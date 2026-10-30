@@ -151,6 +151,10 @@ class CandidateOnlyResolver:
     """Default resolver: no vocabulary, so every term is a candidate (never canonical)."""
 
     def __call__(self, surface: str, category: str, *, software: Optional[str] = None) -> Optional[ResolvedTerm]:
+        """Return a non-canonical ``ResolvedTerm`` for `surface`, or ``None`` if it is blank or has no usable slug.
+
+        An explicit SMILES surface in the ``material`` category is recorded unverified.
+        """
         surface = (surface or "").strip()
         if not surface:
             return None

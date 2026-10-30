@@ -232,4 +232,5 @@ def _html_sections(raw: str) -> List[tuple[str, str]]:
 
 
 def iter_nonempty(chunks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return the chunks whose ``text`` is non-blank, as a list."""
     return [chunk for chunk in chunks if str(chunk.get("text") or "").strip()]

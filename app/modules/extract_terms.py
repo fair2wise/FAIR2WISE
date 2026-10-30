@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""LLM-driven extraction of materials-science terms from PDFs.
+
+Combines a chat backend (Ollama or CBORG) with LinkML schema validation,
+ChEBI enrichment and property normalization, and writes the results as JSON.
+Also runnable as a script (`python3 app/modules/extract_terms.py ...`).
+"""
 
 if __name__ == "__main__" and not __package__:
     # Checkout script launch (`python3 app/modules/extract_terms.py ...`, documented in
@@ -91,8 +97,8 @@ class OllamaChatClient(ChatClient):
 
 
 class CBorgChatClient(ChatClient):
-    """
-    OpenAI-compatible CBORG client (https://api.cborg.lbl.gov).
+    """OpenAI-compatible CBORG client (https://api.cborg.lbl.gov).
+
     Use model names like: "lbl/cborg-chat", "lbl/cborg-deepthought", etc.
     Env: CBORG_API_KEY, CBORG_BASE_URL (defaults to https://api.cborg.lbl.gov)
     """
@@ -262,8 +268,8 @@ def retry_on_exception(
     retries: int = 2,
     delay_seconds: float = 1.0,
 ) -> Any:
-    """
-    Decorator that retries a function up to `retries` times if one of `exceptions` is raised.
+    """Retry a function up to `retries` times if one of `exceptions` is raised.
+
     Sleeps `delay_seconds * 2^attempt` between attempts.
     """
     def decorator(fn):
@@ -296,15 +302,17 @@ def retry_on_exception(
 
 
 class SchemaHelper:
-    """
-    Loads a LinkML schema and provides:
+    """Loads a LinkML schema and provides schema-aware term checks.
+
+    Provides:
       - RapidFuzz indexes for class‐names and slot‐names
       - Exact‐match + fuzzy suggestions
       - Domain/range validation
       - Relation filtering (drop 'description'/'category')
     """
     def __init__(self, schema_path: str = "matkg_schema.yaml", fuzzy_cutoff: int = 80):
-        """
+        """Load the schema and build the class/slot lookup indexes.
+
         Args:
             schema_path: Path to a LinkML YAML schema.
             fuzzy_cutoff: RapidFuzz score cutoff (0–100) for fuzzy matching.
@@ -449,8 +457,8 @@ class SchemaHelper:
         return broad if broad in self.slots else None
 
     def validate_and_fix_term(self, term_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Ensure 'category' is valid (fuzzy-fix if needed).
+        """Ensure 'category' is valid (fuzzy-fix if needed).
+
         Filter out any relations named 'description' or 'category'.
         For each remaining relation:
           - If slot exists → keep verified=True
@@ -544,9 +552,7 @@ class SchemaHelper:
         return self._is_subclass_of(p, parent)
 
     def check_relation_validity(self, subj_cls: str, pred: str, obj_cls: str) -> bool:
-        """
-        Verify domain/range of (subj_cls, pred, obj_cls). Return False if invalid.
-        """
+        """Verify domain/range of (subj_cls, pred, obj_cls). Return False if invalid."""
         if pred not in self.slots:
             return False
         slot = self.slots[pred]
@@ -565,8 +571,8 @@ class SchemaHelper:
 
 
 class LLMTermExtractor:
-    """
-    Extracts terms from PDFs using a local Ollama LLM + LinkML schema validation.
+    """Extracts terms from PDFs using an LLM backend + LinkML schema validation.
+
     - Drops 'description'/'category' relations
     - Records unverified relations with {"verified": false}
     - Ensures every ChemicalEntity gets a formula_validation entry (or 'missing')
@@ -590,9 +596,10 @@ class LLMTermExtractor:
         merge_embed_model: str = "",
         merge_index: TermMergeIndex | None = None,
     ):
-        """
+        """Configure the extractor and load any previously saved results.
+
         Args:
-            ollama_model: Ollama model specifier.
+            model_name: Ollama model specifier.
             ollama_base_url: Base URL of Ollama API.
             temperature: LLM sampling temperature.
             data_dir: Directory with PDFs.
@@ -600,7 +607,15 @@ class LLMTermExtractor:
             context_length: Tokens of context snippet.
             schema_path: Path to LinkML schema.
             max_workers: Parallel workers for pages.
+            chat_client: Pre-built chat client; when None, an Ollama-backed
+                client is built from `model_name` and `ollama_base_url`.
             chebi_obo_path: Optional ChEBI OBO path for chemical enrichment.
+            merge_top_k: Number of nearest existing terms offered to the
+                duplicate-merge step (clamped to at least 1).
+            merge_embed_model: Embedding model for the merge index; empty
+                means the module default.
+            merge_index: Pre-built merge index; when None, one is created
+                from `merge_embed_model` and `merge_top_k`.
         """
         self.model_name = model_name
         self.ollama_base_url = ollama_base_url.rstrip("/")
@@ -694,9 +709,7 @@ class LLMTermExtractor:
 
     @retry_on_exception((Exception,), retries=2, delay_seconds=1.0)
     def extract_json_from_text(self, text: str) -> Dict[str, Any]:
-        """
-        Extract largest JSON object containing "terms". Return {"terms": []} if none.
-        """
+        """Extract largest JSON object containing "terms". Return {"terms": []} if none."""
         pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
         matches = list(re.finditer(pattern, text))
         matches.sort(key=lambda m: -len(m.group(0)))
@@ -712,9 +725,7 @@ class LLMTermExtractor:
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
     def _extract_snippets_json_from_text(self, text: str) -> Dict[str, Any]:
-        """
-        Extract largest JSON object containing "snippets". Return {"snippets": []} if none.
-        """
+        """Extract largest JSON object containing "snippets". Return {"snippets": []} if none."""
         pattern = r"\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}"
         matches = list(re.finditer(pattern, text))
         matches.sort(key=lambda m: -len(m.group(0)))
@@ -742,8 +753,8 @@ class LLMTermExtractor:
         return bool(re.search(r"[A-Z][a-z]?[\d]", s or ""))
 
     def _postprocess_term(self, term: Dict[str, Any], context: str) -> Dict[str, Any]:
-        """
-        Ensure every ChemicalEntity has 'formula_validation'.
+        """Ensure every ChemicalEntity has 'formula_validation'.
+
         If formula string exists and looks like a formula → validate/repair.
         Otherwise set formula=None and status="missing".
         """
@@ -823,9 +834,7 @@ class LLMTermExtractor:
         return None
 
     def _register_new_term(self, display_text: str) -> str:
-        """
-        Register new term → key, return lowercase key.
-        """
+        """Register new term → key, return lowercase key."""
         key = self.normalize_term(display_text)
         self._bk_terms[display_text] = key
         self._merge_index.add(display_text)
@@ -835,9 +844,7 @@ class LLMTermExtractor:
     def get_context_snippet(
         self, full_text: str, term: str, filename: str, page_num: int
     ) -> Dict[str, Union[str, int]]:
-        """
-        Extract ~context_length tokens around `term`. Return snippet + source/page.
-        """
+        """Extract ~context_length tokens around `term`. Return snippet + source/page."""
         sentences = re.split(r"(?<=[\.\!\?])\s+", full_text)
         low = term.lower()
         for sent in sentences:
@@ -849,9 +856,10 @@ class LLMTermExtractor:
         return {"text": snippet, "source_paper": filename, "page": page_num + 1}
 
     def _prepare_prompt(self, schema_ctx: str, filename: str, page_num: int, text: str) -> str:
-        """
-        Build terms extraction prompt. Extracts materials-science entities and
-        publication metadata. Code extraction is handled separately by regex.
+        """Build the terms-extraction prompt.
+
+        Extracts materials-science entities and publication metadata. Code
+        extraction is handled separately by regex.
         """
         max_len = 8000
         page_text = text[-max_len:] if len(text) > max_len else text
@@ -987,8 +995,8 @@ INSTRUCTIONS:
                 logger.error(f"Failed to save code snippets: {e}")
 
     def _prepare_code_snippet_prompt(self, page_text: str, schema_helper: SchemaHelper) -> str:
-        """
-        Prompt for scientific CONTEXT around code snippets.
+        """Build the prompt for scientific CONTEXT around code snippets.
+
         Code bodies are extracted by regex — not by LLM.
         Returns JSON with "snippets" keyed by function_name → domain metadata.
         """
@@ -1077,8 +1085,7 @@ Output JSON:
         source_paper: str = "",
         page: int = 0,
     ) -> List[Dict]:
-        """
-        Extract code snippets from a page.
+        """Extract code snippets from a page.
 
         Strategy:
           1. Regex extracts ALL named code blocks (def/class/function) deterministically.
@@ -1172,10 +1179,10 @@ Output JSON:
         page_num: int,
         pub_meta: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """
-        Run code-snippet extraction for one page, dedup into
-        `self.code_snippets`, and save (thread-safe). Returns True if new
-        snippets were added.
+        """Run code-snippet extraction for one page and save new snippets.
+
+        Results are deduplicated into `self.code_snippets` and saved
+        (thread-safe). Returns True if new snippets were added.
         """
         snippets = self.extract_code_snippets(
             page_text,
@@ -1267,8 +1274,9 @@ Output JSON:
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
     def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int, pub_year: Optional[int] = None, pub_meta: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Process one page:
+        """Process one page.
+
+        Steps:
         - Extract text
         - Call LLM for JSON
         - Validate/fix each term
@@ -1507,9 +1515,9 @@ Output JSON:
         return added_or_updated or prop_updated or snippets_updated
 
     def _extract_and_attach_properties(self, full_text: str) -> bool:
-        """
-        Find numeric property mentions for any known material names in full_text,
-        normalize them, and merge into `self.terms_dict`.
+        """Attach numeric property mentions to known materials found in full_text.
+
+        Properties are normalized and merged into `self.terms_dict`.
         Returns True if any properties were added or updated.
         """
         if not self.terms_dict:
@@ -1551,8 +1559,8 @@ Output JSON:
         return updated
 
     def _extract_year_from_pdf(self, doc: fitz.Document, pdf_path: str) -> Optional[int]:
-        """
-        Attempt to extract publication year from PDF metadata or first-page text.
+        """Attempt to extract publication year from PDF metadata or first-page text.
+
         Delegates to _extract_pub_metadata for the full date-aware logic.
         Returns a 4-digit year int or None.
         """
@@ -1560,8 +1568,8 @@ Output JSON:
         return meta.get("publication_year")
 
     def _extract_pub_metadata(self, doc: fitz.Document, pdf_path: str) -> Dict[str, Any]:
-        """
-        Extract publication metadata from PDF metadata fields and first-page text.
+        """Extract publication metadata from PDF metadata fields and first-page text.
+
         Returns a dict with keys: publication_year, paper_title, authors,
         institutions, doi, journal, volume, issue, pages_range, abstract_text, keywords.
         All values are None or [] if not found.
@@ -1762,8 +1770,8 @@ Output JSON:
         return result
 
     def process_pdf(self, pdf_path: str) -> int:
-        """
-        Open PDF and process all pages in parallel.
+        """Open PDF and process all pages in parallel.
+
         Returns number of pages that added/updated ≥1 term or property.
         Updates metadata['processed_pages_total'] and 'processed_pages_with_terms'.
         """
@@ -1853,8 +1861,8 @@ Output JSON:
         return pages_with_terms
 
     def process_directory(self) -> Dict[str, Any]:
-        """
-        Walk data_dir for all PDFs, process them, then compute final importance metrics.
+        """Walk data_dir for all PDFs, process them, then compute final importance metrics.
+
         Saves output JSON one final time.
         """
         if not os.path.isdir(self.data_dir):
@@ -1925,8 +1933,7 @@ def run_extraction(
     merge_top_k: int = DEFAULT_MERGE_TOP_K,
     merge_embed_model: str = "",
 ) -> dict:
-    """
-    Run term extraction on a folder of PDFs and write the results JSON.
+    """Run term extraction on a folder of PDFs and write the results JSON.
 
     Args:
         pdf_dir: Directory containing input PDFs.
@@ -1941,6 +1948,10 @@ def run_extraction(
         temperature: Sampling temperature for the LLM.
         context_length: Max tokens to keep in context snippets.
         max_workers: Page-level parallelism.
+        merge_top_k: Number of nearest existing terms offered to the
+            duplicate-merge step.
+        merge_embed_model: Embedding model for the merge index; empty means
+            the module default.
 
     Returns:
         Result dict returned by `process_directory()` including counts and output path.

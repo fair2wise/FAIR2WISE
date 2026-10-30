@@ -126,6 +126,7 @@ class OpaquePaths:
     """
 
     def __init__(self, **roots: Any) -> None:
+        """Register the roots; empty values are skipped and relative paths resolve against the cwd."""
         self._roots: Dict[str, Path] = {}
         pairs: List[Tuple[str, str]] = []
         for label, raw in roots.items():
@@ -187,6 +188,7 @@ class OwnerRegistry:
     """
 
     def __init__(self, path: Optional[Path] = None) -> None:
+        """Load the persisted owners if ``path`` exists; an unreadable file is logged and ignored."""
         self._path = path
         self._lock = threading.Lock()
         self._data: Dict[str, Dict[str, str]] = {"sessions": {}, "turns": {}}
@@ -240,6 +242,7 @@ class PersonalSettingsStore:
     """
 
     def __init__(self, path: Optional[Path] = None) -> None:
+        """Load the persisted settings if ``path`` exists; an unreadable file is logged and starts empty."""
         self._path = path
         self._lock = threading.Lock()
         self._data: Dict[str, Dict[str, Any]] = {}
@@ -305,6 +308,7 @@ class LegacyUiGuard:
                  owners: OwnerRegistry, session_key: Callable[[Optional[str]], str],
                  source_authority: Optional[SourceAccessAuthority] = None,
                  personal_settings: Optional[PersonalSettingsStore] = None) -> None:
+        """Bind the collaborators; without ``source_authority`` a new ``SourceAccessAuthority`` is created."""
         self.runtime = runtime
         self.projector = projector
         #: Trusted startup wiring (ADR rule A1): the only issuer of quote-verification grants.

@@ -1,0 +1,1 @@
+"""FAIRtoWISE application modules."""

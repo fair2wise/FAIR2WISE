@@ -52,6 +52,7 @@ class MergeOp:
     votes: Tuple[str, ...] = ()
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable dict with tuples as lists and confidence rounded to 4 places."""
         return {
             "term_key": self.term_key,
             "category": self.category,
@@ -68,12 +69,17 @@ class MergeOp:
 class MergeTarget(Protocol):
     """A graph-side adapter. The default flow supplies none."""
 
-    def source_revision(self) -> str: ...
+    def source_revision(self) -> str:
+        """Return the revision of the graph rows, compared with the plan's ``source_revision``."""
+        ...
 
-    def merge(self, op: MergeOp) -> None: ...
+    def merge(self, op: MergeOp) -> None:
+        """Fold the operation's nodes into its target vocabulary entry; may raise on failure."""
+        ...
 
 
 def sha256_json(value: Any) -> str:
+    """Return the SHA-256 hex digest of ``value`` as canonical JSON (sorted keys, compact, sets as lists)."""
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=list).encode()
     ).hexdigest()
@@ -95,6 +101,7 @@ class ScopedMergePlan:
     version: str = PLAN_VERSION
 
     def body(self) -> Dict[str, Any]:
+        """Return the hashed content: every field except the id, hash and ``plan_sha256``."""
         return {
             "version": self.version,
             "scope": list(self.scope),
@@ -152,6 +159,7 @@ class ScopedMergePlan:
         )
 
     def verify_hash(self) -> bool:
+        """Return True if ``plan_sha256`` matches the body and ``plan_id`` derives from it."""
         return sha256_json(self.body()) == self.plan_sha256 and self.plan_id == "t07-" + self.plan_sha256[:16]
 
     def to_change_plan(self) -> ChangePlan:

@@ -40,6 +40,8 @@ REJECT_KINDS = (
 
 @dataclass(frozen=True)
 class ResolverConfig:
+    """Acceptance floor and call/prompt budgets for the resolver; ``model`` is only recorded on verdicts."""
+
     min_confidence: float = 0.8
     max_calls: int = 1000
     max_prompt_tokens: int = 1500
@@ -64,6 +66,11 @@ class StructuredTermResolver:
         self.output_tokens = 0
 
     def build_prompt(self, ev: TermEvidence, framing: str) -> str:
+        """Render the judge prompt for ``ev`` under ``framing``.
+
+        Snippets are dropped from the end until the prompt fits
+        ``config.max_prompt_tokens`` (or none remain).
+        """
         menu = "\n".join(f"- {m.slug}: {m.display_name}" for m in ev.menu) or "(empty)"
         snippets = list(ev.snippets)
         while True:
@@ -89,6 +96,14 @@ class StructuredTermResolver:
             snippets.pop()
 
     def resolve(self, ev: TermEvidence, *, round_key: str, framing: str = "menu_first") -> TermVerdict:
+        """Ask the judge about one term and return a verdict, accepted or not.
+
+        Judge failures, unparseable replies, unknown verdicts and an exhausted call
+        budget yield an ``abstain`` verdict with the cause in ``errors``.
+
+        Raises:
+            ValueError: If ``framing`` is not in ``FRAMINGS``.
+        """
         if framing not in FRAMINGS:
             raise ValueError(f"unknown framing {framing!r}")
         prompt = self.build_prompt(ev, framing)

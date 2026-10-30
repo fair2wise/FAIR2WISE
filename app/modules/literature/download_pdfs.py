@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-download_pdfs (canonical module; ``scripts/download_pdfs.py`` is the CLI facade)
+"""Canonical PDF downloader; ``scripts/download_pdfs.py`` is the CLI facade.
 
 Search and download full-text PDFs of papers from arXiv (or OpenAlex).
 Save each PDF to a directory with filename '[DOI].pdf'.
@@ -134,6 +133,7 @@ def _pmcid_from_text(text: str) -> Optional[str]:
 
 
 def europepmc_pdf_url(pmcid: str) -> str:
+    """Build the Europe PMC render URL for a PMC id, with or without the PMC prefix."""
     ident = pmcid if str(pmcid).upper().startswith("PMC") else f"PMC{pmcid}"
     return f"https://europepmc.org/articles/{ident.upper()}?pdf=render"
 
@@ -271,12 +271,18 @@ def _dedupe_urls(urls: Iterable[str]) -> List[str]:
 
 
 def arxiv_id_from_text(*parts: Any) -> Optional[str]:
+    """Return the first arXiv id found in the joined text parts, or None."""
     blob = " ".join(str(part or "") for part in parts)
     match = _ARXIV_ID_RE.search(blob)
     return match.group(1) if match else None
 
 
 def pmcid_from_openalex_work(work: Dict[str, Any]) -> Optional[str]:
+    """Return the first PMC id found in an OpenAlex work record, or None.
+
+    Checks the work's ``ids``/``pmcid`` fields, then the PDF and landing-page
+    URLs of its OA, primary and other locations.
+    """
     ids = work.get("ids") if isinstance(work.get("ids"), dict) else {}
     for value in (ids.get("pmcid"), work.get("pmcid")):
         pmcid = _pmcid_from_text(str(value or ""))
@@ -444,6 +450,10 @@ def set_delay_floor(seconds: float) -> None:
 
 
 def host_delay(host: str) -> float:
+    """Return the minimum seconds to wait between requests to a host.
+
+    Uses the per-host override when present, never less than the global floor.
+    """
     hostname = (host or "").lower()
     specific = OA_HOST_DELAYS.get(hostname)
     if specific is None:
@@ -795,8 +805,8 @@ def fetch_crossref_tdm_pdfs(doi: str, *, timeout: float = 15.0) -> Tuple[List[st
 
 
 def search_arxiv(keyword: str, max_results: int):
-    """
-    Search arXiv using arxiv.py wrapper.
+    """Search arXiv using arxiv.py wrapper.
+
     Returns a list of arxiv.Result objects.
     """
     import arxiv
@@ -819,8 +829,8 @@ def _cleanup_partial(path: Path):
 
 
 def download_pdf(url: str, dest: str, retries=3):
-    """
-    Download PDF from URL and save to dest file.
+    """Download PDF from URL and save to dest file.
+
     Handles retries, timeout, streaming, and rejects non-PDF payloads.
     """
     dest_path = Path(dest)
@@ -884,6 +894,11 @@ def download_pdf(url: str, dest: str, retries=3):
 
 
 def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int):
+    """Search arXiv for `keyword` and download each result into `target_dir`.
+
+    Files are named ``[DOI].pdf`` (slashes replaced by underscores); existing
+    files are skipped.
+    """
     os.makedirs(target_dir, exist_ok=True)
     for result in search_arxiv(keyword, max_results):
         doi = (result.doi or result.get_short_id()).replace('/', '_')
@@ -898,6 +913,11 @@ def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int):
 
 
 def run_openalex_workflow(keyword: str, target_dir: str, max_results: int):
+    """Search OpenAlex titles for `keyword` and download each result into `target_dir`.
+
+    Works without a DOI or primary-location PDF URL are skipped, as are
+    files that already exist.
+    """
     from pyalex import Works
 
     os.makedirs(target_dir, exist_ok=True)
@@ -916,6 +936,7 @@ def run_openalex_workflow(keyword: str, target_dir: str, max_results: int):
 
 
 def main():
+    """Parse command-line arguments and run the selected download workflow."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--keyword', required=True)
     parser.add_argument('--target', default='./pdfs')

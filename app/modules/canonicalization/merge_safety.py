@@ -498,9 +498,10 @@ def check_merge(
     Args:
         canonical: The form the merge would keep.
         alias: The form that would fold into it.
-        canonical_class / alias_class: Schema class (or category) of each side, when known.
+        canonical_class: Schema class (or category) of the canonical side, when known.
             Different classes never merge here, even if one inherits from the other in the
             schema: inheritance relates classes, it does not make two records the same entity.
+        alias_class: Schema class (or category) of the alias side, when known; see ``canonical_class``.
 
     Returns:
         A :class:`MergeVerdict`; ``allowed=False`` carries a reviewer-readable reason.

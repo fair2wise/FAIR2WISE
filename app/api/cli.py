@@ -156,8 +156,10 @@ def run(ops: F2WOperations, args: argparse.Namespace) -> Any:
 
 
 def build_knowledge(project_root: str, graph_files: Optional[List[str]] = None) -> Any:
-    """The CLI's ``KnowledgeOperations``: ``storage/kg`` or explicit graph files, plus the
-    ``storage/terminology`` corpora."""
+    """Build the CLI's ``KnowledgeOperations``.
+
+    Reads ``storage/kg`` or the explicit graph files, plus the ``storage/terminology`` corpora.
+    """
     from ..modules.operations.corpus import CorpusAuditTool
     from ..modules.operations.knowledge import KnowledgeOperations, directory_corpus_resolver
 

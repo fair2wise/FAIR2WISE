@@ -31,6 +31,7 @@ def repo_root() -> Path:
 
 
 def sha256_file(path: Path) -> str:
+    """Return the SHA-256 hex digest of a file, read in 64 KiB blocks."""
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for block in iter(lambda: handle.read(65536), b""):
@@ -39,6 +40,11 @@ def sha256_file(path: Path) -> str:
 
 
 def work_id_for_paper(paper: Dict[str, Any]) -> str:
+    """Derive a stable work id from a harvest record.
+
+    Preference order: ``doi:<doi>`` (top-level, then any version), ``arxiv:<id>``
+    (version suffix dropped), then ``title:<slug>`` (``title:unknown`` if no title).
+    """
     doi = str(paper.get("doi") or "").strip().lower()
     if doi:
         return f"doi:{doi}"
@@ -56,6 +62,7 @@ def work_id_for_paper(paper: Dict[str, Any]) -> str:
 
 
 def resolve_pdf_path(paper: Dict[str, Any], root: Path) -> Optional[Path]:
+    """Return the paper's ``pdf_path`` (relative paths resolved against ``root``) if the file exists, else None."""
     rel = str(paper.get("pdf_path") or "").strip()
     if not rel:
         return None
@@ -66,6 +73,11 @@ def resolve_pdf_path(paper: Dict[str, Any], root: Path) -> Optional[Path]:
 
 
 def load_harvest_papers(manifest_path: Path) -> List[Dict[str, Any]]:
+    """Load paper records from a harvest manifest.
+
+    Accepts a list or a dict under ``papers`` (list or id-keyed dict). Returns an
+    empty list if the file is missing or unparseable; non-dict entries are skipped.
+    """
     if not manifest_path.is_file():
         return []
     try:

@@ -17,6 +17,7 @@ class EvidenceRanker:
         intent: str = "factual",
         limit: int = 24,
     ) -> List[Evidence]:
+        """Re-score items by source kind, query overlap and `intent`; return the top `limit`, unique by source_id."""
         weights = INTENT_WEIGHTS.get(intent) or INTENT_WEIGHTS["factual"]
         q = (query or "").casefold()
         ranked: List[Evidence] = []

@@ -47,7 +47,11 @@ class GraphRows:
 
 
 class RowSource(Protocol):
-    def read(self) -> GraphRows: ...
+    """Anything that can supply the graph rows."""
+
+    def read(self) -> GraphRows:
+        """Return the rows; ``complete`` is False when the read was only partial."""
+        ...
 
 
 def load_rows(source: RowSource) -> GraphRows:

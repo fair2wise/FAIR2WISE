@@ -1,3 +1,5 @@
+"""Academy agent that runs the term-extraction pipeline on a remote endpoint."""
+
 import asyncio
 import logging
 import os

@@ -124,7 +124,9 @@ class CurationStore:
         return out
 
     def enqueue(self, case: UncertaintyCase) -> Tuple[str, bool]:
-        """Add a case once. Re-enqueueing with a changed revision (new evidence, vocabulary or schema)
+        """Add a case once.
+
+        Re-enqueueing with a changed revision (new evidence, vocabulary or schema)
         resets it to ``pending`` and discards any earlier decision as stale.
 
         Returns:

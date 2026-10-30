@@ -108,6 +108,7 @@ class PublicLayout:
 
     @property
     def prefixed(self) -> bool:
+        """Whether a public prefix is set (False for the unprefixed developer layout)."""
         return bool(self.prefix)
 
     @property
@@ -142,6 +143,7 @@ class PublicLayout:
 
     @property
     def health_path(self) -> str:
+        """Public path of the health endpoint under the prefix."""
         return f"{self.prefix}/healthz"
 
     def as_manifest(self) -> Dict[str, str]:
@@ -281,6 +283,14 @@ def mkdocs_image_config(source: str) -> str:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Run the gateway CLI (``render-nginx``, ``check-build``, ``mkdocs-config``).
+
+    Args:
+        argv: Command-line arguments; ``sys.argv`` when ``None``.
+
+    Returns:
+        0 on success, 2 when the prefix configuration is rejected.
+    """
     parser = argparse.ArgumentParser(prog="gateway", description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     render = sub.add_parser("render-nginx", help="fill the gateway template and check the prefix")

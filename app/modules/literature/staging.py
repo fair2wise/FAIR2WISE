@@ -95,9 +95,24 @@ def save_package(
     """Write one package atomically after checking every asset it names is in the store.
 
     Args:
+        ctx: Request context under which the assets are verified and described.
+        store: Document store that must hold every asset the package names.
+        root: Directory under which the package directory (named by its key) is created.
+        work: Work metadata; its ``doi`` takes part in the package key.
+        source_ref: Store reference of the source document; it must be among the verified assets.
+        parse_record: Parse result with ``document_ref``, ``parser_key`` and optional ``asset_refs``.
+        pipeline: Pipeline description recorded with the package and fingerprinted into its key.
         extraction: Extraction result (opaque to this module), when one ran.
         extraction_requested: Whether this pipeline includes extraction.
         incomplete_chunks: Chunks whose extraction failed; makes extraction ``incomplete``.
+        timings: Optional stage timings recorded in the package.
+        identity: Optional identity record stored in the package.
+
+    Returns:
+        Path of the written ``paper.json``.
+
+    Raises:
+        PackageInvalid: An asset is missing or corrupt in the store; nothing is written.
     """
     refs = [source_ref, str(parse_record["document_ref"]), *[str(r) for r in parse_record.get("asset_refs", [])]]
     assets: Dict[str, int] = {}

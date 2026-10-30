@@ -180,6 +180,7 @@ def validate_graph(
             :class:`SchemaBindingError`; no claim gives ``legacy_unverified`` (a warning).
         selection_source: How ``entry`` was chosen (``caller``, ``default``, ``filename_pattern``...).
         helper: Existing ``SchemaHelper`` to reuse; built from ``entry`` when omitted.
+        implementation: Normalizer implementation used to build the helper when ``helper`` is omitted.
         fingerprint: Precomputed ``closure_fingerprint(entry)`` (saves one schema load).
     """
     fingerprint = fingerprint or closure_fingerprint(entry)

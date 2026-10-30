@@ -112,3 +112,26 @@ approximate (the "silent handler" count in particular includes legitimate fallba
 - Items to confirm in review: `bl1101_ingest.extract_markdown_software(repo_name)` and
   `attach_repo_terms(root)` are documented as unused parameters (candidates for removal); `RepoSpec.mode` is
   only recorded, never branched on.
+
+### 2026-10-30 (later): docstring sweep and flake8 gate
+
+- F2.1-F2.3 closed for ruff `D` under the project config (`D105`/`D107` ignored): 0 findings in `app/`
+  (about 350 further docstrings across 96 files; 109 `.py` files changed in total this session).
+  Verified by AST comparison against `HEAD` with docstrings stripped: code is identical in every file except
+  four previously empty `__init__.py` files that now hold a docstring. Edits were hand-written; the only
+  scripted pass rewrote docstring text for D200/D209/D212 and re-checked AST equality.
+- Review items from the sweep: `term_extractor/tools.py` `@tool` docstrings are sent to the LLM as tool
+  descriptions (blank line and closing quotes moved, wording kept; `fuzzy_merge_term` summary shortened);
+  `LLMTermExtractor.__init__` Args corrected (`ollama_model` -> `model_name`); `term_extractor/agent.py`
+  `build_graph` documents `llm` as required in practice (signature default `None` unchanged); `test_*`
+  functions inside `agents/properties.py` and `json2kg.py` got docstrings (F3.4 still open: they belong in
+  `tests/`); four Protocol stubs now carry a docstring above `...`.
+- Descriptions that go beyond the old text and need a reviewer read: `SchemaHelper.validate_and_fix_term`,
+  `plan_reextraction`, `ResolverConfig.model`, `work_id_for_paper`, `check_merge`, `reserve`, `load_helper`,
+  `run_validation_stage`, `from_deployment.graph_max_records`, `jobs/publish_ports.py` `from_dict`/`as_dict`,
+  `curation/routing.py` `model_route`, `hybrid_rag/ranker.py` `rank`.
+- F0.3/F0.4: `forge-merge-ci.yml` gains a pyflakes (all `F` codes) gate on `app/` against
+  `docs/migration/reviews/H7/known_pyflakes.txt` (25 recorded violations; list may only shrink);
+  `build-app.yml` no longer overrides line length (115 from `.flake8`). `E`/`W` style codes stay ungated.
+- Not run: tests needing `linkml_runtime`, `langgraph`, `academy`, `aiohttp`, `fitz` do not collect in the
+  survey environment; the first `python-quality` / baseline CI run is the real check.

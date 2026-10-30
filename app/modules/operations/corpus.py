@@ -208,8 +208,11 @@ class PaperRecord:
 
 
 def same_work(left: PaperRecord, right: PaperRecord, *, use_content_hash: bool = True) -> bool:
-    """Pairwise rule of ``harvest_rsoxs.works_same_identity`` (without stored ``versions``),
-    preceded by the content-hash step of ``work-identity/2`` unless ``use_content_hash`` is off."""
+    """Return whether two records are the same work.
+
+    Pairwise rule of ``harvest_rsoxs.works_same_identity`` (without stored ``versions``),
+    preceded by the content-hash step of ``work-identity/2`` unless ``use_content_hash`` is off.
+    """
     if left.key == right.key:
         return True
     if use_content_hash and left.content_sha256 and left.content_sha256 == right.content_sha256:

@@ -1,3 +1,5 @@
+"""LangChain tools the term-extraction agent calls to look up, validate and register terms."""
+
 import json
 import logging
 import re
@@ -18,6 +20,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ToolState:
+    """Shared mutable state handed to every tool built by ``build_tools``.
+
+    Holds the term store, schema helper, services, optional LLM callable and
+    merge index, plus the PDF/page context of the extraction in progress.
+    """
+
     store: TermStore
     schema: SchemaHelper
     services: Services
@@ -38,20 +46,37 @@ class ToolState:
         self._tls.page = page
 
     def clear_page_context(self) -> None:
+        """Reset the thread-local source paper and page (the shared paper name is kept)."""
         self._tls.source_paper = None
         self._tls.page = None
 
     def page_context(self) -> Tuple[Optional[str], Optional[int]]:
+        """Return ``(source_paper, page)`` for the current thread.
+
+        The paper falls back to the shared ``current_source_paper`` when this
+        thread has none; the page is ``None`` if it was never set on this thread.
+        """
         paper = getattr(self._tls, "source_paper", None) or self.current_source_paper
         return paper, getattr(self._tls, "page", None)
 
 
 def build_tools(state: ToolState) -> list:
+    """Build the agent tool list as closures over ``state``.
+
+    Args:
+        state: Shared tool state used by every returned tool.
+
+    Returns:
+        LangChain tools: check_existing_term, fuzzy_merge_term, validate_formula,
+        repair_formula, lookup_chebi and register_term.
+    """
     @tool
     def check_existing_term(name: str) -> str:
         """Check whether a term already exists in the knowledge base.
+
         Returns 'exact_match:<key>', 'possible_matches:<csv>', or 'not_found'.
-        If 'not_found', call fuzzy_merge_term before registering."""
+        If 'not_found', call fuzzy_merge_term before registering.
+        """
         key = TermStore.normalize(name)
         logger.debug("check_existing_term: '%s'", name)
         if state.store.get(key) is not None:
@@ -68,10 +93,13 @@ def build_tools(state: ToolState) -> list:
 
     @tool
     def fuzzy_merge_term(name: str) -> str:
-        """Ask the LLM whether a newly extracted term matches one of the nearest
-        already-registered terms (punctuation variants and acronym↔expansion pairs).
+        """Ask the LLM whether a new term matches an already-registered term.
+
+        Compares against the nearest registered terms (punctuation variants and
+        acronym↔expansion pairs).
         Call this when check_existing_term returns 'not_found'.
-        Returns 'match:<key>' if matched to an existing term, or 'no_match'."""
+        Returns 'match:<key>' if matched to an existing term, or 'no_match'.
+        """
         if not state.llm_invoke:
             return "no_match"
         cleaned = clean_term(name)
@@ -115,9 +143,11 @@ def build_tools(state: ToolState) -> list:
     @tool
     def repair_formula(formula: str, context: str) -> str:
         """Validate a chemical formula and repair it via LLM if invalid.
+
         Pass the surrounding sentence as context to help guess the correct formula.
         Returns JSON with keys: status ('valid'|'corrected'|'invalid'|'missing'|'error'),
-        formula (possibly corrected), and original (only when corrected)."""
+        formula (possibly corrected), and original (only when corrected).
+        """
         if not formula or not re.search(r"[A-Z][a-z]?[\d]", formula):
             return json.dumps({"status": "missing", "formula": None})
         try:
@@ -157,7 +187,9 @@ def build_tools(state: ToolState) -> list:
     @tool
     def lookup_chebi(name: str) -> str:
         """Look up a chemical entity by name in the ChEBI ontology.
-        Returns formula, mass, charge, SMILES, InChI, InChIKey when found."""
+
+        Returns formula, mass, charge, SMILES, InChI, InChIKey when found.
+        """
         logger.info("lookup_chebi: '%s'", name)
         if not state.services.chebi_lookup:
             return "ChEBI not available"
@@ -181,11 +213,13 @@ def build_tools(state: ToolState) -> list:
         context: Optional[str] = None,
     ) -> str:
         """Register or update an extracted materials-science term.
+
         Call even when check_existing_term or fuzzy_merge_term found a match so
         relations, context, and paper provenance can be merged onto the existing term.
         Relations must use exact predicate names from the schema.
         Pass a short context sentence as 'context'. source_paper and page default
-        to the PDF page currently being processed."""
+        to the PDF page currently being processed.
+        """
         ctx_paper, ctx_page = state.page_context()
         source_paper = source_paper or ctx_paper
         if page is None:

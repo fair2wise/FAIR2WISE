@@ -29,6 +29,8 @@ def term_key(category: str, folded: str) -> str:
 
 @dataclass(frozen=True)
 class Snippet:
+    """A source passage (publication and section) quoted as evidence for a term."""
+
     publication_id: str
     section_id: str
     text: str
@@ -36,6 +38,8 @@ class Snippet:
 
 @dataclass(frozen=True)
 class MenuEntry:
+    """A candidate vocabulary entry offered to a resolver as a possible mapping target."""
+
     slug: str
     display_name: str
     category: str
@@ -66,6 +70,8 @@ class TermEvidence:
 
 @dataclass(frozen=True)
 class TermVerdict:
+    """The outcome of one resolver round/framing for one term, with cost and acceptance."""
+
     term_key: str
     round_key: str
     framing: str
@@ -85,6 +91,7 @@ class TermVerdict:
     output_tokens: int = 0
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the record as a plain dict."""
         return asdict(self)
 
 
@@ -103,10 +110,16 @@ class Decision:
     reviewer: str = ""
 
     def as_dict(self) -> Dict[str, Any]:
+        """Return the decision as a plain dict."""
         return asdict(self)
 
     @staticmethod
     def from_dict(row: Dict[str, Any]) -> "Decision":
+        """Build a decision from a dict, converting list fields to tuples.
+
+        Raises:
+            TypeError: If ``row`` has unknown keys or lacks required fields.
+        """
         return Decision(
             **{**row, "node_ids": tuple(row.get("node_ids") or ()), "votes": tuple(row.get("votes") or ())}
         )
@@ -114,6 +127,8 @@ class Decision:
 
 @dataclass(frozen=True)
 class RoundRecord:
+    """Bookkeeping for one resolver round: stage, tier, model, counts and cost."""
+
     round_key: str
     stage: str
     tier: str
