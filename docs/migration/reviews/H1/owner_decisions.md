@@ -218,3 +218,14 @@ frozen-UI pin is updated in that change (as O-U1).
   before any H5 publication.
 - **Tiled graph editing plan Q1-Q16:** owner chose to answer one by one (recorded below
   as they are answered). **B3 exceptions:** owner chose to pick individually.
+
+## Register walk-through, batch 3: B3 exceptions (2026-10-30, O-P3)
+
+- **R-08 Langfuse tracer:** NOT an exception. Port it as an opt-in exporter behind a
+  setting, off by default, with a disclosure review (traces hold source text). Work item
+  for T29/T17 scope.
+- **X-05 `seed_synthetic_kg.py` and X-07 `bench_kg.py`:** NOT exceptions. Port both into
+  `scripts/` as developer tools (T29 scope).
+- **RT-20 `add_annotation`:** exception approved; record-level annotations stay in FORGE.
+- **A-01 `openalex_supplement.json`:** retire once L-17 citation links are regenerated
+  (T29). **RT-47 `table_csv`:** stays an internal agent helper, not a user route.
