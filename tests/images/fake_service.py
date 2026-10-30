@@ -2,9 +2,12 @@
 
     python fake_service.py --name api --log events.log [--port N] [--ready-delay S]
         [--die-after S --exit-code C] [--on-term exit|ignore|code:N] [--term-delay S]
-        [--grandchild PIDFILE] [--dump-env FILE]
+        [--grandchild PIDFILE] [--dump-env FILE] [--ready-log FILE]
 
-Every lifecycle event is appended to ``--log`` as ``<event> <name> <pid>``.
+Every lifecycle event is appended to ``--log`` as ``<event> <name> <pid> <unix-time>``.
+With ``--port`` and ``--ready-log``, ``ready <name> <pid> <unix-time>`` is appended to that
+file the moment the HTTP health server starts answering (after ``--ready-delay``), so a
+test can compare it with other services' start times instead of sleeping.
 """
 
 import argparse
@@ -30,11 +33,12 @@ def main():
     p.add_argument("--term-delay", type=float, default=0.0)
     p.add_argument("--grandchild")
     p.add_argument("--dump-env")
+    p.add_argument("--ready-log")
     args = p.parse_args()
 
-    def event(kind):
-        with open(args.log, "a", encoding="utf-8") as fh:
-            fh.write(f"{kind} {args.name} {os.getpid()}\n")
+    def event(kind, path=None):
+        with open(path or args.log, "a", encoding="utf-8") as fh:
+            fh.write(f"{kind} {args.name} {os.getpid()} {time.time():.6f}\n")
 
     event("start")
     if args.dump_env:
@@ -68,7 +72,10 @@ def main():
 
         def serve():
             time.sleep(args.ready_delay)
-            http.server.HTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
+            server = http.server.HTTPServer(("127.0.0.1", args.port), Handler)
+            if args.ready_log:
+                event("ready", args.ready_log)
+            server.serve_forever()
 
         threading.Thread(target=serve, daemon=True).start()
     start = time.monotonic()

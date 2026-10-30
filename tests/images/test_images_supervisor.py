@@ -159,15 +159,23 @@ def test_starts_in_order_after_health_and_stops_in_reverse_on_sigterm(h):
 
 
 def test_next_service_waits_for_the_previous_health_check(h):
+    # D3.15: no fixed sleep. The fake api starts answering its health URL only after a
+    # 1 s delay and records that moment; the worker's start must come after it. A slow
+    # machine can only widen the gaps, never make a correct supervisor fail this.
     port = free_port()
-    profile = h.profile([h.service("api", port=port, extra=["--ready-delay", "1.0"]),
+    ready_log = h.tmp / "ready.log"
+    ready_delay = 1.0
+    profile = h.profile([h.service("api", port=port, timeout=30,
+                                   extra=["--ready-delay", str(ready_delay), "--ready-log", str(ready_log)]),
                          h.service("worker", alive_for=0.2)])
     h.start(profile)
-    h.until(lambda: "start api" in h.kinds())
-    time.sleep(0.6)
-    assert "start worker" not in h.kinds()  # api not healthy yet
-    h.until(h.ready)
+    h.until(h.ready, timeout=45)
     assert h.kinds() == ["start api", "start worker"]
+    api_start, worker_start = (float(e[3]) for e in h.events())
+    api_ready = float(ready_log.read_text(encoding="utf-8").split()[3])
+    assert api_ready - api_start >= ready_delay * 0.9, "the fake api was not reachable before its delay"
+    assert worker_start >= api_ready, (
+        f"the worker started {api_ready - worker_start:.3f}s before the api answered its health check")
     h.proc.send_signal(signal.SIGINT)
     assert h.wait() == 0
 
@@ -220,10 +228,19 @@ def test_optional_child_permanent_exit_code_is_not_restarted(h):
     ])
     h.start(profile)
     h.until(lambda: "service_failed service=tiled exit=78" in h.stderr())
-    time.sleep(0.5)
+    # D3.15: wait on the supervisor's own state instead of a fixed sleep: the status file marks
+    # tiled failed, the application still reaches ready, and no restart was ever scheduled.
+    h.until(lambda: h.status.exists()
+            and json.loads(h.status.read_text(encoding="utf-8"))["services"]["tiled"]["state"] == "failed",
+            timeout=20)
+    h.until(h.ready, timeout=20)
+    assert "restart_scheduled service=tiled" not in h.stderr()
+    status = json.loads(h.status.read_text(encoding="utf-8"))
+    assert status["services"]["tiled"]["restarts"] == 0 and status["services"]["api"]["state"] == "running"
     assert h.kinds().count("start tiled") == 1
     h.proc.send_signal(signal.SIGTERM)
     assert h.wait() == 0
+    assert h.kinds().count("start tiled") == 1, "not restarted at any point of the supervisor's life"
 
 
 def test_child_ignoring_sigterm_is_killed_and_the_stop_is_unclean(h):
