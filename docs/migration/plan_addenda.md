@@ -486,12 +486,28 @@ decision in `docs/migration/reviews/H1/owner_decisions.md`.
   configuration, disabled (404) on ALS images. **Acceptance:** path traversal tests;
   ALS gateway tests show 404.
 
+### Finding from the B7 work (2026-10-30): ALS API process has no identity wiring in `run_api`
+
+`app/api/main.py::run_api` calls `create_api_app(cfg, cors_origins)` without an identity port
+or session store; `build_guard` then raises `StartupConfigError` on any ALS profile, and
+`als_identity_wiring` (`app/api/sessions.py`) is only called from tests. So the ALS `api`
+service cannot start today regardless of B7. This belongs to T24E/T25C and is a blocker for
+the first ALS container run; the model-API mount already takes the main app's identity
+port and session store, so it needs nothing extra once wired. Tracked as **D3.21** in
+`OPEN_DECISIONS.md` (integrator to fix; no owner decision needed unless the wiring choice
+changes the deployment contract).
+
 ### Applied directly on `forge_merge` (2026-10-30, integrator record)
 
 | Decision | Commit | Note |
 |---|---|---|
 | PC-1 / D3.1 (O-D3) terminology files tracked and shipped | `7e3876a` | `.gitignore` rule dropped, nine files (163 MB) committed, `REFUSE_SHIPPED_UNTRACKED_FILES=True` |
 | D3.5 / D3.8 / B14 (O-T2) approval TTL none on `:local`, 24 h on ALS | `120ef06` | `default_approval_ttl(settings)` |
+| D1.5 / D3.12 (O-S2) derived-value tolerance 2% | `8b9ab77` | D1.6 (cited wins) was already the behaviour |
+| D1.9 (O-S3) content-hash step, `work-identity/2` | `b3f14f3` | parity switch `use_content_hash=False` |
+| D1.10 (O-S4) near-duplicate check as a job above 2,000 keys | `e59c9c1` | `ScanControl(job=True)` marks job runs |
+| D1.7 (O-S3) `--figures multimodal` labelling flag | `f6934d7` | guide version 2; off by default |
+| B7 (O-A9) model API on ALS for signed-in users | `bad6c39` | mounted in the API process; D-T8 (non-browser sign-in) still open; worker found `run_api` wires no identity port on ALS (see A7 note) |
 
 ## Order after H2
 

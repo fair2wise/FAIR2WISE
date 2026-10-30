@@ -117,7 +117,7 @@ check would fail. Nothing has been pushed, so it has not failed yet.
 | # | Decision | Context | Recommendation |
 |---|---|---|---|
 | B6 | **Model API chat routes** (T18C F3) | The two chat routes of the six-endpoint model API (Ollama/OpenAI compatible) skip the D19 quote limit. A model that echoes its prompt returns more than 40% of a page verbatim. `run_fastapi` also binds 0.0.0.0 with no auth. | Apply the disclosure projection to both routes and bind to loopback by default |
-| B7 | **Model API under the prefix** | `/fair2wise/model-api` returns 404, so the model API is not exposed on ALS. | Keep it unexposed on ALS; available on `:local` | **Decided 2026-10-30 (O-A9): expose on ALS for signed-in users.**
+| B7 | **Model API under the prefix** | `/fair2wise/model-api` returns 404, so the model API is not exposed on ALS. | Keep it unexposed on ALS; available on `:local` | **Decided 2026-10-30 (O-A9): expose on ALS for signed-in users.** Applied `bad6c39`.
 | B8 | **Origin check on the 19 legacy routes** | The new `/v1` routes and sign-in refuse cross-site browser requests. The 19 frozen UI routes do not. | Add the check. Same-origin UI calls are unaffected |
 | B9 | **Size limit on legacy `/graph/upload`** | Unlimited today, as in the baseline. nginx caps uploads at 128 MB. | Add a cap that matches nginx (128 MB) |
 | B10 | **Reviewer excerpt length** | A curation case shows reviewers a 600-character quote from the source (D19). | Accept 600 characters | **Decided 2026-10-30 (O-A10): 600.**
@@ -186,12 +186,12 @@ No objection was raised, so these defaults are applied (branch `forge_merge-cdef
 | D1.2 | Class name `MeasurementRun` (and `RunCondition`) | `Measurement` already exists (123 nodes in the rsoxs graphs) and keeps its meaning | Accept | **Decided 2026-10-30 (O-S1): MeasurementRun accepted.**
 | D1.3 | Reconcile bl1101's `Sample`/`Detector`/`Endstation` with the new classes later (bl1101 v3) | bl1101 stays on its own schema for now | Later, as a reviewed change | **Decided 2026-10-30 (O-S2): reconcile now (bl1101 v3).**
 | D1.4 | Slot for normalized values (e.g. in nm) in 0.3.0 | Today they stay in candidate records | Keep in candidates for this release | **Decided 2026-10-30 (O-S2): add the slot (0.3.1).**
-| D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% | **Decided 2026-10-30 (O-S2): 2%.**
+| D1.5 | Derived-value tolerance | 1% today; paper A prints 34.3 nm against a computed 34.9 nm (1.7%) | 2% | **Decided 2026-10-30 (O-S2): 2%.** Applied `8b9ab77`.
 | D1.6 | A value both derived and in an attributing sentence | Tagged cited today | Keep cited | **Decided 2026-10-30 (O-S3): cited wins.**
-| D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag | **Decided 2026-10-30 (O-S3): opt-in multimodal flag.**
+| D1.7 | Multimodal labelling of figures | Labeller reads text only; picture-only readings are marked `needs_visual_check` | Yes, as an opt-in flag | **Decided 2026-10-30 (O-S3): opt-in multimodal flag.** Applied `f6934d7`.
 | D1.8 | LOCAL-02 counts as gold with one reviewed paper | It needs a real run, not labels | Accept | **Decided 2026-10-30 (O-S3): accept.**
-| D1.9 | Content-hash step in Work counting (K1) | A renamed copy with no DOI, arXiv id or title counts separately | Add it, as a versioned rule change | **Decided 2026-10-30 (O-S3): add the hash step.**
-| D1.10 | Near-duplicate title check | About 4.5 min at 10k keys | Run it as a job above a size limit | **Decided 2026-10-30 (O-S4): job above a size limit.**
+| D1.9 | Content-hash step in Work counting (K1) | A renamed copy with no DOI, arXiv id or title counts separately | Add it, as a versioned rule change | **Decided 2026-10-30 (O-S3): add the hash step.** Applied `b3f14f3`.
+| D1.10 | Near-duplicate title check | About 4.5 min at 10k keys | Run it as a job above a size limit | **Decided 2026-10-30 (O-S4): job above a size limit.** Applied `e59c9c1`.
 | D1.11 | Tiled scan that reaches the end of its listing | Reported complete, marked as a live read | Keep, with the warning | **Decided 2026-10-30 (O-S4): keep complete + warning.**
 
 ### D2. O06 image tag rules (T24D, `reviews/H6/o06_tag_rules_proposal.md`)
@@ -233,7 +233,7 @@ Recorded for the owner; nothing below is answered here.
 | D3.9 | **T26A release-contract questions Q2-Q6** | Copied verbatim from `docs/migration/data_releases/release_contract.md` section 10 (Q1 was resolved by O-D1). Each is pending owner decision (OPEN_DECISIONS D3.9). |
 | D3.10 | **B25 lock change still pending** | `pip check` fails in the app environment (huggingface-hub vs click, `requirements/semantic.in` unpinned). B25 asks for a reviewed lock change (pin `huggingface-hub` below 1.33 or raise click in the lock). Not applied; T28C owns the requirements files. Pending owner decision (OPEN_DECISIONS B25). | **Decided 2026-10-30 (O-X3).**
 | D3.11 | **May the integrator run `docker build` / `docker run` locally for the T24E container tests?** | B19 authorized the owner to build or to approve a local build (no push). `:local` was built and run once on 2026-10-29 (A5 section 1). T24E's container-level tests (supervisor, preflight, gateway on a real image) need repeated local builds and runs on the integrator's machine. No image is pushed and no registry login happens. Pending owner decision (OPEN_DECISIONS D3.11). | **Decided 2026-10-30 (O-X1): yes, build and run locally.**
-| D3.12 | **D1.5 derived-value tolerance is still 1% in code** | `app/modules/evidence/units.py:381` `RECIPROCAL_DERIVATION_REL_TOL = 0.01`; D1.5 recommends 2% (paper A, 1.7% mismatch) and `extraction_field_mapping.md` says "1 % tolerance". The constant and the doc change together once D1.5 is decided (AUD-17; owner T06B). Pending owner decision (OPEN_DECISIONS D1.5). | **Decided 2026-10-30 (O-S2): 2%.**
+| D3.12 | **D1.5 derived-value tolerance is still 1% in code** | `app/modules/evidence/units.py:381` `RECIPROCAL_DERIVATION_REL_TOL = 0.01`; D1.5 recommends 2% (paper A, 1.7% mismatch) and `extraction_field_mapping.md` says "1 % tolerance". The constant and the doc change together once D1.5 is decided (AUD-17; owner T06B). Pending owner decision (OPEN_DECISIONS D1.5). | **Decided 2026-10-30 (O-S2): 2%.** Applied `8b9ab77`.
 
 **D3.9 verbatim text** (`release_contract.md` section 10, items 2-6):
 
@@ -265,6 +265,7 @@ Recorded for the owner; nothing below is answered here.
 |---|---|---|
 | D3.19 | Deployment handoff choices (O07 inputs): role variable prefix `fair2wise_`, host layout `/srv/fair2wise/<profile>/{state,secrets,backups,releases.json}`, state-schema label `f2w.state/v1`, nginx as the edge proxy (not Traefik), papers and KG volumes not mounted on ALS for now | Accept as the T24E baseline |
 | D3.20 | ALS reader/admin sessions against the real staging Tiled from inside the `:als-dev` image are owner-run only (ALS images lock `F2W_TILED_URL`); when, and with which test account? | Schedule after D3.11 and the first CI image build |
+| D3.21 | **ALS `api` service has no identity wiring in `run_api`** (found during B7) | `create_api_app(cfg, cors_origins)` is called without an identity port or session store, so `build_guard` refuses every ALS profile at startup; `als_identity_wiring` is test-only. Integrator work item for T24E/T25C before the first ALS container run. | Wire `als_identity_wiring` into `run_api` for ALS profiles | open (integrator fix; owner informed) |
 
 ---
 
