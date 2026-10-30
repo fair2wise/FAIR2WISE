@@ -319,3 +319,15 @@ T10 jobs, T11 binary evaluation, T20B Tiled lifecycle) toward H3/H4.
   never pass a client-supplied value through. The in-container gateway forwards
   only the literal `http`/`https` it receives (`docker/nginx.conf`), and the API
   builds its URLs and same-origin checks from it.
+- **T24E handoff landed without containers (2026-10-29):** `deploy/` holds the Ansible
+  role/plays for the two ALS profiles (digest-only image, state + read-only writer-secret
+  mounts, 0600 uid-10001 secret file, nginx edge overwriting `X-Forwarded-Proto`,
+  `/fair2wise/healthz` checks, `--stop-timeout 120`, per-host digest record with rollback,
+  backup/restore with manifest and sha256), the host tools `deploy/scripts/`, and
+  `tests/deployment/` (static checks, restore/rollback harness on a real `JobStore`
+  database, `F2W_CONTAINER_TESTS` stubs). No play has run against a host; `ansible-lint`
+  is not in the venv, so the YAML is validated structurally. Real inventories, FQDNs and
+  secret references are operator inputs (O07). The container-level checks and their
+  commands are listed in `tests/deployment/README.md`; they wait on D3.11. D3.14 applied:
+  the CI Tiled job installs `--require-hashes` from `constraints.lock.txt` like the image.
+  D3.15 applied: the two supervisor tests with fixed sleeps now wait on events.
