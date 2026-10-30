@@ -144,7 +144,11 @@ def test_route_exposure_by_profile():
     by_id = {p.route_id: p for p in ROUTE_POLICIES}
     for rid in [f"R{i:02d}" for i in range(26, 32)]:
         assert not by_id[rid].exposed_on(local) and not by_id[rid].exposed_on(als)
-    for rid in ("R20", "R21", "R32", "R33", "R34"):
+    for rid in ("R20", "R21", "R22", "R23", "R24", "R25"):  # owner B7 (O-A9): signed-in ALS users too
+        assert by_id[rid].exposed_on(local) and by_id[rid].exposed_on(als) and not by_id[rid].public
+        assert by_id[rid].capabilities == {"chat.ask"}
+    assert "D-T8" in by_id["R20"].note and "D-T8" in by_id["R21"].note  # token sign-in still open
+    for rid in ("R32", "R33", "R34"):
         assert by_id[rid].exposed_on(local) and not by_id[rid].exposed_on(als)
     assert route_capabilities("GET", "/not/declared") is None
 

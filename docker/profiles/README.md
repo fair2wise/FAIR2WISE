@@ -26,13 +26,21 @@ Tracked `storage/kg` and `storage/terminology` JSON are included (owner O-D1, H0
 | --- | --- | --- | --- | --- | --- | --- |
 | 0 | preflight (`preflight.py`, `nginx -t`) | yes | yes | - | exit 0 | yes (78) |
 | 1 | `tiled` (`tiled_service.py` -> T20B lifecycle) | yes | **absent** | 127.0.0.1:8765 | `/healthz` | no: 3 restarts with backoff, never for exit 78 |
-| 2 | `api` (`api_service.py`: T14 jobs API, `root_path=/fair2wise/api`) | yes | yes | 127.0.0.1:8090 | `/health` | yes |
+| 2 | `api` (`api_service.py`: T14 jobs API, `root_path=/fair2wise/api`; mounts the model-compatible API at `/model-api`, published as `/fair2wise/model-api`, owner B7) | yes | yes | 127.0.0.1:8090 | `/health` | yes |
 | 3 | `worker` (`python -m app.modules.workers`) | yes | yes | none | alive 3 s | yes |
 | 4 | `gateway` (nginx with `docker/nginx.conf`) | yes | yes | 0.0.0.0:8080 (`F2W_GATEWAY_PORT`) | `/fair2wise/healthz` | yes |
 
 The gateway is the one container ingress. It listens on `F2W_GATEWAY_PORT` (profile default
 `8080`, the T24A contract; overridable at run time, refused if it equals the API or Tiled port).
 The port is unprivileged, so the uid-10001 nginx needs no `setcap`/`cap_net_bind_service`.
+
+Model-compatible API (owner decision B7, O-A9, 2026-10-30): `/fair2wise/model-api/<path>` is
+forwarded by the gateway as `/model-api/<path>` to the same `api` process, which mounts
+`app/modules/kg_rag_api.py` there (`app/api/main.py`, `create_api_app(model_api=True)`). It is
+not a separate service: ALS sessions are held in the API process (B12), so only that process
+can honour the sign-in cookie. On `:local` every caller is the local operator; on ALS the six
+routes need the same signed-in browser session as `/fair2wise/api` (401 `sign_in_required`
+otherwise). Non-browser clients (Open WebUI, SDKs) have no token sign-in yet: D-T8, open.
 
 Stop: SIGTERM to the container -> gateway (SIGQUIT, 15 s), worker (SIGTERM, 45 s; running jobs
 return to `queued`), api (20 s), tiled (25 s; data kept), then SIGKILL per process group. Use

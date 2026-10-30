@@ -310,8 +310,29 @@ def test_als_default_deny_and_not_exposed_routes():
     install_access_control(app, AccessRuntime(staging_settings(), identity_port=port, credential_store=store,
                                               surface=MODEL_API_SURFACE))
     client = TestClient(app, cookies={SESSION_COOKIE: "c"})
-    assert client.post("/api/chat").status_code == 403  # R20: not exposed on ALS until D-T8
+    assert client.post("/api/chat").status_code == 200  # R20: exposed to signed-in ALS users (owner B7, O-A9)
     assert client.get("/api/tags").status_code == 200
+    assert TestClient(app).post("/api/chat").status_code == 401  # and only to them
+
+
+def test_undeclared_routes_inspects_mounted_apps_with_their_own_runtime():
+    """DEP-19 over a mount (B7): a guarded sub-app is checked on its own surface; anything else fails closed."""
+    from app.api.main import PublicRootPath
+
+    outer = FastAPI(**NO_DOCS)
+    install_access_control(outer, AccessRuntime(staging_settings()))
+    inner = _generic_app(MODEL_API_SURFACE)
+    install_access_control(inner, AccessRuntime(staging_settings(), surface=MODEL_API_SURFACE))
+    outer.mount("/model-api", PublicRootPath(inner, "/x/model-api"), name="model-api")
+    assert undeclared_routes(outer) == []
+
+    @inner.get("/extra")
+    def extra():
+        return {}
+
+    assert undeclared_routes(outer) == ["/model-api GET /extra"]
+    outer.mount("/other", FastAPI(**NO_DOCS))
+    assert undeclared_routes(outer) == ["/model-api GET /extra", "UNINSPECTABLE Mount /other"]
 
 
 def test_builtin_docs_routes_are_declared_public():

@@ -628,7 +628,8 @@ def _p(route_id: str, surface: str, method: str, path: str, *caps: str, **kw: An
 
 
 _A, _M, _D, _P = AGENT_SURFACE, MODEL_API_SURFACE, DEV_MODEL_API_SURFACE, PAPER_FINDER_SURFACE
-_MODEL_API_NOTE = "ALS exposure depends on D-T8 (token auth for non-browser clients); not exposed until then"
+_MODEL_API_NOTE = ("ALS: signed-in browser session only (owner decision B7, O-A9, 2026-10-30; served under "
+                   "/fair2wise/model-api by the UI API process); non-browser token sign-in is D-T8, still open")
 
 #: Per-route policy for every route in docs/migration/companion/f2w_http_routes.json.
 ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
@@ -661,8 +662,8 @@ ROUTE_POLICIES: Tuple[RoutePolicy, ...] = (
     _p("R19", _A, "POST", "/annotations", "annotation.write",
        note="annotator replaced by verified subject; any signed-in user on own turns, admins on any "
             "(owner decision O-A1)"),
-    _p("R20", _M, "POST", "/api/chat", "chat.ask", on_als=False, note=_MODEL_API_NOTE),
-    _p("R21", _M, "POST", "/v1/chat/completions", "chat.ask", on_als=False, note=_MODEL_API_NOTE),
+    _p("R20", _M, "POST", "/api/chat", "chat.ask", note=_MODEL_API_NOTE),
+    _p("R21", _M, "POST", "/v1/chat/completions", "chat.ask", note=_MODEL_API_NOTE),
     _p("R22", _M, "GET", "/api/tags", "chat.ask"),
     _p("R23", _M, "GET", "/api/version", "chat.ask"),
     _p("R24", _M, "GET", "/v1/models", "chat.ask"),

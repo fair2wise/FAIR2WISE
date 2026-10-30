@@ -70,7 +70,7 @@ The edge forwards `/fair2wise` unchanged. The in-container gateway is the only p
 | `/fair2wise/` and deep links | `root /usr/share/fair2wise/www;` with the UI at `www/fair2wise/`; `try_files $uri $uri/ /fair2wise/index.html;` | (static) |
 | `/fair2wise/api/<path>` | `location /fair2wise/api/ { proxy_pass http://127.0.0.1:8090/; }` The trailing slash strips `/fair2wise/api` exactly once. | `/<path>`, e.g. `/chat/stream`, `/settings`, `/graph/...` (routes at `app/modules/f2w_agent/api.py:6624-7018`) |
 | `/fair2wise/api` (no slash) | `return 308 /fair2wise/api/` | (redirect) |
-| `/fair2wise/model-api/<path>` | `location /fair2wise/model-api/ { proxy_pass http://127.0.0.1:11435/; }` Only if the profile enables it. | `/v1/chat/completions`, `/v1/models`, `/api/chat`, `/api/tags`, `/api/version`, `/api/ps` (`app/modules/kg_rag_api.py:245-313`) |
+| `/fair2wise/model-api/<path>` | `location ^~ /fair2wise/model-api/ { proxy_pass http://f2w_api$f2w_model_api_uri; }` to the **same** API process as `/model-api/<path>` (decided: owner B7, O-A9, 2026-10-30; the earlier proposal of a separate `:11435` service is superseded because ALS sessions live in the API process, B12). `/fair2wise/api/model-api/...` is refused (one public path). | `/model-api/v1/chat/completions`, `/model-api/v1/models`, `/model-api/api/chat`, `/model-api/api/tags`, `/model-api/api/version`, `/model-api/api/ps` (`app/modules/kg_rag_api.py` mounted by `app/api/main.py`) |
 | Anything else | `404` | (none) |
 | Local Tiled `:8765` | **No route** | (none) |
 
@@ -111,7 +111,7 @@ The edge forwards `/fair2wise` unchanged. The in-container gateway is the only p
 | gateway (nginx) | `0.0.0.0:8080` in the container | yes | yes | `/fair2wise/healthz` | Container exits non-zero |
 | api (uvicorn, F2W FastAPI) | `127.0.0.1:8090` | yes | yes | `GET /health` | Container exits non-zero |
 | worker (durable jobs: extraction/ingest/import) | none | yes | yes | Heartbeat file or job store | Container exits non-zero after drain timeout |
-| model-api (`kg_rag_api`) | `127.0.0.1:11435` | if enabled | if enabled | `GET /v1/models` | Feature not ready |
+| model-api (`kg_rag_api`) | none: mounted in the `api` process at `/model-api` (owner B7; the standalone `run_fastapi` launcher keeps its `127.0.0.1:11435` default for developers) | yes | yes, signed-in users | covered by the api `GET /health` | as api |
 | tiled (managed) | `127.0.0.1:8765` | **yes** | **absent** | C1-C3 (ADR section 3.4) | Graph publication not ready; restart with backoff |
 
 **Observed constraints:**

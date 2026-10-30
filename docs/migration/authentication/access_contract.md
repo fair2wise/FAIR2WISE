@@ -133,7 +133,7 @@ resolve_access_context(transport_request, policy) -> RequestContext | Unauthenti
 | D-T5 | Access/refresh token lifetimes, refresh endpoint and rotation behaviour. |
 | D-T6 | Whether logout/revocation invalidates outstanding access tokens immediately, or only at expiry. This sets how long a revoked admin can still act; it is the bound for `F2W_ROLE_CHECK_MAX_AGE`. |
 | D-T7 | Whether external (OIDC) providers need a redirect URI under `/fair2wise`, and who registers it. |
-| D-T8 | Whether per-user API keys exist on the central servers, so non-browser clients such as the model-compatible proxy can authenticate. Otherwise the proxy is browser-session only, or not exposed on ALS. |
+| D-T8 | Whether per-user API keys exist on the central servers, so non-browser clients such as the model-compatible proxy can authenticate. Otherwise the proxy is browser-session only, or not exposed on ALS. Status 2026-10-30: 0.2.18 issues per-user API keys (`tests/security_live/test_live_identity.py`, `Apikey` scheme resolves to the user principal), but F2W accepts only the session cookie; owner B7 (O-A9) exposes the proxy browser-session only. Token sign-in for non-browser clients stays open. |
 | D-T9 | Whether the F2W writer is `admin` or a scoped service principal (T20A Q-T3). This affects `executed_as` and target scope only, never user roles. |
 
 ## 6. Capability groups
@@ -178,7 +178,7 @@ Key: **A** allowed; **R** reduced/projected form; **D** denied (401 if not signe
 | R17 | GET /traces/{turn_id} | `trace.read_own` / `trace.read_any` | A (projected) | D | own, projected | any, projected | The raw trace is never served (content ADR section 4.3). |
 | R18 | POST /telemetry/ui | `telemetry.write` | A | D | A | A | The actor is recorded from the context, not the payload. |
 | R19 | POST /annotations | `annotation.write` | A | D | A (own turns) | A | `annotator` is replaced by the verified subject or `local-operator`. Owner question O-A1: should ALS evaluation labels be admin-only? |
-| R20, R21 | POST /api/chat, /v1/chat/completions (app copy) | `chat.ask` | A (loopback) | D | A if D-T8 allows token auth, else N/E | same | Mounted under `/fair2wise/model-api` only where exposed. Same disclosure projection as /chat. |
+| R20, R21 | POST /api/chat, /v1/chat/completions (app copy) | `chat.ask` | A (loopback) | D | A (browser session; owner B7, O-A9, 2026-10-30) | A | Mounted in the UI API process at `/model-api`, published as `/fair2wise/model-api` on every image. Same sign-in cookie and disclosure projection as /chat. No token sign-in for non-browser clients until D-T8. |
 | R22-R25 | GET /api/tags, /api/version, /v1/models, /api/ps (app copy) | `chat.ask` | A | D | A | A | Static, but D30 allows only sign-in and health before sign-in. |
 | R26-R31 | `scripts/app/modules/kg_rag_api.py` duplicate (6 routes) | n/a | N/E | N/E | N/E | N/E | Proposed: not packaged in any image; developer script only. |
 | R32-R34 | Paper Finder (/, /detected, /action) | `ingest.acquire` (operator tool) | A (loopback CLI, not via the gateway) | N/E | N/E | N/E | Not in ALS images. It keeps its loopback-only bind (`paper_finder.py:61-82`). |
@@ -296,6 +296,6 @@ ALS cases run first against fake identity (T25B), then against an application-ow
 
 - **O-A1.** Should ALS `/annotations` be admin-only?
 - **O-A2.** `F2W_ROLE_CHECK_MAX_AGE` value (depends on D-T6).
-- **O-A3.** Whether the model-compatible proxy is exposed on ALS at all (depends on D-T8).
+- **O-A3.** ~~Whether the model-compatible proxy is exposed on ALS at all (depends on D-T8).~~ Decided as owner B7 (O-A9, 2026-10-30): exposed for signed-in browser sessions; D-T8 (token sign-in) remains the open follow-up.
 - **O-A4.** Owner may decide that `:local` + `tiled_authenticated` is a supported variant (S2).
 - **T20A dependencies:** D-T1 to D-T9 (section 5.6).

@@ -13,6 +13,10 @@ Public route                            Behaviour
 ``/fair2wise/api/<path>``               the gateway removes ``/fair2wise/api`` once and
                                         forwards the raw ``/<path>?<query>`` to the API,
                                         which runs with ASGI ``root_path=/fair2wise/api``
+``/fair2wise/model-api/<path>``         the model-compatible API (owner B7, O-A9): the
+                                        gateway forwards the raw ``/model-api/<path>`` to the
+                                        same API process, which mounts it there and publishes
+                                        its generated URLs under ``/fair2wise/model-api``
 ``/fair2wise/healthz``, ``/healthz``    gateway health (no secrets, no corpus)
 ======================================  =====================================================
 
@@ -61,6 +65,8 @@ GATEWAY_PORT_ENV = "F2W_GATEWAY_PORT"
 #: The one container ingress port of the T24A contract (``docker_profile_contract.md``). Unprivileged,
 #: so nginx needs no ``cap_net_bind_service``.
 DEFAULT_GATEWAY_PORT = 8080
+#: Mount path of the model-compatible API inside the UI API process (owner decision B7).
+MODEL_API_MOUNT = "/model-api"
 #: Written by ``ui/vite.config.ts`` into the build output (``dist/f2w-build.json``).
 BUILD_MANIFEST_NAME = "f2w-build.json"
 
@@ -113,6 +119,16 @@ class PublicLayout:
     def api_root_path(self) -> str:
         """ASGI ``root_path`` of the UI API behind the gateway (``""`` when unprefixed)."""
         return f"{self.prefix}/api" if self.prefixed else ""
+
+    @property
+    def model_api_root_path(self) -> str:
+        """Public root of the model-compatible API (``app/api/main.py`` mounts it at ``/model-api``).
+
+        ``/fair2wise/model-api`` behind the gateway; ``/model-api`` on an unprefixed developer
+        launch (the mount path itself). Never ``""``: the model API is always one segment below
+        the UI API's process root.
+        """
+        return f"{self.prefix}{MODEL_API_MOUNT}"
 
     @property
     def docs_url(self) -> str:
@@ -200,8 +216,8 @@ def render_nginx_conf(template: str, *, upstream: str = DEFAULT_API_UPSTREAM,
 
     Raises:
         PrefixConfigError: Unknown placeholders, a bad upstream or port, a template whose
-            ``listen`` is not the port placeholder, or a template whose API location is not
-            ``<prefix>/api/`` for the runtime prefix.
+            ``listen`` is not the port placeholder, or a template whose API locations are not
+            ``<prefix>/api/`` and ``<prefix>/model-api/`` for the runtime prefix.
     """
     if not layout.prefixed:
         raise PrefixConfigError("the gateway always serves under a prefix; set F2W_PUBLIC_PREFIX")
@@ -212,6 +228,10 @@ def render_nginx_conf(template: str, *, upstream: str = DEFAULT_API_UPSTREAM,
         raise PrefixConfigError(
             f"gateway template does not route {layout.api_root_path}/; the gateway, the UI build and "
             f"{PREFIX_ENV}={layout.prefix} must agree (rebuild for a different prefix)")
+    if f"location ^~ {layout.model_api_root_path}/ " not in template:
+        raise PrefixConfigError(
+            f"gateway template does not route {layout.model_api_root_path}/ (owner decision B7); the gateway "
+            f"and {PREFIX_ENV}={layout.prefix} must agree")
     listens = re.findall(r"^\s*listen\s+([^;]*);", template, flags=re.M)
     if listens != ["${" + GATEWAY_PORT_ENV + "}"]:
         raise PrefixConfigError(f"gateway template must have exactly one 'listen ${{{GATEWAY_PORT_ENV}}};' "
