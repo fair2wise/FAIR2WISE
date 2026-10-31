@@ -4,7 +4,7 @@ import pytest
 from vision_fakes import SHA, bl_bbox, parsed, table_pdf, tl_bbox
 
 from app.modules.contracts.evidence import SourceLocator
-from app.modules.literature.parsed_document import ParsedTable
+from app.modules.literature.parsed_document import ParsedTable, ParsedTableCell
 from app.modules.vision.classification import ChatAdapter, classify_text_context, panel_context, parse_class_answer
 from app.modules.vision.classification_units import panel_order_map, resolve_units, verdict_classes
 from app.modules.vision.orientation import find_statements, parse_orientation_answer, read_orientation
@@ -97,12 +97,25 @@ def test_figure_vs_panel_units_and_order():
 
 
 ROWS = [["Peak", "q (nm^-1)", "d (nm)"], ["1", "0.31", "20.3"], ["2", "0.62", "10.1"]]
+TABLE_ORIGIN, TABLE_CELL = (60.0, 420.0), (90.0, 22.0)  # the ruled table table_pdf() draws (top-left points)
+
+
+def docling_cells(make, rows=ROWS, origin=TABLE_ORIGIN, cell=TABLE_CELL):
+    """Cells as the Docling parser records them: text, grid position and a box in the parser's origin."""
+    cells = []
+    for r, row in enumerate(rows):
+        for c, text in enumerate(row):
+            region = (origin[0] + c * cell[0], origin[1] + r * cell[1],
+                      origin[0] + (c + 1) * cell[0], origin[1] + (r + 1) * cell[1])
+            cells.append(ParsedTableCell(r, c, text, bbox=make(region)))
+    return tuple(cells)
 
 
 @pytest.mark.parametrize("make", [bl_bbox, tl_bbox], ids=["bottomleft", "topleft"])
 def test_table_cells_have_geometry_and_locators(make):
     region = (60.0, 420.0, 330.0, 486.0)
-    doc = parsed("", tables=(ParsedTable(1, 3, 3, caption="Table 1. Peak positions", bbox=make(region)),))
+    doc = parsed("", tables=(ParsedTable(1, 3, 3, caption="Table 1. Peak positions", bbox=make(region),
+                                         cells=docling_cells(make)),))
     (table,) = extract_tables(doc, table_pdf(ROWS), work_id="10.1000/test")
     assert (table.n_rows, table.n_cols) == (3, 3) and not table.uncertainties
     texts = {(c.row, c.col): c.text for c in table.cells}
@@ -116,8 +129,17 @@ def test_table_cells_have_geometry_and_locators(make):
 
 def test_table_shape_mismatch_and_missing_bbox_are_surfaced():
     region = (60.0, 420.0, 330.0, 486.0)
-    doc = parsed("", tables=(ParsedTable(1, 5, 3, bbox=bl_bbox(region)), ParsedTable(1, 3, 3, bbox=None)))
+    doc = parsed("", tables=(ParsedTable(1, 5, 3, bbox=bl_bbox(region), cells=docling_cells(bl_bbox)),
+                             ParsedTable(1, 3, 3, bbox=None)))
     first, second = extract_tables(doc, table_pdf(ROWS))
     assert [u.code for u in first.uncertainties] == ["table_shape_mismatch"] and first.cells
     assert [u.code for u in second.uncertainties] == ["table_region_unlocated"] and second.cells == ()
     assert second.locator.page == 1 and second.locator.bbox is None
+
+
+def test_table_without_cells_is_reported_not_guessed():
+    region = (60.0, 420.0, 330.0, 486.0)
+    doc = parsed("", tables=(ParsedTable(1, 3, 3, bbox=bl_bbox(region)),))
+    (table,) = extract_tables(doc, table_pdf(ROWS))
+    assert [(u.code, u.blocking) for u in table.uncertainties] == [("table_cells_unavailable", True)]
+    assert table.cells == () and (table.n_rows, table.n_cols) == (0, 0)

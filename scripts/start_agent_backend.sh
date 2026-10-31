@@ -196,7 +196,7 @@ if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 
-# Prefer the project venv Python so all deps (dotenv, PyMuPDF, …) are
+# Prefer the project venv Python so all deps (dotenv, Docling, …) are
 # available even when the shell's PATH doesn't have the venv activated.
 # Falls back to python3 / python if the venv isn't present.
 if [[ -x "$ROOT_DIR/.venv-harvest/bin/python" ]]; then

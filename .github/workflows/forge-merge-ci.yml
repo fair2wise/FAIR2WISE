@@ -83,10 +83,14 @@ jobs:
       # known-failure set is tolerated, any other failure (or a known one now passing)
       # fails the next step. The JUnit file must exist, so a crash before any test ran
       # fails here instead of being compared against nothing (T28B, audit AUD-09).
+      - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
+        # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
+        run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
       - name: Full suite (failures recorded, not hidden)
         run: |
           mkdir -p "$RUNNER_TEMP/home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            HF_HUB_OFFLINE=1 F2W_DOCLING_ARTIFACTS_PATH="$RUNNER_TEMP/docling" \
             python -m pytest -q -p no:cacheprovider --junitxml=full.xml; status=$?
           test -s full.xml || exit "$status"
       - name: Compare with the known-failure set (the gate)
@@ -120,10 +124,14 @@ jobs:
           echo "isort files needing changes: $(grep -c '^ERROR' quality/isort.txt || true)"
       - name: Types (mypy --strict)
         run: mypy 2>&1 | tee quality/mypy.txt | tail -n 3 || true
+      - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
+        # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
+        run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
       - name: Coverage (full suite, T27 80% target per module)
         run: |
           mkdir -p "$RUNNER_TEMP/home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            HF_HUB_OFFLINE=1 F2W_DOCLING_ARTIFACTS_PATH="$RUNNER_TEMP/docling" \
             python -m pytest -q -p no:cacheprovider --cov --cov-report= || true
           coverage report --skip-empty > quality/coverage.txt || true
           tail -n 3 quality/coverage.txt

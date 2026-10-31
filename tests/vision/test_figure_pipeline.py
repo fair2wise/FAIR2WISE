@@ -53,7 +53,9 @@ def test_scale_bar_reported_only_where_measured_and_lengths_assigned_by_panel():
     sa, sb = panel(fig, "a").scale, panel(fig, "b").scale
     assert sa.reported and sa.reading.length_source == "caption"
     assert sa.reading.nm_per_px == pytest.approx(200.0 / 60.0, rel=0.08)   # 30 pt bar at 2 px/pt, 200 nm
-    assert not sb.reported and sb.withheld_reason == "bar_too_short_for_panel"   # white panel letter, not a bar
+    # White panel letter, not a bar: never reported. Which reason is given depends on how the renderer
+    # anti-aliases the glyph (MuPDF left a too-short candidate, pdfium leaves none), both withhold it.
+    assert not sb.reported and sb.withheld_reason in {"bar_too_short_for_panel", "no_bar"}
 
 
 def test_caption_unit_used_when_panel_states_none_and_ambiguous_units_withheld():

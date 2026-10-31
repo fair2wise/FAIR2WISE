@@ -106,7 +106,7 @@ def _make_extractor(tmp_path, client=None, response="{}"):
 
 
 def _make_fake_doc(text: str):
-    """Return a fitz.Document-like object whose page yields `text`."""
+    """Return a PdfDocument-like object whose page yields `text`."""
     fake_page = MagicMock()
     fake_page.get_text.return_value = text
     fake_doc = MagicMock()

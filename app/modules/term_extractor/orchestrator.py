@@ -9,9 +9,6 @@ import re
 from types import SimpleNamespace
 from typing import Any, Sequence
 
-# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-import fitz
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
@@ -19,6 +16,7 @@ from langchain_openai import ChatOpenAI
 from . import provenance, source_repos
 from ..cborg_http import openai_http_kwargs, require_cborg_api_key
 from ..cborg_limiter import sync_slot
+from ..literature.pdf_reader import open_pdf
 from ..llm_admission import shared_admission_enabled
 from .agent import build_graph
 from .clients import make_chat_client
@@ -385,7 +383,7 @@ class Orchestrator:
     def process_pdf(self, pdf_path: str) -> int:
         """Open a PDF and process all pages in parallel. Returns pages that yielded terms."""
         try:
-            doc = fitz.open(pdf_path)
+            doc = open_pdf(pdf_path)
         except Exception as e:
             logger.error("Cannot open PDF %s: %s", pdf_path, e)
             return 0
@@ -496,7 +494,7 @@ class Orchestrator:
     ) -> dict[str, Any]:
         """Process query-relevant pages from one PDF while always extracting publication metadata."""
         try:
-            doc = fitz.open(pdf_path)
+            doc = open_pdf(pdf_path)
         except Exception as e:
             logger.error("Cannot open PDF %s: %s", pdf_path, e)
             return {

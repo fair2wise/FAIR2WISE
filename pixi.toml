@@ -41,8 +41,7 @@ python = "3.12.*"
 # so the move to pixi changes no behaviour). Upgrade deliberately: edit a pin, `pixi lock`, rerun
 # the suite. Direct dependencies are the ones named in requirements/runtime.in and semantic.in.
 # torch comes from the PyTorch CPU index: the default index resolves CUDA builds (+cu13x, ~3 GB of
-# nvidia-* wheels) that no image can use. DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) is being replaced
-# by Docling (H1 E2, T05).
+# nvidia-* wheels) that no image can use.
 academy-py = "==0.5.0"
 aiohappyeyeballs = "==2.7.1"
 aiohttp = "==3.14.3"
@@ -146,7 +145,6 @@ pyjwt = "==2.13.0"
 pymatgen = "==2026.5.4"
 pymatgen-core = "==2026.7.31"
 pymatgen-io-validation = "==0.1.2"
-pymupdf = "==1.28.0"
 pyparsing = "==3.3.2"
 pystow = "==0.8.21"
 pytest = "==9.1.1"
@@ -198,9 +196,17 @@ transformers = "==5.20.1"
 # huggingface-hub 2.x is a major jump from the 1.33 the baseline ran with; the image bakes the
 # embedding models through its snapshot_download. Move it deliberately, not by resolver drift.
 huggingface-hub = "==1.33.0"
+# Docling replaced PyMuPDF (AGPL-3.0; H1 E2, T05): structure parsing through docling, plain page text,
+# metadata and rendering through pypdfium2 (the PDF engine docling itself uses). Model weights are not
+# part of the repo or the lock: images fetch them at build time (Dockerfile docling-models stage).
+docling = ">=2.145.0"
+pypdfium2 = "*"
+torchvision = { version = "*", index = "https://download.pytorch.org/whl/cpu" }
 
 # ---- tests, lint, docs (was requirements/dev.in) ---------------------------------------------
 [feature.dev.pypi-dependencies]
+# Builds the synthetic PDFs the tests need (replaces PyMuPDF as a fixture writer; BSD-licensed).
+reportlab = "*"
 click = "==8.3.3"
 # deepeval needs tabulate<0.10; the application environment (no deepeval) resolves 0.10.0. The
 # environments therefore solve separately (no solve-group), as the split pip locks did.

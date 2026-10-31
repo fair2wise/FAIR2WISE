@@ -1,8 +1,8 @@
-"""PDF text layer, page geometry and figure localization (V-04), over PyMuPDF.
+"""PDF text layer, page geometry and figure localization (V-04), over pypdfium2.
 
 Source text first: spans come from the PDF's own text layer with exact positions.
 All coordinates are normalised to PDF points, **top-left origin**, whatever origin
-the parser recorded (Docling boxes are BOTTOMLEFT, PyMuPDF boxes TOPLEFT), and the
+the parser recorded (Docling boxes are BOTTOMLEFT, text-span boxes TOPLEFT), and the
 original origin is kept in the geometry record. The figure is mapped to render
 pixels by a :class:`FigureFrame` whose scale is the parser's ``images_scale`` when
 stamped, else the extractor default (recorded as ``scale_source``).
@@ -31,12 +31,16 @@ MIN_TEXT_SPANS = 3
 
 
 def open_pdf(data: bytes) -> Any:
-    """Open PDF bytes with PyMuPDF (lazy import; :class:`VisionUnavailable` when absent)."""
+    """Open PDF bytes with pypdfium2 (lazy import; :class:`VisionUnavailable` when absent)."""
     try:
-        import fitz  # PyMuPDF
+        from ..literature.pdf_reader import PdfUnavailable
+        from ..literature.pdf_reader import open_pdf as open_reader
     except ImportError as exc:  # pragma: no cover - environment dependent
-        raise VisionUnavailable("PyMuPDF", "install the 'figures' extra") from exc
-    return fitz.open(stream=data, filetype="pdf")
+        raise VisionUnavailable("pypdfium2", "install the 'figures' extra") from exc
+    try:
+        return open_reader(data)
+    except PdfUnavailable as exc:  # pragma: no cover - environment dependent
+        raise VisionUnavailable("pypdfium2", "install the 'figures' extra") from exc
 
 
 @dataclass(frozen=True)
@@ -55,10 +59,9 @@ class PageGeometry:
 
 
 def page_geometry(doc: Any, page_number: int, info: PageInfo | None = None) -> PageGeometry:
-    """Geometry of 1-based ``page_number``; PyMuPDF's own size wins over the parser's."""
+    """Geometry of 1-based ``page_number``; the PDF's own size wins over the parser's."""
     page = doc[page_number - 1]
-    rect = page.rect
-    return PageGeometry(page_number, float(rect.width), float(rect.height),
+    return PageGeometry(page_number, float(page.width), float(page.height),
                         int(page.rotation or (info.rotation if info else 0)))
 
 
@@ -77,14 +80,7 @@ def to_topleft(bbox: BoundingBox, page_height: float) -> Box:
 def page_spans(doc: Any, page_number: int) -> list[TextSpan]:
     """Every text-layer span on a page, verbatim, boxed in top-left points."""
     page = doc[page_number - 1]
-    spans: list[TextSpan] = []
-    for block in page.get_text("dict").get("blocks", []):
-        for line in block.get("lines", []):
-            for span in line.get("spans", []):
-                text = span.get("text", "")
-                if text.strip():
-                    spans.append(TextSpan(text, box4(tuple(span["bbox"])), page_number, "text_layer"))
-    return spans
+    return [TextSpan(span.text, box4(span.bbox), page_number, "text_layer") for span in page.get_spans()]
 
 
 def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
@@ -94,7 +90,7 @@ def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
     separated images are ambiguous and return ``None`` (the caller records uncertainty).
     """
     page = doc[page_number - 1]
-    boxes = [box4(tuple(info["bbox"])) for info in page.get_image_info() if info.get("bbox")]
+    boxes = [box4(box) for box in page.image_boxes()]
     boxes = [b for b in boxes if (b[2] - b[0]) > 20 and (b[3] - b[1]) > 20]
     if len(boxes) != 1:
         return None
@@ -106,13 +102,7 @@ def render_gray(doc: Any, page_number: int, region: Box, scale: float) -> Any:
 
     The array is the pipeline's internal working image; it is never returned or stored.
     """
-    import fitz
-    import numpy as np
-
-    page = doc[page_number - 1]
-    clip = fitz.Rect(*region) & page.rect
-    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, colorspace=fitz.csGRAY, alpha=False)
-    return np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width).copy()
+    return doc[page_number - 1].render_gray(region, scale)
 
 
 @dataclass(frozen=True)

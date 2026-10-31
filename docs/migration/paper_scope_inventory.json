@@ -885,7 +885,7 @@
    ],
    "tests": [
     "tests/literature/test_parsing.py::test_parser_protocol_and_document_roundtrip",
-    "tests/literature/test_parsing.py::test_pymupdf_parser_preserves_sections_figures_tables_geometry"
+    "tests/literature/test_parsing.py::test_docling_parser_preserves_sections_figures_tables_geometry"
    ],
    "status": "covered",
    "demonstrated": "now_with_fakes",

@@ -156,6 +156,16 @@ RUN python -I -c "from huggingface_hub import snapshot_download as d; \
     done && \
     chmod -R a+rX /opt/fair2wise/hf
 
+# Docling's layout and table-structure model weights (MIT / CC-BY-4.0 model cards), fetched at build
+# time at the commits pinned in scripts/fetch_docling_models.py (one list for the image and CI) into
+# the folder layout Docling reads through F2W_DOCLING_ARTIFACTS_PATH, so the image parses PDFs with
+# HF_HUB_OFFLINE=1 and never downloads at runtime. They are not part of the repository or pixi.lock.
+ENV F2W_DOCLING_ARTIFACTS_PATH=/opt/fair2wise/docling
+COPY scripts/fetch_docling_models.py /tmp/fetch_docling_models.py
+RUN python -I /tmp/fetch_docling_models.py --dest /opt/fair2wise/docling && \
+    rm /tmp/fetch_docling_models.py && \
+    chmod -R a+rX /opt/fair2wise/docling
+
 # Allowlisted application content.
 COPY pyproject.toml config.yml LICENSE.txt ./
 COPY app/ ./app/

@@ -64,20 +64,22 @@ semantic = [
   "sentence-transformers>=5.5.1",
   "torch>=2.12.0",
 ]
-# PDF parsing. DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) is replaced by Docling in T05
-# (docs/migration/reviews/H0/license_dependency_audit.md, E2).
+# PDF parsing: Docling (structure) and pypdfium2 (page text, metadata, rendering). Replaces PyMuPDF
+# (AGPL-3.0; docs/migration/reviews/H0/license_dependency_audit.md, E2). Model weights are not a
+# dependency: images fetch them at build time (scripts/fetch_docling_models.py).
 parser = [
-  "PyMuPDF>=1.27.2",
+  "docling>=2.145.0",
+  "pypdfium2",
 ]
 # Tiled Graph is reached over HTTP with the base dependencies. The `tiled` Python client
 # (lazy import in tiled_graph.py) is not in the lock: Tiled pins pydantic-settings<2.12
 # (ADR optional-dependencies decision 4). Filled by T08/T20B.
 tiled = []
-# Paper figures (T09): source-text-first extraction reads the PDF text layer with PyMuPDF.
+# Paper figures (T09): source-text-first extraction reads the PDF text layer with pypdfium2.
 # OCR (rapidocr/onnxruntime) is an OPTIONAL fallback imported lazily; it is not in the lock and is
 # not a dependency here. numpy is a base dependency.
 figures = [
-  "PyMuPDF>=1.27.2",
+  "pypdfium2",
 ]
 # Academy/Globus Compute deployment (pixi environment `globus`); not part of [full].
 globus = [
@@ -178,7 +180,7 @@ module = [
   "academy.*", "arxiv.*", "colorama.*", "faiss.*", "flask.*", "globus_sdk.*", "langchain_core.*",
   "langchain_openai.*", "langgraph.*", "linkml_runtime.*", "mp_api.*", "obonet.*", "pyalex.*",
   "pymatgen.*", "rapidfuzz.*", "rapidocr_onnxruntime.*", "sentence_transformers.*", "tiled.*",
-  "torch.*", "watchdog.*", "fitz.*",
+  "torch.*", "watchdog.*", "pypdfium2.*", "docling.*", "docling_core.*",
 ]
 ignore_missing_imports = true
 

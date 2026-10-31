@@ -54,3 +54,15 @@ AUD-08 / T28C (hash-locked installs) govern. Review it as a new decision, not as
 2. Accept that `click` is overridden in the dev environment (deepeval caps `<8.4`, `huggingface-hub` 1.33 needs
    `>=8.4.2`; the previous pip environments carried the same violation).
 3. Decide whether the legacy Splash `agent` image should move to the same pixi version (it pins 0.70.2).
+
+## Follow-up: PyMuPDF removed, Docling in (same change set)
+
+Requested together with the pixi switch (owner, 2026-10-30): "transition from pymupdf to docling", weights
+pulled in at build time and never tracked. `pixi.toml` gains `docling`, `pypdfium2` and `torchvision` (CPU
+index) and loses `pymupdf`; `pixi.lock` has no PyMuPDF. New: `app/modules/literature/pdf_reader.py`
+(pypdfium2 reader), `DoclingParser`, table cells on `ParsedTable`, `scripts/fetch_docling_models.py`
+(pinned weight commits, used by the Dockerfile and CI), `docs/migration/reviews/H7/docling_parity.md`.
+Test fixture PDFs are now written with reportlab (dev environment only). Still importing `fitz` and
+therefore broken without a manual `pip install pymupdf`: the archived modules under
+`app/modules/legacy/` (excluded from the package and from T27) and the stale `scripts/app/` duplicate that
+audit finding AUD-02 already schedules for deletion.

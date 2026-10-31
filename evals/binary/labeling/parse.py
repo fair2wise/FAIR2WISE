@@ -1,10 +1,11 @@
-"""Parse one pilot PDF locally with the existing F2W parser.
+"""Parse one pilot PDF locally with the existing F2W parsers.
 
 Structure (figures, captions, the text layer inside each figure, tables, sections, the
-parser revision key) comes from :class:`app.modules.literature.parsers.PyMuPDFParser`.
-Per-page text, which locators and quote checks need, is built from the same parser's line
-reader (``PyMuPDFParser._lines``) so a quote is checked against exactly the text the parser
-produced, figure and table text included.
+parser revision key) comes from :class:`app.modules.literature.parsers.DoclingParser`, which
+needs Docling's model weights (``F2W_DOCLING_ARTIFACTS_PATH``). Per-page text, which locators
+and quote checks need, is the whole page text layer read by ``app.modules.literature.pdf_reader``
+(pypdfium2), so a quote is checked against exactly the text the PDF carries, figure and table
+text included. Figure crops are rendered with the same reader.
 
 Figure crops the parser writes go to a temporary directory that is deleted before this
 function returns. The parsed text is private: it may be cached only inside the private
@@ -13,12 +14,15 @@ label directory (``store.LabelStore``), never in the repository or a report.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 import json
-import tempfile
-from dataclasses import dataclass, field
 from pathlib import Path
+import tempfile
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from app.modules.literature.parsers import DoclingParser
+from app.modules.literature.pdf_reader import open_pdf
 
 
 @dataclass(frozen=True)
@@ -73,15 +77,20 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def parse_pdf(pdf_path: Path) -> ParsedPaper:
-    """Parse ``pdf_path`` with ``PyMuPDFParser`` and its line reader (raises if PyMuPDF is absent)."""
-    import fitz  # DEPRECATED(pymupdf): the F2W parser's library; replaced with the parser (H1 E2)
+def parse_pdf(pdf_path: Path, *, parser: Any | None = None) -> ParsedPaper:
+    """Parse ``pdf_path`` with Docling (structure) and the pypdfium2 reader (page text).
 
-    from app.modules.literature.parsers import PyMuPDFParser
+    Args:
+        pdf_path: The PDF to parse.
+        parser: A structure parser with ``parse(pdf, work_dir, source_ref=...)`` returning a
+            ``ParsedDocument``; defaults to ``DoclingParser()`` (needs Docling's model weights).
 
+    Returns:
+        The parsed paper; ``parser_revision`` is the document's ``parser_key``.
+    """
     pdf_path = Path(pdf_path)
     sha = file_sha256(pdf_path)
-    parser = PyMuPDFParser()
+    parser = parser if parser is not None else DoclingParser()
     with tempfile.TemporaryDirectory(prefix="f2w-label-parse-") as work:
         document = parser.parse(pdf_path, Path(work), source_ref=f"sha256:{sha}")
         figures: List[Dict[str, Any]] = []
@@ -93,11 +102,8 @@ def parse_pdf(pdf_path: Path) -> ParsedPaper:
                             "text_layer": spans, "bbox": fig.bbox.as_dict() if fig.bbox is not None else None})
     tables = [{"table_id": t.table_id, "page": t.page, "caption": t.caption, "n_rows": t.n_rows,
                "n_cols": t.n_cols} for t in document.tables]
-    pages: List[Dict[str, Any]] = []
-    with fitz.open(str(pdf_path)) as doc:
-        for index in range(doc.page_count):
-            lines = PyMuPDFParser._lines(doc.load_page(index), index + 1)  # noqa: SLF001 - the parser's reader
-            pages.append({"page": index + 1, "text": "\n".join(line["text"] for line in lines)})
+    with open_pdf(pdf_path) as doc:
+        pages = [{"page": index + 1, "text": page.get_text("text")} for index, page in enumerate(doc)]
     return ParsedPaper(source_sha256=sha, parser_revision=document.parser_key, pages=tuple(pages),
                        figures=tuple(figures), tables=tuple(tables), num_pages=document.num_pages,
                        section_names=document.section_names())
@@ -108,6 +114,19 @@ FIGURE_CROP_DPI = 144
 FIGURE_CROP_MAX_SIDE = 1600
 
 
+def _topleft_box(box: Dict[str, Any], page_height: float) -> Tuple[float, float, float, float]:
+    """``(x0, y0, x1, y1)`` in top-left points from a figure ``bbox`` dict (origin BOTTOMLEFT or TOPLEFT, pt)."""
+    if str(box.get("units", "pt")) not in ("pt", "points"):
+        raise ValueError(f"unsupported bbox units {box.get('units')!r}")
+    left, top, right, bottom = (float(box[k]) for k in ("l", "t", "r", "b"))
+    origin = str(box.get("origin") or "BOTTOMLEFT").upper()
+    if origin == "BOTTOMLEFT":
+        top, bottom = page_height - top, page_height - bottom
+    elif origin != "TOPLEFT":
+        raise ValueError(f"unsupported bbox origin {box.get('origin')!r}")
+    return min(left, right), min(top, bottom), max(left, right), max(top, bottom)
+
+
 def render_figure_crops(pdf_path: Path, figures: Sequence[Dict[str, Any]], *, dpi: int = FIGURE_CROP_DPI,
                         max_side: int = FIGURE_CROP_MAX_SIDE) -> List[Optional[bytes]]:
     """PNG bytes of each figure's area (``bbox`` on its ``page``), in ``figures`` order (D1.7).
@@ -116,29 +135,26 @@ def render_figure_crops(pdf_path: Path, figures: Sequence[Dict[str, Any]], *, dp
     say which figures the vision model saw. The whole page is never sent. The crop is scaled
     to ``dpi`` and capped at ``max_side`` pixels on the longer edge.
     """
-    import fitz  # DEPRECATED(pymupdf): the F2W parser's library
-
     out: List[Optional[bytes]] = []
-    with fitz.open(str(pdf_path)) as doc:
+    with open_pdf(pdf_path) as doc:
         for fig in figures:
             box = fig.get("bbox")
             page_no = int(fig.get("page") or 0)
-            if not isinstance(box, dict) or not (1 <= page_no <= doc.page_count):
+            if not isinstance(box, dict) or not (1 <= page_no <= len(doc)):
                 out.append(None)
                 continue
             try:
-                rect = fitz.Rect(float(box["l"]), float(box["t"]), float(box["r"]), float(box["b"]))
-                page = doc.load_page(page_no - 1)
-                rect = rect & page.rect
-                if rect.is_empty or rect.width < 4 or rect.height < 4:
+                page = doc[page_no - 1]
+                x0, y0, x1, y1 = _topleft_box(box, page.height)
+                x0, y0, x1, y1 = max(0.0, x0), max(0.0, y0), min(page.width, x1), min(page.height, y1)
+                if x1 - x0 < 4 or y1 - y0 < 4:
                     out.append(None)
                     continue
                 zoom = dpi / 72.0
-                longest = max(rect.width, rect.height) * zoom
+                longest = max(x1 - x0, y1 - y0) * zoom
                 if longest > max_side:
                     zoom *= max_side / longest
-                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=rect, alpha=False)
-                out.append(pix.tobytes("png"))
+                out.append(page.render_png((x0, y0, x1, y1), zoom))
             except Exception:  # noqa: BLE001 - an unrenderable figure is reported as unseen, never guessed
                 out.append(None)
     return out

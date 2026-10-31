@@ -30,7 +30,7 @@ from app.modules.literature.parsed_document import (
     figure_geometry_props,
     without_embedded_images,
 )
-from app.modules.literature.parsers import PublicationParser, PyMuPDFParser
+from app.modules.literature.parsers import DoclingParser, PublicationParser
 from app.modules.literature.reading import PaperReader
 from app.modules.literature.store import FileDocumentStore, ref_for_bytes
 from app.modules.literature.tools import LIT_TOOL_SPECS, LiteratureToolset, authority_scope_provider
@@ -41,14 +41,16 @@ from app.modules.tools.bootstrap import build_registry
 from tests.literature.lit_fakes import (
     Router,
     als_user_ctx,
-    have_pymupdf,
+    
     local_ctx,
     make_paper_pdf,
     minimal_pdf_bytes,
     openalex_work,
 )
 
-needs_pymupdf = pytest.mark.skipif(not have_pymupdf(), reason="PyMuPDF not installed")
+needs_docling = pytest.mark.skipif(
+    not os.environ.get("F2W_DOCLING_ARTIFACTS_PATH"), reason="Docling model weights not available"
+)
 DOI = "10.1021/acs.macromol.0c01782"
 
 
@@ -114,7 +116,7 @@ def put_pdf(store, payload: bytes = b"") -> str:
 
 
 def test_parser_protocol_and_document_roundtrip():
-    assert isinstance(PyMuPDFParser(), PublicationParser) and isinstance(FakeParser(), PublicationParser)
+    assert isinstance(DoclingParser(), PublicationParser) and isinstance(FakeParser(), PublicationParser)
     doc = ParsedDocument(
         source_ref="sha256:" + "a" * 64,
         markdown="m",
@@ -232,8 +234,8 @@ def test_corrupt_source_is_refused(store):
         ParseService(store, [FakeParser()]).parse(local_ctx(), ref)
 
 
-@needs_pymupdf
-def test_pymupdf_parser_preserves_sections_figures_tables_geometry(store, tmp_path):
+@needs_docling
+def test_docling_parser_preserves_sections_figures_tables_geometry(store, tmp_path):
     path = make_paper_pdf(
         tmp_path / "p.pdf",
         title="Resonant soft X-ray scattering of blends",
@@ -246,24 +248,27 @@ def test_pymupdf_parser_preserves_sections_figures_tables_geometry(store, tmp_pa
         table=True,
     )
     ref = store.put_file(local_ctx(), path, media_type="application/pdf", metadata={"kind": "source_pdf"}).ref
-    service = ParseService(store, [PyMuPDFParser()])
+    service = ParseService(store, [DoclingParser()])
     doc = service.load(local_ctx(), service.parse(local_ctx(), ref))
     assert doc.pages[0].width == 612 and doc.pages[0].height == 792
     names = doc.section_names()
-    assert names[0] == "preamble" and "1. Introduction" in names and "2. Results" in names
+    assert "1. Introduction" in names and "2. Results" in names
     intro = doc.sections[names.index("1. Introduction")]
-    assert intro.page == 1 and intro.bbox.coord_origin == "TOPLEFT" and "Body line two." in intro.text
-    assert "Resonant soft X-ray" in doc.sections[0].text and DOI in doc.sections[0].text
+    assert intro.page == 1 and intro.bbox.coord_origin == "BOTTOMLEFT" and "Body line two." in intro.text
+    assert any(DOI in s.text for s in doc.sections) and "Resonant soft X-ray" in " ".join((*names, doc.markdown))
     fig = doc.figures[0]
-    assert (fig.bbox.left, fig.bbox.top, fig.bbox.right, fig.bbox.bottom) == (330, 420, 530, 570)
-    assert fig.caption.startswith("Figure 1.") and fig.images_scale == pytest.approx(1.0)
+    # Docling boxes are BOTTOMLEFT; in top-left points the figure sits where the fixture drew it.
+    top_left = (fig.bbox.left, 792 - fig.bbox.top, fig.bbox.right, 792 - fig.bbox.bottom)
+    assert fig.bbox.coord_origin == "BOTTOMLEFT" and top_left == pytest.approx((330, 420, 530, 570), abs=2.0)
+    assert fig.caption.startswith("Figure 1.") and fig.images_scale == pytest.approx(2.0, abs=0.05)
     assert store.get(local_ctx(), fig.asset_ref).startswith(b"\x89PNG")
     table = doc.tables[0]
     assert table.caption.startswith("Table 1.") and (table.n_rows, table.n_cols) == (3, 3)
     rows = list(csv.reader(io.StringIO(store.get(local_ctx(), table.data_ref).decode())))
     assert rows[0] == ["q", "I", "dI"]
+    assert len(table.cells) == 9 and all(c.bbox is not None for c in table.cells)
     assert "q I dI" not in intro.text  # table cells are not section prose
-    assert doc.parser == "pymupdf" and doc.parser_version and doc.parser_key.startswith("pymupdf-")
+    assert doc.parser == "docling" and doc.parser_version and doc.parser_key.startswith("docling-")
 
 
 # -- reader and tools ----------------------------------------------------------------------------

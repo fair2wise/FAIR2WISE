@@ -14,7 +14,7 @@ from tests.evidence.evidence_fixtures import WORK_ID, make_document
 from tests.extraction.extraction_fakes import (
     PlainPages, RoutedFakeChatClient, make_extractor, page_texts_with_code,
 )
-from tests.literature.lit_fakes import have_pymupdf, make_paper_pdf
+from tests.literature.lit_fakes import have_pdf_stack, make_paper_pdf
 
 FILENAME = "synthetic-t06.pdf"
 
@@ -87,7 +87,7 @@ def test_completeness_is_reported_as_unknown_not_success(tmp_path):
     assert result.inference["model"] == "fake-model"
 
 
-@pytest.mark.skipif(not have_pymupdf(), reason="PyMuPDF not installed")
+@pytest.mark.skipif(not have_pdf_stack(), reason="PDF reader stack not installed")
 def test_pdf_mode_calls_process_pdf_unchanged(tmp_path):
     pdf = make_paper_pdf(tmp_path / FILENAME, title="Synthetic T06",
                          sections=[("Results", " ".join(page_texts_with_code()))])

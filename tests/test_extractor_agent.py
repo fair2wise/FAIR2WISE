@@ -13,6 +13,26 @@ from app.modules.term_extractor.store import TermStore
 from app.modules.f2w_agent.extractor_agent import ExtractorAgent
 
 
+def _write_text_pdf(path, texts):
+    """One A4 page per string: 11 pt Helvetica, baseline at (72, 72) from the top-left."""
+    from io import BytesIO
+
+    from reportlab.pdfgen import canvas
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(595, 842), invariant=1)
+    c.setTitle("")
+    c.setAuthor("")
+    c.setSubject("")
+    c.setCreator("")
+    for text in texts:
+        c.setFont("Helvetica", 11)
+        c.drawString(72, 842 - 72, text)
+        c.showPage()
+    c.save()
+    Path(path).write_bytes(buf.getvalue())
+
+
 def test_term_store_stamps_publications_from_source_metadata(tmp_path):
     store = TermStore(str(tmp_path / "terms.json"))
     record = TermRecord(
@@ -221,18 +241,12 @@ def test_orchestrator_select_relevant_pages_respects_max_pages(tmp_path):
 
 
 def test_orchestrator_targeted_pdf_extracts_metadata_and_selected_pages_only(tmp_path, monkeypatch):
-    import fitz
-
     pdf_path = tmp_path / "paper.pdf"
-    doc = fitz.open()
-    doc.new_page().insert_text((72, 72), "Unrelated introduction about detector setup and calibration.")
-    doc.new_page().insert_text(
-        (72, 72),
+    _write_text_pdf(pdf_path, [
+        "Unrelated introduction about detector setup and calibration.",
         "Adaptive hello interval routing improves FANET link stability and reduces overhead.",
-    )
-    doc.new_page().insert_text((72, 72), "Unrelated conclusion about future work.")
-    doc.save(str(pdf_path))
-    doc.close()
+        "Unrelated conclusion about future work.",
+    ])
 
     metadata_calls = []
     processed_pages = []
@@ -403,18 +417,11 @@ def test_term_extractor_schema_maps_unknown_labels_to_general_schema():
 
 
 def test_orchestrator_process_pdf_adds_github_snippets(tmp_path, monkeypatch):
-    import fitz
-
     pdf_path = tmp_path / "paper.pdf"
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text(
-        (72, 72),
+    _write_text_pdf(pdf_path, [
         "The source code is available at https://github.com/example/peaks. "
         "The function find_peaks_for_q(q, intensity) is used for SAXS analysis.",
-    )
-    doc.save(str(pdf_path))
-    doc.close()
+    ])
 
     monkeypatch.setattr(provenance, "extract_code_snippets", lambda *args, **kwargs: [])
     monkeypatch.setattr(

@@ -1,10 +1,13 @@
-"""Synthetic PDF and ParsedDocument fixtures for the T09 vision tests (PyMuPDF only; no real papers)."""
+"""Synthetic PDF and ParsedDocument fixtures for the T09 vision tests (reportlab; no real papers)."""
 
 from __future__ import annotations
 
+from io import BytesIO
 from typing import Any, List, Optional, Sequence, Tuple
 
-import fitz
+from PIL import Image, ImageDraw
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 from app.modules.literature.parsed_document import BoundingBox, PageInfo, ParsedDocument, ParsedFigure, ParsedTable
 
@@ -17,12 +20,68 @@ PANEL_B = (300.0, 100.0, 520.0, 300.0)
 CAPTION_Y = 350.0
 
 
-def _ticks(page: Any, panel: Tuple[float, ...], values: Sequence[str], title: str) -> None:
+def _text(c: Any, x: float, y: float, value: str, size: float, color: tuple[float, float, float] = (0, 0, 0)) -> None:
+    """Draw ``value`` with its baseline at top-left ``(x, y)`` (PyMuPDF ``insert_text`` semantics)."""
+    c.setFont("Helvetica", size)
+    c.setFillColorRGB(*color)
+    c.drawString(x, PAGE_H - y, value)
+
+
+def _textbox(c: Any, rect: tuple[float, float, float, float], value: str, size: float) -> None:
+    """Word-wrapped text in a top-left ``rect`` (matches PyMuPDF ``insert_textbox`` line placement)."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    x0, y0, x1, _ = rect
+    words, lines, cur = value.split(), [], ""
+    for word in words:
+        trial = f"{cur} {word}" if cur else word
+        if cur and stringWidth(trial, "Helvetica", size) > x1 - x0:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    lines.append(cur)
+    for i, line in enumerate(lines):
+        _text(c, x0, y0 + 1.075 * size + i * 1.4771 * size, line, size)
+
+
+def _rect(c: Any, rect: tuple[float, float, float, float], *, fill: tuple[float, float, float] | None = None,
+          stroke: tuple[float, float, float] | None = None, width: float = 1.0) -> None:
+    x0, y0, x1, y1 = rect
+    if fill is not None:
+        c.setFillColorRGB(*fill)
+    if stroke is not None:
+        c.setStrokeColorRGB(*stroke)
+        c.setLineWidth(width)
+    c.rect(x0, PAGE_H - y1, x1 - x0, y1 - y0, stroke=int(stroke is not None), fill=int(fill is not None))
+
+
+def _canvas(rotation: int = 0) -> tuple[Any, BytesIO]:
+    buf = BytesIO()
+    # reportlab swaps MediaBox width/height for a 90/270 page rotation, so pre-swap to keep a 612x792 MediaBox.
+    size = (PAGE_H, PAGE_W) if rotation % 180 else (PAGE_W, PAGE_H)
+    c = canvas.Canvas(buf, pagesize=size, invariant=1)
+    c.setTitle("")
+    c.setAuthor("")
+    c.setSubject("")
+    c.setCreator("")
+    return c, buf
+
+
+def _finish(c: Any, buf: BytesIO, rotation: int = 0) -> bytes:
+    if rotation:
+        c.setPageRotation(rotation)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+def _ticks(c: Any, panel: Tuple[float, ...], values: Sequence[str], title: str) -> None:
     x0, y0, x1, y1 = panel
     for i, v in enumerate(values):
-        page.insert_text((x0 + 15 + i * 45, y1 - 8), v, fontsize=8)
+        _text(c, x0 + 15 + i * 45, y1 - 8, v, 8)
     if title:
-        page.insert_text((x0 + 40, y1 - 24), title, fontsize=8)
+        _text(c, x0 + 40, y1 - 24, title, 8)
 
 
 def multi_panel_pdf(
@@ -38,54 +97,50 @@ def multi_panel_pdf(
     panels: Sequence[Tuple[float, ...]] = (PANEL_A, PANEL_B),
 ) -> bytes:
     """One page: two filled panels with tick labels, optional white scale bar in panel A, and a caption."""
-    doc = fitz.open()
-    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    c, buf = _canvas(rotation)
     for rect in panels:
-        page.draw_rect(fitz.Rect(*rect), color=None, fill=(0.35, 0.35, 0.35))
+        _rect(c, rect, fill=(0.35, 0.35, 0.35))
     if letters:
         for rect, letter in zip(panels, "abcdefgh"):
-            page.insert_text((rect[0] + 6, rect[1] + 14), letter, fontsize=10, color=(1, 1, 1))
-    _ticks(page, panels[0], ticks_a, title_a)
+            _text(c, rect[0] + 6, rect[1] + 14, letter, 10, (1, 1, 1))
+    _ticks(c, panels[0], ticks_a, title_a)
     if len(panels) > 1:
-        _ticks(page, panels[1], ticks_b, title_b)
+        _ticks(c, panels[1], ticks_b, title_b)
     if bar_a:   # 30 pt white bar, bottom-right quadrant of panel A
         x1, y1 = panels[0][2], panels[0][3]
-        page.draw_rect(fitz.Rect(x1 - 45, y1 - 40, x1 - 15, y1 - 37), color=None, fill=(1, 1, 1))
-    page.insert_textbox(fitz.Rect(40, CAPTION_Y, 560, CAPTION_Y + 80), caption, fontsize=9)
-    if rotation:
-        page.set_rotation(rotation)
-    return doc.tobytes()
+        _rect(c, (x1 - 45, y1 - 40, x1 - 15, y1 - 37), fill=(1, 1, 1))
+    _textbox(c, (40, CAPTION_Y, 560, CAPTION_Y + 80), caption, 9)
+    return _finish(c, buf, rotation)
 
 
 def raster_figure_pdf(caption: str) -> bytes:
     """A flat raster figure with NO text layer inside it (two panels, bar in the first)."""
-    doc = fitz.open()
-    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    c, buf = _canvas()
     w, h = 500, 240
-    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, w, h), False)
-    pix.set_rect(pix.irect, (255, 255, 255))
-    pix.set_rect(fitz.IRect(10, 10, 240, 210), (90, 90, 90))
-    pix.set_rect(fitz.IRect(260, 10, 490, 210), (110, 110, 110))
-    pix.set_rect(fitz.IRect(180, 190, 230, 193), (255, 255, 255))
-    page.insert_image(fitz.Rect(*FIG), pixmap=pix)
-    page.insert_textbox(fitz.Rect(40, CAPTION_Y, 560, CAPTION_Y + 80), caption, fontsize=9)
-    return doc.tobytes()
+    img = Image.new("RGB", (w, h), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([10, 10, 239, 209], fill=(90, 90, 90))
+    draw.rectangle([260, 10, 489, 209], fill=(110, 110, 110))
+    draw.rectangle([180, 190, 229, 192], fill=(255, 255, 255))
+    x0, y0, x1, y1 = FIG
+    c.drawImage(ImageReader(img), x0, PAGE_H - y1, width=x1 - x0, height=y1 - y0)
+    _textbox(c, (40, CAPTION_Y, 560, CAPTION_Y + 80), caption, 9)
+    return _finish(c, buf)
 
 
 def table_pdf(rows: List[List[str]], origin: Tuple[float, float] = (60.0, 420.0),
               cell: Tuple[float, float] = (90.0, 22.0)) -> bytes:
     """A ruled table of text cells."""
-    doc = fitz.open()
-    page = doc.new_page(width=PAGE_W, height=PAGE_H)
+    c, buf = _canvas()
     x0, y0 = origin
     cw, ch = cell
     for r, row in enumerate(rows):
-        for c, text in enumerate(row):
-            rect = fitz.Rect(x0 + c * cw, y0 + r * ch, x0 + (c + 1) * cw, y0 + (r + 1) * ch)
-            page.draw_rect(rect, color=(0, 0, 0), width=0.8)
-            page.insert_text((rect.x0 + 4, rect.y1 - 7), text, fontsize=9)
-    page.insert_text((x0, y0 - 8), "Table 1. Peak positions", fontsize=9)
-    return doc.tobytes()
+        for col, value in enumerate(row):
+            rect = (x0 + col * cw, y0 + r * ch, x0 + (col + 1) * cw, y0 + (r + 1) * ch)
+            _rect(c, rect, stroke=(0, 0, 0), width=0.8)
+            _text(c, rect[0] + 4, rect[3] - 7, value, 9)
+    _text(c, x0, y0 - 8, "Table 1. Peak positions", 9)
+    return _finish(c, buf)
 
 
 def bl_bbox(region: Tuple[float, float, float, float], height: float = PAGE_H) -> BoundingBox:

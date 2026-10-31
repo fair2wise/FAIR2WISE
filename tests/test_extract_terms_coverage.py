@@ -5,7 +5,7 @@ Targets the four large uncovered areas:
   A. OllamaChatClient / CBorgChatClient / make_chat_client  (lines 55–107)
   B. _extract_pub_metadata  — all 4 year-priority branches + title/doi/
      authors/journal/volume/abstract extraction  (lines 1417–1604)
-  C. process_pdf  — happy path, fitz-open failure, per-page error,
+  C. process_pdf  — happy path, open_pdf failure, per-page error,
      metadata backfill  (lines 1612–1703)
   D. process_directory  — empty dir, no-PDF dir, importance scoring,
      final save  (lines 1710–1743)
@@ -13,7 +13,7 @@ Targets the four large uncovered areas:
   F. _merge_term / existing-key path in process_page  (lines 1228–1288)
   G. CBorgChatClient.chat happy path  (line ~90)
 
-All heavy I/O (fitz, requests, openai) is mocked; no real PDF or network needed.
+All heavy I/O (open_pdf, requests, openai) is mocked; no real PDF or network needed.
 """
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ def _fake_page(text: str) -> MagicMock:
 
 
 def _fake_doc(pages: list[str], metadata: dict | None = None) -> MagicMock:
-    """Minimal fitz.Document stub."""
+    """Minimal PdfDocument stub."""
     doc = MagicMock()
     doc.page_count = len(pages)
     doc.metadata = metadata or {}
@@ -446,7 +446,7 @@ class TestProcessPdf:
         e.fuzzy_merge = MagicMock(return_value=None)
         e._save_terms_threadsafe = MagicMock()
 
-        with patch("app.modules.extract_terms.fitz.open", return_value=doc):
+        with patch("app.modules.extract_terms.open_pdf", return_value=doc):
             count = e.process_pdf("/fake/paper.pdf")
 
         assert count == 1
@@ -457,7 +457,7 @@ class TestProcessPdf:
     def test_fitz_open_failure_returns_zero(self, tmp_path):
         e = _bare_extractor(tmp_path)
 
-        with patch("app.modules.extract_terms.fitz.open", side_effect=RuntimeError("corrupt pdf")):
+        with patch("app.modules.extract_terms.open_pdf", side_effect=RuntimeError("corrupt pdf")):
             count = e.process_pdf("/fake/bad.pdf")
 
         assert count == 0
@@ -475,7 +475,7 @@ class TestProcessPdf:
             "issue": None, "pages_range": None, "abstract_text": None, "keywords": [],
         })
 
-        with patch("app.modules.extract_terms.fitz.open", return_value=doc):
+        with patch("app.modules.extract_terms.open_pdf", return_value=doc):
             count = e.process_pdf("/fake/paper.pdf")
 
         assert count == 0
@@ -506,7 +506,7 @@ class TestProcessPdf:
         })
         e._save_terms_threadsafe = MagicMock()
 
-        with patch("app.modules.extract_terms.fitz.open", return_value=doc):
+        with patch("app.modules.extract_terms.open_pdf", return_value=doc):
             e.process_pdf("/fake/paper.pdf")
 
         # Both terms should now have the doi and paper_title backfilled

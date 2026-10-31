@@ -364,7 +364,7 @@ class TestAutoDeviceAndLoadPdf:
         pdf_path = tmp_path / "real.pdf"
         pdf_path.write_bytes(b"%PDF")
 
-        with patch("app.modules.kg_rag_api.fitz.open", return_value=fake_doc):
+        with patch("app.modules.kg_rag_api.open_pdf", return_value=fake_doc):
             result = kg_rag_api.load_pdf_text(str(pdf_path))
 
         assert "extracted text content" in result

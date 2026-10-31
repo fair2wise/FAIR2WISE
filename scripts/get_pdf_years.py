@@ -1,10 +1,14 @@
 import os
 import re
-# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-import fitz  # pip install pymupdf
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
+import sys
+
+# checkout-only script; app/ is not on sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.modules.literature.pdf_reader import open_pdf  # noqa: E402
 
 CURRENT_YEAR = datetime.now().year
 
@@ -34,10 +38,10 @@ def year_from_arxiv_filename(fname: str):
 
 def year_from_metadata(pdf_path: str):
     try:
-        doc = fitz.open(pdf_path)
+        doc = open_pdf(pdf_path)
         meta = doc.metadata or {}
         doc.close()
-        # fitz uses keys like 'creationDate'/'modDate' in Adobe format D:YYYYMMDD...
+        # open_pdf uses fitz-style keys like 'creationDate'/'modDate' in Adobe format D:YYYYMMDD...
         for key in ('creationDate', 'modDate'):
             v = meta.get(key)
             if not v:
@@ -55,7 +59,7 @@ def year_from_metadata(pdf_path: str):
 def year_from_text(pdf_path: str, max_pages_front=2):
     years = []
     try:
-        doc = fitz.open(pdf_path)
+        doc = open_pdf(pdf_path)
         pages_to_scan = list(range(min(max_pages_front, len(doc))))
         if len(doc) > 0:
             last_idx = len(doc) - 1

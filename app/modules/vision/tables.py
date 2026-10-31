@@ -1,9 +1,9 @@
 """Paper tables with cell geometry and locators, from a ParsedDocument and the PDF text layer.
 
-The parser records each table's page, bbox and shape; this adds the cells: text and a box per
-cell, in PDF points with a top-left origin, found by PyMuPDF's ruled-table detector inside the
-parsed bbox. A table whose bbox is missing, whose detector finds nothing/ambiguity, or whose shape
-disagrees with the parser's is reported with an uncertainty rather than guessed. Cell text is source
+The parser records each table's page, bbox, shape and cells (Docling's table-structure model gives
+each cell its row/column position, text and box); this converts the cells to PDF points with a
+top-left origin. A table whose bbox is missing, which has no cells, or whose shape disagrees with the
+parser's is reported with an uncertainty rather than guessed. Cell text is source
 text (agent-private); cells are bounded in count and length.
 
 New for F2W (donor ``figure_extraction`` has no table-geometry equivalent); uses
@@ -17,7 +17,7 @@ from typing import Any, Sequence
 
 from ..contracts.evidence import EvidenceRef, SourceLocator
 from ..literature.parsed_document import ParsedDocument, ParsedTable
-from .results import Box, Uncertainty, box4, evidence, locator
+from .results import Box, Uncertainty, evidence, locator
 from .text_layer import open_pdf, page_geometry, to_topleft
 
 MAX_CELLS = 400
@@ -70,16 +70,21 @@ def table_id_of(table: ParsedTable, ordinal: int) -> str:
     return table.table_id or f"tbl-p{(table.page or 0):03d}-{ordinal:02d}"
 
 
-def _cells(found: Any) -> tuple[list[TableCell], int, int]:
-    grid = found.extract()
+def _cells(table: ParsedTable, page_height: float) -> tuple[list[TableCell], int, int]:
+    """The parsed cells as :class:`TableCell` (top-left points) plus the grid size they span."""
     cells: list[TableCell] = []
-    for r, row in enumerate(found.rows):
-        for c, bb in enumerate(row.cells):
-            if bb is None:
-                continue
-            text = grid[r][c] if r < len(grid) and c < len(grid[r]) and grid[r][c] is not None else ""
-            cells.append(TableCell(r, c, str(text), box4(tuple(bb))))
-    return cells, int(found.row_count), int(found.col_count)
+    n_rows = n_cols = 0
+    for cell in table.cells:
+        n_rows = max(n_rows, cell.row + max(cell.row_span, 1))
+        n_cols = max(n_cols, cell.col + max(cell.col_span, 1))
+        if cell.bbox is None:
+            continue
+        try:
+            box = to_topleft(cell.bbox, page_height)
+        except ValueError:
+            continue
+        cells.append(TableCell(cell.row, cell.col, cell.text, box))
+    return cells, n_rows, n_cols
 
 
 def extract_tables(
@@ -122,18 +127,13 @@ def extract_tables(
             cells: list[TableCell] = []
             n_rows = n_cols = 0
             if region is not None and not geo.rotation:
-                import fitz
-
-                finder = doc[table.page - 1].find_tables(clip=fitz.Rect(*region))
-                if len(finder.tables) != 1:
-                    unc.append(Uncertainty("table_detection_ambiguous",
-                                           f"{len(finder.tables)} ruled tables found inside the parsed bbox",
-                                           blocking=True))
-                else:
-                    cells, n_rows, n_cols = _cells(finder.tables[0])
-                    if (n_rows, n_cols) != shape and shape != (0, 0):
-                        unc.append(Uncertainty("table_shape_mismatch",
-                                               f"parser {shape[0]}x{shape[1]}, cells {n_rows}x{n_cols}"))
+                cells, n_rows, n_cols = _cells(table, geo.height_pt)
+                if not cells:
+                    unc.append(Uncertainty("table_cells_unavailable",
+                                           "the parser gave no cell boxes for this table", blocking=True))
+                elif (n_rows, n_cols) != shape and shape != (0, 0):
+                    unc.append(Uncertainty("table_shape_mismatch",
+                                           f"parser {shape[0]}x{shape[1]}, cells {n_rows}x{n_cols}"))
             refs = (evidence(work_id, sha, loc, "table", tid),) if work_id else ()
             out.append(TableResult(tid, table.page, table.caption, n_rows, n_cols, shape, loc,
                                    tuple(cells[:MAX_CELLS]), len(cells) > MAX_CELLS, tuple(unc), refs))

@@ -212,3 +212,15 @@ embedding models the code defaults to (`all-MiniLM-L6-v2` for the QA retrieval p
 runtime. The profiles default to `KG_RAG_RETRIEVAL_BACKEND=lexical`; pass
 `-e KG_RAG_RETRIEVAL_BACKEND=semantic` to use the embedding backend. A different
 `KG_RAG_EMBED_MODEL` or `F2W_MERGE_EMBED_MODEL` is not in the image and will fail offline.
+
+## PDF parsing in the images
+
+PDFs are read with Docling (structure: headings, figures, tables with cells) and pypdfium2 (page text,
+metadata, rendering); PyMuPDF (AGPL-3.0) is not in any image. Docling's layout and table-structure
+model weights are not in the repository or in `pixi.lock`: the build fetches them with
+`scripts/fetch_docling_models.py` at the commits pinned in that file into
+`F2W_DOCLING_ARTIFACTS_PATH=/opt/fair2wise/docling` (about 0.5 GB), so with `HF_HUB_OFFLINE=1` a
+running image never downloads them. CI fetches the same pinned weights for the suites that run real
+conversions; those tests skip when the variable is unset. Bump a revision deliberately and rerun
+`tests/literature/test_docling_parser.py` and `tests/evals_binary`. How the parser's output compares
+with the old one: `docs/migration/reviews/H7/docling_parity.md`.

@@ -46,10 +46,6 @@ from colorama import Fore, Style
 from colorama import init as colorama_init
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-
-# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-import fitz  # PyMuPDF
 import numpy as np
 import openai
 
@@ -89,6 +85,7 @@ else:
 
 from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
 from .cborg_limiter import async_slot  # noqa: E402
+from .literature.pdf_reader import open_pdf  # noqa: E402
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if TYPE_CHECKING:
@@ -966,7 +963,7 @@ def load_pdf_text(path: str) -> str:
         logger.debug("PDF missing, skipping evidence lookup: %s", path)
         return ""
     try:
-        doc = fitz.open(path)
+        doc = open_pdf(path)
     except Exception as exc:  # pragma: no cover
         logger.debug("PDF open failed %s - %s", path, exc)
         return ""

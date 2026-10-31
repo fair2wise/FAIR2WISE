@@ -177,7 +177,7 @@ def caption_inverse_unit(caption: str) -> str:
 
     THE SECOND ACCEPTABLE PROVENANCE FOR A UNIT, and for most of this corpus
     the only one. In-figure axis titles are usually rasterised into the image,
-    so pymupdf finds no unit inside the figure and OCR mangles the exponent
+    so the text layer finds no unit inside the figure and OCR mangles the exponent
     every time -- measured, RapidOCR renders one plate's q axis as
     ``'q2 [A{]}'``. The caption is prose in the PDF's own text layer, which
     means it is readable and it is not a transcription.

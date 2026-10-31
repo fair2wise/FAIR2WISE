@@ -34,9 +34,6 @@ import sys
 import threading
 from typing import Any, TypeVar, Union, cast
 
-# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-import fitz  # this is exactly the same as PyMuPDF
 from linkml_runtime.utils.schemaview import SchemaView
 import openai
 from rapidfuzz import fuzz, process  # still used by SchemaHelper for class/slot matching
@@ -46,6 +43,7 @@ from .agents.chebi import ChebiOboLookup
 from .agents.chem_checker import ChemicalFormulaValidator
 from .agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
 from .cborg_http import openai_http_kwargs, require_cborg_api_key
+from .literature.pdf_reader import PdfDocument, open_pdf
 from .term_extractor.merge_index import (
     DEFAULT_EMBED_MODEL,
     DEFAULT_MERGE_TOP_K,
@@ -1278,7 +1276,7 @@ Output JSON:
         return True
 
     @retry_on_exception((Exception,), retries=1, delay_seconds=1.0)
-    def process_page(self, doc: fitz.Document, pdf_path: str, page_num: int, pub_year: int | None = None, pub_meta: dict[str, Any] | None = None) -> bool:
+    def process_page(self, doc: PdfDocument, pdf_path: str, page_num: int, pub_year: int | None = None, pub_meta: dict[str, Any] | None = None) -> bool:
         """Process one page.
 
         Steps:
@@ -1563,7 +1561,7 @@ Output JSON:
 
         return updated
 
-    def _extract_year_from_pdf(self, doc: fitz.Document, pdf_path: str) -> int | None:
+    def _extract_year_from_pdf(self, doc: PdfDocument, pdf_path: str) -> int | None:
         """Attempt to extract publication year from PDF metadata or first-page text.
 
         Delegates to _extract_pub_metadata for the full date-aware logic.
@@ -1572,7 +1570,7 @@ Output JSON:
         meta = self._extract_pub_metadata(doc, pdf_path)
         return meta.get("publication_year")
 
-    def _extract_pub_metadata(self, doc: fitz.Document, pdf_path: str) -> dict[str, Any]:
+    def _extract_pub_metadata(self, doc: PdfDocument, pdf_path: str) -> dict[str, Any]:
         """Extract publication metadata from PDF metadata fields and first-page text.
 
         Returns a dict with keys: publication_year, paper_title, authors,
@@ -1781,7 +1779,7 @@ Output JSON:
         Updates metadata['processed_pages_total'] and 'processed_pages_with_terms'.
         """
         try:
-            doc = fitz.open(pdf_path)
+            doc = open_pdf(pdf_path)
         except Exception as e:
             logger.error(f"Cannot open PDF {pdf_path}: {e}")
             return 0

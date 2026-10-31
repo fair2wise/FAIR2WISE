@@ -2,7 +2,7 @@
 
 Nothing here touches the network. Provider responses are synthesized from the
 shapes the donor tests and the provider docs describe; PDFs are generated with
-PyMuPDF when it is installed, otherwise as minimal hand-written PDF bytes.
+reportlab (or as minimal hand-written PDF bytes).
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def als_user_ctx(**kw: Any) -> RequestContext:
 
 
 def minimal_pdf_bytes(text: str = "Hello", *, pad: int = 2000) -> bytes:
-    """A small, structurally valid one-page PDF with ``text`` (no PyMuPDF needed)."""
+    """A small, structurally valid one-page PDF with ``text`` (no PDF library needed)."""
     stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
@@ -68,10 +68,11 @@ def minimal_pdf_bytes(text: str = "Hello", *, pad: int = 2000) -> bytes:
     return bytes(out)
 
 
-def have_pymupdf() -> bool:
-    """Whether PyMuPDF is importable in this environment."""
+def have_pdf_stack() -> bool:
+    """Whether the stacks that read and write the fixture PDFs are importable (pypdfium2, reportlab)."""
     try:
-        import fitz  # noqa: F401
+        import pypdfium2  # noqa: F401
+        import reportlab  # noqa: F401
     except ImportError:
         return False
     return True
@@ -79,57 +80,85 @@ def have_pymupdf() -> bool:
 
 def make_paper_pdf(path: Path, *, title: str, doi: str = "", sections: Iterable[Tuple[str, str]] = (),
                    figure: bool = False, table: bool = False, pages: int = 1) -> Path:
-    """Write a synthetic paper PDF with PyMuPDF (callers skip when unavailable).
+    """Write a synthetic paper PDF with reportlab (callers skip when the reader stack is unavailable).
 
     Headings are drawn larger than body text so a font-size heading detector sees
     them; an optional raster figure with a caption and a ruled table are added on page 1.
+    Coordinates below are top-left points (as the fixtures were designed) and are
+    flipped to reportlab's bottom-left origin when drawn.
     """
-    import fitz
+    from io import BytesIO
 
-    doc = fitz.open()
-    page = doc.new_page(width=612, height=792)
+    from PIL import Image
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    height = 792
+    ops: list[list[Callable[[Any], None]]] = []
+
+    def text(page: int, x: float, y: float, value: str, size: float) -> None:
+        def draw(c: Any) -> None:
+            c.setFont("Helvetica", size)
+            c.setFillColorRGB(0, 0, 0)
+            c.drawString(x, height - y, value)
+        ops[page].append(draw)
+
+    ops.append([])
+    cur = 0
     y = 72
-    page.insert_text((72, y), title, fontsize=18)
+    text(cur, 72, y, title, 18)
     y += 28
     if doi:
-        page.insert_text((72, y), f"https://doi.org/{doi}", fontsize=9)
+        text(cur, 72, y, f"https://doi.org/{doi}", 9)
         y += 20
     for heading, body in sections:
         if y > 640:
-            page = doc.new_page(width=612, height=792)
+            ops.append([])
+            cur += 1
             y = 72
-        page.insert_text((72, y), heading, fontsize=14)
+        text(cur, 72, y, heading, 14)
         y += 20
         for line in body.split("\n"):
-            page.insert_text((72, y), line, fontsize=10)
+            text(cur, 72, y, line, 10)
             y += 14
         y += 10
     if figure:
-        first = doc[0]
-        pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 200, 150), False)
-        for x in range(200):
-            for yy in range(150):
-                pix.set_pixel(x, yy, ((x * 7) % 256, (yy * 5) % 256, ((x + yy) * 3) % 256))
-        rect = fitz.Rect(330, 420, 530, 570)
-        first.insert_image(rect, pixmap=pix)
-        first.insert_text((330, 590), "Figure 1. Scattering pattern of the film.", fontsize=9)
+        img = Image.new("RGB", (200, 150))
+        img.putdata([(((x * 7) % 256, (yy * 5) % 256, ((x + yy) * 3) % 256))
+                     for yy in range(150) for x in range(200)])
+        ops[0].append(lambda c: c.drawImage(ImageReader(img), 330, height - 570, width=200, height=150))
+        text(0, 330, 590, "Figure 1. Scattering pattern of the film.", 9)
     if table:
-        first = doc[0]
         x0, y0, w, h = 72, 620, 240, 60
-        for i in range(4):
-            first.draw_line((x0, y0 + i * 20), (x0 + w, y0 + i * 20))
-        for j in range(4):
-            first.draw_line((x0 + j * 80, y0), (x0 + j * 80, y0 + h))
+
+        def rules(c: Any) -> None:
+            c.setStrokeColorRGB(0, 0, 0)
+            c.setLineWidth(1)
+            for i in range(4):
+                c.line(x0, height - (y0 + i * 20), x0 + w, height - (y0 + i * 20))
+            for j in range(4):
+                c.line(x0 + j * 80, height - y0, x0 + j * 80, height - (y0 + h))
+        ops[0].append(rules)
         cells = [["q", "I", "dI"], ["0.1", "10", "1"], ["0.2", "8", "1"]]
         for i, row in enumerate(cells):
             for j, value in enumerate(row):
-                first.insert_text((x0 + j * 80 + 5, y0 + i * 20 + 14), value, fontsize=9)
-        first.insert_text((72, 612), "Table 1. Fitted parameters.", fontsize=9)
-    while doc.page_count < pages:
-        doc.new_page(width=612, height=792).insert_text((72, 72), "continued", fontsize=10)
-    doc.set_metadata({"title": title, "subject": f"doi:{doi}" if doi else ""})
-    doc.save(str(path))
-    doc.close()
+                text(0, x0 + j * 80 + 5, y0 + i * 20 + 14, value, 9)
+        text(0, 72, 612, "Table 1. Fitted parameters.", 9)
+    while len(ops) < pages:
+        ops.append([])
+        text(len(ops) - 1, 72, 72, "continued", 10)
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(612, height), invariant=1)
+    c.setTitle(title)
+    c.setSubject(f"doi:{doi}" if doi else "")
+    c.setAuthor("")
+    c.setCreator("")
+    for page_ops in ops:
+        for draw in page_ops:
+            draw(c)
+        c.showPage()
+    c.save()
+    path.write_bytes(buf.getvalue())
     return path
 
 
@@ -202,7 +231,7 @@ def json_dump(obj: Any) -> str:
 
 
 __all__ = (
-    "NOW", "Router", "als_user_ctx", "have_pymupdf", "json_dump", "local_ctx", "make_paper_pdf",
+    "NOW", "Router", "als_user_ctx", "have_pdf_stack", "json_dump", "local_ctx", "make_paper_pdf",
     "minimal_pdf_bytes", "openalex_work",
 )
 

@@ -19,9 +19,7 @@ import os
 import re
 from typing import Any
 
-# DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-# See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-import fitz
+from ..literature.pdf_reader import PdfDocument
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +283,7 @@ def extract_code_snippets(
 
 
 # ───────────────────────── publication metadata ─────────────────────────
-def extract_pub_metadata(doc: fitz.Document, pdf_path: str) -> dict[str, Any]:
+def extract_pub_metadata(doc: PdfDocument, pdf_path: str) -> dict[str, Any]:
     """Extract publication metadata from PDF metadata fields and first-page text.
 
     All values are ``None`` or ``[]`` if not found. Never invents fields.

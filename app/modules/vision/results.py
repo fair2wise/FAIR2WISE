@@ -1,7 +1,7 @@
 """Shared result vocabulary for the paper-figure pipeline: frames, locators, uncertainty.
 
 Every figure/panel result carries a contracts :class:`SourceLocator` whose bbox is in
-**PDF points with a top-left origin** (the frame PyMuPDF reports), plus the page size
+**PDF points with a top-left origin** (the frame the PDF reader reports), plus the page size
 and the transform that maps the internal render back to the page. Nothing here holds
 image bytes, store paths or asset URLs (D19): rendering happens in-process and the
 pixels never leave the extractor.
@@ -35,7 +35,7 @@ BLOCKING = frozenset({
 
 
 class VisionUnavailable(ContractError):
-    """A required capability (PyMuPDF, OCR engine, ...) is missing: explicit and retryable."""
+    """A required capability (pypdfium2, OCR engine, ...) is missing: explicit and retryable."""
 
     def __init__(self, capability: str, detail: str = "") -> None:
         super().__init__(ErrorCode.UNAVAILABLE, f"{capability} is not available{': ' + detail if detail else ''}",

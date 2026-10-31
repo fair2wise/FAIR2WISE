@@ -2,7 +2,7 @@
 
 These are observations of what a parser *read*, not scientific entities: a
 parsed package is not a validated publication. Coordinates are kept exactly as
-the parser reports them, with their origin (``TOPLEFT`` for PyMuPDF,
+the parser reports them, with their origin (``TOPLEFT`` for text spans,
 ``BOTTOMLEFT`` for PDF-native Docling boxes) and units (PDF points), plus each
 page's size, so an overlay or crop can be reproduced without guessing.
 
@@ -125,6 +125,51 @@ class ParsedSection:
 
 
 @dataclass(frozen=True)
+class ParsedTableCell:
+    """One table cell as the parser located it.
+
+    Attributes:
+        row: Zero-based first row the cell occupies.
+        col: Zero-based first column the cell occupies.
+        text: The cell text verbatim.
+        row_span: Rows covered (at least 1).
+        col_span: Columns covered (at least 1).
+        bbox: The cell box in its OWN origin and units (``bbox.coord_origin``); ``None`` when the
+            parser gave no geometry for the cell.
+    """
+
+    row: int
+    col: int
+    text: str
+    row_span: int = 1
+    col_span: int = 1
+    bbox: BoundingBox | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        """JSON-safe form."""
+        return {
+            "row": self.row,
+            "col": self.col,
+            "text": self.text,
+            "row_span": self.row_span,
+            "col_span": self.col_span,
+            **({"bbox": self.bbox.as_dict()} if self.bbox else {}),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> ParsedTableCell:
+        """Inverse of :meth:`as_dict`."""
+        return cls(
+            int(value["row"]),
+            int(value["col"]),
+            str(value.get("text", "")),
+            int(value.get("row_span", 1)),
+            int(value.get("col_span", 1)),
+            BoundingBox.from_dict(value.get("bbox")),
+        )
+
+
+@dataclass(frozen=True)
 class ParsedTable:
     """One table with its CSV asset and geometry."""
 
@@ -136,6 +181,8 @@ class ParsedTable:
     bbox: BoundingBox | None = None
     table_id: str = ""
     data_path: Path | None = None
+    #: Cells with text and boxes (empty when the parser gives no cell geometry).
+    cells: tuple[ParsedTableCell, ...] = ()
 
 
 def config_hash(config: Mapping[str, Any]) -> str:
@@ -236,6 +283,7 @@ class ParsedDocument:
                     "data_ref": t.data_ref,
                     "caption": t.caption,
                     **({"bbox": t.bbox.as_dict()} if t.bbox else {}),
+                    **({"cells": [c.as_dict() for c in t.cells]} if t.cells else {}),
                 }
                 for t in self.tables
             ],
@@ -355,6 +403,7 @@ def document_from_dict(data: Mapping[str, Any]) -> ParsedDocument:
                 caption=t.get("caption", ""),
                 bbox=BoundingBox.from_dict(t.get("bbox")),
                 table_id=t.get("table_id", ""),
+                cells=tuple(ParsedTableCell.from_dict(c) for c in t.get("cells", [])),
             )
             for t in data.get("tables", [])
         ),
@@ -400,6 +449,7 @@ __all__ = (
     "ParsedFigure",
     "ParsedSection",
     "ParsedTable",
+    "ParsedTableCell",
     "SECTION_TEXT_MAX_CHARS",
     "config_hash",
     "document_from_dict",

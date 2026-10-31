@@ -269,7 +269,7 @@ class TestLoadPdfText:
         pdf = tmp_path / "test.pdf"
         pdf.write_bytes(b"%PDF")
 
-        with patch("app.modules.kg_rag_api.fitz.open", return_value=fake_doc):
+        with patch("app.modules.kg_rag_api.open_pdf", return_value=fake_doc):
             result = kg_rag_api.load_pdf_text(str(pdf))
         assert "page content" in result
         kg_rag_api.load_pdf_text.cache_clear()

@@ -1,6 +1,5 @@
 import json
-
-import fitz
+from pathlib import Path
 
 from app.modules.f2w_agent.paper_evidence_agent import (
     PaperEvidenceAgent,
@@ -9,12 +8,22 @@ from app.modules.f2w_agent.paper_evidence_agent import (
 
 
 def _pdf(path, texts):
-    doc = fitz.open()
+    from io import BytesIO
+
+    from reportlab.pdfgen import canvas
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(595, 842), invariant=1)  # A4, 11 pt Helvetica at (72, 72) top-left
+    c.setTitle("")
+    c.setAuthor("")
+    c.setSubject("")
+    c.setCreator("")
     for text in texts:
-        page = doc.new_page()
-        page.insert_text((72, 72), text)
-    doc.save(path)
-    doc.close()
+        c.setFont("Helvetica", 11)
+        c.drawString(72, 842 - 72, text)
+        c.showPage()
+    c.save()
+    Path(path).write_bytes(buf.getvalue())
 
 
 def _manifest(path, filename, entry):

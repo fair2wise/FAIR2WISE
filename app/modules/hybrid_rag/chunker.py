@@ -47,16 +47,14 @@ def chunk_pdf(
     """Split one PDF into page-aware windows. Missing/unreadable files yield []."""
     extra = extra or {}
     try:
-        # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-        # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-        import fitz
+        from ..literature.pdf_reader import open_pdf
     except Exception:
         return []
     pdf = Path(path)
     if not pdf.is_file():
         return []
     try:
-        doc = fitz.open(str(pdf))
+        doc = open_pdf(pdf)
     except Exception:
         return []
     chunks: list[dict[str, Any]] = []

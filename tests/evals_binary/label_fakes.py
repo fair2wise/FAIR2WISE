@@ -1,18 +1,28 @@
 """Synthetic pilot paper, fake labelling client and fake model lister (no network, no key, no real paper).
 
-The PDF is generated in ``tmp_path`` with PyMuPDF from invented sentences; nothing from a
-real paper is used or committed.
+The PDF is generated in ``tmp_path`` with reportlab from invented sentences; nothing from a
+real paper is used or committed. Tests that do not need Docling's structure model parse through
+:class:`StubDoclingParser`; tests that run the real parser carry :data:`needs_docling`.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
+import pytest
+
+from app.modules.literature.parsed_document import BoundingBox, ParsedDocument, ParsedFigure
+from app.modules.literature.pdf_reader import open_pdf
 from app.modules.model_catalog import ModelListing
+from evals.binary.labeling import parse as parse_module
 from evals.binary.labeling import pilot as P
 from evals.binary.labeling.parse import file_sha256
+
+needs_docling = pytest.mark.skipif(
+    not os.environ.get("F2W_DOCLING_ARTIFACTS_PATH"), reason="Docling model weights not available")
 
 PAGE_1 = [
     "Synthetic Study of Imaginary Films",
@@ -34,33 +44,78 @@ FIGURE_CAPTION = "Figure 1. Synthetic scattering profile of film X."
 
 def _gradient_png() -> bytes:
     """A 200x200 grey gradient (a usable figure image for the parser)."""
-    import fitz
+    from io import BytesIO
 
-    pix = fitz.Pixmap(fitz.csGRAY, fitz.IRect(0, 0, 200, 200), False)
-    for y in range(200):
-        for x in range(200):
-            pix.set_pixel(x, y, ((x + y) % 256,))
-    return pix.tobytes("png")
+    from PIL import Image
+
+    img = Image.new("L", (200, 200))
+    img.putdata([(x + y) % 256 for y in range(200) for x in range(200)])
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def make_pdf(path: Path, pages: Optional[List[List[str]]] = None, figure: bool = True) -> Path:
     """Write a small PDF with the synthetic sentences and, on page 2, one captioned figure."""
-    import fitz
+    from io import BytesIO
 
-    doc = fitz.open()
+    from PIL import Image
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    height = 842  # A4
+    path.parent.mkdir(parents=True, exist_ok=True)
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(595, height), invariant=1)
+    c.setTitle("")
+    c.setAuthor("")
+    c.setSubject("")
+    c.setCreator("")
     for index, lines in enumerate(pages or [PAGE_1, PAGE_2]):
-        page = doc.new_page()
         y = 72
+        c.setFont("Helvetica", 11)
         for line in lines:
-            page.insert_text((72, y), line, fontsize=11)
+            c.drawString(72, height - y, line)
             y += 18
         if figure and index == 1:
-            page.insert_image(fitz.Rect(72, 200, 272, 400), stream=_gradient_png())
-            page.insert_text((72, 420), FIGURE_CAPTION, fontsize=9)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(str(path))
-    doc.close()
+            c.drawImage(ImageReader(Image.open(BytesIO(_gradient_png()))), 72, height - 400, width=200, height=200)
+            c.setFont("Helvetica", 9)
+            c.drawString(72, height - 420, FIGURE_CAPTION)
+        c.showPage()
+    c.save()
+    path.write_bytes(buf.getvalue())
     return path
+
+
+class StubDoclingParser:
+    """Docling stand-in that needs no weights: one figure per raster image on the page, no tables.
+
+    The figure box is the image's box converted to BOTTOMLEFT points, as Docling reports it, and the
+    caption is the synthetic one, so everything downstream of the parser sees a realistic document.
+    """
+
+    name = "docling"
+
+    def version(self) -> str:
+        """Fixed stub version."""
+        return "0.0-stub"
+
+    def config(self) -> dict[str, Any]:
+        """Fixed stub settings."""
+        return {"stub": True}
+
+    def parse(self, pdf_path: Path, work_dir: Path, *, source_ref: str = "") -> ParsedDocument:
+        """Build the document from the PDF's page count and image boxes."""
+        figures = []
+        with open_pdf(pdf_path) as doc:
+            count = len(doc)
+            for page in doc:
+                for index, (x0, y0, x1, y1) in enumerate(page.image_boxes()):
+                    box = BoundingBox(x0, page.height - y0, x1, page.height - y1, "BOTTOMLEFT", "pt")
+                    figures.append(ParsedFigure(caption=FIGURE_CAPTION, page=page.number + 1, index=index, bbox=box,
+                                                figure_id=f"fig-p{page.number + 1:03d}-{index:02d}"))
+        return ParsedDocument(source_ref=source_ref, markdown="", num_pages=count, parser=self.name,
+                              parser_version=self.version(), parser_config=self.config(), figures=tuple(figures))
 
 
 def synthetic_paper(pdf_rel: str, sha: str, pilot_id: str = "A") -> P.PilotPaper:
@@ -73,7 +128,8 @@ def synthetic_paper(pdf_rel: str, sha: str, pilot_id: str = "A") -> P.PilotPaper
 
 
 def install_synthetic(monkeypatch: Any, root: Path, pilot_id: str = "A") -> P.PilotPaper:
-    """Generate the PDF under ``root/papers`` and swap it into the pilot registry."""
+    """Generate the PDF under ``root/papers``, swap it into the pilot registry and stub the Docling parser."""
+    monkeypatch.setattr(parse_module, "DoclingParser", StubDoclingParser)
     pdf = make_pdf(root / "papers" / "synthetic.pdf")
     paper = synthetic_paper("synthetic.pdf", file_sha256(pdf), pilot_id)
     monkeypatch.setitem(P.PILOT_PAPERS, pilot_id, paper)

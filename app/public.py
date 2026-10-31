@@ -41,7 +41,7 @@ same ``project_api_response`` projection the ``/v1`` routes apply.
 not ported and no addenda task schedules it yet (docs/migration/public_api_spec.md section 4).
 
 Importing this module reads no environment or ``.env`` file, builds no
-registry, model or client, and imports no torch, FAISS, PyMuPDF, OpenAI or
+registry, model or client, and imports no torch, FAISS, Docling, pypdfium2, OpenAI or
 LangGraph code. Construction opens no network connection.
 """
 from __future__ import annotations

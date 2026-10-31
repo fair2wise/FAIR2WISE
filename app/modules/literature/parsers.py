@@ -5,20 +5,17 @@
 a work directory. The parse service stores those files as assets and versions
 the output by ``parser-version-config``.
 
-Only :class:`PyMuPDFParser` ships now. It reads PyMuPDF's structured text
-directly (not ``pymupdf4llm``, which is not a dependency): font-size headings
-with page and bbox, figures with bbox, caption, render scale and the text layer
-inside the figure, and ruled tables to CSV with bbox and caption. Coordinates are
-PyMuPDF's: points, origin top-left.
-
-DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) is to be replaced by Docling (H1 E2,
-docs/migration/reviews/H0/license_dependency_audit.md). A ``DoclingParser`` slots
-in as another :class:`PublicationParser` without changing callers.
+Only :class:`DoclingParser` ships. Docling (MIT) reads the document structure: headings with level
+and page, figures with bbox, caption, render scale and the text layer inside the figure, and tables
+with caption, bbox, CSV and per-cell boxes. PyMuPDF (AGPL-3.0) is gone from this repository (H1 E2,
+docs/migration/reviews/H0/license_dependency_audit.md); plain page text, metadata and rendering come
+from :mod:`.pdf_reader` (pypdfium2). Another engine slots in as another :class:`PublicationParser`
+without changing callers. Coordinates keep the engine's origin: Docling items are BOTTOMLEFT, table
+cells carry their own origin, figure text spans are TOPLEFT; all in points.
 
 Adapted from als-computing/forge_rsoxs_analysis
 als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``PublicationParser``,
-``PyMuPDFParser``, ``_is_usable_figure``, ``_parser_version``, ``_sections_from_markdown``)
-(BSD-3-Clause); the PyMuPDF structure reader is rewritten.
+``_is_usable_figure``, ``_parser_version``, ``_sections_from_markdown``) (BSD-3-Clause).
 """
 
 from __future__ import annotations
@@ -28,8 +25,8 @@ import csv
 import io
 import json
 import logging
+import os
 from pathlib import Path
-import re
 import time
 from typing import Any, Protocol, Sequence, cast, runtime_checkable
 
@@ -40,19 +37,20 @@ from .parsed_document import (
     ParsedFigure,
     ParsedSection,
     ParsedTable,
+    ParsedTableCell,
     extract_sections,
     without_embedded_images,
 )
+from .pdf_reader import open_pdf
 
 logger = logging.getLogger(__name__)
 
-PARSER_PYMUPDF = "pymupdf"
 PARSER_DOCLING = "docling"
 #: Bumped whenever this adapter's output changes for the same input and library version.
-PYMUPDF_ADAPTER_VERSION = 1
-
-_FIG_CAPTION = re.compile(r"^\s*(fig\.?|figure)\s*\d+", re.IGNORECASE)
-_TABLE_CAPTION = re.compile(r"^\s*table\s*\d+", re.IGNORECASE)
+DOCLING_ADAPTER_VERSION = 1
+#: Directory holding Docling's layout and table model weights (never in the repo; images fetch them at
+#: build time, see the Dockerfile ``docling-models`` stage). ``DOCLING_ARTIFACTS_PATH`` is Docling's own name.
+DOCLING_ARTIFACTS_ENV = "F2W_DOCLING_ARTIFACTS_PATH"
 
 
 @runtime_checkable
@@ -124,67 +122,141 @@ def _inside(inner: Sequence[float], outer: Sequence[float], *, pad: float = 1.0)
     return outer[0] - pad <= cx <= outer[2] + pad and outer[1] - pad <= cy <= outer[3] + pad
 
 
-class PyMuPDFParser:
-    """PyMuPDF structure reader: headings by font size, figures, tables, page geometry.
+def _docling_bbox(bbox: Any, *, origin: str | None = None) -> BoundingBox:
+    """A Docling ``BoundingBox`` as ours, keeping its own origin (BOTTOMLEFT or TOPLEFT) and units."""
+    coord = str(getattr(bbox.coord_origin, "value", bbox.coord_origin) or "BOTTOMLEFT")
+    return BoundingBox(
+        left=round(float(bbox.l), 2),
+        top=round(float(bbox.t), 2),
+        right=round(float(bbox.r), 2),
+        bottom=round(float(bbox.b), 2),
+        coord_origin=origin or coord,
+        units="pt",
+    )
+
+
+def _docling_page_of(item: Any) -> tuple[int | None, Any | None]:
+    """First provenance page number and box of a Docling item (``(None, None)`` without provenance)."""
+    prov = getattr(item, "prov", None) or []
+    if not prov:
+        return None, None
+    return int(prov[0].page_no), prov[0].bbox
+
+
+class DoclingParser:
+    """Docling structure reader: headings with level, figures, tables with cells, page geometry.
+
+    Docling (MIT) replaces PyMuPDF (AGPL-3.0) as the document structure engine (H1 E2, T05). Layout and
+    table models run on CPU with OCR off (the PDFs carry a text layer); figure text spans and page
+    rotation come from the PDF itself through :mod:`.pdf_reader`. Bounding boxes keep Docling's origin
+    (BOTTOMLEFT for items, per-cell origin for table cells); ``vision.text_layer.to_topleft`` converts.
 
     Args:
-        heading_ratio: A line is a heading candidate when its font size is at
-            least this multiple of the body size.
+        artifacts_path: Directory with Docling's model weights. Defaults to ``F2W_DOCLING_ARTIFACTS_PATH``,
+            then Docling's own default (which downloads on first use, not allowed with ``HF_HUB_OFFLINE``).
+        images_scale: Rendering scale for figure crops (pixels per point).
         min_figure_side: Short-side pixel floor for a usable figure.
-        max_heading_chars: Longer lines are never headings.
+        do_table_structure: Run the table-structure model (cells with boxes).
+        converter: A ready ``DocumentConverter`` (tests inject one; ``None`` builds Docling's).
     """
 
-    name = PARSER_PYMUPDF
+    name = PARSER_DOCLING
 
     def __init__(
-        self, *, heading_ratio: float = 1.15, min_figure_side: int = 120, max_heading_chars: int = 160
+        self,
+        *,
+        artifacts_path: str | Path | None = None,
+        images_scale: float = 2.0,
+        min_figure_side: int = 120,
+        do_table_structure: bool = True,
+        converter: Any | None = None,
     ) -> None:
-        self.heading_ratio = heading_ratio
+        self.artifacts_path = artifacts_path
+        self.images_scale = images_scale
         self.min_figure_side = min_figure_side
-        self.max_heading_chars = max_heading_chars
+        self.do_table_structure = do_table_structure
+        self._converter_instance = converter
 
     def version(self) -> str:
-        """Installed PyMuPDF version."""
-        return library_version("PyMuPDF") or library_version("pymupdf")
+        """Installed Docling version."""
+        return library_version("docling")
 
     def config(self) -> dict[str, Any]:
         """Output-changing settings (part of the versioned key)."""
         return {
-            "adapter_version": PYMUPDF_ADAPTER_VERSION,
-            "heading_ratio": self.heading_ratio,
+            "adapter_version": DOCLING_ADAPTER_VERSION,
+            "images_scale": self.images_scale,
             "min_figure_side": self.min_figure_side,
-            "max_heading_chars": self.max_heading_chars,
+            "do_ocr": False,
+            "do_table_structure": self.do_table_structure,
         }
 
-    def parse(self, pdf_path: Path, work_dir: Path, *, source_ref: str) -> ParsedDocument:
-        """Parse with PyMuPDF (raises ``ImportError`` when it is not installed)."""
-        import fitz  # DEPRECATED(pymupdf): replaced by Docling later (H1 E2).
+    def _converter(self) -> Any:
+        if self._converter_instance is None:
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.document_converter import DocumentConverter, PdfFormatOption
 
+            artifacts = self.artifacts_path or os.environ.get(DOCLING_ARTIFACTS_ENV) or None
+            options = PdfPipelineOptions(
+                artifacts_path=str(artifacts) if artifacts else None,
+                do_ocr=False,
+                do_table_structure=self.do_table_structure,
+                generate_picture_images=True,
+                generate_page_images=False,
+                images_scale=self.images_scale,
+            )
+            self._converter_instance = DocumentConverter(
+                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
+            )
+        return self._converter_instance
+
+    def parse(self, pdf_path: Path, work_dir: Path, *, source_ref: str) -> ParsedDocument:
+        """Parse with Docling (raises ``ImportError`` when it is not installed).
+
+        Raises:
+            ImportError: Docling is not installed.
+            ValueError: The PDF could not be converted (Docling's failure status).
+        """
         started = time.monotonic()
+        converter = self._converter()
+        result = converter.convert(str(pdf_path))
+        status = getattr(getattr(result, "status", None), "value", getattr(result, "status", None))
+        if status not in (None, "success", "partial_success"):
+            raise ValueError(f"docling could not convert the PDF (status {status})")
+        return self.document_from_docling(
+            result.document,
+            pdf_path=pdf_path,
+            work_dir=work_dir,
+            source_ref=source_ref,
+            conversion_seconds=time.monotonic() - started,
+        )
+
+    def document_from_docling(
+        self,
+        doc: Any,
+        *,
+        pdf_path: Path,
+        work_dir: Path,
+        source_ref: str,
+        conversion_seconds: float = 0.0,
+    ) -> ParsedDocument:
+        """Map a ``DoclingDocument`` onto a :class:`ParsedDocument` (no model inference happens here)."""
         work_dir.mkdir(parents=True, exist_ok=True)
         stem = source_ref.split(":", 1)[-1][:16]
-        with fitz.open(str(pdf_path)) as doc:
-            if getattr(doc, "needs_pass", False):
-                raise ValueError("encrypted PDF")
-            pages: list[PageInfo] = []
-            lines: list[dict[str, Any]] = []
-            figures: list[ParsedFigure] = []
-            tables: list[ParsedTable] = []
-            for page_index in range(doc.page_count):
-                page = doc.load_page(page_index)
-                number = page_index + 1
-                pages.append(PageInfo(number, float(page.rect.width), float(page.rect.height), int(page.rotation)))
-                page_lines = self._lines(page, number)
-                fig_rects = self._figures(doc, page, number, page_lines, work_dir, stem, figures)
-                table_rects = self._tables(page, number, page_lines, work_dir, stem, tables)
-                for line in page_lines:
-                    if any(_inside(line["bbox"], r) for r in fig_rects + table_rects):
-                        continue
-                    lines.append(line)
-        sections, markdown = self._sections(lines)
+        reader = open_pdf(pdf_path) if pdf_path and Path(pdf_path).is_file() else None
+        try:
+            pages = self._pages(doc, reader)
+            sections, markdown_lines = self._sections(doc)
+            figures = self._figures(doc, reader, pages, work_dir, stem)
+            tables = self._tables(doc, work_dir, stem)
+        finally:
+            if reader is not None:
+                reader.close()
+        markdown = without_embedded_images(doc.export_to_markdown()) if hasattr(doc, "export_to_markdown") else ""
         return ParsedDocument(
             source_ref=source_ref,
-            markdown=without_embedded_images(markdown),
+            markdown=markdown,
             num_pages=len(pages),
             parser=self.name,
             parser_version=self.version(),
@@ -193,59 +265,32 @@ class PyMuPDFParser:
             figures=tuple(figures),
             tables=tuple(tables),
             pages=tuple(pages),
-            timings={"parser_conversion_s": round(time.monotonic() - started, 3)},
+            timings={"parser_conversion_s": round(conversion_seconds, 3)},
             pdf_path=pdf_path,
         )
 
-    # -- text -----------------------------------------------------------------------------------
+    # -- pages and text ---------------------------------------------------------------------------
 
     @staticmethod
-    def _lines(page: Any, number: int) -> list[dict[str, Any]]:
-        out = []
-        for block in page.get_text("dict", sort=True).get("blocks", []):
-            if block.get("type") != 0:
-                continue
-            for line in block.get("lines", []):
-                spans = [s for s in line.get("spans", []) if str(s.get("text", "")).strip()]
-                if not spans:
-                    continue
-                text = " ".join(" ".join(str(s["text"]).split()) for s in spans).strip()
-                size = max(float(s.get("size", 0)) for s in spans)
-                bold = any(int(s.get("flags", 0)) & 16 for s in spans)
-                out.append(
-                    {
-                        "page": number,
-                        "text": text,
-                        "size": round(size, 1),
-                        "bold": bold,
-                        "bbox": tuple(float(v) for v in line["bbox"]),
-                    }
-                )
-        return out
+    def _pages(doc: Any, reader: Any | None) -> list[PageInfo]:
+        pages: list[PageInfo] = []
+        for number in sorted(doc.pages):
+            size = doc.pages[number].size
+            rotation = 0
+            if reader is not None and 0 < number <= len(reader):
+                rotation = reader[number - 1].rotation
+            pages.append(PageInfo(int(number), float(size.width), float(size.height), int(rotation)))
+        return pages
 
-    def _sections(self, lines: list[dict[str, Any]]) -> tuple[list[ParsedSection], str]:
-        if not lines:
-            return [], ""
-        weights: Counter[float] = Counter()
-        for line in lines:
-            weights[line["size"]] += len(line["text"])
-        body = weights.most_common(1)[0][0]
-        threshold = body * self.heading_ratio
+    @staticmethod
+    def _sections(doc: Any) -> tuple[list[ParsedSection], list[str]]:
+        """Sections from Docling's reading order: headings open a section, body text joins it."""
+        from docling_core.types.doc.labels import DocItemLabel
 
-        def is_heading(line: dict[str, Any]) -> bool:
-            return line["size"] >= threshold and len(line["text"]) <= self.max_heading_chars
-
-        heading_sizes = sorted({ln["size"] for ln in lines if is_heading(ln)}, reverse=True)
-        title_size = None
-        if heading_sizes:
-            biggest = [ln for ln in lines if ln["size"] == heading_sizes[0]]
-            if len(heading_sizes) > 1 and all(ln["page"] == 1 for ln in biggest) and len(biggest) <= 2:
-                title_size = heading_sizes[0]  # the title is front matter, not a section
-                heading_sizes = heading_sizes[1:]
-        levels = {size: i + 1 for i, size in enumerate(heading_sizes)}
+        skip = {DocItemLabel.PAGE_HEADER, DocItemLabel.PAGE_FOOTER}
         sections: list[ParsedSection] = []
-        markdown: list[str] = []
-        name, level, page, bbox, parts, last_page = "preamble", 0, lines[0]["page"], None, cast(list[str], []), lines[0]["page"]
+        lines: list[str] = []
+        name, level, page, bbox, parts, last_page = "preamble", 0, None, None, cast(list[str], []), None
 
         def flush() -> None:
             text = "\n".join(parts).strip()
@@ -262,62 +307,84 @@ class PyMuPDFParser:
                     )
                 )
 
-        for line in lines:
-            if is_heading(line) and line["size"] != title_size:
+        for item, _depth in doc.iterate_items():
+            label = getattr(item, "label", None)
+            text = str(getattr(item, "text", "") or "").strip()
+            if not text or label in skip:
+                continue
+            item_page, item_box = _docling_page_of(item)
+            if label == DocItemLabel.TITLE:  # the title is front matter, not a section
+                lines.append(f"# {text}")
+                continue
+            if label == DocItemLabel.SECTION_HEADER:
                 flush()
-                name, level, page = line["text"], levels.get(line["size"], 1), line["page"]
-                bbox, parts, last_page = _bbox(line["bbox"]), [], line["page"]
-                markdown.append(f"{'#' * min(level + 1, 6)} {line['text']}")
+                name, level, page = text, int(getattr(item, "level", 1) or 1), item_page
+                bbox = _docling_bbox(item_box) if item_box is not None else None
+                parts, last_page = [], item_page
+                lines.append(f"{'#' * min(level + 1, 6)} {text}")
                 continue
-            if line["size"] == title_size:
-                markdown.append(f"# {line['text']}")
-            else:
-                markdown.append(line["text"])
-            parts.append(line["text"])
-            last_page = line["page"]
+            if page is None:
+                page = item_page
+            lines.append(text)
+            parts.append(text)
+            last_page = item_page or last_page
         flush()
-        return sections, "\n".join(markdown)
+        return sections, lines
 
-    # -- figures and tables ---------------------------------------------------------------------
+    # -- figures and tables -----------------------------------------------------------------------
 
-    def _figures(
-        self,
-        doc: Any,
-        page: Any,
-        number: int,
-        lines: list[dict[str, Any]],
-        work_dir: Path,
-        stem: str,
-        out: list[ParsedFigure],
-    ) -> list[tuple[float, ...]]:
-        import fitz
-
-        rects: list[tuple[float, ...]] = []
-        for index, info in enumerate(page.get_image_info(xrefs=True)):
-            xref = int(info.get("xref") or 0)
-            rect = tuple(float(v) for v in info.get("bbox") or (0, 0, 0, 0))
-            if not xref or rect[2] - rect[0] < 1 or rect[3] - rect[1] < 1:
-                continue
+    @staticmethod
+    def _caption(item: Any, doc: Any) -> tuple[str, BoundingBox | None]:
+        try:
+            text = str(item.caption_text(doc) or "").strip()
+        except Exception:  # noqa: BLE001 - a malformed caption reference must not lose the figure
+            return "", None
+        box = None
+        for ref in getattr(item, "captions", None) or []:
             try:
-                pix = fitz.Pixmap(doc, xref)
-                if pix.n - pix.alpha >= 4:
-                    pix = fitz.Pixmap(fitz.csRGB, pix)
-                png = pix.tobytes("png")
-                width_px = pix.width
+                _, cap_box = _docling_page_of(ref.resolve(doc))
+            except Exception:  # noqa: BLE001
+                continue
+            if cap_box is not None:
+                box = _docling_bbox(cap_box)
+                break
+        return text, box
+
+    def _figures(self, doc: Any, reader: Any | None, pages: list[PageInfo], work_dir: Path, stem: str) -> list[ParsedFigure]:
+        out: list[ParsedFigure] = []
+        height_of = {p.number: p.height for p in pages}
+        per_page: Counter[int] = Counter()
+        for picture in doc.pictures:
+            number, box = _docling_page_of(picture)
+            if number is None or box is None:
+                continue
+            index = per_page[number]
+            per_page[number] += 1
+            try:
+                image = picture.get_image(doc)
+                if image is None:
+                    continue
+                buffer = io.BytesIO()
+                image.convert("RGB").save(buffer, format="PNG")
+                png, width_px = buffer.getvalue(), image.width
             except Exception as exc:  # noqa: BLE001 - one bad image must not lose the paper
-                logger.warning("could not extract image xref %s on page %d: %s", xref, number, type(exc).__name__)
+                logger.warning("could not render picture %d on page %d: %s", index, number, type(exc).__name__)
                 continue
             if not is_usable_figure_image(png, min_short_side=self.min_figure_side):
                 continue
             figure_id = f"fig-p{number:03d}-{index:02d}"
             path = work_dir / f"{stem}-{figure_id}.png"
             path.write_bytes(png)
-            caption, caption_rect = self._caption(lines, rect, _FIG_CAPTION)
-            spans = [
-                {"text": ln["text"], "page": number, "bbox": _bbox(ln["bbox"]).as_dict()}
-                for ln in lines
-                if _inside(ln["bbox"], rect)
-            ]
+            bbox = _docling_bbox(box)
+            caption, caption_bbox = self._caption(picture, doc)
+            rect = self._topleft_rect(bbox, height_of.get(number))
+            spans = []
+            if reader is not None and rect is not None and 0 < number <= len(reader):
+                spans = [
+                    {"text": s.text, "page": number, "bbox": _bbox(s.bbox).as_dict()}
+                    for s in reader[number - 1].get_spans()
+                    if _inside(s.bbox, rect)
+                ]
             spans_path = None
             if spans:  # no file when there is no text layer (absent differs from empty)
                 spans_path = path.with_suffix(".spans.json")
@@ -327,80 +394,71 @@ class PyMuPDFParser:
                     caption=caption,
                     page=number,
                     index=index,
-                    bbox=_bbox(rect),
-                    images_scale=round(width_px / max(rect[2] - rect[0], 1e-6), 4),
-                    caption_bbox=_bbox(caption_rect) if caption_rect else None,
+                    bbox=bbox,
+                    images_scale=round(width_px / max(bbox.right - bbox.left, 1e-6), 4),
+                    caption_bbox=caption_bbox,
                     figure_id=figure_id,
                     path=path,
                     spans_path=spans_path,
                 )
             )
-            rects.append(rect)
-        return rects
+        return out
 
-    def _tables(
-        self,
-        page: Any,
-        number: int,
-        lines: list[dict[str, Any]],
-        work_dir: Path,
-        stem: str,
-        out: list[ParsedTable],
-    ) -> list[tuple[float, ...]]:
-        rects: list[tuple[float, ...]] = []
-        try:
-            finder = page.find_tables()
-        except Exception as exc:  # noqa: BLE001 - table detection is best-effort
-            logger.info("table detection failed on page %d: %s", number, type(exc).__name__)
-            return rects
-        for index, table in enumerate(getattr(finder, "tables", []) or []):
-            rect = tuple(float(v) for v in table.bbox)
+    @staticmethod
+    def _topleft_rect(bbox: BoundingBox, page_height: float | None) -> tuple[float, float, float, float] | None:
+        """``bbox`` as ``(x0, y0, x1, y1)`` top-left points (``None`` when the page height is unknown)."""
+        if bbox.coord_origin.upper() == "TOPLEFT":
+            return (bbox.left, bbox.top, bbox.right, bbox.bottom)
+        if page_height is None:
+            return None
+        return (bbox.left, page_height - bbox.top, bbox.right, page_height - bbox.bottom)
+
+    def _tables(self, doc: Any, work_dir: Path, stem: str) -> list[ParsedTable]:
+        out: list[ParsedTable] = []
+        per_page: Counter[int] = Counter()
+        for table in doc.tables:
+            number, box = _docling_page_of(table)
+            if number is None:
+                continue
+            index = per_page[number]
+            per_page[number] += 1
             table_id = f"tab-p{number:03d}-{index:02d}"
+            data = table.data
+            rows = [[str(getattr(cell, "text", "") or "") for cell in row] for row in (data.grid or [])]
             data_path: Path | None = None
-            rows: list[list[Any]] = []
-            try:
-                rows = [[("" if cell is None else str(cell)) for cell in row] for row in table.extract()]
-                buffer = io.StringIO()
-                csv.writer(buffer).writerows(rows)
-                data_path = work_dir / f"{stem}-{table_id}.csv"
-                data_path.write_text(buffer.getvalue(), encoding="utf-8")
-            except Exception as exc:  # noqa: BLE001 - a bad table must not lose the paper
-                logger.warning("could not export table %d on page %d: %s", index, number, type(exc).__name__)
-            caption, _ = self._caption(lines, rect, _TABLE_CAPTION)
+            if rows:
+                try:
+                    buffer = io.StringIO()
+                    csv.writer(buffer).writerows(rows)
+                    data_path = work_dir / f"{stem}-{table_id}.csv"
+                    data_path.write_text(buffer.getvalue(), encoding="utf-8")
+                except Exception as exc:  # noqa: BLE001 - a bad table must not lose the paper
+                    logger.warning("could not export table %d on page %d: %s", index, number, type(exc).__name__)
+            cells = tuple(
+                ParsedTableCell(
+                    row=int(c.start_row_offset_idx),
+                    col=int(c.start_col_offset_idx),
+                    text=str(c.text or ""),
+                    row_span=int(getattr(c, "row_span", 1) or 1),
+                    col_span=int(getattr(c, "col_span", 1) or 1),
+                    bbox=_docling_bbox(c.bbox) if getattr(c, "bbox", None) is not None else None,
+                )
+                for c in (data.table_cells or [])
+            )
+            caption, _ = self._caption(table, doc)
             out.append(
                 ParsedTable(
                     page=number,
-                    n_rows=len(rows),
-                    n_cols=max((len(r) for r in rows), default=0),
+                    n_rows=int(data.num_rows),
+                    n_cols=int(data.num_cols),
                     caption=caption,
-                    bbox=_bbox(rect),
+                    bbox=_docling_bbox(box) if box is not None else None,
                     table_id=table_id,
                     data_path=data_path,
+                    cells=cells,
                 )
             )
-            rects.append(rect)
-        return rects
-
-    @staticmethod
-    def _caption(
-        lines: list[dict[str, Any]], rect: Sequence[float], pattern: re.Pattern[str]
-    ) -> tuple[str, tuple[float, ...] | None]:
-        """Nearest caption line above or below ``rect`` (within 72 pt) matching ``pattern``."""
-        best: dict[str, Any] | None = None
-        best_gap = 72.0
-        for line in lines:
-            if not pattern.match(line["text"]):
-                continue
-            box = line["bbox"]
-            overlap = min(box[2], rect[2]) - max(box[0], rect[0])
-            if overlap <= 0:
-                continue
-            gap = box[1] - rect[3] if box[1] >= rect[3] - 1 else rect[1] - box[3]
-            if -1 <= gap < best_gap:
-                best, best_gap = line, gap
-        if best is None:
-            return "", None
-        return best["text"], best["bbox"]
+        return out
 
 
 def sections_from_markdown(markdown: str) -> tuple[ParsedSection, ...]:
@@ -412,16 +470,16 @@ def sections_from_markdown(markdown: str) -> tuple[ParsedSection, ...]:
 
 
 def default_parsers() -> tuple[PublicationParser, ...]:
-    """The parsers available now (PyMuPDF only; Docling joins with T09/E2)."""
-    return (PyMuPDFParser(),)
+    """The parsers the parse service tries, in order (Docling only)."""
+    return (DoclingParser(),)
 
 
 __all__ = (
+    "DOCLING_ADAPTER_VERSION",
+    "DOCLING_ARTIFACTS_ENV",
+    "DoclingParser",
     "PARSER_DOCLING",
-    "PARSER_PYMUPDF",
-    "PYMUPDF_ADAPTER_VERSION",
     "PublicationParser",
-    "PyMuPDFParser",
     "default_parsers",
     "is_usable_figure_image",
     "library_version",

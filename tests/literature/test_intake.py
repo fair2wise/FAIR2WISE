@@ -11,14 +11,14 @@ import pytest
 from app.modules.literature import bibliography as bib
 from app.modules.literature.ingested import IngestedPapers, graph_ingested_keys, staged_keys
 from app.modules.literature.intake import (
-    extract_doi_candidates, filename_doi_candidates, prepare_local_pdf, pymupdf_first_pages_text,
+    extract_doi_candidates, filename_doi_candidates, prepare_local_pdf, pdf_first_pages_text,
     resolve_verified, title_matches_pdf, version_pair_candidate,
 )
 from app.modules.literature.legacy import LegacyIndex
 from app.modules.literature.openalex import QUOTA_PAUSED, UNREACHABLE, OpenAlexNoData
 from app.modules.literature.resolver_batch import Resolved
 from app.modules.literature.store import FileDocumentStore
-from tests.literature.lit_fakes import have_pymupdf, local_ctx, make_paper_pdf, minimal_pdf_bytes, openalex_work
+from tests.literature.lit_fakes import have_pdf_stack, local_ctx, make_paper_pdf, minimal_pdf_bytes, openalex_work
 
 TITLE = "Resonant soft X-ray scattering of polymer blend morphology"
 DOI = "10.1021/acs.macromol.0c01782"
@@ -221,11 +221,11 @@ def test_doi_extraction_and_title_check():
     assert "10.48550/arXiv.2209.13121" in filename_doi_candidates("CyRSoXS2209.13121.pdf")
 
 
-@pytest.mark.skipif(not have_pymupdf(), reason="PyMuPDF not installed")
-def test_pymupdf_text_extractor_reads_first_pages(tmp_path):
+@pytest.mark.skipif(not have_pdf_stack(), reason="PDF reader stack not installed")
+def test_pdf_text_extractor_reads_first_pages(tmp_path):
     path = make_paper_pdf(tmp_path / "real.pdf", title=TITLE, doi=DOI,
                           sections=[("1. Introduction", "Lamellar domains were measured.")])
-    text = pymupdf_first_pages_text(path)
+    text = pdf_first_pages_text(path)
     assert DOI in text and "Introduction" in text
 
 

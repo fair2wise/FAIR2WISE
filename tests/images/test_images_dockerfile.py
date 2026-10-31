@@ -237,6 +237,33 @@ def test_semantic_deps_install_cpu_torch_and_refuse_cuda_builds():
     assert (("app-env-build", [APP_ENV], APP_ENV) in DF.stage("runtime-base").copies())
 
 
+def test_docling_weights_are_baked_at_pinned_commits_and_never_tracked():
+    """The parser's model weights are fetched at build time (not in the repo) by the one script that
+    names the pinned commits, into the folder layout Docling reads, readable by uid 10001."""
+    import sys
+
+    sys.path.insert(0, str(REPO / "scripts"))
+    try:
+        import fetch_docling_models as fetch
+    finally:
+        sys.path.remove(str(REPO / "scripts"))
+    stage = DF.stage("runtime-base")
+    run = " ".join(i.args for i in stage.of("RUN"))
+    assert DF.effective_env("runtime-base").get("F2W_DOCLING_ARTIFACTS_PATH") == "/opt/fair2wise/docling"
+    assert "python -I /tmp/fetch_docling_models.py --dest /opt/fair2wise/docling" in run
+    assert "chmod -R a+rX /opt/fair2wise/docling" in run
+    assert (None, ["scripts/fetch_docling_models.py"], "/tmp/fetch_docling_models.py") in stage.copies()
+    assert set(fetch.PINNED_MODELS) == {"docling-project/docling-layout-heron", "docling-project/docling-models"}
+    assert all(re.fullmatch(r"[0-9a-f]{40}", rev) for rev in fetch.PINNED_MODELS.values())  # commits, not tags
+    assert fetch.model_folder("docling-project/docling-models") == "docling-project--docling-models"
+    import subprocess
+
+    listing = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True)
+    if listing.returncode == 0:
+        weights = [p for p in listing.stdout.splitlines() if p.endswith((".safetensors", ".onnx", ".pt", ".ckpt"))]
+        assert not weights, weights  # no model weights are tracked: images fetch them at build time
+
+
 def test_embedding_models_are_baked_at_pinned_revisions_and_match_code_defaults():
     run = _runtime_base_runs()
     env = DF.effective_env("runtime-base")

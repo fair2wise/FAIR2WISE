@@ -123,19 +123,17 @@ class IntakeReport:
         return data
 
 
-def pymupdf_first_pages_text(path: Path, pages: int = DOI_SEARCH_PAGES) -> str:
+def pdf_first_pages_text(path: Path, pages: int = DOI_SEARCH_PAGES) -> str:
     """First ``pages`` pages of text plus document metadata; ``""`` on any failure.
 
-    DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) is to be replaced by Docling (H1 E2).
-    Pass a different ``text_extractor`` to :func:`prepare_local_pdf` to avoid it.
+    Read with :func:`app.modules.literature.pdf_reader.open_pdf` (pypdfium2). Pass a different
+    ``text_extractor`` to :func:`prepare_local_pdf` to read the PDF another way.
     """
-    try:
-        import fitz
-    except ImportError:
-        return ""
+    from .pdf_reader import open_pdf
+
     chunks: list[str] = []
     try:
-        with fitz.open(str(path)) as doc:
+        with open_pdf(path) as doc:
             if getattr(doc, "needs_pass", False):
                 return ""
             chunks.extend(str(v) for v in (doc.metadata or {}).values() if v)
@@ -328,7 +326,7 @@ def prepare_local_pdf(
     store: FileDocumentStore,
     index: LegacyIndex | None = None,
     fetch: Fetch | None = None,
-    text_extractor: TextExtractor = pymupdf_first_pages_text,
+    text_extractor: TextExtractor = pdf_first_pages_text,
     apply: bool = False,
     force: bool = False,
     verify: str = "openalex",
@@ -345,7 +343,7 @@ def prepare_local_pdf(
         index: Legacy index receiving the verified DOI alias (optional).
         fetch: Registry lookup (``OpenAlexClient.fetch``); required unless
             ``verify="filename"`` and no ``doi`` is asserted.
-        text_extractor: First-pages text extractor (pluggable; PyMuPDF default).
+        text_extractor: First-pages text extractor (pluggable; pypdfium2 default).
         apply: Store bytes and record the alias. ``False`` writes nothing.
         force: Proceed although the store already holds these bytes.
         verify: ``"openalex"`` (title check) or ``"filename"`` (offline).
@@ -463,6 +461,6 @@ def prepare_local_pdf(
 __all__ = (
     "DOI_SEARCH_PAGES", "INGESTABLE", "IntakeReport", "MIN_PDF_BYTES", "RETRYABLE", "STATUSES", "WorkIdentity",
     "extract_doi_candidates", "filename_doi_candidates", "is_preprint_doi", "prepare_local_pdf",
-    "pymupdf_first_pages_text", "resolve_asserted", "resolve_by_filename", "resolve_verified",
+    "pdf_first_pages_text", "resolve_asserted", "resolve_by_filename", "resolve_verified",
     "title_matches_pdf", "version_pair_candidate",
 )

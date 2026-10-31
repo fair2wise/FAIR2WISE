@@ -315,9 +315,7 @@ class PaperEvidenceAgent(Agent):
 
     def _query(self, question: str, pdf_path: str, manifest_path: str) -> dict[str, Any]:
         """Answer from eligible PDF pages, repairing or rejecting uncited claims."""
-        # DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) will be replaced by Docling in this repo.
-        # See docs/migration/reviews/H0/license_dependency_audit.md, E2.
-        import fitz
+        from ..literature.pdf_reader import open_pdf
 
         path = Path(pdf_path)
         if not path.is_file():
@@ -327,7 +325,7 @@ class PaperEvidenceAgent(Agent):
             }
         try:
             entry = _manifest_entry(Path(manifest_path), path.name)
-            with fitz.open(path) as doc:
+            with open_pdf(path) as doc:
                 mode, eligible = _eligible_pages(entry, len(doc))
                 if not eligible:
                     return {

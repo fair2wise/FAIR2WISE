@@ -171,14 +171,34 @@ TITLE = "Synthetic lamellar annealing contrast"
 
 
 def _write_pdf(path: Path) -> None:
-    import fitz
+    from io import BytesIO
+
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    from reportlab.pdfgen import canvas
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_textbox(fitz.Rect(36, 36, 560, 800), PAGE, fontsize=10)
-    doc.save(str(path))
-    doc.close()
+    height, size = 842, 10  # A4 page, 10 pt text box (36, 36)-(560, 800) wrapped like PyMuPDF insert_textbox
+    lines, cur = [], ""
+    for word in PAGE.split():
+        trial = f"{cur} {word}" if cur else word
+        if cur and stringWidth(trial, "Helvetica", size) > 560 - 36:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    lines.append(cur)
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=(595, height), invariant=1)
+    c.setTitle("")
+    c.setAuthor("")
+    c.setSubject("")
+    c.setCreator("")
+    c.setFont("Helvetica", size)
+    for i, line in enumerate(lines):
+        c.drawString(36, height - (36 + 1.075 * size + i * 1.4771 * size), line)
+    c.showPage()
+    c.save()
+    path.write_bytes(buf.getvalue())
 
 
 def _install_paper_evidence(monkeypatch, answer: str) -> Dict[str, Any]:

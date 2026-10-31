@@ -3,8 +3,8 @@
 import csv
 import io
 import json
-import sys
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -12,6 +12,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import label_fakes as F  # noqa: E402
+
 from evals.binary.labeling import cli, guide  # noqa: E402
 from evals.binary.labeling import pilot as P  # noqa: E402
 from evals.binary.labeling.labeler import calls_for, page_chunks, parse_response  # noqa: E402
@@ -86,7 +87,7 @@ def test_end_to_end_labels_are_provisional_with_provenance(synth):
     assert prov["labeler_model"] == F.LABELER and prov["guide_version"] == guide.GUIDE_VERSION
     assert prov["prompt_template_sha256"] == guide.template_sha256()
     assert prov["source_sha256"] == synth.paper.versions[0].sha256
-    assert prov["parser_revision"].startswith("pymupdf-") and prov["created_at"].endswith("Z")
+    assert prov["parser_revision"].startswith("docling-") and prov["created_at"].endswith("Z")
     assert all(len(c["prompt_sha256"]) == 64 for c in doc["calls"])
     kinds = {i["kind"] for i in doc["items"]}
     assert {"value", "absent", "question", "identity"} <= kinds
@@ -166,7 +167,7 @@ def test_figures_are_text_only_by_default_and_multimodal_sends_the_crops(synth):
 
 
 def test_render_figure_crops_returns_png_per_figure_and_none_without_a_bbox(synth):
-    from evals.binary.labeling.parse import parse_pdf, render_figure_crops
+    from evals.binary.labeling.parse import render_figure_crops
 
     pdf = synth.papers / "synthetic.pdf"
     parsed = parse_pdf(pdf)
@@ -176,6 +177,11 @@ def test_render_figure_crops_returns_png_per_figure_and_none_without_a_bbox(synt
     assert render_figure_crops(pdf, [dict(parsed.figures[0], bbox=None), dict(parsed.figures[0], page=99)]) == [None, None]
     small = render_figure_crops(pdf, parsed.figures, max_side=64)
     assert len(small[0]) < len(crops[0])
+    # the same area given with a TOP-LEFT origin renders the same pixels
+    box = parsed.figures[0]["bbox"]
+    top_left = dict(box, origin="TOPLEFT", t=842 - box["t"], b=842 - box["b"])
+    assert render_figure_crops(pdf, [dict(parsed.figures[0], bbox=top_left)]) == [crops[0]]
+    assert render_figure_crops(pdf, [dict(parsed.figures[0], bbox=dict(box, r=box["l"] + 1))]) == [None]
 
 
 def test_multimodal_mode_needs_one_image_slot_per_figure_and_rejects_unknown_modes(synth):
@@ -430,7 +436,25 @@ def test_role_separation_rules(tmp_path):
     assert resolve_judge_model(None, tmp_path) == (None, "none")
 
 
+def test_parse_pdf_reads_page_text_with_the_injected_parser(tmp_path):
+    parsed = parse_pdf(F.make_pdf(tmp_path / "x.pdf"), parser=F.StubDoclingParser())
+    assert parsed.num_pages == 2 and "21.0 nm" in parsed.page_text(1) and parsed.page_text(3) == ""
+    assert parsed.parser_revision.startswith("docling-") and len(parsed.figures) == 1
+
+
+@F.needs_docling
 def test_parse_pdf_reads_page_text_with_the_f2w_parser(tmp_path):
     parsed = parse_pdf(F.make_pdf(tmp_path / "x.pdf"))
     assert parsed.num_pages == 2 and "21.0 nm" in parsed.page_text(1) and parsed.page_text(3) == ""
-    assert parsed.parser_revision.startswith("pymupdf-")
+    assert parsed.parser_revision.startswith("docling-")
+
+
+@F.needs_docling
+def test_real_docling_figure_boxes_render_to_png_crops(tmp_path):
+    from evals.binary.labeling.parse import render_figure_crops
+
+    pdf = F.make_pdf(tmp_path / "x.pdf")
+    parsed = parse_pdf(pdf)
+    assert parsed.figures and parsed.figures[0]["bbox"] is not None
+    crops = render_figure_crops(pdf, parsed.figures)
+    assert crops[0] is not None and crops[0][:8] == b"\x89PNG\r\n\x1a\n"

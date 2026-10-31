@@ -16,7 +16,7 @@ region. This module supplies the two things the projector needs:
     ignored, so answers grounded only in them are projected as before.
   - :func:`note_paper_evidence` keeps the active PDF path and the pages the
     paper-evidence answer used or cited (``PaperEvidenceAgent`` reads the same
-    pages with PyMuPDF ``get_text("text")``).
+    pages with the pypdfium2 reader's ``get_text("text")``).
 
   Capture is bound to the request by :func:`capture_turn` (a context variable
   set by the route); nothing is captured outside a route, and nothing comes
@@ -34,7 +34,7 @@ by newlines), so the 40% rule is applied to the retained text the turn
 actually used, which is never more than the page. When both exist for the same
 citation the full page wins.
 
-Importing this module has no side effects (PyMuPDF is imported on first read).
+Importing this module has no side effects (the PDF reader is imported on first read).
 """
 
 from __future__ import annotations
@@ -101,13 +101,12 @@ def pdf_blocks(merged_context: str) -> dict[tuple[str, int], str]:
 
 def _pdf_page_text(pdf_path: str, page: int) -> str | None:
     """Extracted text of one PDF page, as ``PaperEvidenceAgent._query`` reads it."""
-    # DEPRECATED(pymupdf): same reader as paper_evidence_agent.py (license audit E2).
-    import fitz
+    from ..modules.literature.pdf_reader import open_pdf
 
     path = Path(pdf_path)
     if not path.is_file():
         return None
-    with fitz.open(path) as doc:
+    with open_pdf(path) as doc:
         if page < 1 or page > len(doc):
             return None
         return str(doc[page - 1].get_text("text") or "").strip() or None
@@ -117,7 +116,7 @@ class TurnSources:
     """Source regions retrieved and cited for one chat turn (references; text is read on demand).
 
     Args:
-        page_reader: ``(pdf_path, page) -> text`` for paper-evidence pages (PyMuPDF by default).
+        page_reader: ``(pdf_path, page) -> text`` for paper-evidence pages (pypdfium2 by default).
     """
 
     def __init__(self, page_reader: Callable[[str, int], str | None] = _pdf_page_text) -> None:

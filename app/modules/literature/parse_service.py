@@ -84,7 +84,7 @@ class ParseService:
 
     Args:
         store: The content-addressed store holding sources and receiving assets.
-        parsers: Parsers tried in order (default: PyMuPDF).
+        parsers: Parsers tried in order (default: Docling).
         state_dir: Where parse records and state markers live (default ``<store>/parses``).
         clock: Epoch seconds, injectable.
     """
