@@ -4,9 +4,9 @@
 # namespace `f2w` and never as a top-level `app`. Checkout launches keep using
 # `app.modules...`. One process uses one name (guard in app/__init__.py).
 #
-# Locks stay in requirements/*.txt (pip-compile output). The ranges below are
-# copied from requirements/*.in; install with the lock as constraints, e.g.
-#   pip install "fair2wise[full]" -c requirements/runtime.txt
+# The locked environments live in pixi.toml / pixi.lock (the single source of truth for CI and
+# the images). The ranges below are the PyPI packaging metadata for `pip install fair2wise[...]`
+# and mirror the direct dependencies in pixi.toml; they are not a lock.
 #
 # Not packaged: app/modules/legacy/ (archived, no __init__.py), app/run_pipeline_cborg.py
 # (checkout-only script), scripts/, storage/, config.yml. Schemas, vocabularies and
@@ -22,10 +22,10 @@ version = "0.1.0.dev0"
 description = "FAIR2WISE literature knowledge-graph services, SDK and agents"
 readme = "README.md"
 license = { file = "LICENSE.txt" }
-# Tested: CPython 3.12 (requirements/*.txt are compiled for 3.12) on macOS arm64.
+# Tested: CPython 3.12 (pixi.lock is solved for 3.12) on macOS arm64.
 requires-python = ">=3.12"
 dependencies = [
-  # requirements/runtime.in minus the packages split into extras below.
+  # The application's direct runtime dependencies minus the packages split into extras below.
   "academy-py>=0.5.0",
   "aiohttp>=3.14.0",
   "arxiv>=4.0.0",
@@ -58,7 +58,7 @@ agents = [
   "langchain-openai>=1.3.0",
   "langgraph>=1.2.0",
 ]
-# requirements/semantic.in (no lock: wheels are platform-specific).
+# Semantic retrieval (platform-specific wheels; fixed per platform by pixi.lock).
 semantic = [
   "faiss-cpu>=1.14.2",
   "sentence-transformers>=5.5.1",
@@ -79,7 +79,7 @@ tiled = []
 figures = [
   "PyMuPDF>=1.27.2",
 ]
-# Academy/Globus Compute deployment (requirements/globus.in); not part of [full].
+# Academy/Globus Compute deployment (pixi environment `globus`); not part of [full].
 globus = [
   "globus-sdk>=4.8,<5",
   "globus-compute-sdk==4.13.0",
@@ -129,7 +129,7 @@ packages = [
 include-package-data = false
 
 # T27 code-quality closure (docs/migration/reviews/H7/sniff_findings.md). The tools are pinned in
-# requirements/quality.txt and run by the `python-quality` job of forge-merge-ci.yml, which only
+# pixi.lock (pixi feature `quality`) and run by the `python-quality` job of forge-merge-ci.yml, which only
 # reports (counts per rule, per module) until the findings are cleared; none of this alters runtime
 # behaviour. Scope follows T27: app/ without app/modules/legacy/ and generated files.
 [tool.ruff]

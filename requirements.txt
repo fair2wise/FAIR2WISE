@@ -1,3 +1,0 @@
-# Compatibility entry point for standard Python tooling and Docker.
--r requirements/runtime.txt
--r requirements/semantic.in

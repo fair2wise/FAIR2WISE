@@ -203,3 +203,6 @@ AGENT/
 # graphify output (local analysis only; already excluded from the image build context)
 graphify-out/
 **/graphify-out/
+
+# pixi environments (created by `pixi install`; see pixi.toml / pixi.lock)
+.pixi/

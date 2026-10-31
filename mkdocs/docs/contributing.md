@@ -54,40 +54,30 @@ Record at least:
 
 ### Python
 
-Human-edited dependency inputs live in `requirements/*.in`. Generated
-`requirements/*.txt` files are Python 3.12 locks and must not be hand-edited.
-The root `requirements.txt` includes `requirements/runtime.txt` and
-`requirements/semantic.in`.
-
-Use Python 3.12 and pip-tools from the development environment:
+`pixi.toml` and `pixi.lock` at the repository root are the single source of
+truth for Python dependencies (Python 3.12; linux-64, linux-aarch64,
+osx-arm64). Never hand-edit `pixi.lock`.
 
 ```bash
-python3.12 -m pip install -r requirements.txt
-python3.12 -m pip install -r requirements/dev.txt
-python3.12 -m piptools compile --strip-extras \
-  -o requirements/runtime.txt requirements/runtime.in
-python3.12 -m piptools compile --strip-extras \
-  -o requirements/dev.txt requirements/dev.in
-python3.12 -m pip check
+pixi install --locked -e dev
+# edit pixi.toml, then regenerate the lock with pixi 0.66.0
+pixi lock
+pixi install --locked -e dev
+pixi run -e dev test
 ```
 
-When `runtime.in` changes, regenerate both `runtime.txt` and `dev.txt` because
-`dev.in` includes the runtime inputs. Regenerate `globus.txt` or `legacy.txt`
-only when its corresponding input changes:
+Use pixi 0.66.0, the version that wrote the lock; the Dockerfile and
+`scripts/ci/install_pixi.sh` pin the same version. Environments are `default`
+(application runtime), `dev`, `docs`, and the isolated `globus`, `legacy`, and
+`tiled-server`. `globus` conflicts with linkml-runtime and `tiled-server` pins
+Tiled 0.2.18 (owner pin O-T1; needs pydantic-settings<2.12), so neither shares
+the default solve.
 
-```bash
-python3.12 -m piptools compile --strip-extras \
-  -o requirements/globus.txt requirements/globus.in
-python3.12 -m piptools compile --strip-extras \
-  -o requirements/legacy.txt requirements/legacy.in
-```
-
-`requirements/semantic.in` has no compiled lock because torch/faiss wheels are
-platform-specific. It is part of the default install: `requirements.txt`
-includes the runtime lock and `semantic.in`, and the agent image copies that
-file. Do not compile it into `runtime.txt` unless you intend a large
-cross-platform lock update. A change there should note the retrieval-stack
-impact in the pull request.
+Application pins are exact. The semantic retrieval stack (faiss-cpu,
+sentence-transformers, torch CPU build) is deliberately unpinned in
+`pixi.toml` because its wheels are platform-specific; `pixi.lock` fixes the
+versions. A change there should note the retrieval-stack impact in the pull
+request. `pyproject.toml` extras remain as PyPI packaging metadata.
 
 Inspect lock diffs for unexpected transitive upgrades. A direct dependency
 removal is incomplete until imports, Docker installation, tests, and relevant
@@ -136,12 +126,12 @@ bug or compatibility boundary can be encoded deterministically.
 | UI behavior or API client | `cd ui && npm test && npm run build` |
 | Shell script | `bash -n scripts/name.sh` plus its associated test or a safe dry run |
 | MkDocs or public behavior | `mkdocs build -f mkdocs/mkdocs.yml --strict` |
-| Python requirement | Regenerated locks, clean install where practical, `pip check`, root tests |
+| Python requirement | `pixi lock`, `pixi install --locked -e dev`, root tests |
 | npm requirement | `npm ci`, UI tests, production build |
 | Dockerfile, Compose, startup, or networking | `docker compose config --quiet` and `./scripts/test_compose.sh` |
 | Database migration or seed | Migration tests, backup/upgrade/rollback exercise, Compose smoke test |
 
-The current GitHub workflow installs `requirements/dev.txt`, checks selected
+The current GitHub workflow installs the locked pixi `dev` environment, checks selected
 Black targets, runs flake8, executes root pytest, and builds MkDocs strictly.
 UI, Splash, Compose, and live external-service checks are not all enforced by
 that job, so contributors must run them when affected.

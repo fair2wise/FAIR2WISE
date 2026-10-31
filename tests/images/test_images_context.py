@@ -84,7 +84,7 @@ def test_dockerignore_keeps_what_the_build_needs():
     for path in ("app/modules/deployment/gateway.py", "storage/kg/matkg_rsoxs_v1.json",
                  "storage/terminology", "storage/schema/rsoxs_schema.yaml", "docker/nginx.conf",
                  "docker/entrypoint/f2w_supervisor.py", "docker/profiles/local.json", "ui/package.json",
-                 "mkdocs/mkdocs.yml", "requirements/runtime.txt", ".env.example"):
+                 "mkdocs/mkdocs.yml", "pixi.toml", "pixi.lock", ".env.example"):
         assert not ignored(path, IGNORE), path
 
 
@@ -113,8 +113,7 @@ def test_final_images_keep_code_schemas_and_tracked_kg_json(name):
     assert any(p.startswith("storage/terminology/") for p in shipped)  # O-D1 / H0 E3
     other = {"local", "als-dev", "als-prod"} - {name}
     assert not [p for p in shipped if any(p == f"docker/profiles/{o}.json" for o in other)]
-    assert "docker/profiles/tiled-server/constraints.txt" not in shipped  # build stage only
-    assert "docker/profiles/tiled-server/constraints.lock.txt" not in shipped
+    assert "pixi.toml" not in shipped and "pixi.lock" not in shipped  # build stages only, never a final layer
 
 
 @pytest.mark.parametrize("name", FINALS)

@@ -54,13 +54,9 @@ GATEWAY_PORT = 8080
 
 # Files whose bytes decide what goes into the three images.
 LOCK_FILES = (
-    "requirements.txt",
-    "requirements/runtime.txt",
-    "requirements/runtime.lock.txt",
-    "requirements/semantic.in",
+    "pixi.toml",
+    "pixi.lock",
     "ui/package-lock.json",
-    "docker/profiles/tiled-server/constraints.txt",
-    "docker/profiles/tiled-server/constraints.lock.txt",
     "docker/profiles/local.json",
     "docker/profiles/als-dev.json",
     "docker/profiles/als-prod.json",
@@ -115,12 +111,17 @@ def tiled_pins(root: Path) -> Dict[str, Any]:
             raise ManifestError(f"{name} not found in {TILED_CONFIG}")
         pins[name] = match.group(1)
     dockerfile = (root / "Dockerfile").read_text(encoding="utf-8")
-    in_dockerfile = f'{pins["PINNED_TILED_WHEEL_SHA256"]}  /tmp/tiled/wheel/{pins["PINNED_TILED_WHEEL"]}' in dockerfile
+    lock = (root / "pixi.lock").read_text(encoding="utf-8")
+    # The image installs the Tiled environment with --locked, and pixi.lock records the owner-pinned
+    # wheel's sha256 (pixi refuses any other bytes for that artifact).
+    entry = re.search(rf"^- pypi: \S*{re.escape(pins['PINNED_TILED_WHEEL'])}\n(?:  .*\n)+", lock, re.MULTILINE)
+    lock_records_hash = bool(entry) and f"sha256: {pins['PINNED_TILED_WHEEL_SHA256']}" in entry.group(0)
+    locked_install = "pixi install --locked -e tiled-server" in dockerfile
     return {
         "version": pins["PINNED_TILED_VERSION"],
         "wheel": pins["PINNED_TILED_WHEEL"],
         "wheel_sha256": pins["PINNED_TILED_WHEEL_SHA256"],
-        "dockerfile_checks_same_hash": in_dockerfile,
+        "lock_records_pinned_hash": lock_records_hash and locked_install,
         "bundled_in": ["local"],
     }
 
@@ -339,8 +340,8 @@ def build_manifest(*, root: Path, commit: str, ref: str, event: str, repository:
     if actual_ui != pinned_ui:
         problems.append(f"ui tree {actual_ui} differs from FROZEN_UI_TREE {pinned_ui}")
     tiled = tiled_pins(root)
-    if not tiled["dockerfile_checks_same_hash"]:
-        problems.append("Dockerfile does not check the pinned Tiled wheel sha256")
+    if not tiled["lock_records_pinned_hash"]:
+        problems.append("pixi.lock does not record the pinned Tiled wheel sha256, or the Dockerfile does not install it --locked")
     variants: Dict[str, Any] = {}
     for variant in VARIANTS:
         report = checks.get(variant)

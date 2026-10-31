@@ -1,0 +1,331 @@
+# FAIR2WISE dependency workspace (pixi). Replaces the pip-compile locks in requirements/ as the
+# single source of truth for the application, test, quality and Tiled-server environments.
+#
+# Install:  pixi install --locked            (default environment: application runtime)
+#           pixi install --locked -e dev     (runtime + tests + lint/type tools)
+# Run:      pixi run test | lint | typecheck | coverage   (see [tasks])
+# Update:   edit this file, then `pixi lock` and commit pixi.lock (never hand-edit it).
+#
+# pixi.lock records the sha256 of every conda package and PyPI artifact; images and CI install
+# with `--locked`, so any other bytes are refused (the hash-lock rule of audit AUD-08 / T28C).
+#
+# The physical tree stays app/ and installs as the import namespace `f2w` through pyproject.toml;
+# this workspace pins the third-party stack only and does not install the project itself
+# (images set PYTHONPATH=/app, checkouts run from the repo root).
+#
+# Python 3.12 only: PEP 695 generics and `X | None` annotations are used in app/.
+[workspace]
+name = "fair2wise"
+channels = ["conda-forge"]
+# linux-64 is the image/CI platform (O06 D2.8); osx-arm64 is the developer platform;
+# linux-aarch64 lets Apple-silicon Docker (colima) build and check the images natively.
+platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
+channel-priority = "strict"
+
+# faiss-cpu ships macosx_14_0_arm64 wheels only; pixi assumes macOS 13 unless told otherwise.
+[system-requirements]
+macos = "14.0"
+
+# deepeval caps click<8.4.0 while huggingface-hub 1.33 (needed by transformers 5.20.1) requires
+# click>=8.4.2. The pip environments the suite was written against carried that violation and ran
+# fine, so the constraint is overridden here and the dev feature pins click to the version that ran.
+[pypi-options.dependency-overrides]
+click = ">=8.0"
+
+[dependencies]
+python = "3.12.*"
+
+# ---- application runtime (was requirements/runtime.in + semantic.in) -------------------------
+[pypi-dependencies]
+# Exact pins (the versions the H0 baseline suite and the pip locks ran against; migrated unchanged
+# so the move to pixi changes no behaviour). Upgrade deliberately: edit a pin, `pixi lock`, rerun
+# the suite. Direct dependencies are the ones named in requirements/runtime.in and semantic.in.
+# torch comes from the PyTorch CPU index: the default index resolves CUDA builds (+cu13x, ~3 GB of
+# nvidia-* wheels) that no image can use. DEPRECATED(pymupdf): PyMuPDF (AGPL-3.0) is being replaced
+# by Docling (H1 E2, T05).
+academy-py = "==0.5.0"
+aiohappyeyeballs = "==2.7.1"
+aiohttp = "==3.14.3"
+aiohttp-sse = "==2.2.0"
+aiologic = "==0.17.1"
+aiosignal = "==1.4.0"
+annotated-doc = "==0.0.5"
+annotated-types = "==0.8.0"
+anyio = "==4.14.2"
+arro3-core = "==0.8.1"
+arxiv = "==4.0.1"
+attrs = "==26.1.0"
+backports-zstd = "==1.6.0"
+bibtexparser = "==1.4.4"
+blake3 = "==1.0.9"
+blinker = "==1.9.0"
+boto3 = "==1.43.64"
+botocore = "==1.43.64"
+cachetools = "==7.1.7"
+certifi = "==2026.7.22"
+cffi = "==2.1.1"
+charset-normalizer = "==3.4.9"
+colorama = "==0.4.6"
+contourpy = "==1.3.3"
+cryptography = "==50.0.0"
+culsans = "==0.11.0"
+curies = "==0.14.5"
+cycler = "==0.12.1"
+deltalake = "==1.5.1"
+deprecated = "==1.3.1"
+distro = "==1.9.0"
+emmet-core = "==0.87.1"
+fastapi = "==0.141.1"
+flask = "==3.1.3"
+fonttools = "==4.63.0"
+frozenlist = "==1.8.0"
+globus-sdk = "==4.8.1"
+h11 = "==0.16.0"
+hbreader = "==0.9.1"
+httpcore = "==1.0.9"
+httpx = "==0.28.1"
+idna = "==3.18"
+inflect = "==7.5.0"
+iniconfig = "==2.3.0"
+itsdangerous = "==2.2.0"
+jinja2 = "==3.1.6"
+jiter = "==0.16.0"
+jmespath = "==1.1.0"
+json-flattener = "==0.1.9"
+jsonasobj2 = "==1.0.4"
+jsonpatch = "==1.33"
+jsonpointer = "==3.1.1"
+jsonschema = "==4.26.0"
+jsonschema-specifications = "==2025.9.1"
+kiwisolver = "==1.5.0"
+langchain-core = "==1.5.3"
+langchain-openai = "==1.4.1"
+langchain-protocol = "==0.0.18"
+langgraph = "==1.2.10"
+langgraph-checkpoint = "==4.1.1"
+langgraph-prebuilt = "==1.1.0"
+langgraph-sdk = "==0.4.2"
+langsmith = "==0.10.15"
+latexcodec = "==3.0.1"
+linkml-runtime = "==1.11.1"
+lxml = "==6.1.1"
+markupsafe = "==3.0.3"
+matplotlib = "==3.11.1"
+monty = "==2026.7.16"
+more-itertools = "==11.1.0"
+mp-api = "==0.46.4"
+mpmath = "==1.3.0"
+multidict = "==6.7.1"
+narwhals = "==2.24.0"
+networkx = "==3.6.1"
+numpy = "==2.5.1"
+obonet = "==1.3.0"
+openai = "==2.53.0"
+orjson = "==3.11.9"
+ormsgpack = "==1.12.2"
+packaging = "==26.3"
+palettable = "==3.3.3"
+pandas = "==3.0.5"
+pillow = "==12.3.0"
+plotly = "==6.9.0"
+pluggy = "==1.6.0"
+prefixcommons = "==0.1.12"
+prefixmaps = "==0.2.6"
+propcache = "==0.5.2"
+psutil = "==7.2.2"
+pubchempy = "==1.0.5"
+pyalex = "==0.21"
+pyarrow = "==25.0.0"
+pybtex = "==0.26.1"
+pycparser = "==3.0"
+pydantic = "==2.13.4"
+pydantic-core = "==2.46.4"
+pydantic-settings = "==2.14.2"
+pygments = "==2.20.0"
+pyjwt = "==2.13.0"
+pymatgen = "==2026.5.4"
+pymatgen-core = "==2026.7.31"
+pymatgen-io-validation = "==0.1.2"
+pymupdf = "==1.28.0"
+pyparsing = "==3.3.2"
+pystow = "==0.8.21"
+pytest = "==9.1.1"
+pytest-logging = "==2015.11.4"
+python-dateutil = "==2.9.0.post0"
+python-dotenv = "==1.2.2"
+pyyaml = "==6.0.3"
+rapidfuzz = "==3.14.5"
+rdflib = "==7.6.0"
+redis = "==8.1.0"
+referencing = "==0.37.0"
+regex = "==2026.7.19"
+requests = "==2.34.2"
+requests-toolbelt = "==1.0.0"
+rpds-py = "==2026.6.3"
+ruamel-yaml = "==0.19.1"
+s3transfer = "==0.19.2"
+six = "==1.17.0"
+sniffio = "==1.3.1"
+spglib = "==2.7.0"
+starlette = "==1.3.1"
+sympy = "==1.14.0"
+tenacity = "==9.1.4"
+tiktoken = "==0.13.0"
+tqdm = "==4.70.0"
+typeguard = "==4.6.0"
+typing-extensions = "==4.16.0"
+typing-inspection = "==0.4.2"
+uncertainties = "==3.2.3"
+urllib3 = "==2.7.0"
+uuid-utils = "==0.17.0"
+uvicorn = "==0.52.1"
+watchdog = "==6.0.0"
+websockets = "==15.0.1"
+werkzeug = "==3.1.8"
+wrapt = "==2.3.0"
+xxhash = "==3.8.1"
+yarl = "==1.24.5"
+zstandard = "==0.25.0"
+# Semantic retrieval stack: unpinned by design (platform-specific wheels; requirements/semantic.in),
+# now fixed per platform by pixi.lock. torch is the PyTorch CPU build.
+faiss-cpu = ">=1.14.2"
+sentence-transformers = ">=5.5.1"
+torch = { version = ">=2.12.0", index = "https://download.pytorch.org/whl/cpu" }
+# Exact pin on purpose: langchain-core imports transformers whenever it is installed, and
+# transformers < 5.20 imports torch eagerly, which the "importing the app package loads no torch"
+# test (tests/canonicalization/test_canon_services.py) and cold-start time rule out.
+transformers = "==5.20.1"
+# huggingface-hub 2.x is a major jump from the 1.33 the baseline ran with; the image bakes the
+# embedding models through its snapshot_download. Move it deliberately, not by resolver drift.
+huggingface-hub = "==1.33.0"
+
+# ---- tests, lint, docs (was requirements/dev.in) ---------------------------------------------
+[feature.dev.pypi-dependencies]
+click = "==8.3.3"
+# deepeval needs tabulate<0.10; the application environment (no deepeval) resolves 0.10.0. The
+# environments therefore solve separately (no solve-group), as the split pip locks did.
+# Exact pins of requirements/dev.txt that are not in the application environment (pytest, black,
+# flake8, deepeval, mkdocs, ...).
+babel = "==2.18.0"
+backoff = "==2.2.1"
+backrefs = "==8.0"
+beautifulsoup4 = "==4.15.0"
+black = "==26.5.1"
+build = "==1.5.0"
+cfgv = "==3.5.0"
+deepeval = "==4.2.7"
+distlib = "==0.4.3"
+editorconfig = "==0.17.1"
+execnet = "==2.1.2"
+filelock = "==3.32.2"
+flake8 = "==7.3.0"
+ghp-import = "==2.1.0"
+grpcio = "==1.84.0"
+identify = "==2.6.19"
+jsbeautifier = "==2.0.3"
+markdown = "==3.10.3"
+markdown-it-py = "==4.2.0"
+mccabe = "==0.7.0"
+mdurl = "==0.1.2"
+mergedeep = "==1.3.4"
+mkdocs = "==1.6.1"
+mkdocs-get-deps = "==0.2.2"
+mkdocs-material = "==9.7.7"
+mkdocs-material-extensions = "==1.3.1"
+mkdocs-mermaid2-plugin = "==1.2.3"
+mypy-extensions = "==1.1.0"
+nest-asyncio = "==1.6.0"
+nodeenv = "==1.10.0"
+opentelemetry-api = "==1.45.0"
+opentelemetry-sdk = "==1.45.0"
+opentelemetry-semantic-conventions = "==0.66b0"
+paginate = "==0.5.7"
+pathspec = "==1.1.1"
+platformdirs = "==4.11.0"
+portalocker = "==4.4.0"
+posthog = "==7.60.1"
+pre-commit = "==4.6.1"
+prompt-toolkit = "==3.0.53"
+pycodestyle = "==2.14.0"
+pyfiglet = "==1.0.4"
+pyflakes = "==3.4.0"
+pymdown-extensions = "==11.0.1"
+pyproject-hooks = "==1.2.0"
+pytest-asyncio = "==1.4.0"
+pytest-repeat = "==0.9.4"
+pytest-rerunfailures = "==16.7"
+pytest-xdist = "==3.8.0"
+python-discovery = "==1.5.1"
+pytokens = "==0.4.1"
+pyyaml-env-tag = "==1.1"
+questionary = "==2.1.1"
+rich = "==14.3.4"
+shellingham = "==1.5.4"
+soupsieve = "==2.9.1"
+typer = "==0.27.2"
+virtualenv = "==21.7.1"
+wcwidth = "==0.9.1"
+
+# ---- MkDocs site (image docs-build stage and `pixi run docs`) --------------------------------
+[feature.docs.dependencies]
+python = "3.12.*"
+
+[feature.docs.pypi-dependencies]
+mkdocs = "==1.6.1"
+mkdocs-material = "==9.7.7"
+mkdocs-mermaid2-plugin = ">=1.2.3"
+
+[feature.docs.tasks]
+docs = "mkdocs build --strict -f mkdocs/mkdocs.yml"
+
+# ---- T27 quality tools (was requirements/quality.in) -----------------------------------------
+[feature.quality.pypi-dependencies]
+mypy = ">=1.20"
+ruff = ">=0.15"
+isort = ">=7"
+pytest-cov = ">=7"
+types-PyYAML = "*"
+types-requests = "*"
+types-jsonschema = "*"
+types-psutil = "*"
+lxml-stubs = "*"
+
+# ---- optional: Academy/Globus Compute deployment (was requirements/globus.in) -----------------
+# Isolated: globus-compute-endpoint==4.13.0 conflicts with the app's linkml-runtime range.
+[feature.globus.dependencies]
+python = "3.12.*"
+
+[feature.globus.pypi-dependencies]
+globus-sdk = ">=4.8,<5"
+globus-compute-sdk = "==4.13.0"
+globus-compute-endpoint = "==4.13.0"
+
+# ---- optional: archived modules under app/modules/legacy (was requirements/legacy.in) ----------
+[feature.legacy.pypi-dependencies]
+rdflib = ">=7.6.0"
+
+# ---- managed-Tiled server (isolated: tiled 0.2.18 needs pydantic-settings<2.12) ----------------
+# Owner decision O-T1: PINNED_TILED_VERSION / PINNED_TILED_WHEEL_SHA256 in
+# app/modules/deployment/tiled_config.py. tests/images check that pixi.lock holds that wheel hash.
+[feature.tiled-server.dependencies]
+python = "3.12.*"
+
+[feature.tiled-server.pypi-dependencies]
+tiled = { version = "==0.2.18", extras = ["server"] }
+
+[environments]
+dev = { features = ["dev", "quality", "docs"] }
+docs = { features = ["docs"], no-default-feature = true }
+globus = { features = ["globus"], no-default-feature = true }
+legacy = { features = ["legacy"] }
+tiled-server = { features = ["tiled-server"], no-default-feature = true }
+
+[feature.dev.tasks]
+test = "python -m pytest -q -p no:cacheprovider --ignore=tests/deepeval"
+lint = "flake8 app --exclude=app/modules/legacy,app/graphify-out --select=F"
+
+[feature.quality.tasks]
+typecheck = "mypy"
+ruff = "ruff check app --statistics --exit-zero"
+isort-check = "isort --check-only app"
+coverage = "python -m pytest -q -p no:cacheprovider --ignore=tests/deepeval --cov"

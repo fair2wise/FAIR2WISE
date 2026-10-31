@@ -6,10 +6,11 @@ Status: candidate for H4. Built and run only by the owner; nothing here has been
 
 | Stage | From | Content |
 | --- | --- | --- |
-| `frontend-build`, `docs-build`, `frontend` | node / python / nginx | T24C: Vite bundle for `/fair2wise`, MkDocs site, standalone gateway image (compose) |
-| `tiled-server-build` | `${PYTHON_IMAGE}` | `/opt/tiled/venv`: `tiled[server]` from the `tiled-0.2.18-py3-none-any.whl` checked against `PINNED_TILED_WHEEL_SHA256`, installed `--require-hashes` from `tiled-server/constraints.lock.txt`, `pip check`, version assert |
-| `runtime-base` | `${PYTHON_IMAGE}` | app lock (`requirements.txt`), allowlisted code/schemas/tracked KG JSON, UI + docs, gateway template, `docker/entrypoint/`, tini, nginx, uid 10001; no profile |
-| `local` | `runtime-base` | + `/opt/tiled/venv`, `profiles/local.json`, `/var/lib/fair2wise/tiled` mount point |
+| `pixi-app`, `frontend-build`, `docs-build`, `frontend` | pixi / node / nginx | T24C: `pixi-app` is pixi 0.66.0 (the version that wrote `pixi.lock`; build stages only); Vite bundle for `/fair2wise`, MkDocs site (pixi `docs` environment), standalone gateway image (compose) |
+| `app-env-build` | `pixi-app` | pixi `default` environment at `/opt/fair2wise/pixi/.pixi/envs/default`, installed `--locked` from `pixi.lock`; fails if torch is a CUDA build |
+| `tiled-server-build` | `pixi-app` | pixi `tiled-server` environment at `/opt/tiled/ws/.pixi/envs/tiled-server`: Tiled 0.2.18 (owner pin O-T1; wheel hash `PINNED_TILED_WHEEL_SHA256` recorded in `pixi.lock`), installed `--locked`, version assert |
+| `runtime-base` | `${PYTHON_IMAGE}` | the `app-env-build` environment copied in (PATH puts it first), allowlisted code/schemas/tracked KG JSON, UI + docs, gateway template, `docker/entrypoint/`, tini, nginx, uid 10001; no profile |
+| `local` | `runtime-base` | + the Tiled server environment, linked as `/opt/tiled/venv`, `profiles/local.json`, `/var/lib/fair2wise/tiled` mount point |
 | `als-dev` | `runtime-base` | + `profiles/als-dev.json` (`https://tiled-staging.als.lbl.gov`) |
 | `als-prod` | `runtime-base` | + `profiles/als-prod.json` (`https://tiled.als.lbl.gov`) |
 | `agent` | `runtime-base` | legacy compose API-only target (`scripts/start_agent_backend.sh`, root, no supervisor) plus Splash/pixi (`splash_links`, `pixi install --locked`) for `compose.splash.yaml`; Splash stays here until its approved retirement gate (T16B/H7 or H8) and is never in the three images |
@@ -179,25 +180,21 @@ docker run -d --name f2w-als-dev -p 127.0.0.1:8081:8080 --stop-timeout 120 \
   ghcr.io/fair2wise/fair2wise:als-dev
 ```
 
-Hash-locked installs (T28C / AUD-08). Both pip installs that decide image content run with
-`--require-hashes`: `runtime-base` from `requirements/runtime.lock.txt` (the pins of
-`requirements/runtime.txt` plus every wheel/sdist sha256) and `tiled-server-build` from
-`docker/profiles/tiled-server/constraints.lock.txt` (the pins of `constraints.txt`, plus
-`tiled[server]==0.2.18` whose hashes include `PINNED_TILED_WHEEL_SHA256`). The plain version
-lists stay for developers and CI, because `pip install -r requirements.txt -r requirements/dev.txt`
-chains the unpinned `requirements/semantic.in`, and pip puts a whole install into hash-checking
-mode once any line carries a hash. `tests/packaging/test_requirements_locks.py` keeps each pair
-in step. Still unhashed: CPU torch (PyTorch index, not PyPI) and `semantic.in`. Regenerate
-(PyPI network only; keep each file's header; bump versions in the plain list first):
+Hash-locked installs (T28C / AUD-08). `pixi.toml` + `pixi.lock` at the repository root are
+the single source of truth, and `pixi.lock` records the sha256 of every conda package and PyPI
+artifact. Both environments that decide image content are installed with `pixi install --locked`,
+which refuses anything the lock does not describe (this replaces `pip --require-hashes`):
+`app-env-build` installs the `default` environment, which `runtime-base` copies in, and
+`tiled-server-build` installs the isolated `tiled-server` environment (Tiled 0.2.18, whose wheel
+hash `PINNED_TILED_WHEEL_SHA256` is checked against the lock). No pixi binary is in any final
+image except the legacy `agent` target (`splash_links`, separate pixi 0.70.2). CI installs pixi
+with `scripts/ci/install_pixi.sh` (pinned release, sha256-verified). The semantic stack
+(faiss-cpu, sentence-transformers, CPU torch) is unpinned in `pixi.toml` by design and fixed by
+the lock. `tests/packaging/test_pixi_lock.py` checks the lock. To change a dependency, edit
+`pixi.toml`, run `pixi lock` with pixi 0.66.0, and commit `pixi.lock`; never hand-edit it.
 
-```sh
-uv pip compile requirements/runtime.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 \
-  --generate-hashes --strip-extras -c requirements/runtime.txt -o requirements/runtime.lock.txt
-echo 'tiled[server]==0.2.18' > /tmp/tiled.in
-uv pip compile /tmp/tiled.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 \
-  --generate-hashes --no-strip-extras -c docker/profiles/tiled-server/constraints.txt \
-  -o docker/profiles/tiled-server/constraints.lock.txt
-```
+Baked Hugging Face models: the image writes `refs/main` in the model cache so offline lookup by
+bare model name resolves.
 
 ## Tests
 

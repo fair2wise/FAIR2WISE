@@ -1,4 +1,5 @@
 """T04: resource discovery and the pyproject package list."""
+import re
 import tomllib
 from pathlib import Path
 
@@ -78,17 +79,26 @@ def test_pyproject_lists_every_package():
     assert not any(p.startswith(("app", "modules")) for p in setuptools["packages"])
 
 
-def test_extras_match_requirements_in():
+def test_extras_match_the_pixi_workspace():
+    """pyproject.toml is the PyPI packaging metadata; pixi.toml is the locked environment source.
+
+    Every direct dependency named in pyproject (base and the api/agents/parser/semantic extras) is
+    declared in the pixi default environment, and the Globus extra is the pixi ``globus`` feature.
+    Only names are compared: pixi pins the application stack exactly while pyproject keeps ranges.
+    """
     data = tomllib.loads((REPO / "pyproject.toml").read_text())["project"]
+    pixi = tomllib.loads((REPO / "pixi.toml").read_text())
 
-    def reqs(name):
-        lines = (REPO / "requirements" / name).read_text().splitlines()
-        return {ln.strip() for ln in lines if ln.strip() and not ln.startswith(("#", "-r"))}
+    def norm(req):
+        return re.split(r"[<>=!~\[ ;]", req.strip(), maxsplit=1)[0].lower().replace("_", "-")
 
+    default = {norm(n) for n in pixi["pypi-dependencies"]}
     extras = data["optional-dependencies"]
-    split = set(extras["api"]) | set(extras["agents"]) | set(extras["parser"])
-    assert set(data["dependencies"]) | split == reqs("runtime.in")
-    assert not set(data["dependencies"]) & split
-    assert set(extras["semantic"]) == reqs("semantic.in")
-    assert set(extras["globus"]) == reqs("globus.in")
+    direct = {norm(r) for r in data["dependencies"]}
+    for extra in ("api", "agents", "parser", "semantic"):
+        direct |= {norm(r) for r in extras[extra]}
+    assert direct <= default, sorted(direct - default)
+    assert {norm(r) for r in extras["globus"]} == {norm(n) for n in pixi["feature"]["globus"]["pypi-dependencies"]}
+    split = {norm(r) for e in ("api", "agents", "parser") for r in extras[e]}
+    assert not {norm(r) for r in data["dependencies"]} & split
     assert set(extras) >= {"api", "agents", "semantic", "parser", "tiled", "figures", "full"}

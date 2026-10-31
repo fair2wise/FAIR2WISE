@@ -465,55 +465,63 @@ def _job_script(job: Dict[str, Any]) -> str:
     return "\n".join(s.get("run", "") for s in job["steps"])
 
 
-def test_tiled_job_installs_the_owner_pinned_wheel_into_its_own_venv(forge_ci: Dict[str, Any]) -> None:
-    from app.modules.deployment.tiled_config import PINNED_TILED_VERSION, PINNED_TILED_WHEEL, PINNED_TILED_WHEEL_SHA256
+def test_tiled_job_installs_the_owner_pinned_wheel_into_its_own_locked_environment(forge_ci: Dict[str, Any]) -> None:
+    from app.modules.deployment.tiled_config import PINNED_TILED_VERSION, PINNED_TILED_WHEEL_SHA256
 
     job = forge_ci["jobs"]["python-tiled-suites"]
     assert job["needs"] == "guard" and "environment" not in job and "secrets" not in job
     install = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Isolated Tiled"))
-    assert f'"tiled=={PINNED_TILED_VERSION}"' in install and "--no-deps" in install and "--only-binary=:all:" in install
-    assert f"{PINNED_TILED_WHEEL_SHA256}  $RUNNER_TEMP/tiled-wheel/{PINNED_TILED_WHEEL}" in install
-    assert "sha256sum -c -" in install, "the downloaded wheel is checked before anything is installed"
-    assert install.index("sha256sum -c") < install.index("python -m venv"), "check first, install second"
-    # T24E / D3.14: the same hash-locked install as the image (Dockerfile tiled-server-build).
-    assert "--require-hashes" in install
-    assert "-r docker/profiles/tiled-server/constraints.lock.txt" in install
-    assert '--find-links "$RUNNER_TEMP/tiled-wheel"' in install, "the checked wheel is what pip installs for tiled"
-    assert "--constraint docker/profiles/tiled-server/constraints.txt" not in install, "the plain list is not the lock"
-    assert f"{PINNED_TILED_WHEEL}[server]" not in install, "no direct install outside hash checking"
-    assert "pip check" in install and f"tiled.__version__ != '{PINNED_TILED_VERSION}'" in install
-    # The server goes into $RUNNER_TEMP/venv-tiled only; the app environment never gets tiled.
-    assert "venv-tiled" in install
+    # The owner pin (O-T1) is asserted against pixi.lock before anything is installed, and the
+    # install is --locked: no byte outside the lock (whose entries carry sha256) is accepted.
+    assert f'grep -q "sha256: {PINNED_TILED_WHEEL_SHA256}" pixi.lock' in install
+    assert "pixi install --locked -e tiled-server" in install
+    assert install.index("grep -q") < install.index("pixi install"), "check first, install second"
+    assert "pip" not in install, "no unlocked install path"
+    assert f"tiled.__version__ != '{PINNED_TILED_VERSION}'" in install
+    # The server goes into its own pixi environment only; the app environment never gets tiled.
+    assert ".pixi/envs/tiled-server" in install
     for step in job["steps"]:
         run = step.get("run", "")
-        if "requirements.txt" in run:
+        if "-e dev" in run:
             assert "tiled" not in run.lower()
 
 
-def test_tiled_job_and_dockerfile_install_the_same_hash_lock(forge_ci: Dict[str, Any]) -> None:
-    """D3.14: CI resolves the Tiled server environment from the same hash-locked file as the image."""
+def test_ci_installs_pixi_from_the_pinned_checksummed_script_not_a_new_action() -> None:
+    """Every workflow action stays a reviewed pin; pixi comes from scripts/ci/install_pixi.sh, whose
+    release digest is pinned and verified before the binary runs, at the version of pixi.lock/Dockerfile."""
+    script = (REPO / "scripts/ci/install_pixi.sh").read_text(encoding="utf-8")
+    version = re.search(r'^PIXI_VERSION="([\d.]+)"', script, re.M).group(1)
+    assert re.search(r'^PIXI_SHA256="[0-9a-f]{64}"', script, re.M)
+    assert "sha256sum -c -" in script and script.index("sha256sum -c") < script.index("chmod +x")
+    code = "\n".join(line for line in script.splitlines() if not line.lstrip().startswith("#"))
+    assert not re.search(r"\|\s*(sh|bash)\b", code) and "bash -c" not in code  # never curl | sh
+    dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
+    assert f"FROM ghcr.io/prefix-dev/pixi:{version} AS pixi-app" in dockerfile
+    for wf in ("forge-merge-ci.yml", "build-app.yml"):
+        text = (WORKFLOWS / wf).read_text(encoding="utf-8")
+        assert "scripts/ci/install_pixi.sh" in text and "pixi install --locked" in text, wf
+        assert "pip install" not in text and "-r requirements" not in text, wf
+
+
+def test_tiled_job_and_dockerfile_install_the_same_lock(forge_ci: Dict[str, Any]) -> None:
+    """D3.14: CI resolves the Tiled server environment from the same pixi.lock environment as the image."""
     from app.modules.deployment.tiled_config import PINNED_TILED_VERSION, PINNED_TILED_WHEEL_SHA256
 
     job = forge_ci["jobs"]["python-tiled-suites"]
     install = next(s["run"] for s in job["steps"] if s.get("name", "").startswith("Isolated Tiled"))
     dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
-    lock = REPO / "docker/profiles/tiled-server/constraints.lock.txt"
-    assert "--require-hashes --find-links /tmp/tiled/wheel" in dockerfile
-    assert "-r /tmp/tiled/constraints.lock.txt" in dockerfile
-    assert "COPY docker/profiles/tiled-server/constraints.lock.txt /tmp/tiled/constraints.lock.txt" in dockerfile
-    assert "-r docker/profiles/tiled-server/constraints.lock.txt" in install
-    text = lock.read_text(encoding="utf-8")
-    assert f"tiled[server]=={PINNED_TILED_VERSION}" in text and PINNED_TILED_WHEEL_SHA256 in text
-    for line in text.splitlines():
-        if line and not line.startswith(("#", " ")) and "==" in line:
-            assert line.rstrip().endswith("\\"), f"unhashed lock line: {line}"
+    assert "pixi install --locked -e tiled-server" in dockerfile
+    assert "pixi install --locked -e tiled-server" in install
+    assert "COPY pixi.toml pixi.lock ./" in dockerfile
+    text = (REPO / "pixi.lock").read_text(encoding="utf-8")
+    assert f"tiled-{PINNED_TILED_VERSION}-py3-none-any.whl" in text and PINNED_TILED_WHEEL_SHA256 in text
 
 
 def test_tiled_job_runs_every_tiled_backed_suite_with_the_isolated_interpreter(forge_ci: Dict[str, Any]) -> None:
     job = forge_ci["jobs"]["python-tiled-suites"]
     run = next(s["run"] for s in job["steps"] if s.get("name") == "Tiled-backed suites")
     assert "env -i" in run, "no ambient environment reaches the servers"
-    assert 'F2W_TILED_PYTHON="$RUNNER_TEMP/venv-tiled/bin/python"' in run
+    assert 'F2W_TILED_PYTHON="$PWD/.pixi/envs/tiled-server/bin/python"' in run
     for suite in TILED_SUITES:
         assert f" {suite}" in run, suite
     assert "|| true" not in run and "continue-on-error" not in job

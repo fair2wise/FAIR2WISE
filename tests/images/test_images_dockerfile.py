@@ -22,17 +22,26 @@ FINALS = ("local", "als-dev", "als-prod")
 ALS = ("als-dev", "als-prod")
 SUPERVISOR = "/opt/fair2wise/entrypoint/f2w_supervisor.py"
 PROFILE_PATH = "/etc/fair2wise/profile.json"
+PIXI_VERSION = "0.66.0"  # the pixi that wrote pixi.lock
+PIXI_LOCK = (REPO / "pixi.lock").read_text(encoding="utf-8")
+PIXI_TOML = (REPO / "pixi.toml").read_text(encoding="utf-8")
+TILED_ENV = "/opt/tiled/ws/.pixi/envs/tiled-server"
+APP_ENV = "/opt/fair2wise/pixi/.pixi/envs/default"
 
 
 def test_stage_layout():
     names = DF.names
-    expected = ("frontend-build", "docs-build", "frontend", "tiled-server-build", "runtime-base", *FINALS, "agent")
+    expected = ("frontend-build", "pixi-app", "docs-build", "frontend", "app-env-build", "tiled-server-build",
+                "runtime-base", *FINALS, "agent")
     for name in expected:
         assert name in names, name
     for name in (*FINALS, "agent"):
         assert DF.stage(name).base == "runtime-base", name
     assert DF.stage("runtime-base").base == "${PYTHON_IMAGE}"
-    assert DF.stage("tiled-server-build").base == "${PYTHON_IMAGE}"
+    # Dependency installs run in pixi stages (pixi.lock, --locked); only runtime-base is a plain Python image.
+    assert DF.stage("pixi-app").base == f"ghcr.io/prefix-dev/pixi:{PIXI_VERSION}"
+    for name in ("docs-build", "app-env-build", "tiled-server-build"):
+        assert DF.stage(name).base == "pixi-app", name
     assert DF.global_args["PYTHON_IMAGE"].startswith("python:3.12")
 
 
@@ -55,28 +64,34 @@ def test_only_local_bundles_the_managed_tiled_server():
         for var in ("F2W_TILED_DATA_DIR", "F2W_TILED_PYTHON", "F2W_TILED_PORT"):
             assert var not in env, (name, var)
     local = [c for c in DF.stage("local").copies() if c[0] == "tiled-server-build"]
-    assert local == [("tiled-server-build", ["/opt/tiled/venv"], "/opt/tiled/venv")]
+    assert local == [("tiled-server-build", [TILED_ENV], TILED_ENV)]
+    assert any(f"ln -s {TILED_ENV} /opt/tiled/venv" in i.args for i in DF.stage("local").of("RUN"))
+
+
+def _lock_entry(url_fragment: str) -> str:
+    """The pixi.lock package block (url line to the next package) whose URL contains the fragment."""
+    m = re.search(r"^- pypi: \S*%s\S*\n(?:  .*\n)+" % re.escape(url_fragment), PIXI_LOCK, re.M)
+    assert m, f"pixi.lock has no entry for {url_fragment}"
+    return m.group(0)
 
 
 def test_tiled_server_pin_is_the_owner_pin_and_hash_checked():
-    stage = DF.stage("tiled-server-build")
-    run = " ".join(i.args for i in stage.of("RUN"))
+    """O-T1: the Tiled server is the owner-pinned 0.2.18 wheel; pixi.lock carries its sha256 and the
+    image installs with --locked, so no other bytes can be installed (AUD-08 / T28C)."""
     version = tiled_config.PINNED_TILED_VERSION
     assert version == "0.2.18"
-    assert f'"tiled=={version}"' in run and "--no-deps" in run and "--only-binary=:all:" in run
-    assert f"{tiled_config.PINNED_TILED_WHEEL_SHA256}  /tmp/tiled/wheel/{tiled_config.PINNED_TILED_WHEEL}" in run
-    assert "sha256sum -c -" in run
-    # The verified wheel is what gets installed: pip runs in --require-hashes mode from the
-    # lock, whose tiled entry carries the same sha256, and the checked file is offered first
-    # through --find-links (T28C; the hash-lock test below checks the lock itself).
-    assert "--require-hashes --find-links /tmp/tiled/wheel -r /tmp/tiled/constraints.lock.txt" in run
-    assert "pip check" in run
+    assert re.search(r'^tiled = \{ version = "==%s", extras = \["server"\] \}' % re.escape(version), PIXI_TOML, re.M)
+    entry = _lock_entry(tiled_config.PINNED_TILED_WHEEL)
+    assert f"sha256: {tiled_config.PINNED_TILED_WHEEL_SHA256}" in entry
+    stage = DF.stage("tiled-server-build")
+    run = " ".join(i.args for i in stage.of("RUN"))
+    assert "pixi install --locked -e tiled-server" in run
     assert f"tiled.__version__ != '{version}'" in run
-    assert run.index("sha256sum -c -") < run.index("python -m venv")
-    constraints = (REPO / "docker/profiles/tiled-server/constraints.txt").read_text(encoding="utf-8")
-    pins = dict(line.split("==", 1) for line in constraints.splitlines() if line and not line.startswith("#"))
-    assert "tiled" not in pins
-    assert pins["pydantic-settings"].startswith("2.11")  # tiled needs <2.12 (separate env)
+    assert [p for _, srcs, _ in stage.copies() for p in srcs] == ["pixi.toml", "pixi.lock"]
+    # tiled needs pydantic-settings<2.12: the isolated environment resolves it separately from the
+    # application environment (which takes a newer one).
+    versions = set(re.findall(r"^  name: pydantic-settings\n  version: (\S+)", PIXI_LOCK, re.M))
+    assert any(v.startswith("2.11") for v in versions) and any(not v.startswith("2.11") for v in versions), versions
 
 
 @pytest.mark.parametrize("name", FINALS)
@@ -183,7 +198,9 @@ def test_splash_stays_only_in_the_legacy_agent_target():
         assert "pixi" not in DF.copied_from_stages(name), name
         assert not any(p.startswith("splash_links") for p in DF.context_sources(name)), name
         assert "SPLASH_LINKS_REPO" not in DF.effective_env(name), name
-        assert not any("pixi" in i.args for s in DF.lineage(name) for i in s.of("RUN")), name
+        # The pixi tool never runs in a final image (locked environments are built in earlier stages and
+        # copied; `.pixi/` paths of those environments are fine, a `pixi <command>` is not).
+        assert not any(re.search(r"(?<![./\w])pixi\s", i.args) for s in DF.lineage(name) for i in s.of("RUN")), name
 
 
 def test_gateway_listens_unprivileged_without_setcap():
@@ -207,12 +224,17 @@ def _runtime_base_runs() -> str:
 
 def test_semantic_deps_install_cpu_torch_and_refuse_cuda_builds():
     """A5/AUD-08: the default index gives CUDA torch (~7 GB); images must take the CPU build."""
-    run = _runtime_base_runs()
-    assert "--require-hashes -r requirements/runtime.lock.txt" in run and "requirements/semantic.in" in run
-    assert "pip install -r requirements/runtime.txt" not in run  # the hashed lock, not the version list
-    assert "--index-url https://download.pytorch.org/whl/cpu" in run
+    run = " ".join(i.args for i in DF.stage("app-env-build").of("RUN"))
+    assert "pixi install --locked -e default" in run
     assert "torch.version.cuda is None" in run
-    assert "pip install -r requirements.txt" not in run  # semantic.in is installed separately, after CPU torch
+    assert 'index = "https://download.pytorch.org/whl/cpu"' in PIXI_TOML
+    torch_urls = re.findall(r"^- pypi: (\S*/torch-\S+)$", PIXI_LOCK, re.M)
+    assert torch_urls and all("download-r2.pytorch.org/whl/cpu/" in u or "download.pytorch.org/whl/cpu/" in u
+                              for u in torch_urls), torch_urls
+    assert not re.findall(r"^  name: (?:nvidia-\S+|cuda-\S+)$", PIXI_LOCK, re.M)  # no CUDA wheel is locked
+    assert f"ENV PATH={APP_ENV}/bin:$PATH" in " ".join(i.args or "" for i in DF.stage("runtime-base").of("ENV")) or \
+        f"PATH={APP_ENV}/bin" in " ".join(i.args for i in DF.stage("runtime-base").of("ENV"))
+    assert (("app-env-build", [APP_ENV], APP_ENV) in DF.stage("runtime-base").copies())
 
 
 def test_embedding_models_are_baked_at_pinned_revisions_and_match_code_defaults():
@@ -230,18 +252,16 @@ def test_embedding_models_are_baked_at_pinned_revisions_and_match_code_defaults(
         assert DF.effective_env(name).get("HF_HUB_OFFLINE", json.load(open(REPO / f"docker/profiles/{name}.json"))["env"].get("HF_HUB_OFFLINE")) == "1", name
 
 
-def test_tiled_server_venv_installs_from_the_hash_lock():
-    """AUD-08/B24: the Tiled venv is built with --require-hashes from constraints.lock.txt; the
-    wheel sha256sum check stays, and the checked wheel is the one pip installs (--find-links)."""
-    run = " ".join(i.args for i in DF.stage("tiled-server-build").of("RUN"))
-    assert "--require-hashes" in run and "-r /tmp/tiled/constraints.lock.txt" in run
-    assert "--find-links /tmp/tiled/wheel" in run
-    assert "sha256sum -c" in run and run.index("sha256sum -c") < run.index("pip install")
-    assert "--constraint /tmp/tiled/constraints.txt" not in run
-    copies = [p for _, srcs, _ in DF.stage("tiled-server-build").copies() for p in srcs]
-    assert copies == ["docker/profiles/tiled-server/constraints.lock.txt"]
-    lock = (REPO / "docker/profiles/tiled-server/constraints.lock.txt").read_text(encoding="utf-8")
-    tiled_block = re.search(r"^tiled\[server\]==%s((?:\s*\\\n\s*--hash=\S+)+)" % re.escape(tiled_config.PINNED_TILED_VERSION),
-                            lock, re.M)
-    assert tiled_block, "the lock pins tiled[server] with hashes"
-    assert f"--hash=sha256:{tiled_config.PINNED_TILED_WHEEL_SHA256}" in tiled_block.group(1)
+def test_pixi_environments_install_only_from_the_lock():
+    """AUD-08/B24: every dependency install in the Dockerfile is `pixi install --locked`; pip never
+    installs application or server packages, and each stage copies only the manifest and the lock."""
+    text = (REPO / "Dockerfile").read_text(encoding="utf-8")
+    assert "pip install" not in re.sub(r"(?m)^\s*#.*$", "", text)
+    for stage, env in (("app-env-build", "default"), ("tiled-server-build", "tiled-server"), ("docs-build", "docs")):
+        run = " ".join(i.args for i in DF.stage(stage).of("RUN"))
+        assert f"pixi install --locked -e {env}" in run, stage
+        assert [p for _, srcs, _ in DF.stage(stage).copies() for p in srcs if p.startswith(("pixi", "requirements"))] \
+            == ["pixi.toml", "pixi.lock"], stage
+    # Every PyPI artifact in the lock carries a sha256 (pixi writes one per artifact).
+    entries = re.split(r"(?m)^- pypi: ", PIXI_LOCK)[1:]
+    assert entries and all("  sha256: " in e.split("\n- ")[0] for e in entries)

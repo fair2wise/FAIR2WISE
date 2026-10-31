@@ -225,7 +225,7 @@ requires conversion tooling, mixed-version tests, and a major-version review.
   for safe inspection and cleanup.
 - Periodically restore a backup into a disposable stack. An untested backup is
   not a rollback plan.
-- Retain the seed database, schema, requirements locks, Pixi lock, npm lock,
+- Retain the seed database, schema, Pixi lock (pixi.lock), npm lock,
   release tag, and image digests needed to recreate each supported release.
 - Use the [deployment upgrade and rollback procedures](deployment.md#upgrade-procedure)
   for operational changes.

@@ -11,12 +11,8 @@ change-impact analysis.
 | `README.md` | User-oriented project overview and operational examples |
 | `config.yml` | Central non-secret defaults and environment mappings |
 | `.env.example` | Local environment template |
-| `requirements.txt` | Compatibility entry point that includes the runtime lock and semantic.in |
-| `requirements/runtime.in` / `requirements/runtime.txt` | Runtime dependency source and compiled Python 3.12 lock |
-| `requirements/dev.in` / `requirements/dev.txt` | Development/tooling source and compiled lock (pytest, MkDocs, DeepEval, pip-tools) |
-| `requirements/globus.in` / `requirements/globus.txt` | Optional Globus Compute dependency source and lock |
-| `requirements/legacy.in` / `requirements/legacy.txt` | Optional archived-module dependency source and lock |
-| `requirements/semantic.in` | FAISS/SentenceTransformer/Torch retrieval inputs included by the default install |
+| `pixi.toml` | Dependency workspace: environments `default`, `dev`, `docs`, `globus`, `legacy`, `tiled-server`, and their tasks |
+| `pixi.lock` | Generated lock (pixi 0.66.0) with sha256 for every conda package and PyPI artifact; never hand-edited |
 | `compose.yaml` | Product agent+UI Compose stack (JSON KG, ports 5175/8090) |
 | `compose.splash.yaml` | Optional Splash + agent + Nginx `/api` stack |
 | `compose.hostnet.yaml` | Linux overlay: agent `network_mode: host` for IPv6 |

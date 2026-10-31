@@ -62,7 +62,7 @@ git clone https://github.com/matesuu/FAIRtoWISE-FORUM-AI.git
 cd FAIRtoWISE-FORUM-AI
 
 cp .env.example .env
-python3.12 -m pip install -r requirements.txt
+pixi install --locked
 
 cd ui
 npm ci
@@ -71,11 +71,11 @@ cd ..
 ./scripts/install_pixi.sh   # legacy Splash mode only
 ```
 
-Use `python3.12 -m pip install -r requirements.txt -r requirements/dev.txt`
-when contributing code or documentation. The `.txt` files are compiled Python
-3.12 locks; edit their corresponding `.in` files and regenerate them with
-pip-tools rather than hand-editing locks. `requirements/semantic.in` is
-included by `requirements.txt` and is not compiled.
+Use `pixi install --locked -e dev` when contributing code or documentation, and
+run tools with `pixi run -e dev ...`. `pixi.toml` and `pixi.lock` are the single
+source of truth for Python dependencies (Python 3.12); edit `pixi.toml`, run
+`pixi lock` (pixi 0.66.0), and commit `pixi.lock` rather than hand-editing it.
+The `default` environment includes the semantic retrieval stack.
 
 Set `CBORG_API_KEY` in `.env` when using CBORG. For Ollama, set the backend and
 model variables described in [Configuration](configuration.md).

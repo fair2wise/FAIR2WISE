@@ -17,12 +17,21 @@ ENV F2W_PUBLIC_PREFIX=/fair2wise
 RUN npm run build && grep -q '"public_prefix": "/fair2wise"' dist/f2w-build.json
 
 
-# MkDocs site served by the gateway at /fair2wise/docs/ (owner decision O-A7).
-FROM python:3.12-slim AS docs-build
+# Pixi version = the one that wrote pixi.lock (a newer pixi reads older locks, but the lock is
+# only guaranteed byte-stable under the writing version). Used by the build stages only; the
+# pixi binary never reaches an image the supervisor runs (the legacy `agent` target keeps its
+# own pixi for splash_links below).
+FROM ghcr.io/prefix-dev/pixi:0.66.0 AS pixi-app
+
+# MkDocs site served by the gateway at /fair2wise/docs/ (owner decision O-A7). Built with the
+# locked pixi `docs` environment (mkdocs 1.6.1, mkdocs-material 9.7.7), at the path it is used from.
+FROM pixi-app AS docs-build
 
 WORKDIR /build
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install mkdocs==1.6.1 mkdocs-material==9.7.7
+COPY pixi.toml pixi.lock ./
+RUN --mount=type=cache,target=/root/.cache/rattler \
+    pixi install --locked -e docs
+ENV PATH=/build/.pixi/envs/docs/bin:$PATH
 COPY mkdocs/ ./mkdocs/
 COPY app/modules/deployment/gateway.py ./gateway.py
 RUN python gateway.py mkdocs-config --source mkdocs/mkdocs.yml --out mkdocs/.mkdocs.image.yml && \
@@ -53,7 +62,10 @@ LABEL Name="fair2wise-frontend" \
 # ---------------------------------------------------------------------------------------
 # T24B: one shared runtime base and three supervised finals (D23-D25, D29; owner O-T1/O-D1).
 #
-#   tiled-server-build  isolated Tiled 0.2.18 server venv (hash-checked wheel), :local only
+#   pixi-app            pixi 0.66.0, the version that wrote pixi.lock (build stages only)
+#   app-env-build       pixi `default` environment from pixi.lock (`--locked`: every conda
+#                       package and PyPI artifact is checked against the lock's sha256)
+#   tiled-server-build  isolated Tiled 0.2.18 server environment (pixi `tiled-server`), :local only
 #   runtime-base        app + UI bundle + MkDocs + gateway + supervisor, no profile baked
 #   local               runtime-base + /opt/tiled/venv + docker/profiles/local.json
 #   als-dev / als-prod  runtime-base + their profile; no Tiled server (central Tiled)
@@ -67,27 +79,34 @@ LABEL Name="fair2wise-frontend" \
 # mounted at runtime and checked by preflight (docker/profiles/README.md).
 # ---------------------------------------------------------------------------------------
 
-FROM ${PYTHON_IMAGE} AS tiled-server-build
-
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+# The application environment. pixi.lock pins every conda package and PyPI artifact with its
+# sha256 and `--locked` refuses to install anything the lock does not describe (audit
+# AUD-08 / T28C: the previous pip --require-hashes rule, now for conda and PyPI alike). torch
+# is the PyTorch CPU build (pixi.toml), so no CUDA wheel can enter; the build still fails if one
+# slips in. The environment lives at the path it is used from: conda prefixes are not relocatable.
+FROM pixi-app AS app-env-build
+WORKDIR /opt/fair2wise/pixi
+COPY pixi.toml pixi.lock ./
+RUN --mount=type=cache,target=/root/.cache/rattler \
+    pixi install --locked -e default && \
+    /opt/fair2wise/pixi/.pixi/envs/default/bin/python -I -c "import sys, torch; sys.exit(0 if torch.version.cuda is None else 1)" && \
+    find /opt/fair2wise/pixi/.pixi/envs/default -name __pycache__ -type d -prune -exec rm -rf {} + && \
+    chmod -R a+rX /opt/fair2wise/pixi/.pixi
 
 # Pin: owner decision O-T1 = PINNED_TILED_VERSION / PINNED_TILED_WHEEL_SHA256 in
-# app/modules/deployment/tiled_config.py (tests/images check they agree). The server gets
-# its own environment: tiled needs pydantic-settings<2.12, the app lock pins 2.14.2.
-# T28C/AUD-08: constraints.lock.txt is the hash-locked form of constraints.txt (same versions,
-# every wheel/sdist sha256); --require-hashes refuses any other bytes. The checked wheel is
-# offered through --find-links so pip installs that file for tiled (its hash is in the lock).
-COPY docker/profiles/tiled-server/constraints.lock.txt /tmp/tiled/constraints.lock.txt
-RUN python -m pip download --no-deps --only-binary=:all: --dest /tmp/tiled/wheel "tiled==0.2.18" && \
-    echo "416079d4b5c9acc5498197d48c05a951ee8f7c699ac3b07920ae907a8da7fa06  /tmp/tiled/wheel/tiled-0.2.18-py3-none-any.whl" \
-        | sha256sum -c - && \
-    python -m venv /opt/tiled/venv && \
-    /opt/tiled/venv/bin/python -m pip install --require-hashes --find-links /tmp/tiled/wheel \
-        -r /tmp/tiled/constraints.lock.txt && \
-    /opt/tiled/venv/bin/python -m pip check && \
-    /opt/tiled/venv/bin/python -I -c "import sys, tiled; sys.exit(tiled.__version__ != '0.2.18')" && \
-    rm -rf /tmp/tiled
+# app/modules/deployment/tiled_config.py; tests/images check pixi.lock records that wheel hash.
+# The server gets its own pixi environment (`tiled-server`, no app packages): tiled needs
+# pydantic-settings<2.12, the app environment pins 2.14.x. Built at the final path
+# /opt/tiled/ws/.pixi/envs/tiled-server; `local` copies it to the same path and links
+# /opt/tiled/venv to it (F2W_TILED_PYTHON keeps its documented value).
+FROM pixi-app AS tiled-server-build
+WORKDIR /opt/tiled/ws
+COPY pixi.toml pixi.lock ./
+RUN --mount=type=cache,target=/root/.cache/rattler \
+    pixi install --locked -e tiled-server && \
+    /opt/tiled/ws/.pixi/envs/tiled-server/bin/python -I -c "import sys, tiled; sys.exit(tiled.__version__ != '0.2.18')" && \
+    find /opt/tiled/ws/.pixi/envs/tiled-server -name __pycache__ -type d -prune -exec rm -rf {} + && \
+    chmod -R a+rX /opt/tiled/ws/.pixi
 
 
 FROM ${PYTHON_IMAGE} AS runtime-base
@@ -95,8 +114,6 @@ FROM ${PYTHON_IMAGE} AS runtime-base
 # Runtime secrets are runtime mounts/env (Ansible), never build args or layers.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     KG_RAG_FORCE_CPU=1 \
     PYSTOW_HOME=/var/lib/fair2wise/cache/pystow \
     F2W_PUBLIC_PREFIX=/fair2wise \
@@ -118,29 +135,25 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY requirements.txt ./
-COPY requirements/runtime.txt requirements/runtime.lock.txt requirements/semantic.in ./requirements/
-# The application lock is installed with --require-hashes from requirements/runtime.lock.txt
-# (T28C/AUD-08: the pins of requirements/runtime.txt plus every wheel/sdist sha256).
-# Semantic retrieval (QA path and the term-merge shortlist) stays in every image. torch is
-# installed first from the PyTorch CPU index: on the default index Linux resolves CUDA
-# builds (+cu13x plus ~3 GB of nvidia-* wheels) that no image can use (no GPU,
-# KG_RAG_FORCE_CPU=1). The build fails if a CUDA build slips in. torch and semantic.in stay
-# unhashed: CPU torch comes from the PyTorch index (not PyPI) and semantic.in is unpinned by
-# design (platform-specific wheels; requirements/semantic.in).
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --require-hashes -r requirements/runtime.lock.txt && \
-    python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.12.0" && \
-    python -m pip install -r requirements/semantic.in && \
-    python -I -c "import sys, torch; sys.exit(0 if torch.version.cuda is None else 1)"
+# The locked application environment from app-env-build, at the path it was built for. PATH
+# puts its python first, so `python` in the entrypoint, HEALTHCHECK helpers and every
+# `RUN python` below is that interpreter. Semantic retrieval (QA path and the term-merge
+# shortlist) stays in every image; torch is the CPU build (locked in pixi.lock).
+COPY --from=app-env-build /opt/fair2wise/pixi/.pixi/envs/default /opt/fair2wise/pixi/.pixi/envs/default
+ENV PATH=/opt/fair2wise/pixi/.pixi/envs/default/bin:$PATH
 
 # Embedding models the semantic backends load (code defaults: KG_RAG_EMBED_MODEL and
 # F2W_MERGE_EMBED_MODEL), fetched at build time at pinned revisions (Apache-2.0) so the
-# image serves them with HF_HUB_OFFLINE=1 and never downloads at runtime.
+# image serves them with HF_HUB_OFFLINE=1 and never downloads at runtime. The code loads them by
+# bare model name, and a snapshot fetched by commit hash has no refs/main, which offline mode
+# needs to resolve the name: the loop writes it (found when the pixi image was first run offline).
 ENV HF_HOME=/opt/fair2wise/hf
 RUN python -I -c "from huggingface_hub import snapshot_download as d; \
     d('sentence-transformers/all-MiniLM-L6-v2', revision='1110a243fdf4706b3f48f1d95db1a4f5529b4d41'); \
     d('sentence-transformers/paraphrase-MiniLM-L6-v2', revision='c9a2bfebc254878aee8c3aca9e6844d5bbb102d1')" && \
+    for m in /opt/fair2wise/hf/hub/models--*/; do \
+        mkdir -p "$m/refs" && ls "$m/snapshots" | head -n 1 | tr -d '\n' > "$m/refs/main"; \
+    done && \
     chmod -R a+rX /opt/fair2wise/hf
 
 # Allowlisted application content.
@@ -182,7 +195,8 @@ ENTRYPOINT ["/usr/bin/tini", "--", "python", "/opt/fair2wise/entrypoint/f2w_supe
 FROM runtime-base AS local
 
 USER root
-COPY --from=tiled-server-build /opt/tiled/venv /opt/tiled/venv
+COPY --from=tiled-server-build /opt/tiled/ws/.pixi/envs/tiled-server /opt/tiled/ws/.pixi/envs/tiled-server
+RUN ln -s /opt/tiled/ws/.pixi/envs/tiled-server /opt/tiled/venv
 COPY docker/profiles/local.json /etc/fair2wise/profile.json
 RUN mkdir -p /var/lib/fair2wise/tiled && \
     chown 10001:10001 /var/lib/fair2wise/tiled && \

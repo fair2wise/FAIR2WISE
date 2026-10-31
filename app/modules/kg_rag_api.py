@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
 
 def _load_kg_deps() -> None:
-    """Require the semantic-retrieval packages from requirements/semantic.in."""
+    """Require the semantic-retrieval packages from the pixi default environment."""
     missing = []
     if faiss is None:
         missing.append("faiss-cpu")
@@ -113,7 +113,7 @@ def _load_kg_deps() -> None:
         missing.append("torch")
     if missing:
         raise RuntimeError(
-            "Semantic retrieval requires the packages listed in requirements/semantic.in; missing: "
+            "Semantic retrieval requires the packages provided by the pixi default environment; missing: "
             + ", ".join(missing)
         )
 
@@ -632,7 +632,7 @@ def auto_device() -> str:
     """Return 'cuda' if available and not forced to CPU, otherwise 'cpu'.
 
     Device selection only needs torch. The full semantic stack from
-    ``requirements/semantic.in`` (faiss, sentence-transformers) is required
+    the pixi default environment (faiss, sentence-transformers) is required
     later, when a semantic index is actually built.
     """
     if FORCE_CPU or torch is None:

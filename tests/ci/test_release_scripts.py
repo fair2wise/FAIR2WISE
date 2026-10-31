@@ -212,11 +212,9 @@ def test_manifest_records_commit_digests_locks_tiled_and_ui_tree(tmp_path: Path)
     assert m["variants"]["local"]["bundles_tiled_server"] is True
     assert m["variants"]["als-prod"]["tiled_url"] == "https://tiled.als.lbl.gov"
     assert m["variants"]["als-dev"]["required_runtime_env"] == ["F2W_CORS_ORIGINS"]
-    assert {"requirements.txt", "requirements/runtime.lock.txt", "ui/package-lock.json",
-            "docker/profiles/tiled-server/constraints.txt",
-            "docker/profiles/tiled-server/constraints.lock.txt"} <= set(m["locks"])
+    assert {"pixi.toml", "pixi.lock", "ui/package-lock.json"} <= set(m["locks"])
     assert m["tiled"]["wheel_sha256"] == "416079d4b5c9acc5498197d48c05a951ee8f7c699ac3b07920ae907a8da7fa06"
-    assert m["tiled"]["dockerfile_checks_same_hash"] is True
+    assert m["tiled"]["lock_records_pinned_hash"] is True
     assert m["frozen_ui_tree"]["pinned"] == rm.frozen_ui_pin(REPO)
     assert m["frozen_ui_tree"]["matches"] is (m["frozen_ui_tree"]["actual"] == m["frozen_ui_tree"]["pinned"])
     assert m["platforms_tested"] == ["linux/amd64"]

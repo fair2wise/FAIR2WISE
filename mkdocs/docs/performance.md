@@ -107,9 +107,10 @@ Semantic mode uses `KG_RAG_EMBED_MODEL`, a device-dependent encoding batch
 (`KG_RAG_BATCH`, normally 16 on CUDA or 32 on CPU), and FAISS. Set
 `KG_RAG_FORCE_CPU=1` for predictable CPU behavior or GPU troubleshooting.
 Lower the batch size after out-of-memory failures; raising it can improve
-throughput only when device memory permits. The default `requirements.txt`
-install and agent image include `requirements/semantic.in`, so enabling
-`KG_RAG_RETRIEVAL_BACKEND=semantic` does not need a second pip extra.
+throughput only when device memory permits. The pixi `default`
+environment and the agent image include the semantic stack (CPU torch, FAISS,
+sentence-transformers), so enabling `KG_RAG_RETRIEVAL_BACKEND=semantic` needs
+no extra install step.
 
 Search results are cached in memory by exact query string. The cache has no
 configured size bound and lives until the graph object is replaced or the

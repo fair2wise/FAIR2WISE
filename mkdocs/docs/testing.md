@@ -6,24 +6,17 @@ and frontend Vitest tests.
 ## Root Python suite
 
 ```bash
-python3 -m pytest
+pixi run -e dev test
 ```
 
-Install the compiled development environment with
-`python3.12 -m pip install -r requirements.txt -r requirements/dev.txt`.
-Runtime containers install the runtime lock plus `requirements/semantic.in`
-through the root `requirements.txt` compatibility file.
-
-Regenerate locks after editing an `.in` source file:
-
-```bash
-python3.12 -m piptools compile --strip-extras -o requirements/runtime.txt requirements/runtime.in
-python3.12 -m piptools compile --strip-extras -o requirements/dev.txt requirements/dev.in
-python3.12 -m piptools compile --strip-extras -o requirements/globus.txt requirements/globus.in
-python3.12 -m piptools compile --strip-extras -o requirements/legacy.txt requirements/legacy.in
-```
-
-Run `python3.12 -m pip check` after installation.
+Install the locked development environment with
+`pixi install --locked -e dev`; `pixi run -e dev python -m pytest ...` runs
+any subset. Other tasks: `lint`, `typecheck`, `ruff`, `isort-check`,
+`coverage`, `docs`.
+Runtime containers install the pixi `default` environment from `pixi.lock`
+with `--locked`. After editing a dependency in `pixi.toml`, run `pixi lock`
+(pixi 0.66.0) and commit `pixi.lock`; `tests/packaging/test_pixi_lock.py`
+checks the lock.
 
 `pytest.ini` sets the repository on `pythonpath` and limits default discovery to
 `tests/`, so the vendored Splash suite does not run implicitly.
@@ -58,7 +51,7 @@ deterministic suite offline.
 - sparse graphs.
 
 The module collects with the rest of `tests/`. `deepeval` is a development
-dependency (`requirements/dev.in`). Deterministic prompt/decompose/budget cases
+dependency (the pixi `dev` environment). Deterministic prompt/decompose/budget cases
 always run. LLM-graded cases skip when `CBORG_API_KEY` is unset.
 
 Run the full eval (including the judge) with credentials:
