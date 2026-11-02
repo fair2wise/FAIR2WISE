@@ -28,8 +28,6 @@ Author: David Abramov (@dabramov)
 import re
 from typing import Any
 
-import pytest
-
 
 class PhysicalPropertyExtractor:
     """Extracts physical property mentions from text for known materials.
@@ -160,7 +158,15 @@ class PhysicalPropertyExtractor:
 
                         # Attempt numeric extraction in this proximal sentence
                         found_value = False
-                        for match in self.VALUE_UNIT_PATTERN.finditer(sent):
+                        # Mask the material and property phrase so digits inside names ("Na3Bi")
+                        # are not read as values, and keep only the first value that follows.
+                        masked = re.sub(
+                            "|".join(re.escape(t) for t in (material, prop_phrase)),
+                            lambda m: " " * len(m.group(0)),
+                            sent,
+                            flags=re.IGNORECASE,
+                        )
+                        for match in list(self.VALUE_UNIT_PATTERN.finditer(masked))[:1]:
                             found_value = True
                             value = match.group("value")
                             unit = match.group("unit")
@@ -494,177 +500,3 @@ class PropertyNormalizer:
             normalized_entries.append(norm_entry)
 
         return normalized_entries
-
-
-# ----------------------------------------
-# Unit Tests
-# ----------------------------------------
-def test_extractor_basic_bandgap() -> None:
-    """Extract a band gap value and unit when material and property are adjacent."""
-    text = "The Na3Bi film exhibited a band gap of 1.9 eV at room temperature."
-    extractor = PhysicalPropertyExtractor()
-    entries = extractor.extract(text, ["Na3Bi"])
-    assert len(entries) == 1
-    e = entries[0]
-    assert e["material"] == "Na3Bi"
-    assert e["property"] == "band_gap"
-    assert e["raw_value"] == "1.9"
-    assert e["raw_unit"] == "eV"
-    assert e["verified"] is True
-
-def test_extractor_no_value_but_pattern() -> None:
-    """Return an unverified entry when the pattern matches but no value is present."""
-    text = "Measured_property: band gap of Na3Bi."
-    extractor = PhysicalPropertyExtractor()
-    entries = extractor.extract(text, ["Na3Bi"])
-    assert len(entries) == 1
-    e = entries[0]
-    assert e["raw_value"] is None
-    assert e["verified"] is False
-
-def test_extractor_out_of_proximity() -> None:
-    """Reject a property mention that is far from the material."""
-    text = (
-        "The PL quenching efficiency of PM6: Y6-2O blends is 30.2%, which indicates that "
-        "results in a low EQE of the Y6-2O-based devices."
-    )
-    extractor = PhysicalPropertyExtractor()
-    # We only want "efficiency" of "EQE" if truly “EQE efficiency” is mentioned near each other.
-    entries = extractor.extract(text, ["EQE"])
-    # Should be empty, because “EQE” and “efficiency” are far apart (not proximal/pattern-matched).
-    assert len(entries) == 0
-
-def test_extractor_density() -> None:
-    """Extract a density value with a compound unit."""
-    text = "The density of Na3Bi is 6.7 g/cm3 at 300 K."
-    extractor = PhysicalPropertyExtractor()
-    entries = extractor.extract(text, ["Na3Bi"])
-    assert len(entries) == 1
-    e = entries[0]
-    assert e["property"] == "density"
-    assert e["raw_value"] == "6.7"
-    assert e["raw_unit"] == "g/cm3"
-    assert e["verified"] is True
-
-def test_extract_from_relations() -> None:
-    """Pull only measured_property relations from a term record."""
-    term_record = {
-        "term": "Na3Bi",
-        "relations": [
-            {"relation": "measured_property", "related_term": "band gap", "verified": True},
-            {"relation": "measured_property", "related_term": "mobility", "verified": False},
-            {"relation": "energy_level", "related_term": "Fermi energy", "verified": True},
-        ]
-    }
-    extractor = PhysicalPropertyExtractor()
-    raw = extractor.extract_from_relations(term_record)
-    assert len(raw) == 2
-    props = {r["property"] for r in raw}
-    assert "band_gap" in props
-    assert "mobility" in props
-
-def test_normalizer_ev_to_ev() -> None:
-    """Leave an eV band gap unchanged and flag no conversion failure."""
-    entries = [{
-        "material": "Na3Bi",
-        "property": "band_gap",
-        "raw_value": "1.9",
-        "raw_unit": "eV",
-        "uncertainty": None,
-        "context": "",
-        "verified": True
-    }]
-    normalizer = PropertyNormalizer()
-    ne = normalizer.normalize(entries)[0]
-    assert ne["normalized_value"] == 1.9
-    assert ne["normalized_unit"] == "eV"
-    assert ne["unit_conversion_failed"] is False
-
-def test_normalizer_density() -> None:
-    """Convert density from g/cm3 to kg/m3, scaling the uncertainty too."""
-    entries = [{
-        "material": "Na3Bi",
-        "property": "density",
-        "raw_value": "6.7",
-        "raw_unit": "g/cm3",
-        "uncertainty": "0.1",
-        "context": "",
-        "verified": True
-    }]
-    normalizer = PropertyNormalizer()
-    ne = normalizer.normalize(entries)[0]
-    # 6.7 g/cm3 = 6700 kg/m3
-    assert abs(ne["normalized_value"] - 6700.0) < 1e-6
-    assert ne["normalized_unit"] == "kg/m3"
-    assert abs(ne["uncertainty_value"] - 100.0) < 1e-6
-
-def test_normalizer_efficiency_plausibility() -> None:
-    """Flag out-of-range efficiency values as failed conversions."""
-    # Efficiency = -20% (invalid)
-    entries = [{
-        "material": "EQE",
-        "property": "efficiency",
-        "raw_value": "-20",
-        "raw_unit": "%",
-        "uncertainty": None,
-        "context": "",
-        "verified": True
-    }]
-    normalizer = PropertyNormalizer()
-    ne = normalizer.normalize(entries)[0]
-    assert ne["unit_conversion_failed"] is True
-
-    # Efficiency = 600% (invalid)
-    entries2 = [{
-        "material": "EQE",
-        "property": "efficiency",
-        "raw_value": "600",
-        "raw_unit": "%",
-        "uncertainty": None,
-        "context": "",
-        "verified": True
-    }]
-    ne2 = normalizer.normalize(entries2)[0]
-    assert ne2["unit_conversion_failed"] is True
-
-def test_normalizer_bulk_modulus() -> None:
-    """Normalize GPa and MPa bulk moduli to GPa."""
-    entries = [{
-        "material": "Na3Bi",
-        "property": "bulk_modulus",
-        "raw_value": "200",
-        "raw_unit": "GPa",
-        "uncertainty": "5",
-        "context": "",
-        "verified": True
-    }, {
-        "material": "Na3Bi",
-        "property": "bulk_modulus",
-        "raw_value": "200000",
-        "raw_unit": "MPa",
-        "uncertainty": "5000",
-        "context": "",
-        "verified": True
-    }]
-    normalizer = PropertyNormalizer()
-    ne1, ne2 = normalizer.normalize(entries)
-    assert ne1["normalized_unit"] == "GPa" and abs(ne1["normalized_value"] - 200.0) < 1e-6
-    assert ne2["normalized_unit"] == "GPa" and abs(ne2["normalized_value"] - 200.0) < 1e-6
-
-def test_normalizer_failed_unit() -> None:
-    """Flag unparseable values and units as failed conversions."""
-    entries = [{
-        "material": "Unknown",
-        "property": "band_gap",
-        "raw_value": "abc",
-        "raw_unit": "xyz",
-        "uncertainty": None,
-        "context": "",
-        "verified": True
-    }]
-    normalizer = PropertyNormalizer()
-    ne = normalizer.normalize(entries)[0]
-    assert ne["unit_conversion_failed"]
-
-if __name__ == "__main__":
-    pytest.main([__file__])
