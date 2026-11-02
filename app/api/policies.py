@@ -120,6 +120,18 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="bounded document inventory under one folder (read only; ingest is a job)"),
     # per-job log channel (T33)
     _v("V42", "GET", "/jobs/{job_id}/logs", note=_OBJ + "; scrubbed, bounded free-text log lines"),
+    # B5/J-11 job kinds (T10B): enrichment, topic sweep and PDF parse; status and stop are V03/V08.
+    # Row ids V32-V42 belong to other branches; this block starts at V50.
+    _v("V50", "POST", "/jobs/enrichment", "jobs.admin", note="enrichment job (RT-27..29); admin-only on ALS" + _FRESH),
+    _v("V51", "POST", "/jobs/topic-sweep", "jobs.admin", note="topic_sweep job (RT-30..32); admin-only on ALS" + _FRESH),
+    _v("V52", "POST", "/jobs/pdf-parse", "jobs.admin", note="pdf_parse job (J-11); admin-only on ALS" + _FRESH),
+    # rollback and corpus operations as publication jobs (T10B); approval is V18 (curation.approve)
+    _v("V53", "POST", "/publications/rollback-replacement", "graph.publish",
+       note="rollback = replacement plan to the previous pointer's version (revive); human only; H5 gate"),
+    _v("V54", "POST", "/publications/corpus-retire", "graph.publish",
+       note="corpus removal plan, corpus name typed in; approval via V18; H5 gate"),
+    _v("V55", "POST", "/publications/corpus-purge", "graph.publish",
+       note="purge plan of retired records, own approval via V18 (Q3); H5 gate"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

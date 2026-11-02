@@ -28,8 +28,8 @@
   "capabilities_by_status": {
    "covered": 94,
    "proposed_exception": 3,
-   "partial": 26,
-   "gap_needs_owner": 14,
+   "partial": 27,
+   "gap_needs_owner": 13,
    "pending": 41,
    "remains_in_forge": 6,
    "retained_in_place": 17
@@ -37,8 +37,8 @@
   "routes": 84,
   "routes_by_status": {
    "covered": 22,
-   "partial": 11,
-   "gap_needs_owner": 14,
+   "partial": 17,
+   "gap_needs_owner": 8,
    "remains_in_forge": 9,
    "pending": 27,
    "proposed_exception": 1
@@ -1586,16 +1586,18 @@
    ],
    "f2w_locations": [
     "app/modules/jobs/pipeline.py",
-    "app/modules/jobs/stages.py"
+    "app/modules/jobs/stages.py",
+    "app/modules/jobs/paper_jobs.py"
    ],
    "tests": [
-    "tests/jobs/test_pipeline.py::test_full_run_then_rerun_skips_every_compatible_stage"
+    "tests/api_v1/test_v1_paper_jobs.py::test_fake_handler_runs_on_the_job_lifecycle",
+    "tests/api_v1/test_v1_paper_jobs.py::test_stop_is_the_ordinary_cancel_and_resume_skips_settled_units"
    ],
-   "status": "gap_needs_owner",
-   "demonstrated": "not_demonstrated",
-   "blocking_task": "owner: assign (T10 did not register topic_sweep/pdf_parse kinds; T13 lists J-11 for rehearsal)",
+   "status": "partial",
+   "demonstrated": "now_with_fakes",
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
    "follow_on_task": null,
-   "notes": "Generic stage pipeline exists; enrichment agent (topic sweep, PDF-parse sweep, enrich start/status/stop) has no job kind."
+   "notes": "T10B registered enrichment, topic_sweep and pdf_parse kinds (jobs.admin) with a handler port and fake-handler tests; the donor sweep code is not ported (model calls)."
   },
   {
    "id": "J-12",
@@ -7221,16 +7223,15 @@
    "source_function": "start_enrichment",
    "catalog_disposition": "split_paper_portion",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "/v1/jobs lifecycle exists; no enrichment/topic_sweep kind",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "partial",
+   "f2w_equivalent": "POST /v1/jobs/enrichment (V50): job kind `enrichment` (jobs/paper_jobs.py)",
+   "f2w_exposure": "jobs.admin (admin-only on ALS); curation.approve for any graph proposal",
    "tests": [
-    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http",
-    "tests/api_v1/test_v1_local.py::test_cancel_and_resume",
-    "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+    "tests/api_v1/test_v1_paper_jobs.py::test_fake_handler_runs_on_the_job_lifecycle",
+    "tests/api_v1/test_v1_paper_jobs.py::test_policy_rows_declare_jobs_admin_with_unique_ids"
    ],
-   "blocking_task": "owner: assign (J-11)",
-   "notes": ""
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
+   "notes": "T10B: job kind, V-row and fake-handler test exist; the handler port is bound by trusted wiring."
   },
   {
    "id": "RT-28",
@@ -7240,16 +7241,15 @@
    "source_function": "enrichment_status",
    "catalog_disposition": "split_paper_portion",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "/v1/jobs lifecycle exists; no enrichment/topic_sweep kind",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "partial",
+   "f2w_equivalent": "GET /v1/jobs/{id} for an `enrichment` job (V03)",
+   "f2w_exposure": "jobs.admin (admin-only on ALS); curation.approve for any graph proposal",
    "tests": [
-    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http",
-    "tests/api_v1/test_v1_local.py::test_cancel_and_resume",
-    "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+    "tests/api_v1/test_v1_paper_jobs.py::test_fake_handler_runs_on_the_job_lifecycle",
+    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http"
    ],
-   "blocking_task": "owner: assign (J-11)",
-   "notes": ""
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
+   "notes": "T10B: job kind, V-row and fake-handler test exist; the handler port is bound by trusted wiring."
   },
   {
    "id": "RT-29",
@@ -7259,16 +7259,15 @@
    "source_function": "stop_enrichment",
    "catalog_disposition": "split_paper_portion",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "/v1/jobs lifecycle exists; no enrichment/topic_sweep kind",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "partial",
+   "f2w_equivalent": "POST /v1/jobs/{id}/cancel (V08)",
+   "f2w_exposure": "jobs.admin (admin-only on ALS); curation.approve for any graph proposal",
    "tests": [
-    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http",
-    "tests/api_v1/test_v1_local.py::test_cancel_and_resume",
-    "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+    "tests/api_v1/test_v1_paper_jobs.py::test_stop_is_the_ordinary_cancel_and_resume_skips_settled_units",
+    "tests/api_v1/test_v1_local.py::test_cancel_and_resume"
    ],
-   "blocking_task": "owner: assign (J-11)",
-   "notes": ""
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
+   "notes": "T10B: job kind, V-row and fake-handler test exist; the handler port is bound by trusted wiring."
   },
   {
    "id": "RT-30",
@@ -7278,16 +7277,15 @@
    "source_function": "start_topic_sweep",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "/v1/jobs lifecycle exists; no enrichment/topic_sweep kind",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "partial",
+   "f2w_equivalent": "POST /v1/jobs/topic-sweep (V51): job kind `topic_sweep`",
+   "f2w_exposure": "jobs.admin (admin-only on ALS); curation.approve for any graph proposal",
    "tests": [
-    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http",
-    "tests/api_v1/test_v1_local.py::test_cancel_and_resume",
-    "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+    "tests/api_v1/test_v1_paper_jobs.py::test_fake_handler_runs_on_the_job_lifecycle",
+    "tests/api_v1/test_v1_paper_jobs.py::test_als_ordinary_user_is_refused_and_admin_may_submit"
    ],
-   "blocking_task": "owner: assign (J-11)",
-   "notes": ""
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
+   "notes": "T10B: job kind, V-row and fake-handler test exist; the handler port is bound by trusted wiring."
   },
   {
    "id": "RT-31",
@@ -7297,16 +7295,15 @@
    "source_function": "topic_sweep_status",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "/v1/jobs lifecycle exists; no enrichment/topic_sweep kind",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "partial",
+   "f2w_equivalent": "GET /v1/jobs/{id} for a `topic_sweep` job (V03)",
+   "f2w_exposure": "jobs.admin (admin-only on ALS); curation.approve for any graph proposal",
    "tests": [
-    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http",
-    "tests/api_v1/test_v1_local.py::test_cancel_and_resume",
-    "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+    "tests/api_v1/test_v1_paper_jobs.py::test_fake_handler_runs_on_the_job_lifecycle",
+    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http"
    ],
-   "blocking_task": "owner: assign (J-11)",
-   "notes": ""
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
+   "notes": "T10B: job kind, V-row and fake-handler test exist; the handler port is bound by trusted wiring."
   },
   {
    "id": "RT-32",
@@ -7316,16 +7313,15 @@
    "source_function": "stop_topic_sweep",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "/v1/jobs lifecycle exists; no enrichment/topic_sweep kind",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "partial",
+   "f2w_equivalent": "POST /v1/jobs/{id}/cancel (V08)",
+   "f2w_exposure": "jobs.admin (admin-only on ALS); curation.approve for any graph proposal",
    "tests": [
-    "tests/api_v1/test_v1_local.py::test_job_lifecycle_over_http",
-    "tests/api_v1/test_v1_local.py::test_cancel_and_resume",
-    "tests/api_v1/test_v1_local.py::test_job_stream_is_legacy_sse_with_ids_and_a_single_end"
+    "tests/api_v1/test_v1_paper_jobs.py::test_stop_is_the_ordinary_cancel_and_resume_skips_settled_units",
+    "tests/api_v1/test_v1_local.py::test_cancel_and_resume"
    ],
-   "blocking_task": "owner: assign (J-11)",
-   "notes": ""
+   "blocking_task": "owner: real enrichment/topic-sweep handlers (enrichment agent port needs model calls); the job kinds, policies and lifecycle are in place (T10B)",
+   "notes": "T10B: job kind, V-row and fake-handler test exist; the handler port is bound by trusted wiring."
   },
   {
    "id": "RT-33",

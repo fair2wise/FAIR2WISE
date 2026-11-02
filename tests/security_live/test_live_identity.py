@@ -18,7 +18,13 @@ from live_support import (
     user_api_key, utcnow,
 )
 
-from app.modules.contracts.context import ADMIN_CAPABILITIES, CAPABILITIES, CHAT_CAPABILITIES, ActorKind
+from app.modules.contracts.context import (
+    ADMIN_CAPABILITIES,
+    CAPABILITIES,
+    CHAT_CAPABILITIES,
+    LOCAL_ONLY_CAPABILITIES,
+    ActorKind,
+)
 from app.modules.contracts.errors import ContractError, ErrorCode
 from app.modules.security.authorization import (
     DeploymentSettings,
@@ -68,7 +74,7 @@ def test_admin_gets_every_capability_and_reader_is_chat_only(live_auth, http):
     port = TiledWhoamiAdapter(live_auth.url, http)
     admin = _ctx(settings, port, _cred(live_auth, access_token(live_auth, "admin")))
     reader = _ctx(settings, port, _cred(live_auth, access_token(live_auth, "reader")))
-    assert admin.capabilities == CAPABILITIES and admin.principal.is_admin is True
+    assert admin.capabilities == CAPABILITIES - LOCAL_ONLY_CAPABILITIES and admin.principal.is_admin is True
     assert reader.capabilities == CHAT_CAPABILITIES and reader.principal.is_admin is False
     assert not reader.capabilities & ADMIN_CAPABILITIES
     # The subject is the stable Tiled principal uuid; the issuer is the server that answered.

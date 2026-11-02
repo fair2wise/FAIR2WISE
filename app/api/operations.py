@@ -220,6 +220,23 @@ class F2WOperations:
                 raise ContractError(ErrorCode.INVALID_INPUT, f"invalid job inputs: {exc}") from None
         return self.jobs.submit(ctx, kind, inputs, settings_revision=settings_revision)
 
+    def submit_paper_job(self, ctx: RequestContext, kind: str, params: Mapping[str, Any]) -> JobHandle:
+        """Submit an enrichment, topic-sweep or PDF-parse job (B5/J-11, RT-27..RT-32; ``jobs.admin``).
+
+        Status and stop are the ordinary job routes (``GET /v1/jobs/{job_id}``, ``.../cancel``).
+
+        Raises:
+            ContractError: ``INVALID_INPUT`` (unknown kind or bad parameters); ``DENIED`` (no ``jobs.admin``);
+                ``UNSUPPORTED_CAPABILITY`` when no handler is registered for the kind on this deployment.
+        """
+        from ..modules.jobs.paper_jobs import PAPER_JOB_CAPABILITY, job_inputs
+
+        inputs = job_inputs(kind, params)
+        require(ctx, PAPER_JOB_CAPABILITY)
+        if not self.jobs.has_kind(kind):
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, f"{kind} jobs are not registered on this deployment")
+        return self.jobs.submit(ctx, kind, inputs)
+
     def list_jobs(self, ctx: RequestContext, *, state: str | None = None, kind: str | None = None,
                   limit: int = 100) -> list[JobHandle]:
         """Most recently updated jobs the caller may see (creator or ``jobs.admin``, corpus scope)."""
@@ -655,6 +672,34 @@ class F2WOperations:
         self.gate.check(target, self.settings)
         pointer = pub.rollback(ctx, target, reason=reason)
         return {"target": pointer.name, "version": pointer.version, **pointer.as_dict()}
+
+    def rollback_publication_replacement(self, ctx: RequestContext, target: str, *, reason: str) -> JobHandle:
+        """Roll back (or, repeated, forward) as a replacement plan to the previous pointer's version (T10B).
+
+        Returns the publication job; it plans, waits for ``/v1/publications/{job_id}/approval`` and then
+        revives the retired records of that version, moving the Tiled release marker and the pointer together.
+        """
+        require(ctx, "graph.publish")
+        pub = self._publication()
+        self.gate.check(target, self.settings)
+        return cast(JobHandle, pub.rollback_replacement(ctx, target, reason=reason))
+
+    def submit_corpus_retire(self, ctx: RequestContext, scope: str, target: str, *, confirm_scope: str,
+                             resolutions: Sequence[Mapping[str, Any]] = ()) -> JobHandle:
+        """Submit a corpus removal (retire-all; the corpus name typed in as ``confirm_scope``)."""
+        require(ctx, "graph.publish")
+        pub = self._publication()
+        self.gate.check(target, self.settings)
+        return cast(JobHandle, pub.submit_retire(ctx, scope, target, confirm_scope=confirm_scope,
+                                                 resolutions=resolutions))
+
+    def submit_corpus_purge(self, ctx: RequestContext, scope: str, target: str, *,
+                            include_previous: bool = False) -> JobHandle:
+        """Submit a purge of the retired records of a corpus (its own plan and approval, Q3)."""
+        require(ctx, "graph.publish")
+        pub = self._publication()
+        self.gate.check(target, self.settings)
+        return cast(JobHandle, pub.submit_purge(ctx, scope, target, include_previous=include_previous))
 
     # --- knowledge operations (T19E over the T19C suites) ------------------------------------------
 

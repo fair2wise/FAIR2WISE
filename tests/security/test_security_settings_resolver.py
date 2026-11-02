@@ -14,6 +14,7 @@ from app.modules.contracts.context import (
     ADMIN_CAPABILITIES,
     CAPABILITIES,
     CHAT_CAPABILITIES,
+    LOCAL_ONLY_CAPABILITIES,
     LOCAL_OPERATOR,
     ActorKind,
     AuthorizationMode,
@@ -158,7 +159,7 @@ def _als(port, credential, clock=None, **kw):
 def test_als_admin_gets_all_capabilities_user_gets_chat_only():
     port = FakeTiledIdentityPort(tokens={"a": admin_user(), "u": plain_user()})
     admin, user = _als(port, "a"), _als(port, "u")
-    assert admin.capabilities == CAPABILITIES and admin.principal.is_admin is True
+    assert admin.capabilities == CAPABILITIES - LOCAL_ONLY_CAPABILITIES and admin.principal.is_admin is True
     assert admin.principal.issuer == STAGING and admin.principal.roles == ("admin",)
     assert user.capabilities == CHAT_CAPABILITIES and not (user.capabilities & ADMIN_CAPABILITIES)
     assert user.principal.is_admin is False and user.tiled_target == STAGING

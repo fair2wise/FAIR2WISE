@@ -324,7 +324,11 @@
         "curation.approve",
         "json.build",
         "graph.publish",
-        "jobs.admin"
+        "jobs.admin",
+        "library.read",
+        "library.upload",
+        "library.index",
+        "library.extract"
       ]
     }
   },

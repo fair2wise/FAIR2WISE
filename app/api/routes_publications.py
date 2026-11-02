@@ -1,4 +1,4 @@
-"""``/v1/publications`` routes over ``Publication`` (policies V16-V20). Real targets stay H5-gated.
+"""``/v1/publications`` routes over ``Publication`` (policies V16-V20, V53-V55). Real targets stay H5-gated.
 
 The approval route takes the ``plan_sha256`` the reviewer was shown; the approval is created
 server-side by ``security.authorization.create_approval`` with the caller's own credential
@@ -48,6 +48,27 @@ class RollbackRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=300)
 
 
+class CorpusRetireRequest(BaseModel):
+    """Body of ``POST /v1/publications/corpus-retire``: the corpus name typed in, plus reviewed resolutions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: str = Field(min_length=1, max_length=200)
+    target: str = Field(min_length=1, max_length=1000)
+    confirm_scope: str = Field(max_length=200)
+    resolutions: list[dict[str, Any]] = Field(default_factory=list, max_length=1000)
+
+
+class CorpusPurgeRequest(BaseModel):
+    """Body of ``POST /v1/publications/corpus-purge``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: str = Field(min_length=1, max_length=200)
+    target: str = Field(min_length=1, max_length=1000)
+    include_previous: bool = False
+
+
 def install(app: FastAPI) -> FastAPI:
     """Mount the publication routes on ``app``."""
     router = Prefixed(app, "/v1/publications")
@@ -71,6 +92,27 @@ def install(app: FastAPI) -> FastAPI:
         restored = operations(request).rollback_publication(ctx, body.target, reason=body.reason)
         return project(request, {"pointer": restored})
 
+    @router.post("/rollback-replacement")
+    def rollback_replacement(request: Request, body: RollbackRequest,
+                             ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Roll back (or forward) as a replacement plan to the previous pointer's version; approve the plan next."""
+        return project(request, dump(operations(request).rollback_publication_replacement(
+            ctx, body.target, reason=body.reason)))
+
+    @router.post("/corpus-retire")
+    def corpus_retire(request: Request, body: CorpusRetireRequest,
+                      ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Plan a corpus removal (the corpus name typed in); approve it through the approval route."""
+        return project(request, dump(operations(request).submit_corpus_retire(
+            ctx, body.scope, body.target, confirm_scope=body.confirm_scope, resolutions=body.resolutions)))
+
+    @router.post("/corpus-purge")
+    def corpus_purge(request: Request, body: CorpusPurgeRequest,
+                     ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Plan a purge of the corpus's retired records (separate approval; foreign links are never touched)."""
+        return project(request, dump(operations(request).submit_corpus_purge(
+            ctx, body.scope, body.target, include_previous=body.include_previous)))
+
     @router.get("/{job_id}/plan")
     def current_plan(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The plan a reviewer is asked to approve."""
@@ -88,4 +130,5 @@ def install(app: FastAPI) -> FastAPI:
     return app
 
 
-__all__ = ("ApprovalRequest", "PublicationRequest", "RollbackRequest", "install")
+__all__ = ("ApprovalRequest", "CorpusPurgeRequest", "CorpusRetireRequest", "PublicationRequest", "RollbackRequest",
+           "install")

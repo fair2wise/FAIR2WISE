@@ -27,11 +27,16 @@ ADMIN_CAPABILITIES = frozenset({
     "graph.publish", "jobs.admin",
 })
 
+#: Library capabilities (A8/T34): held by the local operator only. They are in the vocabulary but never
+#: granted to an ALS principal, admin or not (``capabilities_for``; ``RequestContext`` refuses them in
+#: ``tiled_authenticated`` mode). ALS-admin support for the library is T44, deferred.
+LOCAL_ONLY_CAPABILITIES = frozenset({"library.read", "library.upload", "library.index", "library.extract"})
+
 #: Frozen capability vocabulary (docs/migration/authentication/access_contract.md section 6).
 #: Reading private sources (``source.read``) is deliberately *not* a capability: it can
 #: never be placed on a request. It needs a sealed per-request grant from trusted
 #: service code (``app/modules/security/content_access.py``).
-CAPABILITIES = CHAT_CAPABILITIES | ADMIN_CAPABILITIES
+CAPABILITIES = CHAT_CAPABILITIES | ADMIN_CAPABILITIES | LOCAL_ONLY_CAPABILITIES
 
 
 class DeploymentProfile(StrEnum):
@@ -151,6 +156,8 @@ class RequestContext(BaseModel):
         else:
             if self.principal.subject == LOCAL_OPERATOR:
                 raise ValueError("ALS requests cannot act as local-operator")
+            if self.capabilities & LOCAL_ONLY_CAPABILITIES:
+                raise ValueError("library capabilities are local-operator only")
             if self.profile is DeploymentProfile.LOCAL:
                 raise ValueError("the local profile uses local_trusted mode")
             if not (self.principal.issuer and self.principal.verified_at and self.principal.is_admin is not None):

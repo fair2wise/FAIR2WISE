@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 import logging
 from typing import Any
 
-from ..contracts.changes import ApprovalRecord, ChangePlan
+from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.context import ActorKind, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobHandle, JobState
@@ -53,6 +53,11 @@ from .store import JobRecord
 logger = logging.getLogger(__name__)
 
 KIND = "publish"
+#: Corpus removal (retire-all) and purge are separate jobs with their own plan and approval (Q3).
+RETIRE_KIND = "corpus_retire"
+PURGE_KIND = "corpus_purge"
+OPERATION_KIND_NAMES = {RETIRE_KIND: "retire", PURGE_KIND: "purge"}
+OPERATION_STAGES = ("plan", "review", "apply", "record")
 PUBLISH_STAGES = ("plan", "review", "revalidate", "import", "verify", "receipt", "activate")
 ApprovalVerifier = Callable[[ApprovalRecord, ChangePlan, datetime], ApprovalRecord]
 PackageCheck = Callable[[FrozenSnapshot], Sequence[PackageProblem]]
@@ -116,6 +121,12 @@ class Publication:
         self.store = deps.store
         self.pipeline = Pipeline(self._specs())
         jobs.register(KIND, self.pipeline, capability="graph.publish")
+        #: The step keeps a Tiled release marker (replacement importer): pointer and marker move together.
+        self.replacement = bool(getattr(deps.step, "has_release_marker", False))
+        if hasattr(deps.step, "plan_operation"):
+            self.operation_pipeline = Pipeline(self._operation_specs())
+            for kind in OPERATION_KIND_NAMES:
+                jobs.register(kind, self.operation_pipeline, capability="graph.publish")
         jobs.on_scope_change(self._on_scope_change)
 
     # --- stages ----------------------------------------------------------------------------
@@ -169,7 +180,10 @@ class Publication:
                 )
         target = str(self._params(sc)["target"])
         ctx = self.deps.ctx_for(job)
-        plan = self.deps.step.plan(ctx, snapshot, target, operation_id=f"plan-{job.job_id}")
+        extra: dict[str, Any] = {}
+        if getattr(self.deps.step, "plan_options", False):
+            extra["options"] = dict(self._params(sc).get("options") or {})
+        plan = self.deps.step.plan(ctx, snapshot, target, operation_id=f"plan-{job.job_id}", **extra)
         if (
             plan.input_sha256 != snapshot.sha256
             or plan.target != target
@@ -224,12 +238,17 @@ class Publication:
             reasons.append("schema_changed")
         if self.deps.probe.vocabulary_revision() != record.vocabulary_revision:
             reasons.append("vocabulary_changed")
-        if (
-            check_target
-            and self.deps.step.target_revision(self.deps.ctx_for(sc.job), plan.target) != plan.base_revision
-        ):
+        if check_target and self._current_revision(sc.job, plan) != plan.base_revision:
             reasons.append("target_revision_changed")
         return reasons
+
+    def _current_revision(self, job: JobRecord, plan: ChangePlan) -> str:
+        """Current target revision; a scoped importer answers per plan (``plan_revision``), else per target."""
+        ctx = self.deps.ctx_for(job)
+        scoped = getattr(self.deps.step, "plan_revision", None)
+        if scoped is not None:
+            return str(scoped(ctx, plan))
+        return self.deps.step.target_revision(ctx, plan.target)
 
     def _stale(self, sc: StageContext, reasons: list[str]) -> None:
         """Invalidate approvals and everything from ``plan`` on, then re-plan in this same run (B27).
@@ -387,7 +406,12 @@ class Publication:
             raise QuarantineStage("receipt does not match the plan, approval or target")
         stored = self.store.save_receipt(sc.job.job_id, receipt)
         self.store.consume_approval(approval.approval_id)
-        return StageResult(artifact_refs=(f"receipt:{stored.receipt_id}",), data={"receipt_id": stored.receipt_id})
+        result: dict[str, Any] = {"receipt_id": stored.receipt_id}
+        reporter = getattr(self.deps.step, "report", None)
+        if reporter is not None:
+            # Q14: a foreign record that changed during the run is reported here, never a failure.
+            result["report"] = reporter(ctx, plan, stored)
+        return StageResult(artifact_refs=(f"receipt:{stored.receipt_id}",), data=result)
 
     def _activate(self, sc: StageContext) -> StageResult:
         record = self.store.current_plan(sc.job.job_id)
@@ -396,6 +420,9 @@ class Publication:
         if receipt is None or not receipt.verified:
             raise QuarantineStage("no verified receipt to activate")
         snapshot = self.deps.snapshots.load(str(self._params(sc)["snapshot_ref"]))
+        if self.replacement:
+            self._check_marker(sc, ctx, plan, snapshot)
+        rollback_info = self._params(sc).get("rollback")
         lease = sc.store.acquire_lease(f"publish:{plan.target}", self.deps.owner)
         if lease is None:
             raise ContractError(ErrorCode.CONFLICT, "another publisher holds this target", retryable=True)
@@ -420,6 +447,8 @@ class Publication:
                     index_ref=index.ref,
                     expected_version=expected,
                     actor=sc.job.created_by,
+                    reason=f"rollback: {rollback_info.get('reason', '')}" if rollback_info else "activate",
+                    action="rollback" if rollback_info else "activate",
                 )
                 return {"version": pointer.version}
 
@@ -436,16 +465,204 @@ class Publication:
             sc.store.release_lease(lease)
         return StageResult(artifact_refs=(f"pointer:{plan.target}@{result['version']}",), data=result)
 
+    def _check_marker(self, sc: StageContext, ctx: RequestContext, plan: ChangePlan, snapshot: FrozenSnapshot) -> None:
+        """TIL-14: the Tiled release marker must name the version the pointer is about to name."""
+        marker = self.deps.step.release_marker(ctx, plan.corpus_scope[0])  # type: ignore[attr-defined]
+        if (
+            marker is None
+            or marker.get("snapshot_id") != snapshot.manifest.snapshot_id
+            or marker.get("plan_sha256") != plan.plan_sha256
+        ):
+            self.store.quarantine(
+                sc.job.job_id,
+                plan.target,
+                "the Tiled release marker does not name the version being activated; pointer not switched",
+                {"marker": marker, "snapshot_id": snapshot.manifest.snapshot_id},
+            )
+            raise QuarantineStage("release marker and pointer would disagree; the previous pointer stays active")
+
+    def verify_agreement(self, ctx: RequestContext, target: str, scope: str) -> dict[str, Any]:
+        """Whether F2W's pointer and the Tiled release marker name the same version (TIL-14).
+
+        Returns ``{"agree", "pointer_snapshot_id", "marker_snapshot_id"}``; both ``None`` (and ``agree``)
+        when nothing is live (before the first publication or after a corpus removal).
+        """
+        pointer = self.store.pointer(target)
+        pointer_id = pointer.snapshot_ref.split("/")[-1] if pointer else None
+        marker = self.deps.step.release_marker(ctx, scope) if self.replacement else None  # type: ignore[attr-defined]
+        marker_id = marker.get("snapshot_id") if marker else None
+        return {"agree": pointer_id == marker_id, "pointer_snapshot_id": pointer_id, "marker_snapshot_id": marker_id}
+
+    # --- corpus removal and purge jobs ------------------------------------------------------
+
+    def _operation_specs(self) -> list[StageSpec]:
+        return [
+            StageSpec("plan", self._op_plan, phase="validation", relevant=("params",)),
+            StageSpec("review", self._op_review, phase="review", depends_on=("plan",)),
+            StageSpec("apply", self._op_apply, phase="import", depends_on=("review",), always_run=False,
+                      required_capability="graph.publish"),
+            StageSpec("record", self._op_record, phase="import", depends_on=("apply",)),
+        ]
+
+    def _op_plan(self, sc: StageContext) -> StageResult:
+        sc.require("graph.publish")
+        params = self._params(sc)
+        plan = self.deps.step.plan_operation(  # type: ignore[attr-defined]
+            self.deps.ctx_for(sc.job), OPERATION_KIND_NAMES[sc.job.kind], params
+        )
+        self.store.save_plan(
+            sc.job.job_id,
+            plan,
+            schema_fingerprint=self.deps.probe.schema_fingerprint(),
+            vocabulary_revision=self.deps.probe.vocabulary_revision(),
+        )
+        return StageResult(
+            artifact_refs=(f"plan:{plan.plan_sha256}",),
+            data={"plan_id": plan.plan_id, "plan_sha256": plan.plan_sha256, "supersessions": plan.supersessions},
+        )
+
+    def _op_started(self, sc: StageContext) -> bool:
+        record = self.store.current_plan(sc.job.job_id)
+        return record is not None and sc.store.effect(sc.job.job_id, "apply", self._effect_id(record)) is not None
+
+    def _op_review(self, sc: StageContext) -> StageResult:
+        record = self.store.current_plan(sc.job.job_id)
+        if record is None:
+            raise QuarantineStage("no plan recorded")
+        if not self._op_started(sc) and self._current_revision(sc.job, record.plan) != record.plan.base_revision:
+            self.store.invalidate_approvals(reason="stale: target_revision_changed", job_id=sc.job.job_id)
+            sc.store.invalidate(sc.lease, sc.job.job_id, OPERATION_STAGES, "stale: target_revision_changed")
+            raise RestartStages("plan is stale (target_revision_changed); recomputing the plan for a new review")
+        approval = self._approval_for(sc, record)
+        return StageResult(data={"approval_id": approval.approval_id, "plan_sha256": record.plan.plan_sha256})
+
+    def _op_apply(self, sc: StageContext) -> StageResult:
+        record = self.store.current_plan(sc.job.job_id)
+        if record is None:
+            raise QuarantineStage("no plan recorded")
+        approval = self._approval_for(sc, record)
+        plan, ctx, step = record.plan, self.deps.ctx_for(sc.job), self.deps.step
+        sc.require("graph.publish")
+        op_id = operation_id(plan)
+        lease = sc.store.acquire_lease(f"publish:{plan.target}", self.deps.owner)
+        if lease is None:
+            raise ContractError(ErrorCode.CONFLICT, "another publisher holds this target", retryable=True)
+
+        def guard() -> None:
+            sc.guard()
+            sc.store.check_lease(lease)
+
+        def effect() -> dict[str, Any]:
+            def run() -> dict[str, Any]:
+                outcome, receipt = step.apply_operation(  # type: ignore[attr-defined]
+                    ctx, plan, approval, guard=guard,
+                    pointer_to_none=(
+                        (lambda: self.store.clear_pointer(plan.target, actor=sc.job.created_by,
+                                                          reason=f"corpus removal {plan.plan_sha256[:12]}"))
+                        if sc.job.kind == RETIRE_KIND else None
+                    ),
+                )
+                return {**outcome.as_dict(), "receipt": receipt.model_dump(mode="json")}
+
+            return self.deps.audit.guard(
+                kind=f"scope_{OPERATION_KIND_NAMES[sc.job.kind]}",
+                operation_id=op_id,
+                actor=sc.job.created_by,
+                target=plan.target,
+                run_id=sc.job.job_id,
+                payload={"plan_sha256": plan.plan_sha256, "approval_id": approval.approval_id,
+                         "scope": list(plan.corpus_scope)},
+                mutation=run,
+            )
+
+        try:
+            result = sc.run_effect(self._effect_id(record), effect)
+        finally:
+            sc.store.release_lease(lease)
+        return StageResult(effects=tuple(result.get("effects") or ()),
+                           data={**result, "approval_id": approval.approval_id})
+
+    def _op_record(self, sc: StageContext) -> StageResult:
+        record = self.store.current_plan(sc.job.job_id)
+        row = sc.store.stage(sc.job.job_id, "apply")
+        if record is None or row is None or not row.result:
+            raise QuarantineStage("no applied operation to record")
+        receipt = ImportReceipt.model_validate(row.result["receipt"])
+        if (not receipt.verified or receipt.plan_sha256 != record.plan.plan_sha256
+                or receipt.target != record.plan.target):
+            self.store.quarantine(sc.job.job_id, record.plan.target, "receipt does not match the plan", {})
+            raise QuarantineStage("receipt does not match the plan or target")
+        stored = self.store.save_receipt(sc.job.job_id, receipt)
+        self.store.consume_approval(str(row.result.get("approval_id", "")))
+        report = self.deps.step.operation_report(record.plan)  # type: ignore[attr-defined]
+        return StageResult(artifact_refs=(f"receipt:{stored.receipt_id}",),
+                           data={"receipt_id": stored.receipt_id, "report": report})
+
+    def _submit_operation(self, ctx: RequestContext, kind: str, scope: str, target: str,
+                          params: dict[str, Any]) -> JobHandle:
+        if not hasattr(self.deps.step, "plan_operation"):
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "this importer has no corpus operations")
+        current = self.store.pointer(target)
+        body = {"scope": scope, "target": target, **params, "after_pointer_version": current.version if current else 0}
+        inputs = OperationInputs(corpus_scope=(scope,), params=body)
+        return self.jobs.submit(ctx, kind, inputs)
+
+    def submit_retire(self, ctx: RequestContext, scope: str, target: str, *, confirm_scope: str,
+                      resolutions: Sequence[Mapping[str, Any]] = ()) -> JobHandle:
+        """Submit a corpus removal (retire-all).
+
+        The corpus name must be typed in as ``confirm_scope``; open edits block the plan unless each carries a
+        reviewed ``discarded`` resolution.
+        """
+        return self._submit_operation(ctx, RETIRE_KIND, scope, target,
+                                      {"confirm_scope": confirm_scope, "resolutions": [dict(r) for r in resolutions]})
+
+    def submit_purge(self, ctx: RequestContext, scope: str, target: str, *, include_previous: bool = False) -> JobHandle:
+        """Submit a purge of retired records (own plan and approval).
+
+        ``include_previous`` is the second explicit choice a full purge after a corpus removal needs (the live
+        version's predecessor is kept otherwise).
+        """
+        return self._submit_operation(ctx, PURGE_KIND, scope, target, {"include_previous": bool(include_previous)})
+
     # --- service interface ------------------------------------------------------------------
 
-    def submit(self, ctx: RequestContext, snapshot_ref: str, target: str) -> JobHandle:
-        """Submit a publication job for a frozen snapshot (requires ``graph.publish``)."""
+    def submit(
+        self,
+        ctx: RequestContext,
+        snapshot_ref: str,
+        target: str,
+        *,
+        adopt_legacy: bool = False,
+        resolutions: Sequence[Mapping[str, Any]] = (),
+        rollback_reason: str | None = None,
+    ) -> JobHandle:
+        """Submit a publication job for a frozen snapshot (requires ``graph.publish``).
+
+        With a replacement importer a version change, a rollback and a roll-forward are all this call (a
+        rollback names an older snapshot; the importer revives its retired records). ``adopt_legacy`` retires
+        the one-time per-version imports of the corpus into its scope and always needs ``jobs.admin`` and an
+        approval of the resulting plan. ``resolutions`` are reviewed :class:`ConflictResolution` dicts for edits
+        a rollback would otherwise drop (Q15). The pointer version at submission is part of the job identity,
+        so a repeated rollback or roll-forward is a new job while a retried submit stays idempotent.
+        """
+        if adopt_legacy and not ctx.has("jobs.admin"):
+            raise ContractError(ErrorCode.DENIED, "legacy adoption needs jobs.admin and an explicit approval")
         snapshot = self.deps.snapshots.load(snapshot_ref)
+        params: dict[str, Any] = {"snapshot_ref": snapshot.ref, "target": target}
+        if self.replacement:
+            current = self.store.pointer(target)
+            params["after_pointer_version"] = current.version if current else 0
+            options = {"adopt_legacy": adopt_legacy, "resolutions": [dict(r) for r in resolutions]}
+            if adopt_legacy or resolutions:
+                params["options"] = options
+            if rollback_reason is not None:
+                params["rollback"] = {"reason": rollback_reason}
         inputs = OperationInputs(
             corpus_scope=(snapshot.corpus,),
             source_sha256=snapshot.sha256,
             source_version=snapshot.manifest.snapshot_id,
-            params={"snapshot_ref": snapshot.ref, "target": target},
+            params=params,
         )
         return self.jobs.submit(ctx, KIND, inputs)
 
@@ -488,19 +705,18 @@ class Publication:
             )
         now = datetime.fromtimestamp(self.deps.clock(), tz=UTC)
         self.deps.verify_approval(approval, record.plan, now)
-        probe_ctx = self.deps.ctx_for(job)
         stale = []
         if self.deps.probe.schema_fingerprint() != record.schema_fingerprint:
             stale.append("schema_changed")
         if self.deps.probe.vocabulary_revision() != record.vocabulary_revision:
             stale.append("vocabulary_changed")
-        if self.deps.snapshots.load(str(job.inputs.params["snapshot_ref"])).sha256 != record.plan.input_sha256:
-            stale.append("snapshot_changed")
-        started = self.jobs.store.stage(job_id, "import")
-        if (
-            not started
-            and self.deps.step.target_revision(probe_ctx, record.plan.target) != record.plan.base_revision
+        operation = job.kind in OPERATION_KIND_NAMES
+        if not operation and (
+            self.deps.snapshots.load(str(job.inputs.params["snapshot_ref"])).sha256 != record.plan.input_sha256
         ):
+            stale.append("snapshot_changed")
+        started = self.jobs.store.stage(job_id, "apply" if operation else "import")
+        if not started and self._current_revision(job, record.plan) != record.plan.base_revision:
             stale.append("target_revision_changed")
         if stale:
             self.store.invalidate_approvals(reason=f"stale: {', '.join(stale)}", job_id=job_id)
@@ -522,6 +738,12 @@ class Publication:
         """Restore the previous active pointer (human, ``graph.publish``, audited). Candidates are retained."""
         if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI) or not ctx.has("graph.publish"):
             raise ContractError(ErrorCode.DENIED, "rollback requires a human with graph.publish")
+        if self.replacement:
+            raise ContractError(
+                ErrorCode.CONFLICT,
+                "this deployment moves a Tiled release marker with the pointer; a pointer-only rollback would "
+                "leave them disagreeing (TIL-14): use rollback_replacement",
+            )
         return self.deps.audit.guard(
             kind="pointer_rollback",
             operation_id=f"rollback-{target}-{int(self.deps.clock())}",
@@ -530,6 +752,26 @@ class Publication:
             payload={"reason": reason},
             mutation=lambda: self.store.rollback(target, actor=ctx.principal.subject, reason=reason),
         )
+
+    def rollback_replacement(self, ctx: RequestContext, target: str, *, reason: str) -> JobHandle:
+        """Roll back (or, a second time, forward) as a replacement plan to the previous pointer's version.
+
+        The toggle is over the last two pointers (B28): the version named by the pointer one step back becomes
+        the replacement source, so the importer revives its retired records (same Tiled UUIDs) and the marker
+        and pointer move together. The job still plans, waits for approval, imports, verifies and activates.
+
+        Raises:
+            ContractError: ``DENIED`` (human with ``graph.publish`` required); ``CONFLICT`` when there is no
+                previous pointer or this deployment keeps no release marker.
+        """
+        if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI) or not ctx.has("graph.publish"):
+            raise ContractError(ErrorCode.DENIED, "rollback requires a human with graph.publish")
+        if not self.replacement:
+            raise ContractError(ErrorCode.CONFLICT, "this deployment has no replacement importer; use rollback")
+        previous = self.store.previous_record(target)
+        if previous is None:
+            raise ContractError(ErrorCode.CONFLICT, "there is no previous pointer to roll back to")
+        return self.submit(ctx, str(previous["snapshot_ref"]), target, rollback_reason=reason)
 
     def _on_scope_change(self, change: Mapping[str, Any]) -> None:
         """Handle a scope change or revocation.
@@ -546,4 +788,4 @@ class Publication:
         )
 
 
-__all__ = ("KIND", "PUBLISH_STAGES", "Publication", "PublicationDeps", "default_approval_verifier", "operation_id")
+__all__ = ("KIND", "OPERATION_KIND_NAMES", "OPERATION_STAGES", "PURGE_KIND", "PUBLISH_STAGES", "RETIRE_KIND", "Publication", "PublicationDeps", "default_approval_verifier", "operation_id")

@@ -9,12 +9,12 @@
 | Entrypoint | Behaviour |
 | --- | --- |
 | `app.modules.f2w_agent.api.create_app(cfg, *, cors_origins, deployment, startup_config, identity_port, credential_store, clock)` | Unchanged signature and routes: the 19 UI routes, ALS sign-in handlers, access control and disclosure projection. The frozen UI and T18A/T18B contract tests use it as before. |
-| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 42 `/v1` routes (39 on an ALS profile: the three T32 folder routes are registered on `:local` only), the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E), `folder_roots` (T32). |
+| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 48 `/v1` routes (45 on an ALS profile: the three T32 folder routes are registered on `:local` only), the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E), `folder_roots` (T32). |
 | `python -m app.modules.f2w_agent.cli api` | Unchanged (legacy app). `api --jobs-api` serves `create_api_app`. |
 | `python -m app.api.cli --root DIR jobs|cases|cost|vocab|scales|folders|audit|ops ...` | Calls `F2WOperations` directly with a `cli` context (local profile only). `ops statistics|compare|paper-subgraph|recent|corpus-audit|submit|result` are the T19E Knowledge Operation wrappers (graphs from `--project-root/storage/kg` or `--graph-file`, corpora from `storage/terminology`). `cases bulk-review`, `cost show|set`, `vocab quality` and `scales list|show|record` are the T31 wrappers; `folders roots|list|index` (T32) browse the roots named by `F2W_FOLDER_ROOTS`. |
 | `F2WOperations` | Direct Python use (SDK, notebooks, FORGE). Same methods the routes call. |
 
-With no `operations` argument the factory builds `build_operations(settings, <workdir>/operations)`: SQLite job, curation and audit stores, the figure-scale record table in the curation database, the cost-control file `cost_control.json` and the vocabulary-quality snapshot directory `vocab_quality/` (T31), **no job kind and no publication** (real pipeline handlers need H3, real publication needs H5). Trusted wiring registers kinds on `ops.jobs` and builds a `Publication` on it.
+With no `operations` argument the factory builds `build_operations(settings, <workdir>/operations)`: SQLite job, curation and audit stores, the figure-scale record table in the curation database, the cost-control file `cost_control.json` and the vocabulary-quality snapshot directory `vocab_quality/` (T31), **no job kind and no publication** (real pipeline handlers need H3, real publication needs H5). Trusted wiring registers kinds on `ops.jobs` and builds a `Publication` on it. Exception (A8/T34): `create_api_app` calls `modules.library.register_library_jobs` itself, so on `:local` the kinds below exist; on ALS nothing is registered.
 
 ## 2. Shared service contract (`F2WOperations`)
 
@@ -32,6 +32,22 @@ Every method takes the server-resolved `RequestContext` first and forwards to th
 | Scope | `notify_scope_change` | `JobService.notify_scope_change` (invalidates dependent approvals) |
 
 The worker path uses the same rules: job stages call `StageContext.require`, which deployments wire to `security.authorization.WorkerAuthority.check` (fresh whoami with the initiator's credential on ALS). Tests: `test_v1_als.py::test_sdk_calls_apply_the_same_policy_as_http`, `::test_worker_reauthorizes_and_stops_when_the_initiator_lost_admin`, and the live `::test_real_role_downgrade_stops_the_worker_before_the_effect`.
+
+### 2.0 Library job kinds (A8/T34, `:local` only)
+
+`app/modules/library/jobs.py` registers four kinds through `register_library_jobs(job_service, settings)`, called from `create_api_app` (next to `register_knowledge_jobs`) and from the worker factory `app.modules.workers.factories:library_service`. They are submitted on the existing `POST /v1/jobs` (no new route, so no new policy row; V32-V41 belong to the unmerged T31 routes branch and V42 to T33).
+
+| Kind | Capability | State |
+| --- | --- | --- |
+| `library_probe` | `library.read` | no-op, completes at once (proves a worker claims library jobs) |
+| `library_verify` | `library.upload` | fails closed, `unsupported_capability`, "not implemented until T35" |
+| `library_index` | `library.index` | fails closed, "not implemented until T36" |
+| `library_extract` | `library.extract` | fails closed, "not implemented until T39" |
+
+- **Local operator only.** The four capabilities are `contracts.context.LOCAL_ONLY_CAPABILITIES`: in the vocabulary (`CAPABILITIES`), held by the local operator, never by an ALS principal (`capabilities_for` removes them from the admin set and `RequestContext` refuses them in `tiled_authenticated` mode). ALS registers no library kind, so a submission is refused as an unknown kind (`invalid_input`). ALS-admin support is T44, deferred.
+- **Rebuild.** Job identity is idempotent on identical inputs; a rebuild is the same submission with a different `params.nonce` (`library_inputs(params, nonce=...)`). Secrets in `inputs` or `params` are refused by `OperationInputs`.
+- **Worker.** `docker/profiles/local.json` sets `F2W_WORKER_FACTORY=app.modules.workers.factories:library_service`; `als-dev` and `als-prod` keep `idle_service`. `library_service` builds the job service from the worker's startup environment and refuses to start on an ALS profile.
+- **Handlers.** `register_library_jobs(..., handlers={kind: stage_body})` replaces a stub; T35, T36 and T39 supply theirs.
 
 ### 2.1 Job UI mapping (`GET /v1/jobs/{id}/view`)
 
@@ -53,7 +69,7 @@ Legacy SSE framing (`event:`/`data:` LF blocks, as `/chat/stream`) with `JobEven
 
 ## 3. Route policies (`app/api/policies.py`, DEP-19)
 
-All 42 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
+All 48 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
 
 - A route whose effect needs one fixed capability declares it, so the dependency refuses the caller first and, for an admin capability, re-runs the ALS role check.
 - Routes whose capability depends on the job kind or on ownership declare no entry capability (signed-in on ALS) and rely on `JobService`; their mutating handlers re-run the ALS role check (`fresh_request_context`).
@@ -93,8 +109,55 @@ All 42 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V40 | GET /v1/folders/list?root=L&path=P | `ingest.acquire`, `:local` only | entries of one folder (directories first; links named, never followed; hidden entries skipped; 1000 entries max); `..`, absolute paths, backslashes, encoded separators and empty segments are 422; an unknown root, a missing folder, a file or a link is one fixed 404 |
 | V41 | GET /v1/folders/index?root=L&path=P | `ingest.acquire`, `:local` only | bounded recursive PDF inventory (5000 documents, 20000 folders) without following links; read only: starting an ingest over it stays a job (`POST /v1/jobs`) |
 | V42 | GET /v1/jobs/{id}/logs?after=&limit= | signed in | T33: per-job free-text log lines (`{job_id, logs:[{seq, at, level, stage, message}]}`), same visibility as V03; messages scrubbed and cut to 400 characters, 2000 lines kept per job; `/stream` also sends `event: job_log` frames (no `id:`, resume with `?logs_after=` or `/logs?after=`) |
+| V50-V52 | POST /v1/jobs/enrichment, /topic-sweep, /pdf-parse | `jobs.admin` | T10B (B5/J-11, RT-27..RT-32): job kinds `enrichment`, `topic_sweep`, `pdf_parse`; status is V03, stop is V08; fresh role check; admin-only on ALS |
+| V53 | POST /v1/publications/rollback-replacement | `graph.publish` | T10B: rollback as a replacement plan to the previous pointer's version (revive); returns the job; approval is V18; human only; H5 gate |
+| V54 | POST /v1/publications/corpus-retire | `graph.publish` | T10B: corpus removal plan, corpus name typed in as `confirm_scope`; approval via V18; H5 gate |
+| V55 | POST /v1/publications/corpus-purge | `graph.publish` | T10B: purge plan of retired records (`include_previous` is the explicit second choice after a removal); own approval via V18 (Q3); H5 gate |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
+
+## 3.1 Rollback, replacement and the two-pointer toggle (T10B, owner decisions B28, B27, Q14, Q15)
+
+**Two pointers, one toggle (B28).** The publication pointer of a target keeps its history (`pub_pointer_history`).
+`PublishStore.previous_record` names the pointer one step back; asking again after a rollback names the one that was
+rolled back from, so rollback is a toggle between the **last two pointers**: a second rollback is a roll-forward.
+History rows carry `action` (`activate` or `rollback`) and the reason; candidates, receipts and snapshots are never
+deleted by a rollback. The code rollback (the image) stays independent of this data rollback (REL-08).
+
+**Which rollback.** With the replacement importer (`jobs/replacement_step.ReplacementPublishStep`, the one that keeps a
+release-marker entity in Tiled) a rollback is a **replacement plan whose source is the previous pointer's snapshot**
+(`Publication.rollback_replacement`, V53). The importer revives the retired records whose content equals that
+snapshot, so v5 to v4 to v5 restores the same Tiled UUIDs. The job plans, waits for the V18 approval, imports,
+verifies, receipts and activates like any publication; the pointer moves with `action = rollback`. The pointer-only
+`Publication.rollback` (V20) would leave the Tiled marker and the pointer disagreeing, so it answers 409 `conflict`
+on such a deployment and stays valid only for importers without a marker.
+
+**Marker and pointer agree after every step (TIL-14).** Before the pointer is switched the activate stage reads the
+live release marker from Tiled; if it does not name the snapshot and plan being activated the stage quarantines and
+the previous pointer stays active. `Publication.verify_agreement(ctx, target, scope)` reports
+`{agree, pointer_snapshot_id, marker_snapshot_id}` (both `None` after a corpus removal).
+
+**Reviewed resolutions (Q15, T23C).** A rollback below a snapshot that carries a `reconciled` edit is refused at plan
+time unless each such edit has a reviewed `ConflictResolution` (`discarded` or `carried`) passed as
+`resolutions` on submit; the resolutions are bound into the plan hash.
+
+**Foreign changes (Q14).** A record that FORGE or anyone else changes during a run never stops it; the importer's
+receipt lists `foreign_changes` and the job's `receipt` stage returns them in `result.report.foreign_changes`.
+
+**Stale approval (B27).** If the schema, vocabulary, snapshot or the scope's revision moved after planning, the runner
+invalidates the approval and re-plans in the same run, then waits for approval of the new plan (a replacement plan
+included: a changed owned row of the scope changes `base_revision`). A changed snapshot is quarantined, not re-planned.
+
+**Legacy adoption** of per-version imports needs `jobs.admin` on submit (`adopt_legacy`) and an explicit approval; a
+plan is *safe* (eligible for a `:local` auto-approval policy) only with no boundary links and no legacy adoption.
+**Corpus removal and purge** are separate jobs (`corpus_retire`, `corpus_purge`; V54, V55) with their own plans and
+approvals; a full purge after a removal needs `include_previous` as the second explicit choice.
+
+**Job kinds (B5/J-11).** `enrichment`, `topic_sweep` and `pdf_parse` (`jobs/paper_jobs.py`, V50-V52) replace the donor
+start/status/stop route triples: submit is the V50-V52 route, status `GET /v1/jobs/{id}`, stop `POST /v1/jobs/{id}/cancel`.
+The kind capability is `jobs.admin` (verified admins on ALS); the work is a handler port bound by trusted wiring, so
+the lifecycle, parameter validation, cancellation and resume are tested with fake handlers and no model or parser runs
+in the API process. Anything a handler proposes for the graph still goes through the `curation.approve` review.
 
 ## 4. H5 publication gate
 

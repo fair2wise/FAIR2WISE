@@ -193,6 +193,7 @@ def create_api_app(
     from . import routes_validation as validation
     from .folders import FOLDER_ROOTS_ENV, FolderRoots
     from ..modules.f2w_agent.api import create_app, effective_cors_origins
+    from ..modules.library import register_library_jobs
     from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
@@ -219,6 +220,8 @@ def create_api_app(
         lookup = runtime.credential_lookup() or getattr(operations.jobs.authority, "credential_lookup", None)
         operations.register_knowledge_jobs(knowledge_job_context(
             settings, identity_port=operations.identity_port, credential_lookup=lookup, clock=clock or _utcnow))
+    # T34: the library kinds (local operator only; nothing is registered on ALS, so submissions are refused).
+    register_library_jobs(operations.jobs, settings)
     app.state.f2w_operations = operations
     runtime.on_scope_change(operations.notify_scope_change)
 

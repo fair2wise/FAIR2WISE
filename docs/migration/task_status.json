@@ -684,7 +684,7 @@
       "gate": "H6",
       "status": "open",
       "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (library package, library_service factory, local-only capabilities, nonce), uncommitted and not merged, so the row stays open until the integrator commit; verify/index/extract are fail-closed stubs until T35/T36/T39"
     },
     {
       "id": "T35",

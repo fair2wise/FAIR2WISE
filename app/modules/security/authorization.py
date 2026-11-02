@@ -33,6 +33,7 @@ from ..contracts.context import (
     ADMIN_CAPABILITIES,
     CAPABILITIES,
     CHAT_CAPABILITIES,
+    LOCAL_ONLY_CAPABILITIES,
     LOCAL_OPERATOR,
     ActorKind,
     AuthorizationMode,
@@ -348,7 +349,7 @@ class RoleCheckCache:
 
 def capabilities_for(identity: VerifiedIdentity) -> frozenset[str]:
     """Return the capability set for a verified ALS principal (section 6)."""
-    return CAPABILITIES if identity.is_admin else CHAT_CAPABILITIES
+    return CAPABILITIES - LOCAL_ONLY_CAPABILITIES if identity.is_admin else CHAT_CAPABILITIES
 
 
 def local_operator_context(settings: DeploymentSettings, *, request_id: str, session_id: str | None = None,

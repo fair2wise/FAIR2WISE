@@ -125,14 +125,19 @@ class SourceSnapshot:
     nodes: dict[str, dict[str, Any]]
     edges: list[tuple[str, dict[str, Any]]]
     data_commit: str | None = None
+    ancestry: tuple[str, ...] = ()
 
     @property
     def lineage(self) -> list[str]:
-        """The snapshot and its recorded parent."""
+        """The snapshot and its full ancestor chain (T23C), nearest first.
+
+        ``ancestry`` is walked from the sibling snapshot directories when the source is a directory; for a
+        release object with no directory it falls back to the recorded parent, and the caller may add known
+        ancestors through the ``lineage`` argument of the plan functions.
+        """
         ids = [self.manifest.snapshot_id]
-        if self.manifest.parent:
-            ids.append(self.manifest.parent.snapshot_id)
-        return ids
+        chain = list(self.ancestry) or ([self.manifest.parent.snapshot_id] if self.manifest.parent else [])
+        return ids + [i for i in chain if i not in ids]
 
 
 def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str]:
@@ -152,6 +157,25 @@ def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str
     return frozenset(current | {fp for fp in before if fp})
 
 
+def walk_ancestry(snapshot_dir: Path, manifest: KGManifest, *, limit: int = 1000) -> tuple[str, ...]:
+    """Parent chain of a snapshot read from sibling ``<corpus>/<vN>/manifest.json`` files (T23C).
+
+    The walk stops at the first missing or unreadable ancestor manifest (the chain is then shorter, which can
+    only make an import look *less* protected-safe, never hide a conflict) and on any cycle.
+    """
+    seen = [manifest.snapshot_id]
+    current = manifest.parent.snapshot_id if manifest.parent else None
+    while current and current not in seen and len(seen) <= limit:
+        seen.append(current)
+        try:
+            raw = json.loads((snapshot_dir.parent / current / "manifest.json").read_text(encoding="utf-8"))
+            parent = (raw.get("parent") or {}).get("snapshot_id")
+        except (OSError, ValueError, AttributeError):
+            break
+        current = parent if isinstance(parent, str) else None
+    return tuple(seen[1:])
+
+
 def load_source(source: Source, *, supported_schema_fingerprints: Collection[str]) -> SourceSnapshot:
     """Preflight a frozen snapshot (json_kg_contract.md 5.1; no target contact).
 
@@ -161,9 +185,11 @@ def load_source(source: Source, *, supported_schema_fingerprints: Collection[str
     Raises:
         ContractError: ``INVALID_INPUT`` for any verification, schema, validation or disclosure refusal.
     """
+    source_dir: Path | None = None
     try:
         if isinstance(source, (str, Path)):
-            source = verify_snapshot_dir(Path(source))
+            source_dir = Path(source)
+            source = verify_snapshot_dir(source_dir)
     except ReleaseVerificationError as exc:
         raise ContractError(ErrorCode.INVALID_INPUT, f"snapshot verification failed: {exc}") from None
     if isinstance(source, VerifiedRelease):
@@ -194,7 +220,8 @@ def load_source(source: Source, *, supported_schema_fingerprints: Collection[str
         list[tuple[str, dict[str, Any]]],  # Any: untyped KG edge payload; the generator yields only dicts
         list(assign_edge_ids(e for e in raw_edges if isinstance(e, dict))),
     )
-    return SourceSnapshot(manifest, graph_sha, manifest_sha, manifest.graph_id, nodes, edges, commit)
+    ancestry = walk_ancestry(source_dir, manifest) if source_dir is not None else ()
+    return SourceSnapshot(manifest, graph_sha, manifest_sha, manifest.graph_id, nodes, edges, commit, ancestry)
 
 
 # --------------------------------------------------------------------------- target state

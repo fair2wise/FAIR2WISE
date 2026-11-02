@@ -45,7 +45,7 @@ def test_every_route_is_declared_and_v1_matches_the_policy_table(local):
     routes = _routes(local.app)
     v1 = {r for r in routes if r[1].startswith(V1_PREFIX + "/")}
     assert v1 == {(p.method, p.path) for p in API_ROUTE_POLICIES}
-    assert len(API_ROUTE_POLICIES) == len({p.route_id for p in API_ROUTE_POLICIES}) == 42
+    assert len(API_ROUTE_POLICIES) == len({p.route_id for p in API_ROUTE_POLICIES}) == 48
     legacy = {(p.method, p.path) for p in ROUTE_POLICIES if p.surface == AGENT_SURFACE}
     assert len(legacy) == 19 and legacy <= routes  # the 19 UI routes are still served
     assert routes - v1 - legacy == {("GET", "/docs"), ("GET", "/docs/oauth2-redirect"), ("GET", "/redoc"),
@@ -416,7 +416,8 @@ def test_audit_status_reports_the_degraded_flag(local):
     degraded = c.get("/v1/audit/status").json()
     assert degraded["degraded"] is True and degraded["healthy"] is False and degraded["reason"]
     ops = c.get("/v1/ops/status").json()
-    assert ops["audit"]["degraded"] is True and ops["kinds"] == ["ingest", "knowledge_operation", "publish"]
+    assert ops["audit"]["degraded"] is True and ops["kinds"] == ["ingest", "knowledge_operation", "library_extract", "library_index",
+                                                           "library_probe", "library_verify", "publish"]
 
 
 def test_ops_status_monitor_dto(local):

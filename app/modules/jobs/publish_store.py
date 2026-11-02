@@ -262,6 +262,7 @@ class PublishStore:
         expected_version: int,
         actor: str,
         reason: str = "activate",
+        action: str = "activate",
     ) -> Pointer:
         """Switch the pointer by compare-and-swap, only to a verified receipt.
 
@@ -296,10 +297,25 @@ class PublishStore:
                 "INSERT OR REPLACE INTO pub_pointers VALUES (?, ?, ?)", (name, version, canonical_json(record))
             )
             con.execute(
-                "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'activate', ?, ?, ?)",
-                (name, version, canonical_json(record), reason, actor, self.clock()),
+                "INSERT INTO pub_pointer_history VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (name, version, canonical_json(record), action, reason[:300], actor, self.clock()),
             )
         return Pointer(name, version, **record)
+
+    def previous_record(self, name: str) -> dict[str, Any] | None:
+        """The pointer record one step back (what a rollback toggle restores), or ``None``.
+
+        The toggle is over the last two pointers (owner decision B28): after a rollback, asking again names the
+        pointer that was rolled back from, so a second rollback is a roll-forward.
+        """
+        row = self.db.one("SELECT version FROM pub_pointers WHERE name=?", (name,))
+        if row is None:
+            return None
+        hist = self.db.one(
+            "SELECT record FROM pub_pointer_history WHERE name=? AND version<? ORDER BY version DESC LIMIT 1",
+            (name, row["version"]),
+        )
+        return cast(dict[str, Any], json.loads(hist["record"])) if hist else None
 
     def rollback(self, name: str, *, actor: str, reason: str) -> Pointer:
         """Restore the previous pointer (new candidate packages, receipts and history are retained)."""

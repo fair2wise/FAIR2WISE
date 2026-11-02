@@ -572,6 +572,12 @@ React Testing Library). The owner decisions are fixed; this addendum records the
 - **Acceptance:** a `:local` worker claims and completes a no-op library job; ALS images register no library
   kinds and refuse submissions of them; secrets in `inputs` or `params` are refused; identical submissions
   return the same job and a changed nonce a new one; `tests/images/test_images_profiles.py` updated.
+- **Implementation note (2026-11-02):** `library_probe` (`library.read`) is the no-op kind the acceptance needs;
+  `library_verify` (`library.upload`), `library_index` and `library_extract` are fail-closed stubs
+  (`unsupported_capability`, "not implemented until T35/T36/T39") replaceable through `register_library_jobs(handlers=)`.
+  The four capabilities are `LOCAL_ONLY_CAPABILITIES` in `contracts/context.py` (not in the ALS admin set). The worker
+  factory is `library_service`, which refuses an ALS profile. No route and no policy row are added (kinds ride `POST /v1/jobs`);
+  any later row uses V43 or higher. Details: `docs/migration/api/README.md` section 2.0.
 
 ### T35: Library catalog, upload and verify (supersedes T32)
 - **Depends on:** T34, T29 (functions only). **Blocks:** T36, T38, T41.

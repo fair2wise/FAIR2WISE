@@ -105,6 +105,20 @@ def resolutions_sha256(resolutions: Iterable[ConflictResolution]) -> str:
     return hashlib.sha256("\n".join(rows).encode()).hexdigest()
 
 
+def derive_edit_id(*, target: str, scope: Sequence[str], base_snapshot_id: str, operation: str,
+                   ids: Sequence[str], before: dict[str, object], after: dict[str, object]) -> str:
+    """Content-derived edit id (T23C): the same request content always yields the same id.
+
+    A client retry of a Save (after a lost response) therefore finds its own entry instead of recording a
+    second edit. The id covers target, scope, base snapshot, operation, touched ids and the before/after
+    values, never the actor or the time.
+    """
+    body = json.dumps({"t": target, "s": sorted(scope), "b": base_snapshot_id, "o": operation, "i": list(ids),
+                       "x": before, "y": after}, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                      default=str)
+    return "e-" + hashlib.sha256(body.encode()).hexdigest()[:24]
+
+
 class EditJournal:
     """Append-only JSONL journal for one ``(target, scope)``.
 
@@ -141,6 +155,17 @@ class EditJournal:
             os.fsync(handle.fileno())
         return record
 
+    def record(self, record: EditRecord) -> tuple[EditRecord, bool]:
+        """Idempotent first append of a content-derived edit (``seq`` 1).
+
+        Returns ``(current_record, created)``; when the edit id is already journaled (a retried Save) the
+        existing current record is returned and nothing is written.
+        """
+        current = self.latest().get(record.edit_id)
+        if current is not None:
+            return current, False
+        return self.append(record), True
+
     def latest(self) -> dict[str, EditRecord]:
         """Current record of every edit."""
         return {r.edit_id: r for r in self._read()}
@@ -161,20 +186,28 @@ class EditJournal:
 
 
 def unreconciled(journal: EditJournal, *, target: str, scope: Sequence[str],
-                 lineage: Iterable[str]) -> list[EditRecord]:
-    """List edits for this target/scope that are not yet reflected in the imported snapshot.
+                 lineage: Iterable[str], include_reconciled: bool = True) -> list[EditRecord]:
+    """List edits for this target/scope that the imported snapshot would not carry.
 
-    These are edits that were applied or acknowledged but whose effect is not in the
-    snapshot lineage being imported (``lineage``: the snapshot id and its ancestors).
+    * Applied, acknowledged, conflicting and failed edits are listed unless the snapshot carrying them
+      (``reconciled_in``) is in ``lineage``.
+    * T23C (F4/B26, Q15): a ``reconciled`` edit is listed when its ``reconciled_in`` snapshot is not in
+      ``lineage``, so importing a snapshot *below* the reconciliation (a rollback) is refused without a
+      reviewed :class:`ConflictResolution`. ``lineage`` must be the full ancestor chain of the imported
+      snapshot, nearest first (``SourceSnapshot.lineage``). ``include_reconciled=False`` restores the
+      pre-T23C view (open edits only), used where JSON in Git already carries reconciled edits (corpus
+      removal).
     """
     ancestry = set(lineage)
     wanted = set(scope)
+    states = PROTECTED_STATES | ({"reconciled"} if include_reconciled else frozenset())
     out = []
     for rec in journal.latest().values():
-        if rec.target != target or not (set(rec.scope) & wanted) or rec.state not in PROTECTED_STATES:
+        if rec.target != target or not (set(rec.scope) & wanted) or rec.state not in states:
             continue
         out.append(rec)
-    return [r for r in out if r.reconciled_in not in ancestry]
+    # A ``conflict`` edit's effect is by definition not in the graph: it blocks until resolved.
+    return [r for r in out if r.state == "conflict" or r.reconciled_in not in ancestry]
 
 
 def check_import(journal: EditJournal | None, *, target: str, scope: Sequence[str], lineage: Iterable[str],
