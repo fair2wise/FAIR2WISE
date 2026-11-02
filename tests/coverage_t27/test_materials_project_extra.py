@@ -32,10 +32,11 @@ def test_should_query_matches_extraction():
 
 
 def test_element_counting_and_formula_screening():
-    assert mp._element_count("CH3NH3PbI3") == 6  # symbols are counted per occurrence (H twice) and mp._element_count("lowercase") == 0
+    assert mp._element_count("CH3NH3PbI3") == 6  # symbols are counted per occurrence (H twice)
+    assert mp._element_count("lowercase") == 0
     assert mp._looks_like_formula("TiO2") and mp._looks_like_formula("NaCl") and not mp._looks_like_formula("Na")
     assert not mp._looks_like_formula("RSoXS") and not mp._looks_like_formula("abc")
-    assert mp._parse_ok("TiO2") and not mp._parse_ok("Zz9Qq")
+    assert mp._parse_ok("TiO2") and not mp._parse_ok("TiO2(")
 
 
 def test_cite_tokens_and_context_rendering():
