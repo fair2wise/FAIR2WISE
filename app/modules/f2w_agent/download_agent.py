@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 MAX_SEARCH_QUERIES = 5
 
 from ..literature import download_pdfs as _dl
+from ..literature.legacy_download import hardened_download_pdf
 
 RELIABLE_PDF_HOSTS = _dl.RELIABLE_PDF_HOSTS
 
@@ -763,7 +764,7 @@ class DownloadAgent(Agent):
                 url_attempts += 1
                 if url == oa_url:
                     oa_url_attempts += 1
-                ok = dl.download_pdf(url, str(dest))
+                ok = hardened_download_pdf(url, str(dest))
                 if ok:
                     break
                 self._sleep_between_download_attempts()
