@@ -51,7 +51,7 @@ def test_register_normalises_ipinfo_loc_and_matches_logo(board):
 def test_register_tolerates_malformed_loc_and_unknown_org(board):
     board.register_agent("B", _reg({"loc": "not-a-pair", "org": "Nowhere"}))
     agent = board._snapshot()["agents"]["B"]
-    assert agent["geo"] == {"loc": "not-a-pair", "org": "Nowhere"} or agent["geo"] is None
+    assert agent["geo"] is None
     assert agent["logo_url"] == "/assets/logo-Academy-2025-200x200-dark-bg.png"
 
 
