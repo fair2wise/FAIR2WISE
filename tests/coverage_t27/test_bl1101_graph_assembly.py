@@ -210,7 +210,7 @@ def test_attach_repo_terms_for_each_repo_flavour():
          "start": 3, "end": 9},
         {"id": "beamline:ophyd-Dev", "name": "Dev", "category": "OphydDevice", "file": "p.py"},
     ]
-    terms, snippets = bi.attach_repo_terms(spec, Path("."), "a" * 40, symbols, [{"s": 1}],
+    terms, snippets = bi.attach_repo_terms(spec, Path(), "a" * 40, symbols, [{"s": 1}],
                                            [{"name": "web", "file": "compose.yml"}],
                                            [("docs/guide.md", "Summary"), ("docs/empty.md", "")])
     ids = {t["id"]: t for t in terms}
@@ -222,7 +222,7 @@ def test_attach_repo_terms_for_each_repo_flavour():
     assert "beamline:doc-bcs2sim-ophyd-empty" not in ids and "beamline:config-sim-config" in ids
     for name, expect in (("bl11012-scan-replay", "beamline:DataPath-labview-replay-bundle"),
                          ("bl11012-bluesky", "beamline:DataPath-tiled-compose")):
-        extra, _ = bi.attach_repo_terms(bi.RepoSpec(name=name, url="u", mode="docs"), Path("."), "", [], [], [], [])
+        extra, _ = bi.attach_repo_terms(bi.RepoSpec(name=name, url="u", mode="docs"), Path(), "", [], [], [], [])
         assert expect in {t["id"] for t in extra}
 
 
