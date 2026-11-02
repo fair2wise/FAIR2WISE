@@ -488,7 +488,7 @@ def plan_retire_all(*, client: TiledMutationClient, settings: DeploymentSettings
     target = target_for(client, namespace)
     _check_client(client, settings, target)
     if edit_journal is not None:
-        open_edits = ej.unreconciled(edit_journal, target=target, scope=(scope,), lineage=())
+        open_edits = ej.unreconciled(edit_journal, target=target, scope=(scope,), lineage=(), include_reconciled=False)
         decided = {r.edit_id: r.decision for r in resolutions}
         blocking = sorted(r.edit_id for r in open_edits if decided.get(r.edit_id) != "discarded")
         if blocking:

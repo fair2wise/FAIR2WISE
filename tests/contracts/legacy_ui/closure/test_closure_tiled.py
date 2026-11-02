@@ -182,21 +182,26 @@ def test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits(t
     for node in g2["things"][1:]:  # no other record changed identity
         assert _reader(mode, inst, client).get_entity(ctx, graph_id, node["id"])["id"] == node["id"]
 
-    # Rollback to v1 (the pre-edit parent). Observed: once an edit is ``reconciled`` the journal
-    # no longer gates imports (edit_journal.PROTECTED_STATES excludes it), so rolling the target
-    # back below the reconciliation snapshot is not refused and needs no reviewed resolution.
-    # The edit survives in v2 (versioned JSON) but leaves Tiled. Surfaced to the owner as T18C
-    # finding F4; this test pins the current behaviour so a change is noticed.
-    rollback = ops.plan(snap, edit_journal=journal)
+    # Rollback to v1 (the pre-edit parent). T23C flips the T18C finding F4 (Q15): a ``reconciled``
+    # edit protects every import whose lineage lacks its snapshot, so rolling the target back below the
+    # reconciliation snapshot is refused until a reviewed ConflictResolution exists.
+    with pytest.raises(ContractError) as refused:
+        ops.plan(snap, edit_journal=journal)
+    assert refused.value.code is ErrorCode.CONFLICT and "ui15-1" in str(refused.value)
+    res = ej.ConflictResolution(edit_id="ui15-1", decision="discarded", reviewed_by="local-operator",
+                                reviewed_at=ops.clock(), note="T18C rollback rehearsal")
+    carried = ej.ConflictResolution(edit_id="ui15-1", decision="carried", reviewed_by="local-operator",
+                                    reviewed_at=ops.clock(), note="T18C rollback rehearsal")
+    rollback = ops.plan(snap, edit_journal=journal, resolutions=[res])
     assert not rollback.is_noop
+    assert ops.plan(snap, edit_journal=journal, resolutions=[carried]).change.plan_sha256 != rollback.change.plan_sha256
     out3 = ops.apply(rollback, snap)
     assert out3.status == "applied"
     back = _reader(mode, inst, client).get_entity(ctx, graph_id, cite_id)
     assert back["id"] == cite_id and back["data"].get("description") == edited.get("description")
-    res = ej.ConflictResolution(edit_id="ui15-1", decision="discarded", reviewed_by="local-operator",
-                                reviewed_at=ops.clock(), note="T18C rollback rehearsal")
 
-    # Roll forward again to v2: the same id resolves to the edited record.
+    # Roll forward again to v2: the edit's snapshot is in the lineage, so no resolution is needed and
+    # the same id resolves to the edited record.
     out4 = ops.apply(ops.plan(v2, edit_journal=journal), v2)
     assert out4.status == "applied"
     assert _reader(mode, inst, client).get_entity(ctx, graph_id, cite_id)["data"].get(
@@ -204,7 +209,6 @@ def test_json_to_tiled_import_retains_fields_ids_evidence_and_reconciles_edits(t
 
     # Replay of the same plan is a no-op (no duplicate facts); FORGE records untouched.
     assert ops.plan(v2, edit_journal=journal).is_noop
-    assert ops.plan(snap, edit_journal=journal, resolutions=[res]).change.plan_sha256 != rollback.change.plan_sha256
     owned = [e for e in client.scan_entities() if (e.get("properties") or {}).get("f2w_owner") == "f2w-literature"
              and not str(e.get("uri", "")).count("#")]
     assert len({e["uri"] for e in owned}) == len(owned)
