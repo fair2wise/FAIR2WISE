@@ -58,6 +58,8 @@ def test_term_extractor_package_degrades_to_none_when_optional_imports_fail(monk
         for name in names:
             sys.modules.pop(name, None)
         sys.modules.update(saved)  # other tests keep the module objects they imported
+        if "app.modules.term_extractor" in saved:  # the import system also rebinds the attribute on the parent
+            setattr(sys.modules["app.modules"], "term_extractor", saved["app.modules.term_extractor"])
     assert degraded.TermExtractorAgent is None and degraded.make_chat_client is None and degraded.Orchestrator is None
     assert degraded.SchemaHelper is not None
 
