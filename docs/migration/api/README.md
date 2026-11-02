@@ -81,8 +81,55 @@ All 31 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V25-V29 | GET /v1/operations/statistics, /compare, /paper-subgraph, /recent, /corpus-audit | `chat.ask` | T19E: the five T19C operations inline (bounded result, `status` `ok` or `partial`); a graph or corpus outside a non-empty corpus scope is 403 (T19C rule); `/recent` on a JSON snapshot is 501 |
 | V30 | POST /v1/operations/jobs | `ops.run` | submit a `knowledge_operation` job (whole population, no inline bound); fresh role check |
 | V31 | GET /v1/operations/jobs/{id} | signed in | job visibility; the bounded report once computed |
+| V50-V52 | POST /v1/jobs/enrichment, /topic-sweep, /pdf-parse | `jobs.admin` | T10B (B5/J-11, RT-27..RT-32): job kinds `enrichment`, `topic_sweep`, `pdf_parse`; status is V03, stop is V08; fresh role check; admin-only on ALS |
+| V53 | POST /v1/publications/rollback-replacement | `graph.publish` | T10B: rollback as a replacement plan to the previous pointer's version (revive); returns the job; approval is V18; human only; H5 gate |
+| V54 | POST /v1/publications/corpus-retire | `graph.publish` | T10B: corpus removal plan, corpus name typed in as `confirm_scope`; approval via V18; H5 gate |
+| V55 | POST /v1/publications/corpus-purge | `graph.publish` | T10B: purge plan of retired records (`include_previous` is the explicit second choice after a removal); own approval via V18 (Q3); H5 gate |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
+
+## 3.1 Rollback, replacement and the two-pointer toggle (T10B, owner decisions B28, B27, Q14, Q15)
+
+**Two pointers, one toggle (B28).** The publication pointer of a target keeps its history (`pub_pointer_history`).
+`PublishStore.previous_record` names the pointer one step back; asking again after a rollback names the one that was
+rolled back from, so rollback is a toggle between the **last two pointers**: a second rollback is a roll-forward.
+History rows carry `action` (`activate` or `rollback`) and the reason; candidates, receipts and snapshots are never
+deleted by a rollback. The code rollback (the image) stays independent of this data rollback (REL-08).
+
+**Which rollback.** With the replacement importer (`jobs/replacement_step.ReplacementPublishStep`, the one that keeps a
+release-marker entity in Tiled) a rollback is a **replacement plan whose source is the previous pointer's snapshot**
+(`Publication.rollback_replacement`, V53). The importer revives the retired records whose content equals that
+snapshot, so v5 to v4 to v5 restores the same Tiled UUIDs. The job plans, waits for the V18 approval, imports,
+verifies, receipts and activates like any publication; the pointer moves with `action = rollback`. The pointer-only
+`Publication.rollback` (V20) would leave the Tiled marker and the pointer disagreeing, so it answers 409 `conflict`
+on such a deployment and stays valid only for importers without a marker.
+
+**Marker and pointer agree after every step (TIL-14).** Before the pointer is switched the activate stage reads the
+live release marker from Tiled; if it does not name the snapshot and plan being activated the stage quarantines and
+the previous pointer stays active. `Publication.verify_agreement(ctx, target, scope)` reports
+`{agree, pointer_snapshot_id, marker_snapshot_id}` (both `None` after a corpus removal).
+
+**Reviewed resolutions (Q15, T23C).** A rollback below a snapshot that carries a `reconciled` edit is refused at plan
+time unless each such edit has a reviewed `ConflictResolution` (`discarded` or `carried`) passed as
+`resolutions` on submit; the resolutions are bound into the plan hash.
+
+**Foreign changes (Q14).** A record that FORGE or anyone else changes during a run never stops it; the importer's
+receipt lists `foreign_changes` and the job's `receipt` stage returns them in `result.report.foreign_changes`.
+
+**Stale approval (B27).** If the schema, vocabulary, snapshot or the scope's revision moved after planning, the runner
+invalidates the approval and re-plans in the same run, then waits for approval of the new plan (a replacement plan
+included: a changed owned row of the scope changes `base_revision`). A changed snapshot is quarantined, not re-planned.
+
+**Legacy adoption** of per-version imports needs `jobs.admin` on submit (`adopt_legacy`) and an explicit approval; a
+plan is *safe* (eligible for a `:local` auto-approval policy) only with no boundary links and no legacy adoption.
+**Corpus removal and purge** are separate jobs (`corpus_retire`, `corpus_purge`; V54, V55) with their own plans and
+approvals; a full purge after a removal needs `include_previous` as the second explicit choice.
+
+**Job kinds (B5/J-11).** `enrichment`, `topic_sweep` and `pdf_parse` (`jobs/paper_jobs.py`, V50-V52) replace the donor
+start/status/stop route triples: submit is the V50-V52 route, status `GET /v1/jobs/{id}`, stop `POST /v1/jobs/{id}/cancel`.
+The kind capability is `jobs.admin` (verified admins on ALS); the work is a handler port bound by trusted wiring, so
+the lifecycle, parameter validation, cancellation and resume are tested with fake handlers and no model or parser runs
+in the API process. Anything a handler proposes for the graph still goes through the `curation.approve` review.
 
 ## 4. H5 publication gate
 

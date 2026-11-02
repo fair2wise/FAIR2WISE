@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError
 from ..modules.contracts.jobs import TERMINAL_STATES, JobState
+from ..modules.jobs.paper_jobs import ENRICHMENT_KIND, PDF_PARSE_KIND, TOPIC_SWEEP_KIND
 from ..modules.security.authorization import Unauthenticated
 from .auth import request_context
 from .operations import job_event_json
@@ -45,6 +46,19 @@ class JobSubmitRequest(BaseModel):
     kind: str = Field(min_length=1, max_length=100)
     inputs: dict[str, Any]
     settings_revision: str | None = Field(default=None, max_length=200)
+
+
+class PaperJobRequest(BaseModel):
+    """Body of ``POST /v1/jobs/{enrichment,topic-sweep,pdf-parse}`` (policies V50-V52; B5/J-11)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    corpus: str = Field(min_length=1, max_length=200)
+    limit: int | None = Field(default=None, ge=1, le=1_000_000)
+    entity_ids: list[str] | None = Field(default=None, max_length=100_000)
+    topics: list[str] | None = Field(default=None, max_length=1000)
+    paper_ids: list[str] | None = Field(default=None, max_length=100_000)
+    force: bool | None = None
 
 
 class JobResumeRequest(BaseModel):
@@ -72,6 +86,21 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
         handle = operations(request).submit_job(ctx, body.kind, body.inputs,
                                                 settings_revision=body.settings_revision)
         return project(request, dump(handle))
+
+    def _paper_route(path: str, kind: str, what: str) -> None:
+        @router.post(path)
+        def submit_paper_job(request: Request, body: PaperJobRequest,
+                             ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
+            return project(request, dump(operations(request).submit_paper_job(
+                ctx, kind, body.model_dump(exclude_none=True))))
+
+        submit_paper_job.__doc__ = (f"Submit a ``{kind}`` job ({what}; ``jobs.admin``). Status is ``GET "
+                                    "/v1/jobs/{job_id}``, stop is ``POST /v1/jobs/{job_id}/cancel``.")
+
+    for _path, _kind, _what in (("/enrichment", ENRICHMENT_KIND, "graph enrichment, RT-27..RT-29"),
+                                ("/topic-sweep", TOPIC_SWEEP_KIND, "topic sweep, RT-30..RT-32"),
+                                ("/pdf-parse", PDF_PARSE_KIND, "PDF-parse sweep, J-11")):
+        _paper_route(_path, _kind, _what)
 
     @router.get("")
     def list_jobs(request: Request, state: str | None = Query(default=None, max_length=40),
@@ -168,4 +197,4 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
     return app
 
 
-__all__ = ("JobResumeRequest", "JobSubmitRequest", "WAITING_STATES", "install")
+__all__ = ("JobResumeRequest", "JobSubmitRequest", "PaperJobRequest", "WAITING_STATES", "install")
