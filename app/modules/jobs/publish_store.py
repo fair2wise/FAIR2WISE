@@ -288,7 +288,10 @@ class PublishStore:
                 raise ContractError(
                     ErrorCode.CONFLICT, "active pointer changed since the job read it", retryable=True
                 )
-            version = current + 1
+            last = con.execute(
+                "SELECT MAX(version) AS v FROM pub_pointer_history WHERE name=?", (name,)
+            ).fetchone()
+            version = max(current, int(last["v"] or 0)) + 1
             con.execute(
                 "INSERT OR REPLACE INTO pub_pointers VALUES (?, ?, ?)", (name, version, canonical_json(record))
             )
@@ -321,6 +324,25 @@ class PublishStore:
             )
         return Pointer(name, version, **json.loads(history["record"]))
 
+    def clear_pointer(self, name: str, *, actor: str, reason: str) -> Pointer | None:
+        """Point ``name`` at nothing after a corpus removal (T08D); history keeps the retired record.
+
+        Returns the pointer that was active, or ``None`` when nothing was (then nothing is recorded). A later
+        publication starts again at version ``history + 1``; ``rollback`` needs an active pointer and so
+        cannot undo a removal: re-import from the committed JSON instead.
+        """
+        with self.db.tx() as con:
+            row = con.execute("SELECT version, record FROM pub_pointers WHERE name=?", (name,)).fetchone()
+            if row is None:
+                return None
+            version = row["version"] + 1
+            con.execute("DELETE FROM pub_pointers WHERE name=?", (name,))
+            con.execute(
+                "INSERT INTO pub_pointer_history VALUES (?, ?, ?, 'retire', ?, ?, ?)",
+                (name, version, row["record"], reason[:300], actor, self.clock()),
+            )
+        return Pointer(name, row["version"], **json.loads(row["record"]))
+
     def pointer_history(self, name: str) -> list[dict[str, Any]]:
         """All pointer movements for ``name``."""
         return [
@@ -331,7 +353,6 @@ class PublishStore:
 
 def utc(moment: float) -> datetime:
     """Epoch seconds as an aware UTC datetime."""
-
     return datetime.fromtimestamp(moment, tz=UTC)
 
 

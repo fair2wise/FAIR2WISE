@@ -9,6 +9,12 @@ Lifecycle of an entry: ``recorded`` -> ``applied`` (scoped Tiled effect done) ->
 (the caller was told) -> ``reconciled`` (carried into snapshot ``reconciled_in``). An entry may also
 become ``conflict`` or ``resolved`` (a reviewed :class:`ConflictResolution` was attached).
 
+Q7/Q12 (owner, 2026-10-30): a Save performs its multi-write sequence on Tiled immediately and is
+acknowledged only after the Tiled effect. A sequence that stops half-way marks the entry ``failed``;
+the recovery job (:mod:`.imports.save_recovery`) then finishes it (``applied``) or undoes it
+(``reverted``, the pre-Save state). A ``failed`` entry is protected like an acknowledged one: no import
+may paper over an edit whose Tiled effect is unresolved.
+
 The store is an append-only JSONL file, one file per (target, scope); every append is fsynced, and
 the current state of an edit is its last record (state changes append, never rewrite).
 """
@@ -28,11 +34,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from .ports import ContractError, ErrorCode
 
 OPERATIONS = ("node_patch", "relationship_add", "relationship_remove", "snippet_upsert", "snippet_unlink")
-State = Literal["recorded", "applied", "acknowledged", "reconciled", "conflict", "resolved"]
+State = Literal["recorded", "applied", "acknowledged", "reconciled", "conflict", "resolved", "failed", "reverted"]
 #: States in which an edit exists in the target but is not yet part of any JSON snapshot.
-OPEN_STATES = frozenset({"recorded", "applied", "acknowledged", "conflict"})
-#: A ``recorded``-only edit was never applied or acknowledged; it cannot be "lost" by an import.
-PROTECTED_STATES = frozenset({"applied", "acknowledged", "conflict"})
+OPEN_STATES = frozenset({"recorded", "applied", "acknowledged", "conflict", "failed"})
+#: A ``recorded``-only edit was never applied or acknowledged; it cannot be "lost" by an import. A
+#: ``reverted`` edit has no Tiled effect either. A ``failed`` edit's effect is unknown until recovered.
+PROTECTED_STATES = frozenset({"applied", "acknowledged", "conflict", "failed"})
 
 
 class EditRecord(BaseModel):

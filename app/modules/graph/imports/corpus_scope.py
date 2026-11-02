@@ -569,12 +569,14 @@ def plan_replacement(source: Source, *, client: TiledMutationClient, settings: D
                      access_blob: Mapping[str, Any] | None = None, adopt_legacy: bool = False,
                      edit_journal: ej.EditJournal | None = None,
                      resolutions: Sequence[ej.ConflictResolution] = (),
-                     lineage: Sequence[str] = ()) -> ReplacementPlan:
+                     lineage: Sequence[str] = (), state_dir: Path | None = None) -> ReplacementPlan:
     """Dry-run: preflight the snapshot, read the whole target and return the exact replacement plan.
 
     No writes. The scope key is the snapshot's corpus (Q1). Legacy per-version imports of the corpus
     (``<corpus>_v<N>`` graph ids) are refused unless ``adopt_legacy`` is set, in which case the plan retires
-    them into the scope once (their records keep existing under retired URIs; purge is T08D).
+    them into the scope once (their records keep existing under retired URIs; purge is T08D). With
+    ``state_dir`` the scope's :class:`ReleaseState` is bound into the plan too, so re-importing the same
+    snapshot after a corpus removal and purge is a new plan with its own receipt.
 
     Raises:
         ContractError: preflight refusal (``INVALID_INPUT``); ``UNAVAILABLE``; ``WRITER_UNAUTHORIZED``;
@@ -602,8 +604,13 @@ def plan_replacement(source: Source, *, client: TiledMutationClient, settings: D
         probes = read_probes(client, state)
     ops, counts, _ids = compute_ops(src, state)
     boundary = boundary_links(src, state, ops)
+    release: dict[str, Any] | None = None
+    if state_dir is not None:
+        rec = ReleaseState(scope_dir(state_dir, target, scope) / "release.json").read()
+        release = {k: rec.get(k) for k in ("pointer", "live_receipt_id", "live_plan_sha256", "retired_by_receipt_id")}
     detail = {
         "adapter_version": ADAPTER_VERSION, "manifest_sha256": src.manifest_sha256, "scope": scope,
+        "release_state": release,
         "json_graph_id": src.graph_id, "owner": ida.LITERATURE_OWNER, "access_blob": dict(access_blob or {}),
         "adopted_graph_ids": list(state.adopted), "resolutions_sha256": ej.resolutions_sha256(resolutions),
         "data_commit": src.data_commit,

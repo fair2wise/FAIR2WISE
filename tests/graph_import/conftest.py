@@ -80,6 +80,7 @@ class Env:
 
     # -- T08C corpus-scoped replacement -------------------------------------------------------
     def replan(self, source, **kw):
+        kw.setdefault("state_dir", self.state_dir)
         return cs.plan_replacement(source, client=self.client, settings=self.settings,
                                    supported_schema_fingerprints=self.fingerprints, **kw)
 

@@ -53,9 +53,9 @@ def owned(env, scope=SCOPE):
     return mine, mine_l
 
 
-def make_v2(snap, tmp_path, *, revise=1, remove=1, add=1, name="v2"):
-    """A second version: ``revise`` nodes changed, ``remove`` nodes dropped, ``add`` nodes added."""
-    g = graph_of(snap)
+def make_v2(snap, tmp_path, *, revise=1, remove=1, add=1, name="v2", base=None):
+    """A later version of ``base`` (default v1): ``revise`` nodes changed, ``remove`` dropped, ``add`` added."""
+    g = copy.deepcopy(base) if base is not None else graph_of(snap)
     things = g["things"]
     revised = [t["id"] for t in things[:revise]]
     for t in things[:revise]:
