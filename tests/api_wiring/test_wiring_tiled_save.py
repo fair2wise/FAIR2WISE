@@ -115,8 +115,9 @@ def build_local(monkeypatch, tmp_path, template):
     from app.modules.f2w_agent import api as api_mod
 
     w = World(monkeypatch, tmp_path, template)
-    w.app = api_mod.create_app(make_cfg(w.ctx), deployment=local_settings(), identity_port=ForbiddenIdentityPort(),
-                               tiled_save=w.target)
+    cfg = make_cfg(w.ctx)
+    cfg.tiled_save = w.target
+    w.app = api_mod.create_app(cfg, deployment=local_settings(), identity_port=ForbiddenIdentityPort())
     w.client = TestClient(w.app, raise_server_exceptions=False)
     return w
 
@@ -130,8 +131,10 @@ def build_als(monkeypatch, tmp_path, template):
     for who, user in (("user", plain_user()), ("admin", admin_user())):
         port.tokens[f"token-{who}"] = user
         store.sessions[f"cookie-{who}"] = TiledCredential(f"token-{who}", tiled_target=STAGING)
-    w.app = api_mod.create_app(make_cfg(w.ctx), deployment=staging_settings(), identity_port=port,
-                               credential_store=store, clock=w.clock, tiled_save=w.target)
+    cfg = make_cfg(w.ctx)
+    cfg.tiled_save = w.target
+    w.app = api_mod.create_app(cfg, deployment=staging_settings(), identity_port=port,
+                               credential_store=store, clock=w.clock)
     return w
 
 

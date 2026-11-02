@@ -132,6 +132,10 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="corpus removal plan, corpus name typed in; approval via V18; H5 gate"),
     _v("V55", "POST", "/publications/corpus-purge", "graph.publish",
        note="purge plan of retired records, own approval via V18 (Q3); H5 gate"),
+    # T18D (Q13, O-U3): the capability read behind the frozen UI's hidden Edit/Save controls. V56-V59 belong to
+    # another branch; this block is V60-V69.
+    _v("V60", "GET", "/capabilities", "chat.read_support",
+       note="caller's role, can_edit (graph.edit), can_save, can_upload; computed from the guards that answer 403"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

@@ -113,6 +113,7 @@ All 48 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V53 | POST /v1/publications/rollback-replacement | `graph.publish` | T10B: rollback as a replacement plan to the previous pointer's version (revive); returns the job; approval is V18; human only; H5 gate |
 | V54 | POST /v1/publications/corpus-retire | `graph.publish` | T10B: corpus removal plan, corpus name typed in as `confirm_scope`; approval via V18; H5 gate |
 | V55 | POST /v1/publications/corpus-purge | `graph.publish` | T10B: purge plan of retired records (`include_previous` is the explicit second choice after a removal); own approval via V18 (Q3); H5 gate |
+| V60 | GET /v1/capabilities | `chat.read_support` | T18D (Q13, O-U3): `{role, profile, can_edit, can_save, can_upload}` for the caller, computed from the same checks that answer 403 on `PATCH /graph/node` (`graph.edit`) and `POST /graph/upload` (`graph.upload`); the frozen UI hides Edit/Save when `can_save` is false; the 403 stays the backstop |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
 

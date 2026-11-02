@@ -178,14 +178,15 @@ def create_api_app(
             Default: parsed from ``F2W_FOLDER_ROOTS`` in ``startup_config`` (or the process
             environment). The routes are registered on the ``:local`` profile only; on an ALS
             profile they are absent (404) and a configured value is ignored with a warning.
-        tiled_save: A :class:`~app.modules.graph.legacy_save.SaveTarget` (T18D), passed to ``create_app``: the
-            UI Save becomes a journaled multi-write on Tiled with no Splash call.
+        tiled_save: A :class:`~app.modules.graph.legacy_save.SaveTarget` (T18D), attached to the legacy service (the
+            ``create_app`` signature is pinned): the UI Save becomes a journaled multi-write on Tiled with no Splash call.
 
     Raises:
         StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
             ``knowledge_operations`` given beside ``operations`` that already carry one, or
             ``model_api`` without a JSON graph in ``cfg.graph``.
     """
+    from . import routes_capabilities as capabilities
     from . import routes_folders as folders
     from . import routes_jobs as jobs
     from . import routes_operations as knowledge_routes
@@ -200,9 +201,10 @@ def create_api_app(
     from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
+    if tiled_save is not None:
+        cfg.tiled_save = tiled_save     # read by the service before it builds its session graph (no Splash call)
     app = create_app(cfg, cors_origins=cors_origins, deployment=deployment, startup_config=startup_config,
-                     identity_port=identity_port, credential_store=credential_store, clock=clock,
-                     tiled_save=tiled_save)
+                     identity_port=identity_port, credential_store=credential_store, clock=clock)
     runtime = app.state.f2w_access
     settings = runtime.settings
     if operations is None:
@@ -233,6 +235,7 @@ def create_api_app(
     review.install(app)
     publications.install(app)
     status.install(app)
+    capabilities.install(app)
     if judge_settings is None:
         judge_settings = JudgeModelService(JudgeModelStore(judge_settings_path(Path(cfg.workdir))))
     app.state.f2w_judge_settings = judge_settings

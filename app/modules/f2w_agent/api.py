@@ -2583,14 +2583,13 @@ _TILED_SAVE_NO_SPLASH = _NoSplash()
 class AgentPipelineService:
     """Reusable in-process orchestrated pipeline for HTTP chat requests."""
 
-    def __init__(self, cfg: CoordinatorConfig, tiled_save: SaveTarget | None = None) -> None:
-        """Initialize coordinator, session state, runtime settings, and agents.
-
-        ``tiled_save`` (T18D) routes the UI Save to a journaled multi-write on Tiled and the session graph to the
-        effective record; ``None`` keeps the previous behaviour.
-        """
+    def __init__(self, cfg: CoordinatorConfig) -> None:
+        """Initialize coordinator, session state, runtime settings, and agents."""
         self.cfg = cfg
-        self.tiled_save: TiledSaveBackend | None = TiledSaveBackend(tiled_save) if tiled_save is not None else None
+        #: T18D: a ``SaveTarget`` in ``cfg.tiled_save`` (set by ``create_api_app(tiled_save=...)``) routes the UI
+        #: Save and the session graph to Tiled from the first line of startup, so no Splash call is ever made.
+        target = getattr(cfg, "tiled_save", None)
+        self.tiled_save: TiledSaveBackend | None = TiledSaveBackend(target) if target is not None else None
         self.coord = Coordinator(cfg)
         self.memory = SessionMemory(self.coord.workdir / "session_memory.json")
         self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
@@ -3194,6 +3193,16 @@ class AgentPipelineService:
         if kg is None:
             return GraphPayload(nodes=[], edges=[], source_path="tiled://graphql")
         return graph_neighborhood_from_lookup(kg, node_id)
+
+    def attach_tiled_save(self, target: SaveTarget) -> None:
+        """Route the UI Save to a journaled multi-write on Tiled and the session graph to the effective record.
+
+        The session graph file is rebuilt from the active snapshot plus the in-flight journal entries and the agents
+        are rebuilt over it, so a restart after a crash shows the journaled edit before any recovery has run.
+        """
+        self.tiled_save = TiledSaveBackend(target)
+        self._sync_session_graph_from_splash()
+        self._rebuild_agents()
 
     @property
     def _splash(self) -> Any:
@@ -6649,13 +6658,11 @@ def create_app(
     identity_port: Any | None = None,
     credential_store: Any | None = None,
     clock: Callable[[], Any] | None = None,
-    tiled_save: SaveTarget | None = None,
 ) -> FastAPI:
     """Build the FastAPI app with CORS and agent pipeline routes.
 
-    ``tiled_save`` (T18D): a :class:`~app.modules.graph.legacy_save.SaveTarget`. With it ``PATCH /graph/node``
-    is a journaled multi-write on Tiled with no Splash call, and ``/graph``, search and retrieval read the
-    active snapshot plus in-flight journal entries; without it the route behaves as before.
+    The signature is pinned (``tests/api_v1/test_v1_local.py``). A Tiled save target (T18D) travels on the
+    launcher's config as ``cfg.tiled_save`` (``create_api_app(tiled_save=...)`` sets it).
 
     Access (T18B): ``deployment`` (``DeploymentSettings``) or ``startup_config``
     (``os.environ`` when ``None``, profile ``local`` when unset) selects the profile
@@ -6671,7 +6678,7 @@ def create_app(
         startup_config=startup_config, identity_port=identity_port, credential_store=credential_store,
         clock=clock,
     )
-    service = AgentPipelineService(cfg, tiled_save=tiled_save)
+    service = AgentPipelineService(cfg)
     app.state.f2w_agent_service = service
     service.personal_settings = guard.personal_settings  # T25D: None on :local
     guard.check_service(service)
