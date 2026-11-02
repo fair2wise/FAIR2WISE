@@ -55,8 +55,35 @@ KNOWN_QUIRKS: dict[str, tuple[str, ...]] = {
         "entity-accessBlob-not-readable",
         # No uniqueness on entity uri: two createEntity calls with one uri both succeed.
         "entity-uri-not-unique",
+        # T20C P1/P2: links reference entities with ondelete=CASCADE on both ends (graph/orm.py),
+        # so deleteEntity deletes every attached link, including links of other owners and links
+        # the caller cannot read under TagBasedAccessPolicy.
+        "deleteEntity-cascades-foreign-links",
+        # T20C P6: _modify_access_blob returns the current blob when no policy is configured, so an
+        # accessBlob change in updateEntity/updateLink is silently ignored (other fields still apply).
+        "accessBlob-update-ignored-without-policy",
     ),
 }
+
+#: Edit-relevant behaviour of the pinned build that introspection cannot reveal (T20C, probes P1-P9 in
+#: ``tests/tiled/test_tiled_edit_facts_0218.py``). Keyed by ``library_version``; an unknown version gets
+#: the fail-closed defaults in :func:`known_behaviour` (cascade assumed, blob updates assumed ineffective).
+KNOWN_BEHAVIOUR: dict[str, dict[str, bool]] = {
+    "0.2.18": {
+        # P1/P2: deleteEntity deletes attached links of every owner (database cascade). The T08D purge
+        # therefore reads an entity's links immediately before each delete and refuses on any foreign link.
+        "delete_cascades_foreign_links": True,
+        # P6: without an access policy a new accessBlob is silently ignored; with a policy, the policy
+        # decides. F2W sets tags once at creation and never relies on changing them (editing plan 1.2.4).
+        "blob_update_effective": False,
+    },
+}
+FAIL_CLOSED_BEHAVIOUR: dict[str, bool] = {"delete_cascades_foreign_links": True, "blob_update_effective": False}
+
+
+def known_behaviour(version: str) -> dict[str, bool]:
+    """Return :data:`KNOWN_BEHAVIOUR` for ``version``, or the fail-closed defaults for an unknown build."""
+    return dict(KNOWN_BEHAVIOUR.get(version, FAIL_CLOSED_BEHAVIOUR))
 
 
 class TiledTargetUnavailable(TiledDeploymentError):
@@ -107,6 +134,10 @@ class CapabilityReport:
         writer_roles: Role names from ``whoami``.
         read_probe: ``ok``, ``empty`` or ``unsigned`` (C6).
         quirks: :data:`KNOWN_QUIRKS` for this version.
+        delete_cascades_foreign_links: ``deleteEntity`` deletes attached links of other owners too
+            (T20C P1/P2; ``True`` on 0.2.18 and for unknown builds).
+        blob_update_effective: an ``accessBlob`` change in an update takes effect without an access
+            policy (T20C P6; ``False`` on 0.2.18 and for unknown builds).
         capability_hash: SHA-256 over version and schema surface.
     """
 
@@ -126,6 +157,8 @@ class CapabilityReport:
     writer_roles: tuple[str, ...] = ()
     read_probe: str = "unsigned"
     quirks: tuple[str, ...] = ()
+    delete_cascades_foreign_links: bool = True
+    blob_update_effective: bool = False
     capability_hash: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -303,6 +336,7 @@ def check_capabilities(
         "update_link": update_link,
     }
     digest = hashlib.sha256(json.dumps(surface, sort_keys=True).encode()).hexdigest()
+    behaviour = known_behaviour(version)
     return CapabilityReport(
         url=base,
         library_version=version,
@@ -320,6 +354,8 @@ def check_capabilities(
         writer_roles=writer_roles,
         read_probe=read_probe,
         quirks=KNOWN_QUIRKS.get(version, ()),
+        delete_cascades_foreign_links=behaviour["delete_cascades_foreign_links"],
+        blob_update_effective=behaviour["blob_update_effective"],
         capability_hash=digest,
     )
 
