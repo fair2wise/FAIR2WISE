@@ -45,7 +45,7 @@ def test_every_route_is_declared_and_v1_matches_the_policy_table(local):
     routes = _routes(local.app)
     v1 = {r for r in routes if r[1].startswith(V1_PREFIX + "/")}
     assert v1 == {(p.method, p.path) for p in API_ROUTE_POLICIES}
-    assert len(API_ROUTE_POLICIES) == len({p.route_id for p in API_ROUTE_POLICIES}) == 31
+    assert len(API_ROUTE_POLICIES) == len({p.route_id for p in API_ROUTE_POLICIES}) == 41
     legacy = {(p.method, p.path) for p in ROUTE_POLICIES if p.surface == AGENT_SURFACE}
     assert len(legacy) == 19 and legacy <= routes  # the 19 UI routes are still served
     assert routes - v1 - legacy == {("GET", "/docs"), ("GET", "/docs/oauth2-redirect"), ("GET", "/redoc"),
@@ -293,6 +293,100 @@ def test_case_review_is_bound_to_the_revision_and_audited(local):
     assert any(e.kind == "case_review" for _s, e in local.audit_log.events())
     summary = c.get("/v1/curation/summary").json()
     assert summary["cases"] and "budget" in summary
+
+
+def test_bulk_review_reports_one_result_per_case(local):
+    """T31 (B5): every decision runs through review_case; a refused item does not stop the others."""
+    store = local.ops.curation
+    ids = []
+    for _ in range(2):
+        case_id, _new = store.enqueue(make_case(evidence="e" * 1000, payload={"surface": f"T{len(ids)}",
+                                                                            "category": "technique"}))
+        ids.append(case_id)
+    leased = store.claim("triage", [CORPUS], limit=2)
+    for row in leased:
+        store.route_case(row["id"], row["lease_token"], "human", state=CaseState.NEEDS_REVIEW)
+    c = local.client()
+    revisions = {cid: c.get(f"/v1/curation/cases/{cid}").json()["case"]["revision"] for cid in ids}
+    body = {"decisions": [
+        {"case_id": ids[0], "bound_revision": revisions[ids[0]], "accept": False, "reason": "not a term"},
+        {"case_id": ids[1], "bound_revision": "stale", "accept": False},
+        {"case_id": "case-missing", "bound_revision": "r", "accept": False},
+    ]}
+    resp = c.post("/v1/curation/cases/bulk-review", json=body)
+    assert resp.status_code == 200, resp.text
+    out = resp.json()
+    assert (out["accepted"], out["rejected"], out["failed"]) == (0, 1, 2), out
+    assert [r["status"] for r in out["results"]] == ["ok", "error", "error"]
+    assert out["results"][0]["case"]["resolved_by"] == "local-operator"
+    assert len(out["results"][0]["case"]["evidence"]) == 600 and "lease_token" not in out["results"][0]["case"]
+    assert out["results"][1]["code"] == "stale_approval" and out["results"][2]["code"] == "not_found"
+    assert store.get_case(ids[1], [CORPUS])["state"] == CaseState.NEEDS_REVIEW.value  # untouched
+    assert sum(e.kind == "case_review" for _s, e in local.audit_log.events()) >= 1
+    assert c.post("/v1/curation/cases/bulk-review", json={"decisions": []}).status_code == 422
+    too_many = {"decisions": [{"case_id": "x", "bound_revision": "r", "accept": False}] * 201}
+    assert c.post("/v1/curation/cases/bulk-review", json=too_many).status_code == 422
+
+
+def test_cost_control_read_set_and_audit(local):
+    """T31 (B5): the donor cborg_control switch and cap, read with the ledger spend, set under audit."""
+    c = local.client()
+    shown = c.get("/v1/curation/cost-control").json()
+    assert shown["configured"] is True and shown["enabled"] is False and shown["budget_cap_usd"] is None
+    assert shown["spend"]["charged_usd"] == 0 and shown["spend"]["cap_exceeded"] is False
+    saved = c.put("/v1/curation/cost-control", json={"enabled": True, "budget_cap_usd": 0.5})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["enabled"] is True and saved.json()["budget_cap_usd"] == 0.5
+    assert saved.json()["spend"]["cap_usd"] == 0.5
+    local.ops.curation.ledger.reserve(corpus=CORPUS, case_id=None, model="m", amount_usd=0.75, cap_usd=None)
+    again = c.get("/v1/curation/cost-control").json()
+    assert again["spend"]["reserved_usd"] == 0.75 and again["spend"]["cap_exceeded"] is True
+    assert c.put("/v1/curation/cost-control", json={"enabled": True, "budget_cap_usd": -1}).status_code == 422
+    assert c.put("/v1/curation/cost-control", json={"enabled": True, "budget_cap_usd": 1, "x": 1}).status_code == 422
+    cleared = c.put("/v1/curation/cost-control", json={"enabled": False, "budget_cap_usd": None}).json()
+    assert cleared["enabled"] is False and cleared["budget_cap_usd"] is None
+    assert sum(e.kind == "cost_control" for _s, e in local.audit_log.events()) == 4  # intent + outcome, twice
+    assert not (local.ops.control_path.read_text()).startswith("{\n")  # one atomic JSON document
+
+
+def test_vocabulary_quality_lists_snapshots_newest_first(local):
+    """T31 (B5): the C-16 snapshot history behind a read route (counts only)."""
+    from datetime import UTC, datetime
+
+    from app.modules.canonicalization.quality_snapshots import summarise, write_snapshot
+
+    c = local.client()
+    assert c.get("/v1/vocabulary/quality").json() == {"snapshots": [], "count": 0, "latest": None}
+    report = {"candidate_nodes": 10, "candidate_terms": 12, "by_class": {"technique": 7}, "canonical_vocabulary_entries": 3,
+              "source_revision": "src1", "vocabulary_revision": "v1"}
+    write_snapshot(local.ops.quality_dir, summarise(report), taken_at=datetime(2026, 10, 1, tzinfo=UTC))
+    write_snapshot(local.ops.quality_dir, summarise({**report, "candidate_terms": 14}),
+                   taken_at=datetime(2026, 10, 2, tzinfo=UTC))
+    out = c.get("/v1/vocabulary/quality").json()
+    assert out["count"] == 2 and out["latest"]["summary"]["candidate"]["terms"] == 14
+    assert [s["summary"]["candidate"]["terms"] for s in out["snapshots"]] == [14, 12]
+    assert out["snapshots"][0]["summary"]["canonical"] == {"vocabulary_entries": 3}
+    assert c.get("/v1/vocabulary/quality", params={"limit": 1}).json()["count"] == 1
+
+
+def test_figure_scale_records_local_flow(local):
+    """T31 (B5): a human-read scale is recorded, listed and read back; nothing but ids and numbers is stored."""
+    c = local.client()
+    body = {"corpus": CORPUS, "work_id": "10.1/x", "figure_id": "fig3", "panel_index": 0, "nm_per_px": 1.5,
+            "bar_length_px": 100, "bar_length_nm": 150, "note": "bar read at /abs/private/dir/figure.png"}
+    created = c.post("/v1/figures/scales", json=body)
+    assert created.status_code == 200, created.text
+    record = created.json()["record"]
+    assert record["id"].startswith("fsc-") and record["recorded_by"] == "local-operator"
+    assert "/abs/private" not in created.text  # the note passes the projector (paths opaque)
+    assert c.post("/v1/figures/scales", json={**body, "nm_per_px": 0}).status_code == 422
+    assert c.post("/v1/figures/scales", json={**body, "length_source": "guess"}).status_code == 422
+    listed = c.get("/v1/figures/scales", params={"work_id": "10.1/x", "figure_id": "fig3"}).json()["records"]
+    assert [r["id"] for r in listed] == [record["id"]]
+    assert c.get("/v1/figures/scales", params={"corpus": "other"}).json() == {"records": []}
+    assert c.get(f"/v1/figures/scales/{record['id']}").json()["record"]["bar_length_nm"] == 150
+    assert c.get("/v1/figures/scales/fsc-missing").status_code == 404
+    assert any(e.kind == "figure_scale" for _s, e in local.audit_log.events())
 
 
 def test_cost_approval_create_and_revoke(local):

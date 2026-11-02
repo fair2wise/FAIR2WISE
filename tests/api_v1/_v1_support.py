@@ -142,7 +142,8 @@ def _build(monkeypatch: Any, tmp_path: Path, settings: DeploymentSettings, *, po
     gate = PublicationGate(frozenset({settings.tiled_target + "/api#f2w"})) if rehearsal else PublicationGate()
     curation = CurationStore(tmp_path / "cur.sqlite3", clock=epoch)
     ops = F2WOperations(settings, jobs, publication=pub, curation=curation,
-                        audit=audit, identity_port=port, publication_gate=gate, clock=clock)
+                        audit=audit, identity_port=port, publication_gate=gate, clock=clock,
+                        control_path=tmp_path / "cost_control.json", quality_dir=tmp_path / "vocab_quality")
     app = create_api_app(make_cfg(ctx), deployment=settings, identity_port=port, credential_store=store,
                          clock=clock, operations=ops,
                          **{"sse_poll_seconds": 0.01, "sse_max_seconds": 2.0, **app_kw})

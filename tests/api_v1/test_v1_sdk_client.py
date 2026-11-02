@@ -157,3 +157,37 @@ def test_without_operations_the_methods_are_unsupported_and_mismatched_settings_
     local_app = F2WApplication(settings=local_settings(), retrieval=LegacyRetrievalService(StubAgent(SUCCESS)))
     with pytest.raises(ValueError):
         public.F2WClient(local_app, operations=als.ops)
+
+
+def test_t31_methods_apply_the_same_policy_as_http(als):
+    """Mirrors the T31 rows of test_ordinary_user_is_refused_every_privileged_action_before_effects."""
+    with _client(als) as client:
+        user, admin = _ctx(als, "user"), _ctx(als, "admin")
+        _refused(lambda: client.cost_control(user))
+        _refused(lambda: client.set_cost_control(user, enabled=True, budget_cap_usd=1.0))
+        _refused(lambda: client.bulk_review(user, [{"case_id": "c", "bound_revision": "r", "accept": False}]))
+        _refused(lambda: client.record_figure_scale(user, corpus="rsoxs", work_id="w", figure_id="f",
+                                                    panel_index=0, nm_per_px=1.0))
+        _refused(lambda: client.folder_roots(admin))  # T32: never off :local
+        assert client.figure_scales(user) == [] and client.vocabulary_quality(user)["count"] == 0
+        record = client.record_figure_scale(admin, corpus="rsoxs", work_id="w", figure_id="f", panel_index=0,
+                                            nm_per_px=1.0)
+        assert client.figure_scale(user, record["id"]) == record
+        _refused(lambda: client.figure_scales(user, corpus="other"))
+        saved = client.set_cost_control(admin, enabled=True, budget_cap_usd=2.0)
+        assert saved["enabled"] is True and client.cost_control(admin)["budget_cap_usd"] == 2.0
+
+
+def test_local_operator_browses_folders_through_the_sdk(monkeypatch, tmp_path):
+    from _v1_support import build_local
+
+    from app.api.folders import FolderRoots
+
+    (tmp_path / "papers" / "sub").mkdir(parents=True)
+    local = build_local(monkeypatch, tmp_path, folder_roots=FolderRoots.from_paths({"papers": tmp_path / "papers"}))
+    with _client(local) as client:
+        ctx = client.context_for()
+        assert client.folder_roots(ctx) == {"roots": [{"root": "papers", "exists": True}]}
+        assert [e["name"] for e in client.list_folder(ctx, "papers")["entries"]] == ["sub"]
+        assert client.folder_index(ctx, "papers", "sub")["documents"] == []
+        _refused(lambda: client.list_folder(ctx, "papers", ".."), ErrorCode.INVALID_INPUT)

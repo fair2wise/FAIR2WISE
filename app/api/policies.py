@@ -1,4 +1,4 @@
-"""Declared access policy for the versioned ``/v1`` routes of ``app/api/main.py`` (tasks T14, T19E).
+"""Declared access policy for the versioned ``/v1`` routes of ``app/api/main.py`` (tasks T14, T19E, T31, T32).
 
 The 34 inventoried routes and the ALS sign-in handlers keep their policies in
 :mod:`app.modules.security.authorization`. This module adds the T14 routes with the same
@@ -18,6 +18,9 @@ Rules (docs/migration/api/README.md section 3):
   any effect (:func:`app.api.auth.fresh_request_context`).
 * **Signed in.** On ALS every ``/v1`` route needs a verified caller (none is public). On
   ``:local`` the caller is the local operator with every capability (D34).
+* **``:local`` only.** A policy with ``on_als=False`` (the T32 folder routes) is registered by
+  the factory on the local profile only; ALS profiles answer 404 for it
+  (:func:`local_only_policies`).
 """
 
 from __future__ import annotations
@@ -36,12 +39,16 @@ _OBJ = "object policy in JobService (creator or jobs.admin, corpus scope)"
 _FRESH = "; handler re-runs the ALS role check before the effect"
 
 
-def _v(route_id: str, method: str, path: str, *caps: str, note: str = "") -> RoutePolicy:
-    """Build one ``/v1`` policy, validating capability names."""
+def _v(route_id: str, method: str, path: str, *caps: str, note: str = "", on_als: bool = True) -> RoutePolicy:
+    """Build one ``/v1`` policy, validating capability names.
+
+    ``on_als=False`` marks a ``:local``-only route (T32): the factory does not register it on an
+    ALS profile, so it answers a plain 404 there, and the policy refuses it should it ever be mounted.
+    """
     unknown = set(caps) - CAPABILITIES
     if unknown:
         raise ValueError(f"unknown capabilities: {sorted(unknown)}")
-    return RoutePolicy(route_id, API_SURFACE, method, V1_PREFIX + path, frozenset(caps), note=note)
+    return RoutePolicy(route_id, API_SURFACE, method, V1_PREFIX + path, frozenset(caps), note=note, on_als=on_als)
 
 
 #: Every ``/v1`` route (route_id, method, path, entry capabilities, note).
@@ -90,6 +97,27 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V30", "POST", "/operations/jobs", "ops.run",
        note="submit a knowledge_operation job (whole population, no inline bound)" + _FRESH),
     _v("V31", "GET", "/operations/jobs/{job_id}", note=_OBJ + "; bounded report of a knowledge_operation job"),
+    # T31 (owner decision B5, O-P4): cost control, bulk review, vocabulary quality, figure-scale records
+    _v("V32", "GET", "/curation/cost-control", "curation.approve",
+       note="remote-cost switch and cap (donor cborg_control) with the ledger spend against the cap"),
+    _v("V33", "PUT", "/curation/cost-control", "curation.approve",
+       note="set the switch and cap: human only, write-ahead audited" + _FRESH),
+    _v("V34", "POST", "/curation/cases/bulk-review", "curation.approve",
+       note="review_case per item (human only, bound to each shown revision, audited); results per case"),
+    _v("V35", "GET", "/vocabulary/quality", "chat.read_support",
+       note="vocabulary-quality snapshot history: counts only, newest first, bounded"),
+    _v("V36", "GET", "/figures/scales", "chat.read_support",
+       note="human-read figure-scale records within the caller's corpus scope; no image, crop or path"),
+    _v("V37", "POST", "/figures/scales", "curation.approve",
+       note="record a human-read scale: human only, corpus in scope, write-ahead audited" + _FRESH),
+    _v("V38", "GET", "/figures/scales/{record_id}", "chat.read_support", note="one record; outside scope is 404"),
+    # T32 (owner decision B4, O-P4): folder browse/index over F2W_FOLDER_ROOTS, mounted on :local only
+    _v("V39", "GET", "/folders/roots", "ingest.acquire", on_als=False,
+       note="root labels only; not registered on ALS profiles (404)"),
+    _v("V40", "GET", "/folders/list", "ingest.acquire", on_als=False,
+       note="entries of one folder under a configured root; traversal and links refused as 404"),
+    _v("V41", "GET", "/folders/index", "ingest.acquire", on_als=False,
+       note="bounded document inventory under one folder (read only; ingest is a job)"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.
@@ -103,4 +131,10 @@ def api_route_policy(method: str, path: str) -> RoutePolicy | None:
     return API_ROUTE_CAPABILITIES.get((method.upper(), path))
 
 
-__all__ = ("API_ROUTE_CAPABILITIES", "API_ROUTE_POLICIES", "API_SURFACE", "V1_PREFIX", "api_route_policy")
+def local_only_policies() -> tuple[RoutePolicy, ...]:
+    """The ``/v1`` policies served on the local profile only (not registered on ALS)."""
+    return tuple(p for p in API_ROUTE_POLICIES if not p.on_als)
+
+
+__all__ = ("API_ROUTE_CAPABILITIES", "API_ROUTE_POLICIES", "API_SURFACE", "V1_PREFIX", "api_route_policy",
+           "local_only_policies")

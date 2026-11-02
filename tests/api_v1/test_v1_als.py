@@ -28,7 +28,7 @@ FORGED = {"X-Local-Trusted": "1", "X-F2W-Is-Admin": "true", "X-F2W-Mode": "local
 
 def _sample(path):
     return (path.replace("{job_id}", "job-x").replace("{case_id}", "case-x")
-            .replace("{approval_id}", "appr-x"))
+            .replace("{approval_id}", "appr-x").replace("{record_id}", "fsc-x"))
 
 
 def _call(client, policy):
@@ -59,12 +59,48 @@ def _to_review(als):
 
 
 def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
+    """Every ALS-exposed route: 401. A ``:local``-only route (T32 folders) is not registered: plain 404."""
     anon = als.client("anon")
+    local_only = 0
     for policy in API_ROUTE_POLICIES:
         resp = _call(anon, policy)
+        if not policy.on_als:
+            local_only += 1
+            assert resp.status_code == 404 and resp.json() == {"detail": "Not Found"}, (policy.route_id, resp.text)
+            continue
         assert resp.status_code == 401, (policy.route_id, resp.status_code, resp.text)
         assert resp.json()["code"] == "sign_in_required"
+    assert local_only == 3 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
+        "/v1/folders/roots", "/v1/folders/list", "/v1/folders/index"}
     assert als.ops.jobs.store.list_jobs() == []
+
+
+def test_folder_routes_are_absent_on_als_whoever_calls(monkeypatch, tmp_path, caplog):
+    """T32 (B4): no folder route exists on an ALS profile, even for a verified admin, even when
+    ``F2W_FOLDER_ROOTS`` is set in the startup environment (ignored with a warning)."""
+    import logging
+
+    from _v1_support import build_als
+
+    from app.api.folders import FolderRoots
+
+    roots = FolderRoots.from_paths({"papers": tmp_path / "papers"})
+    (tmp_path / "papers").mkdir()
+    with caplog.at_level(logging.WARNING, logger="app.api.main"):
+        als = build_als(monkeypatch, tmp_path, folder_roots=roots,
+                        after_install=lambda mp: mp.setenv("F2W_FOLDER_ROOTS", str(tmp_path / "papers")))
+    assert als.ops.folders is None  # never attached off :local
+    assert any("F2W_FOLDER_ROOTS is ignored" in r.getMessage() for r in caplog.records)
+    for who in ("anon", "user", "admin"):
+        c = als.client(who)
+        for path in ("/v1/folders/roots", "/v1/folders/list?root=papers", "/v1/folders/index?root=papers"):
+            resp = c.get(path)
+            assert resp.status_code == 404 and resp.json() == {"detail": "Not Found"}, (who, path, resp.text)
+            assert "papers" not in resp.text and str(tmp_path) not in resp.text
+    # The SDK path refuses too: the shared operations know the profile.
+    with pytest.raises(ContractError) as err:
+        als.ops.folder_roots(_ctx(als, "admin"))
+    assert err.value.code is ErrorCode.DENIED
 
 
 @pytest.mark.parametrize("headers", [None, FORGED])
@@ -81,15 +117,27 @@ def test_ordinary_user_is_refused_every_privileged_action_before_effects(als, he
         ("POST", "/v1/curation/cost-approvals/appr-x/revoke", None),
         ("GET", "/v1/curation/cases", None), ("GET", "/v1/curation/summary", None),
         ("GET", "/v1/audit/status", None), ("GET", "/v1/ops/status", None),
+        # T31 (B5): cost control, bulk review and recording a scale are curation.approve
+        ("GET", "/v1/curation/cost-control", None),
+        ("PUT", "/v1/curation/cost-control", {"enabled": True, "budget_cap_usd": 5}),
+        ("POST", "/v1/curation/cases/bulk-review",
+         {"decisions": [{"case_id": "case-x", "bound_revision": "r", "accept": False}]}),
+        ("POST", "/v1/figures/scales", {"corpus": CORPUS, "work_id": "10.1/x", "figure_id": "fig1",
+                                        "panel_index": 0, "nm_per_px": 2.5}),
     ]
     for method, path, body in privileged:
         resp = user.request(method, path, json=body)
         assert resp.status_code == 403, (path, resp.status_code, resp.text)
         assert resp.json()["code"] == "denied"
     assert als.ops.jobs.store.list_jobs() == [] and als.tiled.writes == []
+    assert als.ops.scales.list_records([CORPUS]) == [] and not (als.ops.control_path).exists()
     assert user.get("/v1/jobs").json() == {"jobs": []}
     pointer = user.get("/v1/publications/pointer", params={"target": als.target})
     assert pointer.status_code == 200 and pointer.json() == {"pointer": None}  # chat.read_support
+    # T31 reads for any signed-in user (chat.read_support): vocabulary quality and figure-scale records
+    assert user.get("/v1/vocabulary/quality").json() == {"snapshots": [], "count": 0, "latest": None}
+    assert user.get("/v1/figures/scales").json() == {"records": []}
+    assert user.get("/v1/figures/scales/fsc-x").status_code == 404
 
 
 def test_admin_publishes_to_the_rehearsal_target_with_an_als_approval(als):
@@ -137,6 +185,14 @@ def test_sdk_calls_apply_the_same_policy_as_http(als):
         lambda: als.ops.audit_status(user),
         lambda: als.ops.ops_status(user),
         lambda: als.ops.revoke_cost_approval(user, "appr-x"),
+        # T31
+        lambda: als.ops.cost_control(user),
+        lambda: als.ops.set_cost_control(user, enabled=True, budget_cap_usd=1.0),
+        lambda: als.ops.bulk_review(user, [{"case_id": "c", "bound_revision": "r", "accept": False}]),
+        lambda: als.ops.record_figure_scale(user, corpus=CORPUS, work_id="w", figure_id="f", panel_index=0,
+                                            nm_per_px=1.0),
+        # T32: folders are a :local feature, whoever asks
+        lambda: als.ops.folder_roots(admin),
     ]
     for call in refusals:
         with pytest.raises(ContractError) as err:
@@ -210,3 +266,43 @@ def test_credential_for_another_tiled_is_rejected(als):
     als.store.sessions["cookie-admin"] = TiledCredential("token-admin", tiled_target="http://127.0.0.1:1")
     resp = als.client("admin").get("/v1/jobs")
     assert resp.status_code == 401
+
+
+# ------------------------------------------------------------------ T31 on ALS: scope and audit
+
+
+def test_admin_records_a_figure_scale_in_scope_and_every_user_reads_it(als):
+    admin, user = als.client("admin"), als.client("user")
+    body = {"corpus": CORPUS, "work_id": "10.1/x", "figure_id": "fig2", "panel_index": 1, "nm_per_px": 3.25,
+            "bar_length_px": 80, "bar_length_nm": 260, "note": "read from the 200 nm bar"}
+    outside = admin.post("/v1/figures/scales", json={**body, "corpus": "other"})
+    assert outside.status_code == 403 and outside.json()["code"] == "denied"  # corpus outside the ALS scope
+    created = admin.post("/v1/figures/scales", json=body)
+    assert created.status_code == 200, created.text
+    record = created.json()["record"]
+    assert record["recorded_by"] == "uuid-admin" and record["length_source"] == "human"
+    assert "token-admin" not in created.text and "cookie-admin" not in created.text
+    assert [r["id"] for r in user.get("/v1/figures/scales", params={"work_id": "10.1/x"}).json()["records"]] == [
+        record["id"]]
+    assert user.get(f"/v1/figures/scales/{record['id']}").json()["record"]["nm_per_px"] == 3.25
+    denied = user.get("/v1/figures/scales", params={"corpus": "other"})
+    assert denied.status_code == 403  # a corpus outside a non-empty scope is denied (T19C rule)
+    kinds = [e.kind for _s, e in als.audit_log.events()]
+    assert "figure_scale" in kinds
+
+
+def test_admin_sets_the_cost_control_with_a_fresh_role_check(als):
+    admin = als.client("admin")
+    before = len(als.port.calls)
+    shown = admin.get("/v1/curation/cost-control").json()
+    assert shown == {"configured": True, "enabled": False, "budget_cap_usd": None,
+                     "spend": {**shown["spend"], "cap_usd": None, "cap_exceeded": False}}
+    saved = admin.put("/v1/curation/cost-control", json={"enabled": True, "budget_cap_usd": 12.5})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["enabled"] is True and saved.json()["budget_cap_usd"] == 12.5
+    assert saved.json()["spend"]["cap_usd"] == 12.5
+    assert len(als.port.calls) > before  # fresh role check on the mutation
+    als.port.tokens["token-admin"].roles = ("user",)
+    refused = admin.put("/v1/curation/cost-control", json={"enabled": False, "budget_cap_usd": None})
+    assert refused.status_code == 403
+    assert admin.get("/v1/curation/cost-control").status_code == 403  # the read is curation.approve too

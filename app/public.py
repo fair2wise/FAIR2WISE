@@ -19,6 +19,12 @@ the methods that exist today are implemented:
   :meth:`~F2WClient.submit_knowledge_operation` and :meth:`~F2WClient.knowledge_job_result`
   (T19E): the five T19C Knowledge Operations, forwarded unchanged to the same
   ``F2WOperations`` (``/v1/operations/...``); the typed result is the agent Tool's;
+- :meth:`F2WClient.cost_control`, :meth:`~F2WClient.set_cost_control`, :meth:`~F2WClient.bulk_review`,
+  :meth:`~F2WClient.vocabulary_quality`, :meth:`~F2WClient.figure_scales`,
+  :meth:`~F2WClient.figure_scale`, :meth:`~F2WClient.record_figure_scale` (T31) and
+  :meth:`~F2WClient.folder_roots`, :meth:`~F2WClient.list_folder`, :meth:`~F2WClient.folder_index`
+  (T32, ``:local`` only): forwarded unchanged to the same ``F2WOperations`` as the matching
+  ``/v1`` routes;
 - :meth:`F2WClient.search_literature`, :meth:`~F2WClient.resolve_work`,
   :meth:`~F2WClient.read_paper` and :meth:`~F2WClient.read_section` (T15 over T05): the
   ``lit_*`` tools of the application's ``LiteratureToolset`` run through the same
@@ -309,6 +315,55 @@ class F2WClient:
     def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> Any:
         """Handle and bounded report of a ``knowledge_operation`` job (``GET /v1/operations/jobs/{id}``)."""
         return self._operations("knowledge_job_result").knowledge_job_result(ctx, job_id)
+
+    # -- T31/T32: cost control, bulk review, vocabulary quality, figure scales, folders (same policy as /v1) --
+
+    def cost_control(self, ctx: RequestContext) -> Any:
+        """The remote-cost switch and cap with the ledger spend (``GET /v1/curation/cost-control``)."""
+        return self._operations("cost_control").cost_control(ctx)
+
+    def set_cost_control(self, ctx: RequestContext, *, enabled: bool, budget_cap_usd: float | None) -> Any:
+        """Set the remote-cost switch and cap (``PUT /v1/curation/cost-control``; human, audited)."""
+        return self._operations("set_cost_control").set_cost_control(ctx, enabled=enabled,
+                                                                     budget_cap_usd=budget_cap_usd)
+
+    def bulk_review(self, ctx: RequestContext, decisions: Sequence[Mapping[str, Any]]) -> Any:
+        """Review several cases at once (``POST /v1/curation/cases/bulk-review``); one result per case."""
+        return self._operations("bulk_review").bulk_review(ctx, decisions)
+
+    def vocabulary_quality(self, ctx: RequestContext, *, limit: int = 30) -> Any:
+        """Newest-first vocabulary-quality snapshots (``GET /v1/vocabulary/quality``)."""
+        return self._operations("vocabulary_quality").vocabulary_quality(ctx, limit=limit)
+
+    def figure_scales(self, ctx: RequestContext, *, corpus: str | None = None, work_id: str | None = None,
+                      figure_id: str | None = None, limit: int = 100) -> Any:
+        """Human-read figure-scale records in the caller's scope (``GET /v1/figures/scales``)."""
+        return self._operations("figure_scales").list_figure_scales(ctx, corpus=corpus, work_id=work_id,
+                                                                    figure_id=figure_id, limit=limit)
+
+    def figure_scale(self, ctx: RequestContext, record_id: str) -> Any:
+        """One figure-scale record (``GET /v1/figures/scales/{id}``)."""
+        return self._operations("figure_scale").get_figure_scale(ctx, record_id)
+
+    def record_figure_scale(self, ctx: RequestContext, **fields: Any) -> Any:
+        """Record a human-read scale (``POST /v1/figures/scales``; human, ``curation.approve``, audited).
+
+        ``fields`` are those of ``F2WOperations.record_figure_scale``: ``corpus``, ``work_id``,
+        ``figure_id``, ``panel_index``, ``nm_per_px`` and the optional bar lengths, source and note.
+        """
+        return self._operations("record_figure_scale").record_figure_scale(ctx, **fields)
+
+    def folder_roots(self, ctx: RequestContext) -> Any:
+        """The configured folder root labels (``GET /v1/folders/roots``; ``:local`` only)."""
+        return self._operations("folder_roots").folder_roots(ctx)
+
+    def list_folder(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 1000) -> Any:
+        """Entries of one folder under a configured root (``GET /v1/folders/list``; ``:local`` only)."""
+        return self._operations("list_folder").list_folder(ctx, root, path, limit=limit)
+
+    def folder_index(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 500) -> Any:
+        """Bounded document inventory under one folder (``GET /v1/folders/index``; ``:local`` only)."""
+        return self._operations("folder_index").folder_index(ctx, root, path, limit=limit)
 
     # -- literature (T15 over the T05 lit_* tools, through the application's executor) ----------------
 

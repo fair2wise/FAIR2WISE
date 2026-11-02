@@ -192,6 +192,7 @@ def test_forbidden_names_cover_the_app_rules(name):
     assert set(tiled_config._SECRET_VALUE_VARS) <= forbidden
     if name in ALS:
         assert set(tiled_config._MANAGED_ONLY_VARS) <= forbidden and "F2W_LOCAL_BIND" in forbidden
+        assert "F2W_FOLDER_ROOTS" in forbidden  # T32 (B4): folder browsing is a :local feature
     else:
         assert "F2W_TILED_URL" in forbidden
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -40,6 +41,77 @@ def test_cli_prints_json_from_the_shared_operations(tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["kinds"] == []
     assert cli.main(["--root", root, "jobs", "get", "job-missing"], environ={}) == 2
     assert json.loads(capsys.readouterr().err)["code"] == "not_found"
+
+
+def test_cli_t31_commands_cost_scales_vocab_and_bulk_review(tmp_path, capsys):
+    """T31 (B5): the CLI wrappers call the same operations as /v1 with the local-operator context."""
+    root = str(tmp_path / "ops")
+
+    def run(*argv):
+        code = cli.main(["--root", root, *argv], environ={})
+        out = capsys.readouterr()
+        return code, json.loads(out.out or out.err)
+
+    code, shown = run("cost", "show")
+    assert code == 0 and shown["configured"] and shown["enabled"] is False and shown["budget_cap_usd"] is None
+    code, saved = run("cost", "set", "--enable", "--cap-usd", "3")
+    assert code == 0 and saved["enabled"] is True and saved["budget_cap_usd"] == 3.0
+    code, cleared = run("cost", "set", "--disable", "--no-cap")
+    assert code == 0 and cleared["enabled"] is False and cleared["budget_cap_usd"] is None
+    code, bad = run("cost", "set", "--enable", "--cap-usd", "-2")
+    assert code == 2 and bad["code"] == "invalid_input"
+
+    code, record = run("scales", "record", "--corpus", "rsoxs", "--work", "10.1/x", "--figure", "fig1",
+                       "--panel", "0", "--nm-per-px", "2.0", "--bar-px", "50", "--bar-nm", "100")
+    assert code == 0 and record["recorded_by"] == "local-operator" and record["nm_per_px"] == 2.0
+    code, listed = run("scales", "list", "--work", "10.1/x")
+    assert code == 0 and [r["id"] for r in listed] == [record["id"]]
+    code, one = run("scales", "show", record["id"])
+    assert code == 0 and one["bar_length_nm"] == 100.0
+    code, missing = run("scales", "show", "fsc-missing")
+    assert code == 2 and missing["code"] == "not_found"
+
+    code, quality = run("vocab", "quality", "--limit", "5")
+    assert code == 0 and quality == {"snapshots": [], "count": 0, "latest": None}
+
+    decisions = tmp_path / "decisions.json"
+    decisions.write_text(json.dumps([{"case_id": "case-x", "bound_revision": "r", "accept": False}]))
+    code, bulk = run("cases", "bulk-review", "--decisions", f"@{decisions}")
+    assert code == 0 and bulk["failed"] == 1 and bulk["results"][0]["code"] == "not_found"
+    code, inline = run("cases", "bulk-review", "--decisions", '[{"case_id": "c", "bound_revision": "r", "accept": true}]')
+    assert code == 0 and inline["results"][0]["status"] == "error"
+    code, bad = run("cases", "bulk-review", "--decisions", "{not json")
+    assert code == 2 and bad["code"] == "invalid_input"
+    code, bad = run("cases", "bulk-review", "--decisions", "@" + str(tmp_path / "nope.json"))
+    assert code == 2 and bad["code"] == "invalid_input"
+
+
+def test_cli_folders_read_the_roots_from_the_startup_environment(tmp_path, capsys):
+    """T32 (B4): ``folders`` browses only the roots named by F2W_FOLDER_ROOTS; the request names a label."""
+    papers = tmp_path / "papers"
+    (papers / "sub").mkdir(parents=True)
+    (papers / "sub" / "a.pdf").write_bytes(b"%PDF-1.7\n")
+    root = str(tmp_path / "ops")
+    env = {"F2W_FOLDER_ROOTS": f"papers={papers}"}
+
+    def run(*argv, environ=env):
+        code = cli.main(["--root", root, *argv], environ=environ)
+        out = capsys.readouterr()
+        return code, json.loads(out.out or out.err), out.out + out.err
+
+    code, roots, _ = run("folders", "roots")
+    assert code == 0 and roots == {"roots": [{"root": "papers", "exists": True}]}
+    code, listed, text = run("folders", "list", "--root", "papers", "--path", "sub")
+    assert code == 0 and [e["name"] for e in listed["entries"]] == ["a.pdf"] and str(papers) not in text
+    code, index, _ = run("folders", "index", "--root", "papers")
+    assert code == 0 and [d["relative_path"] for d in index["documents"]] == ["sub/a.pdf"]
+    code, refused, text = run("folders", "list", "--root", "papers", "--path", "../outside")
+    assert code == 2 and refused["code"] == "invalid_input" and str(tmp_path) not in text
+    code, unknown, _ = run("folders", "list", "--root", "other")
+    assert code == 2 and unknown["code"] == "not_found"
+    code, none, _ = run("folders", "roots", environ={})
+    assert code == 0 and none == {"roots": []}
+    assert not Path("other").exists()  # the folder label never becomes an operations root (dest collision)
 
 
 def test_cli_refuses_an_als_profile(tmp_path, capsys):

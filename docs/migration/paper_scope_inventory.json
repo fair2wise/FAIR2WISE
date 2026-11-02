@@ -36,9 +36,9 @@
   },
   "routes": 84,
   "routes_by_status": {
-   "covered": 17,
-   "partial": 12,
-   "gap_needs_owner": 18,
+   "covered": 22,
+   "partial": 11,
+   "gap_needs_owner": 14,
    "remains_in_forge": 9,
    "pending": 27,
    "proposed_exception": 1
@@ -6825,19 +6825,15 @@
    "source_function": "vocab_quality",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "partial",
-   "f2w_equivalent": "canonicalization.quality_snapshots (service only)",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "covered",
+   "f2w_equivalent": "GET /v1/vocabulary/quality (T31)",
+   "f2w_exposure": "authenticated, safe projection (D19)",
    "tests": [
-    "tests/canonicalization/test_canon_services.py::test_rowwise_grouping_is_identical_to_matrix_grouping_and_capped",
-    "tests/canonicalization/test_canon_services.py::test_group_adjudication_is_proposal_with_mandatory_safety",
-    "tests/canonicalization/test_canon_services.py::test_cleanup_report_proposal_triage_and_scoped_plan",
-    "tests/canonicalization/test_canon_services.py::test_growth_keeps_observations_proposals_and_withheld_apart",
-    "tests/canonicalization/test_canon_services.py::test_audit_flags_unsafe_and_cross_entry_aliases_and_activation_is_gated",
+    "tests/api_v1/test_v1_local.py::test_vocabulary_quality_lists_snapshots_newest_first",
     "tests/canonicalization/test_canon_services.py::test_quality_snapshots_are_versioned_and_bounded"
    ],
-   "blocking_task": "owner: assign route (T19E)",
-   "notes": "No HTTP route."
+   "blocking_task": null,
+   "notes": "T31 (owner decision B5): the C-16 snapshot history behind a read route (counts only); chat.read_support."
   },
   {
    "id": "RT-05",
@@ -7735,12 +7731,15 @@
    "source_function": "review_resolve_bulk",
    "catalog_disposition": "split_paper_portion",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "none (single-case review only)",
+   "status": "covered",
+   "f2w_equivalent": "POST /v1/curation/cases/bulk-review (T31)",
    "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
-   "tests": [],
-   "blocking_task": "owner: assign (T14 follow-up)",
-   "notes": "Bulk review is named in T17 scope."
+   "tests": [
+    "tests/api_v1/test_v1_local.py::test_bulk_review_reports_one_result_per_case",
+    "tests/api_v1/test_v1_als.py::test_ordinary_user_is_refused_every_privileged_action_before_effects"
+   ],
+   "blocking_task": null,
+   "notes": "T31 (owner decision B5): one decision per case through review_case; one result per case."
   },
   {
    "id": "RT-54",
@@ -7750,12 +7749,15 @@
    "source_function": "figure_scale_record",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "none",
+   "status": "covered",
+   "f2w_equivalent": "POST /v1/figures/scales, GET /v1/figures/scales[/{id}] (T31)",
    "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
-   "tests": [],
-   "blocking_task": "owner: assign (V-06 follow-up)",
-   "notes": "Human-read scale record; the paper part (a reviewed figure reading with provenance) has no F2W store/route. Unblocking dual fits stays in FORGE."
+   "tests": [
+    "tests/api_v1/test_v1_local.py::test_figure_scale_records_local_flow",
+    "tests/api_v1/test_v1_als.py::test_admin_records_a_figure_scale_in_scope_and_every_user_reads_it"
+   ],
+   "blocking_task": null,
+   "notes": "T31 (owner decision B5): human-read scale records in the curation database (app/modules/curation/scale_records.py); identifiers and numbers only. Unblocking dual fits stays in FORGE."
   },
   {
    "id": "RT-55",
@@ -7890,14 +7892,16 @@
    "source_function": "ingest_roots",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "none (T14 deferral)",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "covered",
+   "f2w_equivalent": "GET /v1/folders/roots (T32, :local only)",
+   "f2w_exposure": "ingest.acquire; :local only (404 on ALS)",
    "tests": [
+    "tests/api_v1/test_v1_folders.py::test_roots_and_listing_show_labels_and_relative_paths_only",
+    "tests/api_v1/test_v1_als.py::test_folder_routes_are_absent_on_als_whoever_calls",
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": null,
+   "notes": "T32 (owner decision B4): roots fixed by F2W_FOLDER_ROOTS; labels only; 404 on ALS."
   },
   {
    "id": "RT-63",
@@ -7907,14 +7911,17 @@
    "source_function": "list_folder",
    "catalog_disposition": "port_paper_contract",
    "v4_exposure": "public_safe_projection_or_internal_scope_review",
-   "status": "gap_needs_owner",
-   "f2w_equivalent": "none (T14 deferral)",
-   "f2w_exposure": "jobs.admin / curation.approve (admin-only on ALS)",
+   "status": "covered",
+   "f2w_equivalent": "GET /v1/folders/list (T32, :local only)",
+   "f2w_exposure": "ingest.acquire; :local only (404 on ALS)",
    "tests": [
+    "tests/api_v1/test_v1_folders.py::test_traversal_attempts_are_refused_without_a_path",
+    "tests/api_v1/test_v1_folders.py::test_links_files_and_missing_folders_are_the_same_404",
+    "tests/gateway/test_gateway_prefix.py::test_t32_folder_routes_are_404_on_als_behind_the_gateway",
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": null,
+   "notes": "T32 (owner decision B4): containment by LocalIntakePolicy; traversal and links refused without a path; 404 on ALS."
   },
   {
    "id": "RT-64",
@@ -7930,8 +7937,8 @@
    "tests": [
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": "T12 (ingest job kind over the T32 roots)",
+   "notes": "Folder browsing landed as /v1/folders (T32, B4); the read-only inventory GET /v1/folders/index shows what an index run would cover. Starting, stopping and reporting an index run, domains and search wait for the ingest pipeline (H3) as a job kind."
   },
   {
    "id": "RT-65",
@@ -7947,8 +7954,8 @@
    "tests": [
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": "T12 (ingest job kind over the T32 roots)",
+   "notes": "Folder browsing landed as /v1/folders (T32, B4); the read-only inventory GET /v1/folders/index shows what an index run would cover. Starting, stopping and reporting an index run, domains and search wait for the ingest pipeline (H3) as a job kind."
   },
   {
    "id": "RT-66",
@@ -7964,8 +7971,8 @@
    "tests": [
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": "T12 (ingest job kind over the T32 roots)",
+   "notes": "Folder browsing landed as /v1/folders (T32, B4); the read-only inventory GET /v1/folders/index shows what an index run would cover. Starting, stopping and reporting an index run, domains and search wait for the ingest pipeline (H3) as a job kind."
   },
   {
    "id": "RT-67",
@@ -7981,8 +7988,8 @@
    "tests": [
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": "T12 (ingest job kind over the T32 roots)",
+   "notes": "Folder browsing landed as /v1/folders (T32, B4); the read-only inventory GET /v1/folders/index shows what an index run would cover. Starting, stopping and reporting an index run, domains and search wait for the ingest pipeline (H3) as a job kind."
   },
   {
    "id": "RT-68",
@@ -7998,8 +8005,8 @@
    "tests": [
     "tests/literature/test_safe_fetch.py::test_local_policy_roots_and_symlinks"
    ],
-   "blocking_task": "owner: approve path-root policy, then T12",
-   "notes": "Folder browse/index needs an approved trusted-root policy (I-02)."
+   "blocking_task": "T12 (ingest job kind over the T32 roots)",
+   "notes": "Folder browsing landed as /v1/folders (T32, B4); the read-only inventory GET /v1/folders/index shows what an index run would cover. Starting, stopping and reporting an index run, domains and search wait for the ingest pipeline (H3) as a job kind."
   },
   {
    "id": "RT-69",
