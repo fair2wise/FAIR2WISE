@@ -214,13 +214,14 @@ def _html_sections(raw: str) -> list[tuple[str, str]]:
             sections.append((current_heading, text))
         buf.clear()
 
-    for node in tree.iter():
+    nodes: Iterable[Any] = tree.iter()  # lxml.html elements: text_content() is not in the stubs
+    for node in nodes:
         tag = str(getattr(node, "tag", "") or "").lower()
         if tag in {"script", "style", "noscript"}:
             continue
         if tag in {"h1", "h2", "h3"}:
             flush()
-            current_heading = " ".join(node.text_content().split())
+            current_heading = " ".join(str(node.text_content()).split())
             continue
         if node.text:
             buf.append(node.text)

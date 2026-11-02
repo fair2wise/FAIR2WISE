@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Convert extracted_terms JSON into a MatKG graph.json.
 
 json2kg.py -- Optimized conversion of extracted_terms JSON → MatKG graph.json

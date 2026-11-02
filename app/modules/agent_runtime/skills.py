@@ -179,9 +179,9 @@ class SkillRegistry:
         for skill in self._skills.values():
             if not skill.required_capabilities <= caps:
                 continue
-            tools = tuple(t for t in skill.tools if t in visible_tools)
-            if tools:
-                out.append(Skill(skill.name, skill.description, skill.when_to_use, tools,
+            kept = tuple(t for t in skill.tools if t in visible_tools)
+            if kept:
+                out.append(Skill(skill.name, skill.description, skill.when_to_use, kept,
                                  skill.required_capabilities))
         return out
 

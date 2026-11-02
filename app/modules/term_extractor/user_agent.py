@@ -33,7 +33,7 @@ class UserAgent(Agent):
         def _shutdown_callback(agent_id: str) -> None:
             asyncio.run_coroutine_threadsafe(
                 self._agent_manager.get_handle(
-                    AgentId(uid=uuid.UUID(agent_id)),
+                    AgentId(uid=uuid.UUID(agent_id), name=None, role="agent"),
                 ).shutdown(),
                 loop,
             )

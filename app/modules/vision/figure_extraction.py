@@ -128,10 +128,11 @@ def _assign_panels(
                                f"caption names {len(letters)} panels, geometry found {len(boxes)}; "
                                "figure kept whole and readings withheld", blocking=True))
         return [PanelBox(0, 0, width, height, method="whole_figure")], ["none"], unc
-    by_text = label_panels_from_spans(boxes, [s for s in layer.spans if s.source == "text_layer"],
-                                      layer.frame, allowed=allowed)
-    if len(boxes) > 1 and all(b.label for b in by_text) and len({b.label for b in by_text}) == len(by_text):
-        return by_text, ["text_layer"] * len(by_text), unc
+    if layer.frame is not None:
+        by_text = label_panels_from_spans(boxes, [s for s in layer.spans if s.source == "text_layer"],
+                                          layer.frame, allowed=allowed)
+        if len(boxes) > 1 and all(b.label for b in by_text) and len({b.label for b in by_text}) == len(by_text):
+            return by_text, ["text_layer"] * len(by_text), unc
     if len(letters) >= 2:
         settled = reconcile_panels(boxes, letters, (height, width))
         unc.append(Uncertainty("panel_labels_from_reading_order",

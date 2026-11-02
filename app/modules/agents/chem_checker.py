@@ -81,7 +81,7 @@ class ChemicalFormulaValidator:
 
     # -------------------------- internals --------------------------- #
 
-    @functools.lru_cache(maxsize=None)
+    @functools.cache
     def _query_mp(self, formula: str) -> int:
         """Return number of MP materials matching *formula*."""
         with MPRester(self.api_key) as mpr:

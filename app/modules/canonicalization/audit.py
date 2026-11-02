@@ -136,4 +136,6 @@ def activate_vocabulary(
         raise ApplyRefused("stale_audit", "audit was run on a different revision")
     if not report.clean:
         raise ApplyRefused("audit_blocking", f"{sum(f.blocking for f in report.findings)} blocking findings")
+    if approval is None:
+        raise ApplyRefused("approval_required", "activation needs a recorded approval")
     return ActivationRecord(vocab.revision, approval.approval_id, report.checked_aliases)

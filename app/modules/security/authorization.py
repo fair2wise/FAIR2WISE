@@ -806,8 +806,8 @@ def settings_update_plan(fields: Iterable[str], *, local: bool, admin: bool) -> 
     deployment = rest - ignored
     if not admin:
         ignored, deployment = ignored | deployment, frozenset()
-    caps = {"settings.personal"} | ({"settings.global"} if deployment else set())
-    return SettingsUpdatePlan(frozenset(caps), personal, deployment, ignored)
+    caps = frozenset({"settings.personal"} | ({"settings.global"} if deployment else set()))
+    return SettingsUpdatePlan(caps, personal, deployment, ignored)
 
 
 def chat_action_capabilities(decision: str, kind: str | None) -> frozenset[str]:

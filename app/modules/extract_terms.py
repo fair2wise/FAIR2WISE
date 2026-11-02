@@ -175,10 +175,10 @@ class _AnsiColorFormatter(logging.Formatter):
         level = record.levelname
         color = self._COLORS.get(level)
         if color:
-            record.levelname = "{}{}{}".format(color, level, self._RESET)
-            record.msg = "{}{}{}".format(color, record.getMessage(), self._RESET)
+            record.levelname = f"{color}{level}{self._RESET}"
+            record.msg = f"{color}{record.getMessage()}{self._RESET}"
             record.args = ()
-        return super(_AnsiColorFormatter, self).format(record)
+        return super().format(record)
 
 
 handler = logging.StreamHandler(sys.stdout)

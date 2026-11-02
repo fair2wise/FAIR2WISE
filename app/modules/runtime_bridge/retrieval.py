@@ -120,6 +120,8 @@ class LegacyRetrievalService:
         if self._agent is None:
             with self._lock:
                 if self._agent is None:
+                    if self._settings is None:  # constructor guarantees one of agent/provider/settings
+                        raise RuntimeError("retrieval agent has no settings to build from")
                     self._agent = self._factory(self._settings)
         return self._agent
 

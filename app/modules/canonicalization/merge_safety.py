@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from functools import lru_cache
+from functools import lru_cache, cache
 import os
 import re
 import unicodedata
@@ -309,7 +309,7 @@ def _is_acronym_of(short: str, long_form: str) -> bool:
         # abbreviation (PS / polystyrene) is a synonym for a human to list.
         return False
 
-    @lru_cache(maxsize=None)
+    @cache
     def match(i: int, w: int, pos: int, started: bool, starts: int) -> bool:
         # i: next acronym character; w/pos: current word and offset in it;
         # started: whether word w has had its initial consumed; starts: how

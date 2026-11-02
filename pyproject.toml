@@ -43,6 +43,7 @@ dependencies = [
   "PyYAML>=6.0.3",
   "rapidfuzz>=3.14.5",
   "requests>=2.33.1",
+  "typer>=0.12",
   "watchdog>=6.0.0",
 ]
 
@@ -168,7 +169,7 @@ extend_skip = ["app/modules/legacy", "app/graphify-out", "ui", "storage", "paper
 [tool.mypy]
 python_version = "3.12"
 files = ["app"]
-exclude = ["^app/modules/legacy/", "^app/graphify-out/"]
+exclude = ["^app/modules/legacy/", "^app/graphify-out/", "^app/run_pipeline_cborg\\.py$"]
 namespace_packages = true
 explicit_package_bases = true
 strict = true
@@ -181,6 +182,7 @@ module = [
   "langchain_openai.*", "langgraph.*", "linkml_runtime.*", "mp_api.*", "obonet.*", "pyalex.*",
   "pymatgen.*", "rapidfuzz.*", "rapidocr_onnxruntime.*", "sentence_transformers.*", "tiled.*",
   "torch.*", "watchdog.*", "pypdfium2.*", "docling.*", "docling_core.*",
+  "rdkit.*", "pynvml.*", "globus_compute_sdk.*",
 ]
 ignore_missing_imports = true
 

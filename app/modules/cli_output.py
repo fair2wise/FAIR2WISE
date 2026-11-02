@@ -50,7 +50,7 @@ class _LiveStreamHandler(logging.StreamHandler):  # type: ignore[type-arg]
                        and (at_least is None or record.levelno >= at_least))
 
     @property
-    def stream(self) -> object:  # type: ignore[override]
+    def stream(self) -> object:
         """The current ``sys`` stream."""
         return getattr(sys, self._stream_name)
 

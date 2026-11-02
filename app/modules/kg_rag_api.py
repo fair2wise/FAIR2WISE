@@ -411,8 +411,8 @@ def create_fastapi_app(
 
         return rag_resp
 
-    @app.post("/api/chat")
-    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)):
+    @app.post("/api/chat", response_model=None)
+    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)) -> Any:
         """Handle incoming chat request: retrieve KG context, call LLM, return response."""
         body = await req.json()
         messages = body.get("messages", [])
@@ -428,8 +428,8 @@ def create_fastapi_app(
             "done": True,
         }, ModelTurnSources(snippets))
 
-    @app.post("/v1/chat/completions")
-    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)):
+    @app.post("/v1/chat/completions", response_model=None)
+    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)) -> Any:
         """Handle OpenAI-compatible chat completions for Open WebUI."""
         body = await req.json()
         messages = body.get("messages", [])
@@ -452,8 +452,8 @@ def create_fastapi_app(
             ],
         }, ModelTurnSources(snippets))
 
-    @app.get("/api/tags")
-    async def list_models(ctx: RequestContext = Depends(request_context)):
+    @app.get("/api/tags", response_model=None)
+    async def list_models(ctx: RequestContext = Depends(request_context)) -> dict[str, Any]:
         """Return available model tags for OpenWebUI compatibility."""
         return {
             "models": [
@@ -461,13 +461,13 @@ def create_fastapi_app(
             ]
         }
 
-    @app.get("/api/version")
-    async def ollama_version(ctx: RequestContext = Depends(request_context)):
+    @app.get("/api/version", response_model=None)
+    async def ollama_version(ctx: RequestContext = Depends(request_context)) -> dict[str, str]:
         """Return a minimal Ollama-compatible version response."""
         return {"version": "0.1.0"}
 
-    @app.get("/v1/models")
-    async def openai_models(ctx: RequestContext = Depends(request_context)):
+    @app.get("/v1/models", response_model=None)
+    async def openai_models(ctx: RequestContext = Depends(request_context)) -> dict[str, Any]:
         """Return OpenAI-compatible model list for Open WebUI."""
         return {
             "object": "list",
@@ -481,8 +481,8 @@ def create_fastapi_app(
             ],
         }
 
-    @app.get("/api/ps")
-    async def list_processes(ctx: RequestContext = Depends(request_context)):
+    @app.get("/api/ps", response_model=None)
+    async def list_processes(ctx: RequestContext = Depends(request_context)) -> dict[str, Any]:
         """Return running processes (stub for OpenWebUI compatibility)."""
         return {"processes": []}
 
@@ -1810,7 +1810,7 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
     started = time.perf_counter()
     try:
         result = await asyncio.wait_for(cli.chat(messages), timeout=LLM_TIMEOUT + 5)
-    except asyncio.TimeoutError as exc:
+    except TimeoutError as exc:
         wrapped = RuntimeError(
             f"{label} call exceeded {LLM_TIMEOUT}s. Try --timeout 30, another model, or check CBORG."
         )

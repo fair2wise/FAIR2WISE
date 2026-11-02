@@ -331,7 +331,6 @@ class PublishStore:
 
 def utc(moment: float) -> datetime:
     """Epoch seconds as an aware UTC datetime."""
-
     return datetime.fromtimestamp(moment, tz=UTC)
 
 

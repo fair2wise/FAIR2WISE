@@ -1669,9 +1669,9 @@ def query_graph_payload(
                 resolved = resolve_tiled_node_id(kg, hit["id"])
                 if not resolved:
                     continue
-                display = remap.get((gid, resolved))
-                if display:
-                    remap[(gid, hit["id"])] = display
+                shown = remap.get((gid, resolved))
+                if shown:
+                    remap[(gid, hit["id"])] = shown
         for edge in subset.get("edges") or []:
             if not isinstance(edge, dict):
                 continue
@@ -1689,16 +1689,16 @@ def query_graph_payload(
     ordered_ids: list[str] = []
     seen_display: set[str] = set()
     for hit in hits:
-        display = remap.get((hit["graph_id"], hit["id"]))
-        if not display or display in seen_display:
+        shown = remap.get((hit["graph_id"], hit["id"]))
+        if not shown or shown in seen_display:
             continue
-        seen_display.add(display)
-        ordered_ids.append(display)
-    for display in nodes_by_display:
-        if display in seen_display:
+        seen_display.add(shown)
+        ordered_ids.append(shown)
+    for shown in nodes_by_display:
+        if shown in seen_display:
             continue
-        seen_display.add(display)
-        ordered_ids.append(display)
+        seen_display.add(shown)
+        ordered_ids.append(shown)
 
     nodes = [nodes_by_display[node_id] for node_id in ordered_ids if node_id in nodes_by_display]
     unique_sources = unique_graph_paths(source_names) or [str(graph_path)]
@@ -3867,19 +3867,19 @@ class AgentPipelineService:
                 await self._finalize_memory(original_question, response, effective_question=original_question)
                 return response
             if prepared.get("status") == "query_extracted_paper":
-                response = await self._maybe_query_active_paper(
+                maybe = await self._maybe_query_active_paper(
                     original_question, emit=None, force=True, decide=False
                 )
-                if response is not None:
-                    await self._finalize_memory(original_question, response, effective_question=original_question)
-                    return response
+                if maybe is not None:
+                    await self._finalize_memory(original_question, maybe, effective_question=original_question)
+                    return maybe
             if prepared.get("status") == "report_extraction":
-                response = await self._maybe_report_active_extraction(
+                maybe = await self._maybe_report_active_extraction(
                     original_question, emit=None, force=True, decide=False
                 )
-                if response is not None:
-                    await self._finalize_memory(original_question, response, effective_question=original_question)
-                    return response
+                if maybe is not None:
+                    await self._finalize_memory(original_question, maybe, effective_question=original_question)
+                    return maybe
             effective_question = str(prepared.get("question") or original_question)
             history = _history_payload(messages)
             if prepared.get("status") == "direct_download_search":
@@ -4017,19 +4017,19 @@ class AgentPipelineService:
                 await self._finalize_memory(original_question, response, effective_question=original_question)
                 return response
             if prepared.get("status") == "query_extracted_paper":
-                response = await self._maybe_query_active_paper(
+                maybe = await self._maybe_query_active_paper(
                     original_question, emit=emit, force=True, decide=False
                 )
-                if response is not None:
-                    await self._finalize_memory(original_question, response, effective_question=original_question)
-                    return response
+                if maybe is not None:
+                    await self._finalize_memory(original_question, maybe, effective_question=original_question)
+                    return maybe
             if prepared.get("status") == "report_extraction":
-                response = await self._maybe_report_active_extraction(
+                maybe = await self._maybe_report_active_extraction(
                     original_question, emit=emit, force=True, decide=False
                 )
-                if response is not None:
-                    await self._finalize_memory(original_question, response, effective_question=original_question)
-                    return response
+                if maybe is not None:
+                    await self._finalize_memory(original_question, maybe, effective_question=original_question)
+                    return maybe
             effective_question = str(prepared.get("question") or original_question)
             history = _history_payload(messages)
             if prepared.get("status") == "direct_download_search":
@@ -4947,281 +4947,6 @@ class AgentPipelineService:
             emit,
             graph_source=graph_source,
             json_graph_path=json_graph_path,
-        )
-
-        rounds: list[dict[str, Any]] = []
-        last_verdict: dict[str, Any] = {}
-        effective_graph_source = (graph_source or self.runtime.graph_source).lower()
-
-        if effective_graph_source == "json":
-            selected_path = json_graph_path or self.runtime.json_graph_path
-            if not selected_path:
-                raise ValueError("JSON graph mode requires a graph file")
-            active_graph_path = self._resolve_runtime_json_graph_path(selected_path)
-            active_graph_source = "json"
-        else:
-            active_graph_path = self._session_graph_path()
-            active_graph_source = "splash"
-
-        try:
-            await self.retrieval.reload_kg(str(active_graph_path), graph_source=active_graph_source)
-        except Exception as exc:
-            self.workflow.update(phase="retrieval_error")
-            return self._response(
-                "retrieval_error",
-                f"Retrieval agent could not load the active graph: {exc}",
-                False,
-                {},
-                [],
-                active_graph_path,
-            )
-
-        for round_no in range(1, self.cfg.max_rounds + 1):
-            await self._emit(
-                emit,
-                "retrieval_started",
-                "Retrieval agent searching the KG",
-                round=round_no,
-            )
-            try:
-                try:
-                    verdict = await self.retrieval.query(question, history=history)
-                except TypeError:
-                    verdict = await self.retrieval.query(question)
-            except Exception as exc:
-                self.workflow.update(phase="retrieval_error")
-                return self._response(
-                    "retrieval_error",
-                    f"Retrieval failed safely: {exc}",
-                    False,
-                    {},
-                    rounds,
-                    active_graph_path,
-                )
-            last_verdict = verdict
-            round_info: dict[str, Any] = {
-                "round": round_no,
-                "retrieval": verdict,
-            }
-            rounds.append(round_info)
-
-            selected_count = len(verdict.get("selected") or [])
-            await self._emit(
-                emit,
-                "retrieval_result",
-                (
-                    f"Retrieved {selected_count} KG node(s); "
-                    + ("evidence sufficient" if verdict.get("sufficient") else "evidence insufficient")
-                ),
-                round=round_no,
-                selected_count=selected_count,
-                direct_evidence_count=int(verdict.get("direct_evidence_count") or 0),
-                sufficient=bool(verdict.get("sufficient")),
-                missing_topics=verdict.get("missing_topics") or [],
-            )
-
-            selected_ids = [str(n) for n in (verdict.get("selected") or [])]
-            if selected_ids:
-                subset_payload = self._query_graph_payload(verdict, active_graph_path)
-                subset = self._query_graph_event(subset_payload)
-                selected_ids = [node.id for node in subset_payload.nodes] or selected_ids
-                await self._emit(
-                    emit,
-                    "graph_update",
-                    f"Mapping {len(subset['nodes'])} node(s) onto the graph",
-                    round=round_no,
-                    node_ids=selected_ids,
-                    graph=subset,
-                )
-
-            if str(verdict.get("status", "")).endswith("_error"):
-                self.workflow.update(phase="retrieval_error")
-                return self._response(
-                    "retrieval_error",
-                    f"Retrieval failed: {verdict.get('error') or verdict.get('status')}",
-                    False,
-                    verdict,
-                    rounds,
-                    active_graph_path,
-                )
-
-            if verdict.get("sufficient"):
-                return self._response(
-                    "answered",
-                    str(verdict.get("answer") or ""),
-                    True,
-                    verdict,
-                    rounds,
-                    active_graph_path,
-                )
-
-            if active_graph_source == "json":
-                return self._response(
-                    "insufficient_json_graph",
-                    _json_graph_insufficient_answer(verdict),
-                    False,
-                    verdict,
-                    rounds,
-                    active_graph_path,
-                )
-
-            missing = verdict.get("missing_topics") or [question]
-            await self._emit(
-                emit,
-                "download_started",
-                "Download agent finding relevant papers",
-                round=round_no,
-                missing_topics=missing,
-            )
-            dl = await self.download.find_and_download(
-                question,
-                missing_topics=missing,
-                target_dir=str(self.coord.pdf_dir),
-                max_papers=self.cfg.max_papers,
-                candidate_pool=self.cfg.candidate_pool,
-            )
-            round_info["download"] = dl
-            downloaded_names = [Path(p).name for p in (dl.get("downloaded") or [])]
-            await self._emit(
-                emit,
-                "download_result",
-                (
-                    f"Downloaded {dl.get('count', 0)} PDF(s)"
-                    + (f": {', '.join(downloaded_names)}" if downloaded_names else "")
-                ),
-                round=round_no,
-                count=int(dl.get("count") or 0),
-                titles=downloaded_names,
-                skipped=int(dl.get("skipped") or 0),
-                failed=int(dl.get("failed") or 0),
-            )
-            if dl.get("count", 0) == 0:
-                return self._response(
-                    "no_new_papers",
-                    "I could not find new relevant open-access PDFs to gather more evidence.",
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-
-            round_pdf_dir, pending_pdfs = self.coord._stage_unprocessed_pdfs(round_no)
-            round_info["pending_pdfs"] = [p.name for p in pending_pdfs]
-            if not pending_pdfs:
-                return self._response(
-                    "no_unprocessed_pdfs",
-                    "Downloaded papers were already processed; no new evidence was available.",
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-
-            await self._emit(
-                emit,
-                "extraction_started",
-                "Extractor agent reading new PDFs",
-                round=round_no,
-                pdfs=[p.name for p in pending_pdfs],
-            )
-            ext = await self.extractor.extract(str(round_pdf_dir), str(self.coord.session_terms))
-            round_info["extraction"] = ext
-            if ext.get("status") == "error":
-                return self._response(
-                    "extraction_error",
-                    f"Extraction failed: {ext.get('message') or ext}",
-                    False,
-                    verdict,
-                    rounds,
-                    self.graph_path(),
-                )
-            await self._emit(
-                emit,
-                "extraction_result",
-                (
-                    f"Extracted {ext.get('unique_terms', 0)} term(s) "
-                    f"from {ext.get('processed_files', 0)} PDF(s)"
-                ),
-                round=round_no,
-                term_count=int(ext.get("unique_terms") or 0),
-                processed_files=int(ext.get("processed_files") or 0),
-                processed_pages_with_terms=int(ext.get("processed_pages_with_terms") or 0),
-            )
-            self.coord._record_full_extraction(pending_pdfs, ext)
-            self.coord._mark_processed_pdfs(pending_pdfs)
-
-            await self._emit(
-                emit,
-                "kg_rebuild_started",
-                "KG builder updating session graph",
-                round=round_no,
-            )
-            kg = kg_update.rebuild_kg(str(self.coord.session_terms), str(self.coord.session_kg))
-            round_info["kg"] = kg
-            await self._emit(
-                emit,
-                "kg_rebuild_result",
-                f"Rebuilt KG: {kg.get('nodes', 0)} node(s), {kg.get('edges', 0)} edge(s)",
-                round=round_no,
-                node_count=int(kg.get("nodes") or 0),
-                edge_count=int(kg.get("edges") or 0),
-            )
-
-            if self.cfg.kg_mode == "splash":
-                await self._emit(
-                    emit,
-                    "splash_reimport_started",
-                    "Splash importer refreshing graph store",
-                    round=round_no,
-                )
-                splash = kg_update.splash_reimport(
-                    str(self.coord.session_kg),
-                    splash_repo=self.cfg.splash_repo,
-                    allow_wipe=self.cfg.allow_splash_wipe,
-                )
-                round_info["splash"] = splash
-                if splash.get("status") == "error":
-                    return self._response(
-                        "splash_error",
-                        f"Splash reimport failed: {splash.get('message') or splash}",
-                        False,
-                        verdict,
-                        rounds,
-                        self.graph_path(),
-                    )
-                await self._emit(
-                    emit,
-                    "splash_reimport_result",
-                    "Splash graph store refreshed",
-                    round=round_no,
-                    status=str(splash.get("status") or ""),
-                )
-
-            await self._emit(
-                emit,
-                "reload_started",
-                "Retrieval agent reloading updated KG",
-                round=round_no,
-            )
-            reload_res = await self.retrieval.reload_kg(str(self.coord.session_kg))
-            round_info["reload"] = reload_res
-            active_graph_path = self.graph_path()
-            await self._emit(
-                emit,
-                "reload_result",
-                f"Reloaded KG with {reload_res.get('nodes', 0)} node(s)",
-                round=round_no,
-                node_count=int(reload_res.get("nodes") or 0),
-                status=str(reload_res.get("status") or ""),
-            )
-
-        return self._response(
-            "max_rounds",
-            f"Reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.",
-            False,
-            last_verdict,
-            rounds,
-            self.graph_path(),
         )
 
     async def _ask_locked(
@@ -6900,8 +6625,8 @@ def create_app(
             req, ignored = guard.settings_update(request, ctx, req)
             key = guard.settings_key(ctx)
             if key is not None:  # T25D: warn only about ignored values that differ from the server's
-                ignored = {name for name in ignored
-                           if sent.get(name) != getattr(service.deployment_runtime, name, None)}
+                ignored = frozenset(name for name in ignored
+                                    if sent.get(name) != getattr(service.deployment_runtime, name, None))
             response.headers.update(guard.setting_warning_headers(ignored))
             return cast(AgentSettingsResponse, guard.project_settings(ctx, _model_to_jsonable(await service.apply_settings_for(key, req))))
         except (FileNotFoundError, ValueError) as exc:
@@ -7230,10 +6955,10 @@ def create_app(
                     if item is None:
                         break
                     event, data = item
-                    data = guard.project_sse(ctx, event, data, session_id=req.session_id,
-                                             turn_id=collector.turn_id, sources=sources)
-                    if data is not None:
-                        yield _sse(event, data)
+                    projected = guard.project_sse(ctx, event, data, session_id=req.session_id,
+                                                  turn_id=collector.turn_id, sources=sources)
+                    if projected is not None:
+                        yield _sse(event, projected)
             finally:
                 if not task.done():
                     task.cancel()
@@ -7336,10 +7061,10 @@ def create_app(
                     if item is None:
                         break
                     event, data = item
-                    data = guard.project_sse(ctx, event, data, session_id=req.session_id,
-                                             turn_id=collector.turn_id, sources=sources)
-                    if data is not None:
-                        yield _sse(event, data)
+                    projected = guard.project_sse(ctx, event, data, session_id=req.session_id,
+                                                  turn_id=collector.turn_id, sources=sources)
+                    if projected is not None:
+                        yield _sse(event, projected)
             finally:
                 if not task.done():
                     task.cancel()

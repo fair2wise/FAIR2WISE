@@ -1430,7 +1430,7 @@ class RetrievalAgent(Agent):
                 "direct_evidence_count": direct_evidence_count,
                 "missing_topics": list(missing_topics),
                 "live_tiled": dict(meta.get("live_tiled") or {}),
-                "hybrid_rag": dict((hybrid_meta.get("hybrid_rag") or {})),
+                "hybrid_rag": dict(hybrid_meta.get("hybrid_rag") or {}),
                 "route_flags": {
                     "_is_ops_layout_question": _is_ops_layout_question(question),
                     "_is_numeric_claim": _is_numeric_claim(question),

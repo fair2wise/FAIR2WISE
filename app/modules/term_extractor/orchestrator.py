@@ -13,6 +13,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from . import provenance, source_repos
 from ..cborg_http import openai_http_kwargs, require_cborg_api_key
@@ -221,7 +222,8 @@ class Orchestrator:
     def _build_tools(self, llm_base: ChatOpenAI) -> list[BaseTool]:
         def _llm_invoke(prompt: str) -> str:
             from langchain_core.messages import HumanMessage
-            return llm_base.invoke([HumanMessage(content=prompt)]).content or ""
+            content = llm_base.invoke([HumanMessage(content=prompt)]).content
+            return content if isinstance(content, str) else str(content or "")
 
         self._tool_state = ToolState(
             store=self.store,
@@ -249,13 +251,13 @@ class Orchestrator:
             return ChatOpenAI(
                 model=self.model,
                 base_url=self.ollama_url.rstrip("/") + "/v1",
-                api_key="ollama",
+                api_key=SecretStr("ollama"),
                 temperature=self.temperature,
             )
         logger.debug("Building LLM: backend=cborg base=%s model=%s", self.cborg_base, self.model)
         return ChatOpenAI(
             model=self.model,
-            api_key=require_cborg_api_key(self.cborg_api_key),
+            api_key=SecretStr(require_cborg_api_key(self.cborg_api_key)),
             base_url=self.cborg_base,
             temperature=self.temperature,
             streaming=True,

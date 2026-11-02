@@ -334,14 +334,14 @@ class WorkIndex:
         groups: dict[str, list[str]] = defaultdict(list)
         for key in recs:
             groups[uf.find(key)].append(key)
-        index = cls(records=recs)
+        built = cls(records=recs)
         for keys in groups.values():
             keys.sort()
             work_id = _work_id([recs[k] for k in keys], use_content_hash=use_content_hash)
-            index.members[work_id] = keys
+            built.members[work_id] = keys
             for key in keys:
-                index.work_of[key] = work_id
-        return index
+                built.work_of[key] = work_id
+        return built
 
     def __len__(self) -> int:
         return len(self.members)

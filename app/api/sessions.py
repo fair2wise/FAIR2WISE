@@ -278,9 +278,10 @@ class TiledSessionStore:
             matches = [(key, sess) for key, sess in self._sessions.items() if sess.subject == subject]
         for key, sess in sorted(matches, key=lambda item: item[1].created_at, reverse=True):
             if sess.expires_at is not None and self._clock() + CLOCK_SKEW_TOLERANCE >= sess.expires_at:
-                sess = self._refresh(key, sess)
-                if sess is None:
+                refreshed = self._refresh(key, sess)
+                if refreshed is None:
                     continue
+                sess = refreshed
             return TiledCredential(sess.access_token, tiled_target=self.tiled_target, expires_at=sess.expires_at)
         return None
 
@@ -401,8 +402,11 @@ def als_identity_wiring(settings: DeploymentSettings, http_client: Any = None, *
         import httpx
 
         http_client = httpx.Client(follow_redirects=False, timeout=timeout)
-    port = TiledWhoamiAdapter(settings.tiled_target, http_client, timeout=timeout)
-    store = TiledSessionStore(settings.tiled_target, http_client, timeout=timeout, **store_kwargs)
+    target = settings.tiled_target
+    if target is None:  # the ALS profiles fix the target; ``is_local`` was refused above
+        raise StartupConfigError("config_rejected: the profile names no Tiled target for identity")
+    port = TiledWhoamiAdapter(target, http_client, timeout=timeout)
+    store = TiledSessionStore(target, http_client, timeout=timeout, **store_kwargs)
     return port, store
 
 

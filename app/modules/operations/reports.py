@@ -326,7 +326,7 @@ class ScanControl:
 # -- jobs ----------------------------------------------------------------------------
 
 #: ``(ctx, operation, args, control) -> OperationReport``; :class:`OperationRunner` implementations.
-OperationFn = Callable[[RequestContext, str, Mapping[str, Any], ScanControl], OperationReport]
+OperationFn = Callable[[RequestContext, str, Mapping[str, Any], ScanControl | None], OperationReport]
 
 
 def operation_dispatch(*suites: Any) -> OperationFn:
@@ -342,7 +342,8 @@ def operation_dispatch(*suites: Any) -> OperationFn:
                 raise ValueError(f"operation {name!r} is provided twice")
             table[name] = suite
 
-    def run(ctx: RequestContext, operation: str, args: Mapping[str, Any], control: ScanControl) -> OperationReport:
+    def run(ctx: RequestContext, operation: str, args: Mapping[str, Any],
+            control: ScanControl | None) -> OperationReport:
         suite = table.get(operation)
         if suite is None:
             raise ContractError(ErrorCode.INVALID_INPUT, f"unknown operation {operation!r}")

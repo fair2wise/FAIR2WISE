@@ -1595,7 +1595,7 @@ class DisclosureProjector:
             for idx, item in enumerate(items if isinstance(items, list) else []):
                 item = item if isinstance(item, Mapping) else {"text": str(item)}
                 text = str(item.get("text") or "")
-                ref = "ev:" + hashlib.sha256(f"{owner}|{idx}|{text}".encode("utf-8")).hexdigest()[:16]
+                ref = "ev:" + hashlib.sha256(f"{owner}|{idx}|{text}".encode()).hexdigest()[:16]
                 private.append({"evidence_ref": ref, "owner": owner, **dict(item)})
                 out.append({"evidence_ref": ref, "source_paper": item.get("source_paper"),
                             "page": item.get("page")})
