@@ -20,12 +20,13 @@ als_knowledge_agent/src/als_knowledge_agent/graph/parsed_document.py
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 #: Version of the serialized document record.
 DOCUMENT_SCHEMA_VERSION = 1

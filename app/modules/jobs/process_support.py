@@ -11,13 +11,14 @@ als_knowledge_agent/src/als_knowledge_agent/graph/child_process.py (``write_text
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
-from typing import Sequence, cast
+from typing import cast
 
 TAIL_BYTES = 64 * 1024
 TAIL_LINE_CHARS = 400
@@ -40,7 +41,7 @@ def write_text_atomic(path: Path, text: str) -> None:
             out.write(text)
             out.flush()
             os.fsync(out.fileno())
-        os.replace(temporary, path)
+        temporary.replace(path)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

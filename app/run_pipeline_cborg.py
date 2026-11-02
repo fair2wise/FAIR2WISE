@@ -18,6 +18,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
+from modules.cli_output import output
 from modules.extract_terms import run_extraction
 from modules.json2kg import convert_terms_to_graph
 
@@ -101,12 +102,12 @@ def run_checkpoint_pipeline(
             graph_json = Path(f"./storage/kg/matkg_{safe_model}_{checkpoint}_{timestamp}.json")
 
             if dry_run:
-                print(f"[DRY-RUN] Checkpoint={checkpoint}, model={model}")
-                print(f"  → New folders: {new_folders}")
-                print(f"  → New papers: {len(new_pdfs)}")
-                print(f"  → Prev terms: {prev_terms_json}")
-                print(f"  → Terms file: {terms_json}")
-                print(f"  → Graph file: {graph_json}")
+                output.info(f"[DRY-RUN] Checkpoint={checkpoint}, model={model}")
+                output.info(f"  → New folders: {new_folders}")
+                output.info(f"  → New papers: {len(new_pdfs)}")
+                output.info(f"  → Prev terms: {prev_terms_json}")
+                output.info(f"  → Terms file: {terms_json}")
+                output.info(f"  → Graph file: {graph_json}")
                 continue
 
             logging.info(f"Checkpoint {checkpoint}, model={model}")
@@ -158,7 +159,7 @@ if __name__ == "__main__":
 
     load_entrypoint_dotenv(__file__)
     DEFAULT_CBORG_BASE = os.environ.get("CBORG_BASE_URL", DEFAULT_CBORG_BASE)
-    print("Using CBORG_BASE_URL =", DEFAULT_CBORG_BASE)
+    output.info(f"Using CBORG_BASE_URL = {DEFAULT_CBORG_BASE}")
 
     parser = argparse.ArgumentParser(description="Run FAIR2WISE checkpoint evaluation")
     parser.add_argument("--pdf-root", type=Path, default=DEFAULT_PDF_ROOT)

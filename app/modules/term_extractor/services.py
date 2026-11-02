@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 import logging
 import os
+from pathlib import Path
 
 from ..agents.chebi import ChebiOboLookup
 from ..agents.chem_checker import ChemicalFormulaValidator
@@ -39,7 +40,7 @@ def build_services(
         logger.warning("MP_API_KEY not set; formula validation may be incomplete.")
 
     chebi_lookup: ChebiOboLookup | None = None
-    if chebi_obo_path and os.path.exists(chebi_obo_path):
+    if chebi_obo_path and Path(chebi_obo_path).exists():
         try:
             chebi_lookup = ChebiOboLookup(chebi_obo_path)
         except Exception as e:

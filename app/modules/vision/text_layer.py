@@ -17,8 +17,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_text_layer.py
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
 from .kernels.geometry import FigureFrame, spans_inside

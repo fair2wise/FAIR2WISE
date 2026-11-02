@@ -18,11 +18,12 @@ recovery of running jobs whose lease expired.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence, cast
+from typing import Any, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode

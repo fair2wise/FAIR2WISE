@@ -1,8 +1,8 @@
 """ContextBuilder: intent-weighted prompt packing with distinct citations."""
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Callable, Sequence
 
 from .evidence import Evidence
 

@@ -29,12 +29,14 @@ als_knowledge_agent/src/als_knowledge_agent/graph/pdf_extraction.py
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 import json
 import logging
 import re
-from typing import Any, Mapping, Pattern, Protocol, Sequence
+from re import Pattern
+from typing import Any, Protocol
 import unicodedata
 
 from ...literature.parsed_document import without_embedded_images

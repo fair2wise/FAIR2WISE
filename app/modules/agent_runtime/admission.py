@@ -13,19 +13,20 @@ runtime can be built and tested without importing the real controller.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager, contextmanager
-from typing import Any, AsyncContextManager, AsyncIterator, ContextManager, Iterator, Protocol, runtime_checkable
+from collections.abc import AsyncIterator, Iterator
+from contextlib import AbstractAsyncContextManager, AbstractContextManager, asynccontextmanager, contextmanager
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
 class Admission(Protocol):
     """Anything with ``slot``/``aslot`` context managers keyed by provider name."""
 
-    def slot(self, provider: str) -> ContextManager[Any]:
+    def slot(self, provider: str) -> AbstractContextManager[Any]:
         """Hold one synchronous admission slot for ``provider``."""
         ...
 
-    def aslot(self, provider: str) -> AsyncContextManager[Any]:
+    def aslot(self, provider: str) -> AbstractAsyncContextManager[Any]:
         """Hold one asynchronous admission slot for ``provider``."""
         ...
 

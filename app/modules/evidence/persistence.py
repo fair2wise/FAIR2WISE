@@ -30,12 +30,13 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_simulation.py
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Iterable, Protocol, Sequence
+from typing import Any, Protocol
 
 from ..contracts.evidence import EvidenceRef, MatchType, SourceLocator
 from ..literature.parsed_document import SECTION_TEXT_MAX_CHARS, ParsedDocument, ParsedSection

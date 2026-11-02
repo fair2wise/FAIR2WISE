@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime
 import json
 import logging
-import os
+from pathlib import Path
 import re
 from typing import Any
 
@@ -289,7 +289,7 @@ def extract_pub_metadata(doc: PdfDocument, pdf_path: str) -> dict[str, Any]:
     All values are ``None`` or ``[]`` if not found. Never invents fields.
     """
     pdf_meta = doc.metadata or {}
-    filename = os.path.basename(pdf_path)
+    filename = Path(pdf_path).name
     current_year = datetime.datetime.now(datetime.UTC).year
 
     _MONTHS = (

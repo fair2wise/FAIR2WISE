@@ -15,11 +15,12 @@ v2 adds structure to reduce cross-topic smear:
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 import json
 from pathlib import Path
 import re
-from typing import Any, Callable, Iterable, cast
+from typing import Any, cast
 import uuid
 
 MAX_SUMMARY_CHARS = 3000

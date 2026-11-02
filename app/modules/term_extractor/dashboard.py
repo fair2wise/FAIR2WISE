@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os as _os
+from pathlib import Path
 import queue
 import threading
 import time
@@ -14,7 +14,8 @@ from flask import Flask, Response, request, send_from_directory
 
 from .message import Log, Registration, Stats, UserPrompt
 
-_ASSETS_DIR = _os.path.join(_os.path.dirname(__file__), 'assets')
+_ASSETS_PATH = Path(__file__).parent / 'assets'
+_ASSETS_DIR = str(_ASSETS_PATH)
 
 logger = logging.getLogger(__name__)
 
@@ -1114,9 +1115,9 @@ class Dashboard:
 
         We ignore fqdn for now.
         """
-        if not _os.path.isdir(_ASSETS_DIR):
+        if not _ASSETS_PATH.is_dir():
             return None
-        for fname in sorted(_os.listdir(_ASSETS_DIR)):
+        for fname in sorted(entry.name for entry in _ASSETS_PATH.iterdir()):
             fname_no_suffix = fname.split('.')[0]
             if fname_no_suffix == org:
                 return f'/assets/{fname}'

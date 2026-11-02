@@ -15,10 +15,11 @@ als_knowledge_agent/src/als_knowledge_agent/graph/chunk_reextraction.py (``plan_
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 import json
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from ..contracts.errors import CapabilityError, ContractError, ErrorCode
 from ..contracts.ports import GraphCapabilities

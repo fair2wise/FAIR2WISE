@@ -32,7 +32,7 @@ from pathlib import Path
 import re
 import sys
 import threading
-from typing import Any, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 
 from linkml_runtime.utils.schemaview import SchemaView
 import openai
@@ -43,6 +43,7 @@ from .agents.chebi import ChebiOboLookup
 from .agents.chem_checker import ChemicalFormulaValidator
 from .agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
 from .cborg_http import openai_http_kwargs, require_cborg_api_key
+from .cli_output import output
 from .literature.pdf_reader import PdfDocument, open_pdf
 from .term_extractor.merge_index import (
     DEFAULT_EMBED_MODEL,
@@ -267,7 +268,7 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 
 
 def retry_on_exception(
-    exceptions: Union[tuple[type[BaseException], ...], type[BaseException]],
+    exceptions: tuple[type[BaseException], ...] | type[BaseException],
     retries: int = 2,
     delay_seconds: float = 1.0,
 ) -> Callable[[_F], _F]:
@@ -497,7 +498,7 @@ class SchemaHelper:
             logger.warning("Dropping non-list relations for term '%s'", term_data.get("term", ""))
             raw_rels = []
 
-        cleaned_rels: list[dict[str, Union[str, bool]]] = []
+        cleaned_rels: list[dict[str, str | bool]] = []
         for rel in raw_rels:
             if not isinstance(rel, dict):
                 logger.debug("Dropping malformed relation for term '%s': %r", term_data.get("term", ""), rel)
@@ -528,7 +529,7 @@ class SchemaHelper:
                     })
                 else:
                     fallback_slot = "related_to" if "related_to" in self.slots else pred
-                    rel_out: dict[str, Union[str, bool]] = {
+                    rel_out: dict[str, str | bool] = {
                         "relation": fallback_slot,
                         "related_term": obj,
                         "verified": fallback_slot != pred,
@@ -666,10 +667,10 @@ class LLMTermExtractor:
         }
 
         self._save_lock = threading.Lock()
-        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
-        if os.path.exists(self.output_file):
+        Path(self.output_file).parent.mkdir(parents=True, exist_ok=True)
+        if Path(self.output_file).exists():
             try:
-                with open(self.output_file, "r") as fh:
+                with Path(self.output_file).open("r") as fh:
                     prev = json.load(fh)
                     for term in prev.get("terms", []):
                         key = term["term"].strip().lower()
@@ -846,7 +847,7 @@ class LLMTermExtractor:
 
     def get_context_snippet(
         self, full_text: str, term: str, filename: str, page_num: int
-    ) -> dict[str, Union[str, int]]:
+    ) -> dict[str, str | int]:
         """Extract ~context_length tokens around `term`. Return snippet + source/page."""
         sentences = re.split(r"(?<=[\.\!\?])\s+", full_text)
         low = term.lower()
@@ -969,7 +970,7 @@ INSTRUCTIONS:
                     "terms": terms_out,
                     "code_snippets": self.code_snippets,
                 }
-                with open(self.output_file, "w") as fh:
+                with Path(self.output_file).open("w") as fh:
                     json.dump(out, fh, indent=2)
                 logger.debug(f"Saved {len(self.terms_dict)} terms to {self.output_file}")
             except Exception as e:
@@ -989,7 +990,7 @@ INSTRUCTIONS:
                     "terms": terms_out,
                     "code_snippets": self.code_snippets,
                 }
-                with open(self.output_file, "w") as fh:
+                with Path(self.output_file).open("w") as fh:
                     json.dump(out, fh, indent=2)
                 logger.debug(
                     f"Saved {len(self.code_snippets)} code snippets to {self.output_file}"
@@ -1292,7 +1293,7 @@ Output JSON:
         - If new/updated → save immediately (thread-safe)
         Returns True if new/updated terms or properties were added.
         """
-        filename = os.path.basename(pdf_path)
+        filename = Path(pdf_path).name
         logger.debug(f">> Starting process_page: {filename} (page {page_num+1})")
         try:
             page = doc.load_page(page_num)
@@ -1584,7 +1585,7 @@ Output JSON:
           4. Most common 4-digit year on first page as last resort
         """
         pdf_meta = doc.metadata or {}
-        filename = os.path.basename(pdf_path)
+        filename = Path(pdf_path).name
         current_year = datetime.datetime.now(datetime.UTC).year
 
         # Month names for date pattern matching
@@ -1791,7 +1792,7 @@ Output JSON:
         pub_meta = self._extract_pub_metadata(doc, pdf_path)
         pub_year = pub_meta.get("publication_year")
         if pub_year:
-            logger.debug(f"Publication year for {os.path.basename(pdf_path)}: {pub_year}")
+            logger.debug(f"Publication year for {Path(pdf_path).name}: {pub_year}")
 
         logger.debug(f"Processing '{pdf_path}' ({total_pages} pages) with {self.max_workers} workers")
         with ThreadPoolExecutor(max_workers=self.max_workers) as exe:
@@ -1805,15 +1806,15 @@ Output JSON:
                     if result:
                         pages_with_terms += 1
                         logger.debug(
-                            f"Page {page_i+1}/{total_pages} of {os.path.basename(pdf_path)} yielded terms or properties"
+                            f"Page {page_i+1}/{total_pages} of {Path(pdf_path).name} yielded terms or properties"
                         )
                     else:
                         logger.debug(
-                            f"Page {page_i+1}/{total_pages} of {os.path.basename(pdf_path)} had no new terms or properties"
+                            f"Page {page_i+1}/{total_pages} of {Path(pdf_path).name} had no new terms or properties"
                         )
                 except Exception as e:
                     logger.error(
-                        f"Error processing page {page_i+1} of {os.path.basename(pdf_path)}: {e}"
+                        f"Error processing page {page_i+1} of {Path(pdf_path).name}: {e}"
                     )
 
         self.metadata["processed_files"] += 1
@@ -1823,7 +1824,7 @@ Output JSON:
         # Do not infer missing publication/authorship fields from extracted terms;
         # those term fields may have been hallucinated by the LLM or loaded from
         # old generated output.
-        filename = os.path.basename(pdf_path)
+        filename = Path(pdf_path).name
         best_meta: dict[str, Any] = dict(pub_meta or {})
         scalar_fields = ("paper_title", "doi", "journal", "volume", "issue",
                          "pages_range", "abstract_text", "publication_year")
@@ -1868,18 +1869,18 @@ Output JSON:
 
         Saves output JSON one final time.
         """
-        if not os.path.isdir(self.data_dir):
+        if not Path(self.data_dir).is_dir():
             msg = f"Directory not found: {self.data_dir}"
             logger.error(msg)
             return {"status": "error", "message": msg}
 
-        pdfs = [f for f in os.listdir(self.data_dir) if f.lower().endswith(".pdf")]
+        pdfs = [f.name for f in Path(self.data_dir).iterdir() if f.name.lower().endswith(".pdf")]
         if not pdfs:
             logger.warning(f"No PDFs in {self.data_dir}")
 
         total_files = 0
         for idx, fname in enumerate(pdfs, start=1):
-            fullpath = os.path.join(self.data_dir, fname)
+            fullpath = os.path.join(self.data_dir, fname)  # noqa: PTH118 - Path would normalise './x' and the path is logged/passed on verbatim
             logger.info(f"[{idx}/{len(pdfs)}] Processing file: {fname}")
             self.process_pdf(fullpath)
             total_files += 1
@@ -2108,12 +2109,12 @@ if __name__ == "__main__":
         merge_embed_model=args.merge_embed_model,
     )
     if result.get("status") == "error":
-        print(f"✗ Error: {result.get('message')}")
-        print(f"  Expected directory: {args.pdf_dir}")
-        print(f"  Current working directory: {os.getcwd()}")
-        print(f"  Available directories: {[d for d in os.listdir('.') if os.path.isdir(d)]}")
+        output.info(f"✗ Error: {result.get('message')}")
+        output.info(f"  Expected directory: {args.pdf_dir}")
+        output.info(f"  Current working directory: {Path.cwd()}")
+        output.info(f"  Available directories: {[d.name for d in Path().iterdir() if d.is_dir()]}")
     else:
-        print(
+        output.info(
             f"✓ Processed {result['processed_files']} files, "
             f"{result['processed_pages_total']} total pages, "
             f"{result['processed_pages_with_terms']} pages with terms, "

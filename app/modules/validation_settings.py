@@ -26,12 +26,13 @@ imports the evaluation suite or waits on a binary result.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 import json
 import logging
 from pathlib import Path
 import threading
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from .contracts.context import RequestContext
 from .contracts.errors import ContractError, ErrorCode

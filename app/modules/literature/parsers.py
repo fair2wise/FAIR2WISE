@@ -21,6 +21,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``Publicatio
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 import csv
 import io
 import json
@@ -28,7 +29,7 @@ import logging
 import os
 from pathlib import Path
 import time
-from typing import Any, Protocol, Sequence, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from .parsed_document import (
     BoundingBox,

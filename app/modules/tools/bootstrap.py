@@ -12,7 +12,8 @@ passed in by the caller. Real retrieval/QA tools arrive in T03.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import Any
 
 from ..agent_runtime.registry import ToolRegistry, ToolRegistryError
 from ..agent_runtime.skills import Skill, SkillRegistry

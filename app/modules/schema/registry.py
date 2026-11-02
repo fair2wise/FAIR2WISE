@@ -25,10 +25,11 @@ bound to a pre-S4 fingerprint is still recognised (``closure_fingerprint(entry, 
 """
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Sequence, cast
+from typing import Any, cast
 
 import yaml
 

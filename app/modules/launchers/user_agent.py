@@ -15,6 +15,7 @@ from academy.exchange.cloud.login import get_token_storage
 from academy.exchange.cloud.scopes import AcademyExchangeScopes
 from academy.manager import Manager
 
+from ..cli_output import output
 from ..term_extractor.user_agent import UserAgent
 
 try:
@@ -62,9 +63,9 @@ async def launch(port: int, token_db: Path = DEFAULT_TOKEN_DB) -> None:
         executors=ThreadPoolExecutor(max_workers=4),
     ) as manager:
         agent_hdl = await manager.launch(UserAgent, kwargs={"port": port})
-        print(f"User Agent Handle >>>> {agent_hdl.agent_id.uid!s}")
+        output.info(f"User Agent Handle >>>> {agent_hdl.agent_id.uid!s}")
 
-        with open("user_agent_handle.pkl", "wb") as handle:
+        with Path("user_agent_handle.pkl").open("wb") as handle:
             pickle.dump(agent_hdl.agent_id, handle)
         await manager.wait([agent_hdl], raise_error=True)
 

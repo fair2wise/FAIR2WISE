@@ -18,13 +18,14 @@ field (header, cookie claim, body ``mode``/``is_admin``, hostname) is an input.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import functools
 import inspect
 import ipaddress
 import threading
-from typing import Any, Callable, Iterable, Mapping, Sequence, TypeVar, Union, cast
+from typing import Any, TypeVar, cast
 import uuid
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, RoleCheckEvidence
@@ -118,9 +119,9 @@ class DeploymentSettings:
         corpus_scope: Corpora this deployment may read or affect.
     """
 
-    profile: Union[DeploymentProfile, str]
+    profile: DeploymentProfile | str
     writer_identity: str
-    mode: Union[AuthorizationMode, str] | None = None
+    mode: AuthorizationMode | str | None = None
     tiled_target: str | None = None
     local_bind: str = "loopback"
     role_check_max_age: timedelta = DEFAULT_ROLE_CHECK_MAX_AGE
@@ -212,7 +213,7 @@ class DeploymentSettings:
         )
 
     @classmethod
-    def for_disposable_test_target(cls, profile: Union[DeploymentProfile, str], *, tiled_target: str,
+    def for_disposable_test_target(cls, profile: DeploymentProfile | str, *, tiled_target: str,
                                    writer_identity: str, **kwargs: Any) -> DeploymentSettings:
         """Test-only ALS settings bound to an application-owned disposable Tiled (T25C).
 
@@ -383,7 +384,7 @@ def _als_context(settings: DeploymentSettings, identity: VerifiedIdentity, *, re
     )
 
 
-def verify_identity(settings: DeploymentSettings, credential: Union[TiledCredential, str, None], *,
+def verify_identity(settings: DeploymentSettings, credential: TiledCredential | str | None, *,
                     identity_port: TiledIdentityPort | None, clock: Clock,
                     role_cache: RoleCheckCache | None = None, require_fresh: bool = True) -> VerifiedIdentity:
     """Verify an ALS user credential against the profile's own Tiled.
@@ -442,7 +443,7 @@ def verify_identity(settings: DeploymentSettings, credential: Union[TiledCredent
     return identity
 
 
-def resolve_context(settings: DeploymentSettings, request_credential: Union[TiledCredential, str, None], *,
+def resolve_context(settings: DeploymentSettings, request_credential: TiledCredential | str | None, *,
                     request_id: str, session_id: str | None = None,
                     actor_kind: ActorKind = ActorKind.INTERACTIVE,
                     identity_port: TiledIdentityPort | None = None, clock: Clock,

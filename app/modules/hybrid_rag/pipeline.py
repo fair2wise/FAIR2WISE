@@ -1,11 +1,12 @@
 """Hybrid source RAG facade: index builders + retrieve/rank/pack."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 import logging
 import os
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from .chunker import CHUNKER_VERSION, chunk_pdf, chunk_text_document, iter_nonempty
 from .context import ContextBuilder

@@ -22,7 +22,7 @@ Rules (docs/migration/api/README.md section 3):
 
 from __future__ import annotations
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from ..modules.contracts.context import CAPABILITIES
 from ..modules.security.authorization import RoutePolicy

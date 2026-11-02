@@ -11,10 +11,11 @@ rebuilding anything. Until a new triple is activated the old one stays in place.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
-from typing import Any, Callable, Iterable, cast
+from typing import Any, cast
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.errors import ContractError, ErrorCode

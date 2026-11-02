@@ -35,10 +35,11 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 import json
 import re
-from typing import Any, Callable, Final, Iterable, Literal, Mapping, Sequence, cast
+from typing import Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 

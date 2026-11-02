@@ -15,12 +15,13 @@ Retries are at-least-once with reconciled effects; exactly-once is not claimed.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
 import uuid
 
 from ..ports import ContractError, ErrorCode
@@ -39,7 +40,7 @@ def _atomic_write(path: Path, text: str) -> None:
         handle.write(text)
         handle.flush()
         os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    tmp.replace(path)
 
 
 class Lease:

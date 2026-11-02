@@ -25,9 +25,9 @@ Changed for F2W:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 import json
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, RemoveMessage
 

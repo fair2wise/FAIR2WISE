@@ -12,9 +12,10 @@ The gates are not configuration: opening one is an owner decision recorded in re
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..extraction import H3_GATES as _EXTRACTION_GATES

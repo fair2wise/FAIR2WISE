@@ -43,13 +43,14 @@ still goes through the live whoami role check in ``resolve_context``.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import hashlib
 import logging
 import secrets
 import threading
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse

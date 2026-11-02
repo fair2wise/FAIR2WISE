@@ -14,8 +14,9 @@ it has one and leaves slot ownership to the resolver.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)

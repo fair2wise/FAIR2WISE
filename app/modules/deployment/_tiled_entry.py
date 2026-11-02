@@ -17,10 +17,11 @@ Exit codes: 3 = installed tiled is not the expected version; 4 = configuration r
 """
 
 import argparse
+from collections.abc import Sequence
 import json
 from pathlib import Path
 import sys
-from typing import NoReturn, Sequence
+from typing import NoReturn
 
 EXIT_UNSUPPORTED_VERSION = 3
 EXIT_CONFIG = 4
@@ -45,7 +46,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     import tiled
 
     if tiled.__version__ != args.expected_version:
-        print(
+        print(  # noqa: T201 - protocol line the supervisor parses; stdlib-only script, no project logger
             f"F2W_TILED_ERROR unsupported_version installed={tiled.__version__} "
             f"expected={args.expected_version}",
             file=sys.stderr,
@@ -73,7 +74,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         config = Config.model_validate(conf)
     except Exception as exc:  # pydantic ValidationError; message names fields, not values
-        print(f"F2W_TILED_ERROR config_invalid {type(exc).__name__}", file=sys.stderr, flush=True)
+        print(  # noqa: T201 - protocol line the supervisor parses
+            f"F2W_TILED_ERROR config_invalid {type(exc).__name__}", file=sys.stderr, flush=True
+        )
         return EXIT_CONFIG
 
     from tiled.commandline._serve import _setup_log_config
@@ -83,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     host = config.uvicorn.get("host", "127.0.0.1")
     port = int(config.uvicorn.get("port", 8765))
     web_app = build_app_from_config(config)
-    print(
+    print(  # noqa: T201 - protocol line the supervisor parses
         f"F2W_TILED_LAUNCH version={tiled.__version__} host={host} port={port} instance={args.instance}",
         file=sys.stderr,
         flush=True,

@@ -46,7 +46,8 @@ LangGraph code. Construction opens no network connection.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence, Union, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult
@@ -252,7 +253,7 @@ class F2WClient:
         """
         return self._operations("plan_publication").submit_publication(ctx, snapshot_id, target)
 
-    def approve_plan(self, ctx: RequestContext, plan: Union[Any, str], *, job_id: str,
+    def approve_plan(self, ctx: RequestContext, plan: Any | str, *, job_id: str,
                      approver_credential: Any = None, expires_at: Any = None) -> Any:
         """Approve the publication job's current plan (``F2WOperations.approve_publication``).
 

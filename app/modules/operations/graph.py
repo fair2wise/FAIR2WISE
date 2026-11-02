@@ -47,9 +47,10 @@ snippets or source text (D19).
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence, cast
+from typing import Any, Literal, cast
 import uuid
 
 from ..agent_runtime.executor import is_control_flow

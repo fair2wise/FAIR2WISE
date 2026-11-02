@@ -23,12 +23,13 @@ src/forge/agents/literature/structured_output.py (BSD-3-Clause).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 import inspect
 import json
 import re
 import threading
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 
 
 class SyncChatClient(Protocol):

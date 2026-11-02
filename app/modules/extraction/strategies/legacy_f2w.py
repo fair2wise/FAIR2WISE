@@ -21,8 +21,9 @@ code-snippet provenance stay attached as mention attributes.
 
 from __future__ import annotations
 
-import os
-from typing import Any, Sequence
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
 from ..contract import ChunkCoverage, ExtractedMention, ExtractionResult, ExtractionSource, frozen_copy
 
@@ -80,7 +81,7 @@ class LegacyF2WStrategy:
         """Run the extractor on ``source``; return the ``source_paper`` filename and coverage."""
         coverage: list[ChunkCoverage] = []
         if source.pdf_path:
-            filename = os.path.basename(source.pdf_path)
+            filename = Path(source.pdf_path).name
             changed_pages = self.extractor.process_pdf(source.pdf_path)
             coverage.append(ChunkCoverage(
                 chunk_id=f"pdf:{filename}", section=None, start=None, end=None, ok=None,

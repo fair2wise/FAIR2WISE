@@ -20,12 +20,13 @@ Never log API keys. Missing auth typically returns empty lists, not HTTP 401.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 import logging
 import os
 import re
 from types import SimpleNamespace
-from typing import Any, Iterable, Sequence
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 import requests

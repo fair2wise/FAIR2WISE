@@ -14,8 +14,9 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/pape
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode

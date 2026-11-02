@@ -37,11 +37,12 @@ imports (they load when an instance is built or a delegated task runs).
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from .contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult

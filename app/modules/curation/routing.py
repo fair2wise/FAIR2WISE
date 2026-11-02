@@ -13,11 +13,12 @@ cache (network); a ``StructuralAuthority`` port may be supplied instead.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 import hashlib
 import json
 import re
-from typing import Any, Iterable, Protocol, cast
+from typing import Any, Protocol, cast
 import unicodedata
 import uuid
 

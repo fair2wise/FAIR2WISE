@@ -13,7 +13,8 @@ als_knowledge_agent/src/als_knowledge_agent/graph/classification_units.py
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping, NamedTuple
+from collections.abc import Iterable, Mapping
+from typing import Any, NamedTuple
 
 
 class Unit(NamedTuple):

@@ -26,14 +26,15 @@ malicious host code. Importing it has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 import hashlib
 import hmac
 import secrets
 import threading
-from typing import Any, Callable, Iterable, NoReturn, TypeVar
+from typing import Any, NoReturn, TypeVar
 import uuid
 
 from ..contracts.context import RequestContext
@@ -45,7 +46,7 @@ SOURCE_READ = "source.read"
 T = TypeVar("T")
 
 
-class SourceKind(str, Enum):
+class SourceKind(StrEnum):
     """Private source material an internal read may touch."""
 
     PDF_BYTES = "pdf_bytes"
@@ -57,7 +58,7 @@ class SourceKind(str, Enum):
     PRIVATE_EVIDENCE = "private_evidence"
 
 
-class ReadPurpose(str, Enum):
+class ReadPurpose(StrEnum):
     """Why trusted service code reads a private source."""
 
     RETRIEVAL = "retrieval"

@@ -23,7 +23,7 @@ Two input modes, both existing entry points:
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
 from typing import Any
 
 from ..contract import ChunkCoverage, ExtractionResult, ExtractionSource, frozen_copy
@@ -59,7 +59,7 @@ class TermExtractorAgentStrategy:
         """Run the orchestrator on ``source``; return the ``source_paper`` filename and coverage."""
         coverage: list[ChunkCoverage] = []
         if source.pdf_path:
-            filename = os.path.basename(source.pdf_path)
+            filename = Path(source.pdf_path).name
             pages = self.orchestrator.process_pdf(source.pdf_path)
             coverage.append(ChunkCoverage(chunk_id=f"pdf:{filename}", section=None, start=None, end=None, ok=None,
                                           extracted_by="agent_pdf", reason=f"pages_with_terms={pages}",

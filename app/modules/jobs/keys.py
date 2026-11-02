@@ -13,11 +13,12 @@ digest is taken over canonical JSON so it never reveals the inputs.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import json
 import re
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 #: Input fields a stage may depend on.
 INPUT_FIELDS = (

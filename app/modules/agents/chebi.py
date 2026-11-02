@@ -16,7 +16,7 @@ def load_chebi_obo(obo_path: str) -> Any:  # Any: networkx graph (untyped)
         graph = obonet.read_obo(obo_path)
         return graph
     except Exception as e:
-        print(f"Failed to load OBO file '{obo_path}': {e}", file=sys.stderr)
+        print(f"Failed to load OBO file '{obo_path}': {e}", file=sys.stderr)  # noqa: T201 - standalone script output (plain script, no package context)
         raise FileNotFoundError(f"Failed to load OBO file '{obo_path}': {e}") from e
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -166,13 +166,13 @@ class ChebiOboLookup:
 def main() -> None:
     """Run an interactive ChEBI lookup prompt for the OBO file given as argv[1]."""
     if len(sys.argv) != 2:
-        print("Usage: python chebi.py <path/to/chebi.obo>", file=sys.stderr)
+        print("Usage: python chebi.py <path/to/chebi.obo>", file=sys.stderr)  # noqa: T201 - standalone script output (plain script, no package context)
         sys.exit(1)
 
     obo_path = sys.argv[1]
     chebi_lookup = ChebiOboLookup(obo_path)
 
-    print("Enter a chemical name (exact label or synonym) to look it up in ChEBI (Ctrl+C to exit):")
+    print("Enter a chemical name (exact label or synonym) to look it up in ChEBI (Ctrl+C to exit):")  # noqa: T201 - standalone script output (plain script, no package context)
     try:
         while True:
             query = input(">>> ").strip()
@@ -181,40 +181,40 @@ def main() -> None:
 
             result = chebi_lookup.lookup(query)
             if not result:
-                print(f"No match found for '{query}'.\n")
+                print(f"No match found for '{query}'.\n")  # noqa: T201 - standalone script output (plain script, no package context)
                 continue
 
-            print(f"\n✅ Match for '{query}':")
+            print(f"\n✅ Match for '{query}':")  # noqa: T201 - standalone script output (plain script, no package context)
             for key, val in result.items():
                 if key == "all_attributes":
-                    print(f"  {key}:")
+                    print(f"  {key}:")  # noqa: T201 - standalone script output (plain script, no package context)
                     for attr_name, attr_val in val.items():
                         if isinstance(attr_val, list):
                             if attr_val:
                                 joined = ", ".join(str(x) for x in attr_val)
-                                print(f"    - {attr_name}: [{joined}]")
+                                print(f"    - {attr_name}: [{joined}]")  # noqa: T201 - standalone script output (plain script, no package context)
                             else:
-                                print(f"    - {attr_name}: []")
+                                print(f"    - {attr_name}: []")  # noqa: T201 - standalone script output (plain script, no package context)
                         else:
-                            print(f"    - {attr_name}: {attr_val}")
+                            print(f"    - {attr_name}: {attr_val}")  # noqa: T201 - standalone script output (plain script, no package context)
                 elif isinstance(val, dict):
-                    print(f"  {key}:")
+                    print(f"  {key}:")  # noqa: T201 - standalone script output (plain script, no package context)
                     for subk, subv in val.items():
                         if isinstance(subv, list):
-                            print(f"    - {subk}: {', '.join(subv)}")
+                            print(f"    - {subk}: {', '.join(subv)}")  # noqa: T201 - standalone script output (plain script, no package context)
                         else:
-                            print(f"    - {subk}: {subv}")
+                            print(f"    - {subk}: {subv}")  # noqa: T201 - standalone script output (plain script, no package context)
                 elif isinstance(val, list):
                     if val:
-                        print(f"  {key}: {', '.join(val)}")
+                        print(f"  {key}: {', '.join(val)}")  # noqa: T201 - standalone script output (plain script, no package context)
                     else:
-                        print(f"  {key}: —")
+                        print(f"  {key}: —")  # noqa: T201 - standalone script output (plain script, no package context)
                 else:
-                    print(f"  {key}: {val}")
-            print()
+                    print(f"  {key}: {val}")  # noqa: T201 - standalone script output (plain script, no package context)
+            print()  # noqa: T201 - standalone script output (plain script, no package context)
 
     except KeyboardInterrupt:
-        print("\nExiting.")
+        print("\nExiting.")  # noqa: T201 - standalone script output (plain script, no package context)
 
 
 if __name__ == "__main__":

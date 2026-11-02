@@ -27,6 +27,7 @@ staged_import_status.py (``read_staged_import_status``) (BSD-3-Clause).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Mapping, Sequence
 import contextlib
 import hashlib
 import json
@@ -34,7 +35,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Callable, Iterator, Mapping, Sequence, cast
+from typing import Any, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -165,7 +166,7 @@ def _write_ordered(path: Path, payload: dict[str, Any]) -> None:
         json.dump(payload, stream, ensure_ascii=False, allow_nan=False)
         stream.flush()
         os.fsync(stream.fileno())
-    os.replace(tmp, path)
+    tmp.replace(path)
 
 
 def load_package(ctx: RequestContext, store: FileDocumentStore, path: Path) -> dict[str, Any]:
@@ -194,7 +195,7 @@ def _file_sha(path: Path) -> str:
 @contextlib.contextmanager
 def _exclusive(lock_path: Path) -> Iterator[None]:
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "a") as handle:
+    with lock_path.open("a") as handle:
         if fcntl is not None:
             try:
                 fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)

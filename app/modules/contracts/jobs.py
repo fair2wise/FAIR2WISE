@@ -8,7 +8,7 @@ references, never large PDF or base64 payloads.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,7 +17,7 @@ from .errors import ErrorCode
 JOB_EVENT_VERSION = 1
 
 
-class JobState(str, Enum):
+class JobState(StrEnum):
     """Overall job lifecycle."""
 
     QUEUED = "queued"
@@ -33,7 +33,7 @@ class JobState(str, Enum):
 TERMINAL_STATES = frozenset({JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED})
 
 
-class StageOutcome(str, Enum):
+class StageOutcome(StrEnum):
     """Outcome of one pipeline stage, independent of the job lifecycle."""
 
     PENDING = "pending"

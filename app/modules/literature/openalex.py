@@ -25,6 +25,7 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/open
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import hashlib
@@ -35,7 +36,7 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence, Union, cast
+from typing import Any, cast
 
 import httpx
 
@@ -329,7 +330,7 @@ class ResponseCache:
         clock: Epoch seconds, injectable.
     """
 
-    def __init__(self, path: Union[str, Path] = ":memory:", *, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, path: str | Path = ":memory:", *, clock: Callable[[], float] = time.time) -> None:
         self._clock = clock
         self._lock = threading.Lock()
         target = str(path)

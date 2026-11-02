@@ -29,6 +29,7 @@ injected, an artifact reference.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 import inspect
@@ -36,7 +37,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Awaitable, Callable, Mapping, cast
+from typing import Any, cast
 
 from ..contracts import (
     ApprovalRecord,

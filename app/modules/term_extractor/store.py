@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 import os
+from pathlib import Path
 import threading
 from typing import Any
 
@@ -47,7 +48,7 @@ class TermStore:
             "processed_pages_with_terms": 0,
             "version": "2.1",
         }
-        os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+        Path(os.path.abspath(output_file)).parent.mkdir(parents=True, exist_ok=True)  # noqa: PTH100 - lexical abspath, not resolve()
         self._load()
 
     # ------------------------------------------------------------------
@@ -56,10 +57,10 @@ class TermStore:
 
     def _load(self) -> None:
         """Populate ``_records`` from the JSON file on disk. No-op if the file is absent."""
-        if not os.path.exists(self.output_file):
+        if not Path(self.output_file).exists():
             return
         try:
-            with open(self.output_file) as fh:
+            with Path(self.output_file).open() as fh:
                 data = json.load(fh)
             for raw in data.get("terms", []):
                 record = TermRecord.from_dict(raw)
@@ -87,7 +88,7 @@ class TermStore:
         with self._save_lock:
             try:
                 out = {"metadata": metadata_snapshot, "terms": terms_out, "code_snippets": snippets_out}
-                with open(self.output_file, "w") as fh:
+                with Path(self.output_file).open("w") as fh:
                     json.dump(out, fh, indent=2)
                 logger.debug("Saved %d terms to %s", len(self._records), self.output_file)
             except Exception as e:

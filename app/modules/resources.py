@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Union
 
 RESOURCE_ROOT_VAR = "F2W_RESOURCE_ROOT"
 _PACKAGE_DIR = Path(__file__).resolve().parents[1]  # app/ in a checkout, site-packages/f2w when installed
@@ -45,7 +44,7 @@ def resource_root() -> Path | None:
     return None
 
 
-def resolve_resource(path: Union[str, Path]) -> Path:
+def resolve_resource(path: str | Path) -> Path:
     """Resolve a schema/vocabulary path without depending on the working directory.
 
     Absolute paths and relative paths that exist from the current directory are

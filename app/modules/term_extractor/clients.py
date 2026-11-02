@@ -1,9 +1,10 @@
 """Chat-completion clients (Ollama, CBORG) with LLM-call tracing."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 import logging
 import time
-from typing import Any, Callable
+from typing import Any
 
 import openai
 import requests

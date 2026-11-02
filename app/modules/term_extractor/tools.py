@@ -1,11 +1,11 @@
 """LangChain tools the term-extraction agent calls to look up, validate and register terms."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
 import re
 import threading
-from typing import Callable
 
 from langchain_core.tools import BaseTool, tool
 

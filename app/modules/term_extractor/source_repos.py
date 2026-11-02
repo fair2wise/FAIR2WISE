@@ -8,11 +8,12 @@ records used by the existing PDF-embedded code path.
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 import logging
 import os
 import re
-from typing import Any, Iterable, Sequence
+from typing import Any
 from urllib.parse import quote
 
 import requests

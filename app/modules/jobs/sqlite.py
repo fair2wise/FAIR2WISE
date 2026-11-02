@@ -13,11 +13,12 @@ als_knowledge_agent/src/als_knowledge_agent/graph/thread_sqlite.py (``thread_con
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 import threading
-from typing import Any, Iterator, Sequence
+from typing import Any
 
 
 class OperationalDB:

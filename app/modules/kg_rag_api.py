@@ -25,6 +25,7 @@ if __name__ == "__main__" and not __package__:
 import argparse
 import asyncio
 from collections import defaultdict, deque
+from collections.abc import Callable, Sequence
 import contextlib
 import contextvars
 from dataclasses import dataclass
@@ -38,7 +39,7 @@ from pathlib import Path
 import re
 import sys
 import time
-from typing import TYPE_CHECKING, Any, Callable, Protocol, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -85,6 +86,7 @@ else:
 
 from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
 from .cborg_limiter import async_slot  # noqa: E402
+from .cli_output import output  # noqa: E402
 from .literature.pdf_reader import open_pdf  # noqa: E402
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
@@ -292,7 +294,7 @@ def create_fastapi_app(
     identity_port: Any | None = None,
     credential_store: Any | None = None,
     clock: Callable[[], Any] | None = None,
-    gaps_dir: Union[str, Path] | None = None,
+    gaps_dir: str | Path | None = None,
 ) -> FastAPI:
     """Create a FastAPI app that proxies chat requests through the KG-RAG pipeline.
 
@@ -538,7 +540,7 @@ class MissingNodeTracker:
             disabled: ``path`` is ``None``, ``log`` keeps nothing, and a warning is logged once.
     """
 
-    def __init__(self, kg_file: str, out_dir: Union[str, Path] | None = None) -> None:
+    def __init__(self, kg_file: str, out_dir: str | Path | None = None) -> None:
         """Initialize tracker with output path derived from KG filename."""
         kg_name = Path(kg_file).stem
         directory = Path(out_dir) if out_dir is not None else DEFAULT_GAPS_DIR
@@ -566,7 +568,7 @@ class MissingNodeTracker:
             "reason": node.reason,
             "timestamp": node.timestamp,
         }
-        with open(self.path, "a", encoding="utf-8") as f:
+        with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         logger.info(
             Fore.RED + f"[GapTracker] Logged missing node: {node.entity} ({node.reason})" + Style.RESET_ALL
@@ -991,7 +993,7 @@ class KnowledgeGraph:
         self.graph_source_requested = source
         self.graph_source_used = source
         if source == "json":
-            with open(graph_file, "r") as fh:
+            with Path(graph_file).open("r") as fh:
                 data = json.load(fh)
         elif source in {"splash", "splash_links", "splash-links"}:
             logger.info("Loading KG from splash-links at %s...", SPLASH_LINKS_URI)
@@ -1006,7 +1008,7 @@ class KnowledgeGraph:
                     exc,
                     graph_file,
                 )
-                with open(graph_file, "r") as fh:
+                with Path(graph_file).open("r") as fh:
                     data = json.load(fh)
         else:
             raise ValueError(f"Unknown KG_RAG_GRAPH_SOURCE: {source}")
@@ -1546,12 +1548,12 @@ async def run_competency_questions(
 ) -> None:
     """Run a batch of competency questions, saving baseline and KG-RAG responses to JSON."""
     # load questions
-    with open(infile, "r") as f:
+    with infile.open("r") as f:
         questions = [line.strip() for line in f if line.strip()]
 
     results = []
     for i, q in enumerate(questions, 1):
-        print(Fore.YELLOW + f"\n[Q{i}] {q}" + Style.RESET_ALL)
+        output.info(Fore.YELLOW + f"\n[Q{i}] {q}" + Style.RESET_ALL)
 
         infos = retrieve_nodes(q, kg)
         ctx = kg.build_context(
@@ -1577,8 +1579,8 @@ async def run_competency_questions(
             "kg_rag": rag_resp,
         })
 
-        print(Fore.GREEN + "[Baseline]\n" + base_resp[:500] + "..." + Style.RESET_ALL)
-        print(Fore.GREEN + "[KG-RAG]\n" + rag_resp[:500] + "..." + Style.RESET_ALL)
+        output.info(Fore.GREEN + "[Baseline]\n" + base_resp[:500] + "..." + Style.RESET_ALL)
+        output.info(Fore.GREEN + "[KG-RAG]\n" + rag_resp[:500] + "..." + Style.RESET_ALL)
 
         missing: list[MissingNode] = []
         if all(ni.evidence_ct == 0 for ni in infos):
@@ -1590,7 +1592,7 @@ async def run_competency_questions(
             gap_tracker.log(mn)
 
         # 🔥 Save incrementally after each question
-        with open(out_json, "w") as jf:
+        with out_json.open("w") as jf:
             json.dump(results, jf, indent=2)
 
         logger.info(f"Progress saved after Q{i} → {out_json}")
@@ -1800,11 +1802,10 @@ async def call_llm(cli: ChatClient, messages: Sequence[dict[str, str]], label: s
     """Call the LLM with timeout handling, printing status to stdout."""
     from .f2w_agent.trace import record_llm_call
 
-    print(
+    output.info(
         Fore.YELLOW
         + f"Calling {cli.model} for {label} (timeout={LLM_TIMEOUT}s)..."
         + Style.RESET_ALL,
-        flush=True,
     )
     started = time.perf_counter()
     try:
@@ -1855,15 +1856,15 @@ async def answer(
     gap_tracker: MissingNodeTracker
 ) -> None:
     """Answer a single question: retrieve KG context, call LLM, print result, log gaps."""
-    print(Fore.MAGENTA + f"\nQ: {q}" + Style.RESET_ALL)
+    output.info(Fore.MAGENTA + f"\nQ: {q}" + Style.RESET_ALL)
     infos = retrieve_nodes(q, kg)
-    print(
+    output.info(
         Fore.CYAN
         + "Selected: "
         + str([f"{n.id}:{n.score_prp:.2f}" for n in infos])
         + Style.RESET_ALL
     )
-    print(Fore.YELLOW + "Building retrieved context..." + Style.RESET_ALL, flush=True)
+    output.info(Fore.YELLOW + "Building retrieved context..." + Style.RESET_ALL)
     ctx = kg.build_context(
         infos,
         include_structured=STRUCT_CTX,
@@ -1882,8 +1883,8 @@ async def answer(
     rag_c.add(rag_prompt, rag_resp)
 
     if SHOW_BASELINE:
-        print(Fore.GREEN + "\n[Baseline]\n" + base_resp + Style.RESET_ALL)
-    print(Fore.GREEN + "\n[KG-RAG]\n" + rag_resp + Style.RESET_ALL)
+        output.info(Fore.GREEN + "\n[Baseline]\n" + base_resp + Style.RESET_ALL)
+    output.info(Fore.GREEN + "\n[KG-RAG]\n" + rag_resp + Style.RESET_ALL)
 
     missing: list[MissingNode] = []
     if all(ni.evidence_ct == 0 for ni in infos):
@@ -1941,9 +1942,10 @@ def main(args: argparse.Namespace) -> None:  # pragma: no cover
     try:
         asyncio.run(main_async(args))
     except KeyboardInterrupt:
-        print("\nInterrupted.")
+        output.info("\nInterrupted.")
     except RuntimeError as exc:
-        print(Fore.RED + f"\nError: {exc}" + Style.RESET_ALL)
+        # Printed to stdout before the conversion, so it stays on the stdout stream.
+        output.info(Fore.RED + f"\nError: {exc}" + Style.RESET_ALL)
 
 
 if __name__ == "__main__":

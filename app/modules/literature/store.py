@@ -30,8 +30,9 @@ manifest/duplicate handling) (BSD-3-Clause).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 import hashlib
 import json
 import os
@@ -40,7 +41,7 @@ import re
 import tempfile
 import threading
 import time
-from typing import Any, BinaryIO, Callable, Iterable, Iterator, Mapping, cast
+from typing import Any, BinaryIO, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -57,7 +58,7 @@ _META_KEY_RE = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
 _MAX_META_VALUE = 2048
 
 
-class AssetKind(str, Enum):
+class AssetKind(StrEnum):
     """What a stored object is. Recorded at first write and never changed."""
 
     SOURCE_PDF = "source_pdf"
@@ -160,10 +161,10 @@ def atomic_write_json(path: Path, payload: Any) -> None:
             json.dump(payload, stream, ensure_ascii=False, sort_keys=True, indent=1, allow_nan=False)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(tmp, path)
+        Path(tmp).replace(path)
     finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        if Path(tmp).exists():
+            Path(tmp).unlink()
 
 
 def _check_metadata(metadata: Mapping[str, str]) -> dict[str, str]:
@@ -296,13 +297,13 @@ class FileDocumentStore:
                 # kept inside the store (this is also how a deleted blob is repaired).
                 if external is None and (not target.exists() or sha256_of(target) != hexdigest):
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(tmp, target)
-                    os.chmod(target, 0o444)
+                    tmp.replace(target)
+                    target.chmod(0o444)
                 return existing
             if external is None:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(tmp, target)
-                os.chmod(target, 0o444)
+                tmp.replace(target)
+                target.chmod(0o444)
             record = {
                 "schema_version": STORE_SCHEMA_VERSION, "sha256": hexdigest, "size": size,
                 "media_type": media_type, "kind": kind, "metadata": meta, "created_at": self._clock(),
@@ -458,10 +459,10 @@ class FileDocumentStore:
             with os.fdopen(fd, "wb") as out:
                 for chunk in self.open_verified(ctx, ref):
                     out.write(chunk)
-            os.replace(tmp_name, dest)
+            Path(tmp_name).replace(dest)
         finally:
-            if os.path.exists(tmp_name):
-                os.unlink(tmp_name)
+            if Path(tmp_name).exists():
+                Path(tmp_name).unlink()
         return dest
 
     def read_stream(self, ctx: RequestContext, ref: str) -> BinaryIO:  # pragma: no cover - thin helper

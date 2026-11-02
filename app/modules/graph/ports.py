@@ -18,7 +18,8 @@ Adapted in part from als-computing/forge_rsoxs_analysis src/forge/kg/paging.py (
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from app.modules.contracts.context import RequestContext
 from app.modules.contracts.errors import CapabilityError, ContractError, ErrorCode

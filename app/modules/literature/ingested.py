@@ -20,12 +20,13 @@ als_knowledge_agent/src/als_knowledge_agent/graph/ingested_papers.py (``Ingested
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 import json
 import logging
 from pathlib import Path
 import re
 import threading
-from typing import Any, Iterable, Mapping, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 

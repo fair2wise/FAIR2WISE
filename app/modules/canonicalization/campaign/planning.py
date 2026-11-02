@@ -9,8 +9,8 @@ Model-callable code never receives application authority: nothing here accepts o
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Sequence
 
 from ..migration import PlanDraft, plan_migration
 from ..vocabulary import Vocabulary

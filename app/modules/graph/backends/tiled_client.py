@@ -21,9 +21,10 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/kg/client.py (BSD-3-Cl
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from functools import partial
 import re
-from typing import Any, Callable, Mapping
+from typing import Any
 
 import requests
 

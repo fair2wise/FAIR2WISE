@@ -8,7 +8,7 @@ body, header or model argument (plan section 4.13, D30/D34).
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -34,7 +34,7 @@ ADMIN_CAPABILITIES = frozenset({
 CAPABILITIES = CHAT_CAPABILITIES | ADMIN_CAPABILITIES
 
 
-class DeploymentProfile(str, Enum):
+class DeploymentProfile(StrEnum):
     """Image/deployment profile selected at startup (D23-D25)."""
 
     LOCAL = "local"
@@ -42,7 +42,7 @@ class DeploymentProfile(str, Enum):
     ALS_PROD = "als-prod"
 
 
-class AuthorizationMode(str, Enum):
+class AuthorizationMode(StrEnum):
     """How caller authority is established.
 
     Attributes:
@@ -56,7 +56,7 @@ class AuthorizationMode(str, Enum):
     TILED_AUTHENTICATED = "tiled_authenticated"
 
 
-class ActorKind(str, Enum):
+class ActorKind(StrEnum):
     """What is driving the request."""
 
     INTERACTIVE = "interactive"

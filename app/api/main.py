@@ -40,10 +40,11 @@ has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 import os
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send

@@ -26,12 +26,13 @@ configuration or model defaults, no direct HTTP transport, no auto-acceptance of
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import json
 import threading
-from typing import Any, Callable, Iterable, Protocol, cast
+from typing import Any, Protocol, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode

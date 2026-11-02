@@ -14,8 +14,9 @@ free of schema loading.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import re
-from typing import Any, Sequence
+from typing import Any
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
 

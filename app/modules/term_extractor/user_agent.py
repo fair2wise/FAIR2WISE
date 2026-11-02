@@ -10,6 +10,7 @@ import uuid
 from academy.agent import Agent, action
 from academy.identifier import AgentId
 
+from ..cli_output import output
 from .dashboard import Dashboard
 from .message import Log, Message, Registration, Stats, UserPrompt
 
@@ -22,7 +23,7 @@ class UserAgent(Agent):
     def __init__(self, host: str = '0.0.0.0', port: int = 8000) -> None:
 
         super().__init__()
-        print(f'Starting user agent on Port: {port}')
+        output.info(f'Starting user agent on Port: {port}')
         self._dashboard = Dashboard(host=host, port=port)
 
     async def agent_on_startup(self) -> None:
@@ -39,7 +40,7 @@ class UserAgent(Agent):
 
         self._dashboard.set_shutdown_callback(_shutdown_callback)
         self._dashboard.start()
-        print('Starting dashboard')
+        output.info('Starting dashboard')
 
     @action
     async def message(self, sender: str, message: Message) -> None:

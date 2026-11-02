@@ -7,7 +7,7 @@ perform network I/O, write staged artifacts and spend model budget (plan section
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -16,7 +16,7 @@ from .errors import ErrorCode
 from .evidence import EvidenceRef
 
 
-class Effect(str, Enum):
+class Effect(StrEnum):
     """Effects a tool may have. A tool with no effects is a pure read."""
 
     READ_CORPUS = "read_corpus"
@@ -29,7 +29,7 @@ class Effect(str, Enum):
     DESTRUCTIVE = "destructive"
 
 
-class CostClass(str, Enum):
+class CostClass(StrEnum):
     """Rough cost of one call, for admission and budgeting."""
 
     FREE = "free"
@@ -86,7 +86,7 @@ class ToolSpec(BaseModel):
         return self
 
 
-class ToolStatus(str, Enum):
+class ToolStatus(StrEnum):
     """Outcome of a tool call.
 
     ``EMPTY`` is a successful call with no results; it is never used for an

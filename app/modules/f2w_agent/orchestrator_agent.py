@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 import json
 import logging
 import os
 import re
-from typing import Any, Iterable, cast
+from typing import Any, cast
 
 from academy.agent import Agent, action
 

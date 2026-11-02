@@ -14,10 +14,11 @@ als_knowledge_agent/src/als_knowledge_agent/graph/scientific_artifacts.py
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 import hashlib
 import json
 import time
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode

@@ -100,7 +100,7 @@ class ReceiptStore:
             handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp, path)
+        tmp.replace(path)
         return path
 
     def read(self, receipt_id: str) -> ReceiptArtifact:

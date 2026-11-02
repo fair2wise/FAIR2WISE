@@ -39,6 +39,7 @@ Importing this module has no side effects (the PDF reader is imported on first r
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Mapping, Sequence
 import contextlib
 import contextvars
 import hashlib
@@ -46,7 +47,7 @@ import logging
 from pathlib import Path
 import re
 import threading
-from typing import Any, Callable, Iterator, Mapping, Sequence
+from typing import Any
 
 from ..modules.contracts.evidence import SourceLocator
 from ..modules.security.disclosure import SourceRef

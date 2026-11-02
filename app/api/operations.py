@@ -33,11 +33,12 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence, Union, cast
+from typing import Any, cast
 import uuid
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan
@@ -184,7 +185,7 @@ class F2WOperations:
 
     # --- jobs ---------------------------------------------------------------------------
 
-    def submit_job(self, ctx: RequestContext, kind: str, inputs: Union[OperationInputs, Mapping[str, Any]], *,
+    def submit_job(self, ctx: RequestContext, kind: str, inputs: OperationInputs | Mapping[str, Any], *,
                    settings_revision: str | None = None) -> JobHandle:
         """Register a job of a registered ``kind`` (idempotent for identical inputs)."""
         if not isinstance(inputs, OperationInputs):
@@ -563,7 +564,7 @@ class F2WOperations:
         }
 
 
-def build_operations(settings: DeploymentSettings, root: Union[str, Path], *,
+def build_operations(settings: DeploymentSettings, root: str | Path, *,
                      identity_port: TiledIdentityPort | None = None, epoch: Callable[[], float] = time.time,
                      clock: Clock = _utcnow, owner: str = "api",
                      publication_gate: PublicationGate | None = None,

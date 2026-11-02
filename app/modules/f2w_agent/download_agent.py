@@ -14,13 +14,14 @@ Abstract-first filtering keeps actual PDF downloads minimal.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import json
 import logging
 import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Callable
+from typing import Any
 
 from academy.agent import Agent, action
 

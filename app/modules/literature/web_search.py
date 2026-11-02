@@ -15,9 +15,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/web_search.py (BSD-3-Clause).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
 import logging
-from typing import Any, Callable, Sequence
+from typing import Any
 import xml.etree.ElementTree as ET
 
 import httpx

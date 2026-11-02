@@ -168,3 +168,25 @@ approximate (the "silent handler" count in particular includes legitimate fallba
 - Pyflakes baseline now 18 entries. `f2w_agent/api.py:4987` `history` (F821) is still open: `history` is not
   defined in that scope; the `try/except TypeError` around `retrieval.query(question, history=history)` would
   not catch the resulting `NameError`. Owner decision needed.
+
+### 2026-11-02: UP035, UP007, UP042, T201 and PTH closed in `app/` (ruff reports 0)
+
+- `UP035` (179): `Sequence`, `Mapping`, `Callable`, `Iterable`, `Iterator` now come from `collections.abc`
+  (identical on Python 3.12); `typing.ContextManager`/`AsyncContextManager` became
+  `contextlib.AbstractContextManager`/`AbstractAsyncContextManager`. `UP007` (33): `Union[...]` rewritten as `X | Y`.
+- `UP042` (19 classes in 12 files): `(str, Enum)` became `StrEnum`. This changes `str(member)`/`format(member)`
+  from `Class.MEMBER` to the bare value. An instrumented full-suite run (4,888 tests) recorded zero such calls on
+  any of these classes, and JSON encoding is unchanged; code paths the suite does not reach are unchecked.
+- `T201` (128): command output now goes through `app/modules/cli_output.py`, the `f2w.output` logger
+  (info to stdout, warning and above to stderr, bare message, installed on import, does not propagate), so the
+  text and streams are byte-identical and callers that never configure logging see the same lines. Characterization
+  tests written against the old `print` code first (38 + 13 + 6) pin the exact output. Left on `print` with a
+  reason: `deployment/_tiled_entry.py` and `deployment/gateway.py` (stdlib-only protocol/build scripts the supervisor
+  and image build parse or run before app code is importable) and `agents/chebi.py` (a plain `python chebi.py`
+  script that imports no project code).
+- `PTH` (82): `os.path`, `os.*` and builtin `open` replaced with `pathlib` at 3 `noqa` exceptions where the
+  lexical `abspath` and `os.path.join("./x")` semantics differ from `Path` (`literature/legacy.py`,
+  `term_extractor/store.py`, `extract_terms.py`). One accepted difference: `ExtractionOutput` given a bare
+  filename (no directory) used to raise `FileNotFoundError` from `os.makedirs("")` and now succeeds; no real call
+  site passes one.
+- `known_pyflakes.txt` is unchanged (18 entries). Binary-case manifest hashes regenerated.

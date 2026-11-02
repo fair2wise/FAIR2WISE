@@ -12,8 +12,9 @@ New for F2W (donor ``figure_extraction`` has no table-geometry equivalent); uses
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 from ..contracts.evidence import EvidenceRef, SourceLocator
 from ..literature.parsed_document import ParsedDocument, ParsedTable

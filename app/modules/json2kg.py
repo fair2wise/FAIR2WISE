@@ -14,13 +14,14 @@ Features:
   - Pytest test suite included below
 """
 import argparse
+from collections.abc import Iterable
 import hashlib
 import json
 import logging
 from pathlib import Path
 import re
 import sys
-from typing import Any, Iterable, cast
+from typing import Any, cast
 
 # Precompile regex pattern for performance
 _CLEAN_PATTERN = re.compile(r"[^A-Za-z0-9\-]")

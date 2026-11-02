@@ -13,8 +13,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_scale.py (reported-scal
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .kernels.scalebar import caption_bar_lengths, pair_lengths_to_panels, read_panel_scale
 from .kernels.types import PanelBox, ScaleReading, TextSpan

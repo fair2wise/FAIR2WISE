@@ -29,6 +29,7 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from ..modules.cli_output import output
 from ..modules.contracts.errors import ContractError, ErrorCode
 from .legacy_ui import deployment_settings_from
 from .operations import F2WOperations, build_operations
@@ -184,9 +185,9 @@ def main(argv: list[str] | None = None, *, environ: Any | None = None) -> int:
             from ..modules.operations.knowledge import knowledge_job_context
 
             ops.register_knowledge_jobs(knowledge_job_context(settings))  # the kind the worker runs (same store)
-        print(json.dumps(run(ops, args), indent=2, sort_keys=True, default=str))
+        output.info(json.dumps(run(ops, args), indent=2, sort_keys=True, default=str))
     except ContractError as exc:
-        print(json.dumps({"code": exc.code.value, "message": str(exc)}), file=sys.stderr)
+        output.error(json.dumps({"code": exc.code.value, "message": str(exc)}))
         return 2
     return 0
 

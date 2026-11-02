@@ -1,7 +1,7 @@
 """EvidenceRanker: one ranker over mixed, tagged evidence objects."""
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from .evidence import INTENT_WEIGHTS, Evidence
 

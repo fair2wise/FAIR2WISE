@@ -22,8 +22,8 @@ Importing this package has no side effects (no environment, network or model).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Mapping
 
 from .contract import (
     EXTRACTION_CONTRACT_VERSION,

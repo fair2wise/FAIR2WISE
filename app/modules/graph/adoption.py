@@ -25,6 +25,7 @@ the objects at that commit, and checked with :func:`validate_descriptor` against
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import json
@@ -32,7 +33,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import Any, Literal, Mapping, Sequence, cast
+from typing import Any, Literal, cast
 import uuid
 
 from app.modules import json2kg
@@ -292,7 +293,7 @@ def adopt_legacy_flat_file(
         if (staging / "graph.json").read_bytes() != blob:
             raise SnapshotError("graph.json does not read back identically to the flat file")
         try:
-            os.rename(staging, final)
+            staging.rename(final)
         except OSError:
             if os.path.lexists(final):
                 raise SnapshotExistsError(f"{corpus}/{snapshot_id} appeared during adoption") from None

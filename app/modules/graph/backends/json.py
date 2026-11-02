@@ -14,9 +14,10 @@ that changed on disk is not silently re-read mid-session ("caches reload intenti
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 import threading
-from typing import Any, Iterable, Iterator, Mapping, Sequence, Union
+from typing import Any
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext
@@ -58,7 +59,7 @@ class JsonGraphBackend:
         ContractError: ``INVALID_INPUT`` if two paths map to the same ``graph_id``.
     """
 
-    def __init__(self, graphs: Union[Sequence[Union[str, Path]], Mapping[str, Union[str, Path]]]) -> None:
+    def __init__(self, graphs: Sequence[str | Path] | Mapping[str, str | Path]) -> None:
         if isinstance(graphs, Mapping):
             pairs = [(str(g), Path(p)) for g, p in graphs.items()]
         else:

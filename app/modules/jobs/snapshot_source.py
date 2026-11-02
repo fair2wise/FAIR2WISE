@@ -9,10 +9,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import json
 from pathlib import Path
-from typing import Sequence
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..graph.releases import ReleaseVerificationError, verify_snapshot_dir

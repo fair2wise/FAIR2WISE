@@ -39,6 +39,7 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime
 import json
@@ -46,7 +47,7 @@ import logging
 import os
 from pathlib import Path
 import threading
-from typing import Any, Callable, Iterable, Mapping, cast
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler

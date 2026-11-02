@@ -11,8 +11,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/vocabulary_audit.py (BSD-3-Cla
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
 from .gates import ApplyRefused, authorize_vocabulary_change
 from .merge_safety import check_merge, fold

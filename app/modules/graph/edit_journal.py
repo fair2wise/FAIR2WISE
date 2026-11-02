@@ -15,12 +15,13 @@ the current state of an edit is its last record (state changes append, never rew
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Iterable, Literal, Sequence
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 

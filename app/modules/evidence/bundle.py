@@ -31,8 +31,9 @@ back (:meth:`LiteratureEvidenceBundle.from_json`). Importing this module has no 
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 import json
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 

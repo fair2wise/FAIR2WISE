@@ -12,11 +12,12 @@ durable local sink with the graph projection as an optional, lagging consumer.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 import hashlib
 import json
 import re
-from typing import Any, Mapping
+from typing import Any
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -21,11 +21,12 @@ als_knowledge_agent/src/als_knowledge_agent/graph/folder_ingest.py (``FileVerdic
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 import hashlib
 from pathlib import Path
 import time
-from typing import Any, Callable, Iterator, Sequence
+from typing import Any
 
 from .ingested import IngestedLookup
 from .intake import INGESTABLE, RETRYABLE, IntakeReport

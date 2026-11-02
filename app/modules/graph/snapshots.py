@@ -20,11 +20,12 @@ reproduces the stored bytes.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 from app.modules.f2w_agent.multi_kg import graph_id_for_path
 

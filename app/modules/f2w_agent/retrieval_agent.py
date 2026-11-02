@@ -9,12 +9,13 @@ numeric measurement claims still need explicit slots or snippets.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 import json
 import logging
 from pathlib import Path
 import re
 from types import SimpleNamespace
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 from academy.agent import Agent, action
 

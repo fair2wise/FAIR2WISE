@@ -35,9 +35,10 @@ pending review is refused unless the caller passes ``allow_pending_review=True``
 """
 from __future__ import annotations
 
+from collections.abc import Container
 import hashlib
 import re
-from typing import Any, Container
+from typing import Any
 
 from ..contracts.evidence import EvidenceRef, MatchType
 from ..evidence.units import normalize_quantity

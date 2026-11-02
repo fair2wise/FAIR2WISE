@@ -26,6 +26,7 @@ if __name__ == "__main__":
 
     load_entrypoint_dotenv(__file__)
 
+from ..cli_output import output
 from .coordinator import (
     Coordinator,
     CoordinatorConfig,
@@ -70,7 +71,7 @@ def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
 async def _run_chat(cfg: CoordinatorConfig) -> None:
     """Interactive stdin loop that sends each question through the coordinator."""
     coord = Coordinator(cfg)
-    print("FAIR2WISE orchestrated KG-RAG chat. Type 'exit' to quit.")
+    output.info("FAIR2WISE orchestrated KG-RAG chat. Type 'exit' to quit.")
     while True:
         try:
             q = input("\nAsk> ").strip()
@@ -163,7 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "status":
         import json
-        print(json.dumps({
+        output.info(json.dumps({
             "backend": cfg.backend, "model": cfg.model, "graph": cfg.graph,
             "graphs": cfg.graphs,
             "seed_terms": cfg.seed_terms, "kg_mode": cfg.kg_mode,
@@ -194,7 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:  # pragma: no cover
             raise SystemExit(f"Unknown command: {args.command}")
     except KeyboardInterrupt:
-        print("\nInterrupted.")
+        output.info("\nInterrupted.")
         return 130
     return 0
 

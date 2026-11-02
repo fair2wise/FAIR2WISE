@@ -13,8 +13,9 @@ Candidate (non-approved) vocabularies never produce an accepted mapping.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from ..extraction.contract import ExtractedMention
 from .adjudication import Judge, MentionVerdict, adjudicate_mention

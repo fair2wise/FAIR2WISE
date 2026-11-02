@@ -19,8 +19,9 @@ Nothing here reads the environment, a model or the network.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from ..evidence.records import EvidenceRecord, EvidenceSource, ReportedQuantity, TagDecision
 from ..evidence.units import (

@@ -14,11 +14,12 @@ catalog readers and the in-place ``apply`` flag.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from ..growth import ObservationLog
 from ..migration import PlanDraft, sha256_json

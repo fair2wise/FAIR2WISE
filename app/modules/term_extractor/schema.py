@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Any, Union
+from typing import Any
 
 from linkml_runtime.utils.schemaview import SchemaView
 from rapidfuzz import fuzz, process
@@ -297,7 +297,7 @@ class SchemaHelper:
             logger.warning("Dropping non-list relations for term '%s'", term_data.get("term", ""))
             raw_rels = []
 
-        cleaned_rels: list[dict[str, Union[str, bool]]] = []
+        cleaned_rels: list[dict[str, str | bool]] = []
         for rel in raw_rels:
             if not isinstance(rel, dict):
                 logger.debug("Dropping malformed relation for term '%s': %r", term_data.get("term", ""), rel)
@@ -327,7 +327,7 @@ class SchemaHelper:
                     })
                 else:
                     fallback_slot = "related_to" if "related_to" in self.slots else pred
-                    rel_out: dict[str, Union[str, bool]] = {
+                    rel_out: dict[str, str | bool] = {
                         "relation": fallback_slot,
                         "related_term": obj,
                         "verified": fallback_slot != pred,

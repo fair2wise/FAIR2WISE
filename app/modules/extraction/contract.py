@@ -19,9 +19,10 @@ Two rules keep the contract lossless:
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import copy
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from ..evidence.records import ReportedQuantity
 from ..literature.parsed_document import ParsedDocument

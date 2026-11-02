@@ -44,10 +44,11 @@ though ``ToolResult.data`` is bounded by the executor.
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 import re
 import threading
-from typing import Any, Awaitable, Callable, Mapping, Sequence
+from typing import Any
 import uuid
 
 from ..agent_runtime.executor import is_control_flow

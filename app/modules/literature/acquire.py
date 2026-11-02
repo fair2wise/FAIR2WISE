@@ -23,9 +23,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``_download_
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 import logging
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import httpx
 

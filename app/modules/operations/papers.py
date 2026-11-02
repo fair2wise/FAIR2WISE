@@ -45,6 +45,7 @@ per-instance bounded ledger for the legacy adapter.
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -52,7 +53,7 @@ import json
 from pathlib import Path
 import re
 import threading
-from typing import Any, Callable, Final, Iterator, Literal, Mapping, Sequence
+from typing import Any, Final, Literal
 import uuid
 
 from pydantic import BaseModel, ConfigDict

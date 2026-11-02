@@ -14,10 +14,11 @@ backlog instead of an in-memory queue.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 import threading
 import time
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from .events import GraphWriteEvent
 from .recorder import AuditLog

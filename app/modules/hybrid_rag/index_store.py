@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Sequence
 import json
 import math
 from pathlib import Path
 import re
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from .evidence import CHUNKER_VERSION, LEXICAL_INDEX_VERSION
 

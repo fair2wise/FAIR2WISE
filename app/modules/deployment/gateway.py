@@ -44,13 +44,14 @@ Standard library only, so the image build can run this file directly
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import ipaddress
 import json
 from pathlib import Path
 import re
 import sys
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 #: Trusted startup setting naming the public prefix. Unset or empty: unprefixed (developer).
 PREFIX_ENV = "F2W_PUBLIC_PREFIX"
@@ -320,7 +321,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             args.out.write_text(mkdocs_image_config(args.source.read_text(encoding="utf-8")), encoding="utf-8")
     except PrefixConfigError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {exc}", file=sys.stderr)  # noqa: T201 - build-time script
         return 2
     return 0
 

@@ -10,7 +10,8 @@ its own; the policies are declared in :mod:`app.api.policies`.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import FastAPI, Request
 

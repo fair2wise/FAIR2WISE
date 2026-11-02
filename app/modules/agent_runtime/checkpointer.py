@@ -19,12 +19,13 @@ principal and session so two principals cannot address the same thread.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import threading
-from typing import Any, Iterator, Literal
+from typing import Any, Literal
 
 from ..contracts import RequestContext
 

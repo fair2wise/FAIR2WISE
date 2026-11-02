@@ -1,8 +1,9 @@
 """Common Evidence model for KG hits, paper/ops chunks, and Tiled runs."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 SOURCE_KINDS = ("kg", "paper_chunk", "tiled_run")
 SOURCE_TYPES = ("literature", "ops", "kg", "tiled")

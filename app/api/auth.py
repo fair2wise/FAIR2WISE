@@ -25,10 +25,11 @@ claim trust (``X-Local-Trusted`` and similar) are logged and ignored.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import logging
-from typing import Any, Callable, Mapping, Protocol, cast
+from typing import Any, Protocol, cast
 import uuid
 
 from fastapi import FastAPI, Request

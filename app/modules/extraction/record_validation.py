@@ -32,9 +32,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/scientific_records.py (BSD-3-C
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 import re
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 

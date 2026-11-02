@@ -23,6 +23,7 @@ parse stage, immutable version namespace, atomic manifest) (BSD-3-Clause).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field, replace
 import json
 import logging
@@ -31,7 +32,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import time
-from typing import Any, Callable, Sequence
+from typing import Any
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode

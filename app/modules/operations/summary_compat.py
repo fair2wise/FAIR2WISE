@@ -30,9 +30,10 @@ is wired (T18B).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 import re
-from typing import Any, Callable, cast
+from typing import Any, cast
 import uuid
 
 from ..contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus

@@ -26,7 +26,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_simulation.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ..contracts.evidence import EvidenceRef
@@ -37,7 +37,7 @@ from .units import NormalizedQuantity
 RECORD_VERSION = 2
 
 
-class EvidenceSource(str, Enum):
+class EvidenceSource(StrEnum):
     """How the source relates to a value: its own result, a citation, a derivation, an assumption.
 
     H3 F2: every value is captured with one of these tags and none is withheld
@@ -98,7 +98,7 @@ class TagDecision:
                 "paper_measurement": self.tag.is_paper_measurement, "presented_as": self.tag.presented_as}
 
 
-class UncertaintyKind(str, Enum):
+class UncertaintyKind(StrEnum):
     """What a stated uncertainty means."""
 
     STANDARD_DEVIATION = "standard_deviation"
@@ -107,7 +107,7 @@ class UncertaintyKind(str, Enum):
     UNKNOWN = "unknown"
 
 
-class MissingData(str, Enum):
+class MissingData(StrEnum):
     """Closed set of explicit absence markers on an evidence/quantity record."""
 
     QUOTE_ABSENT = "quote_absent"

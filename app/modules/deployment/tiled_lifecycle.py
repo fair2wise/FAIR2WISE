@@ -132,7 +132,7 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    tmp.replace(path)
 
 
 def _pid_alive(pid: int) -> bool:
@@ -224,7 +224,7 @@ def _child_env(home: Path) -> dict[str, str]:
 
 def _prepare_secrets(cfg: ManagedTiledConfig) -> None:
     cfg.secrets_dir.mkdir(parents=True, exist_ok=True)
-    os.chmod(cfg.secrets_dir, 0o700)
+    cfg.secrets_dir.chmod(0o700)
     if cfg.authn is not None:
         if not cfg.authn_secrets_file.exists():
             data = {
@@ -392,7 +392,7 @@ def _spawn(cfg: ManagedTiledConfig, port: int, env_info: dict[str, str]) -> Mana
     else:
         argv += ["--authn-secrets-file", str(cfg.authn_secrets_file)]
     home = cfg.run_dir
-    with open(log_path, "ab") as log:
+    with log_path.open("ab") as log:
         process = subprocess.Popen(argv, cwd=str(home), env=_child_env(home), stdin=subprocess.DEVNULL,
                                    stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                                    close_fds=True)

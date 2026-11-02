@@ -21,13 +21,14 @@ content revision. Dropped: effective-vocabulary SQLite overlay (replaced by :mod
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Iterable
+from typing import Any
 import unicodedata
 
 CATEGORIES = ("technique", "analysis", "instrument", "material")

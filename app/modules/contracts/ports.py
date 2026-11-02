@@ -8,7 +8,8 @@ section 3, ADR 0004).
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping, Protocol, Sequence, runtime_checkable
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 

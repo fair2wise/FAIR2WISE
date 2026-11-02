@@ -16,10 +16,10 @@ empty success. A shortlist is a retrieval result, not identity.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 import math
-from typing import Sequence
 
 import numpy as np
 

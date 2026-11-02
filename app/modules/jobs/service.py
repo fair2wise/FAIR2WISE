@@ -8,10 +8,11 @@ context is never accepted from a request body.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
 import threading
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode

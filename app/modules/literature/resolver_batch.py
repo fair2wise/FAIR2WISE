@@ -21,6 +21,7 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/reso
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
@@ -30,7 +31,7 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, Callable, Iterable, Protocol, Sequence, Union, cast
+from typing import Any, Protocol, cast
 
 import httpx
 
@@ -115,7 +116,7 @@ class Resolved:
 class ResolverCache:
     """One row per identifier key; a row with no record says "asked; nobody has it"."""
 
-    def __init__(self, path: Union[str, Path] = ":memory:", *, positive_ttl: timedelta = POSITIVE_TTL,
+    def __init__(self, path: str | Path = ":memory:", *, positive_ttl: timedelta = POSITIVE_TTL,
                  negative_ttl: timedelta = NEGATIVE_TTL) -> None:
         target = str(path)
         if target != ":memory:":

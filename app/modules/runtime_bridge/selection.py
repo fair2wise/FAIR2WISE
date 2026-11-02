@@ -7,7 +7,8 @@ loading the runtime: in the default legacy mode nothing beyond
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .mode import RuntimeMode, runtime_mode
 

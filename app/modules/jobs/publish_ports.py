@@ -20,8 +20,9 @@ Contract for a :class:`PublishStep` implementation:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt, SnapshotManifest
 from ..contracts.context import RequestContext

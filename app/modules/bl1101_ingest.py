@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
@@ -29,7 +30,7 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Any, Iterable, Sequence
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -37,6 +38,7 @@ from lxml import html as lhtml
 import yaml
 
 from . import json2kg
+from .cli_output import output
 
 LOGGER = logging.getLogger("ingest_bl1101")
 
@@ -2287,7 +2289,7 @@ def ingest_records(
     for payload in repo_payloads or []:
         extra_terms, extra_snips = attach_repo_terms(
             payload["spec"],
-            payload.get("root") or Path("."),
+            payload.get("root") or Path(),
             payload.get("sha") or "",
             payload.get("symbols") or [],
             payload.get("snippets") or [],
@@ -2679,26 +2681,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             version=args.snapshot,
             map_path=args.motor_stage_map,
         )
-        print(
+        output.info(
             f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
         )
-        print(
-            "motor links:",
-            f"+{result['stats']['linked']} part_of,",
-            f"+{result['stats']['aliased']} alias related_to",
+        output.info(
+            "motor links: "
+            f"+{result['stats']['linked']} part_of, "
+            f"+{result['stats']['aliased']} alias related_to"
         )
         return 0
     result = run_ingest(from_scratch=args.from_scratch, offline=args.offline)
-    print(
+    output.info(
         f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
     )
-    print("landed:", ", ".join(item.get("name", "?") for item in result["sources_landed"]) or "(none)")
+    landed = ", ".join(item.get("name", "?") for item in result["sources_landed"]) or "(none)"
+    output.info(f"landed: {landed}")
     if result["sources_skipped"]:
         skipped = ", ".join(
             f"{item.get('name')} ({item.get('reason', item.get('status'))})"
             for item in result["sources_skipped"]
         )
-        print("skipped:", skipped)
+        output.info(f"skipped: {skipped}")
     return 0
 
 

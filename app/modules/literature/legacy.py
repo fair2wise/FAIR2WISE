@@ -25,6 +25,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_reading.py (``read_manif
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 import contextlib
 from dataclasses import asdict, dataclass, field
 import json
@@ -34,7 +35,7 @@ from pathlib import Path
 import re
 import threading
 import time
-from typing import Any, Iterator, Mapping, cast
+from typing import Any, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ErrorCode
@@ -112,7 +113,7 @@ def contained_regular_file(root: Path, path: Path) -> bool:
         resolved = candidate.resolve(strict=True)
     except (OSError, RuntimeError):
         return False
-    lexical = Path(os.path.abspath(candidate))
+    lexical = Path(os.path.abspath(candidate))  # noqa: PTH100 - lexical (symlink-blind) normalisation is the point
     if resolved != lexical:
         return False
     return (resolved == root or root in resolved.parents) and resolved.is_file()
@@ -186,7 +187,7 @@ class LegacyIndex:
     @contextlib.contextmanager
     def _editing(self) -> Iterator[dict[str, Any]]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._lock, open(self.path.with_suffix(".lock"), "a") as lock_file:
+        with self._lock, self.path.with_suffix(".lock").open("a") as lock_file:
             if fcntl is not None:
                 fcntl.flock(lock_file, fcntl.LOCK_EX)
             try:
@@ -470,7 +471,7 @@ class LegacyIndex:
 def unlink_quietly(path: Path) -> None:  # pragma: no cover - tiny helper kept for callers
     """Remove ``path`` if present."""
     with contextlib.suppress(FileNotFoundError):
-        os.unlink(path)
+        path.unlink()
 
 
 __all__ = (

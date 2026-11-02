@@ -8,13 +8,13 @@ the queue. ``--once`` exits when no job is queued or running (used by tests and 
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import importlib
 import re
 import signal
 import sys
 import threading
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 from .executor import WorkerExecutor
 

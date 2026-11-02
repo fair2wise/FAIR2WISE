@@ -12,11 +12,12 @@ Diagnostic categories are kept separate: ``contract_error``, ``legacy_warning``,
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable, Mapping
 import copy
 from dataclasses import dataclass, field
 import hashlib
 import json
-from typing import Any, Iterable, Mapping, cast
+from typing import Any, cast
 
 from .loading import closure_fingerprint, load_helper, pre_s4_fingerprint
 from .registry import (

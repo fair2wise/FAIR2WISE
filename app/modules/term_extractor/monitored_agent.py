@@ -16,6 +16,7 @@ from academy.handle import Handle
 import psutil
 import requests
 
+from ..cli_output import output
 from .message import Log, Message, Registration, Stats, UserPrompt
 
 if TYPE_CHECKING:
@@ -98,21 +99,21 @@ class MonitoredAgent(Agent):
 
     async def agent_on_shutdown(self) -> None:
         """Cancel the drainer and remove the log handler."""
-        print('Agent on shutdown... closing log handler hooks')
+        output.info('Agent on shutdown... closing log handler hooks')
         self._drain_task.cancel()
         self._stats_task.cancel()
         logging.getLogger().removeHandler(self._log_handler)
 
     async def _send_message(self, message: Message) -> None:
         """Send a message to the UserAgent."""
-        print(f'Sending message to UserAgent {message}')
+        output.info(f'Sending message to UserAgent {message}')
         await self.user_agent.message(self._agent_uid_str, message)
 
     @action
     async def log(self, message: str, level: str = 'INFO') -> None:
         """Action to report a log message to the UserAgent."""
-        print(f'Monitored Agent : message={message} level={level}')
-        print(f'Agent id : {self._agent_uid_str}')
+        output.info(f'Monitored Agent : message={message} level={level}')
+        output.info(f'Agent id : {self._agent_uid_str}')
         await self._send_message(
             Log(
                 agent_id=self._agent_uid_str,

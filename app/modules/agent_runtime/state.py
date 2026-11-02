@@ -13,12 +13,13 @@ the context of the resuming call, not by stored state.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Annotated, Any, NotRequired
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
-from typing_extensions import Annotated, NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 from ..contracts import ContractError, ErrorCode, RequestContext
 

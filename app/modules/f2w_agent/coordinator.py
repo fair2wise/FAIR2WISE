@@ -16,6 +16,7 @@ import shutil
 from typing import Any
 
 from . import kg_update
+from ..cli_output import output
 from .debate_agent import EvidenceDebateAgent
 from .download_agent import DownloadAgent
 from .extractor_agent import ExtractorAgent
@@ -223,15 +224,15 @@ class Coordinator:
         service = AgentPipelineService(self.cfg)
         for question in questions:
             response = await service.ask(question, auto_approve=self.cfg.auto_approve)
-            print(f"\n=== Question: {question} ===")
+            output.info(f"\n=== Question: {question} ===")
             if response.answer:
-                print(f"\n[Answer]\n{response.answer}")
+                output.info(f"\n[Answer]\n{response.answer}")
             if response.pending:
                 kind = response.pending.get("kind")
                 if kind == "download":
-                    print("[approval required] Choose a candidate in a later ask/chat turn.")
+                    output.info("[approval required] Choose a candidate in a later ask/chat turn.")
                 else:
-                    print("[approval required] Approve extraction in a later ask/chat turn.")
+                    output.info("[approval required] Approve extraction in a later ask/chat turn.")
 
     async def _answer(
         self,
@@ -248,28 +249,28 @@ class Coordinator:
             await self._answer_agentic(question, retrieval, download, extractor, debate)
             return
 
-        print(f"\n=== Question: {question} ===")
+        output.info(f"\n=== Question: {question} ===")
         for round_no in range(1, self.cfg.max_rounds + 1):
             try:
                 verdict = await retrieval.query(question)
             except Exception as exc:
                 logger.exception("Retrieval agent failed")
-                print(f"[stop] retrieval failed: {exc}")
+                output.info(f"[stop] retrieval failed: {exc}")
                 return
             if str(verdict.get("status", "")).endswith("_error"):
-                print(f"[stop] retrieval failed: {verdict.get('error') or verdict.get('status')}")
+                output.info(f"[stop] retrieval failed: {verdict.get('error') or verdict.get('status')}")
                 return
             if verdict.get("graph_source_used") and verdict.get("graph_source_used") != verdict.get("graph_source_requested"):
-                print(
+                output.info(
                     f"[info] graph source fallback: requested={verdict.get('graph_source_requested')} "
                     f"used={verdict.get('graph_source_used')}"
                 )
             if verdict.get("sufficient"):
-                print(f"\n[Answer]\n{verdict.get('answer')}")
+                output.info(f"\n[Answer]\n{verdict.get('answer')}")
                 return
 
             missing = verdict.get("missing_topics") or [question]
-            print(f"[round {round_no}] insufficient evidence; missing: {missing}")
+            output.info(f"[round {round_no}] insufficient evidence; missing: {missing}")
 
             try:
                 dl = await download.find_and_download(
@@ -281,41 +282,41 @@ class Coordinator:
                 )
             except Exception as exc:
                 logger.exception("Download agent failed")
-                print(f"[stop] download failed: {exc}")
+                output.info(f"[stop] download failed: {exc}")
                 return
-            print(f"[round {round_no}] downloaded {dl.get('count', 0)} paper(s) "
+            output.info(f"[round {round_no}] downloaded {dl.get('count', 0)} paper(s) "
                   f"(from {dl.get('candidates', 0)} candidates; "
                   f"failed={dl.get('failed', 0)}, "
                   f"semantic_rejected={dl.get('semantic_rejected', 0)})")
             if dl.get("count", 0) == 0:
-                print("[stop] no new relevant papers found; cannot gather more evidence.")
+                output.info("[stop] no new relevant papers found; cannot gather more evidence.")
                 return
 
             round_pdf_dir, pending_pdfs = self._stage_unprocessed_pdfs(round_no)
             if not pending_pdfs:
-                print("[stop] no unprocessed PDFs available after download.")
+                output.info("[stop] no unprocessed PDFs available after download.")
                 return
-            print(f"[round {round_no}] extracting {len(pending_pdfs)} new PDF(s)")
+            output.info(f"[round {round_no}] extracting {len(pending_pdfs)} new PDF(s)")
             try:
                 ext = await extractor.extract(str(round_pdf_dir), str(self.session_terms))
             except Exception as exc:
                 logger.exception("Extractor agent failed")
-                print(f"[stop] extraction failed: {exc}")
+                output.info(f"[stop] extraction failed: {exc}")
                 return
             if ext.get("status") == "error":
-                print(f"[stop] extraction failed: {ext.get('message') or ext}")
+                output.info(f"[stop] extraction failed: {ext.get('message') or ext}")
                 return
             self._record_full_extraction(pending_pdfs, ext)
             self._mark_processed_pdfs(pending_pdfs)
-            print(f"[round {round_no}] extracted -> {ext.get('unique_terms', '?')} unique terms")
+            output.info(f"[round {round_no}] extracted -> {ext.get('unique_terms', '?')} unique terms")
 
             try:
                 kg = kg_update.rebuild_kg(str(self.session_terms), str(self.session_kg))
             except Exception as exc:
                 logger.exception("KG rebuild failed")
-                print(f"[stop] KG rebuild failed: {exc}")
+                output.info(f"[stop] KG rebuild failed: {exc}")
                 return
-            print(f"[round {round_no}] KG rebuilt: {kg.get('nodes')} nodes, {kg.get('edges')} edges")
+            output.info(f"[round {round_no}] KG rebuilt: {kg.get('nodes')} nodes, {kg.get('edges')} edges")
             if self.cfg.kg_mode == "splash":
                 try:
                     res = kg_update.splash_reimport(
@@ -325,27 +326,27 @@ class Coordinator:
                     )
                 except Exception as exc:
                     logger.exception("Splash reimport failed")
-                    print(f"[stop] splash reimport failed: {exc}")
+                    output.info(f"[stop] splash reimport failed: {exc}")
                     return
                 db_note = f" db={res.get('db_path')}" if res.get("db_path") else ""
-                print(f"[round {round_no}] splash reimport: {res.get('status')}{db_note}")
+                output.info(f"[round {round_no}] splash reimport: {res.get('status')}{db_note}")
                 if res.get("status") == "error":
-                    print(f"[stop] splash reimport failed: {res.get('message') or res}")
+                    output.info(f"[stop] splash reimport failed: {res.get('message') or res}")
                     return
 
             try:
                 reload_res = await retrieval.reload_kg(str(self.session_kg))
             except Exception as exc:
                 logger.exception("Retrieval KG reload failed")
-                print(f"[stop] KG reload failed: {exc}")
+                output.info(f"[stop] KG reload failed: {exc}")
                 return
             if reload_res.get("graph_source_used") and reload_res.get("graph_source_used") != reload_res.get("graph_source_requested"):
-                print(
+                output.info(
                     f"[info] graph source fallback after reload: requested={reload_res.get('graph_source_requested')} "
                     f"used={reload_res.get('graph_source_used')}"
                 )
 
-        print(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
+        output.info(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
 
     async def _answer_agentic(
         self,
@@ -356,32 +357,32 @@ class Coordinator:
         debate: EvidenceDebateAgent,
     ) -> None:
         """Debate-gated retrieve, search, download, extract, and KG rebuild loop."""
-        print(f"\n=== Question: {question} ===")
+        output.info(f"\n=== Question: {question} ===")
         for round_no in range(1, self.cfg.max_rounds + 1):
             try:
                 verdict = await retrieval.query(question)
             except Exception as exc:
                 logger.exception("Retrieval agent failed")
-                print(f"[stop] retrieval failed: {exc}")
+                output.info(f"[stop] retrieval failed: {exc}")
                 return
             if str(verdict.get("status", "")).endswith("_error"):
-                print(f"[stop] retrieval failed: {verdict.get('error') or verdict.get('status')}")
+                output.info(f"[stop] retrieval failed: {verdict.get('error') or verdict.get('status')}")
                 return
             if verdict.get("graph_source_used") and verdict.get("graph_source_used") != verdict.get("graph_source_requested"):
-                print(
+                output.info(
                     f"[info] graph source fallback: requested={verdict.get('graph_source_requested')} "
                     f"used={verdict.get('graph_source_used')}"
                 )
 
             missing = verdict.get("missing_topics") or [question]
-            print(f"[round {round_no}] evidence probe: selected={len(verdict.get('selected') or [])} "
+            output.info(f"[round {round_no}] evidence probe: selected={len(verdict.get('selected') or [])} "
                   f"sufficient={bool(verdict.get('sufficient'))}")
 
             if verdict.get("sufficient"):
                 debate_summary = await debate.decide(question, verdict, [], round_no)
-                print(f"[round {round_no}] debate: {debate_summary.get('selected_action')} - "
+                output.info(f"[round {round_no}] debate: {debate_summary.get('selected_action')} - "
                       f"{debate_summary.get('reason')}")
-                print(f"\n[Answer]\n{verdict.get('answer')}")
+                output.info(f"\n[Answer]\n{verdict.get('answer')}")
                 return
 
             try:
@@ -392,18 +393,18 @@ class Coordinator:
                 )
             except Exception as exc:
                 logger.exception("Candidate search failed")
-                print(f"[stop] candidate search failed: {exc}")
+                output.info(f"[stop] candidate search failed: {exc}")
                 return
             candidates = search.get("candidates") or []
             titles = [str(c.get("title") or c.get("doi") or c.get("id") or "Untitled") for c in candidates[:3]]
-            print(f"[round {round_no}] candidate search: {len(candidates)} candidate(s)"
+            output.info(f"[round {round_no}] candidate search: {len(candidates)} candidate(s)"
                   f"{' - ' + '; '.join(titles) if titles else ''}")
 
             try:
                 debate_summary = await debate.decide(question, verdict, candidates, round_no)
             except Exception as exc:
                 logger.exception("Evidence debate failed")
-                print(f"[stop] evidence debate failed: {exc}")
+                output.info(f"[stop] evidence debate failed: {exc}")
                 return
 
             if (
@@ -411,7 +412,7 @@ class Coordinator:
                 and debate_summary.get("refined_query")
             ):
                 refined_query = str(debate_summary["refined_query"])
-                print(f"[round {round_no}] debate requested refined search: {refined_query}")
+                output.info(f"[round {round_no}] debate requested refined search: {refined_query}")
                 try:
                     search = await download.search_candidates(
                         refined_query,
@@ -422,18 +423,18 @@ class Coordinator:
                     debate_summary = await debate.decide(question, verdict, candidates, round_no)
                 except Exception as exc:
                     logger.exception("Refined candidate search failed")
-                    print(f"[stop] refined candidate search failed: {exc}")
+                    output.info(f"[stop] refined candidate search failed: {exc}")
                     return
 
-            print(f"[round {round_no}] debate: {debate_summary.get('selected_action')} - "
+            output.info(f"[round {round_no}] debate: {debate_summary.get('selected_action')} - "
                   f"{debate_summary.get('reason')}")
 
             action_name = debate_summary.get("selected_action")
             if action_name == "answer_from_kg" and verdict.get("sufficient"):
-                print(f"\n[Answer]\n{verdict.get('answer')}")
+                output.info(f"\n[Answer]\n{verdict.get('answer')}")
                 return
             if action_name != "download_selected":
-                print(f"[stop] insufficient evidence: {debate_summary.get('reason')}")
+                output.info(f"[stop] insufficient evidence: {debate_summary.get('reason')}")
                 return
 
             selected_indices = debate_summary.get("candidate_indices") or []
@@ -445,7 +446,7 @@ class Coordinator:
             if not selected_candidates and candidates:
                 selected_candidates = candidates[:1]
             if not selected_candidates:
-                print("[stop] debate approved download but no candidate was selected.")
+                output.info("[stop] debate approved download but no candidate was selected.")
                 return
 
             try:
@@ -458,21 +459,21 @@ class Coordinator:
                 )
             except Exception as exc:
                 logger.exception("Download agent failed")
-                print(f"[stop] download failed: {exc}")
+                output.info(f"[stop] download failed: {exc}")
                 return
-            print(f"[round {round_no}] approved download {dl.get('count', 0)} paper(s) "
+            output.info(f"[round {round_no}] approved download {dl.get('count', 0)} paper(s) "
                   f"(failed={dl.get('failed', 0)}, "
                   f"semantic_rejected={dl.get('semantic_rejected', 0)})")
             if dl.get("count", 0) == 0:
-                print("[stop] approved paper could not be downloaded; cannot gather more evidence.")
+                output.info("[stop] approved paper could not be downloaded; cannot gather more evidence.")
                 return
 
             round_pdf_dir, pending_pdfs = self._stage_unprocessed_pdfs(round_no)
             if not pending_pdfs:
-                print("[stop] no unprocessed PDFs available after download.")
+                output.info("[stop] no unprocessed PDFs available after download.")
                 return
             if self.cfg.extraction_mode == "targeted":
-                print(
+                output.info(
                     f"[round {round_no}] targeted extraction from {len(pending_pdfs)} approved PDF(s) "
                     f"(max_pages={self.cfg.targeted_max_pages})"
                 )
@@ -486,21 +487,21 @@ class Coordinator:
                     )
                 except Exception as exc:
                     logger.exception("Extractor agent failed")
-                    print(f"[stop] targeted extraction failed: {exc}")
+                    output.info(f"[stop] targeted extraction failed: {exc}")
                     return
             else:
-                print(f"[round {round_no}] extracting {len(pending_pdfs)} approved PDF(s)")
+                output.info(f"[round {round_no}] extracting {len(pending_pdfs)} approved PDF(s)")
                 try:
                     ext = await extractor.extract(str(round_pdf_dir), str(self.session_terms))
                 except Exception as exc:
                     logger.exception("Extractor agent failed")
-                    print(f"[stop] extraction failed: {exc}")
+                    output.info(f"[stop] extraction failed: {exc}")
                     return
             if not isinstance(ext, dict):
-                print(f"[stop] extraction failed: {ext}")
+                output.info(f"[stop] extraction failed: {ext}")
                 return
             if ext.get("status") == "error":
-                print(f"[stop] extraction failed: {ext.get('message') or ext}")
+                output.info(f"[stop] extraction failed: {ext.get('message') or ext}")
                 return
             if self.cfg.extraction_mode == "targeted":
                 self._record_partial_extraction(
@@ -512,15 +513,15 @@ class Coordinator:
             else:
                 self._record_full_extraction(pending_pdfs, ext)
                 self._mark_processed_pdfs(pending_pdfs)
-            print(f"[round {round_no}] extracted -> {ext.get('unique_terms', '?')} unique terms")
+            output.info(f"[round {round_no}] extracted -> {ext.get('unique_terms', '?')} unique terms")
 
             try:
                 kg = kg_update.rebuild_kg(str(self.session_terms), str(self.session_kg))
             except Exception as exc:
                 logger.exception("KG rebuild failed")
-                print(f"[stop] KG rebuild failed: {exc}")
+                output.info(f"[stop] KG rebuild failed: {exc}")
                 return
-            print(f"[round {round_no}] KG rebuilt: {kg.get('nodes')} nodes, {kg.get('edges')} edges")
+            output.info(f"[round {round_no}] KG rebuilt: {kg.get('nodes')} nodes, {kg.get('edges')} edges")
             if self.cfg.kg_mode == "splash":
                 try:
                     res = kg_update.splash_reimport(
@@ -530,27 +531,27 @@ class Coordinator:
                     )
                 except Exception as exc:
                     logger.exception("Splash reimport failed")
-                    print(f"[stop] splash reimport failed: {exc}")
+                    output.info(f"[stop] splash reimport failed: {exc}")
                     return
                 db_note = f" db={res.get('db_path')}" if res.get("db_path") else ""
-                print(f"[round {round_no}] splash reimport: {res.get('status')}{db_note}")
+                output.info(f"[round {round_no}] splash reimport: {res.get('status')}{db_note}")
                 if res.get("status") == "error":
-                    print(f"[stop] splash reimport failed: {res.get('message') or res}")
+                    output.info(f"[stop] splash reimport failed: {res.get('message') or res}")
                     return
 
             try:
                 reload_res = await retrieval.reload_kg(str(self.session_kg))
             except Exception as exc:
                 logger.exception("Retrieval KG reload failed")
-                print(f"[stop] KG reload failed: {exc}")
+                output.info(f"[stop] KG reload failed: {exc}")
                 return
             if reload_res.get("graph_source_used") and reload_res.get("graph_source_used") != reload_res.get("graph_source_requested"):
-                print(
+                output.info(
                     f"[info] graph source fallback after reload: requested={reload_res.get('graph_source_requested')} "
                     f"used={reload_res.get('graph_source_used')}"
                 )
 
-        print(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
+        output.info(f"[stop] reached max rounds ({self.cfg.max_rounds}) without sufficient evidence.")
 
     def _stage_unprocessed_pdfs(
         self,

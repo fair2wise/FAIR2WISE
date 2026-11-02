@@ -67,13 +67,14 @@ Corpus selection: the Tool takes a corpus *name*; an injected :data:`CorpusResol
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import json
 import math
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any
 import unicodedata
 import uuid
 

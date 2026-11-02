@@ -19,9 +19,10 @@ admission rule, ``record_figure_qrange`` needs_review) (BSD-3-Clause); axis fit 
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import re
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .kernels.qaxis import read_q_axis
 from .kernels.types import PanelBox, QAxisReading, TextSpan

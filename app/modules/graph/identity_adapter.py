@@ -40,10 +40,11 @@ different key). T08B should persist it in the import receipt (``id_mapping_sha25
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 import hashlib
 import json
-from typing import Any, Iterable, Mapping
+from typing import Any
 from urllib.parse import quote, unquote
 
 from .ports import ContractError, ErrorCode

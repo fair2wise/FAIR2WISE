@@ -5,10 +5,11 @@ beamline questions stay on the KGs. Requires ``MP_API_KEY``; never logs the key.
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 import logging
 import os
 import re
-from typing import Any, Sequence
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

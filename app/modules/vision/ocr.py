@@ -15,8 +15,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_ocr.py
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, Sequence
+from typing import Any, Protocol
 
 from .kernels.geometry import FigureFrame
 from .kernels.types import TextSpan

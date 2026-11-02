@@ -12,10 +12,11 @@ Rewritten: row model, menu bounding, no store/catalog readers.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import re
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 
 from ..merge_safety import fold, is_acronym_of
 from ..migration import sha256_json

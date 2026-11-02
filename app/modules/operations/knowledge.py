@@ -49,13 +49,14 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC
 import logging
 import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence, Union, cast
+from typing import Any, cast
 from urllib.parse import urlsplit
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolSpec
@@ -83,7 +84,7 @@ _LOG = logging.getLogger(__name__)
 #: Discovery reads only what ``literature_entity_key`` needs (owner marker, graph id, URI).
 _DISCOVER_Q = "query($l: Int!, $o: Int!) { entities(limit: $l, offset: $o) { uri properties } }"
 
-GraphFilesProvider = Callable[[], Sequence[Union[str, Path]]]
+GraphFilesProvider = Callable[[], Sequence[str | Path]]
 #: Returns the Tiled GraphPort to read, or ``None`` when no server is reachable right now.
 TiledBackendFactory = Callable[[], Any | None]
 
@@ -151,7 +152,7 @@ class CompositeGraphPort:
     is shadowed by the JSON graph (warned once; see the module docstring).
     """
 
-    def __init__(self, json_port: Any, tiled: Union[Any, TiledBackendFactory, None] = None, *,
+    def __init__(self, json_port: Any, tiled: Any | TiledBackendFactory | None = None, *,
                  ttl: float = TILED_DISCOVERY_TTL, max_scan: int = TILED_DISCOVERY_MAX_SCAN,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._json = json_port
@@ -375,7 +376,7 @@ def resolve_tiled_settings(settings: Any, environ: Any = None) -> tuple[Any | No
     return tiled, None
 
 
-def storage_graph_files(root: Union[str, Path]) -> list[str]:
+def storage_graph_files(root: str | Path) -> list[str]:
     """``<root>/storage/kg/*.json``, sorted by name (the legacy ``list_storage_kg_json_files`` rule)."""
     kg_dir = Path(root) / "storage" / "kg"
     if not kg_dir.is_dir():
@@ -383,7 +384,7 @@ def storage_graph_files(root: Union[str, Path]) -> list[str]:
     return [str(p) for p in sorted(kg_dir.glob("*.json"), key=lambda p: p.name.lower())]
 
 
-def directory_corpus_resolver(directory: Union[str, Path]) -> CorpusResolver:
+def directory_corpus_resolver(directory: str | Path) -> CorpusResolver:
     """Resolve a corpus name to ``<directory>/<name>.json`` (the extracted-terms files).
 
     Names are file stems (``extracted_terms_xray_papers_cborg_chat``); nothing outside
@@ -436,7 +437,7 @@ class KnowledgeOperations:
     # -- construction helpers -----------------------------------------------------------------
 
     @classmethod
-    def from_storage(cls, root: Union[str, Path], *, artifact_store: Any = None,
+    def from_storage(cls, root: str | Path, *, artifact_store: Any = None,
                      graph_max_records: int = 500_000) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` (graphs) and ``<root>/storage/terminology`` (corpora).
 
@@ -450,7 +451,7 @@ class KnowledgeOperations:
         return cls(graph, corpus, artifact_store=artifact_store)
 
     @classmethod
-    def from_deployment(cls, settings: Any, environ: Any = None, root: Union[str, Path, None] = None, *,
+    def from_deployment(cls, settings: Any, environ: Any = None, root: str | Path | None = None, *,
                         artifact_store: Any = None, graph_max_records: int = 500_000,
                         discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` *and* the deployment's Tiled graphs (D3.17).
@@ -484,7 +485,7 @@ class KnowledgeOperations:
     @classmethod
     def from_graph_files(cls, provider: GraphFilesProvider, *, corpus: CorpusAuditTool | None = None,
                          artifact_store: Any = None, graph_max_records: int = 500_000,
-                         tiled: Union[Any, TiledBackendFactory, None] = None,
+                         tiled: Any | TiledBackendFactory | None = None,
                          discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations following a caller-supplied graph selection (T25D: the active runtime's files).
 

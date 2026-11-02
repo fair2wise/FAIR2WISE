@@ -12,14 +12,15 @@ the executor can block a write it cannot audit (plan section 11.3).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 import hashlib
 import json
 import os
 from pathlib import Path
 import threading
-from typing import Any, Mapping, Protocol, Union, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,7 +43,7 @@ WRITE_EFFECTS = frozenset({Effect.WRITE_STAGED, Effect.WRITE_GRAPH, Effect.DESTR
 APPROVAL_EFFECTS = frozenset({Effect.WRITE_GRAPH, Effect.DESTRUCTIVE})
 
 
-class AuditKind(str, Enum):
+class AuditKind(StrEnum):
     """What an audit event records."""
 
     APPROVAL_REQUESTED = "approval_requested"
@@ -186,7 +187,7 @@ class JsonlEventSink:
         fsync: Whether to fsync after each write (default ``True``).
     """
 
-    def __init__(self, path: Union[str, Path], *, fsync: bool = True) -> None:
+    def __init__(self, path: str | Path, *, fsync: bool = True) -> None:
         self.path = Path(path)
         self._fsync = fsync
         self._lock = threading.Lock()
@@ -195,7 +196,7 @@ class JsonlEventSink:
         """Append ``event`` as one JSON line; raises ``OSError`` on failure."""
         line = event.model_dump_json() + "\n"
         with self._lock:
-            with open(self.path, "a", encoding="utf-8") as fh:
+            with self.path.open("a", encoding="utf-8") as fh:
                 fh.write(line)
                 fh.flush()
                 if self._fsync:

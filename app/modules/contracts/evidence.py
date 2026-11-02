@@ -7,12 +7,12 @@ when it matches the retained source version (plan section 4.8, D19).
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class MatchType(str, Enum):
+class MatchType(StrEnum):
     """How ``quote`` relates to the source text.
 
     ``NORMALIZED`` means the quote equals the source after the recorded

@@ -11,6 +11,7 @@ retrieval work in a worker must wrap the callable with :func:`bind_context`.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 import contextvars
 from datetime import UTC, datetime
 import hashlib
@@ -22,7 +23,7 @@ import re
 import subprocess
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence, cast
+from typing import Any, cast
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -694,7 +695,7 @@ def _write_turn(payload: Mapping[str, Any], summary: Mapping[str, Any]) -> None:
         encoded = json.dumps(payload, ensure_ascii=False, default=_json_default, indent=2)
         temporary = detail_path.with_suffix(".json.tmp")
         temporary.write_text(encoded, encoding="utf-8")
-        os.replace(temporary, detail_path)
+        temporary.replace(detail_path)
         _append_jsonl(summary_path, summary)
     except Exception as exc:
         logger.warning("Trace write failed for %s: %s", payload.get("turn_id"), exc)

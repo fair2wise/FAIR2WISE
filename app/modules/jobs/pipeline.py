@@ -16,9 +16,10 @@ simply a process that stops: the lease expires and another owner resumes from th
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome

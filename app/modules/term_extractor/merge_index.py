@@ -8,11 +8,12 @@ product), and returns only the top-k neighbors for the LLM to verify.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 import logging
 import os
 import re
 import threading
-from typing import Any, Callable, Sequence
+from typing import Any
 
 import numpy as np
 

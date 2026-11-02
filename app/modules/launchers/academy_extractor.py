@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import logging
 import os
+from pathlib import Path
 import pickle
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,7 @@ from academy.handle import Handle
 from academy.manager import Manager
 from globus_compute_sdk import Executor as GlobusComputeExecutor
 
+from ..cli_output import output
 from ..term_extractor.academy_agent import TermExtractorAgent
 
 if TYPE_CHECKING:
@@ -47,7 +49,7 @@ def _configure_logging() -> None:
 def _load_user_agent_handle() -> "Handle[UserAgent]":
     """Load the UserAgent handle written by the user-agent launcher."""
     try:
-        with open("user_agent_handle.pkl", "rb") as handle:
+        with Path("user_agent_handle.pkl").open("rb") as handle:
             user_agent_id = pickle.load(handle)
     except FileNotFoundError:
         raise SystemExit(
@@ -112,7 +114,7 @@ async def run(
         await manager.shutdown(handle, blocking=True)
         logger.info("Agent shut down cleanly.")
 
-    print("\nResult:", result)
+    output.info(f"\nResult: {result}")
 
 
 def main() -> None:

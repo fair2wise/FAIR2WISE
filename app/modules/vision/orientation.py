@@ -21,9 +21,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/figure_orientation.py
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 import re
-from typing import Any, Sequence
+from typing import Any
 
 from ..contracts.evidence import SourceLocator
 from .classification import ChatAdapter

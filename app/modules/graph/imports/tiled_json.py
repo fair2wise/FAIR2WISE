@@ -30,6 +30,7 @@ compared before and after.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -37,7 +38,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Callable, Collection, Iterator, Mapping, Sequence, Union, cast
+from typing import Any, cast
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import DeploymentProfile, RequestContext
@@ -70,7 +71,7 @@ ADAPTER_VERSION = "f2w-tiled-json-import/1+tiled-0.2.18"
 STAGES = ("entities", "links", "retire")
 Clock = Callable[[], datetime]
 FaultHook = Callable[[str, int], None]
-Source = Union[Path, str, VerifiedSnapshot, VerifiedRelease]
+Source = Path | str | VerifiedSnapshot | VerifiedRelease
 
 
 class InjectedCrash(BaseException):

@@ -24,9 +24,10 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/agents/literature/tool
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 import logging
-from typing import Any, Callable, Sequence
+from typing import Any
 import uuid
 
 from ..contracts.context import RequestContext

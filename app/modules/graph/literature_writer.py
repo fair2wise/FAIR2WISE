@@ -10,9 +10,10 @@ Adapted from als-computing/forge_rsoxs_analysis src/als_knowledge_agent/graph/kg
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import json
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import quote
 
 from . import identity_adapter as ida

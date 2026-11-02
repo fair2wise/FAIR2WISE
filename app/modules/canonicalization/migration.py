@@ -20,11 +20,12 @@ Rewritten: plan binding, revision checks and the single gate; the donor's in-pla
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Protocol
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from .campaign.models import Decision, TermEvidence

@@ -29,6 +29,7 @@ talks to Git; snapshot creation does not import it for that purpose and calls no
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import json
@@ -37,7 +38,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
-from typing import Any, Collection, Iterable, Iterator, Mapping, Sequence, cast
+from typing import Any, cast
 
 from .snapshot_manifest import CORPUS_RE, KGManifest, parse_manifest
 

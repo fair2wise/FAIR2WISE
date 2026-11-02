@@ -18,9 +18,9 @@ Rewritten: transport, reasoning-level plumbing and provider fields removed.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import hashlib
-from typing import Callable, Iterable
 
 from ..adjudication import clamp_confidence, parse_json_object
 from ..candidate_search import estimate_tokens

@@ -21,10 +21,11 @@ als-computing/forge_rsoxs_analysis als_knowledge_agent graph/figure_*.py).
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 import logging
 import re
-from typing import Any, Callable, NamedTuple, Protocol, Sequence
+from typing import Any, NamedTuple, Protocol
 import uuid
 
 from ..contracts.context import RequestContext

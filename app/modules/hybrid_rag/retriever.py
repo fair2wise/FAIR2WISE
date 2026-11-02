@@ -1,9 +1,9 @@
 """PaperRetriever: page-aware chunks from literature and ops indexes."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 import logging
 from pathlib import Path
-from typing import Iterable
 
 from .evidence import Evidence, evidence_from_chunk
 from .index_store import SourceIndex

@@ -29,12 +29,13 @@ Parity rules for the supervisor route:
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 import contextvars
-from enum import Enum
+from enum import StrEnum
 import json
 import os
 import time
-from typing import Any, Callable, Mapping, Sequence, cast
+from typing import Any, cast
 
 from .mode import RuntimeConfigError
 
@@ -42,7 +43,7 @@ QA_ROUTE_ENV = "F2W_QA_ROUTE"
 PLANNING_LABEL = "supervisor-plan"
 
 
-class QaRoute(str, Enum):
+class QaRoute(StrEnum):
     """How a langgraph-mode UI QA turn reaches ``answer_from_knowledge``."""
 
     DIRECT = "direct"

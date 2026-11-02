@@ -22,12 +22,13 @@ als_knowledge_agent/src/als_knowledge_agent/graph/bibliography_backfill.py
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import json
 import re
-from typing import Any, Iterable, Mapping, Protocol
+from typing import Any, Protocol
 
 #: Bumped when :func:`normalise_record` changes shape.
 BIBLIO_VERSION = "1"

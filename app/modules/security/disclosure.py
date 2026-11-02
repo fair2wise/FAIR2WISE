@@ -36,12 +36,13 @@ has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import re
 import threading
 import time
-from typing import Any, Callable, Iterable, Mapping, Sequence, cast
+from typing import Any, cast
 import uuid
 
 from ..contracts.context import RequestContext

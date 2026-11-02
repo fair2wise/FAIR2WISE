@@ -24,10 +24,11 @@ Guarantees (plan 11, T10 acceptance):
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..contracts.context import ActorKind, RequestContext

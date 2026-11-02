@@ -94,10 +94,10 @@ class WorkflowStateStore:
                 json.dump(self.data, handle, indent=2, ensure_ascii=False, default=str)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(tmp_name, self.path)
+            Path(tmp_name).replace(self.path)
         finally:
             try:
-                os.unlink(tmp_name)
+                Path(tmp_name).unlink()
             except FileNotFoundError:
                 pass
 

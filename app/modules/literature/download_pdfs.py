@@ -12,12 +12,13 @@ Usage:
 """
 
 import argparse
+from collections.abc import Iterable
 import logging
 import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Iterable, cast
+from typing import Any, cast
 from urllib.parse import parse_qs, quote, urlparse
 
 import requests
@@ -850,7 +851,7 @@ def download_pdf(url: str, dest: str, retries: int = 3) -> bool:
             invalid_response = False
             content_type = (resp.headers.get("Content-Type") or "").lower()
 
-            with open(tmp_path, 'wb') as f:
+            with tmp_path.open('wb') as f:
                 for chunk in resp.iter_content(1024*32):
                     if not chunk:
                         continue
@@ -883,7 +884,7 @@ def download_pdf(url: str, dest: str, retries: int = 3) -> bool:
                 logging.warning("Rejected empty or truncated PDF response from %s", url)
                 return False
 
-            os.replace(tmp_path, dest_path)
+            tmp_path.replace(dest_path)
             logging.info(f"Saved PDF to {dest}")
             return True
         except Exception as e:
@@ -900,12 +901,13 @@ def run_arxiv_workflow(keyword: str, target_dir: str, max_results: int) -> None:
     Files are named ``[DOI].pdf`` (slashes replaced by underscores); existing
     files are skipped.
     """
-    os.makedirs(target_dir, exist_ok=True)
+    Path(target_dir).mkdir(parents=True, exist_ok=True)
     for result in search_arxiv(keyword, max_results):
         doi = (result.doi or result.get_short_id()).replace('/', '_')
         pdf_url = result.pdf_url
-        filename = os.path.join(target_dir, f"{doi}.pdf")
-        if os.path.exists(filename):
+        target_file = Path(target_dir) / f"{doi}.pdf"
+        filename = str(target_file)
+        if target_file.exists():
             logging.info(f"Already exists: {filename}")
             continue
         if not download_pdf(pdf_url, filename):
@@ -921,7 +923,7 @@ def run_openalex_workflow(keyword: str, target_dir: str, max_results: int) -> No
     """
     from pyalex import Works
 
-    os.makedirs(target_dir, exist_ok=True)
+    Path(target_dir).mkdir(parents=True, exist_ok=True)
     works = Works().search(title=keyword).per_page(max_results).execute()
     for item in works:
         doi = item.doi.replace('/', '_') if item.doi else None
@@ -929,8 +931,9 @@ def run_openalex_workflow(keyword: str, target_dir: str, max_results: int) -> No
         if not doi or not url:
             logging.debug(f"Skipping missing DOI/pdf: {item.id}")
             continue
-        filename = os.path.join(target_dir, f"{doi}.pdf")
-        if os.path.exists(filename):
+        target_file = Path(target_dir) / f"{doi}.pdf"
+        filename = str(target_file)
+        if target_file.exists():
             continue
         download_pdf(url, filename)
         time.sleep(1)

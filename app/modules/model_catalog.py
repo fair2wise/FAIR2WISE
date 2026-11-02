@@ -19,13 +19,14 @@ no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import os
 import re
 import threading
 import time
-from typing import Any, Callable, Iterable
+from typing import Any
 
 DEFAULT_CBORG_BASE = "https://api.cborg.lbl.gov"
 #: Seconds a successful listing is reused before the endpoint is asked again.

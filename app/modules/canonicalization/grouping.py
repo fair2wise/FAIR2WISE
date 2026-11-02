@@ -18,9 +18,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_grouping.py (BSD-3-Clause
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 import math
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 

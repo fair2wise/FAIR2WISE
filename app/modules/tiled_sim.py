@@ -10,6 +10,7 @@ Reproducible: seed ``20260916`` in ``storage/schema/tiled_sim_seed.yaml``.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime, timedelta
 import json
 import logging
@@ -17,7 +18,7 @@ import os
 from pathlib import Path
 import random
 import re
-from typing import Any, Callable, Iterable, Sequence, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 import uuid
 
@@ -42,6 +43,7 @@ from .bl1101_ingest import (
     utc_now,
     write_kg_snapshot,
 )
+from .cli_output import output
 
 LOGGER = logging.getLogger("tiled_sim")
 
@@ -1054,7 +1056,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             fixture = generate_fixture(seed)
             write_fixture(fixture, args.fixture)
         stats = fixture.get("stats") or {}
-        print(
+        output.info(
             f"pushing fixture seed={fixture.get('seed')}: "
             f"{stats.get('esafs')} ESAFs, "
             f"{stats.get('proposals')} proposals, "
@@ -1062,7 +1064,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{stats.get('samples')} samples → Tiled"
         )
         result = push_fixture_to_tiled(fixture, uri=args.tiled_uri)
-        print(
+        output.info(
             "tiled "
             f"{result['uri']}: created {result['created']} "
             f"skipped {result['skipped']} "
@@ -1073,7 +1075,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     seed = load_seed(args.seed_yaml)
     fixture = generate_fixture(seed)
     write_fixture(fixture, args.fixture)
-    print(
+    output.info(
         f"fixture seed={fixture['seed']}: "
         f"{fixture['stats']['esafs']} ESAFs, "
         f"{fixture['stats']['proposals']} proposals, "
@@ -1089,7 +1091,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         seed=seed,
         include_sim_nodes=args.include_sim_nodes,
     )
-    print(
+    output.info(
         f"bl1101 v{result['version']}: {result['nodes']} nodes, {result['edges']} edges → {result['kg_path']}"
     )
     return 0

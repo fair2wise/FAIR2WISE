@@ -8,9 +8,10 @@ or network. Replies are deterministic: a scripted queue, then a fixed default.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 import hashlib
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from .changes import ApprovalRecord, ChangePlan, ImportReceipt
 from .context import RequestContext

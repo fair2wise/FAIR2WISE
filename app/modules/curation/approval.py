@@ -13,9 +13,9 @@ no on-disk approval file that any process could write.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 import math
-from typing import Iterable
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field

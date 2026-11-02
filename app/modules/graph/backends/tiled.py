@@ -38,7 +38,8 @@ src/forge/kg/paging.py (BSD-3-Clause).
 
 from __future__ import annotations
 
-from typing import Any, Iterator, Sequence, cast
+from collections.abc import Iterator, Sequence
+from typing import Any, cast
 
 from app.modules.contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from app.modules.contracts.context import RequestContext

@@ -14,13 +14,13 @@ that may be unknown.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 import hashlib
 import json
 from typing import Any
 
 
-class CaseState(str, Enum):
+class CaseState(StrEnum):
     """Where a case is. ``resolved``/``rejected`` are terminal until the case revision changes."""
 
     PENDING = "pending"
@@ -33,7 +33,7 @@ class CaseState(str, Enum):
     SUPERSEDED = "superseded"
 
 
-class Route(str, Enum):
+class Route(StrEnum):
     """Resolution route chosen by deterministic triage."""
 
     TRIAGE = "triage"

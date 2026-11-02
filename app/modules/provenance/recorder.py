@@ -16,10 +16,11 @@ mutation is allowed.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import json
 import threading
-from typing import Any, Callable, Mapping, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.keys import digest

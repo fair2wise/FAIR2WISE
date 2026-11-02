@@ -17,7 +17,8 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/kg/mutations.py (BSD-3
 
 from __future__ import annotations
 
-from typing import Any, Mapping, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import requests
 

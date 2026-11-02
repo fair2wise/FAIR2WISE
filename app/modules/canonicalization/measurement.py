@@ -25,13 +25,14 @@ is outside top-k), prompt sizes, judge calls, and the no-index path.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
 import json
 from pathlib import Path
 import re
 from statistics import mean
-from typing import Any, Callable, Sequence, cast
+from typing import Any, cast
 
 from ..term_extractor.merge_index import TermMergeIndex, build_merge_prompt, clean_term
 from .adjudication import Judge
@@ -342,5 +343,7 @@ def write_report(directory: Path, report: dict[str, Any] | None = None) -> list[
 if __name__ == "__main__":  # pragma: no cover
     import sys
 
+    from ..cli_output import output
+
     for path in write_report(Path(sys.argv[1] if len(sys.argv) > 1 else "t07_measurement")):
-        print(path)
+        output.info(f"{path}")

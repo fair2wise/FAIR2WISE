@@ -31,9 +31,10 @@ of California, through Lawrence Berkeley National Laboratory), adding same-origi
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 import logging
 import re
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 from urllib.parse import urlsplit
 
 from fastapi.responses import JSONResponse

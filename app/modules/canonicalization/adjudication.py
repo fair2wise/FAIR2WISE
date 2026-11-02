@@ -23,10 +23,11 @@ als_knowledge_agent/src/als_knowledge_agent/graph/group_adjudication.py (BSD-3-C
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Any, Callable, cast
+from typing import Any, cast
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup

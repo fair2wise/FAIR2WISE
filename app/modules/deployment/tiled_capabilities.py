@@ -20,10 +20,11 @@ checks this), so a central outage can never start a local server.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 import hashlib
 import json
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 from .tiled_config import (
     PINNED_TILED_VERSION,

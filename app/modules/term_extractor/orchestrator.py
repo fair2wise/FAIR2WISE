@@ -1,5 +1,6 @@
 """Drive LLM term extraction over PDFs, page by page, into a ``TermStore``."""
 
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import logging
@@ -7,7 +8,7 @@ import os
 from pathlib import Path
 import re
 from types import SimpleNamespace
-from typing import Any, Sequence
+from typing import Any
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
@@ -387,7 +388,7 @@ class Orchestrator:
         except Exception as e:
             logger.error("Cannot open PDF %s: %s", pdf_path, e)
             return 0
-        filename = os.path.basename(pdf_path)
+        filename = Path(pdf_path).name
         total_pages = doc.page_count
         self.store.increment("processed_pages_total", total_pages)
         pages_with_terms = 0
@@ -500,10 +501,10 @@ class Orchestrator:
             return {
                 "status": "error",
                 "message": f"Cannot open PDF {pdf_path}: {e}",
-                "filename": os.path.basename(pdf_path),
+                "filename": Path(pdf_path).name,
             }
 
-        filename = os.path.basename(pdf_path)
+        filename = Path(pdf_path).name
         total_pages = doc.page_count
 
         try:
@@ -604,7 +605,7 @@ class Orchestrator:
         max_pages: int = 6,
     ) -> dict[str, Any]:
         """Walk data_dir and partially process PDFs against one query."""
-        if not os.path.isdir(data_dir):
+        if not data_dir or not Path(data_dir).is_dir():
             msg = f"Directory not found: {data_dir}"
             logger.error(msg)
             return {"status": "error", "message": msg}
@@ -652,7 +653,7 @@ class Orchestrator:
 
     def process_directory(self, data_dir: str) -> dict[str, Any]:
         """Walk data_dir, process all PDFs, assign importance scores, save final output."""
-        if not os.path.isdir(data_dir):
+        if not data_dir or not Path(data_dir).is_dir():
             msg = f"Directory not found: {data_dir}"
             logger.error(msg)
             return {"status": "error", "message": msg}

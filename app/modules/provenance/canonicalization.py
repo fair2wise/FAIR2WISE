@@ -14,11 +14,12 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_provenance.py (``Resoluti
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import hashlib
 import json
 from pathlib import Path
 import subprocess
-from typing import Any, Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 

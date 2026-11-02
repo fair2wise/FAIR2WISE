@@ -16,11 +16,11 @@ semaphores while the flag is off.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import AbstractAsyncContextManager, AbstractContextManager, asynccontextmanager, contextmanager
 import os
 import threading
 import time
-from typing import AsyncIterator, Callable, Iterator
 
 _TRUTHY = {"1", "true", "yes", "on"}
 

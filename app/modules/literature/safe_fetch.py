@@ -20,13 +20,14 @@ Adapted from als-computing/forge_rsoxs_analysis src/forge/simulation/net_guard.p
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 import ipaddress
 import logging
 from pathlib import Path
 import socket
 import time
-from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
+from typing import Any
 from urllib.parse import urljoin, urlsplit
 
 import httpx

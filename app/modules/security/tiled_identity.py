@@ -36,10 +36,11 @@ Importing this module has no side effects and does not import ``httpx`` or ``til
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
-from typing import Any, Mapping, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 
 #: Tiled role name that makes a principal an F2W admin (0.2.18 authn_database/core.py:51).

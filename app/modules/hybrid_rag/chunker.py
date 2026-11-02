@@ -1,10 +1,11 @@
 """Page-aware PDF chunks and heading-aware ops-doc chunks."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from html import unescape
 from pathlib import Path
 import re
-from typing import Any, Iterable
+from typing import Any
 
 CHUNKER_VERSION = "1.0.0"
 WINDOW_CHARS = 1200

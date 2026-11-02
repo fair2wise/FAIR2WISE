@@ -10,8 +10,9 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_quarantine.py (BSD-3-Clau
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 import re
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .growth import definitions
 from .vocabulary import CATEGORIES, Vocabulary

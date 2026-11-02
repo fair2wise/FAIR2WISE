@@ -16,9 +16,10 @@ cborg_resolution.py (``validate_resolution``) (BSD-3-Clause).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import json
 import re
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 

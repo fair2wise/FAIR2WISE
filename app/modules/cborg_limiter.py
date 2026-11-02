@@ -19,10 +19,10 @@ cap and honor 429 cooldowns (H1-3). The flag is read per call.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
 import os
 import threading
-from typing import AsyncIterator, Iterator
 
 try:
     from .llm_admission import get_controller, shared_admission_enabled

@@ -1,11 +1,12 @@
 """Discover literature PDFs and ops docs as two separate source lists."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Sequence
+from typing import Any
 
 GOLD_TITLE_NEEDLES = (
     "p3ht",

@@ -20,6 +20,7 @@ artifact: only the frozen layout passes ``releases.verify_*``.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 import copy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -29,7 +30,7 @@ import os
 from pathlib import Path
 import shutil
 import threading
-from typing import Any, Iterable, Literal, Mapping, Sequence, cast
+from typing import Any, Literal, cast
 import uuid
 
 from app.modules import json2kg
@@ -416,7 +417,7 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
                     _write_synced(flat_tmp, graph_bytes)
                 os.link(flat_tmp, flat)  # claims the flat name atomically; never overwrites
                 claimed_flat = flat
-                os.rename(staging, final)  # fails if another job created `final` first
+                staging.rename(final)  # fails if another job created `final` first
             except FileExistsError:
                 pass
             except OSError as exc:

@@ -20,9 +20,10 @@ transport and the in-place ``apply_cleanup(apply=True)``.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Sequence
+from typing import Any
 
 from .campaign.evidence import GraphRows, assemble, fold_terms
 from .campaign.models import Decision, TermEvidence

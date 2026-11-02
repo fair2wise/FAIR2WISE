@@ -16,9 +16,10 @@ The context is re-resolved before every poll, so a sign-out or revocation ends t
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 import json
 import time
-from typing import Any, AsyncIterator
+from typing import Any
 
 from fastapi import Body, Depends, FastAPI, Query, Request
 from fastapi.responses import StreamingResponse

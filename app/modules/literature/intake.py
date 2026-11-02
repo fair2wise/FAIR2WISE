@@ -24,10 +24,11 @@ als_knowledge_agent/src/als_knowledge_agent/graph/paper_intake.py (``IntakeRepor
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 import re
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from ..contracts.context import RequestContext
 from .legacy import LegacyIndex, doi_key, doi_only, looks_like_pdf

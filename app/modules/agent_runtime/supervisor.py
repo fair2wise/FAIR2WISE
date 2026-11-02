@@ -57,10 +57,10 @@ interrupt-id map, so the interrupt simply stays pending.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 import json
-from typing import Any, Callable, Mapping, cast
+from typing import Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda

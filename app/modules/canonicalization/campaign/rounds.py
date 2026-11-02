@@ -13,7 +13,8 @@ als_knowledge_agent/src/als_knowledge_agent/graph/term_campaign.py (BSD-3-Clause
 from __future__ import annotations
 
 from collections import Counter
-from typing import Protocol, Sequence, cast
+from collections.abc import Sequence
+from typing import Protocol, cast
 
 from ..quarantine import check_context_row, classify_surface
 from ..vocabulary import Vocabulary

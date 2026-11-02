@@ -15,9 +15,9 @@ Any other value refuses startup instead of silently picking a mode.
 
 from __future__ import annotations
 
-from enum import Enum
+from collections.abc import Mapping
+from enum import StrEnum
 import os
-from typing import Mapping
 
 RUNTIME_ENV = "F2W_RUNTIME"
 
@@ -26,7 +26,7 @@ class RuntimeConfigError(ValueError):
     """The runtime selection is invalid; the service must not start."""
 
 
-class RuntimeMode(str, Enum):
+class RuntimeMode(StrEnum):
     """Orchestration used for ordinary read/QA turns."""
 
     LEGACY = "legacy"

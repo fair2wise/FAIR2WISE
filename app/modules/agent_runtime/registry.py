@@ -23,9 +23,10 @@ Changed:
 from __future__ import annotations
 
 import builtins
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import threading
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from ..contracts import CAPABILITIES, RequestContext, ToolSpec
 

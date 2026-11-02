@@ -16,10 +16,10 @@ in-memory bounded cache with JSON export. Retries/timeouts belong to the real F2
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import hashlib
 import re
-from typing import Callable, Sequence
 
 import numpy as np
 

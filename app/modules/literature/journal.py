@@ -19,6 +19,7 @@ als_knowledge_agent/src/als_knowledge_agent/graph/ingest_journal.py (``IngestJou
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 import hashlib
 import json
@@ -26,7 +27,7 @@ from pathlib import Path
 import sqlite3
 import threading
 import time
-from typing import Any, Callable, Iterator, Mapping
+from typing import Any
 
 
 class IngestJournal:

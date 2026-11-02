@@ -5,10 +5,11 @@ merges scored hit lists tagged with ``graph_id``.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence  # noqa: I001
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Any, Iterable, Sequence  # noqa: I001
+from typing import Any
 
 DEFAULT_JSON_GRAPH_PATHS: tuple[str, ...] = (
     "storage/kg/matkg_rsoxs_v1.json",

@@ -29,13 +29,14 @@ Importing this module has no side effects.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 import ipaddress
 import os
 from pathlib import Path
 import secrets
 import stat
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 #: Exact Tiled version F2W supports (O-T1). Compared as an exact string with
@@ -447,7 +448,7 @@ def check_private_file(path: Path) -> None:
             The message names the path and the mode, never the content.
     """
     try:
-        st = os.stat(path)
+        st = path.stat()
     except OSError as exc:
         raise TiledConfigError(f"Cannot read Tiled secret file {path}: {exc.strerror}") from None
     if not stat.S_ISREG(st.st_mode):
@@ -495,12 +496,12 @@ def read_secret_file(path: Path, *, alphanumeric: bool = False) -> str:
 def write_private_file(path: Path, content: str) -> None:
     """Create ``path`` with mode 0600 (refusing to follow an existing symlink)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    os.chmod(path.parent, stat.S_IRWXU)
+    path.parent.chmod(stat.S_IRWXU)
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(path, flags, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(content)
-    os.chmod(path, 0o600)
+    path.chmod(0o600)
 
 
 def generate_api_key() -> str:

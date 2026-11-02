@@ -20,9 +20,10 @@ als_knowledge_agent/src/als_knowledge_agent/graph/scientific_artifacts.py (``res
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import math
 import time
-from typing import Any, Callable
+from typing import Any
 import uuid
 
 from ..jobs.sqlite import OperationalDB
