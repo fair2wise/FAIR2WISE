@@ -762,3 +762,14 @@ def test_cli_renders_the_listen_port(tmp_path):
     assert gw.main(["render-nginx", "--template", str(CONF), "--listen-port", "8181", "--out", str(out)]) == 0
     assert "listen 8181;" in out.read_text()
     assert gw.main(["render-nginx", "--template", str(CONF), "--listen-port", "http"]) == 2
+
+
+def test_gateway_forwards_host_with_its_port() -> None:
+    """The origin gate compares ``Origin`` with ``Host`` including the port.
+
+    nginx's ``$host`` drops the port, so ``http://127.0.0.1:8080`` was refused as cross-site
+    on every sign-in and agent run behind the container gateway. ``$http_host`` keeps it.
+    """
+    text = CONF.read_text(encoding="utf-8")
+    hosts = re.findall(r"proxy_set_header\s+Host\s+(\S+);", text)
+    assert hosts and set(hosts) == {"$http_host"}
