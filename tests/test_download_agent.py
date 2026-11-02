@@ -4,9 +4,6 @@ from pathlib import Path
 
 import pyalex
 
-# Patch the canonical module DownloadAgent uses (scripts/download_pdfs.py is a facade).
-from app.modules.literature import download_pdfs
-
 from app.modules.f2w_agent import download_agent as mod
 from app.modules.f2w_agent.download_agent import DownloadAgent, _search_queries
 
@@ -128,7 +125,7 @@ def test_download_agent_does_not_count_invalid_download(tmp_path, monkeypatch):
 
     monkeypatch.setattr(agent, "_search_candidates", lambda query, missing, pool: [candidate])
     monkeypatch.setattr(agent, "_rank", lambda query, candidates: candidates)
-    monkeypatch.setattr(download_pdfs, "download_pdf", lambda url, dest: False)
+    monkeypatch.setattr(mod, "hardened_download_pdf", lambda url, dest: False)
 
     result = agent._download(
         "question",
@@ -221,7 +218,7 @@ def test_download_agent_rate_limits_between_failed_urls(tmp_path, monkeypatch):
 
     monkeypatch.setattr(agent, "_search_candidates", lambda query, missing, pool: [candidate])
     monkeypatch.setattr(agent, "_rank", lambda query, candidates: candidates)
-    monkeypatch.setattr(download_pdfs, "download_pdf", lambda url, dest: False)
+    monkeypatch.setattr(mod, "hardened_download_pdf", lambda url, dest: False)
     monkeypatch.setattr(mod.time, "sleep", lambda seconds: sleeps.append(seconds))
 
     result = agent._download("question", [], str(target), max_papers=1, candidate_pool=5)
@@ -251,7 +248,7 @@ def test_download_agent_skips_existing_valid_pdf(tmp_path, monkeypatch):
         "score": 0.9,
     }
 
-    monkeypatch.setattr(download_pdfs, "download_pdf", lambda url, dest: False)
+    monkeypatch.setattr(mod, "hardened_download_pdf", lambda url, dest: False)
 
     result = agent._download_candidates(
         "question",
@@ -288,7 +285,7 @@ def test_download_agent_rejects_semantically_invalid_pdf(tmp_path, monkeypatch):
 
     monkeypatch.setattr(agent, "_search_candidates", lambda query, missing, pool: [candidate])
     monkeypatch.setattr(agent, "_rank", lambda query, candidates: candidates)
-    monkeypatch.setattr(download_pdfs, "download_pdf", fake_download)
+    monkeypatch.setattr(mod, "hardened_download_pdf", fake_download)
     monkeypatch.setattr(agent, "_validate_downloaded_pdf", lambda query, work, path: False)
 
     result = agent._download("question", [], str(target), max_papers=1, candidate_pool=5)
