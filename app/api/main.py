@@ -9,6 +9,12 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
   :class:`~app.api.operations.F2WOperations` that SDK, CLI and worker callers use directly;
 * the ``/v1/validation/judge-model`` routes behind the settings panel's judge dropdown
   (owner O-U2; :mod:`app.modules.validation_settings`);
+* the T31 routes (owner decision B5): ``/v1/curation/cost-control``,
+  ``/v1/curation/cases/bulk-review``, ``/v1/vocabulary/quality`` and ``/v1/figures/scales``
+  (``app/api/routes_review.py``, ``app/api/routes_records.py``), all over ``F2WOperations``;
+* on the ``:local`` profile only, the T32 folder routes (owner decision B4) ``/v1/folders/roots``,
+  ``/list`` and ``/index`` over roots fixed by ``F2W_FOLDER_ROOTS`` (:mod:`app.api.folders`); an ALS
+  profile does not register them, so they answer 404 there;
 * the ``/v1/operations`` routes (T19E) over the deployment's
   :class:`~app.modules.operations.knowledge.KnowledgeOperations` (default
   ``KnowledgeOperations.from_deployment``: the JSON graphs under ``storage/kg`` and the
@@ -42,6 +48,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -55,6 +62,8 @@ from .auth import undeclared_routes, warn_if_exposed
 from .operations import F2WOperations, PublicationGate, build_operations
 from .origin_gate import OriginGateMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
+
+logger = logging.getLogger(__name__)
 
 #: Path prefixes covered by the origin gate and the body cap.
 GUARDED_PREFIXES = ("/v1/", "/auth/")
@@ -127,6 +136,7 @@ def create_api_app(
     knowledge_operations: Any | None = None,
     model_api: bool = False,
     model_api_root_path: str | None = None,
+    folder_roots: Any | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -163,18 +173,25 @@ def create_api_app(
         model_api_root_path: Public root the mounted model API advertises (``/fair2wise/model-api``
             behind the gateway). Default from ``F2W_PUBLIC_PREFIX`` in ``startup_config`` (or the
             process environment), as ``PublicLayout.model_api_root_path``.
+        folder_roots: :class:`~app.api.folders.FolderRoots` for the ``/v1/folders`` routes (T32).
+            Default: parsed from ``F2W_FOLDER_ROOTS`` in ``startup_config`` (or the process
+            environment). The routes are registered on the ``:local`` profile only; on an ALS
+            profile they are absent (404) and a configured value is ignored with a warning.
 
     Raises:
         StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
             ``knowledge_operations`` given beside ``operations`` that already carry one, or
             ``model_api`` without a JSON graph in ``cfg.graph``.
     """
+    from . import routes_folders as folders
     from . import routes_jobs as jobs
     from . import routes_operations as knowledge_routes
     from . import routes_publications as publications
+    from . import routes_records as records
     from . import routes_review as review
     from . import routes_status as status
     from . import routes_validation as validation
+    from .folders import FOLDER_ROOTS_ENV, FolderRoots
     from ..modules.f2w_agent.api import create_app, effective_cors_origins
     from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
@@ -214,6 +231,17 @@ def create_api_app(
     app.state.f2w_judge_settings = judge_settings
     validation.install(app)
     knowledge_routes.install(app)
+    records.install(app)
+
+    startup = os.environ if startup_config is None else startup_config
+    if settings.is_local:
+        # T32 (B4): folder browse/index over roots fixed in configuration, on the local profile only.
+        if operations.folders is None:
+            operations.folders = folder_roots if folder_roots is not None else FolderRoots.from_startup(startup)
+        folders.install(app)
+    elif folder_roots is not None or (startup.get(FOLDER_ROOTS_ENV) or "").strip():
+        logger.warning("%s is ignored on %s: folder browsing is a local-profile feature (owner decision B4)",
+                       FOLDER_ROOTS_ENV, settings.profile)
 
     if model_api:
         from ..modules.kg_rag_api import create_fastapi_app as create_model_api_app

@@ -773,3 +773,68 @@ def test_gateway_forwards_host_with_its_port() -> None:
     text = CONF.read_text(encoding="utf-8")
     hosts = re.findall(r"proxy_set_header\s+Host\s+(\S+);", text)
     assert hosts and set(hosts) == {"$http_host"}
+
+
+# ------------------------------------------------------------------ T32 (B4): folder routes through the gateway
+
+
+def _folder_tree(tmp_path):
+    root = tmp_path / "papers"
+    (root / "sub").mkdir(parents=True)
+    (root / "sub" / "a.pdf").write_bytes(b"%PDF-1.7\n")
+    return root
+
+
+def test_t32_folder_routes_are_404_on_als_behind_the_gateway(harness, static_root, monkeypatch, tmp_path):
+    """The ALS image's app factory never registers ``/v1/folders``: anonymous and signed-in alike get 404."""
+    from _wiring_support import make_cfg
+
+    from app.api.folders import FolderRoots
+    from app.api.main import create_api_app
+    from app.api.sessions import als_identity_wiring
+    from app.modules.security.authorization import DeploymentSettings
+
+    monkeypatch.delenv("F2W_RUNTIME", raising=False)
+    monkeypatch.setenv("F2W_FOLDER_ROOTS", f"papers={_folder_tree(tmp_path)}")  # ignored on ALS
+    tiled = ScriptedTiled()
+    settings = DeploymentSettings.for_disposable_test_target("als-dev", tiled_target=tiled.TARGET,
+                                                             writer_identity="w")
+    port, store = als_identity_wiring(settings, httpx.Client(transport=httpx.MockTransport(tiled.handler)))
+    app = create_api_app(make_cfg(harness), deployment=settings, identity_port=port, credential_store=store,
+                         folder_roots=FolderRoots.from_paths({"papers": tmp_path / "papers"}))
+    browser = _prefixed_client(app, static_root, base_url="https://f2w.example")
+    paths = (f"{API}/v1/folders/roots", f"{API}/v1/folders/list?root=papers", f"{API}/v1/folders/index?root=papers")
+    for path in paths:
+        resp = browser.get(path)
+        assert resp.status_code == 404 and resp.json() == {"detail": "Not Found"}, path
+    browser.post(f"{API}/auth/sign-in", json={"provider": "toy", "username": "bob", "password": "pw"})
+    assert browser.get(f"{API}/v1/jobs").status_code == 200  # signed in; other /v1 routes answer
+    for path in paths:
+        resp = browser.get(path)
+        assert resp.status_code == 404 and resp.json() == {"detail": "Not Found"}, path
+        assert "papers" not in resp.text and str(tmp_path) not in resp.text
+
+
+def test_t32_local_contract_lists_the_configured_root_behind_the_gateway(harness, static_root, monkeypatch, tmp_path):
+    """``:local`` behind the same gateway: the roots and a listing, relative paths only, traversal refused."""
+    from _wiring_support import make_cfg
+    from security_fakes import local_settings
+
+    from app.api.folders import FolderRoots
+    from app.api.main import create_api_app
+
+    monkeypatch.delenv("F2W_RUNTIME", raising=False)
+    root = _folder_tree(tmp_path)
+    app = create_api_app(make_cfg(harness), deployment=local_settings(),
+                         folder_roots=FolderRoots.from_paths({"papers": root}))
+    client = _prefixed_client(app, static_root)
+    assert client.get(f"{API}/v1/folders/roots").json() == {"roots": [{"root": "papers", "exists": True}]}
+    listing = client.get(f"{API}/v1/folders/list?root=papers&path=sub")
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["entries"] == [{"name": "a.pdf", "relative_path": "sub/a.pdf", "kind": "file",
+                                          "size": 9, "modified": listing.json()["entries"][0]["modified"],
+                                          "document": True}]
+    assert str(tmp_path) not in listing.text
+    for bad in ("..", "%2e%2e%2fother", "/etc"):
+        resp = client.get(f"{API}/v1/folders/list?root=papers&path={bad}")
+        assert resp.status_code in (404, 422) and str(tmp_path) not in resp.text, bad

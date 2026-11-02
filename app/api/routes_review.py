@@ -1,8 +1,9 @@
-"""``/v1/curation`` routes over ``review_case`` and cost approvals (policies V10-V15).
+"""``/v1/curation`` routes over ``review_case``, cost approvals and cost control (policies V10-V15, V32-V34).
 
 Case lists carry no evidence text; a single case carries a bounded evidence excerpt
 (``EVIDENCE_EXCERPT_CHARS``), never the stored chunk in full (D19: no reconstructable
-source-text export). A decision binds to the case ``revision`` the reviewer was shown.
+source-text export). A decision binds to the case ``revision`` the reviewer was shown; a bulk
+review (T31) is one decision per case with one result per case.
 """
 
 from __future__ import annotations
@@ -14,7 +15,8 @@ from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.context import RequestContext
-from .routes_common import Prefixed, context, dump, operations, project
+from .operations import MAX_BULK_REVIEW
+from .routes_common import Prefixed, context, dump, fresh_context, operations, project
 
 #: Characters of stored evidence shown with one case (reviewers see the cited quote and context).
 EVIDENCE_EXCERPT_CHARS = 600
@@ -43,6 +45,35 @@ class CostApprovalRequest(BaseModel):
     models: list[str] = Field(min_length=1, max_length=50)
     cap_usd: float = Field(gt=0)
     expires_at: datetime
+
+
+class CostControlRequest(BaseModel):
+    """Body of ``PUT /v1/curation/cost-control`` (T31): the remote switch and the cap (``null`` = no cap)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    budget_cap_usd: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+
+class BulkDecision(BaseModel):
+    """One decision of a bulk review: the same fields as ``ReviewRequest`` plus the case id."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str = Field(min_length=1, max_length=200)
+    bound_revision: str = Field(min_length=1, max_length=200)
+    accept: bool
+    resolution: dict[str, Any] | None = None
+    reason: str = Field(default="", max_length=2000)
+
+
+class BulkReviewRequest(BaseModel):
+    """Body of ``POST /v1/curation/cases/bulk-review`` (T31)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decisions: list[BulkDecision] = Field(min_length=1, max_length=MAX_BULK_REVIEW)
 
 
 def _summary(case: dict[str, Any]) -> dict[str, Any]:
@@ -106,7 +137,30 @@ def install(app: FastAPI) -> FastAPI:
         """Revoke a cost approval; later reservations under it are refused."""
         return cast(dict[str, Any], project(request, operations(request).revoke_cost_approval(ctx, approval_id)))
 
+    @router.get("/cost-control")
+    def cost_control(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """The remote-cost switch and cap, with the ledger spend against the cap (T31)."""
+        return cast(dict[str, Any], project(request, operations(request).cost_control(ctx)))
+
+    @router.put("/cost-control")
+    def set_cost_control(request: Request, body: CostControlRequest,
+                         ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
+        """Set the remote-cost switch and cap (human only; audited); returns the saved control (T31)."""
+        result = operations(request).set_cost_control(ctx, enabled=body.enabled, budget_cap_usd=body.budget_cap_usd)
+        return cast(dict[str, Any], project(request, result))
+
+    @router.post("/cases/bulk-review")
+    def bulk_review(request: Request, body: BulkReviewRequest,
+                    ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+        """Review several cases, each bound to the revision the reviewer saw; one result per case (T31)."""
+        result = operations(request).bulk_review(ctx, [d.model_dump() for d in body.decisions])
+        for item in result["results"]:
+            if item.get("case") is not None:
+                item["case"] = _excerpt(item["case"])
+        return cast(dict[str, Any], project(request, result))
+
     return app
 
 
-__all__ = ("CASE_SUMMARY_FIELDS", "CostApprovalRequest", "EVIDENCE_EXCERPT_CHARS", "ReviewRequest", "install")
+__all__ = ("CASE_SUMMARY_FIELDS", "BulkDecision", "BulkReviewRequest", "CostApprovalRequest", "CostControlRequest",
+           "EVIDENCE_EXCERPT_CHARS", "ReviewRequest", "install")

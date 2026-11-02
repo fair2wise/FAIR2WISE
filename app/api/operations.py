@@ -16,7 +16,14 @@ first and forwards to the T10 services, so the same authorization runs on every 
 * audit: :meth:`~app.modules.provenance.recorder.AuditRecorder.status`;
 * Knowledge Operations (T19E): :class:`~app.modules.operations.knowledge.KnowledgeOperations`
   (the five T19C read Tools) for direct bounded results and for the ``knowledge_operation``
-  job kind (``register_knowledge_jobs``; ``ops.run``).
+  job kind (``register_knowledge_jobs``; ``ops.run``);
+* T31 (owner decision B5): the remote-cost control switch and cap
+  (:mod:`app.modules.curation.control`, read with the ledger spend), bulk case review (every
+  item through ``review_case``, results per case), the vocabulary-quality snapshot history
+  (:mod:`app.modules.canonicalization.quality_snapshots`) and human-read figure-scale records
+  (:class:`~app.modules.curation.scale_records.ScaleRecordStore`);
+* T32 (owner decision B4): folder browse and index over roots fixed in configuration
+  (:class:`~app.api.folders.FolderRoots`), ``:local`` only.
 
 Nothing here parses HTTP, and no route holds an algorithm of its own. The only logic added
 here is the H5 publication gate (:class:`PublicationGate`) and the read-only UI mapping of a
@@ -74,6 +81,8 @@ def default_approval_ttl(settings: DeploymentSettings) -> timedelta | None:
     return None if settings.is_local else ALS_APPROVAL_TTL
 H5_MESSAGE = ("publication to {target} is gated at H5: only approved rehearsal targets (fixture or disposable "
               "Tiled) are enabled on this deployment")
+#: Decisions one bulk review may carry (T31).
+MAX_BULK_REVIEW = 200
 
 
 def _utcnow() -> datetime:
@@ -143,12 +152,19 @@ class F2WOperations:
             the profile (``None`` = never expires on ``:local``, 24 h on ALS, O-T2).
         knowledge: The deployment's ``KnowledgeOperations`` (T19E), or ``None`` when no graph
             port is configured (the knowledge methods then raise ``UNSUPPORTED_CAPABILITY``).
+        scales: Figure-scale record store (T31); default one over the curation store's database.
+        control_path: Path of the remote-cost control file (T31); ``None`` = cost control not configured.
+        quality_dir: Directory of the vocabulary-quality snapshots (T31); ``None`` = not configured.
+        folders: ``FolderRoots`` for folder browse/index (T32); ``None`` = not configured. Trusted
+            wiring sets it on ``:local`` only; the folder methods refuse every other profile.
     """
 
     def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Any = None,
                  curation: Any = None, audit: Any = None, identity_port: TiledIdentityPort | None = None,
                  publication_gate: PublicationGate | None = None, clock: Clock = _utcnow,
-                 approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: Any = None) -> None:
+                 approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: Any = None,
+                 scales: Any = None, control_path: Path | None = None, quality_dir: Path | None = None,
+                 folders: Any = None) -> None:
         """Bind the services; see the class docstring for the arguments.
 
         Raises:
@@ -167,6 +183,14 @@ class F2WOperations:
         self.approval_ttl: timedelta | None = (default_approval_ttl(settings) if approval_ttl is PROFILE_APPROVAL_TTL
                                                   else approval_ttl)
         self.knowledge = knowledge
+        if scales is None and curation is not None:
+            from ..modules.curation.scale_records import ScaleRecordStore
+
+            scales = ScaleRecordStore(curation.db, clock=curation.clock)
+        self.scales = scales
+        self.control_path = Path(control_path) if control_path is not None else None
+        self.quality_dir = Path(quality_dir) if quality_dir is not None else None
+        self.folders = folders
 
     # --- contexts ---------------------------------------------------------------------
 
@@ -350,6 +374,201 @@ class F2WOperations:
             raise ContractError(ErrorCode.DENIED, "corpus is outside the caller's scope")
         store.revoke_cost_approval(approval_id)
         return {"approval_id": approval_id, "status": "revoked"}
+
+    # --- T31: cost control, bulk review ---------------------------------------------------------
+
+    @staticmethod
+    def _human(ctx: RequestContext, what: str) -> None:
+        if ctx.actor_kind not in (ActorKind.INTERACTIVE, ActorKind.CLI):
+            raise ContractError(ErrorCode.DENIED, f"{what} is done by a human, not a worker, delegate or model")
+
+    def _guarded(self, ctx: RequestContext, *, kind: str, target: str, payload: Mapping[str, Any],
+                 mutation: Callable[[], Any]) -> Any:
+        """Run ``mutation`` write-ahead audited when audit is configured (as ``review_case``)."""
+        if self.audit is None:
+            return mutation()
+        return self.audit.guard(kind=kind, operation_id=f"{kind}:{uuid.uuid4().hex}", actor=ctx.principal.subject,
+                                target=target, payload=dict(payload), run_id=ctx.run_id, mutation=mutation)
+
+    def cost_control(self, ctx: RequestContext) -> dict[str, Any]:
+        """The remote-cost switch and cap (donor ``cborg_control``) with the ledger spend against that cap.
+
+        ``configured`` is false when the deployment has no control file; the switch then reads
+        as disabled (fail closed, as ``read_control``). ``spend`` is the ``BudgetLedger.summary``
+        (known, reserved and unknown spend kept apart; ``cap_exceeded`` against the cap).
+        """
+        from ..modules.curation.control import read_control
+
+        require(ctx, "curation.approve")
+        control = (read_control(self.control_path) if self.control_path is not None
+                   else {"enabled": False, "budget_cap_usd": None})
+        spend = self.curation.ledger.summary(cap_usd=control["budget_cap_usd"]) if self.curation is not None else None
+        return {"configured": self.control_path is not None, "enabled": bool(control["enabled"]),
+                "budget_cap_usd": control["budget_cap_usd"], "spend": spend}
+
+    def set_cost_control(self, ctx: RequestContext, *, enabled: bool, budget_cap_usd: float | None) -> dict[str, Any]:
+        """Save the remote-cost switch and cap (human with ``curation.approve``; write-ahead audited).
+
+        Raises:
+            ContractError: ``DENIED``; ``UNSUPPORTED_CAPABILITY`` without a control file;
+                ``INVALID_INPUT`` for a cap that is not a positive finite number.
+        """
+        from ..modules.curation.control import write_control
+
+        self._human(ctx, "the cost control")
+        require(ctx, "curation.approve")
+        path = self.control_path
+        if path is None:
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "cost control is not configured on this deployment")
+        cap = None if budget_cap_usd is None else float(budget_cap_usd)
+        if cap is not None and not (cap > 0 and cap != float("inf")):
+            raise ContractError(ErrorCode.INVALID_INPUT, "budget_cap_usd must be a positive finite number or null")
+
+        def apply() -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                write_control(path, enabled=bool(enabled), budget_cap_usd=cap)
+            except ValueError as exc:
+                raise ContractError(ErrorCode.INVALID_INPUT, str(exc)) from None
+
+        self._guarded(ctx, kind="cost_control", target="deployment",
+                      payload={"enabled": bool(enabled), "budget_cap_usd": cap}, mutation=apply)
+        return self.cost_control(ctx)
+
+    def bulk_review(self, ctx: RequestContext, decisions: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+        """Review several cases in one call (donor ``review_resolve_bulk``); each item is its own decision.
+
+        Every item goes through :func:`~app.modules.curation.reviewer.review_case` with the
+        same rules as a single review (human, ``curation.approve``, bound to the shown
+        revision, audited); one item's refusal (stale revision, not awaiting review, unknown
+        case) is reported in its result and does not stop the others. At most
+        :data:`MAX_BULK_REVIEW` items.
+
+        Returns:
+            ``{"results": [{"case_id", "status": "ok" | "error", "case" | "code", "message"}], "accepted",
+            "rejected", "failed"}``.
+        """
+        self._human(ctx, "case review")
+        require(ctx, "curation.approve")
+        self._curation()
+        if not decisions or len(decisions) > MAX_BULK_REVIEW:
+            raise ContractError(ErrorCode.INVALID_INPUT, f"bulk review takes 1 to {MAX_BULK_REVIEW} decisions")
+        results: list[dict[str, Any]] = []
+        accepted = rejected = failed = 0
+        for item in decisions:
+            case_id = str(item.get("case_id") or "")
+            try:
+                accept = bool(item["accept"])
+                case = self.review_case(ctx, case_id, bound_revision=str(item["bound_revision"]), accept=accept,
+                                        resolution=item.get("resolution"), reason=str(item.get("reason") or ""))
+            except KeyError as exc:
+                failed += 1
+                results.append({"case_id": case_id, "status": "error", "code": ErrorCode.INVALID_INPUT.value,
+                                "message": f"decision is missing {exc.args[0]}"})
+            except ContractError as exc:
+                failed += 1
+                results.append({"case_id": case_id, "status": "error", "code": exc.code.value, "message": str(exc)})
+            else:
+                accepted += accept
+                rejected += not accept
+                results.append({"case_id": case_id, "status": "ok", "case": case})
+        return {"results": results, "accepted": accepted, "rejected": rejected, "failed": failed}
+
+    # --- T31: vocabulary quality, figure-scale records -------------------------------------------
+
+    def vocabulary_quality(self, ctx: RequestContext, *, limit: int = 30) -> dict[str, Any]:
+        """Newest-first vocabulary-quality snapshots (counts only; candidate and canonical kept apart).
+
+        Snapshots are what :func:`~app.modules.canonicalization.quality_snapshots.write_snapshot`
+        wrote under the deployment's quality directory; nothing is computed here.
+        """
+        from ..modules.canonicalization.quality_snapshots import HISTORY_CAP, snapshot_history
+
+        require(ctx, "chat.read_support")
+        if self.quality_dir is None:
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
+                                "vocabulary-quality snapshots are not configured on this deployment")
+        bound = max(1, min(int(limit), HISTORY_CAP))
+        snapshots = snapshot_history(self.quality_dir, limit=bound) if self.quality_dir.is_dir() else []
+        return {"snapshots": snapshots, "count": len(snapshots), "latest": snapshots[0] if snapshots else None}
+
+    def _scales(self) -> Any:
+        if self.scales is None:
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "figure-scale records are not configured")
+        return self.scales
+
+    def _scale_scope(self, ctx: RequestContext) -> list[str]:
+        if ctx.principal.subject == LOCAL_OPERATOR and ctx.mode.value == "local_trusted":
+            return cast(list[str], self._scales().corpora())
+        return sorted(ctx.corpus_scope)
+
+    def record_figure_scale(self, ctx: RequestContext, *, corpus: str, work_id: str, figure_id: str,
+                            panel_index: int, nm_per_px: float, bar_length_px: float | None = None,
+                            bar_length_nm: float | None = None, length_source: str = "human",
+                            note: str = "") -> dict[str, Any]:
+        """Append a human-read scale record (donor ``figure_scale_record``; human, ``curation.approve``, audited).
+
+        Raises:
+            ContractError: ``DENIED`` (not a human, missing capability, corpus outside the caller's
+                scope); ``INVALID_INPUT`` (see ``ScaleRecordStore.record``).
+        """
+        self._human(ctx, "a figure-scale record")
+        require(ctx, "curation.approve")
+        store = self._scales()
+        if ctx.principal.subject != LOCAL_OPERATOR and corpus not in ctx.corpus_scope:
+            raise ContractError(ErrorCode.DENIED, "corpus is outside the caller's scope")
+        return cast(dict[str, Any], self._guarded(
+            ctx, kind="figure_scale", target=corpus,
+            payload={"work_id": work_id, "figure_id": figure_id, "panel_index": panel_index},
+            mutation=lambda: store.record(corpus=corpus, work_id=work_id, figure_id=figure_id,
+                                          panel_index=panel_index, nm_per_px=nm_per_px, bar_length_px=bar_length_px,
+                                          bar_length_nm=bar_length_nm, length_source=length_source, note=note,
+                                          recorded_by=ctx.principal.subject)))
+
+    def list_figure_scales(self, ctx: RequestContext, *, corpus: str | None = None, work_id: str | None = None,
+                           figure_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        """Newest-first records within the caller's scope (``chat.read_support``).
+
+        A corpus outside a non-empty ALS scope is ``DENIED`` (the T19C scope rule); the local
+        operator reads every corpus.
+        """
+        require(ctx, "chat.read_support")
+        store = self._scales()
+        scope = self._scale_scope(ctx)
+        if corpus is not None:
+            if ctx.principal.subject != LOCAL_OPERATOR and corpus not in scope:
+                raise ContractError(ErrorCode.DENIED, "corpus is outside the caller's scope")
+            scope = [corpus]
+        return cast(list[dict[str, Any]], store.list_records(scope, work_id=work_id, figure_id=figure_id, limit=limit))
+
+    def get_figure_scale(self, ctx: RequestContext, record_id: str) -> dict[str, Any]:
+        """One record within the caller's scope (``chat.read_support``; outside it is ``NOT_FOUND``)."""
+        require(ctx, "chat.read_support")
+        return cast(dict[str, Any], self._scales().get(record_id, self._scale_scope(ctx)))
+
+    # --- T32: folder browse and index (:local only) -----------------------------------------------
+
+    def _folders(self, ctx: RequestContext) -> Any:
+        if not self.settings.is_local:
+            raise ContractError(ErrorCode.DENIED, "folder browsing is a local-profile feature")
+        require(ctx, "ingest.acquire")
+        if self.folders is None:
+            raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "folder browsing is not configured on this deployment")
+        return self.folders
+
+    def folder_roots(self, ctx: RequestContext) -> dict[str, Any]:
+        """The configured root labels (``ingest.acquire``; never a path)."""
+        return {"roots": self._folders(ctx).describe()}
+
+    def list_folder(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 1000
+                    ) -> dict[str, Any]:
+        """Entries of one folder under a configured root (``FolderRoots.list_folder``)."""
+        return cast(dict[str, Any], self._folders(ctx).list_folder(root, path, limit=limit))
+
+    def folder_index(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 500
+                     ) -> dict[str, Any]:
+        """Bounded document inventory under one folder (``FolderRoots.index_folder``)."""
+        return cast(dict[str, Any], self._folders(ctx).index_folder(root, path, limit=limit))
 
     # --- publication -------------------------------------------------------------------------
 
@@ -600,7 +819,8 @@ def build_operations(settings: DeploymentSettings, root: str | Path, *,
     curation = CurationStore(base / "curation.sqlite3", clock=epoch)
     audit = AuditRecorder(AuditLog(base / "audit.sqlite3", clock=epoch))
     return F2WOperations(settings, jobs, curation=curation, audit=audit, identity_port=identity_port,
-                         publication_gate=publication_gate, clock=clock, knowledge=knowledge)
+                         publication_gate=publication_gate, clock=clock, knowledge=knowledge,
+                         control_path=base / "cost_control.json", quality_dir=base / "vocab_quality")
 
 
 def job_event_json(event: JobEvent) -> dict[str, Any]:
@@ -614,5 +834,5 @@ def job_log_json(log: JobLog) -> dict[str, Any]:
             "stage": log.stage, "message": log.message}
 
 
-__all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "PROFILE_APPROVAL_TTL", "F2WOperations", "PublicationGate",
-           "build_operations", "default_approval_ttl", "job_event_json", "job_log_json")
+__all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "MAX_BULK_REVIEW", "PROFILE_APPROVAL_TTL", "F2WOperations",
+           "PublicationGate", "build_operations", "default_approval_ttl", "job_event_json", "job_log_json")
