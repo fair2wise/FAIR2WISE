@@ -137,6 +137,7 @@ def create_api_app(
     model_api: bool = False,
     model_api_root_path: str | None = None,
     folder_roots: Any | None = None,
+    tiled_save: Any | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -177,6 +178,8 @@ def create_api_app(
             Default: parsed from ``F2W_FOLDER_ROOTS`` in ``startup_config`` (or the process
             environment). The routes are registered on the ``:local`` profile only; on an ALS
             profile they are absent (404) and a configured value is ignored with a warning.
+        tiled_save: A :class:`~app.modules.graph.legacy_save.SaveTarget` (T18D), passed to ``create_app``: the
+            UI Save becomes a journaled multi-write on Tiled with no Splash call.
 
     Raises:
         StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
@@ -198,7 +201,8 @@ def create_api_app(
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
     app = create_app(cfg, cors_origins=cors_origins, deployment=deployment, startup_config=startup_config,
-                     identity_port=identity_port, credential_store=credential_store, clock=clock)
+                     identity_port=identity_port, credential_store=credential_store, clock=clock,
+                     tiled_save=tiled_save)
     runtime = app.state.f2w_access
     settings = runtime.settings
     if operations is None:

@@ -155,17 +155,22 @@ def test_q10_a_save_from_an_out_of_date_copy_is_a_409_with_no_journal_entry(worl
     with pytest.raises(StaleSave):
         backend.save(env.ctx, stale_copy, after)
     assert len(journal.latest()) == n_entries
-    # A stale implicit unlink: the link is already gone on Tiled.
-    snippet_graph = edited(base, node, others, add_edge=False)
+    # A stale implicit unlink: another writer already removed the link on Tiled.
     eff = backend.effective_graph()
-    backend.save(env.ctx, eff, edited(eff, node, others, description=thing(eff, node)["description"], add_edge=False))
+    with_snippet = edited(eff, node, others, description=thing(eff, node)["description"], add_edge=False)
+    backend.save(env.ctx, eff, with_snippet)
     eff2 = backend.effective_graph()
+    st = cs.read_scope_state(env.client, SCOPE, double_read=False)
+    sid = st.final[node]["id"]
+    nid = st.final["matkg:snippetdelta1"]["id"]
+    for lk in [lk for lk in st.link_rows.values() if {lk["subjectId"], lk["objectId"]} == {sid, nid}]:
+        env.client.delete_link(lk, SCOPE)
     unlinked = copy.deepcopy(eff2)
     unlinked["associations"] = [a for a in unlinked["associations"] if a["object"] != "matkg:snippetdelta1"]
-    backend.save(env.ctx, eff2, unlinked)
-    del snippet_graph
+    n_entries = len(journal.latest())
     with pytest.raises(StaleSave):
         backend.save(env.ctx, eff2, unlinked)
+    assert len(journal.latest()) == n_entries
 
 
 def test_q8_a_save_during_a_switch_is_refused_before_anything_is_journaled(world):

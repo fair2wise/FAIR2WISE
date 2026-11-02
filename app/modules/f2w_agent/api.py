@@ -5,6 +5,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 import contextlib
 import contextvars
+import copy
 from dataclasses import dataclass, field
 from dataclasses import replace as dataclass_replace
 from datetime import UTC
@@ -31,6 +32,8 @@ from ...api.sessions import TiledSessionStore, install_session_routes
 from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
 from ..contracts.context import DeploymentProfile, RequestContext
+from ..contracts.errors import ContractError, ErrorCode
+from ..graph.legacy_save import SaveTarget, StaleSave, TiledSaveBackend
 from ..hybrid_rag.pipeline import hybrid_rag_enabled
 from ..project_config import config_value, get_config
 from ..runtime_bridge.selection import attach_read_path, attach_summary_path
@@ -2538,12 +2541,56 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: list[str]) -> li
     )
 
 
+class _NoSplash:
+    """Stand-in for the Splash client when Saves go to Tiled (T18D).
+
+    The editing methods keep their JSON logic and every Splash call becomes a no-op, so nothing here can reach a
+    Splash host.
+    """
+
+    @staticmethod
+    def splash_find_entity_by_matkg_id(matkg_id: str) -> dict[str, Any]:
+        """Every node is 'present'; the Tiled save validates existence itself."""
+        return {"id": matkg_id}
+
+    @staticmethod
+    def splash_update_entity(*_args: Any, **_kwargs: Any) -> None:
+        """No-op."""
+
+    @staticmethod
+    def splash_create_entity(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+        """No-op; returns a placeholder id."""
+        return {"id": str(kwargs.get("uri") or "new")}
+
+    @staticmethod
+    def splash_create_link(*_args: Any, **_kwargs: Any) -> None:
+        """No-op."""
+
+    @staticmethod
+    def splash_find_links(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
+        """No Splash links exist."""
+        return []
+
+    @staticmethod
+    def splash_delete_link(*_args: Any, **_kwargs: Any) -> bool:
+        """No-op."""
+        return False
+
+
+_TILED_SAVE_NO_SPLASH = _NoSplash()
+
+
 class AgentPipelineService:
     """Reusable in-process orchestrated pipeline for HTTP chat requests."""
 
-    def __init__(self, cfg: CoordinatorConfig) -> None:
-        """Initialize coordinator, session state, runtime settings, and agents."""
+    def __init__(self, cfg: CoordinatorConfig, tiled_save: SaveTarget | None = None) -> None:
+        """Initialize coordinator, session state, runtime settings, and agents.
+
+        ``tiled_save`` (T18D) routes the UI Save to a journaled multi-write on Tiled and the session graph to the
+        effective record; ``None`` keeps the previous behaviour.
+        """
         self.cfg = cfg
+        self.tiled_save: TiledSaveBackend | None = TiledSaveBackend(tiled_save) if tiled_save is not None else None
         self.coord = Coordinator(cfg)
         self.memory = SessionMemory(self.coord.workdir / "session_memory.json")
         self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
@@ -2648,7 +2695,17 @@ class AgentPipelineService:
         self._last_orchestration = context.last_orchestration
 
     def _sync_session_graph_from_splash(self) -> bool:
-        """Refresh session MatKG JSON from splash so UI reads survive restarts."""
+        """Refresh session MatKG JSON from splash so UI reads survive restarts.
+
+        With a Tiled save target the session graph is the effective record instead (no Splash call).
+        """
+        if self.tiled_save is not None:
+            try:
+                self._materialize_effective_graph(self._session_graph_path())
+                return True
+            except Exception as exc:
+                logger.warning("Failed to build the effective graph from the snapshot and journal: %s", exc)
+                return False
         try:
             data = kg_update.load_splash_graph(timeout=5)
             if not (data.get("things") or []):
@@ -3138,18 +3195,59 @@ class AgentPipelineService:
             return GraphPayload(nodes=[], edges=[], source_path="tiled://graphql")
         return graph_neighborhood_from_lookup(kg, node_id)
 
-    async def update_graph_node(self, node_id: str, update: GraphNodeUpdateRequest) -> GraphNode:
-        """Patch a splash-mode node, its snippets, and incident relationships."""
+    @property
+    def _splash(self) -> Any:
+        """The Splash client module, or the no-op stand-in when Saves go to Tiled (T18D: no Splash call)."""
+        return kg_update if self.tiled_save is None else _TILED_SAVE_NO_SPLASH
+
+    def _materialize_effective_graph(self, graph_path: Path) -> None:
+        """Write the effective record (active snapshot plus in-flight journal entries) to the session graph file.
+
+        Every reader (``/graph``, node search and detail, retrieval) reads that file, so a journaled edit is
+        visible to all of them at once. A pure function of the snapshot and the journal: a reverted edit
+        disappears on the next call.
+        """
+        assert self.tiled_save is not None
+        effective = self.tiled_save.effective_graph()
+        text = json.dumps(effective, indent=2, ensure_ascii=False)
+        try:
+            same = graph_path.read_text(encoding="utf-8") == text
+        except OSError:
+            same = False
+        if not same:
+            graph_path.parent.mkdir(parents=True, exist_ok=True)
+            graph_path.write_text(text, encoding="utf-8")
+            _GRAPH_JSON_CACHE.pop(str(graph_path), None)
+
+    async def update_graph_node(
+        self, node_id: str, update: GraphNodeUpdateRequest, ctx: RequestContext | None = None,
+    ) -> GraphNode:
+        """Patch a splash-mode node, its snippets, and incident relationships.
+
+        With a Tiled save target (T18D) this is a journaled multi-write on Tiled with no Splash call:
+        authorization, the switch refusal and the recovery of earlier half-done Saves come first, the diff is
+        journaled and written to Tiled, and the request returns only after the Tiled effect (Q12).
+        """
         if self.runtime.graph_source == "json":
             raise ValueError("Editing node properties requires splash graph mode")
 
+        tiled = self.tiled_save
         graph_path = self.graph_path()
+        if tiled is not None:
+            if ctx is None:
+                raise ContractError(ErrorCode.DENIED, "no server-resolved request context")
+            await asyncio.to_thread(tiled.prepare, ctx)
+            self._materialize_effective_graph(graph_path)
         data = _load_session_graph(graph_path)
+        before: dict[str, Any] | None = None
+        if tiled is not None:    # never mutate the parse cache: a failed Save must leave readers untouched
+            data = copy.deepcopy(data)
+            before = copy.deepcopy(data)
         thing = _find_thing(data, node_id)
         if thing is None:
             raise FileNotFoundError(f"Node not found: {node_id}")
 
-        splash_entity = kg_update.splash_find_entity_by_matkg_id(node_id)
+        splash_entity = self._splash.splash_find_entity_by_matkg_id(node_id)
         if splash_entity is None:
             raise FileNotFoundError(f"Splash entity not found for node: {node_id}")
 
@@ -3178,7 +3276,7 @@ class AgentPipelineService:
             publications=update.publications,
         )
 
-        kg_update.splash_update_entity(
+        self._splash.splash_update_entity(
             splash_entity["id"],
             name=update.label if update.label is not None else None,
             entity_type=normalized_type,
@@ -3200,7 +3298,11 @@ class AgentPipelineService:
                 updates=update.relationship_updates,
             )
 
-        _save_session_graph(graph_path, data)
+        if tiled is not None and ctx is not None and before is not None:
+            await asyncio.to_thread(tiled.save, ctx, before, data)
+            self._materialize_effective_graph(graph_path)
+        else:
+            _save_session_graph(graph_path, data)
         await self.retrieval.reload_kg(str(graph_path), graph_source="splash")
 
         node = graph_node_from_file(graph_path, node_id)
@@ -3252,8 +3354,8 @@ class AgentPipelineService:
             source = update.source.strip()
             target = update.target.strip()
             predicate = _normalize_relationship_predicate(update.predicate)
-            source_entity = kg_update.splash_find_entity_by_matkg_id(source)
-            target_entity = kg_update.splash_find_entity_by_matkg_id(target)
+            source_entity = self._splash.splash_find_entity_by_matkg_id(source)
+            target_entity = self._splash.splash_find_entity_by_matkg_id(target)
             if source_entity is None:
                 raise FileNotFoundError(f"Splash entity not found for node: {source}")
             if target_entity is None:
@@ -3269,7 +3371,7 @@ class AgentPipelineService:
                     and _string_value(raw.get("object") or raw.get("target")) == target
                 )
 
-            splash_links = kg_update.splash_find_links(
+            splash_links = self._splash.splash_find_links(
                 subject_id=str(source_entity["id"]),
                 predicate=predicate,
                 object_id=str(target_entity["id"]),
@@ -3280,7 +3382,7 @@ class AgentPipelineService:
                         {"subject": source, "predicate": predicate, "object": target}
                     )
                 if not splash_links:
-                    kg_update.splash_create_link(
+                    self._splash.splash_create_link(
                         subject_id=str(source_entity["id"]),
                         predicate=predicate,
                         object_id=str(target_entity["id"]),
@@ -3289,7 +3391,7 @@ class AgentPipelineService:
 
             associations[:] = [raw for raw in associations if not is_exact(raw)]
             for link in splash_links:
-                kg_update.splash_delete_link(str(link["id"]))
+                self._splash.splash_delete_link(str(link["id"]))
 
     async def _apply_linked_snippet_updates(
         self,
@@ -3335,21 +3437,21 @@ class AgentPipelineService:
                 )
             ]
             associations[:] = kept
-            snippet_entity = kg_update.splash_find_entity_by_matkg_id(snippet_id)
+            snippet_entity = self._splash.splash_find_entity_by_matkg_id(snippet_id)
             if snippet_entity is None:
                 return
-            for link in kg_update.splash_find_links(
+            for link in self._splash.splash_find_links(
                 subject_id=subject_splash_id,
                 predicate="rel:has_code_snippet",
                 object_id=str(snippet_entity["id"]),
             ):
-                kg_update.splash_delete_link(str(link["id"]))
-            for link in kg_update.splash_find_links(
+                self._splash.splash_delete_link(str(link["id"]))
+            for link in self._splash.splash_find_links(
                 subject_id=str(snippet_entity["id"]),
                 predicate="rel:has_code_snippet",
                 object_id=subject_splash_id,
             ):
-                kg_update.splash_delete_link(str(link["id"]))
+                self._splash.splash_delete_link(str(link["id"]))
 
         for item in updates:
             if item.action == "unlink":
@@ -3389,7 +3491,7 @@ class AgentPipelineService:
                     existing["code_snippet"] = code_text
                     existing["category"] = "CodeSnippet"
 
-                splash_snippet = kg_update.splash_find_entity_by_matkg_id(snippet_id)
+                splash_snippet = self._splash.splash_find_entity_by_matkg_id(snippet_id)
                 snippet_props = {
                     "matkg_id": snippet_id,
                     "code_snippet": code_text,
@@ -3397,13 +3499,13 @@ class AgentPipelineService:
                     "code_language": code_language,
                 }
                 if splash_snippet is None:
-                    splash_snippet = kg_update.splash_create_entity(
+                    splash_snippet = self._splash.splash_create_entity(
                         entity_type="CodeSnippet",
                         name=label,
                         uri=snippet_id,
                         properties=snippet_props,
                     )
-                    kg_update.splash_create_link(
+                    self._splash.splash_create_link(
                         subject_id=subject_splash_id,
                         predicate="rel:has_code_snippet",
                         object_id=str(splash_snippet["id"]),
@@ -3416,7 +3518,7 @@ class AgentPipelineService:
                         }
                     )
                 else:
-                    kg_update.splash_update_entity(
+                    self._splash.splash_update_entity(
                         str(splash_snippet["id"]),
                         name=label,
                         properties=snippet_props,
@@ -3437,7 +3539,7 @@ class AgentPipelineService:
                         for assoc in associations
                     )
                     if not linked:
-                        kg_update.splash_create_link(
+                        self._splash.splash_create_link(
                             subject_id=subject_splash_id,
                             predicate="rel:has_code_snippet",
                             object_id=str(splash_snippet["id"]),
@@ -3473,7 +3575,7 @@ class AgentPipelineService:
                     "object": snippet_id,
                 }
             )
-            splash_snippet = kg_update.splash_create_entity(
+            splash_snippet = self._splash.splash_create_entity(
                 entity_type="CodeSnippet",
                 name=label,
                 uri=snippet_id,
@@ -3484,7 +3586,7 @@ class AgentPipelineService:
                     "code_language": code_language,
                 },
             )
-            kg_update.splash_create_link(
+            self._splash.splash_create_link(
                 subject_id=subject_splash_id,
                 predicate="rel:has_code_snippet",
                 object_id=str(splash_snippet["id"]),
@@ -6547,8 +6649,13 @@ def create_app(
     identity_port: Any | None = None,
     credential_store: Any | None = None,
     clock: Callable[[], Any] | None = None,
+    tiled_save: SaveTarget | None = None,
 ) -> FastAPI:
     """Build the FastAPI app with CORS and agent pipeline routes.
+
+    ``tiled_save`` (T18D): a :class:`~app.modules.graph.legacy_save.SaveTarget`. With it ``PATCH /graph/node``
+    is a journaled multi-write on Tiled with no Splash call, and ``/graph``, search and retrieval read the
+    active snapshot plus in-flight journal entries; without it the route behaves as before.
 
     Access (T18B): ``deployment`` (``DeploymentSettings``) or ``startup_config``
     (``os.environ`` when ``None``, profile ``local`` when unset) selects the profile
@@ -6564,7 +6671,8 @@ def create_app(
         startup_config=startup_config, identity_port=identity_port, credential_store=credential_store,
         clock=clock,
     )
-    service = AgentPipelineService(cfg)
+    service = AgentPipelineService(cfg, tiled_save=tiled_save)
+    app.state.f2w_agent_service = service
     service.personal_settings = guard.personal_settings  # T25D: None on :local
     guard.check_service(service)
     guard.install(app)
@@ -6759,11 +6867,18 @@ def create_app(
     ) -> GraphNode:
         """Patch a splash-mode graph node."""
         try:
-            node = await service.update_graph_node(node_id, req)
+            node = await service.update_graph_node(node_id, req, ctx)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except StaleSave as exc:      # Q10: a Save from an out-of-date copy
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ContractError as exc:
+            if exc.code is ErrorCode.DENIED:     # the guard already answered 403 first; never a 502
+                raise
+            raise HTTPException(status_code=502,
+                                detail=f"Splash update failed: {guard.error_detail(ctx, exc)}") from exc
         except Exception as exc:
             raise HTTPException(status_code=502,
                                 detail=f"Splash update failed: {guard.error_detail(ctx, exc)}") from exc

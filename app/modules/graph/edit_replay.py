@@ -149,15 +149,18 @@ def _apply_snippet_upsert(graph: dict[str, Any], rec: EditRecord) -> tuple[str, 
 
 
 def replay_edits(graph: Mapping[str, Any], records: Sequence[EditRecord], *,
-                 states: frozenset[str] = REPLAYED_STATES) -> ReplayResult:
+                 states: frozenset[str] = REPLAYED_STATES, ordered: bool = False) -> ReplayResult:
     """Apply ``records`` (oldest first by ``recorded_at``/``seq``) to a deep copy of ``graph``.
 
     Every record in ``states`` (default :data:`REPLAYED_STATES`) ends in exactly one of ``kept``, ``already``
-    or ``conflicts``. ``states=IN_FLIGHT_STATES`` builds the effective record (T18D).
+    or ``conflicts``. ``states=IN_FLIGHT_STATES`` builds the effective record (T18D). ``ordered=True`` keeps the
+    order of ``records`` (the journal's creation order) instead of sorting by the time of each edit's latest
+    state: a recovery that finishes an old edit late must not reorder it behind a newer one.
     """
     out = copy.deepcopy(dict(graph))
     result = ReplayResult(graph=out)
-    for rec in sorted((r for r in records if r.state in states), key=lambda r: (r.recorded_at, r.edit_id)):
+    chosen = [r for r in records if r.state in states]
+    for rec in chosen if ordered else sorted(chosen, key=lambda r: (r.recorded_at, r.edit_id)):
         if rec.operation == "node_patch":
             outcome, conflict = _apply_node_patch(out, rec)
         elif rec.operation == "snippet_upsert":
@@ -181,7 +184,7 @@ def replay_journal(graph: Mapping[str, Any], journal: EditJournal, *, target: st
     """:func:`replay_edits` over the journal's current records for ``target`` and ``scope``."""
     wanted = set(scope)
     records = [r for r in journal.latest().values() if r.target == target and set(r.scope) & wanted]
-    return replay_edits(graph, records, states=states)
+    return replay_edits(graph, records, states=states, ordered=True)
 
 
 def record_conflicts(journal: EditJournal, result: ReplayResult, at: datetime) -> list[str]:

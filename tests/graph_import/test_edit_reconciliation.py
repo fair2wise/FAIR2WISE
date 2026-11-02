@@ -126,7 +126,7 @@ def test_json10_replay_keeps_every_edit_or_records_a_conflict(tmp_path):
     assert out.accounted == sorted(f"e{i}" for i in range(1, 9))          # every edit has an outcome
     assert sorted(out.kept) == ["e1", "e5", "e6"] and out.already == ["e4"]
     assert {c.edit_id: c.reason for c in out.conflicts} == {
-        "e2": "node_missing", "e3": "field_changed", "e7": "endpoint_missing", "e8": "unsupported_operation"}
+        "e2": "node_missing", "e3": "field_changed", "e7": "endpoint_missing", "e8": "invalid_payload"}   # snippet ops are replayable since T18D; no payload is a conflict
     nodes = {n["id"]: n for n in out.graph["things"]}
     assert nodes["a"]["description"] == "edited" and nodes["b"]["description"] == "rebuilt-b"
     assert [(e["predicate"]) for e in out.graph["associations"]] == ["q"]
