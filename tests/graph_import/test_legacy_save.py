@@ -10,6 +10,7 @@ Binary-case equivalents (the companion inventory is frozen, so these pytest name
 """
 import copy
 import hashlib
+import json
 
 import pytest
 from test_corpus_replacement import SCOPE, foreign_rows, graph_of, live, owned
@@ -324,3 +325,46 @@ def test_snippet_and_link_edits_replay_onto_a_rebuilt_graph(world):
     assert sorted(result.kept) == sorted(r.edit_id for r in records) and not result.conflicts
     again = er.replay_edits(result.graph, records, states=er.IN_FLIGHT_STATES)
     assert sorted(again.already) == sorted(r.edit_id for r in records) and not again.kept
+
+
+def test_a_snapshot_rebuild_replays_the_journal_and_reconciles_the_carried_edits(snap, tmp_path, registry):
+    """T23C left ``replay_journal`` unwired: ``create_snapshot(edit_journal=...)`` is the v<N+1> build path."""
+    from datetime import UTC, datetime
+
+    from app.modules.graph.releases import verify_snapshot_dir
+    from app.modules.graph.snapshot import SnapshotRequest, create_snapshot
+    from tests.snapshots.snapshot_fakes import COMMIT, INPUTS
+
+    now = datetime(2026, 11, 2, tzinfo=UTC)
+    v1 = graph_of(snap)
+    node, _others = pick(v1)
+    journal = ej.EditJournal(tmp_path / "edits.jsonl")
+
+    def record(edit_id, state, **kw):
+        base = dict(edit_id=edit_id, seq=1, state=state, target="T", scope=(SCOPE,), base_snapshot_id="v1",
+                    base_graph_sha256="0" * 64, profile="local", mode="local_trusted", actor="local-operator",
+                    operation="node_patch", ids=(node,), recorded_at=now)
+        base.update(kw)
+        return ej.EditRecord(**base)
+    after = copy.deepcopy(thing(v1, node))
+    after["description"] = "carried into v2"
+    journal.append(record("carried", "applied", before={"node": thing(v1, node)}, after={"node": after}))
+    journal.append(record("lost", "applied", ids=("matkg:gone",), before={"node": {"id": "matkg:gone"}},
+                          after={"node": {"id": "matkg:gone", "name": "x"}}))
+    journal.append(record("never-acked", "recorded", before={"node": thing(v1, node)},
+                          after={"node": {**thing(v1, node), "description": "not replayed"}}))
+    result = create_snapshot(SnapshotRequest(
+        corpus="synthetic", terms_path=INPUTS / "core_dict.terms.json", storage_kg=snap.parents[1],
+        snapshot_id="v2", parent_snapshot_id="v1", parent_relation="edit_reconciliation",
+        terms_ref="inputs/core_dict.terms.json", code_commit=COMMIT, registry=registry, now=now,
+        edit_journal=journal, journal_target="T", journal_scope=(SCOPE,)))
+    v2 = json.loads(result.graph_path.read_text(encoding="utf-8"))
+    assert thing(v2, node)["description"] == "carried into v2"
+    assert result.reconciled_edits == ("carried",) and result.edit_conflicts == ("lost",)
+    latest = journal.latest()
+    assert (latest["carried"].state, latest["carried"].reconciled_in) == ("reconciled", "v2")
+    assert latest["lost"].state == "conflict" and "node_missing" in latest["lost"].note
+    assert latest["never-acked"].state == "recorded"
+    assert verify_snapshot_dir(result.directory).graph_sha256 == result.graph_sha256, "frozen layout still verifies"
+    assert any("lost" in w for w in result.warnings)
+

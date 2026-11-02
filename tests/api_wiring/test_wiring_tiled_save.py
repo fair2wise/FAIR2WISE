@@ -21,13 +21,15 @@ from fastapi.testclient import TestClient
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-for extra in (REPO / "tests" / "graph_import", REPO / "tests" / "security", HERE):
+for extra in (REPO / "tests" / "graph_import", REPO / "tests" / "security", REPO / "tests" / "fixtures", REPO / "tests" / "contracts" / "legacy_ui" / "closure", HERE):
     if str(extra) not in sys.path:
         sys.path.insert(0, str(extra))
 
 import _legacy_ui_harness as H  # noqa: E402
 from _wiring_support import FORGED_HEADERS, make_cfg, other_user  # noqa: E402,F401
-from import_fakes import FakeClock as _FakeClock, MemoryTiled, snapshot_with_graph  # noqa: E402
+from closure_support import loopback_guard  # noqa: E402
+from import_fakes import CountingClient, FakeClock as _FakeClock, MemoryTiled, snapshot_with_graph  # noqa: E402
+from tiled_server import start_tiled_instance, tiled_base, tiled_python  # noqa: E402,F401
 from security_fakes import (  # noqa: E402
     STAGING, FakeTiledIdentityPort, ForbiddenIdentityPort, InMemoryCredentialStore, admin_user, local_settings,
     plain_user, staging_settings)
@@ -73,15 +75,21 @@ def template(tmp_path_factory):
 class World:
     """One legacy app, one Tiled double and the journal, all under ``tmp_path``."""
 
-    def __init__(self, monkeypatch, tmp_path, template, *, als=False):
+    def __init__(self, monkeypatch, tmp_path, template, *, als=False, instance=None):
+        self.instance = instance
         self.ctx = H.install(monkeypatch, tmp_path / "ws", REPO_ROOT)
         monkeypatch.delenv("F2W_RUNTIME", raising=False)
         payload = json.loads((self.ctx.workspace / "storage" / "kg" / H.GRAPH_FILENAME).read_text(encoding="utf-8"))
         self.base_payload = payload
         self.snap = snapshot_with_graph(template, tmp_path / "snaproot", SCOPE, "v1", payload)
-        loopback = "http://127.0.0.1:59999"
-        self.mem = MemoryTiled(loopback)   # an in-memory double: no socket is ever opened
-        self.mem.add_forge_sentinel()
+        if instance is None:
+            loopback = "http://127.0.0.1:59999"
+            self.mem = MemoryTiled(loopback)   # an in-memory double: no socket is ever opened
+            self.mem.add_forge_sentinel()
+        else:                                  # a real disposable Tiled 0.2.18 on an ephemeral 127.0.0.1 port
+            loopback_guard(monkeypatch)        # 127.0.0.1 only, never the developer's servers
+            loopback = instance.url
+            self.mem = CountingClient.from_managed(instance.server)
         self.clock = FakeClock()
         self.state_dir = tmp_path / "state"
         # Seed the corpus as the local operator would publish it; the ALS variant then re-labels the double as
@@ -107,14 +115,25 @@ class World:
                                  scope=SCOPE, journal=self.journal, base_graph_path=self.snap / "graph.json",
                                  base_snapshot_id="v1", base_graph_sha256=sha)
 
+    @property
+    def memory(self):
+        """Direct row access exists on the in-memory double only."""
+        if self.instance is not None:
+            pytest.skip("needs direct row mutation; the server-backed equivalent is in tests/graph_import/"
+                        "test_legacy_save.py")
+        return self.mem
+
+    def rows(self):
+        return [*self.mem.scan_entities(), *self.mem.scan_links()]
+
     def splash_calls(self):
         return {k: v for k, v in self.ctx.calls.items() if k.startswith("splash.")}
 
 
-def build_local(monkeypatch, tmp_path, template):
+def build_local(monkeypatch, tmp_path, template, instance=None):
     from app.modules.f2w_agent import api as api_mod
 
-    w = World(monkeypatch, tmp_path, template)
+    w = World(monkeypatch, tmp_path, template, instance=instance)
     cfg = make_cfg(w.ctx)
     cfg.tiled_save = w.target
     w.app = api_mod.create_app(cfg, deployment=local_settings(), identity_port=ForbiddenIdentityPort())
@@ -138,21 +157,31 @@ def build_als(monkeypatch, tmp_path, template):
     return w
 
 
-@pytest.fixture
-def w(monkeypatch, tmp_path, template):
-    return build_local(monkeypatch, tmp_path, template)
+@pytest.fixture(params=["memory", "server"])
+def w(request, monkeypatch, tmp_path, template):
+    if request.param == "memory":
+        yield build_local(monkeypatch, tmp_path, template)
+        return
+    if tiled_python() is None:
+        pytest.skip("F2W_TILED_PYTHON is not set (needs tiled 0.2.18)")
+    inst = start_tiled_instance(request.getfixturevalue("tiled_base"))
+    try:
+        yield build_local(monkeypatch, tmp_path, template, instance=inst)
+    finally:
+        inst.destroy()
 
 
-def live_nodes(mem):
-    return {ida.parse_entity_uri(e["uri"])[1]: e for e in mem.entities.values()
+def live_nodes(client):
+    return {ida.parse_entity_uri(e["uri"])[1]: e for e in client.scan_entities()
             if ida.literature_entity_key(e) and ida.literature_entity_key(e)[0] == SCOPE}
 
 
-def owned_triples(mem):
+def owned_triples(client):
+    by_id = {e["id"]: e for e in client.scan_entities()}
     out = set()
-    for lk in mem.links.values():
+    for lk in client.scan_links():
         if (lk.get("properties") or {}).get("f2w_graph_id") == SCOPE:
-            s, o = mem.entities[lk["subjectId"]], mem.entities[lk["objectId"]]
+            s, o = by_id[lk["subjectId"]], by_id[lk["objectId"]]
             out.add((s["properties"]["f2w_id"], lk["predicate"], o["properties"]["f2w_id"]))
     return out
 
@@ -168,7 +197,7 @@ def test_ui04_ui15_ui16_ui17_save_reads_back_on_tiled_with_no_splash_call(w):
     c = w.client
     before_graph = c.get("/graph").json()
     assert {n["id"] for n in before_graph["nodes"]} >= {NODE, "matkg:Other"}
-    foreign = [json.dumps(r, sort_keys=True) for r in [*w.mem.entities.values(), *w.mem.links.values()]
+    foreign = [json.dumps(r, sort_keys=True) for r in w.rows()
                if (r.get("properties") or {}).get("f2w_owner") != "f2w-literature"]
     body = {
         "label": "Term A edited", "description": "Edited in the frozen UI against Tiled.",
@@ -191,7 +220,7 @@ def test_ui04_ui15_ui16_ui17_save_reads_back_on_tiled_with_no_splash_call(w):
     assert {op for op, st in states(w.journal)} == {"node_patch", "relationship_add", "snippet_upsert"}
     assert {st for _op, st in states(w.journal)} == {"applied"}
     assert w.splash_calls() == {}, "no Splash call"
-    assert [json.dumps(r, sort_keys=True) for r in [*w.mem.entities.values(), *w.mem.links.values()]
+    assert [json.dumps(r, sort_keys=True) for r in w.rows()
             if (r.get("properties") or {}).get("f2w_owner") != "f2w-literature"] == foreign
     # Same id read back through every reader: detail, search, graph, neighbourhood is the same file.
     assert c.get(f"/graph/node/{NODE}").json()["label"] == "Term A edited"
@@ -242,8 +271,9 @@ def test_q8_a_save_during_a_switch_is_the_legacy_502_and_leaves_nothing(w):
 
 
 def test_q10_a_save_from_an_out_of_date_copy_is_409_with_no_journal_entry(w):
-    row = live_nodes(w.mem)[NODE]
-    w.mem.entities[row["id"]]["properties"]["description"] = "changed by another writer"
+    mem = w.memory
+    row = live_nodes(mem)[NODE]
+    mem.entities[row["id"]]["properties"]["description"] = "changed by another writer"
     resp = w.client.patch(f"/graph/node/{NODE}", json={"label": "from a stale tab"})
     assert resp.status_code == 409, resp.text
     assert not w.journal.path.exists()
@@ -252,16 +282,17 @@ def test_q10_a_save_from_an_out_of_date_copy_is_409_with_no_journal_entry(w):
 def test_q9_removing_a_link_f2w_does_not_own_is_the_legacy_400(w):
     graph = w.client.get("/graph").json()
     edge = next(e for e in graph["edges"] if e["source"] == NODE and e["predicate"] != "rel:has_code_snippet")
-    s, o = live_nodes(w.mem)[edge["source"]]["id"], live_nodes(w.mem)[edge["target"]]["id"]
-    for lid in [lid for lid, lk in w.mem.links.items() if lk["subjectId"] == s and lk["objectId"] == o
+    mem = w.memory
+    s, o = live_nodes(mem)[edge["source"]]["id"], live_nodes(mem)[edge["target"]]["id"]
+    for lid in [lid for lid, lk in mem.links.items() if lk["subjectId"] == s and lk["objectId"] == o
                 and lk["predicate"] == edge["predicate"]]:
-        del w.mem.links[lid]
-    w.mem.links["foreign-1"] = {"id": "foreign-1", "subjectId": s, "objectId": o, "predicate": edge["predicate"],
+        del mem.links[lid]
+    mem.links["foreign-1"] = {"id": "foreign-1", "subjectId": s, "objectId": o, "predicate": edge["predicate"],
                                 "properties": {"owner": "forge"}, "accessBlob": None}
     resp = w.client.patch(f"/graph/node/{NODE}", json={"relationship_updates": [
         {"action": "remove", "source": edge["source"], "predicate": edge["predicate"], "target": edge["target"]}]})
     assert resp.status_code == 400 and "F2W" in resp.json()["detail"]
-    assert "foreign-1" in w.mem.links and not w.journal.path.exists()
+    assert "foreign-1" in mem.links and not w.journal.path.exists()
 
 
 def test_json_graph_mode_is_unchanged_read_only_400(w):
@@ -296,6 +327,33 @@ def test_q12_a_partial_failure_is_502_and_failed_and_the_retry_completes_with_th
     assert len(w.journal.latest()) == 1 and [st for _op, st in states(w.journal)] == ["applied"]
     assert live_nodes(w.mem)[NODE]["name"] == "Term A partial"
     assert len(live_nodes(w.mem)) == len(w.base_payload["things"])
+    assert w.splash_calls() == {}
+
+
+def test_til18_after_a_restart_reads_show_the_in_flight_edit_and_the_retry_gets_the_same_readback(w):
+    from app.modules.f2w_agent import api as api_mod
+
+    def fault(stage, i):
+        if stage == "retire_old_effect":
+            raise ContractError(ErrorCode.UNAVAILABLE, "Tiled graph is unavailable (ConnectionError)")
+    w.target.fault = fault
+    body = {"label": "Term A in flight", "description": "journaled, Tiled effect unfinished"}
+    assert w.client.patch(f"/graph/node/{NODE}", json=body).status_code == 502
+    assert [st for _op, st in states(w.journal)] == ["failed"]
+    # "Process restart": a new app over the same state; the fault is gone. Reads show the in-flight entry
+    # (effective record = active snapshot + journal) although no recovery has run yet.
+    w.target.fault = None
+    cfg = make_cfg(w.ctx)
+    cfg.tiled_save = w.target
+    restarted = TestClient(api_mod.create_app(cfg, deployment=local_settings(), identity_port=ForbiddenIdentityPort()),
+                           raise_server_exceptions=False)
+    assert restarted.get(f"/graph/node/{NODE}").json()["label"] == "Term A in flight"
+    assert [st for _op, st in states(w.journal)] == ["failed"]
+    w.clock.advance(1000)
+    first = restarted.patch(f"/graph/node/{NODE}", json=body)         # the retry: recovery job runs first
+    assert first.status_code == 200 and first.json()["label"] == "Term A in flight" and first.json()["id"] == NODE
+    assert [st for _op, st in states(w.journal)] == ["applied"] and len(w.journal.latest()) == 1
+    assert live_nodes(w.mem)[NODE]["name"] == "Term A in flight"
     assert w.splash_calls() == {}
 
 
