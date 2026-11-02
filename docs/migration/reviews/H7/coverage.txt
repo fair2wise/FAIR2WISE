@@ -1,0 +1,171 @@
+T27 item 4: test coverage for modules below 80% (H7 review packet)
+=====================================================================
+
+READ THIS FIRST. These are PER-MODULE measurements, not a full-suite run. Each module was
+measured with the pytest files that exercise it (groups A-L below), using pytest-cov on the
+module's package. The integrator reruns the full suite for the final number; the full-suite
+figure can differ from these in both directions (a module can also be covered by tests outside
+its group, and a group run omits tests that the full suite counts). "before" is the last full-suite
+line coverage (the report the task quoted, scratchpad coverage.json, 2026-11-02 13:27, statements
+counted by coverage.py with the pyproject [tool.coverage] settings). Branch coverage is off
+(pyproject: branch = false), so these are line figures.
+
+Branch: forge_merge-T27-coverage (based on forge_merge 6f4c719). New tests live in
+tests/coverage_t27/ (516 tests, about 7 s). The pre-existing tests of each module were NOT edited.
+
+Table (statements, before %, after %, group the "after" was measured with). A star marks modules
+that were not in the task's list but were below 80% in the same full-suite report; they were done
+because the cost was small.
+
+module                                               stmts  before%   after%  measured with (group)
+app/modules/deployment/_tiled_entry.py                  65      0.0    100.0  A
+app/modules/workers/__main__.py                         35      0.0    100.0  A
+app/modules/agents/properties.py                       288      9.4     99.5  B
+app/modules/term_extractor/dashboard.py                166     19.3    100.0  C
+app/modules/term_extractor/provenance.py               228     19.7     99.1  C
+app/modules/literature/parsers.py                      232     23.7     84.5  D
+app/modules/f2w_agent/debate_agent.py                  105     25.7    100.0  F
+app/modules/literature/pdf_reader.py                   136     33.1     98.5  D
+app/modules/term_extractor/monitored_agent.py          109     38.5     97.2  C
+app/modules/vision/scale.py                             45     40.0     93.3  E
+app/modules/vision/tables.py                            89     40.4     87.6  E
+app/modules/vision/qrange.py                            50     42.0     96.0  E
+app/modules/term_extractor/academy_agent.py             57     42.1    100.0  C
+app/modules/vision/figure_extraction.py                156     42.3     98.1  E
+app/modules/f2w_agent/kg_update.py                     202     45.0     99.0  F
+app/modules/vision/text_layer.py                       101     46.5     92.1  E
+app/modules/bl1101_ingest.py                          1116     48.1     97.5  G
+app/modules/f2w_agent/paper_evidence_agent.py          245     51.4     86.1  F
+app/modules/vision/ocr.py                               60     53.3     83.3  E
+app/modules/f2w_agent/download_agent.py                502     55.8     95.2  F
+app/modules/term_extractor/services.py                  43     55.8    100.0  C
+app/modules/term_extractor/orchestrator.py             368     57.6     98.6  C
+app/modules/term_extractor/tools.py                    152     60.5    100.0  C
+app/modules/hybrid_rag/sources.py                      148     61.5     96.6  I
+app/modules/cborg_http.py                              123     61.8     98.4  H
+app/modules/hybrid_rag/chunker.py                      138     65.2     96.4  I
+app/modules/vision/tools.py                            184     67.9     89.1  E
+app/modules/canonicalization/vocabulary.py             130     69.2     99.2  I
+app/modules/canonicalization/chemical_identity.py       66     69.7    100.0  I
+app/api/upload_limits.py                                81     71.6    100.0  K
+app/modules/literature/download_pdfs.py                643     71.7     94.6  D
+app/modules/tiled_graph.py                             582     72.3     97.4  J
+app/modules/hybrid_rag/pipeline.py                     134     73.9     97.0  I
+app/modules/jobs/telemetry.py                           37     75.7    100.0  K
+app/modules/contracts/ports.py                          38     76.3    100.0  K
+app/modules/literature/resolver_batch.py               349     76.8     98.6  D
+app/modules/f2w_agent/retrieval_agent.py               657     77.2     83.9  F
+app/modules/term_extractor/clients.py                   62     77.4     98.4  C
+app/modules/vision/kernels/panels.py                   163     76.1     97.5  E
+app/modules/f2w_agent/session_memory.py                253     79.1     99.6  F  *
+app/modules/term_extractor/schema.py                   183     79.2     94.0  C  *
+app/modules/canonicalization/quarantine.py              53     79.2    100.0  I  *
+app/modules/hybrid_rag/evidence.py                      79     79.7    100.0  I  *
+app/modules/term_extractor/merge_index.py              163     64.4     99.4  C  *
+app/modules/f2w_agent/materials_project.py             155     72.3     98.1  F  *
+app/modules/term_extractor/agent.py                     28     71.4    100.0  C  *
+app/modules/term_extractor/user_agent.py                41     68.3     85.4  C  *
+app/modules/term_extractor/__init__.py                  14     57.1    100.0  C  *
+app/modules/f2w_agent/__init__.py                       23     47.8    100.0  L  *
+app/modules/agent_runtime/__init__.py                   15     46.7    100.0  C  *
+app/modules/runtime_bridge/__init__.py                  15     73.3    100.0  C  *
+app/modules/launchers/academy_extractor.py              57     66.7    100.0  C  *
+app/modules/launchers/user_agent.py                     46     67.4     97.8  C  *
+app/modules/launchers/academy_auth.py                    7      0.0    100.0  C  *
+app/modules/launchers/f2w_agent.py                       2      0.0    100.0  C  *
+app/modules/workers/factories.py                         6      0.0     83.3  A  *
+app/modules/term_extractor/store.py                    217     51.2     70.5  C  *
+app/modules/operations/__init__.py                      15     46.7      0.0  G  *
+
+All in-scope modules are at or above 80% in their group measurement. Lowest margins:
+retrieval_agent 83.9, ocr 83.3, parsers 84.5, paper_evidence_agent 86.1, tables 87.6, tools 89.1
+(vision), schema 94.0. The integrator should look at those first if the full-suite number comes
+out lower than this table.
+
+ENVIRONMENT CAVEAT for the "before" column (important for the integrator)
+  The full-suite log the "before" numbers came from (scratchpad full-suite-cov.log, 60 failed / 4963 passed) was
+  produced in an environment where pypdfium2 could not be imported: tests/vision (25 failures), the literature
+  parsing tests, tests/test_paper_evidence_agent.py (4), tests/api_wiring/test_wiring_quotes.py (8) and
+  tests/evals_binary (20) all failed with "PdfUnavailable: pypdfium2 is not installed". Those failures are why
+  vision/*, literature/parsers.py, literature/pdf_reader.py and f2w_agent/paper_evidence_agent.py read 33-53% there.
+  In the interpreter used for this work (venv-app, pypdfium2 present) those existing tests pass and the modules
+  already reach 83-98% with NO new tests: parsers 84.5, pdf_reader 98.5, vision scale/tables/qrange/figure_extraction/
+  text_layer/ocr/tools 83-98, paper_evidence_agent 86.1. Only vision/kernels/panels.py (77.9 even with the vision tests)
+  needed new tests (tests/coverage_t27/test_vision_panels_extra.py). If the integrator's full-suite run is again in an
+  environment without pypdfium2, those modules will read low again for the same reason; fix the environment
+  (pixi.toml already lists pypdfium2 = "*"), not the tests.
+
+Measurement groups (run from the worktree; Python is venv-app, HOME and PATH scrubbed with env -i,
+F2W_TILED_PYTHON set, -p no:cacheprovider; "T" = tests/coverage_t27)
+  A  T/test_entry_points.py                                                --cov=app/modules/deployment --cov=app/modules/workers
+  B  T/test_agents_properties.py                                           --cov=app/modules/agents
+  C  T/test_dashboard_state.py T/test_provenance_extras.py T/test_term_services_clients.py
+     T/test_academy_agents_local.py T/test_term_tools_behaviour.py T/test_orchestrator_extra.py
+     T/test_schema_helper_mapping.py T/test_merge_index_extra.py T/test_lazy_packages_and_launchers.py
+     tests/test_extractor_agent.py tests/test_llm_admission.py tests/test_term_merge_index.py
+                                                                           --cov=app/modules/term_extractor --cov=app/modules/launchers
+                                                                           --cov=app/modules/agent_runtime --cov=app/modules/runtime_bridge
+  D  T/test_download_pdfs_resolvers.py T/test_resolver_batch_extra.py tests/literature
+     tests/test_download_pdfs.py tests/test_download_parity.py             --cov=app/modules/literature
+  E  T/test_vision_panels_extra.py tests/vision                            --cov=app/modules/vision
+  F  T/test_debate_agent.py T/test_kg_update_graphql.py T/test_download_agent_extra.py
+     T/test_retrieval_agent_helpers.py T/test_session_memory_behaviour.py T/test_materials_project_extra.py
+     tests/test_download_agent.py tests/test_kg_update.py tests/test_paper_evidence_agent.py
+     tests/operations/test_paper_summary_tool.py tests/operations/test_paper_summary_service.py
+     tests/operations/test_scale_population.py tests/test_retrieval_agent.py tests/test_hybrid_rag.py
+     tests/test_multi_kg.py tests/evals/test_route_regex.py tests/read_path tests/test_kg_rag_api.py
+     tests/test_f2w_coordinator.py tests/test_materials_project.py         --cov=app/modules/f2w_agent
+  G  T/test_bl1101_parsing.py T/test_bl1101_graph_assembly.py tests/test_bl1101_ingest.py   --cov=app/modules
+  H  T/test_cborg_http_extra.py tests/test_cborg_http.py tests/test_llm_admission.py        --cov=app/modules
+  I  T/test_hybrid_rag_pipeline_extra.py T/test_canon_chem_vocab_extra.py T/test_quarantine_evidence.py
+     tests/test_hybrid_rag.py tests/canonicalization                       --cov=app/modules/hybrid_rag --cov=app/modules/canonicalization
+  J  T/test_tiled_graph_lookup.py tests/test_tiled_graph.py tests/tiled/test_edit_plan_probes.py   --cov=app/modules
+  K  T/test_telemetry_ports_limits.py tests/jobs tests/api_v1/test_v1_cli_units.py
+     tests/api_wiring/test_wiring_surface_guards.py                        --cov=app/api --cov=app/modules/jobs --cov=app/modules/contracts
+  L  T/test_lazy_packages_and_launchers.py                                 --cov=app/modules/f2w_agent   (f2w_agent/__init__ only)
+Note: entry-point scripts and a few files are best measured with the directory form (--cov=app/modules/deployment);
+the dotted form (--cov=app.modules.term_extractor.services) makes coverage import the module early and the
+deltalake/Rust logger panics ("Builder::init should not be called after logger initialized") under pytest-cov.
+
+Exceptions and deferrals (proposed for the owner's coverage-exception list)
+-----------------------------------------------------------------------------
+No in-scope module needed a hollow test or a permanent exception. Modules that look untestable were
+covered through fakes: the Tiled launcher with a fake tiled/uvicorn, the worker process through
+main() with a fake executor and signal registration, the Flask dashboard through the Flask test
+client, the Academy agents in-process with a fake handle, the Academy/Globus launchers with a fake
+exchange factory, manager and executor (no login, no endpoint, no exchange), splash GraphQL against
+an in-memory double, Tiled GraphQL against a fake POST (the default loopback URL is never contacted:
+requests.post raises if anything bypasses the fake), bl1101 ingest against fixture HTML and a fake
+git. Remaining uncovered lines per module are error branches that need a real fault (corrupt PDF
+render, OS errors), not services.
+
+Deferred, not an exception: files in the off-limits set (other work in flight), so they were not
+touched and no tests were written against them:
+  app/modules/term_extractor/store.py     70.5% in group C (before 51.2%); gains came only from the
+      orchestrator/tools tests that use TermStore. Cover it once the in-flight store/models work lands.
+  app/modules/operations/__init__.py       lazy-export module of the operations package (before 46.7%, 15 statements);
+      the same table-driven "every export resolves" test used for agent_runtime/runtime_bridge/f2w_agent
+      (tests/coverage_t27/test_lazy_packages_and_launchers.py) would cover it; written only after that package settles.
+
+Single lines that stay uncovered on purpose (not worth an exception entry by themselves):
+  launchers/user_agent.py:28  the "Academy has no init_logging" fallback needs an older Academy install.
+  tiled_graph.py (15 lines), download_agent.py (24 lines), bl1101_ingest.py (29 lines): unreachable-in-practice
+      guards and defensive returns; the figures above already clear 80%.
+
+Tests that fail in the full group runs and are NOT caused by this work (verified on the untouched base)
+  tests/test_kg_update.py::test_splash_reimport_refuses_wipe_without_explicit_allow
+      asserts the wipe-refusal message but the scrubbed PATH has no `pixi`, so the earlier "pixi not found on PATH"
+      branch answers first. Passes where pixi is on PATH (the earlier full-suite log lists it as failing too).
+  tests/packaging/test_resources.py::test_extras_match_the_pixi_workspace
+      pyproject extras name `typer`, which pixi.toml does not list (pixi.toml is out of scope here).
+
+Application changes made while testing (also reported in the hand-off)
+  agents/properties.py: the unit tests that lived inside the module (never collected by pytest, so never run)
+      moved to tests/coverage_t27/test_agents_properties.py and `import pytest` was removed from production code.
+      Run for the first time, three of them failed: "band gap of Na3Bi is 1.9 eV" produced a spurious entry
+      raw_value "3", unit "Bi" (digits inside the material name), and every later number in the sentence
+      ("300 K") became another entry. extract() now masks the material and property phrase before searching for
+      a value and keeps the first value after them.
+  tiled_graph.py: entity_to_node indexed props['proposal_code'] inside an f-string guarded by
+      "proposal_code or proposal_id"; an entity with only proposal_id raised KeyError and aborted the whole
+      identity lookup. Fixed with props.get().

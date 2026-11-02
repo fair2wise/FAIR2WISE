@@ -647,7 +647,7 @@ def entity_to_node(entity: dict[str, Any]) -> dict[str, Any]:
         str(props.get("title") or "").strip(),
         str(props.get("description") or "").strip(),
         f"ESAF {props['esaf_number']}" if props.get("esaf_number") else "",
-        f"proposal {props['proposal_code'] or props.get('proposal_id')}" if props.get("proposal_code") or props.get("proposal_id") else "",
+        f"proposal {props.get('proposal_code') or props.get('proposal_id')}" if props.get("proposal_code") or props.get("proposal_id") else "",
         f"sample {props['sample_code']}" if props.get("sample_code") else "",
         f"uid {props['uid']}" if props.get("uid") else "",
         f"scan_id {props['scan_id']}" if props.get("scan_id") else "",
