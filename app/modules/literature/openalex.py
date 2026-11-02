@@ -63,7 +63,7 @@ REJECTED = "rejected"
 
 _WORK_FIELDS = (
     "id,doi,title,authorships,publication_year,primary_location,"
-    "cited_by_count,concepts,abstract_inverted_index,open_access"
+    "best_oa_location,cited_by_count,concepts,abstract_inverted_index,open_access"
 )
 _BULK_WORK_FIELDS = (
     "id,doi,title,authorships,publication_year,primary_location,"
@@ -738,6 +738,12 @@ class BulkResult:
     batches: int = 0
 
 
+def _licence_from_openalex(work: Mapping[str, Any]) -> Any:
+    from .licence import from_openalex
+
+    return from_openalex(work)
+
+
 def paper_record(work: Mapping[str, Any], *, abstract_chars: int = 500) -> dict[str, Any]:
     """One OpenAlex work reduced to the donor's search-result fields, marked as external.
 
@@ -757,6 +763,7 @@ def paper_record(work: Mapping[str, Any], *, abstract_chars: int = 500) -> dict[
         "concepts": [c.get("display_name", "") for c in (work.get("concepts") or [])[:8]],
         "citation_count": work.get("cited_by_count", 0),
         "is_oa": bool((work.get("open_access") or {}).get("is_oa")),
+        "licence": _licence_from_openalex(work).as_dict(),
         "source": "openalex",
         "record_kind": EXTERNAL_RESULT,
     }

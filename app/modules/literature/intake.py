@@ -31,6 +31,7 @@ import re
 from typing import Any
 
 from ..contracts.context import RequestContext
+from .licence import LicenceInfo, collect as collect_licence, licence_status as _licence_status
 from .legacy import LegacyIndex, doi_key, doi_only, looks_like_pdf
 from .openalex import is_quota_paused
 from .resolver_batch import title_similarity
@@ -106,6 +107,13 @@ class IntakeReport:
     identity: WorkIdentity = field(default_factory=WorkIdentity)
     work: dict[str, Any] | None = None
     warnings: list[str] = field(default_factory=list)
+    #: B2 licence and open-access facts; every record carries one (explicit ``unknown`` when nothing is known).
+    licence: LicenceInfo = field(default_factory=LicenceInfo)
+
+    @property
+    def licence_status(self) -> str:
+        """``licensed`` | ``notice_only`` | ``unknown`` (see :mod:`.licence`)."""
+        return _licence_status(self.licence)
 
     @property
     def ok(self) -> bool:
@@ -121,6 +129,7 @@ class IntakeReport:
         """JSON-safe form; the source filename only, never a store path."""
         data = asdict(self)
         data["source"] = Path(self.source).name
+        data["licence"] = self.licence.as_dict()
         return data
 
 
@@ -334,6 +343,7 @@ def prepare_local_pdf(
     doi: str = "",
     max_bytes: int = 256 * 1024 * 1024,
     allowed: Callable[[Path], Path] | None = None,
+    crossref: Mapping[str, Any] | None = None,
 ) -> IntakeReport:
     """Vet one local PDF and, with ``apply``, put its bytes in the candidate store.
 
@@ -352,6 +362,8 @@ def prepare_local_pdf(
         max_bytes: Size limit (giant uploads are refused before hashing).
         allowed: Containment check returning the resolved path or raising
             ``ValueError`` (see :class:`.fetch.LocalIntakePolicy`).
+        crossref: An already-fetched Crossref work message whose licence array is recorded
+            (no lookup happens here).
 
     Returns:
         An :class:`IntakeReport`; never raises for a bad input file.
@@ -389,6 +401,7 @@ def prepare_local_pdf(
             report.detail = "these bytes are already in the candidate store; use force to re-run intake"
             return report
     text = text_extractor(path, DOI_SEARCH_PAGES)
+    report.licence = collect_licence(None, pdf_text=text)  # the PDF's own notice, even if identity later fails
     report.identity.pdf_doi_candidates = extract_doi_candidates(text)
     if len((text or "").strip()) < 50 and not doi:
         report.status, report.detail = "skipped:no_text", "no extractable text in the first pages (OCR first)"
@@ -428,6 +441,7 @@ def prepare_local_pdf(
         return report
 
     report.work = dict(work)
+    report.licence = collect_licence(work, crossref=crossref, pdf_text=text)
     report.title = str(work.get("title") or "")
     # The DOI spelling comes from the registry, not the PDF (case differs by publisher).
     report.doi = doi_only(str(work.get("doi") or "")) or tried[0]
@@ -446,7 +460,9 @@ def prepare_local_pdf(
     try:
         asset = store.put_file(ctx, path, media_type="application/pdf", max_bytes=max_bytes, metadata={
             "kind": AssetKind.SOURCE_PDF.value, "doi": report.doi, "intake": verification,
-            "original_name": Path(path).name[:200]})
+            "original_name": Path(path).name[:200],
+            "licence_status": report.licence_status, "licence": report.licence.license,
+            "oa_status": report.licence.oa_status})
     except (OSError, StoreError) as exc:
         report.status, report.detail = "failed:store", f"could not store the file: {type(exc).__name__}"
         return report
