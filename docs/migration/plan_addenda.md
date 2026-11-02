@@ -518,12 +518,179 @@ changes the deployment contract).
 | T26A Q2 adoption of legacy KG files (O-R1) | `aa78a21` | tool + 6 adopted releases; 53 files skipped on R1/R2/R3/R4/R7 or empty (D3.22-D3.24); no descriptor committed (Q6 open) |
 | B7 (O-A9) model API on ALS for signed-in users | `bad6c39` | mounted in the API process; D-T8 (non-browser sign-in) still open; worker found `run_api` wires no identity port on ALS (see A7 note) |
 
+## A8 (2026-11-02, owner request; B4/O-P4 kept, new UI exception O-U4): Library and Extraction tabs
+
+Two additive left-sidebar tabs on `:local`: **Library** (reference PDFs of a mounted `papers/sourcedoc`
+folder: file name, title, DOI, drag-and-drop upload, use for Extraction and QA) and **Extraction** (is one
+running, its progress and logs; otherwise continue an existing KG or start a new KG for a topic with the
+papers, model, KG name and schema chosen). Built to the ALS standards (typed Python, Google docstrings, Typer
+CLIs, pytest; React with Tailwind, shadcn, Finch, TanStack Query, `@als-computing` tokens, JSDoc, Vitest and
+React Testing Library). The owner decisions are fixed; this addendum records them and does not reopen them.
+
+- **Scope:** `:local` only (B4/O-P4). On ALS every `/v1/library/*` route answers 404 and the tabs hide
+  themselves (the probe-and-hide pattern of `judgeModel.ts`). ALS-admin support is **T44**, deferred.
+- **O-U4 (new UI exception, granted by this request):** two additive Finch `HubSidebar` routes. The frozen-UI
+  process applies: `ui-change-approved` label, the `FROZEN_UI_TREE` re-pin as its own integrator commit with a
+  dated comment, `docs/migration/ui_contracts/` updated, no new `localStorage` keys.
+- **Uploads** are written into the mounted papers/sourcedoc folder itself (read-write, uid 10001, optional
+  mount) through `read_upload_limited`, `require_pdf`, `safe_child` and `LocalIntakePolicy`; deduped by sha256;
+  no symlinks; no PDF download route; route paths are `/v1/library/...` so none matches `SOURCE_SERVING_PATH_RE`.
+- **Title and DOI:** local first (PDF info title, DOI regex on pages 1-2, DOI in the file name; no network),
+  plus an explicit **Verify** (OpenAlex through `intake.prepare_local_pdf`, existing quota breaker), cached.
+- **QA:** Library feeds the `hybrid_rag` lexical source index only (no embeddings).
+- **Execution:** new `/v1` job kinds run in the worker process, which gets a real factory (today it is
+  `idle_service`, so no job runs in the images). Kinds: `library_verify`, `library_index`, `library_extract`.
+- **KG bundles:** a KG built from the Extraction tab is a bundle in the state volume, registered as selectable
+  in Settings, with an explicit export to `storage/kg`. Publication to Tiled stays the gated T10/H5 flow.
+- **Continue a KG:** reverse-builds a terms JSON from any KG JSON (`kg_to_terms`, including the `nodes/edges`
+  shape of `matkg_rsoxs_v3.json`).
+- **Topic** is a label and a paper-picker filter and also selects the schema, locked for the life of the KG.
+- **Relation to existing tasks:** T32 is superseded by T35 (same routes, same `:local`-only rule). T10B owns the
+  publication job kinds; T34 only adds the generic worker factory. T29 owns parsing and intake metadata; T35 and
+  T36 call the same functions. RT-17/RT-18 (`paper_route_ledger.md`) are covered by T35 for PDF upload; add-by-DOI
+  stays with T31/T29.
+
+### T33: Per-job log channel
+- **Depends on:** T14 (merged). **Blocks:** T34, T39, T42.
+- **Scope:** a `job_logs` table (job_id, seq, at, level, stage, message; bounded per job, messages scrubbed with
+  the existing scrubbers); `JobStore.append_log`/`logs`, `StageContext.log`, `JobService.logs`;
+  `GET /v1/jobs/{id}/logs?after=` and `event: job_log` on `/stream` with `Last-Event-ID` resume; a
+  `JobLogHandler` keyed on the process's single active library job, not on the calling thread, because
+  `Orchestrator.process_pdf` runs its own page thread pool. Additive schema; `JobEvent.progress` stays
+  `dict[str, int]`.
+- **Acceptance:** log lines survive a worker restart; concurrent jobs do not cross-capture; the cap is enforced
+  and secrets are scrubbed; the route has a policy row, `undeclared_routes` stays empty, the route count rises;
+  legacy OpenAPI and ledger tests are unchanged.
+
+### T34: Worker factory, library job kinds and capabilities
+- **Depends on:** T33. **Blocks:** T35, T36, T39.
+- **Scope:** `app/modules/library/`; `register_library_jobs` called in `app/api/main.py` next to
+  `register_knowledge_jobs` and in a new worker factory in `app/modules/workers/factories.py`;
+  `F2W_WORKER_FACTORY` changed in `docker/profiles/local.json` only (the ALS profiles keep `idle_service`);
+  capabilities `library.read`, `library.upload`, `library.index`, `library.extract` for the local operator
+  only; a nonce input for "rebuild" (job identity is idempotent on identical inputs).
+- **Acceptance:** a `:local` worker claims and completes a no-op library job; ALS images register no library
+  kinds and refuse submissions of them; secrets in `inputs` or `params` are refused; identical submissions
+  return the same job and a changed nonce a new one; `tests/images/test_images_profiles.py` updated.
+
+### T35: Library catalog, upload and verify (supersedes T32)
+- **Depends on:** T34, T29 (functions only). **Blocks:** T36, T38, T41.
+- **Scope:** `F2W_LIBRARY_DIR` (the mount) and a sidecar `<F2W_WORKDIR>/library/catalog.sqlite`; a
+  `LibraryService` (listing keyed by relpath and sha256; local metadata; upload; verify);
+  `GET /v1/library`, `GET /v1/library/papers`, `POST /v1/library/papers` (multipart),
+  `POST /v1/library/papers/{id}/verify`; verify-all as the `library_verify` job; an optional mount entry in the
+  `:local` profile. Without the mount the status route says `mounted=false`.
+- **Acceptance:** traversal, symlink, non-PDF, oversize and duplicate-upload tests; written files are owned by
+  uid 10001; local metadata costs zero network calls (socket-blocking test); verify caches the registry title and
+  reports an open quota breaker; no route path matches `SOURCE_SERVING_PATH_RE` and no route returns PDF bytes;
+  the ALS gateway answers 404.
+
+### T36: Library in the source index
+- **Depends on:** T35, T34. **Blocks:** T38 (BM25 ranking), T41 (indexed badge).
+- **Scope:** a `library_index` job builds chunks into the literature index directory with corpus `library`,
+  `doc_id=lib:<relpath>`, `work_id` from the DOI or `lib:<sha256[:16]>`; `meta["docs"]` records sha256,
+  `n_chunks`, title, DOI, pages and a status (`ok`, `no_text`); incremental by sha256, removed or changed
+  documents pruned; atomic write under a file lock; `SourceIndex` reloads when `meta.json` changes; the index
+  lives on the state volume and the profile sets `HYBRID_RAG_LITERATURE_INDEX`.
+- **Acceptance:** an unchanged re-run does nothing; a replaced PDF is re-chunked and a deleted one pruned;
+  scanned PDFs are reported `no_text` without failing the job; a QA question over a library fixture returns a
+  library citation; a concurrent reader never sees a torn index; the existing `hybrid_rag` tests pass.
+
+### T37: `kg_to_terms` and `TermStore` hardening
+- **Depends on:** none. **Blocks:** T38, T39.
+- **Scope:** reverse a flat KG JSON into a terms JSON, including an adapter for the `nodes/edges` shape (label to
+  name, entityType to category, papers to source_papers, slots); `TermRecord` gains an `extra` passthrough and
+  `RelationRecord` gains `evidence`; `TermStore._load` skips a bad record with a warning; reconstructed
+  bookkeeping is marked `reconstructed`; stubs (no papers, no description) are not promoted;
+  `has_code_snippet` edges are regenerated; the tool fails closed on `TermStore` key collisions; a Typer CLI.
+- **Acceptance:** over every (terms file, KG file) pair on disk, terms to KG to `kg_to_terms` to `TermStore` to
+  rebuild equals the KG up to ordering and newer fields; a continuation test (add two synthetic papers, the old
+  subgraph is unchanged); an idempotence test for KGs with no terms file; existing extraction and `kg_update`
+  tests pass unchanged.
+
+### T38: KG bundles, schemas, models and cost estimate
+- **Depends on:** T37, T35. **Blocks:** T39, T42.
+- **Scope:** bundles at `<F2W_WORKDIR>/kgs/<name>/` (`terms.json`, `kg.json`, `manifest.json` with topic, schema,
+  model, backend, papers with sha256, parent bundle and the `reconstructed` flag, `processed_pdfs.json`,
+  `extraction_manifest.json`); schema choices from the schema registry, locked per bundle; additive
+  registration in the Settings graph list (`list_storage_kg_json_files`, `_resolve_json_graph_path`) with a
+  manifest-based schema lookup; `GET /v1/library/kgs|schemas|models` (models over `CachedModelCatalog`, never
+  `PUT /settings`); `POST /v1/library/estimate` (pages times model) and a confirmation step; export of a bundle
+  to a configured release directory as `matkg_<name>.json` with the schema name in its metadata; paper-picker
+  ranking (keyword; BM25 once indexed); "continue" on a KG without a bundle runs `kg_to_terms` into a child bundle.
+- **Acceptance:** `tests/contracts/legacy_ui` passes with bundles absent and present; the schema cannot change
+  on continuation; export outside the configured directory is refused; the model route reports unavailable
+  without a backend; the estimate is deterministic; bundle names are validated and collisions refused.
+
+### T39: `library_extract` job (resumable per PDF)
+- **Depends on:** T38, T37, T34. **Blocks:** T42.
+- **Scope:** a chunked stage with one `WorkUnit` per PDF through `Orchestrator.process_pdf` (unit key = pdf
+  sha256 plus extractor, schema and model revision), then `assign_importance`, `save` and
+  `kg_update.rebuild_kg`, then the bundle manifest; model, paper list, KG name, schema and topic ride in
+  `OperationInputs` (the model never goes through `PUT /settings`); a per-bundle lock allows one extraction per
+  bundle; cancellation stops between PDFs; the same `processed_pdfs.json` and `extraction_manifest.json` the
+  coordinator writes.
+- **Acceptance:** a killed worker resumes without redoing finished PDFs; the unit key changes with model or
+  schema; a fake-LLM end-to-end run yields the bundle `kg.json` equal to what the CLI produces for the same
+  inputs; a failed PDF is recorded and the others finish; no network call without a configured backend; progress
+  and logs are visible while the job runs.
+
+### T40: UI foundations (O-U4)
+- **Depends on:** T33, the T35 route contract (can start on mocked routes). **Blocks:** T41, T42.
+- **Scope:** `libraryApi.ts` and `extractionApi.ts` following `liveAgent.ts` (`AGENT_API_BASE`,
+  `agentApiErrors.ts`); the SSE reader exported from `liveAgent.ts` and reused for the job stream; TanStack
+  Query hooks; a probe-and-hide hook; two `routes` entries in `ui/src/app/App.tsx` with labels short enough for
+  the 6rem sidebar; Vitest widened to `.test.tsx` with `@testing-library/react`, `user-event`, `jest-dom`;
+  first verify that switching tabs does not unmount the chat or graph state.
+- **Acceptance:** mocked-fetch API tests; the tabs are hidden when the probe returns 404; switching tabs loses
+  no chat or graph state (test); `npm run build` and the Dockerfile frontend-build stage pass.
+
+### T41: Library tab
+- **Depends on:** T40, T35 (T36 for the indexed badge). **Blocks:** T43.
+- **Scope:** a shadcn table (file name, title, DOI, status; `truncate`), a keyboard-accessible native dropzone with
+  an upload mutation, per-row and bulk Verify, "Index for QA", an indexed badge, empty and "not mounted" states;
+  `@als-computing` tokens, no hardcoded hex, disabled styling, ARIA labels; JSDoc on every export.
+- **Acceptance:** one component test per prop and state plus ARIA tests; a non-PDF drop is rejected client-side
+  and a server error is shown; no new `localStorage` key.
+
+### T42: Extraction tab
+- **Depends on:** T40, T38, T39, T33. **Blocks:** T43.
+- **Scope:** running view with progress and a live log pane (SSE, reconnect with `Last-Event-ID`, cancel),
+  re-attaching after a page reload through `GET /v1/jobs?state=running&kind=library_extract`; idle view with
+  continue-or-new, topic, schema (disabled when continuing), a paper picker (filter, count, select all), a model
+  picker following the `JudgeModelSetting` pattern, KG name, cost confirmation and export. It never changes the
+  Settings model.
+- **Acceptance:** component tests for idle, running, finished, failed and no-backend; Start stays disabled until
+  the name is valid, at least one paper is chosen and the cost is confirmed; the log pane is bounded; a reload
+  during a run re-attaches.
+
+### T43: UI and docs closure
+- **Depends on:** T41, T42. **Blocks:** H6.
+- **Scope:** Playwright specs modelled on `ui/e2e/judge-model.spec.ts` with `/v1` mocks in
+  `ui/e2e/fixtures/agent.ts`, run in both configs (standalone and `/fair2wise` prefix); the `ui-change-approved`
+  label; the `FROZEN_UI_TREE` re-pin as its own integrator commit with a dated comment in
+  `.github/workflows/forge-merge-ci.yml`; `docs/migration/ui_contracts/`; mkdocs `ui-library.md` and
+  `ui-extraction.md`; the capability and route-policy docs; `task_status.json`.
+- **Acceptance:** `tests/ci` green with the new pin; both Playwright configs green; `mkdocs build --strict`
+  and the frozen-UI contracts green.
+
+### T44: ALS-admin support (deferred follow-up)
+- **Depends on:** the ALS worker identity wiring (a worker factory with an identity port and credential lookup).
+  **Scope:** enable the library routes and tabs for verified ALS admins, with a mount policy and a disclosure
+  review for uploaded PDFs reaching other users through Source RAG. Not built under A8.
+
+### Order for A8
+T33 and T37 first (parallel), then T34 and T40 against mocked routes, then T35 and T38, then T36 and T41, then
+T39 and T42, then T43. Tests assert 31 `/v1` routes and 19 legacy routes, so route-count edits merge in the
+order T33, T35, T38.
+
 ## Order after H2
 
 T25D, T03B and T02B first (they can run in parallel), then the plan's
 post-H2 ports (T04 packaging, T05 literature/parsing, T06 extraction/evidence,
 T07 canonicalization, T08 graph ports and Tiled adapter, T09 paper figures,
-T10 jobs, T11 binary evaluation, T20B Tiled lifecycle) toward H3/H4.
+T10 jobs, T11 binary evaluation, T20B Tiled lifecycle) toward H3/H4. A8 (T33-T44) is the
+Library and Extraction tabs and runs after the job and worker foundations (T10, T14) are merged.
 
 ## Deployment notes for T24E
 

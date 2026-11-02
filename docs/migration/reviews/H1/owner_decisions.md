@@ -439,3 +439,20 @@ tags with recorded digests, report recorded not gating. `O06_APPROVED` may then 
 - **T26A Q3 and Q4 (O-R1):** both approved: `.gitignore` negation plus `-text` attributes for
   the KG release paths; T23B stops writing `metadata.graph_snapshot` into promoted payloads
   (the descriptor carries it).
+
+## Library and Extraction tabs (2026-11-02, owner request; addendum A8)
+
+- **O-U4 (new UI exception):** the owner's request for a "Library" and an "Extraction" tab in the left sidebar is
+  the approval of two additive `HubSidebar` routes in `ui/src/app/App.tsx` (no change to the existing chat,
+  graph, settings, citations, pending actions, sessions, bookmarks or annotations). The frozen-UI rules stay in
+  force: `ui-change-approved` label, a dated `FROZEN_UI_TREE` re-pin as its own integrator commit, updated
+  `docs/migration/ui_contracts/`, no new `localStorage` keys.
+- **Uploads** go into the mounted `papers/sourcedoc` folder itself (read-write mount, uid 10001, optional).
+- **Title and DOI:** local first, with an explicit Verify through OpenAlex under the existing quota breaker.
+- **QA:** the source index only (the lexical BM25 index, no embeddings).
+- **Continue a KG:** includes reverse-building a terms JSON from any KG JSON, including the `nodes/edges` shape.
+- **Topic:** a label and a paper-picker filter, and it selects the schema, locked per KG.
+- **Execution:** new `/v1` job kinds in the worker, with a per-job log stream.
+- **Scope:** `:local` only (B4/O-P4 kept); routes 404 and tabs hide on ALS images; ALS-admin support is T44.
+- **Handoff:** finished KGs are registered as selectable in Settings, plus an explicit export to `storage/kg`.
+

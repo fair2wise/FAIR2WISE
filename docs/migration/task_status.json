@@ -664,9 +664,117 @@
       "title": ":local-only folder routes (B4)",
       "source": "plan_addenda.md A7",
       "gate": "H6",
+      "status": "superseded",
+      "merge_commit": null,
+      "note": "added 2026-10-30 from owner decisions (register walk-through); superseded by T35 (A8, 2026-11-02): same :local-only folder routes under /v1/library"
+    },
+    {
+      "id": "T33",
+      "title": "Per-job log channel",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
       "status": "open",
       "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T34",
+      "title": "Worker factory, library job kinds and capabilities",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T35",
+      "title": "Library catalog, upload and verify (supersedes T32)",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T36",
+      "title": "Library in the source index",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T37",
+      "title": "kg_to_terms and TermStore hardening",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T38",
+      "title": "KG bundles, schemas, models and cost estimate",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T39",
+      "title": "library_extract job (resumable per PDF)",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T40",
+      "title": "UI foundations for Library and Extraction (O-U4)",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T41",
+      "title": "Library tab",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T42",
+      "title": "Extraction tab",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T43",
+      "title": "UI and docs closure (frozen-UI re-pin)",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+    },
+    {
+      "id": "T44",
+      "title": "ALS-admin support for Library and Extraction (deferred)",
+      "source": "plan_addenda.md A8",
+      "gate": "H6",
+      "status": "open",
+      "merge_commit": null,
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
     }
   ]
 }
