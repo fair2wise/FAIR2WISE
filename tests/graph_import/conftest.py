@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from import_fakes import CountingClient, FakeClock, MemoryTiled  # noqa: E402
 from tiled_server import start_tiled_instance, tiled_base, tiled_python  # noqa: E402,F401
 
+from app.modules.graph.imports import corpus_scope as cs  # noqa: E402
 from app.modules.graph.imports import tiled_json as tj  # noqa: E402
 from app.modules.graph.snapshot import SnapshotRequest, create_snapshot  # noqa: E402
 from app.modules.schema.registry import SchemaRegistry  # noqa: E402
@@ -77,8 +78,62 @@ class Env:
                                supported_schema_fingerprints=self.fingerprints, state_dir=self.state_dir,
                                clock=self.clock, **kw)
 
+    # -- T08C corpus-scoped replacement -------------------------------------------------------
+    def replan(self, source, **kw):
+        return cs.plan_replacement(source, client=self.client, settings=self.settings,
+                                   supported_schema_fingerprints=self.fingerprints, **kw)
+
+    def rapply(self, plan, approval, source, **kw):
+        return cs.apply_replacement(self.ctx, plan, approval, source=source, client=self.client,
+                                    settings=self.settings, supported_schema_fingerprints=self.fingerprints,
+                                    state_dir=self.state_dir, clock=self.clock, **kw)
+
+    def replace(self, source, **kw):
+        """Plan, approve and apply a replacement in one go (returns plan, outcome)."""
+        plan = self.replan(source, **kw)
+        out = self.rapply(plan, None if plan.is_noop else self.approve(plan), source)
+        return plan, out
+
+    def abandon(self, plan):
+        return cs.abandon_plan(self.ctx, plan, client=self.client, settings=self.settings,
+                               state_dir=self.state_dir, clock=self.clock)
+
+    def scope_root(self, scope="synthetic"):
+        return cs.scope_dir(self.state_dir, self.url, scope)
+
     def scan(self):
         return self.client.scan_entities(), self.client.scan_links()
+
+    def graphql(self, query, variables=None):
+        """Raw GraphQL against the server instance (``None`` on the memory backend)."""
+        return self.instance.graphql(query, variables) if self.instance is not None else None
+
+    def foreign_entity_id(self):
+        """A FORGE-owned entity UUID on this backend."""
+        if self.instance is not None:
+            return self.instance.seed_receipt["sentinel_id"]
+        return next(e["id"] for e in self.client.entities.values() if e["uri"] == "forge:esaf/1")
+
+    def add_foreign_link(self, subject_id, object_id, predicate="forge:cites"):
+        """Create a link F2W does not own (as FORGE would)."""
+        if self.instance is not None:
+            return self.instance.graphql(
+                "mutation($i: CreateLinkInput!) { createLink(input: $i) { id } }",
+                {"i": {"subjectId": subject_id, "predicate": predicate, "objectId": object_id,
+                       "properties": {"owner": "forge"}}})["createLink"]["id"]
+        import uuid
+        lid = str(uuid.uuid4())
+        self.client.links[lid] = {"id": lid, "subjectId": subject_id, "objectId": object_id, "predicate": predicate,
+                                  "properties": {"owner": "forge"}, "accessBlob": None}
+        return lid
+
+    def rename_foreign_entity(self, entity_id, name):
+        """Change a FORGE record under F2W's feet (Q14)."""
+        if self.instance is not None:
+            self.instance.graphql("mutation($id: ID!, $i: UpdateEntityInput!) { updateEntity(id: $id, input: $i) "
+                                  "{ id } }", {"id": entity_id, "i": {"name": name, "accessBlob": {}}})
+        else:
+            self.client.entities[entity_id]["name"] = name
 
     def writes(self):
         return list(self.client.writes)

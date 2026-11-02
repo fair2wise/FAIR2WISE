@@ -29,11 +29,19 @@ from .tiled_client import TiledCredentialRejected, TiledGraphClient
 _ENTITY_FIELDS = "id name entityType uri properties"
 _LINK_FIELDS = "id predicate subjectId objectId properties accessBlob"
 _ENTITY_PAGE = "query($l: Int!, $o: Int!) { entities(limit: $l, offset: $o) { " + _ENTITY_FIELDS + " } }"
+_TYPED_ENTITY_PAGE = ("query($t: String!, $l: Int!, $o: Int!) { entities(entityType: $t, limit: $l, offset: $o) { "
+                      + _ENTITY_FIELDS + " } }")
 _LINK_PAGE = "query($l: Int!, $o: Int!) { links(limit: $l, offset: $o) { " + _LINK_FIELDS + " } }"
+_LINKS_BY_SUBJECT = ("query($s: ID!, $l: Int!, $o: Int!) { links(subjectId: $s, limit: $l, offset: $o) { "
+                     + _LINK_FIELDS + " } }")
+_LINKS_BY_OBJECT = ("query($s: ID!, $l: Int!, $o: Int!) { links(objectId: $s, limit: $l, offset: $o) { "
+                    + _LINK_FIELDS + " } }")
+_ENTITY_BY_ID = "query($i: ID!) { entity(id: $i) { " + _ENTITY_FIELDS + " } }"
 _CREATE_ENTITY = "mutation($i: CreateEntityInput!) { createEntity(input: $i) { id } }"
 _CREATE_LINK = "mutation($i: CreateLinkInput!) { createLink(input: $i) { id } }"
 _UPDATE_ENTITY = "mutation($id: ID!, $i: UpdateEntityInput!) { updateEntity(id: $id, input: $i) { id uri } }"
 _DELETE_LINK = "mutation($id: ID!) { deleteLink(id: $id) }"
+_DELETE_ENTITY = "mutation($id: ID!) { deleteEntity(id: $id) }"
 
 
 def _owned_by(row: Mapping[str, Any], graph_id: str) -> bool:
@@ -78,14 +86,15 @@ class TiledMutationClient(TiledGraphClient):
         return data
 
     # -- complete reads -------------------------------------------------------------------
-    def _scan(self, document: str, key: str, page_size: int, max_rows: int) -> list[dict[str, Any]]:
+    def _scan(self, document: str, key: str, page_size: int, max_rows: int,
+              variables: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         seen: set[str] = set()
         while True:
             limit = min(page_size, max_rows - len(rows))
             if limit <= 0:
                 raise TruncatedGraphRead(f"tiled.{key} scan", max_rows)
-            page = self.query(document, {"l": limit, "o": len(rows)}).get(key) or []
+            page = self.query(document, {**dict(variables or {}), "l": limit, "o": len(rows)}).get(key) or []
             if any(r["id"] in seen for r in page):
                 raise ContractError(ErrorCode.CONFLICT, f"the {key} listing changed while it was read")
             seen.update(r["id"] for r in page)
@@ -94,9 +103,29 @@ class TiledMutationClient(TiledGraphClient):
                 break
         return rows
 
-    def scan_entities(self, *, page_size: int = 500, max_rows: int = 200_000) -> list[dict[str, Any]]:
-        """Every entity (all owners); ``TruncatedGraphRead`` rather than a partial list."""
+    def scan_entities(self, *, page_size: int = 500, max_rows: int = 200_000,
+                      entity_type: str | None = None) -> list[dict[str, Any]]:
+        """Every entity (all owners), or every entity of ``entity_type`` as other readers list them.
+
+        Raises ``TruncatedGraphRead`` rather than returning a partial list.
+        """
+        if entity_type is not None:
+            return self._scan(_TYPED_ENTITY_PAGE, "entities", page_size, max_rows, {"t": entity_type})
         return self._scan(_ENTITY_PAGE, "entities", page_size, max_rows)
+
+    def entity(self, entity_id: str) -> dict[str, Any] | None:
+        """One entity by UUID (any owner, any state), or ``None`` when it does not exist."""
+        row = self.query(_ENTITY_BY_ID, {"i": entity_id}).get("entity")
+        return cast(dict[str, Any] | None, row)
+
+    def links_of(self, entity_id: str, *, page_size: int = 500, max_rows: int = 100_000) -> list[dict[str, Any]]:
+        """Every link attached to ``entity_id`` in either direction (all owners), de-duplicated by id."""
+        rows = self._scan(_LINKS_BY_SUBJECT, "links", page_size, max_rows, {"s": entity_id})
+        seen = {r["id"] for r in rows}
+        for row in self._scan(_LINKS_BY_OBJECT, "links", page_size, max_rows, {"s": entity_id}):
+            if row["id"] not in seen:
+                rows.append(row)
+        return rows
 
     def scan_links(self, *, page_size: int = 500, max_rows: int = 500_000) -> list[dict[str, Any]]:
         """Every link (all owners), with ``accessBlob``."""
@@ -126,8 +155,31 @@ class TiledMutationClient(TiledGraphClient):
             raise ContractError(ErrorCode.DENIED, "refusing to modify a record F2W literature does not own")
         self.mutate(_UPDATE_ENTITY, {"id": row["id"], "i": {"uri": uri, "accessBlob": dict(access_blob)}})
 
+    def set_entity_state(self, row: Mapping[str, Any], graph_id: str, *, uri: str, entity_type: str,
+                         access_blob: Mapping[str, Any]) -> None:
+        """``updateEntity`` of ``uri`` and ``entityType`` together (T08C stage/retire/promote); owned rows only.
+
+        The type change is what keeps staged and retired records out of other readers' type-filtered
+        listings (``f2w:Staged`` / ``f2w:Retired``, T20C P3); properties are create-only and stay as they are.
+        """
+        if not _owned_by(row, graph_id):
+            raise ContractError(ErrorCode.DENIED, "refusing to modify a record F2W literature does not own")
+        self.mutate(_UPDATE_ENTITY, {"id": row["id"], "i": {"uri": uri, "entityType": entity_type,
+                                                         "accessBlob": dict(access_blob)}})
+
     def delete_link(self, row: Mapping[str, Any], graph_id: str) -> None:
         """``deleteLink`` for an owned link only."""
         if not _owned_by(row, graph_id):
             raise ContractError(ErrorCode.DENIED, "refusing to delete a record F2W literature does not own")
         self.mutate(_DELETE_LINK, {"id": row["id"]})
+
+    def delete_entity(self, row: Mapping[str, Any], graph_id: str) -> None:
+        """``deleteEntity`` for an owned entity only (T08D purge and abandon-plan).
+
+        0.2.18 cascades the delete into every attached link of every owner (T20C P1/P2), so callers must
+        read the entity's links immediately before and refuse when any is foreign; this method only
+        enforces ownership of the entity itself.
+        """
+        if not _owned_by(row, graph_id):
+            raise ContractError(ErrorCode.DENIED, "refusing to delete a record F2W literature does not own")
+        self.mutate(_DELETE_ENTITY, {"id": row["id"]})
