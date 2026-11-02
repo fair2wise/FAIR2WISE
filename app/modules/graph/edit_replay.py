@@ -12,8 +12,9 @@ Edits replayed: ``acknowledged``/``applied``/``failed``/``conflict``/``reconcile
 replayed: ``recorded`` (never acknowledged), ``reverted``, ``resolved``.
 
 Supported payloads: ``node_patch`` with ``before.node``/``after.node`` or flat field maps;
-``relationship_add``/``relationship_remove`` with ``edge`` payloads. Any other operation is a conflict
-(``unsupported_operation``), not a skip.
+``relationship_add``/``relationship_remove`` with ``edge`` payloads; ``snippet_upsert`` (``after.node`` is
+created when absent, ``after.edge`` is added; T18D) and ``snippet_unlink`` (``before.edge`` is removed, the
+snippet node stays). Any other operation is a conflict (``unsupported_operation``), not a skip.
 """
 
 from __future__ import annotations
@@ -27,6 +28,10 @@ import copy
 from .edit_journal import EditJournal, EditRecord
 
 REPLAYED_STATES = frozenset({"acknowledged", "applied", "failed", "conflict", "reconciled"})
+#: T18D: edits whose effect the effective record must show although no snapshot carries them yet: a Save
+#: journaled but not finished (``recorded``, ``failed``) and one finished (``applied``, ``acknowledged``).
+#: ``reverted`` and ``resolved`` are never shown; ``reconciled`` edits are already in the active snapshot.
+IN_FLIGHT_STATES = frozenset({"recorded", "applied", "acknowledged", "failed"})
 _MISSING = object()
 
 
@@ -102,7 +107,7 @@ def _edge_payload(rec: EditRecord, side: str) -> dict[str, Any] | None:
 
 
 def _apply_edge(graph: dict[str, Any], rec: EditRecord) -> tuple[str, ReplayConflict | None]:
-    add = rec.operation == "relationship_add"
+    add = rec.operation in ("relationship_add", "snippet_upsert")
     edge = _edge_payload(rec, "after" if add else "before")
     if edge is None:
         return "conflict", ReplayConflict(rec.edit_id, "invalid_payload", f"{rec.operation} needs an edge payload")
@@ -125,17 +130,39 @@ def _apply_edge(graph: dict[str, Any], rec: EditRecord) -> tuple[str, ReplayConf
     return "kept", None
 
 
-def replay_edits(graph: Mapping[str, Any], records: Sequence[EditRecord]) -> ReplayResult:
+def _apply_snippet_upsert(graph: dict[str, Any], rec: EditRecord) -> tuple[str, ReplayConflict | None]:
+    node = rec.after.get("node")
+    if not isinstance(node, Mapping) or not node.get("id") or _edge_payload(rec, "after") is None:
+        return "conflict", ReplayConflict(rec.edit_id, "invalid_payload", "snippet_upsert needs after.node and after.edge")
+    nodes = graph.setdefault(_node_key(graph), [])
+    created = not any(isinstance(n, dict) and n.get("id") == node["id"] for n in nodes)
+    if created:
+        nodes.append(copy.deepcopy(dict(node)))
+    # The edge endpoint check of _apply_edge would reject a snippet whose node was just added only if the
+    # subject is gone; that is a genuine conflict.
+    outcome, conflict = _apply_edge(graph, rec)
+    if conflict is not None:
+        if created:
+            nodes[:] = [n for n in nodes if not (isinstance(n, dict) and n.get("id") == node["id"])]
+        return outcome, conflict
+    return ("kept" if created or outcome == "kept" else "already"), None
+
+
+def replay_edits(graph: Mapping[str, Any], records: Sequence[EditRecord], *,
+                 states: frozenset[str] = REPLAYED_STATES) -> ReplayResult:
     """Apply ``records`` (oldest first by ``recorded_at``/``seq``) to a deep copy of ``graph``.
 
-    Every record in :data:`REPLAYED_STATES` ends in exactly one of ``kept``, ``already`` or ``conflicts``.
+    Every record in ``states`` (default :data:`REPLAYED_STATES`) ends in exactly one of ``kept``, ``already``
+    or ``conflicts``. ``states=IN_FLIGHT_STATES`` builds the effective record (T18D).
     """
     out = copy.deepcopy(dict(graph))
     result = ReplayResult(graph=out)
-    for rec in sorted((r for r in records if r.state in REPLAYED_STATES), key=lambda r: (r.recorded_at, r.edit_id)):
+    for rec in sorted((r for r in records if r.state in states), key=lambda r: (r.recorded_at, r.edit_id)):
         if rec.operation == "node_patch":
             outcome, conflict = _apply_node_patch(out, rec)
-        elif rec.operation in ("relationship_add", "relationship_remove"):
+        elif rec.operation == "snippet_upsert":
+            outcome, conflict = _apply_snippet_upsert(out, rec)
+        elif rec.operation in ("relationship_add", "relationship_remove", "snippet_unlink"):
             outcome, conflict = _apply_edge(out, rec)
         else:
             outcome, conflict = "conflict", ReplayConflict(rec.edit_id, "unsupported_operation",
@@ -150,11 +177,11 @@ def replay_edits(graph: Mapping[str, Any], records: Sequence[EditRecord]) -> Rep
 
 
 def replay_journal(graph: Mapping[str, Any], journal: EditJournal, *, target: str,
-                   scope: Sequence[str]) -> ReplayResult:
+                   scope: Sequence[str], states: frozenset[str] = REPLAYED_STATES) -> ReplayResult:
     """:func:`replay_edits` over the journal's current records for ``target`` and ``scope``."""
     wanted = set(scope)
     records = [r for r in journal.latest().values() if r.target == target and set(r.scope) & wanted]
-    return replay_edits(graph, records)
+    return replay_edits(graph, records, states=states)
 
 
 def record_conflicts(journal: EditJournal, result: ReplayResult, at: datetime) -> list[str]:
