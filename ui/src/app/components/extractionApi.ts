@@ -1,0 +1,209 @@
+/**
+ * Extraction tab API client (A8, T40). Typed against the T38/T39/T42 contract:
+ * `GET /v1/library/kgs|schemas|models`, `POST /v1/library/estimate`, export of a bundle, and the
+ * `library_extract` job on the generic `/v1/jobs` routes (`GET /v1/jobs?state=&kind=`,
+ * `GET /v1/jobs/{id}/logs?after=`, `GET /v1/jobs/{id}/stream` with `Last-Event-ID` resume).
+ * The model chosen here rides in the job inputs; it never goes through `PUT /settings`.
+ */
+import { readSseStream, type SseBlock } from './data/liveAgent';
+import { jsonBody, v1Fetch, v1Json, v1Url } from './apiHttp';
+
+/** Job kind submitted by the Extraction tab. */
+export const EXTRACT_JOB_KIND = 'library_extract';
+
+/** Lifecycle state of a `/v1` job. */
+export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+/** Terminal states: no further progress or logs arrive. */
+export const TERMINAL_JOB_STATES: ReadonlySet<JobState> = new Set(['succeeded', 'failed', 'cancelled']);
+
+/** Reference returned when a job is submitted (identical inputs return the same job). */
+export interface JobRef {
+  id: string;
+  kind: string;
+  state: JobState;
+}
+
+/** A job record. `progress` is `dict[str, int]` (e.g. `{done: 3, total: 10}`). */
+export interface JobInfo extends JobRef {
+  progress: Record<string, number>;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** `GET /v1/jobs`. */
+export interface JobListResponse {
+  jobs: JobInfo[];
+}
+
+/** One log line of a job (T33). `seq` is the SSE event id used to resume. */
+export interface JobLogEntry {
+  seq: number;
+  at: string;
+  level: 'debug' | 'info' | 'warning' | 'error';
+  stage: string;
+  message: string;
+}
+
+/** `GET /v1/jobs/{id}/logs?after=`. */
+export interface JobLogsResponse {
+  logs: JobLogEntry[];
+}
+
+/** Summary of one KG bundle (`<F2W_WORKDIR>/kgs/<name>/`). */
+export interface KgBundleSummary {
+  name: string;
+  topic: string | null;
+  schema: string;
+  model: string | null;
+  backend: string | null;
+  paper_count: number;
+  parent: string | null;
+  /** True when the bundle was reverse-built by `kg_to_terms`. */
+  reconstructed: boolean;
+  updated_at: string | null;
+}
+
+/** `GET /v1/library/kgs`. */
+export interface KgBundlesResponse {
+  bundles: KgBundleSummary[];
+}
+
+/** One extraction schema from the registry. */
+export interface SchemaChoice {
+  name: string;
+  label: string;
+  description: string | null;
+}
+
+/** `GET /v1/library/schemas`. */
+export interface SchemasResponse {
+  schemas: SchemaChoice[];
+}
+
+/** `GET /v1/library/models` (the live provider list, as for the judge model; never hardcoded). */
+export interface ModelsResponse {
+  available: boolean;
+  models: string[];
+  source: 'live' | 'unavailable' | string;
+  error: string | null;
+}
+
+/** Body of `POST /v1/library/estimate` (pages times model). */
+export interface EstimateRequest {
+  paper_ids: string[];
+  model: string;
+  schema: string;
+}
+
+/** Deterministic cost estimate; `confirmation` is echoed in the start request after the user confirms. */
+export interface EstimateResponse {
+  pages: number;
+  model: string;
+  estimated_tokens: number | null;
+  estimated_cost_usd: number | null;
+  confirmation: string;
+}
+
+/** Inputs of a `library_extract` job. */
+export interface StartExtractionRequest {
+  kg_name: string;
+  /** Parent bundle when continuing an existing KG; `null` for a new KG. */
+  continue_from: string | null;
+  topic: string | null;
+  /** Locked on continuation; the server rejects a change. */
+  schema: string;
+  model: string;
+  paper_ids: string[];
+  confirmation: string;
+  nonce?: string;
+}
+
+/** `POST /v1/library/kgs/{name}/export`: where the bundle was written (inside the release directory). */
+export interface ExportResult {
+  name: string;
+  file_name: string;
+}
+
+/** List KG bundles. */
+export function fetchKgBundles(fetcher: typeof fetch = fetch): Promise<KgBundlesResponse> {
+  return v1Json<KgBundlesResponse>(v1Url('/v1/library/kgs'), {}, fetcher);
+}
+
+/** List the schema registry choices. */
+export function fetchSchemas(fetcher: typeof fetch = fetch): Promise<SchemasResponse> {
+  return v1Json<SchemasResponse>(v1Url('/v1/library/schemas'), {}, fetcher);
+}
+
+/** List extraction models (live provider list; `available=false` without a backend). */
+export function fetchExtractionModels(fetcher: typeof fetch = fetch): Promise<ModelsResponse> {
+  return v1Json<ModelsResponse>(v1Url('/v1/library/models'), {}, fetcher);
+}
+
+/** Ask for the cost estimate of an extraction. */
+export function estimateExtraction(request: EstimateRequest, fetcher: typeof fetch = fetch): Promise<EstimateResponse> {
+  return v1Json<EstimateResponse>(v1Url('/v1/library/estimate'), jsonBody('POST', request), fetcher);
+}
+
+/** Submit a `library_extract` job. */
+export function startExtraction(request: StartExtractionRequest, fetcher: typeof fetch = fetch): Promise<JobRef> {
+  const { nonce, ...inputs } = request;
+  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: EXTRACT_JOB_KIND, inputs, nonce }), fetcher);
+}
+
+/** Fetch one job. */
+export function fetchJob(jobId: string, fetcher: typeof fetch = fetch): Promise<JobInfo> {
+  return v1Json<JobInfo>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}`), {}, fetcher);
+}
+
+/** Jobs of a kind in a state (re-attach after a reload: `state=running`, `kind=library_extract`). */
+export function fetchJobs(
+  filter: { state?: JobState; kind?: string },
+  fetcher: typeof fetch = fetch,
+): Promise<JobListResponse> {
+  return v1Json<JobListResponse>(v1Url('/v1/jobs', filter), {}, fetcher);
+}
+
+/** Log lines after `seq` (0 for all); the server bounds the buffer. */
+export function fetchJobLogs(jobId: string, after = 0, fetcher: typeof fetch = fetch): Promise<JobLogsResponse> {
+  return v1Json<JobLogsResponse>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/logs`, { after }), {}, fetcher);
+}
+
+/** Request cancellation (the job stops between PDFs). */
+export function cancelJob(jobId: string, fetcher: typeof fetch = fetch): Promise<JobInfo> {
+  return v1Json<JobInfo>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/cancel`), { method: 'POST' }, fetcher);
+}
+
+/** Export a bundle to the configured release directory as `matkg_<name>.json`. */
+export function exportKgBundle(name: string, fetcher: typeof fetch = fetch): Promise<ExportResult> {
+  return v1Json<ExportResult>(v1Url(`/v1/library/kgs/${encodeURIComponent(name)}/export`), { method: 'POST' }, fetcher);
+}
+
+/** Options of `streamJobEvents`. */
+export interface JobStreamOptions {
+  /** Called for every event (`job_log`, progress, state changes), with the SSE `id` when present. */
+  onEvent: (block: SseBlock) => void;
+  /** Resume point: sent as `Last-Event-ID` so a reconnect does not replay or lose lines. */
+  lastEventId?: string;
+  signal?: AbortSignal;
+  fetcher?: typeof fetch;
+}
+
+/**
+ * Follow `GET /v1/jobs/{id}/stream` with the shared SSE reader from `liveAgent.ts`.
+ * Resolves when the server closes the stream; the caller reconnects with the last seen id if the
+ * job is not terminal. Throws `ApiError` on a non-2xx status.
+ */
+export async function streamJobEvents(jobId: string, options: JobStreamOptions): Promise<void> {
+  const headers: Record<string, string> = { Accept: 'text/event-stream' };
+  if (options.lastEventId) headers['Last-Event-ID'] = options.lastEventId;
+  const response = await v1Fetch(
+    v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/stream`),
+    { headers, signal: options.signal },
+    options.fetcher,
+  );
+  await readSseStream(response, block => {
+    options.onEvent(block);
+  });
+}

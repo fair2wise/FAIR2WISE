@@ -77,9 +77,13 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "4.1.12",
-    "@types/d3": "^7.4.3",
     "@playwright/test": "^1.55.0",
+    "@tailwindcss/vite": "4.1.12",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/d3": "^7.4.3",
     "@vitejs/plugin-react": "4.7.0",
     "jsdom": "^26.1.0",
     "tailwindcss": "4.1.12",

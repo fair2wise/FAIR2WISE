@@ -445,8 +445,17 @@ export async function deleteAgentSession(sessionId: string): Promise<void> {
   }
 }
 
-function parseSseBlock(block: string): { event: string; data: unknown } | null {
+/** One parsed server-sent-event block. `id` is the optional `id:` field (for `Last-Event-ID` resume). */
+export interface SseBlock {
+  event: string;
+  data: unknown;
+  id?: string;
+}
+
+/** Parse one SSE block (text between blank lines); `null` when it carries no `data:` lines. */
+export function parseSseBlock(block: string): SseBlock | null {
   let event = 'message';
+  let id: string | undefined;
   const dataLines: string[] = [];
 
   for (const line of block.split(/\r?\n/)) {
@@ -454,11 +463,53 @@ function parseSseBlock(block: string): { event: string; data: unknown } | null {
       event = line.slice(6).trim();
     } else if (line.startsWith('data:')) {
       dataLines.push(line.slice(5).trim());
+    } else if (line.startsWith('id:')) {
+      id = line.slice(3).trim();
     }
   }
 
   if (dataLines.length === 0) return null;
-  return { event, data: JSON.parse(dataLines.join('\n')) };
+  const parsed: SseBlock = { event, data: JSON.parse(dataLines.join('\n')) };
+  if (id !== undefined) parsed.id = id;
+  return parsed;
+}
+
+/**
+ * Read an SSE response body to its end, calling `onBlock` for each parsed block.
+ * Reusable by any stream consumer (chat uses its own loop; the job stream uses this).
+ * Return `true` from `onBlock` to stop early.
+ *
+ * @throws Error when the response has no body.
+ */
+export async function readSseStream(
+  response: Response,
+  onBlock: (block: SseBlock) => boolean | void,
+): Promise<void> {
+  if (!response.body) {
+    throw new Error('Agent API returned no stream body');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    const blocks = buffer.split(/\n\n/);
+    buffer = blocks.pop() ?? '';
+    for (const raw of blocks) {
+      const parsed = parseSseBlock(raw.trim());
+      if (parsed && onBlock(parsed) === true) {
+        await reader.cancel();
+        return;
+      }
+    }
+    if (done) {
+      const parsed = parseSseBlock(buffer.trim());
+      if (parsed) onBlock(parsed);
+      return;
+    }
+  }
 }
 
 export async function queryLiveAgentStream(

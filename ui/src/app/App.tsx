@@ -5,10 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   FinchConfigProvider,
   HubHeader,
-  HubMainContent,
   HubSidebar,
 } from '@blueskyproject/finch';
-import { Share2 } from 'lucide-react';
+import { FlaskConical, Library, Share2 } from 'lucide-react';
+import { ExtractionTab } from './components/ExtractionTab';
+import { KeepAliveMainContent } from './components/KeepAliveMainContent';
+import { LibraryTab } from './components/LibraryTab';
+import { useLibraryProbe } from './components/libraryHooks';
 import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
 import { AppPaperSearchButton } from './components/AppPaperSearchButton';
@@ -87,7 +90,17 @@ function AgentKGView({
   );
 }
 
+/** Root: provides the TanStack Query client, then renders the shell that uses it. */
 export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppShell />
+    </QueryClientProvider>
+  );
+}
+
+function AppShell() {
+  const libraryProbe = useLibraryProbe();
   const [activeQuery, setActiveQuery] = useState<ExampleQuery>(EMPTY_QUERY);
   const [graph, setGraph] = useState(EMPTY_GRAPH);
   const [chatStore, setChatStore] = useState(() => loadChatSessionStore());
@@ -203,7 +216,24 @@ export default function App() {
       icon: <Share2 size={28} />,
       isBackgroundTransparent: true,
     },
-  ], [activeQuery, activeSession.id, activeSession.messages, graph, reloadGraph, setActiveSessionMessages]);
+    // Library and Extract exist only when `/v1/library` answers (not 404 on ALS); T41/T42 fill them.
+    ...(libraryProbe.available
+      ? [
+          {
+            path: '/library',
+            label: 'Library',
+            element: <LibraryTab />,
+            icon: <Library size={28} />,
+          },
+          {
+            path: '/extract',
+            label: 'Extract',
+            element: <ExtractionTab />,
+            icon: <FlaskConical size={28} />,
+          },
+        ]
+      : []),
+  ], [activeQuery, activeSession.id, activeSession.messages, graph, libraryProbe.available, reloadGraph, setActiveSessionMessages]);
 
   const headerLogoIcon = (
     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-white">
@@ -217,7 +247,6 @@ export default function App() {
 
   return (
     <BrowserRouter basename={ROUTER_BASENAME}>
-      <QueryClientProvider client={queryClient}>
         <FinchConfigProvider config={{}}>
           <div className="grid h-screen w-screen grid-cols-[6rem_1fr] grid-rows-[auto_1fr]">
             <HubSidebar routes={routes} />
@@ -240,13 +269,12 @@ export default function App() {
                 </div>
               }
             />
-            <HubMainContent
+            <KeepAliveMainContent
               routes={routes}
               className="h-[calc(100vh-4rem)] p-6"
             />
           </div>
         </FinchConfigProvider>
-      </QueryClientProvider>
     </BrowserRouter>
   );
 }
