@@ -9,7 +9,7 @@
 | Entrypoint | Behaviour |
 | --- | --- |
 | `app.modules.f2w_agent.api.create_app(cfg, *, cors_origins, deployment, startup_config, identity_port, credential_store, clock)` | Unchanged signature and routes: the 19 UI routes, ALS sign-in handlers, access control and disclosure projection. The frozen UI and T18A/T18B contract tests use it as before. |
-| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 31 `/v1` routes, the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E). |
+| `app.api.main.create_api_app(cfg, ...)` | Calls `create_app` with the same arguments, then adds the 32 `/v1` routes, the origin gate and the body cap on `/v1/` and `/auth/`, and the scope-change wiring. Extra arguments: `operations`, `operations_root`, `publication_gate`, `max_body_bytes`, `sse_poll_seconds`, `sse_max_seconds`, `judge_settings`, `knowledge_operations` (T19E). |
 | `python -m app.modules.f2w_agent.cli api` | Unchanged (legacy app). `api --jobs-api` serves `create_api_app`. |
 | `python -m app.api.cli --root DIR jobs|cases|audit|ops ...` | Calls `F2WOperations` directly with a `cli` context (local profile only). `ops statistics|compare|paper-subgraph|recent|corpus-audit|submit|result` are the T19E Knowledge Operation wrappers (graphs from `--project-root/storage/kg` or `--graph-file`, corpora from `storage/terminology`). |
 | `F2WOperations` | Direct Python use (SDK, notebooks, FORGE). Same methods the routes call. |
@@ -24,7 +24,7 @@ Every method takes the server-resolved `RequestContext` first and forwards to th
 
 | Area | Methods | Policy lives in |
 | --- | --- | --- |
-| Jobs | `submit_job`, `list_jobs`, `get_job`, `job_events`, `job_progress`, `cancel_job`, `resume_job`, `job_view` | `JobService` (kind capability, creator or `jobs.admin`, corpus scope) |
+| Jobs | `submit_job`, `list_jobs`, `get_job`, `job_events`, `job_logs`, `job_progress`, `cancel_job`, `resume_job`, `job_view` | `JobService` (kind capability, creator or `jobs.admin`, corpus scope) |
 | Review | `curation_summary`, `list_cases`, `get_case`, `review_case`, `create_cost_approval`, `revoke_cost_approval` | `curation.reviewer.review_case`, `curation.approval.create_cost_approval` (human, `curation.approve`, case revision) |
 | Publication | `submit_publication`, `current_plan`, `approve_publication`, `publication_pointer`, `rollback_publication` | `Publication` + `security.authorization.create_approval` / `verify_approval`, plus the H5 gate |
 | Status | `audit_status`, `ops_status` | `jobs.admin` |
@@ -49,11 +49,11 @@ The worker path uses the same rules: job stages call `StageContext.require`, whi
 
 ### 2.2 Job event stream (`GET /v1/jobs/{id}/stream`)
 
-Legacy SSE framing (`event:`/`data:` LF blocks, as `/chat/stream`) with `JobEvent` payloads: `event: job_event` with `id: <sequence>` per durable event (reconnect with `Last-Event-ID` or `?after=`), then exactly one `event: end` with `{"state", "reason"}`, where reason is `terminal`, `waiting` (awaiting review or paused), `timeout` or `denied`. The context is re-resolved before every poll, so a sign-out ends the stream.
+Legacy SSE framing (`event:`/`data:` LF blocks, as `/chat/stream`) with `JobEvent` payloads: `event: job_event` with `id: <sequence>` per durable event (reconnect with `Last-Event-ID` or `?after=`), then exactly one `event: end` with `{"state", "reason"}`, where reason is `terminal`, `waiting` (awaiting review or paused), `timeout` or `denied`. Additive (T33): `event: job_log` frames carry one log line each (`{seq, at, level, stage, message}`) with no `id:`, so `Last-Event-ID` still means job-event sequences; a fresh stream replays the kept lines, `?logs_after=<seq>` skips earlier ones, and clients that reconnect resume logs through `GET /v1/jobs/{id}/logs?after=`. The context is re-resolved before every poll, so a sign-out ends the stream.
 
 ## 3. Route policies (`app/api/policies.py`, DEP-19)
 
-All 31 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
+All 32 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` resolves them for the legacy surface the factory extends, and `undeclared_routes` now also fails closed on routes it cannot inspect (mounts, lazily included routers). Rules:
 
 - A route whose effect needs one fixed capability declares it, so the dependency refuses the caller first and, for an admin capability, re-runs the ALS role check.
 - Routes whose capability depends on the job kind or on ownership declare no entry capability (signed-in on ALS) and rely on `JobService`; their mutating handlers re-run the ALS role check (`fresh_request_context`).
@@ -81,6 +81,7 @@ All 31 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V25-V29 | GET /v1/operations/statistics, /compare, /paper-subgraph, /recent, /corpus-audit | `chat.ask` | T19E: the five T19C operations inline (bounded result, `status` `ok` or `partial`); a graph or corpus outside a non-empty corpus scope is 403 (T19C rule); `/recent` on a JSON snapshot is 501 |
 | V30 | POST /v1/operations/jobs | `ops.run` | submit a `knowledge_operation` job (whole population, no inline bound); fresh role check |
 | V31 | GET /v1/operations/jobs/{id} | signed in | job visibility; the bounded report once computed |
+| V42 | GET /v1/jobs/{id}/logs?after=&limit= | signed in | T33: per-job free-text log lines (`{job_id, logs:[{seq, at, level, stage, message}]}`), same visibility as V03; messages scrubbed and cut to 400 characters, 2000 lines kept per job; `/stream` also sends `event: job_log` frames (no `id:`, resume with `?logs_after=` or `/logs?after=`) |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
 

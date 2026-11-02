@@ -90,6 +90,8 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
     _v("V30", "POST", "/operations/jobs", "ops.run",
        note="submit a knowledge_operation job (whole population, no inline bound)" + _FRESH),
     _v("V31", "GET", "/operations/jobs/{job_id}", note=_OBJ + "; bounded report of a knowledge_operation job"),
+    # per-job log channel (T33)
+    _v("V42", "GET", "/jobs/{job_id}/logs", note=_OBJ + "; scrubbed, bounded free-text log lines"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

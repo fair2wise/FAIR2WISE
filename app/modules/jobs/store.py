@@ -29,6 +29,7 @@ import uuid
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JOB_EVENT_VERSION, TERMINAL_STATES, JobEvent, JobHandle, JobState, StageOutcome
 from .keys import OperationInputs, canonical_json
+from .process_support import scrub
 from .sqlite import OperationalDB
 
 SCHEMA = (
@@ -50,7 +51,16 @@ SCHEMA = (
     "status TEXT NOT NULL, result TEXT, updated_at REAL NOT NULL, PRIMARY KEY(job_id, stage, effect_id));\n",
     "CREATE TABLE IF NOT EXISTS job_events (job_id TEXT NOT NULL, sequence INTEGER NOT NULL, event TEXT NOT NULL, "
     "detail TEXT NOT NULL DEFAULT '{}', at REAL NOT NULL, PRIMARY KEY(job_id, sequence));\n",
+    "CREATE TABLE IF NOT EXISTS job_logs (job_id TEXT NOT NULL, seq INTEGER NOT NULL, at REAL NOT NULL, "
+    "level TEXT NOT NULL, stage TEXT NOT NULL DEFAULT '', message TEXT NOT NULL, PRIMARY KEY(job_id, seq));\n",
 )
+
+#: Longest stored log message (characters, after scrubbing).
+LOG_MESSAGE_CHARS = 400
+#: Most log rows kept per job; the oldest are dropped first.
+LOG_ROWS_PER_JOB = 2000
+#: Accepted log levels.
+LOG_LEVELS = frozenset({"debug", "info", "warning", "error"})
 
 #: Allowed lifecycle transitions. Terminal states have none except an explicit operator retry.
 TRANSITIONS: Mapping[JobState, frozenset[JobState]] = {
@@ -149,6 +159,18 @@ class StageRecord:
     artifact_refs: tuple[str, ...]
     progress: dict[str, int]
     result: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class JobLog:
+    """One free-text log line of a job (``seq`` rises by one per job; ``at`` is epoch seconds)."""
+
+    job_id: str
+    seq: int
+    at: float
+    level: str
+    stage: str
+    message: str
 
 
 def _dt(value: float) -> datetime:
@@ -774,6 +796,45 @@ class JobStore:
         rows = self.db.query("SELECT sequence, detail FROM job_events WHERE job_id=? ORDER BY sequence", (job_id,))
         return [{"sequence": r["sequence"], **json.loads(r["detail"])} for r in rows]
 
+    # --- logs -------------------------------------------------------------------------
+
+    def append_log(self, lease: Lease, job_id: str, stage: str, message: str, level: str = "info") -> JobLog:
+        """Append one scrubbed, bounded log line under ``lease`` and drop rows beyond the per-job cap.
+
+        Args:
+            lease: The lease the caller holds on the job; checked in the same transaction.
+            job_id: The job the line belongs to.
+            stage: Name of the running stage (``""`` when none).
+            message: Free text; credential-like text is redacted, then cut to ``LOG_MESSAGE_CHARS``.
+            level: One of ``debug``, ``info``, ``warning``, ``error``.
+
+        Returns:
+            The stored line.
+
+        Raises:
+            ValueError: ``level`` is not an accepted level.
+            LeaseLost: The lease is no longer current.
+        """
+        if level not in LOG_LEVELS:
+            raise ValueError(f"unknown log level {level!r}")
+        text = scrub(message)[:LOG_MESSAGE_CHARS]
+        now = self.clock()
+        with self.db.tx() as con:
+            self._check_lease(con, lease)
+            seq = con.execute("SELECT COALESCE(MAX(seq), -1) + 1 FROM job_logs WHERE job_id=?", (job_id,)).fetchone()[0]
+            con.execute("INSERT INTO job_logs VALUES (?, ?, ?, ?, ?, ?)", (job_id, seq, now, level, stage, text))
+            con.execute("DELETE FROM job_logs WHERE job_id=? AND seq<=?", (job_id, seq - LOG_ROWS_PER_JOB))
+        return JobLog(job_id, seq, now, level, stage, text)
+
+    def logs(self, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobLog]:
+        """Log lines with ``seq > after`` in ``seq`` order (at most ``limit``, clamped to 1..5000)."""
+        rows = self.db.query(
+            "SELECT job_id, seq, at, level, stage, message FROM job_logs WHERE job_id=? AND seq>? "
+            "ORDER BY seq LIMIT ?",
+            (job_id, after, max(1, min(limit, 5000))),
+        )
+        return [JobLog(r["job_id"], r["seq"], r["at"], r["level"], r["stage"], r["message"]) for r in rows]
+
     def close(self) -> None:
         """Close the database."""
         self.db.close()
@@ -781,8 +842,12 @@ class JobStore:
 
 __all__ = (
     "InvalidTransition",
+    "JobLog",
     "JobRecord",
     "JobStore",
+    "LOG_LEVELS",
+    "LOG_MESSAGE_CHARS",
+    "LOG_ROWS_PER_JOB",
     "Lease",
     "LeaseLost",
     "SCHEMA",

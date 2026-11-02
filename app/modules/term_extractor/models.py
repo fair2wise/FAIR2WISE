@@ -21,21 +21,41 @@ class RelationRecord:
         relation: Relationship label (e.g. ``"is_a"``, ``"part_of"``).
         related_term: Name of the target term.
         verified: Whether the relation has been manually verified.
+        raw_predicate: Original predicate text before normalisation, if any.
+        evidence: Evidence strings for the relation (joined with ``"; "`` on the KG edge).
+        related_id: Explicit target node id, only when it cannot be derived from ``related_term``.
+        related_id_prefix: Id prefix for ``related_id`` when it differs from the subject term's prefix.
     """
 
     relation: str
     related_term: str
     verified: bool = False
     raw_predicate: str | None = None
+    evidence: list[str] = field(default_factory=list)
+    related_id: str | None = None
+    related_id_prefix: str | None = None
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> RelationRecord:
-        """Construct from a plain dict, defaulting ``verified`` to ``False``."""
+        """Construct from a plain dict, defaulting ``verified`` to ``False``.
+
+        ``evidence`` may be a list of strings or a single string; ``related_id`` is optional.
+        """
+        raw_evidence = d.get("evidence")
+        if raw_evidence is None:
+            evidence: list[str] = []
+        elif isinstance(raw_evidence, list):
+            evidence = [str(item) for item in raw_evidence]
+        else:
+            evidence = [str(raw_evidence)]
         return cls(
             relation=d["relation"],
             related_term=d["related_term"],
             verified=d.get("verified", False),
             raw_predicate=d.get("raw_predicate") or d.get("raw_relation"),
+            evidence=evidence,
+            related_id=d.get("related_id"),
+            related_id_prefix=d.get("related_id_prefix"),
         )
 
 
@@ -120,6 +140,8 @@ class TermRecord:
         inchikey: InChIKey, if available.
         mass: Molecular mass, if available.
         importance: Subjective relevance tier — ``"high"``, ``"medium"``, or ``"low"``.
+        extra: Unknown top-level keys of the source dict (for example beamline overlay fields), preserved
+            in order by ``from_dict`` and written back at the top level by ``to_dict``.
     """
 
     term: str
@@ -142,18 +164,36 @@ class TermRecord:
     inchikey: str | None = None
     mass: Any | None = None
     importance: str | None = None  # "high" | "medium" | "low"
+    extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialise to a plain nested dict (via ``dataclasses.asdict``)."""
-        return dataclasses.asdict(self)
+        """Serialise to a plain nested dict (via ``dataclasses.asdict``).
+
+        ``extra`` is flattened to the top level after the known fields, in insertion order. Optional
+        relation keys (``evidence``, ``related_id``, ``related_id_prefix``) are omitted when empty so older files keep their shape.
+        """
+        data = dataclasses.asdict(self)
+        extra = data.pop("extra")
+        for rel in data["relations"]:
+            if not rel.get("evidence"):
+                rel.pop("evidence", None)
+            for optional in ("related_id", "related_id_prefix"):
+                if rel.get(optional) is None:
+                    rel.pop(optional, None)
+        for key, value in extra.items():
+            data.setdefault(key, value)
+        return data
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> TermRecord:
         """Build a record from a dict, with defaults for absent optional fields.
 
+        Unknown top-level keys are kept in ``extra``.
+
         Raises:
             KeyError: If ``term`` is missing.
         """
+        known = _TERM_FIELD_NAMES
         return cls(
             term=d["term"],
             definition=d.get("definition", ""),
@@ -175,4 +215,10 @@ class TermRecord:
             inchikey=d.get("inchikey"),
             mass=d.get("mass"),
             importance=d.get("importance"),
+            extra={key: value for key, value in d.items() if key not in known},
         )
+
+
+_TERM_FIELD_NAMES: frozenset[str] = frozenset(
+    f.name for f in dataclasses.fields(TermRecord) if f.name != "extra"
+)

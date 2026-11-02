@@ -377,7 +377,9 @@ def build_graph(
             tgt = rel.get("related_id") or rel.get("related_term")
             if not tgt:
                 continue
-            rid = make_id(str(tgt), prefix=term_prefix)
+            # ``related_id_prefix`` lets a relation reach a node whose prefix differs from the subject's
+            # (kg_to_terms writes it when the target id is not a known CURIE).
+            rid = make_id(str(tgt), prefix=str(rel.get("related_id_prefix") or term_prefix))
 
             # stub for unseen target
             if rid not in nodes:

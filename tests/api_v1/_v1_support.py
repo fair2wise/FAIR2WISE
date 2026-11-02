@@ -67,6 +67,9 @@ def fake_ingest_pipeline(log: List[str]) -> Pipeline:
         sc.require("ingest.extract")
         sc.guard()
         log.append(sc.job.job_id)
+        if sc.inputs.params.get("log"):
+            sc.log("parsed 3 pages with api_key=sk-secretsecretsecret")
+            sc.log("second line", "warning")
         return StageResult(data={"pages": 3}, progress={"pages": 3})
 
     def review(sc: Any) -> StageResult:

@@ -245,6 +245,11 @@ class StageContext:
         self.guard()
         self.store.update_progress(self.lease, self.job.job_id, self.stage, counters)
 
+    def log(self, message: str, level: str = "info") -> None:
+        """Append a free-text line to the job's log (scrubbed and bounded by the store), tagged with this stage."""
+        self.guard()
+        self.store.append_log(self.lease, self.job.job_id, self.stage, message, level)
+
     def unit(self, unit_id: str, unit_key: str) -> dict[str, Any] | None:
         """A previously settled, still compatible unit result (for example an extracted chunk)."""
         return self.store.get_unit(self.job.job_id, self.stage, unit_id, unit_key)

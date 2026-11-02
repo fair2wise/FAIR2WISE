@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[2]
 TASK_GRAPH = REPO / "docs" / "migration" / "companion" / "task_graph.json"
 STATUS = REPO / "docs" / "migration" / "task_status.json"
 BASELINE = "222b1e7b130567dbf4a3242697ac2b465794a38d"
-STATUSES = {"merged", "open", "blocked_on_owner"}
+STATUSES = {"merged", "open", "blocked_on_owner", "superseded"}
 
 
 def _load(path: Path) -> dict:

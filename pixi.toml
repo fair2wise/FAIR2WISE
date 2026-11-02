@@ -201,6 +201,8 @@ huggingface-hub = "==1.33.0"
 # part of the repo or the lock: images fetch them at build time (Dockerfile docling-models stage).
 docling = ">=2.145.0"
 pypdfium2 = "*"
+# Command-line interfaces for new tools (ALS dev standards: Typer); also pulled in by docling.
+typer = ">=0.12"
 torchvision = { version = "*", index = "https://download.pytorch.org/whl/cpu" }
 
 # ---- tests, lint, docs (was requirements/dev.in) ---------------------------------------------

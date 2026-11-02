@@ -48,6 +48,7 @@ from ..modules.contracts.jobs import JobEvent, JobHandle, JobState
 from ..modules.contracts.tools import ToolResult
 from ..modules.jobs.keys import OperationInputs
 from ..modules.jobs.service import JobService
+from ..modules.jobs.store import JobLog
 from ..modules.security.authorization import (
     DeploymentSettings,
     create_approval,
@@ -212,6 +213,10 @@ class F2WOperations:
     def job_events(self, ctx: RequestContext, job_id: str, *, after: int = -1) -> list[JobEvent]:
         """Durable events after sequence ``after``."""
         return self.jobs.events(ctx, job_id, after=after)
+
+    def job_logs(self, ctx: RequestContext, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobLog]:
+        """Log lines after ``seq`` ``after``."""
+        return self.jobs.logs(ctx, job_id, after=after, limit=limit)
 
     def job_progress(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """Per-phase progress."""
@@ -603,5 +608,11 @@ def job_event_json(event: JobEvent) -> dict[str, Any]:
     return event.model_dump(mode="json")
 
 
+def job_log_json(log: JobLog) -> dict[str, Any]:
+    """JSON payload of one job log line (``/logs`` and SSE ``job_log`` data)."""
+    return {"seq": log.seq, "at": datetime.fromtimestamp(log.at, UTC).isoformat(), "level": log.level,
+            "stage": log.stage, "message": log.message}
+
+
 __all__ = ("ALS_APPROVAL_TTL", "DEFAULT_APPROVAL_TTL", "PROFILE_APPROVAL_TTL", "F2WOperations", "PublicationGate",
-           "build_operations", "default_approval_ttl", "job_event_json")
+           "build_operations", "default_approval_ttl", "job_event_json", "job_log_json")

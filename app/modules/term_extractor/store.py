@@ -62,15 +62,32 @@ class TermStore:
         try:
             with Path(self.output_file).open() as fh:
                 data = json.load(fh)
-            for raw in data.get("terms", []):
-                record = TermRecord.from_dict(raw)
-                key = self.normalize(record.term)
+            skipped = 0
+            for index, raw in enumerate(data.get("terms", [])):
+                try:
+                    record = TermRecord.from_dict(raw)
+                    key = self.normalize(record.term)
+                except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                    skipped += 1
+                    logger.warning(
+                        "Skipping unreadable term record #%d in %s: %s: %s",
+                        index, self.output_file, type(exc).__name__, exc,
+                    )
+                    continue
+                if key in self._records:
+                    logger.warning(
+                        "Term %r in %s collides with %r on key %r; the later record wins",
+                        record.term, self.output_file, self._records[key].term, key,
+                    )
                 self._records[key] = record
                 self._display_to_key[record.term] = key
+            if skipped:
+                logger.warning("Skipped %d unreadable term record(s) in %s", skipped, self.output_file)
             for snip in data.get("code_snippets", []):
                 self.code_snippets.append(snip)
                 self._snippet_seen.add(provenance.snippet_key(snip))
-            self.metadata.update(data.get("metadata", {}))
+            # ``None`` marks an unknown value (reconstructed files): keep the in-memory default instead.
+            self.metadata.update({k: v for k, v in (data.get("metadata") or {}).items() if v is not None})
             logger.info(
                 "Loaded %d existing terms and %d code snippets from %s",
                 len(self._records), len(self.code_snippets), self.output_file,
@@ -325,11 +342,30 @@ class TermStore:
 
     def increment(self, field: str, by: int = 1) -> None:
         """Increment a numeric metadata counter by *by* (default 1), initialising to 0 if absent."""
-        self.metadata[field] = self.metadata.get(field, 0) + by
+        self.metadata[field] = (self.metadata.get(field) or 0) + by
 
     # ------------------------------------------------------------------
     # Post-processing
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def importance_tier(pages: list[int], source_papers: list[str]) -> str:
+        """Return the importance tier for a term seen on ``pages`` in ``source_papers``.
+
+        Args:
+            pages: Page numbers where the term appears.
+            source_papers: Paper identifiers that mention the term.
+
+        Returns:
+            ``"high"`` (more than one paper, or more than 5 pages), ``"medium"`` (more than 2 pages) or ``"low"``.
+        """
+        occ = len(pages)
+        papers = len(set(source_papers))
+        if papers > 1 or occ > 5:
+            return "high"
+        if occ > 2:
+            return "medium"
+        return "low"
 
     def assign_importance(self) -> None:
         """Set ``importance`` on every record based on occurrence frequency.
@@ -341,11 +377,4 @@ class TermStore:
         """
         with self._state_lock:
             for record in self._records.values():
-                occ = len(record.pages)
-                papers = len(set(record.source_papers))
-                if papers > 1 or occ > 5:
-                    record.importance = "high"
-                elif occ > 2:
-                    record.importance = "medium"
-                else:
-                    record.importance = "low"
+                record.importance = self.importance_tier(record.pages, record.source_papers)

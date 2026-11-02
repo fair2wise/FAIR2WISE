@@ -21,7 +21,7 @@ from ..llm_admission import ProviderAdmission
 from ..security.authorization import DeploymentSettings, JobAuthority, StartupConfigError
 from .keys import OperationInputs
 from .pipeline import Pipeline, PipelineRunner
-from .store import JobRecord, JobStore, LeaseLost
+from .store import JobLog, JobRecord, JobStore, LeaseLost
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +230,11 @@ class JobService:
         """Durable events after sequence ``after`` (for polling and SSE)."""
         self._visible(ctx, self.store.get(job_id))
         return self.store.events(job_id, after=after)
+
+    def logs(self, ctx: RequestContext, job_id: str, *, after: int = -1, limit: int = 500) -> list[JobLog]:
+        """Log lines after ``seq`` ``after`` (visibility rule of :meth:`events`)."""
+        self._visible(ctx, self.store.get(job_id))
+        return self.store.logs(job_id, after=after, limit=limit)
 
     def progress(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """Per-phase progress (parsing, extraction, validation, review, import)."""
