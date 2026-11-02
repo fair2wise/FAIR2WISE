@@ -56,6 +56,23 @@ READMES_DIR = CACHE_DIR / "readmes"
 PAGES_DIR = CACHE_DIR / "pages"
 WORK_DIR = CACHE_DIR / "work"
 
+
+def _xp_elems(node: Any, query: str) -> list[Any]:
+    """Run an XPath that selects elements; lxml stubs type the result as a wide union."""
+    # Any: lxml-stubs return a union of bool/float/str/list for xpath(); element queries yield lists.
+    return list(node.xpath(query))
+
+
+def _xp_strs(node: Any, query: str) -> list[str]:
+    """Run an XPath that selects text nodes or attribute values (strings)."""
+    return [str(v) for v in node.xpath(query)]
+
+
+def _texts(node: Any) -> list[str]:
+    """Return the text fragments of an lxml element (``itertext`` is typed str | bytes)."""
+    return [str(t) for t in node.itertext()]
+
+
 SCHEMA_VERSION = "bl1101_v2"
 INGEST_VERSION = "1.2.0"
 NAMESPACE = "beamline"
@@ -531,16 +548,16 @@ def parse_als_page(html_text: str) -> dict[str, Any]:
     """Extract fact table + technique list from the public ALS beamline page."""
     tree = lhtml.fromstring(html_text)
     facts: dict[str, str] = {}
-    for row in tree.xpath("//tr"):
-        cells = [" ".join(cell.itertext()).strip() for cell in row.xpath("./th|./td")]
+    for row in _xp_elems(tree, "//tr"):
+        cells = [" ".join(_texts(cell)).strip() for cell in _xp_elems(row, "./th|./td")]
         cells = [re.sub(r"\s+", " ", c) for c in cells if c]
         if len(cells) >= 2:
             facts[cells[0]] = " | ".join(cells[1:])
-    title = " ".join(tree.xpath("//h1//text()")).strip() or "Beamline 11.0.1.2"
+    title = " ".join(_xp_strs(tree, "//h1//text()")).strip() or "Beamline 11.0.1.2"
     paragraphs = [
-        re.sub(r"\s+", " ", " ".join(p.itertext()).strip())
-        for p in tree.xpath("//p")
-        if " ".join(p.itertext()).strip()
+        re.sub(r"\s+", " ", " ".join(_texts(p)).strip())
+        for p in _xp_elems(tree, "//p")
+        if " ".join(_texts(p)).strip()
     ]
     techniques: list[str] = []
     tech_blob = facts.get("Technique category") or facts.get("Techniques") or ""
@@ -548,7 +565,7 @@ def parse_als_page(html_text: str) -> dict[str, Any]:
         token = token.strip(" -")
         if len(token) > 2:
             techniques.append(token)
-    full_text = re.sub(r"\s+", " ", " ".join(tree.itertext()))
+    full_text = re.sub(r"\s+", " ", " ".join(_texts(tree)))
     people = parse_als_contact_people(facts, full_text, source=ALS_PAGE_URL)
     return {
         "title": title,
@@ -719,8 +736,8 @@ def _svg_coord(el: Any, attr: str) -> float:
 def parse_sheet_a_svg_order(tree: Any) -> list[str]:
     """Sheet A SVG left-to-right, top-to-bottom. This is beam order, not A′ DOM."""
     labels: list[tuple[float, float, str]] = []
-    for text_el in tree.xpath("//section[@id='sheet-a']//figure//svg//text[contains(@class,'big')]"):
-        name = canonical_stage_name(re.sub(r"\s+", " ", " ".join(text_el.itertext())).strip())
+    for text_el in _xp_elems(tree, "//section[@id='sheet-a']//figure//svg//text[contains(@class,'big')]"):
+        name = canonical_stage_name(re.sub(r"\s+", " ", " ".join(_texts(text_el))).strip())
         if not name:
             continue
         # "Sample · θ = 0" belongs to sheet B; ignore if it leaked.
@@ -760,8 +777,8 @@ def parse_arrow_sequence(text: str) -> list[str]:
 
 def parse_figcaption_beam_path(tree: Any) -> list[str]:
     """Return the beam-path chain documented in the Sheet A figcaptions, or ``[]`` if none."""
-    captions = tree.xpath("//section[@id='sheet-a']//figcaption")
-    text = " ".join(re.sub(r"\s+", " ", " ".join(el.itertext())) for el in captions)
+    captions = _xp_elems(tree, "//section[@id='sheet-a']//figcaption")
+    text = " ".join(re.sub(r"\s+", " ", " ".join(_texts(el))) for el in captions)
     return parse_arrow_sequence(text)
 
 
@@ -858,28 +875,28 @@ def parse_blueprint_html(html_text: str) -> dict[str, Any]:
     """Parse Gabe's BL 11.0.1.2 device blueprint (titleblock, stages, sheet E, beam path)."""
     tree = lhtml.fromstring(html_text)
     header: dict[str, str] = {}
-    for block in tree.xpath("//header[contains(@class,'titleblock')]/div"):
-        key = " ".join(block.xpath(".//*[contains(@class,'k')]/text()")).strip()
-        val = " ".join(block.xpath(".//*[contains(@class,'v')]/text()")).strip()
+    for block in _xp_elems(tree, "//header[contains(@class,'titleblock')]/div"):
+        key = " ".join(_xp_strs(block, ".//*[contains(@class,'k')]/text()")).strip()
+        val = " ".join(_xp_strs(block, ".//*[contains(@class,'v')]/text()")).strip()
         if key:
             header[key] = val
-    sources = " ".join(tree.xpath("//*[contains(@class,'sources')]//text()"))
+    sources = " ".join(_xp_strs(tree, "//*[contains(@class,'sources')]//text()"))
     header["sources"] = re.sub(r"\s+", " ", sources).strip()
 
     devices: dict[str, BlueprintDevice] = {}
-    for row in tree.xpath("//table[@id='corr']//tr[@id]"):
+    for row in _xp_elems(tree, "//table[@id='corr']//tr[@id]"):
         dev_id = (row.get("id") or "").replace("dev-", "")
-        tds = row.xpath("./td")
+        tds = _xp_elems(row, "./td")
         if len(tds) < 6:
             continue
-        drawn = " ".join(tds[0].itertext()).strip()
-        name = " ".join(tds[1].itertext()).strip()
-        ioc = " ".join(tds[2].itertext()).strip()
-        pv = " ".join(tds[3].xpath(".//span[contains(@class,'pv')]/text()")).strip()
-        handle = " ".join(tds[4].xpath(".//span[contains(@class,'hd')]/text()")).strip()
-        ophyd_class = " ".join(tds[5].itertext()).strip()
-        mapping = " ".join(tds[6].itertext()).strip() if len(tds) > 6 else ""
-        tip = unescape(" ".join(tds[1].xpath(".//*[@data-tip]/@data-tip")))
+        drawn = " ".join(_texts(tds[0])).strip()
+        name = " ".join(_texts(tds[1])).strip()
+        ioc = " ".join(_texts(tds[2])).strip()
+        pv = " ".join(_xp_strs(tds[3], ".//span[contains(@class,'pv')]/text()")).strip()
+        handle = " ".join(_xp_strs(tds[4], ".//span[contains(@class,'hd')]/text()")).strip()
+        ophyd_class = " ".join(_texts(tds[5])).strip()
+        mapping = " ".join(_texts(tds[6])).strip() if len(tds) > 6 else ""
+        tip = unescape(" ".join(_xp_strs(tds[1], ".//*[@data-tip]/@data-tip")))
         kind = strip_tags(
             " ".join(re.findall(r'tip-k">([^<]+)', tip)) or ""
         ).lower()
@@ -911,15 +928,15 @@ def parse_blueprint_html(html_text: str) -> dict[str, Any]:
         )
 
     stages: list[BlueprintStage] = []
-    for stage_el in tree.xpath("//*[contains(@class,'stage')]"):
-        name = " ".join(stage_el.xpath(".//*[contains(@class,'stage-name')]/text()")).strip()
+    for stage_el in _xp_elems(tree, "//*[contains(@class,'stage')]"):
+        name = " ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-name')]/text()")).strip()
         if not name:
             continue
-        section = " ".join(stage_el.xpath(".//*[contains(@class,'stage-id')]/text()")).strip()
-        what = strip_tags(" ".join(stage_el.xpath(".//*[contains(@class,'stage-what')]//text()")))
-        does = strip_tags(" ".join(stage_el.xpath(".//*[contains(@class,'stage-does')]//text()")))
-        range_text = strip_tags(" ".join(stage_el.xpath(".//*[contains(@class,'stage-range')]//text()")))
-        hrefs = [h.replace("#dev-", "") for h in stage_el.xpath(".//a/@href") if h.startswith("#dev-")]
+        section = " ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-id')]/text()")).strip()
+        what = strip_tags(" ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-what')]//text()")))
+        does = strip_tags(" ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-does')]//text()")))
+        range_text = strip_tags(" ".join(_xp_strs(stage_el, ".//*[contains(@class,'stage-range')]//text()")))
+        hrefs = [h.replace("#dev-", "") for h in _xp_strs(stage_el, ".//a/@href") if h.startswith("#dev-")]
         stages.append(
             BlueprintStage(
                 name=name,
@@ -932,9 +949,9 @@ def parse_blueprint_html(html_text: str) -> dict[str, Any]:
         )
 
     rules = []
-    for rule in tree.xpath("//*[contains(@class,'rule')]"):
-        key = " ".join(rule.xpath(".//*[contains(@class,'rule-k')]/text()")).strip()
-        body = strip_tags(" ".join(rule.xpath(".//text()")))
+    for rule in _xp_elems(tree, "//*[contains(@class,'rule')]"):
+        key = " ".join(_xp_strs(rule, ".//*[contains(@class,'rule-k')]/text()")).strip()
+        body = strip_tags(" ".join(_xp_strs(rule, ".//text()")))
         if key or body:
             rules.append({"name": key, "text": body})
 
