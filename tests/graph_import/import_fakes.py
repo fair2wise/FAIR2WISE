@@ -67,11 +67,40 @@ class MemoryTiled(TiledMutationClient):
         if self.down:
             raise ContractError(ErrorCode.UNAVAILABLE, "Tiled graph is unavailable (ConnectionError)")
 
-    def scan_entities(self, **_kw):
+    def scan_entities(self, entity_type=None, **_kw):
         self._guard()
         if self.max_rows is not None and len(self.entities) > self.max_rows:
             raise TruncatedGraphRead("tiled.entities scan", self.max_rows)
-        return copy.deepcopy(list(self.entities.values()))
+        rows = list(self.entities.values())
+        if entity_type is not None:
+            rows = [r for r in rows if r.get("entityType") == entity_type]
+        return copy.deepcopy(rows)
+
+    def entity(self, entity_id):
+        self._guard()
+        row = self.entities.get(entity_id)
+        return copy.deepcopy(row) if row is not None else None
+
+    def links_of(self, entity_id, **_kw):
+        self._guard()
+        return copy.deepcopy([lk for lk in self.links.values()
+                              if entity_id in (lk["subjectId"], lk["objectId"])])
+
+    def set_entity_state(self, row, graph_id, *, uri, entity_type, access_blob):
+        self._guard()
+        assert row.get("properties", {}).get("f2w_owner") == "f2w-literature" and access_blob is not None
+        self.entities[row["id"]]["uri"] = uri
+        self.entities[row["id"]]["entityType"] = entity_type
+        self.writes.append("updateEntity")
+
+    def delete_entity(self, row, graph_id):
+        """``deleteEntity`` with the observed 0.2.18 cascade (T20C P1): every attached link goes too."""
+        self._guard()
+        assert row.get("properties", {}).get("f2w_owner") == "f2w-literature"
+        del self.entities[row["id"]]
+        for lid in [lid for lid, lk in self.links.items() if row["id"] in (lk["subjectId"], lk["objectId"])]:
+            del self.links[lid]
+        self.writes.append("deleteEntity")
 
     def scan_links(self, **_kw):
         self._guard()

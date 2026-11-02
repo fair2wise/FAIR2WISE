@@ -40,6 +40,15 @@ class ReceiptExtras(BaseModel):
     data_commit: str | None = None
     operation_counts: dict[str, int] = {}
     dangling_unimported: int = 0
+    #: T08C: scope of the replacement (the corpus), the legacy per-version graph ids adopted into it, the
+    #: number of foreign links on retired records (editing plan I5), the foreign records that changed under
+    #: the run (Q14: recorded, never fatal), the I7 read probes and the live release marker.
+    kind: str = "import"
+    adopted_graph_ids: list[str] = []
+    boundary_links: int = 0
+    foreign_changes: list[str] = []
+    read_probes: dict[str, Any] = {}
+    release_marker_id: str | None = None
 
 
 class ReceiptArtifact(BaseModel):

@@ -20,6 +20,15 @@ from . import identity_adapter as ida
 
 RETIRED = "retired"
 PENDING = "pending"
+RELEASE = "release"
+#: Neutral entity types of invisible records (editing plan 1.2.3): other readers list entities by type, so a
+#: staged or retired "Material" must not answer ``entities(entityType: "Material")``. The real category stays
+#: in the properties (``category``), where the T08A readers take it from on promotion.
+STAGED_TYPE = "f2w:Staged"
+RETIRED_TYPE = "f2w:Retired"
+#: Type of the per-scope release marker (editing plan 1.2.2); its node id is :data:`RELEASE_NODE`.
+RELEASE_TYPE = "f2w:Release"
+RELEASE_NODE = "~release"
 
 
 def canonical(value: Any) -> str:
@@ -74,8 +83,16 @@ def state_uri(graph_id: str, node_id: str, state: str, plan_tag: str) -> str:
     return f"{ida.URI_PREFIX}{quote(graph_id, safe='')}/{state}/{quote(node_id, safe='')}/{plan_tag}"
 
 
+def release_uri(scope: str) -> str:
+    """Return the URI of the live release marker of ``scope`` (``f2w:kg/<scope>/release``)."""
+    return f"{ida.URI_PREFIX}{quote(scope, safe='')}/{RELEASE}"
+
+
 def classify_entity(row: Mapping[str, Any], graph_id: str) -> str | None:
-    """``final``/``pending``/``retired`` for an entity this graph owns, ``None`` for anything else.
+    """``final``/``pending``/``retired``/``release`` for an entity this graph owns, ``None`` for anything else.
+
+    ``release`` is the live release marker (:func:`release_uri`); a retired marker classifies as ``retired``
+    like any other revision (its node id is :data:`RELEASE_NODE`).
 
     Raises:
         ValueError: The row carries this graph's owner markers but a URI that fits no state.
@@ -87,6 +104,8 @@ def classify_entity(row: Mapping[str, Any], graph_id: str) -> str | None:
     uri = row.get("uri") or ""
     if ida.parse_entity_uri(uri) == (graph_id, props.get(ida.ENTITY_KEY)):
         return "final"
+    if uri == release_uri(graph_id) and props.get(ida.ENTITY_KEY) == RELEASE_NODE:
+        return RELEASE
     prefix = f"{ida.URI_PREFIX}{quote(graph_id, safe='')}/"
     for state in (PENDING, RETIRED):
         if uri.startswith(prefix + state + "/"):

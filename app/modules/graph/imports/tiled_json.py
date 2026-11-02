@@ -251,7 +251,7 @@ def classify_state(graph_id: str, entities: list[dict[str, Any]], links: list[di
             kind = lw.classify_entity(row, graph_id)
         except ValueError as exc:
             raise ContractError(ErrorCode.CONFLICT, str(exc)) from None
-        if kind is None:
+        if kind is None or kind == lw.RELEASE:  # a T08C release marker is not a per-version record
             st.foreign["e:" + row["id"]] = _sha(row)
             continue
         node = row["properties"][ida.ENTITY_KEY]

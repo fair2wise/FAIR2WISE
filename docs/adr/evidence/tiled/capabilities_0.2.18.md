@@ -113,6 +113,44 @@ by `AccessTagsCompiler`, and 0.2.18 has no CLI for that step, so the F2W launche
 | admin lists | sees everything (admin bypasses tag filters) |
 | reader `deleteEntity` on a tagged record | `Not permitted` |
 
+### 2.3 Edit-relevant facts (T20C, probes P1-P9)
+
+**[Observed]** against disposable 0.2.18 servers (single-user, and multi-user with
+`TagBasedAccessPolicy`); each row is one asserting test in
+`tests/tiled/test_tiled_edit_facts_0218.py` (a server where a fact changes fails exactly that
+test). The observation-only versions live in `tests/tiled/test_edit_plan_probes.py`. The facts
+are what `docs/migration/ui_contracts/tiled_graph_editing_plan.md` sections 1-2 build on.
+
+| # | Fact | 0.2.18 behaviour | Capability flag |
+| --- | --- | --- | --- |
+| P1 | `deleteEntity` deletes **foreign** links attached to the deleted entity, in both directions | FORGE incoming and outgoing links read back `null`; the FORGE entity survives | `delete_cascades_foreign_links = True` |
+| P2 | Under `TagBasedAccessPolicy`, a tag owner deleting its own tagged entity also deletes an admin-created link the owner cannot read | Owner reads the link: `null`; owner `deleteLink` on it: `Not permitted`; after the owner's `deleteEntity`, admin reads the link: `null` | (same flag) |
+| P3 | Changing an entity's URI and `entityType` (how F2W retires: `f2w:Retired`) keeps every link, including foreign ones | The foreign link keeps its endpoints; `incomingLinks`/`outgoingLinks` on the retired entity list it; `entities(entityType: "Material")` no longer lists it, `entities(entityType: "f2w:Retired")` does | - |
+| P4 | Link endpoints cannot change | `updateLink` with `objectId` or `subjectId`: `unknown field`; `UpdateLinkInput = {accessBlob, predicate}`; incoming links are found with `links(objectId:)` | - |
+| P5 | Query surface | `entities(entityType, limit, offset)` only (`Unknown argument 'uri'`, `'properties'`); `links(subjectId, predicate, objectId, limit, offset)`; mutations exactly `createEntity, createLink, updateEntity, updateLink, deleteEntity, deleteLink, upsertNamespace, deleteNamespace`: no batch, transaction or conditional write | - |
+| P6 | An access-blob change is **silently ignored without an access policy** | `updateLink` with a new blob: response and re-read show the old blob while a `predicate` change in the same call applied | `blob_update_effective = False` |
+| P7 | An entity's access blob cannot be read | `Cannot query field 'accessBlob' on type 'Entity'`; `Link` has the field | - |
+| P8 | Two real snapshots of one corpus get two graph ids, and the per-version importer (`tiled_json`, T08B) leaves v1 live when v2 is imported | `create_snapshot` twice: `synthetic_v1`, `synthetic_v2`; after both imports 14 + 14 owned live entities; the v2 plan has 0 `retire_node` operations | - (T08C replaces the scope key by the corpus) |
+| P9 | Revising a node in place (T08B) leaves a FORGE link on the retired revision and the import still verifies | Import `applied`, verified; the FORGE link's `objectId` is the old UUID whose URI is now `f2w:kg/<graph>/retired/...` | - (T08C's boundary-link report closes the gap) |
+| ACL | Owner rights under the tag policy | A tag owner may change the URI of its own tagged entity; a reader may not update it (`Not permitted`); an admin deletes anything | - |
+
+**[Source]** (0.2.18 package; editing plan section 4.2):
+
+- Links reference entities with `ForeignKey("entities.id", ondelete="CASCADE")` on both ends
+  (`tiled/graph/orm.py:138,145`). P1 and P2 are the database cascade, not the resolver, so no
+  access policy can prevent them.
+- `deleteEntity` checks only the entity's effective access blob (`graph/schema.py:508-519`);
+  `deleteLink` checks the link's blob (`:561-570`).
+- `_modify_access_blob` returns the **current** blob when no policy is configured
+  (`graph/schema.py`), which is P6.
+- The T18C closure test built "v2" by copying v1's manifest, so it kept graph id `synthetic_v1`
+  and exercised in-place convergence; `create_snapshot` does not (P8).
+
+The two flags are version-keyed in `tiled_capabilities.KNOWN_BEHAVIOUR` (unknown builds get the
+fail-closed values: cascade assumed, blob updates assumed ineffective) and appear on every
+`CapabilityReport`; the quirk strings `deleteEntity-cascades-foreign-links` and
+`accessBlob-update-ignored-without-policy` join `KNOWN_QUIRKS["0.2.18"]`.
+
 ## 3. Differences from the rc2-based ADR (`docs/adr/tiled-deployment.md`)
 
 1. **Access model.** The ADR (3.2, 3.3, 7.6) uses rc2 `accessTags` inputs and
