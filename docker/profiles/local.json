@@ -44,7 +44,7 @@
     "F2W_SCHEMA": "storage/schema/rsoxs_schema.yaml",
     "F2W_WORKDIR": "/var/lib/fair2wise/state/session",
     "F2W_JOB_DB": "/var/lib/fair2wise/state/session/operations/jobs.sqlite3",
-    "F2W_WORKER_FACTORY": "app.modules.workers.factories:idle_service",
+    "F2W_WORKER_FACTORY": "app.modules.workers.factories:library_service",
     "F2W_WORKER_CONCURRENCY": "2",
     "F2W_TRACE_ENABLED": "1",
     "F2W_TRACE_DIR": "/var/lib/fair2wise/state/traces",
