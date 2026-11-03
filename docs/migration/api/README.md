@@ -190,6 +190,9 @@ start/status/stop route triples: submit is the V50-V52 route, status `GET /v1/jo
 The kind capability is `jobs.admin` (verified admins on ALS); the work is a handler port bound by trusted wiring, so
 the lifecycle, parameter validation, cancellation and resume are tested with fake handlers and no model or parser runs
 in the API process. Anything a handler proposes for the graph still goes through the `curation.approve` review.
+The real handlers (`jobs/paper_handlers.py`, T-handlers) port the donor enrichment agent over injected ports (catalog,
+OpenAlex, corpus, acquisition, parser) and emit `graph_proposal` review cases only; what they do and what was
+deliberately not ported is in `docs/migration/reviews/H8/handler_port_notes.md`.
 
 ## 4. H5 publication gate
 
