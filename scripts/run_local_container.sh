@@ -9,6 +9,9 @@
 #   env: F2W_CONTAINER_NAME (f2w-local), F2W_HOST_PORT (8080),
 #        F2W_PAPERS_DIR (the repo's papers/ folder): mounted read-only at /data/papers and
 #        offered as the one folder root (F2W_FOLDER_ROOTS) of the folder routes.
+#        F2W_LIBRARY_HOST_DIR (default: the same papers/ folder): mounted read-write at
+#        /var/lib/fair2wise/library, the Library tab's folder (uploads and the Harvester write
+#        there, filing papers by category and year and updating each category's manifest.json).
 set -euo pipefail
 
 image="${1:-f2w:local}"
@@ -16,6 +19,8 @@ envfile="${2:-$(cd "$(dirname "$0")/.." && pwd)/.env}"
 name="${F2W_CONTAINER_NAME:-f2w-local}"
 port="${F2W_HOST_PORT:-8080}"
 papers="${F2W_PAPERS_DIR:-$(cd "$(dirname "$0")/.." && pwd)/papers}"
+library="${F2W_LIBRARY_HOST_DIR:-$papers}"
+[ -d "$library" ] || { echo "library folder not found: $library" >&2; exit 1; }
 [ -d "$papers" ] || { echo "papers folder not found: $papers" >&2; exit 1; }
 
 [ -f "$envfile" ] || { echo "dotenv file not found: $envfile" >&2; exit 1; }
@@ -36,6 +41,7 @@ docker run -d --name "$name" --stop-timeout 120 \
   -e CBORG_API_KEY \
   -e F2W_FOLDER_ROOTS=/data/papers \
   -v "$papers":/data/papers:ro \
+  -v "$library":/var/lib/fair2wise/library \
   -v f2w-local-state:/var/lib/fair2wise/state \
   -v f2w-local-tiled:/var/lib/fair2wise/tiled \
   "$image"
