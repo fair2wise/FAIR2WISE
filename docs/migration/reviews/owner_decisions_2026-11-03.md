@@ -56,3 +56,10 @@ Interpretation notes (agent, for the owner to correct):
 | Question | Owner answer |
 |---|---|
 | Test-suite speed-up (parallel run took the suite from 40 to 10 minutes; scale tests and subprocess tests dominate) | "Also shrink the scale tests" (over "Parallel default + slow marker (Recommended)" and "Parallel only") |
+
+## Eighth set
+
+| Question | Owner answer |
+|---|---|
+| T27 sniff findings: handling of the remaining rows | "Accept proposals as written (Recommended)" (each row's proposed disposition in `reviews/H7/sniff_findings.md` becomes the owner's decision) |
+| T30: OCR engine behind the figure-OCR interface | "Docling's built-in OCR" |
