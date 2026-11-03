@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-"""
-scripts/run.py — launch the FAIR2WISE term-extraction agent.
+"""Launch the FAIR2WISE term-extraction agent.
+
+Console script: ``f2w-run`` (``scripts/run.py`` stays as a launch facade).
 
 Usage:
   python3 scripts/run.py --pdf-dir papers --output storage/terminology/terms.json
@@ -14,10 +15,9 @@ import os
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
 
 def parse_args() -> argparse.Namespace:
+    """Parse the command line (no secrets in argv: ``CBORG_API_KEY`` comes from the environment)."""
     p = argparse.ArgumentParser(
         description="FAIR2WISE term-extraction agent",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -51,6 +51,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the extraction agent (or validate the configuration with ``--dry-run``)."""
     args = parse_args()
 
     args.log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -125,9 +126,7 @@ def main() -> None:
         return
 
     # --- Run ---
-    sys.path.insert(0, str(REPO_ROOT))
-    sys.path.insert(0, str(REPO_ROOT / "app"))
-    from modules.term_extractor import run_extraction
+    from ..term_extractor import run_extraction
 
     result = run_extraction(
         pdf_dir=args.pdf_dir,
@@ -157,11 +156,17 @@ def main() -> None:
         sys.exit(1)
 
 
-if __name__ == "__main__":
-    # Entry point only (AUD-02): the checkout .env, or the file named by F2W_DOTENV, is
-    # loaded here before main() reads CBORG_API_KEY; importing this module loads nothing.
-    sys.path.insert(0, str(REPO_ROOT))
-    from app.modules.dotenv_entry import load_entrypoint_dotenv
+def cli() -> None:
+    """Console-script entry point (``f2w-run``).
+
+    Entry point only (AUD-02): the checkout .env, or the file named by F2W_DOTENV, is loaded here before
+    main() reads CBORG_API_KEY; importing this module loads nothing.
+    """
+    from ..dotenv_entry import load_entrypoint_dotenv
 
     load_entrypoint_dotenv(__file__)
     main()
+
+
+if __name__ == "__main__":
+    cli()

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Freeze an extracted-terms JSON into an immutable versioned KG snapshot (T23B).
+r"""Freeze an extracted-terms JSON into an immutable versioned KG snapshot (T23B).
+
+Console script: ``f2w-kg-snapshot`` (``scripts/build_kg_snapshot.py`` stays as a launch facade).
 
 Calls ``app.modules.graph.snapshot.create_snapshot``: json2kg builds the graph, the bytes are frozen under
 ``storage/kg/<corpus>/<snapshot-id>/`` with a sidecar manifest plus the byte-identical flat compatibility copy.
 No Tiled, network, shell or Git process is used, and an existing snapshot is never overwritten.
 
-  python3 scripts/build_kg_snapshot.py --corpus rsoxs --terms storage/terminology/extracted_terms_rsoxs_v1.json \\
+  python3 scripts/build_kg_snapshot.py --corpus rsoxs --terms storage/terminology/extracted_terms_rsoxs_v1.json \
       --extraction-revision extract_terms:2.1:lbl/cborg-chat --run-id 2026-10-14
 """
 from __future__ import annotations
@@ -14,15 +16,15 @@ import argparse
 import json
 import logging
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
-
-from app.modules.graph.snapshot import SnapshotRequest, create_snapshot  # noqa: E402
+from ..cli_output import output
+from ..graph.snapshot import SnapshotRequest, create_snapshot
 
 
-def parse_args(argv=None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse the snapshot command line."""
     parser = argparse.ArgumentParser(description="Create an immutable versioned JSON KG snapshot")
     parser.add_argument("--corpus", required=True)
     parser.add_argument("--terms", required=True, type=Path, help="extracted-terms JSON (read only)")
@@ -45,7 +47,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _revision(text: str) -> dict:
+def _revision(text: str) -> dict[str, str]:
     parts = text.split(":", 2)
     if len(parts) < 2:
         raise ValueError(f"--extraction-revision must be extractor:version[:model], got {text!r}")
@@ -55,7 +57,8 @@ def _revision(text: str) -> dict:
     return out
 
 
-def main(argv=None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
+    """Entry point: freeze the snapshot and print a JSON summary; exit status 0 or 1."""
     args = parse_args(argv)
     logging.basicConfig(stream=sys.stderr, level=logging.DEBUG if args.verbose else logging.WARNING,
                         format="%(levelname)s: %(message)s")
@@ -69,9 +72,9 @@ def main(argv=None) -> int:
             terms_ref=args.terms_ref, code_commit=args.code_commit, run_id=args.run_id, profile=args.profile,
             owner_waiver_ref=args.owner_waiver_ref))
     except (ValueError, LookupError, OSError) as exc:
-        print(f"ERROR: {exc}")
+        output.info(f"ERROR: {exc}")
         return 1
-    print(json.dumps({
+    output.info(json.dumps({
         "snapshot_id": result.snapshot_id, "corpus": result.corpus, "directory": str(result.directory),
         "graph_sha256": result.graph_sha256, "flat_copy": str(result.flat_path),
         "validation": result.validation_status, "disclosure": result.disclosure.status,

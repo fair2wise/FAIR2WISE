@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Adopt legacy flat KG files as nested releases and print data-release descriptors (T26A, owner decision O-R1 Q2).
+r"""Adopt legacy flat KG files as nested releases and print data-release descriptors (T26A, owner decision O-R1 Q2).
+
+Console script: ``f2w-kg-adopt`` (``scripts/adopt_legacy_kg.py`` stays as a launch facade).
 
 No Git writes, no network, no Tiled. An existing frozen directory is never overwritten.
 
@@ -8,7 +10,7 @@ No Git writes, no network, no Tiled. An existing frozen directory is never overw
       storage/kg/<corpus>/v<N>/{graph.json,manifest.json,validation.json} for each that passes. Prints a JSON report
       of adopted and skipped entries with the exact rule. Nothing is allowlisted here.
 
-  python3 scripts/adopt_legacy_kg.py descriptor --commit <full sha> --corpus <c> --snapshot v1 \\
+  python3 scripts/adopt_legacy_kg.py descriptor --commit <full sha> --corpus <c> --snapshot v1 \
       --repository github.com/<org>/<repo> [--out <path outside the repository>]
       Builds a state=candidate descriptor from the objects at the commit and validates it against
       schemas/data_release_descriptor.schema.json. Default output is stdout. Writing inside the repository is
@@ -21,19 +23,21 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT))
+from ..graph import adoption
+from ..graph.releases import ReleaseVerificationError
+from ..graph.snapshot import SnapshotError
+from ..cli_output import output
+from ..resources import resource_root
 
-from app.modules.graph import adoption  # noqa: E402
-from app.modules.graph.releases import ReleaseVerificationError  # noqa: E402
-from app.modules.graph.snapshot import SnapshotError  # noqa: E402
+REPO_ROOT = resource_root() or Path.cwd()
 
 EXIT_OK, EXIT_ERROR = 0, 1
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse the ``adopt`` / ``descriptor`` command line."""
     parser = argparse.ArgumentParser(description="Adopt legacy flat KG files; build release descriptors")
     sub = parser.add_subparsers(dest="command", required=True)
     ad = sub.add_parser("adopt", help="adopt every passing flat file under storage/kg")
@@ -55,7 +59,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
+    """Entry point: adopt flat KG files or print an adoption descriptor; exit status 0 or 1."""
     args = parse_args(argv)
     try:
         if args.command == "adopt":
@@ -63,11 +68,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             outcomes = adoption.adopt_legacy_directory(
                 args.storage_kg, only=args.only, code_commit=args.code_commit, now=now, run_id=args.run_id,
                 dry_run=args.dry_run)
-            print(json.dumps({"outcomes": [o.to_dict() for o in outcomes]}, indent=2, sort_keys=True))
+            output.info(json.dumps({"outcomes": [o.to_dict() for o in outcomes]}, indent=2, sort_keys=True))
             return EXIT_OK
         out = args.out.resolve() if args.out else None
         if out is not None and (out == args.repo.resolve() or args.repo.resolve() in out.parents):
-            print("ERROR: --out must be outside the repository (descriptor location is owner question Q6)")
+            output.info("ERROR: --out must be outside the repository (descriptor location is owner question Q6)")
             return EXIT_ERROR
         descriptor = adoption.build_adoption_descriptor(
             args.repo, args.commit, args.corpus, args.snapshot, repository=args.repository,
@@ -80,7 +85,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 handle.write(data)
         return EXIT_OK
     except (SnapshotError, ReleaseVerificationError, ValueError, OSError) as exc:
-        print(f"ERROR: {exc}")
+        output.info(f"ERROR: {exc}")
         return EXIT_ERROR
 
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Harvest OA RSoXS PDFs into papers/rsoxs/{year}/ and update manifest.json.
 
+Console script: ``f2w-harvest`` (``scripts/harvest_rsoxs.py`` stays as a launch facade).
+
 arXiv (SubmittedDate, newest first) then OpenAlex. Queries are quoted so
 hyphens are literal — unquoted R-SoXS is Lucene ``R AND NOT SoXS`` and
 dumps unrelated newest arXiv.
@@ -30,23 +32,23 @@ import json
 import logging
 import os
 import re
-import sys
 import time
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any
+from collections.abc import Callable, Iterable
+
+from ..resources import resource_root
 
 Classifier = Callable[[str, str], str]
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(REPO_ROOT))
-sys.path.insert(0, str(SCRIPTS_DIR))
+#: Corpus data root: the checkout root (``papers/``, ``storage/``) or ``F2W_RESOURCE_ROOT``; the current
+#: directory for an installed wheel without one.
+REPO_ROOT = resource_root() or Path.cwd()
 
-import download_pdfs as dl  # noqa: E402
-
-from app.modules.literature.legacy_download import (  # noqa: E402
+from ..literature import download_pdfs as dl  # noqa: E402
+from ..literature.legacy_download import (  # noqa: E402
     hardened_download_pdf as download_pdf,
     hardened_get_json,
 )
@@ -225,7 +227,7 @@ _TIER_RANK = {
     "A": 4,
 }
 
-DEFAULT_MANIFEST = {
+DEFAULT_MANIFEST: dict[str, Any] = {
     "corpus": "rsoxs",
     "kg_version": "v1",
     "beamline": "11.0.1.2",
@@ -297,7 +299,7 @@ def _clip01(value: float) -> float:
     return round(min(1.0, max(0.0, value)), 2)
 
 
-def _weight_hits(text: str, patterns: Iterable[Tuple[str, float]]) -> float:
+def _weight_hits(text: str, patterns: Iterable[tuple[str, float]]) -> float:
     """Sum pattern weights for regexes that match ``text``."""
     score = 0.0
     for pattern, weight in patterns:
@@ -306,15 +308,15 @@ def _weight_hits(text: str, patterns: Iterable[Tuple[str, float]]) -> float:
     return score
 
 
-def detect_facility(blob: str) -> Dict[str, Optional[str]]:
+def detect_facility(blob: str) -> dict[str, str | None]:
     """Facility/beamline metadata only — not a relevance feature.
 
     APS is checked before SSRL so TES/29-ID papers that cite SSRL in
     references are not labelled Stanford.
     """
     text = blob or ""
-    facility: Optional[str] = None
-    beamline: Optional[str] = None
+    facility: str | None = None
+    beamline: str | None = None
     if _ALS.search(text) or re.search(r"11\.0\.1\.2", text):
         facility = "ALS"
         if re.search(r"11\.0\.1\.2", text):
@@ -338,7 +340,7 @@ def detect_facility(blob: str) -> Dict[str, Optional[str]]:
     return {"facility": facility, "beamline": beamline}
 
 
-def _kg_seed(title: str) -> Tuple[Optional[str], Optional[int]]:
+def _kg_seed(title: str) -> tuple[str | None, int | None]:
     """Match a title against extract-first KG seed phrases; return tier and rank."""
     t = _normalize_rsoxs_text(title or "")
     # Fink 2013 title is exactly this phrase; do not seed the YBCO REXS paper.
@@ -352,7 +354,7 @@ def _kg_seed(title: str) -> Tuple[Optional[str], Optional[int]]:
     return None, None
 
 
-def score_rsoxs(title: str, abstract: str = "", extra: str = "") -> Dict[str, Any]:
+def score_rsoxs(title: str, abstract: str = "", extra: str = "") -> dict[str, Any]:
     """Three relevance dimensions; facility is metadata, not a boost.
 
     technique_relevance: how central RSoXS/P-RSoXS is to the paper.
@@ -536,7 +538,7 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
     logging.getLogger("pypdf").setLevel(logging.ERROR)
     logging.getLogger("fontTools").setLevel(logging.ERROR)
     try:
-        from app.modules.literature.pdf_reader import open_pdf
+        from ..literature.pdf_reader import open_pdf
 
         doc = open_pdf(path)
         idxs = list(range(min(head_pages, doc.page_count)))
@@ -568,7 +570,7 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
         return ""
 
 
-def _annotate_work(work: Dict[str, Any]) -> Dict[str, Any]:
+def _annotate_work(work: dict[str, Any]) -> dict[str, Any]:
     """Attach RSoXS score fields onto a search hit in place."""
     meta = score_rsoxs(str(work.get("title") or ""), str(work.get("abstract") or ""))
     work.update(meta)
@@ -579,7 +581,7 @@ def _reconstruct_abstract(inverted_index: Any) -> str:
     """Rebuild an OpenAlex inverted-index abstract into a space-joined string."""
     if not inverted_index or not isinstance(inverted_index, dict):
         return ""
-    positions: List[tuple] = []
+    positions: list[tuple[int, str]] = []
     for word, idxs in inverted_index.items():
         for i in idxs or []:
             positions.append((i, word))
@@ -587,7 +589,7 @@ def _reconstruct_abstract(inverted_index: Any) -> str:
     return " ".join(w for _, w in positions)
 
 
-def _dedupe_key(work: Dict[str, Any]) -> str:
+def _dedupe_key(work: dict[str, Any]) -> str:
     """Stable identity key: DOI, else OpenAlex id, else a truncated JSON dump."""
     doi = (work.get("doi") or "").strip().lower()
     if doi:
@@ -600,9 +602,9 @@ def _is_reliable_pdf_url(url: str) -> bool:
     return dl.is_reliable_pdf_url(url)
 
 
-def _pdf_urls(work: Dict[str, Any]) -> List[str]:
+def _pdf_urls(work: dict[str, Any]) -> list[str]:
     """Collect unique PDF URLs already present on an OpenAlex-style work dict."""
-    urls: List[str] = []
+    urls: list[str] = []
     explicit = work.get("pdf_urls")
     if isinstance(explicit, list):
         urls.extend(str(url) for url in explicit if str(url).strip())
@@ -617,7 +619,7 @@ def _pdf_urls(work: Dict[str, Any]) -> List[str]:
     if isinstance(oa, dict) and oa.get("oa_url"):
         urls.append(str(oa["oa_url"]))
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for url in urls:
         if url in seen:
             continue
@@ -626,9 +628,9 @@ def _pdf_urls(work: Dict[str, Any]) -> List[str]:
     return out
 
 
-def _normalize_pdf_urls(urls: Iterable[str]) -> List[str]:
+def _normalize_pdf_urls(urls: Iterable[str]) -> list[str]:
     """Rewrite listed OA URLs and prefer repository copies."""
-    rewritten: List[str] = []
+    rewritten: list[str] = []
     seen: set[str] = set()
     for url in urls:
         mapped = dl.listed_oa_pdf_url(str(url))
@@ -638,7 +640,7 @@ def _normalize_pdf_urls(urls: Iterable[str]) -> List[str]:
     return dl.prefer_repository_pdfs(rewritten)
 
 
-def _reliable_pdf_urls(work: Dict[str, Any]) -> List[str]:
+def _reliable_pdf_urls(work: dict[str, Any]) -> list[str]:
     """Allowlisted OpenAlex OA PDFs, else rewritten URLs already on the work."""
     urls, _, _ = dl.select_openalex_oa_pdfs(work)
     if urls:
@@ -646,9 +648,9 @@ def _reliable_pdf_urls(work: Dict[str, Any]) -> List[str]:
     return _normalize_pdf_urls(_pdf_urls(work))
 
 
-def _europepmc_fallback_urls(urls: Iterable[str]) -> List[str]:
+def _europepmc_fallback_urls(urls: Iterable[str]) -> list[str]:
     """PMC often returns HTML to unauthenticated clients; Europe PMC still serves PDFs."""
-    extra: List[str] = []
+    extra: list[str] = []
     seen: set[str] = set()
     for url in urls:
         pmcid = dl._pmcid_from_text(str(url))
@@ -659,7 +661,7 @@ def _europepmc_fallback_urls(urls: Iterable[str]) -> List[str]:
     return extra
 
 
-def _safe_name(work: Dict[str, Any]) -> str:
+def _safe_name(work: dict[str, Any]) -> str:
     """Filename stem from DOI (slash → underscore) or trailing OpenAlex id."""
     doi = work.get("doi")
     if doi:
@@ -674,7 +676,7 @@ def doi_stem(doi: str) -> str:
     return raw.replace("/", "_") or "unknown"
 
 
-def _canonical_doi(doi: Optional[str]) -> Optional[str]:
+def _canonical_doi(doi: str | None) -> str | None:
     """Normalize a DOI to ``https://doi.org/10.…``, or ``None`` if not a DOI."""
     raw = re.sub(r"^https?://(dx\.)?doi\.org/", "", (doi or "").strip(), flags=re.I)
     if not raw or not raw.lower().startswith("10."):
@@ -682,13 +684,13 @@ def _canonical_doi(doi: Optional[str]) -> Optional[str]:
     return f"https://doi.org/{raw}"
 
 
-def _doi_key(doi: Optional[str]) -> str:
+def _doi_key(doi: str | None) -> str:
     """Lowercased canonical DOI string, or empty if the input is not a DOI."""
     canon = _canonical_doi(doi)
     return (canon or "").lower()
 
 
-def year_from_work(work: Dict[str, Any]) -> str:
+def year_from_work(work: dict[str, Any]) -> str:
     """Publication year string from ``publication_year`` or the date prefix."""
     year = work.get("publication_year")
     if year:
@@ -701,7 +703,7 @@ def year_from_work(work: Dict[str, Any]) -> str:
 
 def _now() -> str:
     """UTC timestamp in ISO-8601 form."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _sha256(path: Path) -> str:
@@ -713,7 +715,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _paper_sort_tuple(paper: Dict[str, Any]) -> Tuple:
+def _paper_sort_tuple(paper: dict[str, Any]) -> tuple[Any, ...]:
     """Sort key: KG seed tier/rank, corpus role, kg_priority, then date and title."""
     tier = str(paper.get("kg_primary_tier") or "")
     seed = paper.get("kg_seed_rank")
@@ -731,7 +733,7 @@ def _paper_sort_tuple(paper: Dict[str, Any]) -> Tuple:
     )
 
 
-def _sort_key(work: Dict[str, Any]) -> Tuple:
+def _sort_key(work: dict[str, Any]) -> tuple[Any, ...]:
     """Paper sort tuple, scoring the work first if kg_priority is missing."""
     meta = work if "kg_priority" in work else score_rsoxs(
         str(work.get("title") or ""), str(work.get("abstract") or "")
@@ -740,12 +742,13 @@ def _sort_key(work: Dict[str, Any]) -> Tuple:
     return _paper_sort_tuple(merged)
 
 
-def _load_manifest(path: Path) -> Dict[str, Any]:
+def _load_manifest(path: Path) -> dict[str, Any]:
     """Load papers/rsoxs/manifest.json, filling DEFAULT_MANIFEST keys."""
     if not path.exists():
-        return json.loads(json.dumps(DEFAULT_MANIFEST))
+        default: dict[str, Any] = json.loads(json.dumps(DEFAULT_MANIFEST))
+        return default
     data = json.loads(path.read_text())
-    merged = json.loads(json.dumps(DEFAULT_MANIFEST))
+    merged: dict[str, Any] = json.loads(json.dumps(DEFAULT_MANIFEST))
     merged.update({k: data.get(k, merged[k]) for k in merged if k != "papers"})
     for key, value in data.items():
         if key not in merged:
@@ -754,7 +757,7 @@ def _load_manifest(path: Path) -> Dict[str, Any]:
     return merged
 
 
-def _save_manifest(path: Path, data: Dict[str, Any]) -> None:
+def _save_manifest(path: Path, data: dict[str, Any]) -> None:
     """Sort papers and atomically write the RSoXS corpus manifest."""
     papers = sorted(
         data.get("papers") or [],
@@ -766,10 +769,10 @@ def _save_manifest(path: Path, data: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n")
-    os.replace(tmp, path)
+    tmp.replace(path)
 
 
-def _upsert_paper(manifest: Dict[str, Any], row: Dict[str, Any]) -> None:
+def _upsert_paper(manifest: dict[str, Any], row: dict[str, Any]) -> None:
     """Insert or merge a paper row by DOI / arXiv / pdf_path, keeping an on-disk PDF."""
     if row.get("doi"):
         row["doi"] = _canonical_doi(str(row["doi"])) or row["doi"]
@@ -799,7 +802,7 @@ def _upsert_paper(manifest: Dict[str, Any], row: Dict[str, Any]) -> None:
     papers.append(row)
 
 
-def _title_tokens(title: str) -> set:
+def _title_tokens(title: str) -> set[str]:
     """Normalized title tokens minus a small English stopword set."""
     stop = {"a", "an", "the", "and", "for", "of", "in", "on", "with", "by"}
     return set(_normalize_title(title).split()) - stop
@@ -813,18 +816,18 @@ def titles_near_duplicate(a: str, b: str, threshold: float = 0.82) -> bool:
     return len(ta & tb) / len(ta | tb) >= threshold
 
 
-def _is_preprint(paper: Dict[str, Any]) -> bool:
+def _is_preprint(paper: dict[str, Any]) -> bool:
     """True if the DOI looks like an arXiv identifier."""
     doi = (paper.get("doi") or "").lower()
     return "arxiv" in doi or "10.48550" in doi
 
 
-def _canonical_preference(paper: Dict[str, Any]) -> Tuple[int, str]:
+def _canonical_preference(paper: dict[str, Any]) -> tuple[int, str]:
     """Journal version outranks arXiv preprint for the same Work."""
     return (0 if _is_preprint(paper) else 1, str(paper.get("publication_date") or ""))
 
 
-def _version_record(paper: Dict[str, Any]) -> Dict[str, Any]:
+def _version_record(paper: dict[str, Any]) -> dict[str, Any]:
     """Compact preprint/journal version dict stored on a collapsed Work."""
     return {
         "kind": "preprint" if _is_preprint(paper) else "journal",
@@ -836,9 +839,9 @@ def _version_record(paper: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def collapse_near_duplicates(papers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def collapse_near_duplicates(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One canonical Work per near-duplicate title; preprint becomes a version."""
-    kept: List[Dict[str, Any]] = []
+    kept: list[dict[str, Any]] = []
     for paper in papers:
         match_i = None
         for i, existing in enumerate(kept):
@@ -855,12 +858,12 @@ def collapse_near_duplicates(papers: List[Dict[str, Any]]) -> List[Dict[str, Any
             winner, loser = dict(paper), current
         else:
             winner, loser = current, paper
-        versions: List[Dict[str, Any]] = []
+        versions: list[dict[str, Any]] = []
         for src in (winner, loser):
             versions.append(_version_record(src))
             versions.extend(src.get("versions") or [])
         seen_v: set[str] = set()
-        uniq: List[Dict[str, Any]] = []
+        uniq: list[dict[str, Any]] = []
         for ver in versions:
             key = str(ver.get("doi") or ver.get("arxiv_id") or ver.get("pdf_path") or "")
             if key in seen_v:
@@ -878,9 +881,9 @@ def collapse_near_duplicates(papers: List[Dict[str, Any]]) -> List[Dict[str, Any
     return kept
 
 
-def _arxiv_id_from_work(work: Dict[str, Any]) -> Optional[str]:
+def _arxiv_id_from_work(work: dict[str, Any]) -> str | None:
     """Pull an arXiv id from work fields and location/PDF URLs."""
-    loc_urls: List[str] = []
+    loc_urls: list[str] = []
     for loc in [work.get("best_oa_location"), work.get("primary_location"), *(work.get("locations") or [])]:
         if isinstance(loc, dict):
             loc_urls.extend([str(loc.get("pdf_url") or ""), str(loc.get("landing_page_url") or "")])
@@ -911,13 +914,13 @@ def _arxiv_is_throttle(exc: BaseException) -> bool:
 
 def _arxiv_throttle_wait(attempt: int) -> float:
     """Exponential wait after a 429/503, capped so a harvest cannot stall for hours."""
-    return min(
+    return float(min(
         ARXIV_THROTTLE_BACKOFF_SECONDS * (2 ** max(attempt, 0)),
         ARXIV_THROTTLE_BACKOFF_CAP_SECONDS,
-    )
+    ))
 
 
-def _work_from_arxiv_result(result: Any) -> Optional[Dict[str, Any]]:
+def _work_from_arxiv_result(result: Any) -> dict[str, Any] | None:
     """Map an arxiv.Result into the harvest work dict, or None if the PDF URL is bad."""
     short_id = str(result.get_short_id()).strip()
     pdf_url = str(result.pdf_url or f"https://arxiv.org/pdf/{short_id}").strip()
@@ -942,8 +945,8 @@ def _work_from_arxiv_result(result: Any) -> Optional[Dict[str, Any]]:
 def search_arxiv(
     queries: Iterable[str],
     per_query: int,
-    classifier: Optional[Classifier] = None,
-) -> List[Dict[str, Any]]:
+    classifier: Classifier | None = None,
+) -> list[dict[str, Any]]:
     """Search arXiv by query (SubmittedDate, newest first); keep classifier A/B hits."""
     import arxiv
 
@@ -953,7 +956,7 @@ def search_arxiv(
         delay_seconds=ARXIV_DELAY_SECONDS,
         num_retries=ARXIV_CLIENT_NUM_RETRIES,
     )
-    merged: List[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     seen: set[str] = set()
     for query in queries:
         LOGGER.info("arXiv search %r (SubmittedDate, %d)", query, per_query)
@@ -996,9 +999,9 @@ def search_arxiv(
 
 
 def _normalize_openalex_work(
-    raw: Dict[str, Any],
-    classifier: Optional[Classifier] = None,
-) -> Optional[Dict[str, Any]]:
+    raw: dict[str, Any],
+    classifier: Classifier | None = None,
+) -> dict[str, Any] | None:
     """Normalize an OpenAlex work; return ``None`` if the classifier rejects it."""
     work = dict(raw)
     title = str(work.get("display_name") or work.get("title") or "")
@@ -1014,9 +1017,9 @@ def _normalize_openalex_work(
     return work
 
 
-def _paginate_works(query_obj: Any, per_query: int) -> List[Dict[str, Any]]:
+def _paginate_works(query_obj: Any, per_query: int) -> list[dict[str, Any]]:
     """Fetch up to ``per_query`` OpenAlex works via paginate, falling back to ``get``."""
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     try:
         if hasattr(query_obj, "paginate"):
             for page in query_obj.paginate(per_page=min(50, max(per_query, 1))):
@@ -1038,18 +1041,18 @@ def _paginate_works(query_obj: Any, per_query: int) -> List[Dict[str, Any]]:
 def search_openalex(
     queries: Iterable[str],
     per_query: int,
-    mailto: Optional[str],
+    mailto: str | None,
     *,
     oa_only: bool = True,
     require_pdf: bool = True,
-    classifier: Optional[Classifier] = None,
-) -> List[Dict[str, Any]]:
+    classifier: Classifier | None = None,
+) -> list[dict[str, Any]]:
     """Search OpenAlex phrase queries; optionally require OA and a PDF URL."""
     from pyalex import Works, config as pyalex_config
 
     if mailto:
         pyalex_config.email = mailto
-    merged: List[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     seen: set[str] = set()
     seen_titles: set[str] = set()
     for query in queries:
@@ -1088,7 +1091,7 @@ def search_openalex(
     return merged
 
 
-def _author_is_target(name: str, rec: Dict[str, Any]) -> bool:
+def _author_is_target(name: str, rec: dict[str, Any]) -> bool:
     """True if an OpenAlex author record matches the requested name (ALS gate for Cheng Wang)."""
     display = str(rec.get("display_name") or "")
     if name.lower() not in display.lower():
@@ -1113,14 +1116,14 @@ def _author_is_target(name: str, rec: Dict[str, Any]) -> bool:
 def search_openalex_authors(
     names: Iterable[str],
     per_query: int,
-    mailto: Optional[str],
-) -> List[Dict[str, Any]]:
+    mailto: str | None,
+) -> list[dict[str, Any]]:
     """OpenAlex author IDs → RSoXS works. Keep hits even without a PDF."""
     from pyalex import Authors, Works, config as pyalex_config
 
     if mailto:
         pyalex_config.email = mailto
-    merged: List[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     seen: set[str] = set()
     phrases = ("RSoXS", '"resonant soft x-ray scattering"', '"11.0.1.2"')
     for name in names:
@@ -1159,11 +1162,11 @@ def search_openalex_authors(
     return merged
 
 
-def merge_candidates(*groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def merge_candidates(*groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Dedupe, score, collapse near-duplicates, and rank hits from multiple sources."""
     seen: set[str] = set()
     seen_titles: set[str] = set()
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for work in groups:
         for item in work:
             key = _dedupe_key(item)
@@ -1195,9 +1198,9 @@ _SCORE_KEYS = (
 )
 
 
-def _retry_urls(paper: Dict[str, Any]) -> List[str]:
+def _retry_urls(paper: dict[str, Any]) -> list[str]:
     """Rebuild allowlisted PDF URLs for a failed/skipped manifest row."""
-    urls: List[str] = []
+    urls: list[str] = []
     explicit = paper.get("pdf_urls")
     if isinstance(explicit, list):
         urls.extend(str(u) for u in explicit if str(u).strip())
@@ -1212,7 +1215,7 @@ def _retry_urls(paper: Dict[str, Any]) -> List[str]:
         ident = doi.split("10.48550/arXiv.", 1)[-1]
         urls.append(f"https://arxiv.org/pdf/{ident}")
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for url in urls:
         mapped = dl.rewrite_oa_pdf_url(url)
         if not mapped or mapped in seen:
@@ -1226,7 +1229,7 @@ def _retry_urls(paper: Dict[str, Any]) -> List[str]:
     return out
 
 
-def retry_failed_pdfs(manifest: Dict[str, Any], dest_root: Path, delay: float) -> int:
+def retry_failed_pdfs(manifest: dict[str, Any], dest_root: Path, delay: float) -> int:
     """Retry skipped/failed rows that still have no PDF on disk."""
     recovered = 0
     for paper in list(manifest.get("papers") or []):
@@ -1279,9 +1282,9 @@ def harvest(
     dest_root: Path,
     max_pdfs: int,
     per_query: int,
-    mailto: Optional[str],
+    mailto: str | None,
     delay: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Search, classify, and download OA RSoXS PDFs into dest_root."""
     manifest_path = dest_root / "manifest.json"
     manifest = _load_manifest(manifest_path)
@@ -1440,7 +1443,7 @@ def harvest(
     return summary
 
 
-def rescore_manifest(dest_root: Path) -> Dict[str, Any]:
+def rescore_manifest(dest_root: Path) -> dict[str, Any]:
     """Re-rank papers already in the manifest; does not download or delete."""
     manifest_path = dest_root / "manifest.json"
     manifest = _load_manifest(manifest_path)
@@ -1462,7 +1465,7 @@ def rescore_manifest(dest_root: Path) -> Dict[str, Any]:
                     paper["arxiv_id"] = ver["arxiv_id"]
                     break
     counts = {"A": 0, "B": 0, "C": 0, "als": 0, "kg_primary": 0, "kg_S": 0, "kg_A": 0}
-    roles = {}
+    roles: dict[str, int] = {}
     for paper in manifest.get("papers") or []:
         counts[paper.get("rsoxs_tier") or "C"] = counts.get(paper.get("rsoxs_tier") or "C", 0) + 1
         role = str(paper.get("corpus_role") or "general")
@@ -1486,7 +1489,7 @@ def rescore_manifest(dest_root: Path) -> Dict[str, Any]:
     return summary
 
 
-def _arxiv_pdf_urls_for_title(title: str) -> List[str]:
+def _arxiv_pdf_urls_for_title(title: str) -> list[str]:
     """Look up allowlisted arXiv PDF URLs whose titles are near-duplicates of ``title``."""
     if not title or len(title) < 12:
         return []
@@ -1500,7 +1503,7 @@ def _arxiv_pdf_urls_for_title(title: str) -> List[str]:
             num_retries=ARXIV_CLIENT_NUM_RETRIES,
         )
         search = arxiv.Search(query=query, max_results=5, sort_by=arxiv.SortCriterion.Relevance)
-        urls: List[str] = []
+        urls: list[str] = []
         for result in client.results(search):
             if titles_near_duplicate(title, str(result.title or ""), threshold=0.72):
                 pdf = str(result.pdf_url or "").strip()
@@ -1517,7 +1520,7 @@ def _strip_jats(text: str) -> str:
     return " ".join(re.sub(r"<[^>]+>", " ", text or "").split())
 
 
-def _crossref_by_doi_or_title(query: str) -> Optional[Dict[str, Any]]:
+def _crossref_by_doi_or_title(query: str) -> dict[str, Any] | None:
     """Resolve a DOI or bibliographic query via Crossref into a work dict."""
     q = (query or "").strip()
     headers = {"User-Agent": "FAIRtoWISE-harvest/1.0 (mailto:dev@localhost)"}
@@ -1553,7 +1556,7 @@ def _crossref_by_doi_or_title(query: str) -> Optional[Dict[str, Any]]:
     date = "-".join(f"{n:02d}" if i else str(n) for i, n in enumerate(parts)) if parts else None
     if date and len(parts) == 1:
         date = f"{parts[0]}-01-01"
-    work = {
+    work: dict[str, Any] = {
         "title": " ".join(picked.get("title") or []),
         "abstract": _strip_jats(str(picked.get("abstract") or "")),
         "doi": _canonical_doi(str(picked.get("DOI") or "")),
@@ -1570,7 +1573,7 @@ def _crossref_by_doi_or_title(query: str) -> Optional[Dict[str, Any]]:
     return work
 
 
-def _openalex_by_doi_or_title(query: str, mailto: Optional[str]) -> Optional[Dict[str, Any]]:
+def _openalex_by_doi_or_title(query: str, mailto: str | None) -> dict[str, Any] | None:
     """Resolve a DOI or title via Crossref first, then OpenAlex."""
     work = _crossref_by_doi_or_title(query)
     if work:
@@ -1605,13 +1608,13 @@ def _openalex_by_doi_or_title(query: str, mailto: Optional[str]) -> Optional[Dic
 def ingest_known_works(
     dest_root: Path,
     queries: Iterable[str],
-    mailto: Optional[str] = None,
+    mailto: str | None = None,
     delay: float = 1.0,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Add specific Works by DOI or title. Keep a row even without an OA PDF."""
     manifest_path = dest_root / "manifest.json"
     manifest = _load_manifest(manifest_path)
-    added: List[Dict[str, Any]] = []
+    added: list[dict[str, Any]] = []
     for query in queries:
         work = _openalex_by_doi_or_title(query, mailto)
         if not work:
@@ -1736,8 +1739,8 @@ _HEADER_RE = re.compile(r"\\f43([^\\{}]+?)\\b0\\par")
 
 def _rtf_unescape(rtf: str) -> str:
     """Convert RTF control words and unicode escapes into plain text."""
-    def uni(match: re.Match) -> str:
-        """Decode an RTF ``\\uN`` unicode code point from a regex match."""
+    def uni(match: re.Match[str]) -> str:
+        r"""Decode an RTF ``\uN`` unicode code point from a regex match."""
         n = int(match.group(1))
         if n < 0:
             n += 65536
@@ -1751,7 +1754,7 @@ def _rtf_unescape(rtf: str) -> str:
         text,
     )
 
-    def ctrl(match: re.Match) -> str:
+    def ctrl(match: re.Match[str]) -> str:
         """Map an RTF control word to a character, or a space if unknown."""
         word = match.group(1)
         return _RTF_SPECIAL.get(word, " ")
@@ -1761,7 +1764,7 @@ def _rtf_unescape(rtf: str) -> str:
     return re.sub(r"\s+", " ", text.replace("\r", " ").replace("\n", " ")).strip()
 
 
-def _pubtemp_kind(section: Optional[str]) -> str:
+def _pubtemp_kind(section: str | None) -> str:
     """Map a PubTemp section header to a publication-kind slug."""
     lowered = (section or "").lower()
     for prefix, kind in _PUBTEMP_KIND:
@@ -1770,7 +1773,7 @@ def _pubtemp_kind(section: Optional[str]) -> str:
     return "unknown"
 
 
-def _split_authors(raw: str) -> List[str]:
+def _split_authors(raw: str) -> list[str]:
     """Split a comma/and-separated author string into name parts."""
     text = re.sub(r"\s+", " ", (raw or "").strip().rstrip(","))
     text = re.sub(r"\band\b", ",", text, flags=re.I)
@@ -1778,7 +1781,7 @@ def _split_authors(raw: str) -> List[str]:
     return parts
 
 
-def _first_author_key(paper: Dict[str, Any]) -> str:
+def _first_author_key(paper: dict[str, Any]) -> str:
     """Normalized surname of the first listed author, for identity matching."""
     authors = paper.get("authors")
     if isinstance(authors, list) and authors:
@@ -1791,14 +1794,14 @@ def _first_author_key(paper: Dict[str, Any]) -> str:
     return _normalize_title(surname)
 
 
-def _arxiv_key(arxiv_id: Optional[str]) -> str:
+def _arxiv_key(arxiv_id: str | None) -> str:
     """Lowercased arXiv id with the version suffix stripped."""
     if not arxiv_id:
         return ""
     return re.sub(r"v\d+$", "", str(arxiv_id).strip().lower())
 
 
-def parse_pubtemp_plain(text: str, section: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def parse_pubtemp_plain(text: str, section: str | None = None) -> dict[str, Any] | None:
     """Parse one unescaped ALS/PubTemp citation into a Work dict. Never invents DOIs."""
     blob = re.sub(r"\s+", " ", text or "").strip()
     if not blob:
@@ -1846,11 +1849,11 @@ def parse_pubtemp_plain(text: str, section: Optional[str] = None) -> Optional[Di
     }
 
 
-def parse_pubtemp_rtf(path: Path) -> List[Dict[str, Any]]:
-    """Read an ALS PubTemp RTF export. One record per ``\\cr`` citation."""
+def parse_pubtemp_rtf(path: Path) -> list[dict[str, Any]]:
+    r"""Read an ALS PubTemp RTF export. One record per ``\cr`` citation."""
     raw = path.read_text(encoding="latin-1")
-    section: Optional[str] = None
-    records: List[Dict[str, Any]] = []
+    section: str | None = None
+    records: list[dict[str, Any]] = []
     for part in re.split(r"(?=\\cr )", raw):
         cr_at = part.find("\\cr ")
         prefix = part if cr_at < 0 else part[:cr_at]
@@ -1869,7 +1872,7 @@ def parse_pubtemp_rtf(path: Path) -> List[Dict[str, Any]]:
     return records
 
 
-def works_same_identity(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
+def works_same_identity(left: dict[str, Any], right: dict[str, Any]) -> bool:
     """DOI / arXiv / title-authors IdentityResolver (plan lock)."""
     doi_l, doi_r = _doi_key(left.get("doi")), _doi_key(right.get("doi"))
     if doi_l and doi_r:
@@ -1902,7 +1905,7 @@ def works_same_identity(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
     return True
 
 
-def _find_existing_work(papers: List[Dict[str, Any]], row: Dict[str, Any]) -> Optional[int]:
+def _find_existing_work(papers: list[dict[str, Any]], row: dict[str, Any]) -> int | None:
     """Index of a paper that shares identity with ``row``, or ``None``."""
     for i, existing in enumerate(papers):
         if works_same_identity(existing, row):
@@ -1910,7 +1913,7 @@ def _find_existing_work(papers: List[Dict[str, Any]], row: Dict[str, Any]) -> Op
     return None
 
 
-def _pubtemp_provenance(record: Dict[str, Any], rtf_rel: str, export_date: str) -> Dict[str, Any]:
+def _pubtemp_provenance(record: dict[str, Any], rtf_rel: str, export_date: str) -> dict[str, Any]:
     """Provenance stamp for a Work imported from an ALS PubTemp RTF."""
     return {
         "source": "als_pubtemp",
@@ -1921,7 +1924,7 @@ def _pubtemp_provenance(record: Dict[str, Any], rtf_rel: str, export_date: str) 
     }
 
 
-def _mark_included(paper: Dict[str, Any], record: Dict[str, Any], rtf_rel: str, export_date: str) -> None:
+def _mark_included(paper: dict[str, Any], record: dict[str, Any], rtf_rel: str, export_date: str) -> None:
     """Flag a paper as PubTemp-included and merge authors, PMID, URLs, and provenance."""
     paper["selection"] = {"included": True}
     provenance = list(paper.get("provenance") or [])
@@ -1943,7 +1946,7 @@ def _mark_included(paper: Dict[str, Any], record: Dict[str, Any], rtf_rel: str, 
         paper["pdf_urls"] = merged_urls
 
 
-def _pubtemp_row(record: Dict[str, Any], rtf_rel: str, export_date: str) -> Dict[str, Any]:
+def _pubtemp_row(record: dict[str, Any], rtf_rel: str, export_date: str) -> dict[str, Any]:
     """Build a new manifest row from a parsed PubTemp citation."""
     title = str(record.get("title") or "")
     meta = score_rsoxs(title, "")
@@ -1987,7 +1990,7 @@ def _pubtemp_row(record: Dict[str, Any], rtf_rel: str, export_date: str) -> Dict
     return row
 
 
-def _pdf_on_disk(paper: Dict[str, Any]) -> bool:
+def _pdf_on_disk(paper: dict[str, Any]) -> bool:
     """True if the paper's ``pdf_path`` exists in the repo and is non-empty."""
     rel = paper.get("pdf_path")
     return bool(rel) and (REPO_ROOT / str(rel)).exists() and (REPO_ROOT / str(rel)).stat().st_size > 0
@@ -1997,7 +2000,7 @@ def import_pubtemp(
     dest_root: Path,
     rtf_path: Path,
     export_date: str = PUBTEMP_EXPORT_DATE,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Merge PubTemp records into the harvest manifest. Does not download PDFs."""
     records = parse_pubtemp_rtf(rtf_path)
     try:
@@ -2090,8 +2093,8 @@ def import_pubtemp(
 
 
 def _openalex_oa_urls_for_doi(
-    doi: str, mailto: Optional[str]
-) -> Tuple[List[str], Optional[str], List[str]]:
+    doi: str, mailto: str | None
+) -> tuple[list[str], str | None, list[str]]:
     """Allowlisted OA PDF URLs for a known DOI. Does not invent identifiers."""
     canon = _canonical_doi(doi)
     if not canon:
@@ -2123,9 +2126,9 @@ def _openalex_oa_urls_for_doi(
 
 
 def _record_oa_resolution(
-    paper: Dict[str, Any],
-    urls: List[str],
-    sources: List[str],
+    paper: dict[str, Any],
+    urls: list[str],
+    sources: list[str],
 ) -> None:
     """Store resolved OA PDF URLs and an oa_resolution provenance stamp on the paper."""
     paper["pdf_urls"] = urls
@@ -2144,9 +2147,9 @@ def _record_oa_resolution(
 
 
 def _s2_from_cache(
-    doi: Optional[str],
-    cache: Optional[Dict[str, Tuple[List[str], List[str]]]],
-) -> Tuple[List[str], List[str]]:
+    doi: str | None,
+    cache: dict[str, tuple[list[str], list[str]]] | None,
+) -> tuple[list[str], list[str]]:
     """Look up Semantic Scholar OA URLs for a DOI in a prefetched cache."""
     if not doi or not cache:
         return [], []
@@ -2167,8 +2170,8 @@ def _s2_from_cache(
 
 
 def _append_trusted_urls(
-    urls: List[str],
-    sources: List[str],
+    urls: list[str],
+    sources: list[str],
     extra_urls: Iterable[str],
     extra_sources: Iterable[str],
 ) -> None:
@@ -2183,9 +2186,9 @@ def _append_trusted_urls(
         sources.extend(extra_sources)
 
 
-def _missing_pdf_dois(papers: Iterable[Dict[str, Any]]) -> List[str]:
+def _missing_pdf_dois(papers: Iterable[dict[str, Any]]) -> list[str]:
     """Bare DOIs for included Works that still lack a PDF file. Does not invent DOIs."""
-    dois: List[str] = []
+    dois: list[str] = []
     seen: set[str] = set()
     for paper in papers:
         if not (paper.get("selection") or {}).get("included"):
@@ -2204,12 +2207,12 @@ def _missing_pdf_dois(papers: Iterable[Dict[str, Any]]) -> List[str]:
 
 
 def _resolve_oa_pdfs(
-    paper: Dict[str, Any],
-    mailto: Optional[str],
-    s2_cache: Optional[Dict[str, Tuple[List[str], List[str]]]] = None,
-) -> Tuple[List[str], List[str]]:
+    paper: dict[str, Any],
+    mailto: str | None,
+    s2_cache: dict[str, tuple[list[str], list[str]]] | None = None,
+) -> tuple[list[str], list[str]]:
     """Merge existing URLs with OpenAlex / Unpaywall / extra OA PDFs. Repositories first."""
-    sources: List[str] = []
+    sources: list[str] = []
     urls = _normalize_pdf_urls(paper.get("pdf_urls") or [])
     doi = paper.get("doi")
     arxiv_id = str(paper.get("arxiv_id") or "").strip() or None
@@ -2257,10 +2260,10 @@ def _resolve_oa_pdfs(
     return urls, _dedupe_sources(sources)
 
 
-def _dedupe_sources(sources: Iterable[str]) -> List[str]:
+def _dedupe_sources(sources: Iterable[str]) -> list[str]:
     """Preserve-order unique non-empty source names."""
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for source in sources:
         name = str(source or "").strip()
         if not name or name in seen:
@@ -2272,10 +2275,10 @@ def _dedupe_sources(sources: Iterable[str]) -> List[str]:
 
 def harvest_pending_pdfs(
     dest_root: Path,
-    mailto: Optional[str] = None,
+    mailto: str | None = None,
     delay: float = 1.0,
-    limit: Optional[int] = None,
-) -> Dict[str, Any]:
+    limit: int | None = None,
+) -> dict[str, Any]:
     """Download allowlisted OA PDFs for included Works that still lack a file."""
     dl.set_delay_floor(delay)
     manifest_path = dest_root / "manifest.json"
@@ -2285,7 +2288,7 @@ def harvest_pending_pdfs(
     skipped = 0
     failed = 0
     pending_dois = _missing_pdf_dois(manifest.get("papers") or [])
-    s2_cache: Dict[str, Tuple[List[str], List[str]]] = {}
+    s2_cache: dict[str, tuple[list[str], list[str]]] = {}
     if pending_dois:
         LOGGER.info(
             "Semantic Scholar batch lookup for %d DOIs still missing a PDF",
@@ -2375,7 +2378,7 @@ def harvest_pending_pdfs(
     }
 
 
-def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """CLI for harvest_rsoxs (search, rescore, PubTemp import, and pending OA downloads)."""
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
@@ -2435,10 +2438,10 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 def main() -> None:
     """Dispatch CLI: import PubTemp, harvest pending PDFs, add works, rescore, or full harvest."""
     try:
-        from dotenv import load_dotenv
+        from ..dotenv_entry import load_entrypoint_dotenv
 
-        load_dotenv(REPO_ROOT / ".env")
-    except Exception:
+        load_entrypoint_dotenv(__file__)
+    except (OSError, ImportError):
         pass
     args = parse_args()
     dl.set_delay_floor(args.delay)

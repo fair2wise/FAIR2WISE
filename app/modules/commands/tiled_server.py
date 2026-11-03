@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Operator CLI for the F2W Tiled server (T20B): a thin facade over the deployment modules.
+r"""Operator CLI for the F2W Tiled server (T20B): a thin facade over the deployment modules.
+
+Console script: ``f2w-tiled-server`` (``scripts/tiled_server.py`` stays as a launch facade).
 
 Not an agent tool and not a general shell: it exposes only the explicit lifecycle
 operations of ``app.modules.deployment``. Settings come from the trusted startup
@@ -18,9 +20,9 @@ Commands::
 
 Examples::
 
-    F2W_DEPLOYMENT_PROFILE=local F2W_TILED_DATA_DIR=/var/lib/fair2wise/tiled \\
+    F2W_DEPLOYMENT_PROFILE=local F2W_TILED_DATA_DIR=/var/lib/fair2wise/tiled \
         F2W_TILED_PYTHON=/opt/tiled/venv/bin/python python scripts/tiled_server.py start
-    F2W_DEPLOYMENT_PROFILE=als-dev F2W_TILED_WRITER_SECRET_FILE=/run/secrets/tiled_writer \\
+    F2W_DEPLOYMENT_PROFILE=als-dev F2W_TILED_WRITER_SECRET_FILE=/run/secrets/tiled_writer \
         python scripts/tiled_server.py check
 """
 
@@ -30,15 +32,11 @@ import argparse
 import json
 import os
 import sys
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:  # checkout launch, same as the other scripts/
-    sys.path.insert(0, str(ROOT))
-
-from app.modules.deployment import tiled_capabilities as caps  # noqa: E402
-from app.modules.deployment.tiled_config import TiledDeploymentError, load_tiled_settings  # noqa: E402
+from ..cli_output import output
+from ..deployment import tiled_capabilities as caps
+from ..deployment.tiled_config import TiledDeploymentError, load_tiled_settings
 
 FLAG_TO_ENV = {
     "profile": "F2W_DEPLOYMENT_PROFILE",
@@ -62,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _settings_env(args: argparse.Namespace, environ: Dict[str, str]) -> Dict[str, str]:
+def _settings_env(args: argparse.Namespace, environ: dict[str, str]) -> dict[str, str]:
     env = {k: v for k, v in environ.items() if k == "F2W_DEPLOYMENT_PROFILE" or k.startswith("F2W_TILED_")}
     for flag, name in FLAG_TO_ENV.items():
         value = getattr(args, flag)
@@ -71,15 +69,17 @@ def _settings_env(args: argparse.Namespace, environ: Dict[str, str]) -> Dict[str
     return env
 
 
-def run(argv: Optional[List[str]] = None, environ: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+def run(argv: list[str] | None = None, environ: dict[str, str] | None = None) -> dict[str, Any]:
     """Execute one command and return its JSON-ready result (raises TiledDeploymentError)."""
     args = build_parser().parse_args(argv)
     settings = load_tiled_settings(_settings_env(args, dict(os.environ if environ is None else environ)))
     if args.command == "check":
         if settings.external is not None:
             return {"mode": "external", "capabilities": caps.connect_external(settings.external).to_dict()}
-        from app.modules.deployment import tiled_lifecycle as lifecycle
+        from ..deployment import tiled_lifecycle as lifecycle
 
+        if settings.managed is None:
+            raise TiledDeploymentError("no managed or external Tiled target is configured", code="not_managed")
         status = lifecycle.managed_status(settings.managed)
         if status["state"] != "running":
             raise TiledDeploymentError(f"Managed Tiled is {status['state']}", code="target_unavailable",
@@ -90,7 +90,7 @@ def run(argv: Optional[List[str]] = None, environ: Optional[Dict[str, str]] = No
     if settings.managed is None:
         raise TiledDeploymentError(f"'{args.command}' manages a server; profile {settings.profile} is "
                                    "external (connect-only)", code="not_managed")
-    from app.modules.deployment import tiled_lifecycle as lifecycle
+    from ..deployment import tiled_lifecycle as lifecycle
 
     cfg = settings.managed
     if args.command == "start":
@@ -100,24 +100,24 @@ def run(argv: Optional[List[str]] = None, environ: Optional[Dict[str, str]] = No
     if args.command == "status":
         return lifecycle.managed_status(cfg)
     if args.command == "stop":
-        server = lifecycle.find_managed(cfg)
-        if server is None:
+        found = lifecycle.find_managed(cfg)
+        if found is None:
             return {"state": lifecycle.managed_status(cfg)["state"], "stopped": False}
-        return lifecycle.stop_managed(server)
+        return lifecycle.stop_managed(found)
     return lifecycle.upgrade_catalog(cfg)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
     try:
         result = run(argv)
     except TiledDeploymentError as exc:
         detail = {k: v for k, v in exc.detail.items() if k != "log_tail"}
-        print(json.dumps({"error": exc.code, "message": str(exc), "detail": detail}, default=str), file=sys.stderr)
+        output.error(json.dumps({"error": exc.code, "message": str(exc), "detail": detail}, default=str))
         if exc.detail.get("log_tail"):
-            print(exc.detail["log_tail"], file=sys.stderr)
+            output.error(str(exc.detail["log_tail"]))
         return 2
-    print(json.dumps(result, indent=2, default=str))
+    output.info(json.dumps(result, indent=2, default=str))
     return 0
 
 

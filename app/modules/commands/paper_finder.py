@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Paper Finder: human-paced review queue for paywalled RSoXS papers.
 
+Console script: ``f2w-paper-finder`` (``scripts/paper_finder.py`` stays as a launch facade).
+
 Companion to ``harvest_rsoxs.py``. Walks ``papers/rsoxs/manifest.json`` rows
 with ``ingestion.status`` in ``{skipped, failed}`` and no PDF on disk, and
 gives a person one paper at a time:
@@ -27,23 +29,19 @@ import json
 import logging
 import os
 import shutil
-import sys
 import threading
 import time
 import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any
+from collections.abc import Sequence
 
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS_DIR))
-
-import harvest_rsoxs as hv  # noqa: E402
+from . import harvest_rsoxs as hv  # noqa: E402
 
 LOGGER = logging.getLogger("paper_finder")
 
@@ -58,7 +56,7 @@ DEFAULT_STAGING = Path("papers") / "staging"
 OPEN_DEBOUNCE_SEC = 20.0
 
 
-def local_bind(host: str, port: int) -> Tuple[str, int]:
+def local_bind(host: str, port: int) -> tuple[str, int]:
     """Return a loopback bind pair, or raise if the bind would be unsafe.
 
     Args:
@@ -111,7 +109,7 @@ def ensure_staging_dir(path: Path) -> Path:
     return path
 
 
-def _paper_key(paper: Dict[str, Any]) -> str:
+def _paper_key(paper: dict[str, Any]) -> str:
     """Identity key matching ``harvest_rsoxs._upsert_paper``.
 
     Args:
@@ -131,11 +129,11 @@ def _paper_key(paper: Dict[str, Any]) -> str:
 def launch_user_browser(
     url: str,
     *,
-    last_url: Optional[str] = None,
+    last_url: str | None = None,
     last_at: float = 0.0,
-    now: Optional[float] = None,
+    now: float | None = None,
     debounce_sec: float = OPEN_DEBOUNCE_SEC,
-) -> Tuple[bool, str, float]:
+) -> tuple[bool, str, float]:
     """Open ``url`` in the operator's browser. Never HTTP-GETs it.
 
     Args:
@@ -158,7 +156,7 @@ def launch_user_browser(
     return True, url, stamp
 
 
-def open_url(paper: Dict[str, Any]) -> Optional[str]:
+def open_url(paper: dict[str, Any]) -> str | None:
     """Browser URL for a human Open click: DOI resolver, then arXiv.
 
     Never fetches the URL. The caller may pass it to ``webbrowser.open``.
@@ -178,7 +176,7 @@ def open_url(paper: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def journal_label(paper: Dict[str, Any]) -> str:
+def journal_label(paper: dict[str, Any]) -> str:
     """Best-effort venue line for the review page.
 
     Harvest rows often omit a journal field; fall back to source / PubTemp kind.
@@ -211,9 +209,9 @@ def journal_label(paper: Dict[str, Any]) -> str:
 
 
 def queue_rows(
-    papers: Sequence[Dict[str, Any]],
-    skipped_keys: Set[str],
-) -> List[Dict[str, Any]]:
+    papers: Sequence[dict[str, Any]],
+    skipped_keys: set[str],
+) -> list[dict[str, Any]]:
     """Manifest rows still needing a human look.
 
     Args:
@@ -235,7 +233,7 @@ def queue_rows(
     return rows
 
 
-def mark_restricted(paper: Dict[str, Any]) -> None:
+def mark_restricted(paper: dict[str, Any]) -> None:
     """Record that a human found no accessible copy (OA or institutional).
 
     Args:
@@ -249,12 +247,12 @@ def mark_restricted(paper: Dict[str, Any]) -> None:
 
 
 def assign_pdf(
-    paper: Dict[str, Any],
+    paper: dict[str, Any],
     src: Path,
     dest_root: Path,
     *,
     dry_run: bool,
-) -> Optional[Path]:
+) -> Path | None:
     """Move a human-saved PDF into the harvest layout and stamp the row.
 
     Writes the same fields a successful ``harvest_rsoxs`` download writes:
@@ -330,7 +328,7 @@ def _wait_for_stable_file(
 class StagingWatcher(FileSystemEventHandler):
     """Watch ``papers/staging/`` for completed PDFs. Never moves or assigns them."""
 
-    def __init__(self, detected: List[Path], lock: threading.Lock) -> None:
+    def __init__(self, detected: list[Path], lock: threading.Lock) -> None:
         self._detected = detected
         self._lock = lock
 
@@ -350,11 +348,13 @@ class StagingWatcher(FileSystemEventHandler):
                 LOGGER.info("Detected download (offer Assign): %s", path.name)
 
     def on_created(self, event: Any) -> None:
+        """Watchdog hook: record a newly created file."""
         if event.is_directory:
             return
         self._maybe_record(Path(str(event.src_path)))
 
     def on_moved(self, event: Any) -> None:
+        """Watchdog hook: record a file moved into the watched folder."""
         if event.is_directory:
             return
         dest = getattr(event, "dest_path", None)
@@ -370,10 +370,10 @@ class QueueState:
     staging_dir: Path
     dry_run: bool = False
     current_index: int = 0
-    skipped_keys: Set[str] = field(default_factory=set)
-    detected_files: List[Path] = field(default_factory=list)
+    skipped_keys: set[str] = field(default_factory=set)
+    detected_files: list[Path] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
-    last_browser_url: Optional[str] = None
+    last_browser_url: str | None = None
     last_browser_open_at: float = 0.0
 
     def launch_open(self, url: str) -> bool:
@@ -390,10 +390,12 @@ class QueueState:
 
     @property
     def manifest_path(self) -> Path:
+        """Path of the corpus ``manifest.json``."""
         return self.dest_root / "manifest.json"
 
     @property
     def state_path(self) -> Path:
+        """Path of the review-queue state file."""
         return self.dest_root / QUEUE_STATE_FILENAME
 
     def load_persisted(self) -> None:
@@ -427,24 +429,24 @@ class QueueState:
             + "\n"
         )
 
-    def load_manifest(self) -> Dict[str, Any]:
+    def load_manifest(self) -> dict[str, Any]:
         """Reload harvest manifest so parallel OA passes drop resolved rows."""
         return hv._load_manifest(self.manifest_path)
 
-    def save_manifest(self, manifest: Dict[str, Any]) -> None:
+    def save_manifest(self, manifest: dict[str, Any]) -> None:
         """Write manifest. No-op when dry-run."""
         if self.dry_run:
             LOGGER.info("[dry-run] would write manifest to %s", self.manifest_path)
             return
         hv._save_manifest(self.manifest_path, manifest)
 
-    def pending(self, manifest: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def pending(self, manifest: dict[str, Any]) -> list[dict[str, Any]]:
         """Papers still needing a human look."""
         return queue_rows(manifest.get("papers") or [], self.skipped_keys)
 
     def current(
-        self, manifest: Dict[str, Any]
-    ) -> Tuple[Optional[Dict[str, Any]], int, int]:
+        self, manifest: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, int, int]:
         """The paper to show now, 1-based position, and queue length."""
         rows = self.pending(manifest)
         if not rows:
@@ -453,7 +455,7 @@ class QueueState:
         self.current_index = index
         return rows[index], index + 1, len(rows)
 
-    def clamp_index(self, manifest: Dict[str, Any]) -> None:
+    def clamp_index(self, manifest: dict[str, Any]) -> None:
         """Keep current_index inside the live queue."""
         rows = self.pending(manifest)
         self.current_index = min(self.current_index, max(0, len(rows) - 1))
@@ -595,7 +597,8 @@ def create_app(state: QueueState) -> Flask:
     app.config["PAPER_FINDER_STATE"] = state
 
     def _state() -> QueueState:
-        return app.config["PAPER_FINDER_STATE"]
+        state_obj: QueueState = app.config["PAPER_FINDER_STATE"]
+        return state_obj
 
     @app.get("/")
     def index() -> str:
@@ -713,7 +716,7 @@ def reset_queue(dest_root: Path) -> bool:
     return False
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse Paper Finder CLI arguments.
 
     Args:
@@ -822,7 +825,7 @@ def serve(
         observer.join(timeout=2)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """CLI entry point."""
     args = parse_args(argv)
     logging.basicConfig(

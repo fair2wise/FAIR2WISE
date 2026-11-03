@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Corpus repair tool for extracted_terms JSON files.
 
+Console script: ``f2w-repair-corpus`` (``scripts/repair_corpus.py`` stays as a launch facade).
+
 Reads a FAIRtoWISE extracted-terms JSON, applies targeted repairs based on
 a QA audit, and writes a repaired copy.  The original file is NEVER modified.
 
@@ -27,7 +29,7 @@ import unicodedata
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import typer
 
@@ -95,7 +97,7 @@ def _levenshtein(a: str, b: str) -> int:
     return prev[-1]
 
 
-def _term_weight(t: dict) -> int:
+def _term_weight(t: dict[str, Any]) -> int:
     """Score for 'how much evidence does this term have'."""
     return (
         len(t.get("source_papers") or []) * 3
@@ -140,8 +142,8 @@ def _reclassify(label: str) -> tuple[str, bool]:
 
 
 def step_quarantine_hard_stubs(
-    terms: list[dict],
-) -> tuple[list[dict], list[dict], int]:
+    terms: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
     """Move hard stubs (no papers AND no snippets AND no pages) to quarantine.
 
     Args:
@@ -150,8 +152,8 @@ def step_quarantine_hard_stubs(
     Returns:
         Tuple of (kept_terms, quarantined_stubs, count_quarantined).
     """
-    kept: list[dict] = []
-    quarantined: list[dict] = []
+    kept: list[dict[str, Any]] = []
+    quarantined: list[dict[str, Any]] = []
 
     for t in terms:
         sp = t.get("source_papers") or []
@@ -165,7 +167,7 @@ def step_quarantine_hard_stubs(
     return kept, quarantined, len(quarantined)
 
 
-def step_reclassify_untyped(terms: list[dict]) -> tuple[list[dict], int]:
+def step_reclassify_untyped(terms: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
     """Reclassify Thing/owl:Thing/Entity nodes based on label heuristics.
 
     Args:
@@ -175,7 +177,7 @@ def step_reclassify_untyped(terms: list[dict]) -> tuple[list[dict], int]:
         Tuple of (updated_terms, count_reclassified).
     """
     count = 0
-    updated: list[dict] = []
+    updated: list[dict[str, Any]] = []
 
     for t in terms:
         cat = t.get("category")
@@ -194,7 +196,7 @@ def step_reclassify_untyped(terms: list[dict]) -> tuple[list[dict], int]:
     return updated, count
 
 
-def step_fix_known_bad_relations(terms: list[dict]) -> tuple[list[dict], int]:
+def step_fix_known_bad_relations(terms: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
     """Fix known-bad relation predicates.
 
     Args:
@@ -204,7 +206,7 @@ def step_fix_known_bad_relations(terms: list[dict]) -> tuple[list[dict], int]:
         Tuple of (updated_terms, count_relations_fixed).
     """
     count = 0
-    updated: list[dict] = []
+    updated: list[dict[str, Any]] = []
 
     for t in terms:
         term_lower = _normalise(t.get("term", "") or "")
@@ -221,7 +223,6 @@ def step_fix_known_bad_relations(terms: list[dict]) -> tuple[list[dict], int]:
                 continue
             rel = r.get("relation", "")
             obj_lower = _normalise(str(r.get("related_term", "") or ""))
-            fixed = False
             for subj_contains, bad_pred, obj_contains, good_pred in KNOWN_BAD_FIXES:
                 if (
                     subj_contains in term_lower
@@ -233,7 +234,6 @@ def step_fix_known_bad_relations(terms: list[dict]) -> tuple[list[dict], int]:
                     r["_repaired_from"] = bad_pred
                     count += 1
                     changed = True
-                    fixed = True
                     break
             new_rels.append(r)
 
@@ -246,8 +246,8 @@ def step_fix_known_bad_relations(terms: list[dict]) -> tuple[list[dict], int]:
 
 
 def step_merge_near_duplicates(
-    terms: list[dict],
-) -> tuple[list[dict], int, int]:
+    terms: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int, int]:
     """Merge near-duplicate terms (edit distance ≤ 2, same first 4 chars).
 
     For each mergeable pair:
@@ -409,10 +409,10 @@ def repair(
 
     typer.echo(f"Loading {terms} ({terms.stat().st_size / 1_048_576:.1f} MB) …")
     with terms.open("r", encoding="utf-8") as fh:
-        data: dict = json.load(fh)
+        data: dict[str, Any] = json.load(fh)
 
-    original_terms: list[dict] = data.get("terms") or []
-    metadata: dict = data.get("metadata") or {}
+    original_terms: list[dict[str, Any]] = data.get("terms") or []
+    metadata: dict[str, Any] = data.get("metadata") or {}
     typer.echo(f"Loaded {len(original_terms):,} term entries.")
 
     # ── Step 1: Quarantine hard stubs ────────────────────────────────────────
@@ -478,5 +478,10 @@ def repair(
     typer.echo(f"Done. Output: {output} ({size_mb:.1f} MB)")
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Console-script entry point."""
     _main_app()
+
+
+if __name__ == "__main__":
+    main()
