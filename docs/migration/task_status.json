@@ -763,9 +763,9 @@
       "title": "UI and docs closure (frozen-UI re-pin)",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "status": "merged",
+      "merge_commit": "bb148f79ca9276ee7279905a3f61ffb979c16682",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs | docs 471bebf, FROZEN_UI_TREE re-pinned in bb148f7 (2026-11-03); owner review at H6"
     },
     {
       "id": "T44",
