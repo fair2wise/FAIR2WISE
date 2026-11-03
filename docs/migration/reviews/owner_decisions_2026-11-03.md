@@ -10,3 +10,12 @@
 Interpretation notes (agent, for the owner to correct):
 - H4 answer covers the T17B moves, ports and script promotions only; it is not an approval of the 16-file retire list or the (r) reclassification (asked separately).
 - Publisher answer: not "skipped"; a distinct, explicit status/indicator naming the state (JSON available, Tiled unavailable). Whether the CLI coordinator gets a publisher is not answered by this reply.
+
+## Second batch
+
+| Question | Owner answer |
+|---|---|
+| Approve retiring the 16 class-(d) files | "I'll review the list" (not approved; held) |
+| Rollback V20 on replacement-importer deployments | "i dont understand what this is about" (not decided; explained, asked again) |
+| Capability for paper job kinds | "jobs.admin only (Recommended)" |
+| Default `F2W_FOLDER_ROOTS` for the :local image | "it should mount the papers/ folder in the repo" |
