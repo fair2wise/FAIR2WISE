@@ -111,7 +111,7 @@ jobs:
     # numbers are always produced; ruff, isort and mypy are at 0 and the gate step below keeps them there
     # (it runs after the reports and the artifact is uploaded either way). Coverage stays report only.
     # Configuration lives in pyproject.toml; tool versions are locked in pixi.lock (feature `quality`).
-    name: Code quality (T27: ruff, isort, mypy gate; coverage reported)
+    name: Code quality (T27, ruff isort mypy gate, coverage reported)
     needs: guard
     runs-on: ubuntu-latest
     steps:
