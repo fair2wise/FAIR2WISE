@@ -44,6 +44,7 @@
     "F2W_SCHEMA": "storage/schema/rsoxs_schema.yaml",
     "F2W_WORKDIR": "/var/lib/fair2wise/state/session",
     "F2W_JOB_DB": "/var/lib/fair2wise/state/session/operations/jobs.sqlite3",
+    "F2W_LIBRARY_DIR": "/var/lib/fair2wise/library",
     "F2W_WORKER_FACTORY": "app.modules.workers.factories:library_service",
     "F2W_WORKER_CONCURRENCY": "2",
     "F2W_TRACE_ENABLED": "1",
@@ -64,6 +65,13 @@
       "path": "/var/lib/fair2wise/tiled",
       "writable": true,
       "purpose": "managed Tiled catalog, writable storage and generated writer key"
+    }
+  ],
+  "optional_mounts": [
+    {
+      "path": "/var/lib/fair2wise/library",
+      "writable": true,
+      "purpose": "reference papers (papers/sourcedoc) for the Library tab (T35); optional, read-write for uid 10001; without it the library reports mounted=false"
     }
   ],
   "gateway": {

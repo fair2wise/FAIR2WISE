@@ -487,13 +487,22 @@ def list_storage_kg_json_files(root: Path | None = None) -> list[str]:
     """List relative paths of JSON graphs in storage/kg."""
     kg_dir = storage_kg_dir(root)
     if not kg_dir.is_dir():
-        return []
+        return _bundle_graph_paths(root)
     paths = sorted(kg_dir.glob("*.json"), key=lambda path: path.name.lower())
     base = root or project_root()
     return [
         str(path.resolve().relative_to(base.resolve())).replace("\\", "/")
         for path in paths
-    ]
+    ] + _bundle_graph_paths(root)
+
+
+def _bundle_graph_paths(root: Path | None) -> list[str]:
+    """T38 additive hook: registered KG bundles (``kgs/<name>/matkg_<name>.json``); empty when none or ``root`` is given."""
+    if root is not None:
+        return []
+    from ..library.bundles import registered_graph_paths
+
+    return registered_graph_paths()
 
 
 def default_json_graph_path(
@@ -3558,6 +3567,11 @@ class AgentPipelineService:
 
     def _resolve_json_graph_path(self, path: str) -> Path:
         """Resolve a JSON graph path, requiring it under storage/kg or uploads."""
+        from ..library.bundles import resolve_registered_graph  # T38 additive hook: a registered KG bundle
+
+        bundle_graph = resolve_registered_graph(path)
+        if bundle_graph is not None:
+            return bundle_graph
         graph_path = Path(path)
         if not graph_path.is_absolute():
             graph_path = (project_root() / graph_path).resolve()

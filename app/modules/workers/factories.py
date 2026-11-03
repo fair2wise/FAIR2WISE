@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import logging
 import os
+from pathlib import Path
 
 from ..jobs.service import JobService
 from ..jobs.store import JobStore
@@ -45,7 +46,12 @@ def library_service(db_path: str, environ: Mapping[str, str] | None = None) -> J
     if not settings.is_local:
         raise StartupConfigError(f"config_rejected: library_service runs on the local profile only, not {settings.profile}")
     service = JobService(JobStore(db_path), settings=settings, heartbeat_interval=30.0)
-    register_library_jobs(service, settings)
+    # T35: the real library_verify handler over the same mount and sidecar catalog as the API process.
+    from ..library.handlers import library_handlers
+    from ..library.service import LibraryService
+
+    workdir = Path(env.get("F2W_WORKDIR") or Path(db_path).parent)
+    register_library_jobs(service, settings, handlers=library_handlers(LibraryService.from_startup(env, workdir, settings)))
     return service
 
 

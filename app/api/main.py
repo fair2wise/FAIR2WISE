@@ -15,6 +15,8 @@ ALS sign-in handlers, access control and disclosure projection) and adds:
 * on the ``:local`` profile only, the T32 folder routes (owner decision B4) ``/v1/folders/roots``,
   ``/list`` and ``/index`` over roots fixed by ``F2W_FOLDER_ROOTS`` (:mod:`app.api.folders`); an ALS
   profile does not register them, so they answer 404 there;
+* on the ``:local`` profile only, the T35 library routes ``/v1/library`` (status, papers, upload, verify) over the
+  mounted ``F2W_LIBRARY_DIR`` (:mod:`app.modules.library.service`), and the real ``library_verify`` job handler;
 * the ``/v1/operations`` routes (T19E) over the deployment's
   :class:`~app.modules.operations.knowledge.KnowledgeOperations` (default
   ``KnowledgeOperations.from_deployment``: the JSON graphs under ``storage/kg`` and the
@@ -117,6 +119,18 @@ class PublicRootPath:
         await self.app(scope, receive, send)
 
 
+def _install_kg_library(app: FastAPI, cfg: Any, judge_settings: Any) -> None:
+    """T38: KG bundle routes (``:local`` only); the model catalog is the judge setting's (one provider cache)."""
+    from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore
+    from ..modules.library.kg_service import KgLibrary
+    from . import routes_library_kgs
+
+    store = BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME)
+    # The estimate resolves paper ids through the T35 catalog service (built just before on :local).
+    routes_library_kgs.install(app, KgLibrary(store, catalog=getattr(judge_settings, "catalog", None),
+                                              papers=getattr(app.state, "f2w_library", None)))
+
+
 def create_api_app(
     cfg: Any,
     *,
@@ -137,6 +151,7 @@ def create_api_app(
     model_api: bool = False,
     model_api_root_path: str | None = None,
     folder_roots: Any | None = None,
+    library: Any | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -174,6 +189,8 @@ def create_api_app(
             behind the gateway). Default from ``F2W_PUBLIC_PREFIX`` in ``startup_config`` (or the
             process environment), as ``PublicLayout.model_api_root_path``.
         folder_roots: :class:`~app.api.folders.FolderRoots` for the ``/v1/folders`` routes (T32).
+        library: :class:`~app.modules.library.service.LibraryService` for the ``/v1/library`` routes (T35); built from
+            ``F2W_LIBRARY_DIR`` when ``None`` (``:local`` only).
             Default: parsed from ``F2W_FOLDER_ROOTS`` in ``startup_config`` (or the process
             environment). The routes are registered on the ``:local`` profile only; on an ALS
             profile they are absent (404) and a configured value is ignored with a warning.
@@ -184,6 +201,7 @@ def create_api_app(
             ``model_api`` without a JSON graph in ``cfg.graph``.
     """
     from . import routes_folders as folders
+    from . import routes_library as library_routes
     from . import routes_jobs as jobs
     from . import routes_operations as knowledge_routes
     from . import routes_publications as publications
@@ -221,7 +239,17 @@ def create_api_app(
         operations.register_knowledge_jobs(knowledge_job_context(
             settings, identity_port=operations.identity_port, credential_lookup=lookup, clock=clock or _utcnow))
     # T34: the library kinds (local operator only; nothing is registered on ALS, so submissions are refused).
-    register_library_jobs(operations.jobs, settings)
+    # T35: the real library_verify handler runs over the mounted folder (:local only; ALS builds no service).
+    library_handlers_: Any = None
+    if settings.is_local:
+        from ..modules.library.handlers import library_handlers
+        from ..modules.library.service import LibraryService
+
+        library_service = library if library is not None else LibraryService.from_startup(
+            os.environ if startup_config is None else startup_config, Path(cfg.workdir), settings)
+        app.state.f2w_library = library_service
+        library_handlers_ = library_handlers(library_service)
+    register_library_jobs(operations.jobs, settings, handlers=library_handlers_)
     app.state.f2w_operations = operations
     runtime.on_scope_change(operations.notify_scope_change)
 
@@ -242,6 +270,8 @@ def create_api_app(
         if operations.folders is None:
             operations.folders = folder_roots if folder_roots is not None else FolderRoots.from_startup(startup)
         folders.install(app)
+        library_routes.install(app)  # T35 (A8): library catalog/upload/verify, local profile only
+        _install_kg_library(app, cfg, judge_settings)
     elif folder_roots is not None or (startup.get(FOLDER_ROOTS_ENV) or "").strip():
         logger.warning("%s is ignored on %s: folder browsing is a local-profile feature (owner decision B4)",
                        FOLDER_ROOTS_ENV, settings.profile)

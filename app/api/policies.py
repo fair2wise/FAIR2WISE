@@ -1,4 +1,4 @@
-"""Declared access policy for the versioned ``/v1`` routes of ``app/api/main.py`` (tasks T14, T19E, T31, T32).
+"""Declared access policy for the versioned ``/v1`` routes of ``app/api/main.py`` (tasks T14, T19E, T31, T32, T35).
 
 The 34 inventoried routes and the ALS sign-in handlers keep their policies in
 :mod:`app.modules.security.authorization`. This module adds the T14 routes with the same
@@ -132,6 +132,27 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="corpus removal plan, corpus name typed in; approval via V18; H5 gate"),
     _v("V55", "POST", "/publications/corpus-purge", "graph.publish",
        note="purge plan of retired records, own approval via V18 (Q3); H5 gate"),
+    # T35 (A8, supersedes T32): library catalog, upload and verify over F2W_LIBRARY_DIR, mounted on :local only
+    _v("V56", "GET", "/library", "library.read", on_als=False,
+       note="mounted flag, paper and indexed counts, OpenAlex quota state; not registered on ALS (404)"),
+    _v("V57", "GET", "/library/papers", "library.read", on_als=False,
+       note="papers of the mounted folder: file name, local or verified title and DOI, status; no bytes, no path"),
+    _v("V58", "POST", "/library/papers", "library.upload", on_als=False,
+       note="multipart PDF upload into the mounted folder: size cap, PDF check, safe name, sha256 dedupe, atomic write"),
+    _v("V59", "POST", "/library/papers/{paper_id}/verify", "library.upload", on_als=False,
+       note="OpenAlex verification of one paper under the quota breaker; settled result cached by sha256"),
+    # T38 (A8): KG bundles, schemas, models and cost estimate under /v1/library; :local only (ALS answers 404).
+    # V56-V59 belong to T35 and V60-V69 to another session; this block uses V70-V75.
+    _v("V70", "GET", "/library/kgs", "library.read", on_als=False, note="KG bundle summaries and continuable KG files"),
+    _v("V71", "GET", "/library/schemas", "library.read", on_als=False, note="extraction schema choices (registry v0.3.x)"),
+    _v("V72", "GET", "/library/models", "library.read", on_als=False,
+       note="live model list for extraction; read-only, never PUT /settings"),
+    _v("V73", "POST", "/library/estimate", "library.read", on_als=False,
+       note="deterministic cost estimate and local confirmation token; writes nothing"),
+    _v("V74", "POST", "/library/kgs/{name}/export", "library.extract", on_als=False,
+       note="export a bundle to the configured release directory; explicit confirm in the body"),
+    _v("V75", "POST", "/library/kgs/continue", "library.extract", on_als=False,
+       note="create a bundle by continuing a bundle or a KG file (kg_to_terms reverse build)"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

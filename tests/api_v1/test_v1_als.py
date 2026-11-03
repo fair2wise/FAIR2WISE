@@ -28,7 +28,8 @@ FORGED = {"X-Local-Trusted": "1", "X-F2W-Is-Admin": "true", "X-F2W-Mode": "local
 
 def _sample(path):
     return (path.replace("{job_id}", "job-x").replace("{case_id}", "case-x")
-            .replace("{approval_id}", "appr-x").replace("{record_id}", "fsc-x"))
+            .replace("{approval_id}", "appr-x").replace("{record_id}", "fsc-x")
+            .replace("{paper_id}", "0" * 16))
 
 
 def _call(client, policy):
@@ -70,8 +71,13 @@ def test_anonymous_gets_sign_in_required_on_every_v1_route(als):
             continue
         assert resp.status_code == 401, (policy.route_id, resp.status_code, resp.text)
         assert resp.json()["code"] == "sign_in_required"
-    assert local_only == 3 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
-        "/v1/folders/roots", "/v1/folders/list", "/v1/folders/index"}
+    assert local_only == 13 and {p.path for p in API_ROUTE_POLICIES if not p.on_als} == {
+        "/v1/folders/roots", "/v1/folders/list", "/v1/folders/index",
+        # T35 (A8): library status, papers (list and upload) and verify
+        "/v1/library", "/v1/library/papers", "/v1/library/papers/{paper_id}/verify",
+        # T38 (A8): KG bundles, schemas, models, estimate, continue and export
+        "/v1/library/kgs", "/v1/library/schemas", "/v1/library/models", "/v1/library/estimate",
+        "/v1/library/kgs/{name}/export", "/v1/library/kgs/continue"}
     assert als.ops.jobs.store.list_jobs() == []
 
 

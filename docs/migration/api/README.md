@@ -40,7 +40,7 @@ The worker path uses the same rules: job stages call `StageContext.require`, whi
 | Kind | Capability | State |
 | --- | --- | --- |
 | `library_probe` | `library.read` | no-op, completes at once (proves a worker claims library jobs) |
-| `library_verify` | `library.upload` | fails closed, `unsupported_capability`, "not implemented until T35" |
+| `library_verify` | `library.upload` | **T35: real** (`app/modules/library/handlers.py`): verifies every paper with no settled result through `prepare_local_pdf(verify="openalex")`; stops and fails retryably (`incomplete` names the papers left) when the OpenAlex quota breaker opens; progress `verified`/`not_found`/`errors`/`remaining` |
 | `library_index` | `library.index` | fails closed, "not implemented until T36" |
 | `library_extract` | `library.extract` | fails closed, "not implemented until T39" |
 
@@ -48,6 +48,23 @@ The worker path uses the same rules: job stages call `StageContext.require`, whi
 - **Rebuild.** Job identity is idempotent on identical inputs; a rebuild is the same submission with a different `params.nonce` (`library_inputs(params, nonce=...)`). Secrets in `inputs` or `params` are refused by `OperationInputs`.
 - **Worker.** `docker/profiles/local.json` sets `F2W_WORKER_FACTORY=app.modules.workers.factories:library_service`; `als-dev` and `als-prod` keep `idle_service`. `library_service` builds the job service from the worker's startup environment and refuses to start on an ALS profile.
 - **Handlers.** `register_library_jobs(..., handlers={kind: stage_body})` replaces a stub; T35, T36 and T39 supply theirs.
+
+### 2.0.0 Library catalog, upload and verify (A8/T35, `:local` only)
+
+`F2W_LIBRARY_DIR` (trusted startup setting; `/var/lib/fair2wise/library` in `docker/profiles/local.json`, an *optional* mount: absent means `mounted=false`; forbidden on the ALS profiles) names the papers folder. `LibraryService` (`app/modules/library/service.py`) reuses `FolderRoots` (label `library`) for root resolution, containment and the recursive PDF inventory; the T32 routes are untouched and there is no second listing route. State: `<F2W_WORKDIR>/library/catalog.sqlite` (sha256, local title and DOI, verification cache keyed by sha256) and `openalex_cache.sqlite`; the papers folder only ever receives uploaded PDFs. User PDFs are parsed by pypdfium2 in a child process (`app/modules/library/probe.py`: wall-clock timeout 20 s, CPU and memory limits on Linux, minimal environment). Local metadata never touches the network (socket-blocking test); only Verify does, and only with `OPENALEX_API_KEY` in the startup environment (otherwise `verify_status=error`, detail names the setting). Routes V56-V59 are in section 3; no route returns PDF bytes and none matches `SOURCE_SERVING_PATH_RE`. `index_status` and `indexed_count` stay null/0 until T36.
+
+### 2.0.1 KG bundles, schemas, models and estimate (A8/T38, `:local` only)
+
+Routes (policies V70-V75, `app/api/routes_library_kgs.py`, mounted by `create_api_app` on `:local` only; ALS answers 404): `GET /v1/library/kgs|schemas|models`, `POST /v1/library/estimate`, `POST /v1/library/kgs/continue`, `POST /v1/library/kgs/{name}/export`. Read routes and the estimate need `library.read`; continue and export need `library.extract`. Logic lives in `app/modules/library/{bundles,schemas,estimate,ranking,kg_service}.py`.
+
+- **Bundle** `<F2W_WORKDIR>/kgs/<name>/{terms,kg,manifest,processed_pdfs,extraction_manifest}.json`. Names: `[A-Za-z0-9][A-Za-z0-9_-]{0,63}`; a collision is `409`; the directory is created with an atomic `mkdir`, the manifest is written last, a failed create is removed. Manifest: topic, `schema` (`id`, `version`, `sha256`, `path`), model, backend, papers (`name`, `sha256`, `pages`), `parent`, `reconstructed`.
+- **Schema.** Choices are the v0.3.x entries of `SchemaRegistry` selectable for extraction (`matkg_schema@0.3.x`, `rsoxs_schema@0.3.x`; pending owner review, so chosen explicitly with `allow_pending_review=True`). The schema is locked per bundle: `fork` and `record_extraction` refuse a different one.
+- **Continue.** `POST /kgs/continue` takes `name` and exactly one of `parent` (a bundle; schema inherited, a different `schema` is refused) or `source` (a plain `*.json` in the release directory; `schema` required; reversed with `kg_to_terms` into a bundle with `reconstructed=true`).
+- **Export.** `POST /kgs/{name}/export` with body `{"confirm": true}` writes `matkg_<name>.json` into the release directory (`F2W_KG_RELEASE_DIR`, default `storage/kg`) with `metadata.schema`; it never overwrites a file that is not this bundle's earlier export and never follows a link.
+- **Models.** `GET /models` is the live `CachedModelCatalog` (shared with the judge-model setting); `available=false` without a backend. No route here calls or changes `PUT /settings`.
+- **Estimate.** pages x fixed per-page token heuristics (1200 in, 400 out); cost only for models with a configured price (none built in, so `estimated_cost_usd` is `null` by default). `confirmation` is the SHA-256 of the canonical selection (papers with sha256 and pages, model, schema, heuristics, price); `KgLibrary.check_confirmation` (for T39's start path) refuses a mismatch with `stale_approval`. `/v1/curation/cost-approvals` (V14) does not fit (human `curation.approve`, corpus scope, USD cap, expiry, bound to review cases), so the confirmation is local.
+- **Paper lookup.** The estimate reads pages and sha256 through `app.state.f2w_library_papers` / `KgLibrary.papers` (`PaperLookup.paper_facts(id)`); until T35 installs it the estimate answers `503 unavailable`.
+- **Legacy Settings list (additive hooks).** `list_storage_kg_json_files()` appends `kgs/<name>/matkg_<name>.json` for every bundle (read from `F2W_WORKDIR`); `_resolve_json_graph_path` first maps exactly that virtual path to the bundle's `kg.json`. `schema_path_for_graph` is unchanged; `bundles.schema_path_for_registered_graph` is the manifest-based lookup (not yet called by `retrieval_agent`).
 
 ### 2.1 Job UI mapping (`GET /v1/jobs/{id}/view`)
 
@@ -113,6 +130,10 @@ All 48 routes are declared with `RoutePolicy`; `app.api.auth.lookup_policy` reso
 | V53 | POST /v1/publications/rollback-replacement | `graph.publish` | T10B: rollback as a replacement plan to the previous pointer's version (revive); returns the job; approval is V18; human only; H5 gate |
 | V54 | POST /v1/publications/corpus-retire | `graph.publish` | T10B: corpus removal plan, corpus name typed in as `confirm_scope`; approval via V18; H5 gate |
 | V55 | POST /v1/publications/corpus-purge | `graph.publish` | T10B: purge plan of retired records (`include_previous` is the explicit second choice after a removal); own approval via V18 (Q3); H5 gate |
+| V56 | GET /v1/library | `library.read`, `:local` only | T35 (A8): `{mounted, paper_count, indexed_count, quota_open}` over `F2W_LIBRARY_DIR`; a cheap walk (no hashing or parsing); `mounted=false` without the mount; absent (404) on ALS |
+| V57 | GET /v1/library/papers | `library.read`, `:local` only | papers keyed by relative path and sha256: `{id, relpath, file_name, sha256, size_bytes, title, doi, verify_status, verified_at, index_status}` plus `verify_detail`, `metadata_status`; local metadata (PDF Info title, DOI from pages 1-2 or the file name, no network); at most 20 files parsed per call, the rest `metadata_status=pending` (`pending_metadata` counts them); no bytes, no path |
+| V58 | POST /v1/library/papers | `library.upload`, `:local` only | multipart field `file` (read by `app/api/multipart_upload.py`; the environment has no `python-multipart`); `read_upload_limited` cap (100 MiB), `require_pdf` (415), `safe_child` name rules (422; directories dropped, `.pdf` appended), sha256 dedupe (`duplicate: true`, nothing written), no-clobber atomic write (hidden temp file, `link`), never through or over a link; 501 when nothing is mounted |
+| V59 | POST /v1/library/papers/{paper_id}/verify | `library.upload`, `:local` only | `{paper}`; `prepare_local_pdf(verify="openalex")` over the shared quota breaker; `verified` and `not_found` are cached by sha256 (a renamed copy shares them), `quota_open` and `error` are reported, not cached; the registry title and DOI replace the local ones once verified |
 
 Every admin capability is held only by verified Tiled admins on ALS, so all privileged `/v1` actions are admin-only there and trusted on `:local`.
 
