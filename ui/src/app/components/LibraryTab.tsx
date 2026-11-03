@@ -18,7 +18,9 @@ import { FolderFilter } from './library/FolderFilter';
 import { NEW_CATEGORY, resolveUploadFolder, UploadTarget, type UploadTargetValue } from './library/UploadTarget';
 import { LibraryDropzone } from './library/LibraryDropzone';
 import { LibraryPapersTable } from './library/LibraryPapersTable';
+import { HarvesterPanel } from './library/harvest/HarvesterPanel';
 import { Button } from './ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
 const JOB_POLL_MS = 2000;
 const LIST_POLL_MS = 3000;
@@ -44,6 +46,7 @@ export function LibraryTab() {
   const [notMounted501, setNotMounted501] = useState(false);
   const mounted = (status?.mounted ?? false) && !notMounted501;
 
+  const [panel, setPanel] = useState<'papers' | 'harvester'>('papers');
   const [tracked, setTracked] = useState<TrackedJob | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -131,6 +134,7 @@ export function LibraryTab() {
             <span className="text-sm text-muted-foreground">{indexedCount} indexed</span>
           ) : null}
         </div>
+        {panel === 'papers' ? (
         <div className="flex items-center gap-2">
           {jobRunning ? (
             <span role="status" className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -156,8 +160,15 @@ export function LibraryTab() {
             Index for QA
           </Button>
         </div>
+        ) : null}
       </header>
 
+      <Tabs value={panel} onValueChange={value => setPanel(value as 'papers' | 'harvester')}>
+        <TabsList aria-label="Library sections" className="self-start">
+          <TabsTrigger value="papers" className="px-4">Papers</TabsTrigger>
+          <TabsTrigger value="harvester" className="px-4" disabled={!mounted}>Harvester</TabsTrigger>
+        </TabsList>
+        <TabsContent value="papers" className="flex flex-col gap-4 pt-2">
       {!mounted ? (
         <p role="status" className="rounded-lg border border-border p-6 text-center text-sm text-muted-foreground">
           The papers folder is not mounted on this server, so the library is read-only here.
@@ -227,6 +238,11 @@ export function LibraryTab() {
           }
         />
       ) : null}
+        </TabsContent>
+        <TabsContent value="harvester" className="pt-2">
+          <HarvesterPanel />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

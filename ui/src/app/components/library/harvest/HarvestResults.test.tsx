@@ -1,0 +1,97 @@
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import type { HarvestCandidate } from '../../harvestApi';
+import { HarvestResults, type HarvestResultsProps } from './HarvestResults';
+
+const cand = (id: string, over: Partial<HarvestCandidate> = {}): HarvestCandidate => ({
+  id, title: `Paper ${id}`, year: 2020, doi: `10.1/${id}`, arxiv_id: null, source: 'openalex', tier: 'A', score: 0.9,
+  status: 'downloaded', landing_url: `https://doi.org/10.1/${id}`, pdf_url: null, relpath: null, detail: null, ...over,
+});
+const pdf = () => new File(['%PDF'], 'saved.pdf', { type: 'application/pdf' });
+
+function setup(candidates: HarvestCandidate[], over: Partial<HarvestResultsProps> = {}) {
+  const props: HarvestResultsProps = {
+    candidates, busyId: null, onFile: vi.fn(), onDismiss: vi.fn(), onRejected: vi.fn(), ...over,
+  };
+  render(<HarvestResults {...props} />);
+  return props;
+}
+
+describe('HarvestResults', () => {
+  it('shows an empty state without candidates', () => {
+    setup([]);
+    expect(screen.getByText('No papers found yet.')).toBeInTheDocument();
+  });
+
+  it('puts non-paywalled outcomes in the table and paywalled ones in the queue', () => {
+    setup([
+      cand('d', { relpath: 'rsoxs/2020/d.pdf' }),
+      cand('f', { status: 'failed', detail: 'HTTP 403', year: null, doi: null, arxiv_id: '2101.00001' }),
+      cand('p', { status: 'paywalled' }),
+    ]);
+    const table = screen.getByRole('table', { name: 'Harvest results' });
+    expect(within(table).getByText('Paper d')).toHaveAttribute('title', 'rsoxs/2020/d.pdf');
+    expect(within(table).getByText('Downloaded')).toBeInTheDocument();
+    expect(within(table).getByText('Failed')).toHaveAttribute('title', 'HTTP 403');
+    expect(within(table).getByText('arXiv:2101.00001')).toBeInTheDocument();
+    expect(within(table).queryByText('Paper p')).not.toBeInTheDocument();
+    const queue = screen.getByRole('list', { name: 'Paywalled papers' });
+    expect(within(queue).getByText('Paper p')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Paywalled queue (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Results (2)' })).toBeInTheDocument();
+  });
+
+  it('says so when the queue or the table is empty', () => {
+    setup([cand('d')]);
+    expect(screen.getByText('Nothing is waiting for a PDF.')).toBeInTheDocument();
+    setup([cand('p', { status: 'paywalled' })]);
+    expect(screen.getByText('No other results.')).toBeInTheDocument();
+  });
+
+  it('opens the publisher page in a new tab without leaking the opener', () => {
+    setup([cand('p', { status: 'paywalled' })]);
+    const link = screen.getByRole('link', { name: /Open publisher page for Paper p/ });
+    expect(link).toHaveAttribute('href', 'https://doi.org/10.1/p');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it.each([null, 'javascript:alert(1)'])('shows no link for an unusable landing URL (%s)', landing => {
+    setup([cand('p', { status: 'paywalled', landing_url: landing })]);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('No publisher link')).toBeInTheDocument();
+  });
+
+  it('files a chosen PDF', async () => {
+    const props = setup([cand('p', { status: 'paywalled' })]);
+    const file = pdf();
+    await userEvent.upload(screen.getByTestId('harvest-file-p'), file);
+    expect(props.onFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'p' }), file);
+  });
+
+  it('files a dropped PDF and rejects a dropped non-PDF', () => {
+    const props = setup([cand('p', { status: 'paywalled' })]);
+    const item = screen.getByText('Paper p').closest('li') as HTMLElement;
+    fireEvent.drop(item, { dataTransfer: { files: [new File(['x'], 'n.txt', { type: 'text/plain' })] } });
+    expect(props.onRejected).toHaveBeenCalledWith(['n.txt']);
+    expect(props.onFile).not.toHaveBeenCalled();
+    fireEvent.drop(item, { dataTransfer: { files: [pdf()] } });
+    expect(props.onFile).toHaveBeenCalledOnce();
+  });
+
+  it('dismisses a candidate', async () => {
+    const props = setup([cand('p', { status: 'paywalled' })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss Paper p' }));
+    expect(props.onDismiss).toHaveBeenCalledWith(expect.objectContaining({ id: 'p' }));
+  });
+
+  it('disables the busy candidate\'s controls and ignores a drop on it', () => {
+    const props = setup([cand('p', { status: 'paywalled' }), cand('q', { status: 'paywalled' })], { busyId: 'p' });
+    expect(screen.getByRole('button', { name: 'Dismiss Paper p' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Choose PDF for Paper p' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Dismiss Paper q' })).toBeEnabled();
+    fireEvent.drop(screen.getByText('Paper p').closest('li') as HTMLElement, { dataTransfer: { files: [pdf()] } });
+    expect(props.onFile).not.toHaveBeenCalled();
+  });
+});

@@ -223,6 +223,31 @@ describe('LibraryTab', () => {
     expect(await screen.findByText('Showing 1 of 5 papers.')).toBeInTheDocument();
   });
 
+  it('switches between the Papers and Harvester panels', async () => {
+    routes['GET /v1/library/schemas'] = { status: 200, body: { schemas: [] } };
+    routes['GET /v1/jobs'] = { status: 200, body: { jobs: [] } };
+    routes['GET /v1/library/harvest/runs'] = { status: 200, body: { runs: [] } };
+    renderTab();
+    expect(await screen.findByText('a.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Library sections' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Papers' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('harvester-panel')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Harvester' }));
+    expect(await screen.findByTestId('harvester-panel')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Harvester' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText('a.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verify all' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Papers' }));
+    expect(await screen.findByText('a.pdf')).toBeInTheDocument();
+  });
+
+  it('disables the Harvester tab when the folder is not mounted', async () => {
+    routes['GET /v1/library'].body = { mounted: false, paper_count: 0, indexed_count: 0, quota_open: false };
+    renderTab();
+    await screen.findByRole('tablist', { name: 'Library sections' });
+    expect(screen.getByRole('tab', { name: 'Harvester' })).toBeDisabled();
+  });
+
   it('labels the section for assistive tech', async () => {
     renderTab();
     expect(screen.getByRole('region', { name: 'Library' })).toBeInTheDocument();
