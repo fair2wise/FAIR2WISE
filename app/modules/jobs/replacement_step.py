@@ -129,6 +129,18 @@ class ReplacementPublishStep:
             edit_journal=self.edit_journal, resolutions=resolutions, state_dir=self.state_dir)
         return self._remember("replacement", rp)
 
+    def plan_is_safe(self, plan: ChangePlan) -> bool:
+        """Whether ``plan`` is a *safe* replacement (no boundary links, no legacy adoption).
+
+        Re-read from the persisted detail with its integrity checked. Anything else, including a retire or purge
+        plan or a plan that is not on record, is not safe: T18E's auto-approval policy uses this and nothing else.
+        """
+        try:
+            kind, obj = self._recall(plan)
+        except ContractError:
+            return False
+        return bool(kind == "replacement" and obj.is_safe)
+
     def _scope_revision(self, scope: str, adopted: Sequence[str]) -> str:
         state = cs.read_scope_state(self.client, scope, adopted=tuple(adopted))
         return state.revision

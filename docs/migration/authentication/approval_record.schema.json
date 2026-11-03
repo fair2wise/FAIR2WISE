@@ -173,6 +173,14 @@
         "string",
         "null"
       ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64,
+      "description": "Policy reason when a deployment policy approved for the local operator (T18E: auto_safe_plan); null otherwise. Never set on ALS."
     }
   },
   "allOf": [

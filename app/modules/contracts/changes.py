@@ -131,6 +131,8 @@ class ApprovalRecord(BaseModel):
         limits: Numeric limits on the approved operation (for example max creates).
         expires_at: Time after which the approval is void.
         approved_at: Approval time.
+        reason: Why the approval was made when a deployment policy made it for the local operator
+            (T18E: ``auto_safe_plan``); ``None`` for an approval a person made by looking at the plan.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -154,6 +156,7 @@ class ApprovalRecord(BaseModel):
     limits: dict[str, int] = Field(default_factory=dict)
     expires_at: datetime | None = None
     approved_at: datetime
+    reason: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _profile_rules(self) -> ApprovalRecord:
@@ -177,6 +180,8 @@ class ApprovalRecord(BaseModel):
                 )
             if self.approver_is_admin is not True:
                 raise ValueError("ALS approvals require a role check showing the approver is an admin")
+            if self.reason is not None:
+                raise ValueError("ALS approvals are made by one verified admin; a policy reason is local only")
             if LOCAL_OPERATOR in (self.approved_by, self.requested_by):
                 raise ValueError("ALS approvals cannot be requested or made by local-operator")
         if self.executed_as == self.approved_by:
