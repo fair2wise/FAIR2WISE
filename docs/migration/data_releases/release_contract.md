@@ -88,7 +88,7 @@ sha256 goes into `manifest.disclosure` and into the descriptor.
 |---|---|---|
 | R1 path allowlist | Only `storage/kg/<corpus>/v<N>/{graph,manifest,validation}.json` and the flat compat copy | Reject PDFs, images and crops, `*.db`/`*.sqlite`, parsed packages, `storage/source_index/`, `papers/`, `.env*`, job, trace or checkpoint stores |
 | R2 schema and hash | Manifest validates. Graph hash and compat copies match. Refs are repo-relative or `private:`. | Reject |
-| R3 secrets | Token regexes (`sk-…`, `AKIA…`, `ghp_…`, bearer tokens, `api_key=`, `password=`) plus an entropy heuristic over every string | Reject, unless an allowlist entry, keyed by sha256 of (path, node id, field, value), was reviewed |
+| R3 secrets | Token regexes (`sk-…`, `AKIA…`, `ghp_…`, bearer tokens, `api_key=`, `password=`) plus a tuned entropy rule over every string (D3.22: tokens of 40+ characters that are high-entropy and shaped like random base62/base64; slug-shaped ids, UUIDs and long hex runs do not match) | Reject, unless an allowlist entry, keyed by sha256 of (path, node id, field, value), was reviewed |
 | R4 local paths | Absolute paths (`/Users/`, `/home/`, `/private/`, `/tmp/`, `/global/`, `/pscratch/`, drive letters, `file://`) in any string | Reject, unless allowlisted as above (for example a reviewed path inside retained public GitHub code) |
 | R5 bearer URLs | Signed or tokenized URLs (`X-Amz-Signature`, `token=`, `sig=`) | Reject |
 | R6 evidence-snippet volume | Per value and per source paper: lengths of `context_snippets[].text`, `has_evidence`, `abstract_text`, long `description` and `feature_source_text` values | **Informational only (owner decision O-D1).** Recorded in the report and the manifest, never a blocker on its own. Never silently truncate. |
@@ -616,10 +616,13 @@ as follows.
 3. **Q3: approved and applied** through `.gitattributes` (`storage/kg/** -text`, `storage/kg/*.json -text`,
    `storage/terminology/*.json -text`, `docs/migration/data_releases/releases/** -text`).
 4. **Q4: applied** (owner decision O-R1).
-5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3. Still an integrator action.
-6. Where descriptors live: the release system, or a later commit under `docs/migration/data_releases/releases/`.
-   **Still pending.** `scripts/adopt_legacy_kg.py descriptor` only prints to stdout or to a path outside the
-   repository, so the answer decides where the output goes and nothing else. No real descriptor is committed.
+5. **Q5: drafted (owner, 2026-11-03: "Yes, draft them").** Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and
+   JSON_KG_PUBLICATION_SPEC for E3 are in `docs/migration/reviews/H8/spec_errata_E3_draft.md`, for owner review. The
+   frozen documents are not edited until the owner approves the entries.
+6. **Q6: decided (owner, 2026-11-03): descriptors live under `docs/migration/data_releases/releases/`.** A descriptor
+   is committed there, in a later commit than the data it pins (a descriptor never names its own containing commit).
+   `scripts/adopt_legacy_kg.py descriptor` still prints to stdout or to a path outside the repository; writing the file
+   into `releases/` and committing it is an operator step. No real descriptor is committed yet.
 
 ### Adoption results [OBSERVED, 2026-10-30]
 
@@ -634,9 +637,13 @@ Tool: `app/modules/graph/adoption.py`, CLI `scripts/adopt_legacy_kg.py`. Run on 
 
 Adopted files get `graph.json` (a byte copy: same sha256, not a symlink, flat file untouched), `manifest.json`
 (`legacy_adoption`, one `unknown` extraction revision, no inputs, empty source set, schema `matkg_schema`, no invented
-hash) and `validation.json`. A name that is not `matkg_<corpus>_v<N>.json` becomes corpus `<name stem>`, snapshot `v1`
-and has no `compat_paths` entry, because the R1 flat allowlist admits only `matkg_<corpus>_v<N>.json`; its flat file is
-named in a descriptor with role `legacy_flat_graph`.
+hash) and `validation.json`. A name that is not `matkg_<corpus>_v<N>.json` becomes corpus `<name stem>` (the stem
+without `matkg_`, lower-cased, other characters mapped to `-`), snapshot `v1`. **D3.24 (owner, "Extend flat allowlist to
+legacy names"):** the R1 flat allowlist now admits `storage/kg/matkg_<name>.json` for any plain name (letters, digits,
+`_`, `-`), so such a file also gets a `compat_paths` entry and its flat path keeps working; a descriptor lists it as
+`compat_copy` like any other. The six files adopted in the first run were frozen before this rule; they keep the
+manifests they have (flat file named in a descriptor with role `legacy_flat_graph`) until a new snapshot replaces
+them. Nested `graph.json` copies are still not shipped in images (`.dockerignore`).
 
 **Adopted (6):**
 
@@ -669,6 +676,13 @@ Open items for the owner: (a) a reviewed allowlist (keyed by `allowlist_key`) fo
 bl1101 R3/R4 hits and the R7 `DocumentChunk` flags, before those files can be adopted; (b) whether `matkg_rsoxs_v3`
 (nodes/edges, an `ingest_rsoxs_v3` product) gets a manifest `format` value of its own, or is adopted after a rebuild;
 (c) whether bl1101 v8/v9 are rebuilt in json2kg serialization (that is a new version, never an edit); (d) Q6 above.
+
+**D3.22 resolved (owner: "Tune the rule").** The R3 entropy rule no longer flags slug-shaped ids: a long token must be
+high-entropy, change character class between neighbours at least 45% of the time and have under 25% of its characters
+in lowercase runs of five or more; UUIDs and 32+ digit hex runs are removed first. On the tracked flat files the tuned
+rule reports no R3 finding (the `sk-`, `AKIA`, `ghp_`, bearer, `api_key` and `password` patterns are unchanged and
+unaffected). Limit: a random single-case base36 token is not caught by entropy alone; prefixed and assigned secrets
+still are. No allowlist and no data-file edit were needed for the entropy hits.
 
 **Images.** The nested `graph.json` copies are excluded from the build context by `.dockerignore`
 (`storage/kg/*/v*/graph.json`); manifests and validation reports ship. The flat copies stay the byte source in

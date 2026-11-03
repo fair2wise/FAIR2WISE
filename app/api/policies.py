@@ -98,8 +98,9 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="submit a knowledge_operation job (whole population, no inline bound)" + _FRESH),
     _v("V31", "GET", "/operations/jobs/{job_id}", note=_OBJ + "; bounded report of a knowledge_operation job"),
     # T31 (owner decision B5, O-P4): cost control, bulk review, vocabulary quality, figure-scale records
-    _v("V32", "GET", "/curation/cost-control", "curation.approve",
-       note="remote-cost switch and cap (donor cborg_control) with the ledger spend against the cap"),
+    _v("V32", "GET", "/curation/cost-control", "jobs.admin",
+       note="remote-cost switch and cap (donor cborg_control) with the ledger spend against the cap"
+            " (owner 2026-11-03: jobs.admin, not curation.approve)"),
     _v("V33", "PUT", "/curation/cost-control", "curation.approve",
        note="set the switch and cap: human only, write-ahead audited" + _FRESH),
     _v("V34", "POST", "/curation/cases/bulk-review", "curation.approve",

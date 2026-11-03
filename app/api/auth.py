@@ -383,5 +383,8 @@ async def _contract_error_handler(request: Request, exc: Exception) -> JSONRespo
                                      ErrorCode.WRITER_UNAUTHORIZED)
     message = str(exc) if shown else "internal error"
     headers = {"Retry-After": "5"} if code is ErrorCode.UNAVAILABLE else None
-    return JSONResponse({"code": code.value, "message": message, "retryable": retryable},
-                        status_code=status, headers=headers)
+    body: dict[str, Any] = {"code": code.value, "message": message, "retryable": retryable}
+    reason = getattr(exc, "reason", None)
+    if reason and shown:
+        body["reason"] = str(reason)
+    return JSONResponse(body, status_code=status, headers=headers)

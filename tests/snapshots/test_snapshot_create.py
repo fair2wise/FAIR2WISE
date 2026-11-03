@@ -385,7 +385,7 @@ def test_a_working_file_is_never_an_approved_artifact(tmp_path):
         with pytest.raises(ReleaseVerificationError) as err:
             verify_snapshot_dir(target)
         assert err.value.code == "layout"
-    paths = ["workdir/kg.json", "storage/kg/matkg_qwen3_235b_257papers_20260101_000000.json",
+    paths = ["workdir/kg.json", "storage/kg/qwen3_235b_257papers_20260101_000000.json",  # D3.24: only matkg_<name>.json flats
              "storage/kg/synthetic/v1/graph.json", "storage/kg/matkg_synthetic_v1.json"]
     assert [f.location for f in check_paths(paths)] == paths[:2]
 

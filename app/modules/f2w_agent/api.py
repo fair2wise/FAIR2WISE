@@ -5733,6 +5733,7 @@ class AgentPipelineService:
                 _PUBLICATION_PHASE_MESSAGES.get(str(splash.get("status")), str(splash.get("message") or "")),
                 round=round_no,
                 status=str(splash.get("status") or ""),
+                **({"publish_state": str(splash["publish_state"])} if splash.get("publish_state") else {}),
             )
 
         await self._emit(

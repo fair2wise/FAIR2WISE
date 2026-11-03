@@ -276,6 +276,49 @@ def test_high_entropy_tokens_are_flagged_but_hex_digests_are_not():
     assert check_disclosure(_graph(description="sha " + "ab12" * 16)).status == "pass"
 
 
+SLUG_IDS = (  # shapes of the 858 false positives found on the flat KG files (D3.22)
+    "snippetanalyzevolfractions101021acsjpcb4c05774pdfp0884f62c3",
+    "Poly56-difluoro-213-benzothiadiazol-47-diyl-alt-33-di2-octyldodecyl-225252-quaterthiophen-55-diylPff",
+    "YXiongLYeAGadisaQZhangJJRechWYouandHAde2019",
+    "1396eVforbothD18-ClN3andD18-ClN3Qxp-C7H8Odevices",
+    "RSoXSMeasurement-167e2a1d-3f3b-9fef-c18c-425cfb0a648a",
+    "https://github.com/als-computing/bcs2sim-ophyd/blob/729686c05f6c39208f4ed034abc3229f63d7ac23/axis_sxr40.py",
+)
+KEY_LIKE = (  # seeded random-looking tokens; none carries a prefix the token-shape patterns know
+    "q7Zr2LmXw9PbT4vNc8KdYs1HgJf6EaUo3RiVt5WnBx0",
+    "Xk93mPq0LzR7vTb2NcY8wDsA4HgJf6EuO1iVt5WnQ-_e",
+    "N8fW2kQz7XpLr4VbTc9YdMs1HgJa6EuO3iAt5wRnBx0Zq8",
+)
+
+
+@pytest.mark.parametrize("ident", SLUG_IDS)
+def test_slug_shaped_identifiers_are_not_flagged_as_entropy(ident):
+    graph = _graph(id=ident, description=f"see {ident}")
+    assert "R3" not in _rules(check_disclosure(graph))
+
+
+@pytest.mark.parametrize("token", KEY_LIKE)
+def test_key_like_tokens_still_fail_the_entropy_rule(token):
+    report = check_disclosure(_graph(description=f"credential {token} here"))
+    assert _rules(report) == ["R3"] and not report.commit_ready
+    assert token not in report.canonical_bytes().decode()
+
+
+@pytest.mark.parametrize("text", (
+    "sk-" + "aB3dE5gH7jK9mN1pQ3sT5vW7yZ",
+    "Authorization: Bearer " + "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1dF",
+    'api_key = "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1dF"',
+))
+def test_prefixed_and_assigned_secrets_still_fail(text):
+    assert _rules(check_disclosure(_graph(description=text))) == ["R3"]
+
+
+def test_slug_next_to_a_key_still_reports_the_key():
+    token = KEY_LIKE[0]
+    graph = _graph(id=SLUG_IDS[0], description=f"{SLUG_IDS[1]} {token}")
+    assert _rules(check_disclosure(graph)) == ["R3"]
+
+
 def test_reviewed_exceptions_by_key_and_owner_waivers():
     graph = _graph(source_file_path="/home/ci/work/x.py")
     report = check_disclosure(graph)
@@ -338,3 +381,14 @@ def test_snapshot_creation_records_disclosure_status_and_blocks_commit_readiness
     assert waived.manifest.disclosure.waiver_ref == "owner:ok"
     # the frozen graph is the same bytes either way: readiness never edits the payload
     assert blocked.graph_path.read_bytes() == waived.graph_path.read_bytes()
+
+
+def test_flat_allowlist_admits_legacy_names_but_not_other_flat_files():
+    """D3.24: ``matkg_<anything>.json`` flat names are allowed; other flat files and odd names are not."""
+    legacy = ["storage/kg/matkg_deepseek-r1_14b_100_20250918_095748.json", "storage/kg/matkg_Qwen3_235b_147papers.json",
+              "storage/kg/matkg_with_code.json"]
+    bad = ["storage/kg/notmatkg.json", "storage/kg/matkg_.json", "storage/kg/matkg_x.json.bak",
+           "storage/kg/matkg_a b.json", "storage/kg/sub/matkg_x.json", "storage/kg/matkg_x.v1.json",
+           "storage/kg/matkg_x.pdf", "other/matkg_x.json", "/storage/kg/matkg_x.json"]
+    assert check_paths(legacy) == []
+    assert [f.location for f in check_paths(bad)] == bad

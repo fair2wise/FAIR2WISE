@@ -109,13 +109,16 @@ def test_is_deterministic_and_leaves_the_flat_file_alone(tmp_path, legacy_bytes,
     assert runs[0] == runs[1]
 
 
-def test_non_standard_name_gets_a_slug_corpus_v1_without_a_compat_entry(tmp_path, legacy_bytes, registry_module):
+def test_non_standard_name_gets_a_slug_corpus_v1_with_a_compat_entry(tmp_path, legacy_bytes, registry_module):
     kg = tmp_path / "kg"
     flat = _flat(kg, "matkg_Qwen3_235b_100_20251004.json", legacy_bytes)
     out = _adopt(flat, registry_module)
     assert (out.corpus, out.snapshot_id) == ("qwen3_235b_100_20251004", "v1")
     manifest = parse_manifest((kg / out.corpus / "v1" / "manifest.json").read_bytes())
-    assert manifest.compat_paths is None  # T26B R1 admits only matkg_<corpus>_v<N>.json flat names
+    # D3.24: legacy names are on the flat allowlist, so the flat path keeps working through compat_paths.
+    assert [(c.path, c.sha256) for c in manifest.compat_paths] == [
+        ("storage/kg/matkg_Qwen3_235b_100_20251004.json", manifest.graph.sha256)]
+    assert verify_snapshot_dir(kg / out.corpus / "v1").compat_paths == ("storage/kg/matkg_Qwen3_235b_100_20251004.json",)
     assert manifest.graph_id == "Qwen3_235b_100_20251004"  # exactly what readers derive from the flat name
     assert manifest.parent.snapshot_id == "matkg_Qwen3_235b_100_20251004"
 
@@ -232,7 +235,7 @@ def committed(tmp_path, legacy_bytes, registry_module):
 
 @pytest.mark.parametrize("corpus,flat_role_path", [
     ("legacyfix", None),
-    ("old_run_20250101", "storage/kg/matkg_old_run_20250101.json"),
+    ("old_run_20250101", None),  # D3.24: a legacy name has a compat_copy entry like a standard one
 ])
 def test_descriptor_is_schema_valid_and_pins_committed_bytes(committed, corpus, flat_role_path):
     repo, commit = committed

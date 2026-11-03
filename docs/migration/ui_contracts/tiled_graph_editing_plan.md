@@ -372,7 +372,11 @@ risk is the same as the baseline's.
    - ALS: it always waits for an admin to approve the plan through the jobs API or CLI. The frozen UI has no
      plan-review screen.
 5. SSE: the legacy phases `splash_reimport_started` and `splash_reimport_result` are kept and report the plan
-   status: "published to Tiled", "publication awaiting admin review", or the error text.
+   status: "published to Tiled", "publication awaiting admin review", or the error text. Every result also
+   carries `publish_state` (`tiled_published`, `awaiting_review`, `error`). When no Tiled publisher is configured the
+   legacy `status` stays `skipped` (wire compatibility) and the result adds `publish_state =
+   json_available_tiled_unavailable` and `indicator = "JSON available, Tiled unavailable"`; the phase message starts
+   with that indicator. The CLI coordinator gets no publisher (owner decision pending); it prints the indicator.
 
 **Crash:** as (a). The JSON snapshot is never affected by an import failure.
 
