@@ -24,7 +24,11 @@ env:
   # Re-pinned 2026-10-16 (owner O-U1): T24C build-base router/logo change for /fair2wise.
   # Re-pinned 2026-10-16 (owner O-U2): T11B additive validation judge-model dropdown in the
   # settings panel (JudgeModelSetting, judgeModel.ts, e2e judge-model.spec.ts); previous 2cc7ccd3.
-  FROZEN_UI_TREE: a9c222b1211efadffbc4f4f43d7e0624e28ee340
+  # Re-pinned 2026-11-03 (owner O-U4, T43): A8 Library, Extract and Harvester tabs (T40-T42, T46:
+  # LibraryTab, ExtractionTab, library/, extraction/, harvest api and hooks, KeepAliveMainContent, App.tsx
+  # routes, e2e library/extraction/harvester specs) plus the T18D UI files (317411b); previous a9c222b1.
+  # PRs touching ui/ carry the ui-change-approved label. See docs/migration/ui_contracts/a8_library_tabs.md.
+  FROZEN_UI_TREE: 059b7a46a8111faa71588a0bbf94e4b0609a3a58
   KG_RAG_RETRIEVAL_BACKEND: lexical
   KG_RAG_FORCE_CPU: "1"
   F2W_SOURCE_RAG: "0"
