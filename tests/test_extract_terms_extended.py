@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.modules.extract_terms import LLMTermExtractor, retry_on_exception
+from app.modules.legacy.extract_terms_cli import LLMTermExtractor, retry_on_exception
 
 
 # ---------------------------------------------------------------------------
@@ -122,23 +122,23 @@ def _make_fake_doc(text: str):
 def test_init_resumes_from_existing_output_file(tmp_path, monkeypatch):
     # Stub out heavy dependencies that fire in real __init__
     monkeypatch.setattr(
-        "app.modules.extract_terms.ChemicalFormulaValidator",
+        "app.modules.legacy.extract_terms_cli.ChemicalFormulaValidator",
         lambda **kw: _DummyFormulaChecker(),
     )
     monkeypatch.setattr(
-        "app.modules.extract_terms.SchemaHelper",
+        "app.modules.legacy.extract_terms_cli.SchemaHelper",
         lambda **kw: _DummySchema(),
     )
     monkeypatch.setattr(
-        "app.modules.extract_terms.ChebiOboLookup",
+        "app.modules.legacy.extract_terms_cli.ChebiOboLookup",
         MagicMock(side_effect=FileNotFoundError("no chebi")),
     )
     monkeypatch.setattr(
-        "app.modules.extract_terms.PhysicalPropertyExtractor",
+        "app.modules.legacy.extract_terms_cli.PhysicalPropertyExtractor",
         MagicMock(return_value=MagicMock()),
     )
     monkeypatch.setattr(
-        "app.modules.extract_terms.PropertyNormalizer",
+        "app.modules.legacy.extract_terms_cli.PropertyNormalizer",
         MagicMock(return_value=MagicMock()),
     )
 
@@ -262,7 +262,7 @@ def test_process_page_handles_llm_failure(tmp_path):
 
     e = _make_extractor(tmp_path, client=AlwaysFailsClient())
     # patch retry so it doesn't re-try and swallow the error
-    import app.modules.extract_terms as et
+    import app.modules.legacy.extract_terms_cli as et
     original = et.retry_on_exception
 
     def no_retry(exc_types, retries=1, delay_seconds=1.0):

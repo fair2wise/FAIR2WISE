@@ -6,7 +6,7 @@ Two active entry paths share the same conceptual output:
 
 - `app/modules/term_extractor/` is the modular implementation used by the
   current local and remote agents.
-- `app/modules/extract_terms.py` is the larger standalone extractor retained as
+- `app/modules/legacy/extract_terms_cli.py` is the larger standalone extractor retained as
   a supported CLI and exercised heavily by tests.
 
 `scripts/run.py` launches the modular extractor. `scripts/build_kg.sh` calls the

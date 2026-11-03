@@ -19,7 +19,7 @@ import shutil
 import tempfile
 
 from modules.cli_output import output
-from modules.extract_terms import run_extraction
+from modules.legacy.extract_terms_cli import run_extraction
 from modules.json2kg import convert_terms_to_graph
 
 # -----------------------------------------------------------------------------

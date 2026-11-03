@@ -3,7 +3,7 @@ import threading
 
 import pytest
 
-from app.modules.extract_terms import (
+from app.modules.legacy.extract_terms_cli import (
     LLMTermExtractor,
     OllamaChatClient,
     SchemaHelper,

@@ -61,7 +61,7 @@ def load_helper(
     Args:
         entry: Registered LinkML schema to load; must not be known-broken.
         implementation: :data:`NORMALIZER_TERM_EXTRACTOR` (``term_extractor/schema.py``) or
-            :data:`NORMALIZER_LEGACY` (the divergent copy in ``extract_terms.py``, T22A F4).
+            :data:`NORMALIZER_LEGACY` (the divergent copy in ``legacy/extract_terms_cli.py``, T22A F4).
         fuzzy_cutoff: Fuzzy-match score cutoff passed to the helper.
 
     Raises:
@@ -74,7 +74,7 @@ def load_helper(
         from ..term_extractor.schema import SchemaHelper
     elif implementation == NORMALIZER_LEGACY:
         # heavy import: only on the legacy path
-        from ..extract_terms import SchemaHelper  # type: ignore[assignment]  # legacy copy (T22A F4)
+        from ..legacy.extract_terms_cli import SchemaHelper  # type: ignore[assignment]  # legacy copy (T22A F4)
     else:
         raise RegistryError(f"unknown normalizer implementation {implementation!r}")
     return SchemaHelper(str(entry.abs_path), fuzzy_cutoff=fuzzy_cutoff)

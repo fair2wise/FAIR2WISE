@@ -251,9 +251,9 @@ python3 scripts/download_pdfs.py --help
 
 ---
 
-## Step 2 — [Concept Extraction](app/modules/extract_terms.py)
+## Step 2 — [Concept Extraction](app/modules/legacy/extract_terms_cli.py)
 
-`extract_terms.py` is a schema-aware, parallel PDF term extraction engine. It produces structured, ontology-aligned JSON output integrating:
+`extract_terms_cli.py` (archived under `app/modules/legacy/` by T17B; canonical extraction is `term_extractor/`) is a schema-aware, parallel PDF term extraction engine. It produces structured, ontology-aligned JSON output integrating:
 
 - CBORG or Ollama (OpenAI-compatible) LLM backends
 - LinkML schema enforcement via `SchemaHelper`
@@ -282,7 +282,7 @@ curl -L https://ftp.ebi.ac.uk/pub/databases/chebi/ontology/chebi.obo \
 Run the extractor on any PDF folder:
 
 ```bash
-python3 app/modules/extract_terms.py \
+python3 app/modules/legacy/extract_terms_cli.py \
   --pdf-dir papers/ \
   --output storage/terminology/extracted_terms_polymer.json
 ```
@@ -290,7 +290,7 @@ python3 app/modules/extract_terms.py \
 For a dedicated xray KG (or any other domain-specific folder):
 
 ```bash
-python3 app/modules/extract_terms.py \
+python3 app/modules/legacy/extract_terms_cli.py \
   --pdf-dir papers/ \
   --output storage/terminology/extracted_terms_xray_papers_cborg_chat.json
 ```
@@ -307,7 +307,7 @@ Target a single PDF by isolating it in a temp folder:
 mkdir -p /tmp/single_pdf
 cp papers/XRAY1.pdf /tmp/single_pdf/
 
-python3 app/modules/extract_terms.py \
+python3 app/modules/legacy/extract_terms_cli.py \
   --pdf-dir /tmp/single_pdf/ \
   --output storage/terminology/extracted_terms_xray1.json
 ```
@@ -315,7 +315,7 @@ python3 app/modules/extract_terms.py \
 Show all options:
 
 ```bash
-python3 app/modules/extract_terms.py --help
+python3 app/modules/legacy/extract_terms_cli.py --help
 ```
 
 ### Checkpoint evaluation pipeline
@@ -881,7 +881,7 @@ The extractor agent uses [`app/modules/term_extractor/`](app/modules/term_extrac
 - Code snippets come from embedded PDF code blocks and explicit GitHub repository links found in PDF text; set optional `GITHUB_TOKEN` for higher GitHub API rate limits.
 - KG conversion uses the existing [`json2kg.py`](app/modules/json2kg.py) (preserves `source_metadata` + CodeSnippet nodes).
 
-The legacy standalone extractor [`extract_terms.py`](app/modules/extract_terms.py) remains available for manual/batch runs. The monitored remote `TermExtractorAgent` + dashboard stack in `term_extractor/` is available for standalone Globus/NERSC extraction, but is **not** used by the local `app.modules.launchers.f2w_agent` loop.
+The legacy standalone extractor [`extract_terms_cli.py`](app/modules/legacy/extract_terms_cli.py) remains available for manual/batch runs. The monitored remote `TermExtractorAgent` + dashboard stack in `term_extractor/` is available for standalone Globus/NERSC extraction, but is **not** used by the local `app.modules.launchers.f2w_agent` loop.
 
 ### NERSC deploy helper
 
@@ -1201,7 +1201,6 @@ that validate ID generation, field retention, and CLI behavior.
 │   │   │   ├── chebi.py
 │   │   │   ├── chem_checker.py
 │   │   │   └── properties.py
-│   │   ├── extract_terms.py
 │   │   ├── f2w_agent
 │   │   │   ├── __init__.py
 │   │   │   ├── cli.py
@@ -1226,7 +1225,9 @@ that validate ID generation, field retention, and CLI behavior.
 │   │   │   ├── store.py
 │   │   │   └── …
 │   │   └── legacy
+│   │       ├── __init__.py
 │   │       ├── build_onto.py
+│   │       ├── extract_terms_cli.py
 │   │       ├── extract_terms_linkml_jun3.py
 │   │       ├── extract_terms_linkml.py
 │   │       ├── extract_terms.py

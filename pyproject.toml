@@ -8,8 +8,8 @@
 # the images). The ranges below are the PyPI packaging metadata for `pip install fair2wise[...]`
 # and mirror the direct dependencies in pixi.toml; they are not a lock.
 #
-# Not packaged: app/modules/legacy/ (archived, no __init__.py), app/run_pipeline_cborg.py
-# (checkout-only script), scripts/, storage/, config.yml. Schemas, vocabularies and
+# Packaged but archived: app/modules/legacy/ (deprecated originals moved by T17B, excluded from lint/typing).
+# Not packaged: app/run_pipeline_cborg.py (checkout-only script), scripts/, storage/, config.yml. Schemas, vocabularies and
 # config.yml resolve from F2W_RESOURCE_ROOT (repo root in a checkout); see
 # app/modules/resources.py.
 [build-system]
@@ -114,6 +114,7 @@ packages = [
   "f2w.modules.graph.imports",
   "f2w.modules.hybrid_rag",
   "f2w.modules.jobs",
+  "f2w.modules.legacy",
   "f2w.modules.launchers",
   "f2w.modules.curation",
   "f2w.modules.library",

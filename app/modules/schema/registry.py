@@ -190,7 +190,7 @@ ENTRYPOINT_DEFAULTS: tuple[EntrypointDefault, ...] = (
     EntrypointDefault("academy-extractor", "app/modules/launchers/academy_extractor.py",
                       'default="storage/schema/matkg_schema.yaml"',
                       "matkg_schema", "default", NORMALIZER_TERM_EXTRACTOR),
-    EntrypointDefault("extract-terms-cli", "app/modules/extract_terms.py",
+    EntrypointDefault("extract-terms-cli", "app/modules/legacy/extract_terms_cli.py",
                       'default=Path("storage/schema/matkg_schema.yaml")',
                       "matkg_schema", "default", NORMALIZER_LEGACY),
     EntrypointDefault("run-pipeline-cborg", "app/run_pipeline_cborg.py",
