@@ -279,7 +279,7 @@ def _terms_ref(request: SnapshotRequest) -> str:
         try:
             return Path(request.terms_path).resolve().relative_to(root.resolve()).as_posix()
         except ValueError:
-            pass
+            logger.debug("terms path %s is outside the resource root %s", request.terms_path, root)
     raise SnapshotError("terms_ref is required (a repo-relative path or private: reference) when the terms file "
                         "is outside the repository; absolute local paths are not recorded")
 
@@ -461,7 +461,7 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
                 claimed_flat = flat
                 staging.rename(final)  # fails if another job created `final` first
             except FileExistsError:
-                pass
+                logger.debug("snapshot %s already claimed by another job", final)
             except OSError as exc:
                 if claimed_flat is not None:
                     claimed_flat.unlink(missing_ok=True)

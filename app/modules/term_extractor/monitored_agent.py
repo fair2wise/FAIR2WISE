@@ -22,6 +22,8 @@ from .message import Log, Message, Registration, Stats, UserPrompt
 if TYPE_CHECKING:
     from .user_agent import UserAgent
 
+logger = logging.getLogger(__name__)
+
 _FORWARDED_LOGGER_SKIP_PREFIXES = (
     # 'academy',
     'asyncio',
@@ -170,6 +172,7 @@ class MonitoredAgent(Agent):
             data = resp.json()
             return cast(dict[str, Any], data)
         except Exception:
+            logger.debug("geolocation lookup failed", exc_info=True)
             return {}
 
     async def agent_registration(self) -> None:
@@ -210,7 +213,7 @@ class MonitoredAgent(Agent):
                     },
                 )
         except Exception:
-            pass
+            logger.debug("GPU stats unavailable", exc_info=True)
 
         return Stats(
             agent_id=self._agent_uid_str,

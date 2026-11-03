@@ -119,10 +119,7 @@ def _atomic_write(path: Path, write: Any) -> None:
             os.fsync(handle.fileno())
         tmp.replace(path)
     finally:
-        try:
-            tmp.unlink()
-        except FileNotFoundError:
-            pass
+        tmp.unlink(missing_ok=True)
 
 
 class SourceIndex:

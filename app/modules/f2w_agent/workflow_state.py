@@ -96,10 +96,7 @@ class WorkflowStateStore:
                 os.fsync(handle.fileno())
             Path(tmp_name).replace(self.path)
         finally:
-            try:
-                Path(tmp_name).unlink()
-            except FileNotFoundError:
-                pass
+            Path(tmp_name).unlink(missing_ok=True)
 
     def update(self, **values: Any) -> dict[str, Any]:
         """Merge *values* into state, persist, and return a snapshot."""

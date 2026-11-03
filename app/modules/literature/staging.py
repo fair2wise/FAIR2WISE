@@ -31,6 +31,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 import contextlib
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -40,6 +41,8 @@ from typing import Any, cast
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .store import FileDocumentStore, atomic_write_json
+
+logger = logging.getLogger(__name__)
 
 try:
     import fcntl
@@ -310,7 +313,7 @@ def read_staged_import_status(root: Path) -> dict[str, Any]:
                 if state not in {"complete", "not_run"}:
                     incomplete_stages[stage] = incomplete_stages.get(stage, 0) + 1
         except (OSError, ValueError):
-            pass
+            logger.debug("package header %s unreadable; counted incomplete", path, exc_info=True)
         counts["incomplete_packages"] += 1
     return {
         **counts,

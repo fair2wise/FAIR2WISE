@@ -824,10 +824,7 @@ def search_arxiv(keyword: str, max_results: int) -> Iterable[Any]:  # Any: arxiv
 
 
 def _cleanup_partial(path: Path) -> None:
-    try:
-        path.unlink()
-    except FileNotFoundError:
-        pass
+    path.unlink(missing_ok=True)
 
 
 def download_pdf(url: str, dest: str, retries: int = 3) -> bool:

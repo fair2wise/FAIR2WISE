@@ -594,7 +594,7 @@ class TurnTrace:
                 try:
                     response.turn_id = self.turn_id
                 except Exception:
-                    pass
+                    logger.debug("could not set turn_id on the response", exc_info=True)
 
     def finish(self) -> None:
         """Write the summary line and detail file once. Never raises."""
@@ -768,7 +768,7 @@ def open_turn(
         try:
             fallback.bind()
         except Exception:
-            pass
+            logger.debug("fallback trace bind failed", exc_info=True)
         return fallback
 
 

@@ -17,12 +17,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import logging
 from pathlib import Path
 import re
 from typing import Any
 import xml.etree.ElementTree as ET  # noqa: S405 - input is a local operator-run service; expat refuses entity bombs
 
 from .statements import Basis, ProvenanceStatement
+
+logger = logging.getLogger(__name__)
 
 #: Stamped into cache names and statements so a parser change re-reads instead of trusting old answers.
 REFERENCE_PARSER_VERSION = "grobid-0.9.1/refparse-v1"
@@ -162,8 +165,8 @@ def grobid_references(pdf: Path, *, base_url: str = "", http: Any = None, timeou
         try:
             return [ParsedReference(**{**r, "authors": tuple(r.get("authors") or ())})
                     for r in json.loads(cache.read_text())]
-        except (ValueError, TypeError):
-            pass  # an unreadable cache is re-fetched
+        except (ValueError, TypeError):  # an unreadable cache is re-fetched
+            logger.debug("unreadable reference cache %s; re-fetching", cache, exc_info=True)
     with pdf.open("rb") as handle:
         resp = http.post(f"{base}/api/processReferences", files={"input": (pdf.name, handle, "application/pdf")},
                          data={"includeRawCitations": "1", "consolidateCitations": "0"}, timeout=timeout)

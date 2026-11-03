@@ -547,7 +547,7 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
         doc.close()
         return " ".join(" ".join(parts).split())
     except Exception:
-        pass
+        LOGGER.debug("PyMuPDF text extraction failed for %s; trying pypdf", path, exc_info=True)
     try:
         from pypdf import PdfReader
 
@@ -562,9 +562,11 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
             try:
                 parts.append(reader.pages[i].extract_text() or "")
             except Exception:
+                LOGGER.debug("pypdf page %d text unreadable", i, exc_info=True)
                 continue
         return " ".join(" ".join(parts).split())
     except Exception:
+        LOGGER.debug("pypdf text extraction failed for %s", path, exc_info=True)
         return ""
 
 
@@ -2443,7 +2445,7 @@ def main() -> None:
 
         load_entrypoint_dotenv(__file__)
     except (OSError, ImportError):
-        pass
+        LOGGER.debug("entrypoint dotenv not loaded", exc_info=True)
     args = parse_args()
     dl.set_delay_floor(args.delay)
     logging.basicConfig(

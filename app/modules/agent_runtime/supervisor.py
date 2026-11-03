@@ -60,6 +60,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 import json
+import logging
 from typing import Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
@@ -88,6 +89,8 @@ from .policies import (
 from .registry import RegisteredTool, ToolRegistry, effective_capabilities
 from .skills import SkillRegistry
 from .state import LiteratureState, RunContext, as_run_context
+
+logger = logging.getLogger(__name__)
 
 #: Default system prompt of :func:`build_literature_supervisor` when a caller injects none.
 #: Not on the ``F2W_RUNTIME=langgraph`` path: ``application.F2WApplication`` (T03) always passes
@@ -341,7 +344,7 @@ def build_literature_supervisor(
                                      args=call.get("args"), plan=plan, thread_id=tid, tool_call_id=tcid,
                                      event_id=f"approval_requested:{tid}:{tcid}"))
             except Exception:  # noqa: BLE001 - the write itself is refused later if audit stays down
-                pass
+                logger.warning("approval_requested audit event for %s not recorded", entry.name, exc_info=True)
         return {"open_approvals": opened, "messages": placeholders}
 
     def unanswered_calls(state: LiteratureState) -> list[Mapping[str, Any]]:
@@ -402,7 +405,7 @@ def build_literature_supervisor(
                                          error_code=verdict.error_code, detail=verdict.reason, thread_id=tid,
                                          tool_call_id=key))
                 except Exception:  # noqa: BLE001 - the executor re-checks and audits the write itself
-                    pass
+                    logger.warning("%s audit event for %s not recorded", kind, entry.name, exc_info=True)
                 decided[key] = approval.model_dump(mode="json") if approval is not None else None
         for key in expired:
             decided[key] = {EXPIRED_KEY: True}

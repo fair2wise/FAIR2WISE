@@ -1134,7 +1134,7 @@ class Dashboard:
                 raw['lat'] = float(lat_str)
                 raw['lon'] = float(lon_str)
             except (ValueError, AttributeError):
-                pass
+                logger.debug("unparseable geolocation 'loc' value", exc_info=True)
         geo = raw if raw.get('lat') else None
         org = raw.get('org', '')
         # Include ipinfo hostname alongside fqdn so logo matching has more signal.
@@ -1250,7 +1250,7 @@ class Dashboard:
             try:
                 self._subscribers.remove(q)
             except ValueError:
-                pass
+                logger.debug("subscriber already removed")
 
     def _broadcast(self, event: str, data: Any) -> None:
         msg = f'event: {event}\ndata: {json.dumps(data)}\n\n'
