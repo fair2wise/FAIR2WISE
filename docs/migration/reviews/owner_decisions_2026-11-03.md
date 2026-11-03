@@ -41,3 +41,12 @@ Interpretation notes (agent, for the owner to correct):
 | T26A Q6: where release descriptors live | "Under docs/migration/data_releases/releases/ (Recommended)" |
 | D3.23: handling of bl1101 v1-v7 `api_key` literal / `/tmp/` strings | "Scrub the literals from the files" |
 | D3.23: matkg_rsoxs_v3 format, bl1101 v8/v9 serialization | "Rebuild them (Recommended)" |
+
+## Sixth set
+
+| Question | Owner answer |
+|---|---|
+| D3.24: adoption naming / nested copies | "Extend flat allowlist to legacy names" |
+| Capability for the cost-control GET | "jobs.admin" |
+| Unported enrichment / topic-sweep / PDF-parse handlers | "is that from forge or f2w?" (not decided; answered: the donor is FORGE's graph-enrichment agent, whose code is not in this repo; asked again) |
+| Rebuild and restart the local container from the current tip | "Yes, rebuild and restart" |
