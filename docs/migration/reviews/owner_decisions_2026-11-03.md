@@ -19,3 +19,9 @@ Interpretation notes (agent, for the owner to correct):
 | Rollback V20 on replacement-importer deployments | "i dont understand what this is about" (not decided; explained, asked again) |
 | Capability for paper job kinds | "jobs.admin only (Recommended)" |
 | Default `F2W_FOLDER_ROOTS` for the :local image | "it should mount the papers/ folder in the repo" |
+
+## Third batch
+
+| Question | Owner answer |
+|---|---|
+| Rollback V20 (pointer-only) on replacement-importer deployments, after the plain-language explanation (return 409 and point to `rollback_replacement`, or allow) | "let's do this" / "rollback_replacement undoes the replacement properly, in order" (read as: V20 returns 409 there and callers use `rollback_replacement`) |
