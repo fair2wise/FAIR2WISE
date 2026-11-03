@@ -20,7 +20,8 @@ export type LibraryIndexStatus = 'ok' | 'no_text' | null;
 export interface LibraryStatus {
   mounted: boolean;
   paper_count: number;
-  indexed_count: number;
+  /** Papers indexed for QA; `null` until the T36 backend reports it. */
+  indexed_count: number | null;
   /** True while the OpenAlex quota breaker is open (Verify would be refused). */
   quota_open: boolean;
 }
@@ -36,6 +37,10 @@ export interface LibraryPaper {
   doi: string | null;
   verify_status: LibraryVerifyStatus;
   verified_at: string | null;
+  /** Short reason text for the verify result (e.g. why it was not found); may be absent. */
+  verify_detail?: string | null;
+  /** State of the title/DOI extraction from the PDF (server-defined string); may be absent. */
+  metadata_status?: string | null;
   index_status: LibraryIndexStatus;
 }
 
@@ -43,6 +48,10 @@ export interface LibraryPaper {
 export interface LibraryPapersResponse {
   papers: LibraryPaper[];
   total: number;
+  /** Papers whose title/DOI are still being read from the PDF. */
+  pending_metadata?: number;
+  /** True when `papers` is a capped prefix of `total`. */
+  truncated?: boolean;
 }
 
 /** `POST /v1/library/papers`: the stored paper, and whether the sha256 already existed. */
@@ -63,7 +72,8 @@ export function normalizeLibraryStatus(raw: unknown): LibraryStatus {
   return {
     mounted: data.mounted === true,
     paper_count: num(data.paper_count),
-    indexed_count: num(data.indexed_count),
+    indexed_count:
+      typeof data.indexed_count === 'number' && Number.isFinite(data.indexed_count) ? data.indexed_count : null,
     quota_open: data.quota_open === true,
   };
 }
@@ -115,18 +125,29 @@ export function verifyLibraryPaper(paperId: string, fetcher: typeof fetch = fetc
 
 /**
  * Submit the `library_verify` job for every paper. `nonce` makes a deliberate re-run a new job
- * (job identity is idempotent on identical inputs).
+ * (job identity is idempotent on identical inputs). The nonce rides in `inputs.params`; a top-level
+ * `nonce` is rejected with 422.
  */
 export function verifyAllLibraryPapers(nonce?: string, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: 'library_verify', inputs: {}, nonce }), fetcher);
+  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: 'library_verify', inputs: { params: { nonce } } }), fetcher);
 }
 
 /** Submit the `library_index` job (Index for QA). */
 export function indexLibraryPapers(nonce?: string, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: 'library_index', inputs: {}, nonce }), fetcher);
+  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: 'library_index', inputs: { params: { nonce } } }), fetcher);
 }
 
 /** True when the file looks like a PDF by name or MIME type (client-side pre-check only). */
 export function isPdfFile(file: Pick<File, 'name' | 'type'>): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+}
+
+/** A user-facing message for a failed upload, keyed on the T35 status codes (415, 413, 422, 501). */
+export function uploadErrorMessage(error: unknown): string {
+  const status = error instanceof ApiError ? error.status : undefined;
+  const detail = error instanceof Error ? error.message : 'Upload failed.';
+  if (status === 415) return `Not a PDF: ${detail}`;
+  if (status === 413) return `File too large: ${detail}`;
+  if (status === 501) return 'The papers folder is not mounted on this server.';
+  return detail;
 }

@@ -11,6 +11,7 @@ import { FlaskConical, Library, Share2 } from 'lucide-react';
 import { ExtractionTab } from './components/ExtractionTab';
 import { KeepAliveMainContent } from './components/KeepAliveMainContent';
 import { LibraryTab } from './components/LibraryTab';
+import { Toaster } from './components/ui/sonner';
 import { useLibraryProbe } from './components/libraryHooks';
 import { AppBookmarksButton } from './components/AppBookmarksButton';
 import { AppNewChatButton } from './components/AppNewChatButton';
@@ -95,6 +96,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppShell />
+      <Toaster />
     </QueryClientProvider>
   );
 }

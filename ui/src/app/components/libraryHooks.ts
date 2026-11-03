@@ -47,12 +47,18 @@ export function useLibraryProbe(): LibraryProbe {
   return { available: status !== null, isLoading: query.isPending, status };
 }
 
-/** The paper list; enabled only when the library is available. */
-export function useLibraryPapers(enabled = true) {
+/**
+ * The paper list; enabled only when the library is available.
+ *
+ * @param enabled - Fetch only when true.
+ * @param pollMs - Refetch interval while a job runs (it also polls every 3 s while `pending_metadata` > 0); `false` (default) disables polling.
+ */
+export function useLibraryPapers(enabled = true, pollMs: number | false = false) {
   return useQuery({
     queryKey: libraryKeys.papers,
     queryFn: () => fetchLibraryPapers(),
     enabled,
+    refetchInterval: query => pollMs || ((query.state.data?.pending_metadata ?? 0) > 0 ? 3000 : false),
   });
 }
 

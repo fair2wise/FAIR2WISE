@@ -6,6 +6,7 @@ import {
   indexLibraryPapers,
   isPdfFile,
   normalizeLibraryStatus,
+  uploadErrorMessage,
   uploadLibraryPaper,
   verifyAllLibraryPapers,
   verifyLibraryPaper,
@@ -39,7 +40,7 @@ describe('libraryApi', () => {
   });
 
   it('normalizes garbage to a safe status', () => {
-    expect(normalizeLibraryStatus(null)).toEqual({ mounted: false, paper_count: 0, indexed_count: 0, quota_open: false });
+    expect(normalizeLibraryStatus(null)).toEqual({ mounted: false, paper_count: 0, indexed_count: null, quota_open: false });
   });
 
   it('lists papers', async () => {
@@ -76,7 +77,8 @@ describe('libraryApi', () => {
     await indexLibraryPapers(undefined, asFetch(fetcher));
     const first = JSON.parse((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     const second = JSON.parse((fetcher.mock.calls[1] as unknown as [string, RequestInit])[1].body as string);
-    expect(first).toMatchObject({ kind: 'library_verify', nonce: 'n1' });
+    expect(first).toEqual({ kind: 'library_verify', inputs: { params: { nonce: 'n1' } } });
+    expect(first.nonce).toBeUndefined();
     expect(second.kind).toBe('library_index');
   });
 
@@ -84,5 +86,12 @@ describe('libraryApi', () => {
     expect(isPdfFile({ name: 'x.PDF', type: '' })).toBe(true);
     expect(isPdfFile({ name: 'x', type: 'application/pdf' })).toBe(true);
     expect(isPdfFile({ name: 'x.txt', type: 'text/plain' })).toBe(false);
+  });
+
+  it('maps upload statuses to messages', () => {
+    expect(uploadErrorMessage(new ApiError('bad', 415))).toContain('Not a PDF');
+    expect(uploadErrorMessage(new ApiError('big', 413))).toContain('too large');
+    expect(uploadErrorMessage(new ApiError('x', 501))).toContain('not mounted');
+    expect(uploadErrorMessage(new ApiError('odd', 422))).toBe('odd');
   });
 });

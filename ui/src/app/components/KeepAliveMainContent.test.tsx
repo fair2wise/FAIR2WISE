@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -29,6 +30,7 @@ function renderTabs(tabs: { library: boolean }) {
       : []),
   ];
   return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={['/']}>
       <nav>
         <Link to="/">chat</Link>
@@ -36,7 +38,8 @@ function renderTabs(tabs: { library: boolean }) {
         <Link to="/extract">extract</Link>
       </nav>
       <KeepAliveMainContent routes={routes} />
-    </MemoryRouter>,
+    </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
