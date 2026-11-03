@@ -7,6 +7,7 @@ import {
   isPdfFile,
   normalizeLibraryStatus,
   uploadErrorMessage,
+  isValidFolderName,
   uploadLibraryPaper,
   verifyAllLibraryPapers,
   verifyLibraryPaper,
@@ -52,16 +53,28 @@ describe('libraryApi', () => {
   it('uploads a PDF as multipart field "file" with a POST', async () => {
     const fetcher = respond(200, { paper: { id: 'p1' }, duplicate: false });
     const file = new File(['%PDF-1.4'], 'a.pdf', { type: 'application/pdf' });
-    await uploadLibraryPaper(file, asFetch(fetcher));
+    await uploadLibraryPaper(file, {}, asFetch(fetcher));
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain('/v1/library/papers');
     expect(init.method).toBe('POST');
     expect((init.body as FormData).get('file')).toBeInstanceOf(File);
   });
 
+  it('files the upload under a category with the folder query parameter', async () => {
+    const fetcher = respond(200, { paper: { id: 'p1' }, duplicate: false });
+    await uploadLibraryPaper(new File(['%PDF'], 'a.pdf'), { folder: 'rsoxs' }, asFetch(fetcher));
+    const [url] = fetcher.mock.calls[0] as unknown as [string];
+    expect(new URL(url, 'http://x').searchParams.get('folder')).toBe('rsoxs');
+  });
+
+  it('accepts only plain category names', () => {
+    expect(['rsoxs', 'tomo-2', 'a_b'].every(isValidFolderName)).toBe(true);
+    expect(['', '.x', 'a/b', 'a b', '..', 'x'.repeat(65)].some(isValidFolderName)).toBe(false);
+  });
+
   it('surfaces the server detail on an upload error', async () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    const promise = uploadLibraryPaper(file, asFetch(respond(415, { detail: 'Not a PDF' })));
+    const promise = uploadLibraryPaper(file, {}, asFetch(respond(415, { detail: 'Not a PDF' })));
     await expect(promise).rejects.toMatchObject({ message: 'Not a PDF', status: 415 });
   });
 

@@ -15,7 +15,7 @@ const paper = (over: Record<string, unknown> = {}) => ({
 
 interface Route { status: number; body: unknown }
 let routes: Record<string, Route>;
-let calls: { method: string; path: string; body?: unknown }[];
+let calls: { method: string; path: string; search: string; body?: unknown }[];
 
 beforeEach(() => {
   calls = [];
@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://x');
     const method = init?.method ?? 'GET';
-    calls.push({ method, path: url.pathname, body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body });
+    calls.push({ method, path: url.pathname, search: url.search, body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body });
     const hit = routes[`${method} ${url.pathname}`];
     return hit ? new Response(JSON.stringify(hit.body), { status: hit.status }) : new Response('{}', { status: 404 });
   }));
@@ -125,6 +125,33 @@ describe('LibraryTab', () => {
     await screen.findByText('a.pdf');
     await userEvent.upload(screen.getByTestId('library-file-input'), pdf());
     expect(await screen.findByRole('alert')).toHaveTextContent(text);
+  });
+
+  it('files an upload under the chosen category and creates a new one on demand', async () => {
+    routes['GET /v1/library/papers'].body = {
+      papers: [paper({ id: 'r1', file_name: 'r1.pdf', folder: 'rsoxs', relpath: 'rsoxs/r1.pdf' }), paper()],
+      total: 2,
+    };
+    routes['POST /v1/library/papers'] = {
+      status: 200,
+      body: { paper: paper({ relpath: 'xray/2020/new.pdf', folder: 'xray' }), duplicate: false,
+        manifest: { updated: true, path: 'xray/manifest.json', detail: 'added to the manifest' } },
+    };
+    renderTab();
+    await screen.findByText('r1.pdf');
+    await userEvent.selectOptions(screen.getByLabelText('Upload to'), 'New category…');
+    expect(screen.getByRole('button', { name: /upload pdf papers/i })).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.type(screen.getByLabelText('New category name'), 'xray');
+    await userEvent.upload(screen.getByTestId('library-file-input'), pdf());
+    await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.search === '?folder=xray')).toBe(true));
+  });
+
+  it('uploads to the library root when no category is chosen', async () => {
+    routes['POST /v1/library/papers'] = { status: 200, body: { paper: paper(), duplicate: false } };
+    renderTab();
+    await screen.findByText('a.pdf');
+    await userEvent.upload(screen.getByTestId('library-file-input'), pdf());
+    await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.search === '')).toBe(true));
   });
 
   it('reports a duplicate upload via toast', async () => {

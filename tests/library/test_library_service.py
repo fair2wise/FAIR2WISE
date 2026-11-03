@@ -27,13 +27,14 @@ TEXT = f"{TITLE}\nA. Author\nhttps://doi.org/{DOI}\nAbstract: lamellar domains"
 class FakeProbe:
     """A probe that never opens a PDF: ``name -> ProbeResult`` (default: readable, no title or DOI)."""
 
-    def __init__(self, results: dict[str, ProbeResult] | None = None) -> None:
+    def __init__(self, results: dict[str, ProbeResult] | None = None, default: ProbeResult | None = None) -> None:
         self.results = results or {}
+        self.default = default or ProbeResult(status="ok", pages=1, page_text="no identifiers here")
         self.calls: list[str] = []
 
     def __call__(self, path: Path) -> ProbeResult:
         self.calls.append(path.name)
-        return self.results.get(path.name, ProbeResult(status="ok", pages=1, page_text="no identifiers here"))
+        return self.results.get(path.name, self.default)
 
 
 class Registry:

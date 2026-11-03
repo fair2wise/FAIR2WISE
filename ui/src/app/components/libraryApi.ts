@@ -60,6 +60,8 @@ export interface LibraryPapersResponse {
 export interface LibraryUploadResult {
   paper: LibraryPaper;
   duplicate: boolean;
+  /** Present when the paper was filed under a category: whether its `manifest.json` row was added. */
+  manifest?: { updated: boolean; path: string; detail: string };
 }
 
 /** `POST /v1/library/papers/{id}/verify`. */
@@ -106,14 +108,37 @@ export function fetchLibraryPapers(fetcher: typeof fetch = fetch): Promise<Libra
   return v1Json<LibraryPapersResponse>(v1Url(`${LIBRARY_PATH}/papers`), {}, fetcher);
 }
 
+/** Options of {@link uploadLibraryPaper}. */
+export interface UploadOptions {
+  /**
+   * Category (top-level folder) to file the paper under; a new name creates the category. The server
+   * puts it in a sub-folder of the publication year and adds it to the category's `manifest.json`.
+   * Omitted: the library root.
+   */
+  folder?: string;
+}
+
+/** Category folder names: a letter or digit first, then letters, digits, `_` or `-`, at most 64 characters. */
+export const FOLDER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/** True when `name` is an acceptable category folder name (the server validates again). */
+export function isValidFolderName(name: string): boolean {
+  return FOLDER_NAME_PATTERN.test(name);
+}
+
 /**
  * Upload one PDF (multipart field `file`). The server owns validation (type, size, dedupe by sha256);
  * the caller should also reject non-PDFs client-side before calling.
  */
-export function uploadLibraryPaper(file: File, fetcher: typeof fetch = fetch): Promise<LibraryUploadResult> {
+export function uploadLibraryPaper(
+  file: File,
+  options: UploadOptions = {},
+  fetcher: typeof fetch = fetch,
+): Promise<LibraryUploadResult> {
   const form = new FormData();
   form.append('file', file, file.name);
-  return v1Json<LibraryUploadResult>(v1Url(`${LIBRARY_PATH}/papers`), { method: 'POST', body: form }, fetcher);
+  const url = v1Url(`${LIBRARY_PATH}/papers`, options.folder ? { folder: options.folder } : undefined);
+  return v1Json<LibraryUploadResult>(url, { method: 'POST', body: form }, fetcher);
 }
 
 /** Verify one paper's title/DOI against the registry (explicit user action, cached server-side). */

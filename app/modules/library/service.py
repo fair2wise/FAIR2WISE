@@ -51,7 +51,9 @@ from ..literature.openalex import (
     default_http_client,
 )
 from ..security.authorization import StartupConfigError, local_operator_context
+from .arrange import guess_year, is_valid_folder_name, year_folder
 from .catalog import LibraryCatalog, sha256_file
+from .manifest import record_upload
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
 
 logger = logging.getLogger(__name__)
@@ -228,14 +230,15 @@ class LibraryService:
         named = filename_doi_candidates(name)
         return (named[0], "filename") if named else (None, None)
 
-    def _record(self, path: Path, relpath: str, sha256: str, size: int, mtime: float, *, probe: bool) -> None:
+    def _record(self, path: Path, relpath: str, sha256: str, size: int, mtime: float, *, probe: bool,
+                result: ProbeResult | None = None) -> None:
         title: str | None = None
         doi: str | None = None
         source: str | None = None
         status = "pending"
         pages: int | None = None
         if probe:
-            result = self._probe(path)
+            result = result or self._probe(path)
             title = result.title or None
             doi, source = self._doi_from(path.name, result)
             status = result.status
@@ -341,23 +344,32 @@ class LibraryService:
 
     # -- upload ------------------------------------------------------------------------------------
 
-    def upload(self, filename: str | None, data: bytes) -> dict[str, Any]:
+    def upload(self, filename: str | None, data: bytes, folder: str | None = None) -> dict[str, Any]:
         """Store one PDF in the mounted folder and catalogue it.
 
         The bytes are already read (``read_upload_limited``); this checks the PDF magic, the name and the
         sha256 duplicate, then writes atomically without ever replacing or following an existing entry.
 
+        With ``folder`` the paper is filed under that category in a sub-folder of its publication year
+        (``rsoxs/2013/x.pdf``; ``rsoxs/unknown/x.pdf`` when no year can be read locally), a new category is
+        created on first use, and the category's ``manifest.json`` gets a row for it. Without ``folder`` the
+        paper goes into the library root, as before.
+
         Returns:
-            ``{"paper": dto, "duplicate": bool}``; a duplicate writes nothing.
+            ``{"paper": dto, "duplicate": bool}``; a duplicate writes nothing. A filed paper also carries
+            ``"manifest"``: ``{"updated", "path", "detail"}``.
 
         Raises:
-            HTTPException: 413 (too large), 415 (not a PDF), 422 (unsafe name).
+            HTTPException: 413 (too large), 415 (not a PDF), 422 (unsafe name or folder).
             ContractError: ``UNSUPPORTED_CAPABILITY`` when nothing is mounted, ``CONFLICT`` when no free name remains.
         """
         if len(data) > self.max_upload_bytes:
             raise HTTPException(status_code=413, detail=f"upload exceeds the {self.max_upload_bytes} byte limit")
         require_pdf(data)
         name = clean_upload_name(filename)
+        category = (folder or "").strip()
+        if category and not is_valid_folder_name(category):
+            raise HTTPException(status_code=422, detail="unsafe folder name")
         root = self._require_root()
         sha = hashlib.sha256(data).hexdigest()
         with self._upload_lock:
@@ -365,22 +377,66 @@ class LibraryService:
             existing = self.catalog.paper_by_sha(sha)
             if existing is not None:
                 return {"paper": self._paper_dto(existing["relpath"]), "duplicate": True}
+            directory, result, year = root, None, None
+            if category:
+                result = self._probe_bytes(root, data)
+                year = guess_year(name, result.page_text, result.meta_text)
+                directory = self._ensure_folder(root, category, year_folder(year))
             stem, suffix = name[:-4], name[-4:]
             target: Path | None = None
             for attempt in range(100):
                 candidate = f"{stem}{'' if attempt == 0 else f' ({attempt})'}{suffix}"
-                if os.path.lexists(root / candidate):
+                if os.path.lexists(directory / candidate):
                     continue  # a file, a link or a dangling link already has this name: never replaced
-                path = safe_child(root, candidate)  # 422 for separators, dot-names, escapes
-                if self._write_new(root, path, data):
+                path = safe_child(directory, candidate)  # 422 for separators, dot-names, escapes
+                if self._write_new(directory, path, data):
                     target = path
                     break
             if target is None:
                 raise ContractError(ErrorCode.CONFLICT, "no free file name for this upload")
             stat = target.stat()
             relpath = target.relative_to(root).as_posix()
-            self._record(target, relpath, sha, stat.st_size, round(stat.st_mtime, 3), probe=True)
-            return {"paper": self._paper_dto(relpath), "duplicate": False}
+            self._record(target, relpath, sha, stat.st_size, round(stat.st_mtime, 3), probe=True, result=result)
+            out: dict[str, Any] = {"paper": self._paper_dto(relpath), "duplicate": False}
+            if category:
+                paper = out["paper"]
+                out["manifest"] = record_upload(
+                    root, relpath.split("/", 1)[0], relpath=relpath, sha256=sha, doi=paper.get("doi"),
+                    title=paper.get("title"), year=year, now=datetime.now(UTC).isoformat())
+            return out
+
+    def _probe_bytes(self, root: Path, data: bytes) -> ProbeResult:
+        """Probe ``data`` through a hidden temporary file in ``root`` (the probe reads paths)."""
+        tmp = root / f".probe-{uuid.uuid4().hex}.tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+            return self._probe(tmp)
+        finally:
+            try:
+                os.unlink(tmp)
+            except FileNotFoundError:
+                pass
+
+    @staticmethod
+    def _ensure_folder(root: Path, category: str, year: str) -> Path:
+        """``root/<category>/<year>``, created on demand; an existing category matches case-insensitively.
+
+        Raises:
+            HTTPException: 422 when a path component exists as something other than a real directory.
+        """
+        for child in root.iterdir():
+            if child.name.lower() == category.lower() and child.is_dir() and not child.is_symlink():
+                category = child.name
+                break
+        directory = root
+        for part in (category, year):
+            directory = directory / part
+            if directory.is_symlink() or (os.path.lexists(directory) and not directory.is_dir()):
+                raise HTTPException(status_code=422, detail="unsafe folder name")
+            directory.mkdir(exist_ok=True)
+        return directory
 
     @staticmethod
     def _write_new(root: Path, target: Path, data: bytes) -> bool:

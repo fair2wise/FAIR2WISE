@@ -15,6 +15,7 @@ import {
 } from './libraryHooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { FolderFilter } from './library/FolderFilter';
+import { NEW_CATEGORY, resolveUploadFolder, UploadTarget, type UploadTargetValue } from './library/UploadTarget';
 import { LibraryDropzone } from './library/LibraryDropzone';
 import { LibraryPapersTable } from './library/LibraryPapersTable';
 import { Button } from './ui/button';
@@ -46,6 +47,8 @@ export function LibraryTab() {
   const [tracked, setTracked] = useState<TrackedJob | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [target, setTarget] = useState<UploadTargetValue>({ choice: '', newName: '' });
+  const uploadFolder = resolveUploadFolder(target);
 
   const job = useJob(tracked?.id ?? null, JOB_POLL_MS);
   const jobRunning = tracked !== null && !(job.data && TERMINAL_JOB_STATES.has(job.data.state));
@@ -82,9 +85,12 @@ export function LibraryTab() {
     const errors: string[] = [];
     for (const file of files) {
       try {
-        const result = await upload.mutateAsync(file);
-        if (result.duplicate) toast.info(`${file.name} is already in the library.`);
-        else toast.success(`Uploaded ${file.name}.`);
+        const result = await upload.mutateAsync({ file, folder: uploadFolder || undefined });
+        if (result.duplicate) toast.info(`${file.name} is already in the library (${result.paper.relpath}).`);
+        else toast.success(`Uploaded ${file.name} to ${result.paper.relpath}.`);
+        if (result.manifest && !result.manifest.updated && result.manifest.detail !== 'already listed in the manifest') {
+          toast.warning(result.manifest.detail);
+        }
       } catch (error) {
         if ((error as { status?: number }).status === 501) setNotMounted501(true);
         const message = `${file.name}: ${uploadErrorMessage(error)}`;
@@ -93,6 +99,10 @@ export function LibraryTab() {
       }
     }
     setUploading(false);
+    // A category created by this upload now exists: keep it selected as an existing one.
+    if (target.choice === NEW_CATEGORY && uploadFolder && errors.length < files.length) {
+      setTarget({ choice: uploadFolder, newName: '' });
+    }
     if (errors.length > 0) setUploadError(errors.join(' '));
   };
 
@@ -154,8 +164,9 @@ export function LibraryTab() {
         </p>
       ) : null}
 
+      <UploadTarget folders={folders} value={target} onChange={setTarget} disabled={!mounted} />
       <LibraryDropzone
-        disabled={!mounted}
+        disabled={!mounted || uploadFolder === null}
         busy={uploading}
         onPdfFiles={files => void uploadFiles(files)}
         onRejected={names => {

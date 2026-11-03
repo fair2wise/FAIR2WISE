@@ -32,6 +32,8 @@ export interface MockLibraryOptions {
   jobPosts?: Array<Record<string, unknown>>;
   /** Captures `POST /v1/library/estimate` bodies. */
   estimatePosts?: Array<Record<string, unknown>>;
+  /** Captures uploads: file name and the `folder` query parameter (`''` when absent). */
+  uploads?: Array<{ name: string; folder: string }>;
   /** Captures `POST /v1/jobs/{id}/cancel` job ids. */
   cancels?: string[];
 }
@@ -91,7 +93,11 @@ export async function mockLibrary(page: Page, options: MockLibraryOptions = {}) 
       }));
     } else if (path === '/v1/library/papers' && method === 'POST') {
       const name = /filename="([^"]+)"/.exec(request.postData() ?? '')?.[1] ?? 'upload.pdf';
-      const paper = mockPaper(name.replace(/\.pdf$/, ''), '');
+      const folder = url.searchParams.get('folder') ?? '';
+      options.uploads?.push({ name, folder });
+      const base = mockPaper(name.replace(/\.pdf$/, ''), folder);
+      // The server files a category upload under a year folder (`unknown` when the year cannot be read).
+      const paper = folder ? { ...base, relpath: `${folder}/unknown/${name}` } : base;
       papers.push(paper);
       await route.fulfill(json({
         paper: { ...paper, sha256: paper.id, size_bytes: 1000, verify_status: 'unverified', verified_at: null,

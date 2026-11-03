@@ -66,7 +66,7 @@ export function useLibraryPapers(enabled = true, pollMs: number | false = false)
 export function useUploadPaper() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => uploadLibraryPaper(file),
+    mutationFn: ({ file, folder }: { file: File; folder?: string }) => uploadLibraryPaper(file, { folder }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: libraryKeys.all }),
   });
 }

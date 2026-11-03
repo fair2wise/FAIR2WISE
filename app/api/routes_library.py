@@ -48,8 +48,12 @@ def install(app: FastAPI) -> FastAPI:
         return cast(dict[str, Any], project(request, library_service(request).list_papers()))
 
     @router.post("/papers")
-    async def upload(request: Request, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
+    async def upload(request: Request, folder: str | None = None,
+                     ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Store one PDF (multipart field ``file``) in the mounted folder; a sha256 duplicate writes nothing.
+
+        With the query parameter ``folder`` the paper is filed under that category (created when new) in a
+        sub-folder of its publication year, and the category's ``manifest.json`` is updated.
 
         The multipart body is read by :mod:`app.api.multipart_upload` (the pinned environment has no
         ``python-multipart``); the size cap is enforced twice (body and :func:`read_upload_limited`).
@@ -57,7 +61,7 @@ def install(app: FastAPI) -> FastAPI:
         service = library_service(request)
         filename, raw = await read_single_file(request, "file", service.max_upload_bytes)
         data = await read_upload_limited(PartFile(raw), service.max_upload_bytes)
-        result = await run_in_threadpool(service.upload, filename, data)
+        result = await run_in_threadpool(service.upload, filename, data, folder)
         return cast(dict[str, Any], project(request, result))
 
     @router.post("/papers/{paper_id}/verify")

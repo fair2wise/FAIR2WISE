@@ -54,7 +54,7 @@ describe('useUploadPaper', () => {
     const { client, Wrapper } = wrapper();
     const spy = vi.spyOn(client, 'invalidateQueries');
     const { result } = renderHook(() => useUploadPaper(), { wrapper: Wrapper });
-    result.current.mutate(new File(['x'], 'a.pdf', { type: 'application/pdf' }));
+    result.current.mutate({ file: new File(['x'], 'a.pdf', { type: 'application/pdf' }) });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(spy).toHaveBeenCalledWith({ queryKey: ['library'] });
   });

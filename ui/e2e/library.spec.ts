@@ -59,4 +59,33 @@ test.describe('Library tab', () => {
     });
     await expect(page.getByRole('table', { name: 'Library papers' }).getByText('fresh.pdf')).toBeVisible();
   });
+
+  test('uploads into an existing category or a new one, which then appears as a folder', async ({ page }) => {
+    const uploads: Array<{ name: string; folder: string }> = [];
+    await mockAgent(page);
+    await mockLibrary(page, { papers: PAPERS, uploads });
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Library' }).click();
+    await expect(page.getByRole('table', { name: 'Library papers' })).toBeVisible();
+
+    await page.getByLabel('Upload to').selectOption('tomo');
+    await page.getByTestId('library-file-input').setInputFiles({
+      name: 'into-tomo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n'),
+    });
+    await expect.poll(() => uploads).toEqual([{ name: 'into-tomo.pdf', folder: 'tomo' }]);
+
+    await page.getByLabel('Upload to').selectOption({ label: 'New category…' });
+    await page.getByLabel('New category name').fill('xray');
+    await page.getByTestId('library-file-input').setInputFiles({
+      name: 'into-xray.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n'),
+    });
+    await expect.poll(() => uploads.at(-1)).toEqual({ name: 'into-xray.pdf', folder: 'xray' });
+
+    const folders = page.getByRole('radiogroup', { name: 'Folder' });
+    await expect(folders.getByRole('radio', { name: /^xray \(1\)/ })).toBeVisible();
+    await expect(folders.getByRole('radio', { name: /^tomo \(2\)/ })).toBeVisible();
+    await folders.getByRole('radio', { name: /^xray/ }).click();
+    const cell = page.getByRole('table', { name: 'Library papers' }).getByRole('cell', { name: 'xray', exact: true });
+    await expect(cell).toHaveAttribute('title', 'xray/unknown/into-xray.pdf');
+  });
 });
