@@ -552,6 +552,11 @@ _UPDATE_TOUCHES = {
 }
 #: T25D: personal-settings key of the caller for the current request (``None``: server settings).
 _SETTINGS_KEY: contextvars.ContextVar[str | None] = contextvars.ContextVar("f2w_settings_key", default=None)
+#: The server-resolved context of the caller of the running chat action (T18E: the post-extraction publication
+#: submits its job as that caller; a worker or a stream's own task sets it before ``service.act`` runs).
+_ACTION_CTX: contextvars.ContextVar[RequestContext | None] = contextvars.ContextVar("f2w_action_ctx", default=None)
+#: SSE text of the ``splash_reimport_result`` phase by publication status; ``success`` is the frozen UI's wording.
+_PUBLICATION_PHASE_MESSAGES = {"success": "Splash graph store refreshed"}
 
 
 @contextlib.contextmanager
@@ -2583,13 +2588,16 @@ _TILED_SAVE_NO_SPLASH = _NoSplash()
 class AgentPipelineService:
     """Reusable in-process orchestrated pipeline for HTTP chat requests."""
 
+    #: Class-level default so a service built without ``__init__`` (unit tests) still routes Saves to Splash.
+    tiled_save: TiledSaveBackend | None = None
+
     def __init__(self, cfg: CoordinatorConfig) -> None:
         """Initialize coordinator, session state, runtime settings, and agents."""
         self.cfg = cfg
         #: T18D: a ``SaveTarget`` in ``cfg.tiled_save`` (set by ``create_api_app(tiled_save=...)``) routes the UI
         #: Save and the session graph to Tiled from the first line of startup, so no Splash call is ever made.
         target = getattr(cfg, "tiled_save", None)
-        self.tiled_save: TiledSaveBackend | None = TiledSaveBackend(target) if target is not None else None
+        self.tiled_save = TiledSaveBackend(target) if target is not None else None
         self.coord = Coordinator(cfg)
         self.memory = SessionMemory(self.coord.workdir / "session_memory.json")
         self.workflow = WorkflowStateStore(self.coord.workdir / "workflow_state.json")
@@ -5676,16 +5684,20 @@ class AgentPipelineService:
                 "Splash importer refreshing graph store",
                 round=round_no,
             )
+            # T18E: the phase names are the frozen UI's; the work is now the post-extraction publication of the
+            # rebuilt corpus to Tiled (freeze v<N+1>, plan, apply under the profile's approval policy). There is
+            # no Splash wipe any more.
             try:
-                splash = kg_update.splash_reimport(
-                    str(self.coord.session_kg),
-                    splash_repo=self.cfg.splash_repo,
-                    allow_wipe=self.cfg.allow_splash_wipe,
+                splash = await asyncio.to_thread(
+                    kg_update.publish_extraction,
+                    str(self.coord.session_terms),
+                    publisher=getattr(self.cfg, "extraction_publisher", None),
+                    ctx=_ACTION_CTX.get(),
                 )
             except Exception as exc:
                 return self._response(
                     "splash_error",
-                    f"Splash reimport failed safely: {exc}",
+                    f"Publication failed safely: {exc}",
                     False,
                     verdict,
                     rounds,
@@ -5695,7 +5707,7 @@ class AgentPipelineService:
             if splash.get("status") == "error":
                 return self._response(
                     "splash_error",
-                    f"Splash reimport failed: {splash.get('message') or splash}",
+                    f"Publication failed: {splash.get('message') or splash}",
                     False,
                     verdict,
                     rounds,
@@ -5704,7 +5716,7 @@ class AgentPipelineService:
             await self._emit(
                 emit,
                 "splash_reimport_result",
-                "Splash graph store refreshed",
+                _PUBLICATION_PHASE_MESSAGES.get(str(splash.get("status")), str(splash.get("message") or "")),
                 round=round_no,
                 status=str(splash.get("status") or ""),
             )
@@ -6945,6 +6957,7 @@ def create_app(
         try:
             ctx = guard.chat_action_entry(request, ctx, req.decision, req.kind, req.session_id, req.client_turn_id)
             guard.claim_turn(ctx, req.client_turn_id)
+            _ACTION_CTX.set(ctx)
             with capture_turn() as sources, settings_scope(guard.settings_key(ctx)):
                 response = await service.act(
                     req.decision,
@@ -6994,6 +7007,7 @@ def create_app(
         async def events() -> AsyncIterator[str]:
             """Yield SSE progress events then the final chat result."""
             _SETTINGS_KEY.set(settings_key)  # T25D: this generator's own context
+            _ACTION_CTX.set(ctx)
             collector = open_turn(
                 client_turn_id=req.client_turn_id,
                 session_id=req.session_id,
@@ -7103,6 +7117,7 @@ def create_app(
         async def events() -> AsyncIterator[str]:
             """Yield SSE progress events then the final action result."""
             _SETTINGS_KEY.set(settings_key)  # T25D: this generator's own context
+            _ACTION_CTX.set(ctx)
             collector = open_turn(
                 client_turn_id=req.client_turn_id,
                 session_id=req.session_id,

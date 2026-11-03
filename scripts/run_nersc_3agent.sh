@@ -103,9 +103,6 @@ CMD+=" --max-rounds $(shell_quote "$F2W_MAX_ROUNDS")"
 CMD+=" --max-papers $(shell_quote "$F2W_MAX_PAPERS")"
 CMD+=" --candidate-pool $(shell_quote "$F2W_CANDIDATE_POOL")"
 CMD+=" --workers $(shell_quote "$F2W_WORKERS")"
-if [[ "$F2W_KG_MODE" == "splash" ]]; then
-  CMD+=" --allow-splash-wipe"
-fi
 
 if [[ "$MODE" == "ask" ]]; then
   CMD+=" ask $(shell_quote "$QUESTION")"

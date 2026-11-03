@@ -29,7 +29,6 @@ python3 -m app.modules.launchers.f2w_agent \
   --max-papers "${F2W_MAX_PAPERS:-1}" \
   --candidate-pool "${F2W_CANDIDATE_POOL:-25}" \
   --workers "${F2W_WORKERS:-1}" \
-  --allow-splash-wipe \
   api \
   --host "${F2W_AGENT_HOST:-127.0.0.1}" \
   --port "${F2W_AGENT_PORT:-8090}" \

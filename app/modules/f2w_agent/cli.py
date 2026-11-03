@@ -59,7 +59,6 @@ def _cfg(args: argparse.Namespace) -> CoordinatorConfig:
         splash_repo=args.splash_repo,
         download_delay_seconds=args.download_delay,
         validate_downloads=not args.no_download_validation,
-        allow_splash_wipe=args.allow_splash_wipe,
         workflow_mode=workflow_mode,
         extraction_mode=args.extraction_mode,
         targeted_max_pages=args.targeted_max_pages,
@@ -128,11 +127,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--workers", type=int, default=default_workers())
     p.add_argument("--splash-repo", default=None, help="Path to splash_links repo (splash mode)")
-    p.add_argument(
-        "--allow-splash-wipe",
-        action="store_true",
-        help="Allow splash mode to delete links.sqlite before re-import",
-    )
 
     sub = p.add_subparsers(dest="command", required=True)
     api = sub.add_parser("api", help="Run HTTP API for the prototype web UI")
@@ -171,7 +165,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             "workdir": str(cfg.workdir), "max_rounds": cfg.max_rounds,
             "max_papers": cfg.max_papers, "download_delay": cfg.download_delay_seconds,
             "validate_downloads": cfg.validate_downloads,
-            "allow_splash_wipe": cfg.allow_splash_wipe,
             "workflow_mode": cfg.workflow_mode,
             "extraction_mode": cfg.extraction_mode,
             "targeted_max_pages": cfg.targeted_max_pages,

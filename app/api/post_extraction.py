@@ -106,21 +106,30 @@ class PostExtractionPublisher:
         is_safe: ``plan -> bool``, normally :meth:`ReplacementPublishStep.plan_is_safe`.
         target: Publication target (Tiled URL with optional ``#namespace``).
         worker_owner: Lease owner name used when this publisher drives the job itself.
+        default_ctx: Context for a caller that has none (the CLI coordinator); default ``operations.cli_context``,
+            which is the local operator on ``:local`` and refused on ALS (there is no ALS CLI sign-in).
     """
 
     def __init__(self, operations: F2WOperations, *, freeze: Callable[[Path], str],
-                 is_safe: Callable[[ChangePlan], bool], target: str, worker_owner: str = "post-extraction") -> None:
+                 is_safe: Callable[[ChangePlan], bool], target: str, worker_owner: str = "post-extraction",
+                 default_ctx: Callable[[], RequestContext] | None = None) -> None:
         self.ops, self.freeze, self.is_safe = operations, freeze, is_safe
         self.target, self.worker_owner = target, worker_owner
+        self.default_ctx = default_ctx or operations.cli_context
 
     # -- the one entry point ----------------------------------------------------------------------
 
-    def publish(self, ctx: RequestContext, terms_path: str | Path) -> dict[str, Any]:
+    def publish(self, ctx: RequestContext | None, terms_path: str | Path) -> dict[str, Any]:
         """Publish the result of an extraction run; never raises (an error is ``status = error``).
 
         ``ctx`` is the extracting caller: the local operator on ``:local``, a verified admin on ALS. It is
         used to submit the job; an approval is never made with it unless the policy allows (``:local``).
         """
+        if ctx is None:
+            try:
+                ctx = self.default_ctx()
+            except ContractError as exc:
+                return {"status": STATUS_ERROR, "stage": "submit", "message": f"no caller context: {exc}"}
         try:
             ref = self.freeze(Path(terms_path))
         except Exception as exc:  # a failed freeze leaves the session KG and the committed snapshots as they were

@@ -87,7 +87,6 @@ class CoordinatorConfig:
     splash_repo: str | None = None
     download_delay_seconds: float = 1.0
     validate_downloads: bool = True
-    allow_splash_wipe: bool = False
     workflow_mode: str = field(default_factory=default_workflow_mode)
     extraction_mode: str = field(default_factory=default_extraction_mode)
     targeted_max_pages: int = field(default_factory=default_targeted_max_pages)
@@ -319,10 +318,9 @@ class Coordinator:
             output.info(f"[round {round_no}] KG rebuilt: {kg.get('nodes')} nodes, {kg.get('edges')} edges")
             if self.cfg.kg_mode == "splash":
                 try:
-                    res = kg_update.splash_reimport(
-                        str(self.session_kg),
-                        splash_repo=self.cfg.splash_repo,
-                        allow_wipe=self.cfg.allow_splash_wipe,
+                    res = kg_update.publish_extraction(
+                        str(self.session_terms),
+                        publisher=getattr(self.cfg, "extraction_publisher", None),
                     )
                 except Exception as exc:
                     logger.exception("Splash reimport failed")
@@ -524,10 +522,9 @@ class Coordinator:
             output.info(f"[round {round_no}] KG rebuilt: {kg.get('nodes')} nodes, {kg.get('edges')} edges")
             if self.cfg.kg_mode == "splash":
                 try:
-                    res = kg_update.splash_reimport(
-                        str(self.session_kg),
-                        splash_repo=self.cfg.splash_repo,
-                        allow_wipe=self.cfg.allow_splash_wipe,
+                    res = kg_update.publish_extraction(
+                        str(self.session_terms),
+                        publisher=getattr(self.cfg, "extraction_publisher", None),
                     )
                 except Exception as exc:
                     logger.exception("Splash reimport failed")
