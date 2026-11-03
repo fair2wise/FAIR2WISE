@@ -33,7 +33,6 @@ import re
 import sys
 import time
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
@@ -46,6 +45,11 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import download_pdfs as dl  # noqa: E402
+
+from app.modules.literature.legacy_download import (  # noqa: E402
+    hardened_download_pdf as download_pdf,
+    hardened_get_json,
+)
 
 # Same allowlist as download_pdfs / DownloadAgent — keep harvest free of Academy imports.
 RELIABLE_PDF_HOSTS = dl.RELIABLE_PDF_HOSTS
@@ -1244,7 +1248,7 @@ def retry_failed_pdfs(manifest: Dict[str, Any], dest_root: Path, delay: float) -
         last_url = ""
         for url in urls:
             last_url = url
-            ok = dl.download_pdf(url, str(dest))
+            ok = download_pdf(url, str(dest))
             if ok:
                 break
         if not ok:
@@ -1395,7 +1399,7 @@ def harvest(
         last_url = ""
         for url in urls:
             last_url = url
-            ok = dl.download_pdf(url, str(dest))
+            ok = download_pdf(url, str(dest))
             if ok:
                 break
         if not ok:
@@ -1515,9 +1519,6 @@ def _strip_jats(text: str) -> str:
 
 def _crossref_by_doi_or_title(query: str) -> Optional[Dict[str, Any]]:
     """Resolve a DOI or bibliographic query via Crossref into a work dict."""
-    import urllib.parse
-    import urllib.request
-
     q = (query or "").strip()
     headers = {"User-Agent": "FAIRtoWISE-harvest/1.0 (mailto:dev@localhost)"}
     doi = _canonical_doi(q)
@@ -1529,9 +1530,7 @@ def _crossref_by_doi_or_title(query: str) -> Optional[Dict[str, Any]]:
         + "&rows=5"
     )
     try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = hardened_get_json(url, headers=headers)
     except Exception as exc:
         LOGGER.warning("Crossref lookup failed for %r (%s)", query, exc)
         return None
@@ -1671,7 +1670,7 @@ def ingest_known_works(
             last_url = ""
             for url in urls:
                 last_url = url
-                ok = dl.download_pdf(url, str(dest))
+                ok = download_pdf(url, str(dest))
                 if ok:
                     break
             if ok:
@@ -2109,15 +2108,9 @@ def _openalex_oa_urls_for_doi(
         user_agent += f"; mailto:{mailto}"
     user_agent += ")"
     try:
-        request = urllib.request.Request(
-            endpoint,
-            headers={
-                "User-Agent": user_agent,
-                "Accept": "application/json",
-            },
+        raw = hardened_get_json(
+            endpoint, headers={"User-Agent": user_agent, "Accept": "application/json"}
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            raw = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
         LOGGER.warning("OpenAlex DOI lookup failed for %r (%s)", canon, exc)
         return [], None, []
@@ -2343,7 +2336,7 @@ def harvest_pending_pdfs(
         last_url = ""
         for url in urls:
             last_url = url
-            ok = dl.download_pdf(url, str(dest))
+            ok = download_pdf(url, str(dest))
             if ok:
                 break
         if ok:

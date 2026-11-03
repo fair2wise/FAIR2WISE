@@ -536,7 +536,7 @@ def harvest(
         last_url = ""
         for url in urls:
             last_url = url
-            ok = dl.download_pdf(url, str(dest))
+            ok = hr.download_pdf(url, str(dest))
             if ok:
                 break
         if not ok:

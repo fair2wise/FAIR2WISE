@@ -507,25 +507,12 @@ def test_openalex_doi_resolution_prefers_repositories_then_listed_publisher_pdfs
         ],
     }
 
-    class FakeResponse:
-        def __enter__(self):
-            return self
+    def fake_get_json(url, *, headers=None, **kwargs):
+        assert url.startswith("https://api.openalex.org/works/doi:10.1021%2Facs.macromol.8b02198")
+        assert headers and headers.get("User-Agent")
+        return payload
 
-        def __exit__(self, *args):
-            return None
-
-        def read(self):
-            return json.dumps(payload).encode()
-
-    def fake_urlopen(request, timeout):
-        assert request.full_url.startswith(
-            "https://api.openalex.org/works/doi:10.1021%2Facs.macromol.8b02198"
-        )
-        assert request.get_header("User-agent")
-        assert timeout == 30
-        return FakeResponse()
-
-    monkeypatch.setattr("harvest_rsoxs.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("harvest_rsoxs.hardened_get_json", fake_get_json)
     urls, arxiv_id, sources = _openalex_oa_urls_for_doi(
         "https://doi.org/10.1021/acs.macromol.8b02198",
         "researcher@example.edu",

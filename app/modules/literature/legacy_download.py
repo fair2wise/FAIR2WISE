@@ -16,15 +16,18 @@ fetched into a private temporary content-addressed store and copied out atomical
 from __future__ import annotations
 
 from collections.abc import Callable
+import json
 import logging
 from pathlib import Path
 import tempfile
 import time
+from typing import Any
+from urllib.parse import urljoin
 
 import httpx
 
 from ..contracts.context import AuthorizationMode, DeploymentProfile, Principal, RequestContext
-from .safe_fetch import NetworkPolicy, SafeFetcher
+from .safe_fetch import BlockedURL, NetworkPolicy, SafeFetcher
 from .store import FileDocumentStore, StoreError
 
 logger = logging.getLogger(__name__)
@@ -89,4 +92,76 @@ def hardened_download_pdf(url: str, dest: str, retries: int = 3, *, fetcher: Saf
             active.http.close()
 
 
-__all__ = ("DOWNLOAD_HEADERS", "default_fetcher", "hardened_download_pdf")
+#: Largest JSON metadata answer accepted by :func:`hardened_get_json` (bytes).
+JSON_MAX_BYTES = 8 * 1024 * 1024
+
+
+class JSONFetchError(Exception):
+    """A metadata lookup was refused by the network policy or did not return usable JSON."""
+
+
+def hardened_get_json(url: str, *, headers: dict[str, str] | None = None, timeout: float = 30.0,
+                      policy: NetworkPolicy | None = None, client: httpx.Client | None = None,
+                      max_bytes: int = JSON_MAX_BYTES) -> Any:
+    """GET ``url`` and parse the body as JSON under the same egress policy as the PDF fetcher.
+
+    Used by the harvest scripts for Crossref and OpenAlex metadata lookups, which previously went through
+    ``urllib.request.urlopen`` (any scheme, silent redirects, unbounded body). Every hop is checked with
+    :meth:`NetworkPolicy.check_url` (http/https only, ports 80/443, no credentials, public addresses),
+    redirects are followed manually up to the policy limit, and the body is capped at ``max_bytes``.
+
+    Args:
+        url: Metadata endpoint.
+        headers: Request headers (for example ``User-Agent``); never put secrets in the URL.
+        timeout: Per-request timeout in seconds.
+        policy: Egress policy; the default :class:`NetworkPolicy` when omitted.
+        client: Injected ``httpx.Client`` (tests); a default one is built and closed otherwise.
+        max_bytes: Body byte limit.
+
+    Returns:
+        The decoded JSON document.
+
+    Raises:
+        JSONFetchError: blocked URL or redirect target, non-200 status, oversized body, transport error
+            or a body that is not valid UTF-8 JSON.
+    """
+    active_policy = policy or NetworkPolicy()
+    own = client is None
+    http = client or httpx.Client(headers=DOWNLOAD_HEADERS)
+    try:
+        current = url
+        for _hop in range(active_policy.max_redirects + 1):
+            try:
+                active_policy.check_url(current)
+            except BlockedURL as exc:
+                raise JSONFetchError(f"blocked URL ({exc.reason})") from exc
+            try:
+                with http.stream("GET", current, headers=headers, follow_redirects=False,
+                                 timeout=timeout) as response:
+                    if response.status_code in (301, 302, 303, 307, 308):
+                        location = response.headers.get("location", "")
+                        if not location:
+                            raise JSONFetchError(f"redirect without location (HTTP {response.status_code})")
+                        current = urljoin(current, location)
+                        continue
+                    if response.status_code != 200:
+                        raise JSONFetchError(f"HTTP {response.status_code}")
+                    body = bytearray()
+                    for chunk in response.iter_bytes(64 * 1024):
+                        body.extend(chunk)
+                        if len(body) > max_bytes:
+                            raise JSONFetchError("response too large")
+            except httpx.HTTPError as exc:
+                raise JSONFetchError(f"network error ({type(exc).__name__})") from exc
+            try:
+                return json.loads(bytes(body).decode("utf-8"))
+            except (UnicodeDecodeError, ValueError) as exc:
+                raise JSONFetchError("not valid JSON") from exc
+        raise JSONFetchError("too many redirects")
+    finally:
+        if own:
+            http.close()
+
+
+__all__ = ("DOWNLOAD_HEADERS", "JSONFetchError", "default_fetcher", "hardened_download_pdf",
+           "hardened_get_json")
