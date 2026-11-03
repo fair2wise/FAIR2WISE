@@ -9,7 +9,7 @@ import json
 import os
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import jsonschema
@@ -23,7 +23,7 @@ from app.modules.graph.snapshot_manifest import parse_manifest
 from tests.snapshots.snapshot_fakes import COMMIT, INPUTS, REPO
 
 MANIFEST_SCHEMA = json.loads((REPO / "docs/migration/data_releases/schemas/kg_snapshot_manifest.schema.json").read_text())
-NOW = datetime(2026, 10, 30, 12, 0, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 30, 12, 0, 0, tzinfo=UTC)
 GIT_ENV = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "GIT_CONFIG_NOSYSTEM": "1",
            "GIT_CONFIG_GLOBAL": os.devnull, "GIT_AUTHOR_NAME": "owner", "GIT_AUTHOR_EMAIL": "o@example.org",
            "GIT_COMMITTER_NAME": "owner", "GIT_COMMITTER_EMAIL": "o@example.org", "LC_ALL": "C"}
@@ -164,7 +164,7 @@ def test_refuses_an_existing_frozen_directory_and_never_modifies_it(tmp_path, le
     nested = kg / "legacyfix" / "v1"
     frozen = {p.name: p.read_bytes() for p in nested.iterdir()}
     with pytest.raises(SnapshotExistsError):
-        _adopt(flat, registry_module, now=datetime(2027, 1, 1, tzinfo=timezone.utc))
+        _adopt(flat, registry_module, now=datetime(2027, 1, 1, tzinfo=UTC))
     assert {p.name: p.read_bytes() for p in nested.iterdir()} == frozen
     assert [o.rule for o in adopt_legacy_directory(kg, registry=registry_module, code_commit=COMMIT)] == [
         "target-exists"]
