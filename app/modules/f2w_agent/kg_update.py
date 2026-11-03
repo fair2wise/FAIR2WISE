@@ -69,6 +69,22 @@ def rebuild_kg(terms_json: str, kg_json: str) -> dict[str, Any]:
     }
 
 
+#: ``publish_state`` values: a distinct, explicit state beside the legacy ``status`` (which stays as it was).
+PUBLISH_STATE_PUBLISHED = "tiled_published"
+PUBLISH_STATE_REVIEW = "awaiting_review"
+PUBLISH_STATE_ERROR = "error"
+PUBLISH_STATE_JSON_ONLY = "json_available_tiled_unavailable"
+#: Owner wording (2026-11-03) for the state where no Tiled publisher is configured.
+JSON_ONLY_INDICATOR = "JSON available, Tiled unavailable"
+#: ``status`` -> ``publish_state`` for a result a publisher returned.
+PUBLISH_STATE_BY_STATUS = {
+    "success": PUBLISH_STATE_PUBLISHED,
+    "awaiting_review": PUBLISH_STATE_REVIEW,
+    "error": PUBLISH_STATE_ERROR,
+    "skipped": PUBLISH_STATE_JSON_ONLY,
+}
+
+
 def publish_extraction(
     terms_json: str,
     *,
@@ -83,19 +99,30 @@ def publish_extraction(
     unsafe plan waits for review, ALS always waits for an admin). Nothing here deletes anything: there is no
     wipe, no ``--allow-splash-wipe`` and no ``links.sqlite`` handling.
 
-    Without a publisher (no Tiled publication target configured) nothing is published and the status is
-    ``skipped``: the session graph stays the source for retrieval, and Splash is neither wiped nor re-imported.
+    Without a publisher (no Tiled publication target configured) nothing is published. The legacy ``status``
+    stays ``skipped`` (wire compatibility); the explicit state is ``publish_state =
+    "json_available_tiled_unavailable"`` with ``indicator = "JSON available, Tiled unavailable"``: the session
+    graph JSON is available and stays the source for retrieval, Tiled has no copy, and Splash is neither wiped
+    nor re-imported.
 
     Returns:
-        ``{"status": "success" | "awaiting_review" | "skipped" | "error", "message": ...}`` plus the job and plan
-        ids when a publication ran.
+        ``{"status": "success" | "awaiting_review" | "skipped" | "error", "publish_state": ..., "message": ...}``
+        plus the job and plan ids when a publication ran. ``publish_state`` is ``tiled_published``,
+        ``awaiting_review``, ``error`` or ``json_available_tiled_unavailable``.
     """
     if publisher is None:
         return {
             "status": "skipped",
-            "message": "no Tiled publication target is configured; the Splash graph is not re-imported",
+            "publish_state": PUBLISH_STATE_JSON_ONLY,
+            "indicator": JSON_ONLY_INDICATOR,
+            "message": f"{JSON_ONLY_INDICATOR}: no Tiled publication target is configured; "
+                       "the Splash graph is not re-imported",
         }
-    return cast(dict[str, Any], publisher.publish(ctx, terms_json))
+    result = dict(cast(dict[str, Any], publisher.publish(ctx, terms_json)))
+    state = PUBLISH_STATE_BY_STATUS.get(str(result.get("status")))
+    if state is not None:
+        result.setdefault("publish_state", state)
+    return result
 
 
 _ENTITY_FIELDS = "id entityType name uri properties"

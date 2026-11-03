@@ -34,7 +34,11 @@ def test_no_image_script_or_doc_entrypoint_passes_the_wipe_flag():
 
 def test_publish_extraction_without_a_publisher_publishes_and_deletes_nothing():
     result = kg_update.publish_extraction("terms.json")
-    assert result["status"] == "skipped" and "not re-imported" in result["message"]
+    assert result["status"] == "skipped" and "not re-imported" in result["message"]  # legacy fields unchanged
+    # D-owner 2026-11-03: a distinct explicit state, not just "skipped".
+    assert result["publish_state"] == "json_available_tiled_unavailable"
+    assert result["indicator"] == "JSON available, Tiled unavailable"
+    assert result["message"].startswith("JSON available, Tiled unavailable")
 
 
 def test_publish_extraction_hands_the_terms_and_caller_to_the_publisher():
@@ -46,4 +50,20 @@ def test_publish_extraction_hands_the_terms_and_caller_to_the_publisher():
             return {"status": "awaiting_review", "message": "m"}
 
     result = kg_update.publish_extraction("terms.json", publisher=Publisher(), ctx="caller")
-    assert result == {"status": "awaiting_review", "message": "m"} and seen == [("caller", "terms.json")]
+    assert result == {"status": "awaiting_review", "message": "m", "publish_state": "awaiting_review"}
+    assert seen == [("caller", "terms.json")]
+
+
+def test_publish_extraction_keeps_a_state_the_publisher_set_and_maps_the_others():
+    class Publisher:
+        def __init__(self, result):
+            self.result = result
+
+        def publish(self, ctx, terms):
+            return self.result
+
+    kept = kg_update.publish_extraction("t", publisher=Publisher({"status": "success", "publish_state": "x"}))
+    assert kept["publish_state"] == "x"
+    assert kg_update.publish_extraction("t", publisher=Publisher({"status": "success"}))["publish_state"] == "tiled_published"
+    assert kg_update.publish_extraction("t", publisher=Publisher({"status": "error"}))["publish_state"] == "error"
+    assert "publish_state" not in kg_update.publish_extraction("t", publisher=Publisher({"status": "other"}))

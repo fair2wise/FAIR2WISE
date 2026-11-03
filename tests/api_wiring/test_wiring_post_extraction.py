@@ -88,6 +88,7 @@ def test_ui12_tiled_stage_run_extraction_publishes_v2_with_the_frozen_phase_name
     assert phases.index("splash_reimport_started") < phases.index("splash_reimport_result")
     result = next(e["data"] for e in events if e["event"] == "progress" and e["data"]["phase"] == "splash_reimport_result")
     assert result["status"] == "success" and result["message"] == "Splash graph store refreshed"  # frozen wording
+    assert result["publish_state"] == "tiled_published"
     assert events[-1]["event"] == "complete"
     # Published to Tiled under the :local auto-approval policy.
     assert w.pubstore.pointer(w.target).snapshot_ref == f"{SCOPE}/v2"
@@ -132,5 +133,7 @@ def test_without_a_publisher_the_phases_run_and_report_skipped(monkeypatch, tmp_
         legacy = client
     events = _run_extraction(W, "t18e-none")
     result = next(e["data"] for e in events if e["event"] == "progress" and e["data"]["phase"] == "splash_reimport_result")
-    assert result["status"] == "skipped" and events[-1]["event"] == "complete"
+    assert result["status"] == "skipped" and events[-1]["event"] == "complete"  # legacy field kept
+    assert result["publish_state"] == "json_available_tiled_unavailable"
+    assert result["message"].startswith("JSON available, Tiled unavailable")
     assert not any("delete" in k for k in ctx.calls)

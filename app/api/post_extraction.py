@@ -19,6 +19,10 @@ corpus, is part of the approved plan and is done by the importer under the plan'
 
 The result is a plain dict the legacy SSE phases ``splash_reimport_started`` / ``splash_reimport_result``
 report (names kept for the frozen UI): ``status`` is ``success`` (published), ``awaiting_review`` or ``error``.
+Each result also carries ``publish_state`` (``tiled_published``, ``awaiting_review`` or ``error``). When no
+publisher is configured at all, :func:`~app.modules.f2w_agent.kg_update.publish_extraction` does not call this
+module: it reports ``status = skipped`` (kept for compatibility) with the explicit
+``publish_state = json_available_tiled_unavailable`` and ``indicator = "JSON available, Tiled unavailable"``.
 """
 
 from __future__ import annotations
@@ -50,6 +54,10 @@ MAX_DRIVES = 6
 STATUS_PUBLISHED = "success"
 STATUS_REVIEW = "awaiting_review"
 STATUS_ERROR = "error"
+
+#: ``status`` -> ``publish_state`` (see :mod:`app.modules.f2w_agent.kg_update`).
+PUBLISH_STATE_BY_STATUS = {STATUS_PUBLISHED: "tiled_published", STATUS_REVIEW: "awaiting_review",
+                           STATUS_ERROR: "error"}
 
 
 @dataclass(frozen=True)
@@ -122,9 +130,16 @@ class PostExtractionPublisher:
     def publish(self, ctx: RequestContext | None, terms_path: str | Path) -> dict[str, Any]:
         """Publish the result of an extraction run; never raises (an error is ``status = error``).
 
+        The result always carries ``publish_state`` (``tiled_published``, ``awaiting_review`` or ``error``).
+
         ``ctx`` is the extracting caller: the local operator on ``:local``, a verified admin on ALS. It is
         used to submit the job; an approval is never made with it unless the policy allows (``:local``).
         """
+        result = self._publish(ctx, terms_path)
+        result.setdefault("publish_state", PUBLISH_STATE_BY_STATUS.get(str(result.get("status")), STATUS_ERROR))
+        return result
+
+    def _publish(self, ctx: RequestContext | None, terms_path: str | Path) -> dict[str, Any]:
         if ctx is None:
             try:
                 ctx = self.default_ctx()

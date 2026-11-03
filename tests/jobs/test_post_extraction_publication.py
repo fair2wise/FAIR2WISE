@@ -59,6 +59,7 @@ def test_til20_local_safe_plan_is_auto_approved_by_the_local_operator_and_publis
     world.client.writes.clear()
     result = _publisher(world).publish(world.ctx, "terms.json")
     assert result["status"] == "success" and result["auto_approved"] is True, result
+    assert result["publish_state"] == "tiled_published"
     assert world.pubstore.pointer(world.target).snapshot_ref == f"{SCOPE}/v2"
     assert world.agree() == {"agree": True, "pointer_snapshot_id": "v2", "marker_snapshot_id": "v2"}
     approval = world.pubstore.get_approval(result["approval_ids"][0])
@@ -79,6 +80,7 @@ def test_unsafe_plan_on_local_waits_for_review_until_a_person_approves(world):
     world.client.writes.clear()
     result = _publisher(world).publish(world.ctx, "terms.json")
     assert result["status"] == "awaiting_review" and result["auto_approved"] is False, result
+    assert result["publish_state"] == "awaiting_review"
     assert "boundary links" in result["message"]
     job_id = result["job_id"]
     assert world.pubstore.pointer(world.target).snapshot_ref == f"{SCOPE}/v1", "nothing moved"
@@ -122,7 +124,7 @@ def test_a_failed_freeze_or_refused_submit_is_an_error_status_not_an_exception(w
     def bad(_terms):
         raise ValueError("no terms")
     out = _publisher(world, freeze=bad).publish(world.ctx, "terms.json")
-    assert out["status"] == "error" and out["stage"] == "freeze"
+    assert out["status"] == "error" and out["stage"] == "freeze" and out["publish_state"] == "error"
     ops = F2WOperations(world.settings, world.service, publication=world.pub)  # default gate allows no target
     closed = PostExtractionPublisher(ops, freeze=lambda _t: f"{SCOPE}/v2", is_safe=world.step.plan_is_safe,
                                      target=world.target)

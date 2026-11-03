@@ -327,7 +327,8 @@ class Coordinator:
                     output.info(f"[stop] splash reimport failed: {exc}")
                     return
                 db_note = f" db={res.get('db_path')}" if res.get("db_path") else ""
-                output.info(f"[round {round_no}] splash reimport: {res.get('status')}{db_note}")
+                indicator_note = f" ({res.get('indicator')})" if res.get("indicator") else ""
+                output.info(f"[round {round_no}] splash reimport: {res.get('status')}{indicator_note}{db_note}")
                 if res.get("status") == "error":
                     output.info(f"[stop] splash reimport failed: {res.get('message') or res}")
                     return
@@ -531,7 +532,8 @@ class Coordinator:
                     output.info(f"[stop] splash reimport failed: {exc}")
                     return
                 db_note = f" db={res.get('db_path')}" if res.get("db_path") else ""
-                output.info(f"[round {round_no}] splash reimport: {res.get('status')}{db_note}")
+                indicator_note = f" ({res.get('indicator')})" if res.get("indicator") else ""
+                output.info(f"[round {round_no}] splash reimport: {res.get('status')}{indicator_note}{db_note}")
                 if res.get("status") == "error":
                     output.info(f"[stop] splash reimport failed: {res.get('message') or res}")
                     return
