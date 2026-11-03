@@ -103,9 +103,9 @@ scripts/run_nersc_3agent.sh ask "What is find_scattering_peaks used for?"
 scripts/run_nersc_3agent.sh chat
 ```
 
-The script builds a shell-quoted remote command from `F2W_*` settings. In
-Splash mode it passes the explicit wipe capability, so confirm the configured
-remote Splash repository/database before use.
+The script builds a shell-quoted remote command from `F2W_*` settings. It
+no longer passes any wipe capability (removed in T18E); confirm the configured
+remote Splash repository before using Splash mode.
 
 `f2w_nersc_smoke.sh` performs a one-question smoke run.
 `f2w_nersc_api.sh` starts the remote API and accepts explicit CORS origins.

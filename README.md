@@ -459,17 +459,9 @@ curl -s http://localhost:8081/docs -o /dev/null -w "%{http_code}\n"
 # expect: 200
 ```
 
-### 4b. Wipe stale DB before re-import (recommended)
+### 4b. No Splash wipe
 
-If you are re-importing after a metadata or schema fix, clear the existing splash graph so stale entities (missing `source_metadata`, `code_snippet`, etc.) do not linger:
-
-```bash
-cd /path/to/f2wlocal
-./scripts/wipe_splash_db.sh
-./scripts/start_all.sh
-```
-
-> **Why wipe?** `import_kg.py` creates new entities; it does not delete old ones. A partial or pre-fix import leaves duplicate/stale records that KG-RAG may still load. The guarded reset script refuses to run while Splash is active and requires typed confirmation before deleting the database.
+There is no Splash wipe or reset tool any more (owner decision Q11, T18E): `scripts/wipe_splash_db.sh` and `--allow-splash-wipe` were removed. A rebuilt corpus reaches the graph store through post-extraction publication to Tiled (a reviewed, plan-bound replacement; see "KG update modes"), and nothing is deleted outside that plan. `import_kg.py` creates new entities and does not delete old ones, so re-importing into an existing Splash database can leave duplicates; start from a fresh `links.sqlite` (stop Splash, move the file aside yourself) if you need one.
 
 ### 4c. Import the MatKG JSON
 
@@ -478,7 +470,7 @@ cd /path/to/f2wlocal/splash_links
 pixi run python scripts/import_kg.py /path/to/f2wlocal/storage/kg/matkg_xray_papers_cborg_chat.json
 ```
 
-If you are using the 3-agent pipeline, `splash_reimport()` is the preferred path. It clears the live splash graph through GraphQL and then runs the import script against the running server. That avoids the SQLite "readonly database" failure that can happen when `links.sqlite` is deleted while `pixi run serve` is still holding the file open.
+The 3-agent pipeline no longer re-imports into Splash after extraction: `kg_update.publish_extraction()` publishes the rebuilt corpus to Tiled instead (nothing is wiped).
 
 Dry-run first (validate counts, no writes):
 
@@ -557,10 +549,6 @@ Or manage splash-links, the agent backend, and the frontend together:
 ```bash
 ./scripts/start_all.sh
 ```
-
-To permanently reset the local Splash database, first stop the stack and run
-`./scripts/wipe_splash_db.sh`. The utility prints the exact database path and
-requires typed confirmation before deleting it.
 
 Defaults used by `start_agent_backend.sh`:
 
@@ -869,7 +857,6 @@ python3 -m app.modules.launchers.f2w_agent ask --help   # global flags go before
 | `--schema` | `storage/schema/matkg_schema.yaml` | LinkML schema for extraction |
 | `--chebi` | — | Optional ChEBI `.obo` path |
 | `--splash-repo` | `splash_links` | Path to the vendored splash_links workspace (`--kg-mode splash`) |
-| `--allow-splash-wipe` | off | Permit `--kg-mode splash` to delete `links.sqlite` before re-import |
 
 ### KG update modes
 
@@ -881,10 +868,9 @@ python3 -m app.modules.launchers.f2w_agent ask --help   # global flags go before
 
 **Legacy Splash mode (`--kg-mode splash`):**
 
-- Same JSON rebuild, then wipes/re-imports into `splash_links` via `scripts/import_kg.py` (see **Step 4**).
-- Requires a running splash-links server and a local `splash_links` checkout (`SPLASH_LINKS_REPO`).
-- Requires `--allow-splash-wipe` before deleting `links.sqlite`; the run prints the DB path it is about to use.
-- Heavier per round; use when you want the live splash DB to stay in sync.
+- Same JSON rebuild. The legacy `splash_reimport_started` / `splash_reimport_result` phases are kept and now report **post-extraction publication** (T18E, owner decision Q11): `v<N+1>` is frozen, a corpus-scoped replacement plan is computed and applied under the profile's approval policy. `:local` auto-approves **only a safe plan** (no boundary links, no legacy adoption) as the local operator with `reason: auto_safe_plan`; an unsafe plan waits for review; on ALS the plan always waits for one verified admin (never auto-approved). Without a configured Tiled publication target the phase reports `skipped`.
+- There is no Splash wipe and no `--allow-splash-wipe`; node edits keep using the non-destructive Splash entity/link calls when no Tiled Save target is configured.
+- Requires a running splash-links server and a local `splash_links` checkout (`SPLASH_LINKS_REPO`) for those edits.
 
 ### Extractor package (`term_extractor`)
 

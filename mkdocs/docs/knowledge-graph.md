@@ -110,16 +110,17 @@ Use `--dry-run` to validate and count without writing.
 `app/modules/f2w_agent/kg_update.py` contains the runtime bridge:
 
 - `rebuild_kg()` converts cumulative terms to session KG JSON;
-- `splash_reimport()` uses the live API for a guarded wipe, then executes the
-  importer;
+- `publish_extraction()` (T18E) publishes the rebuilt corpus to Tiled through the
+  post-extraction publisher (`app/api/post_extraction.py`): freeze `v<N+1>`, plan,
+  then apply under the profile's approval policy. The Splash wipe-and-reimport it
+  replaced no longer exists;
 - `load_splash_graph()` pages through entities/links and reconstructs MatKG;
 - `export_splash_graph_to_json()` writes an editable graph snapshot.
 
 The workflow reloads the in-memory retrieval graph after successful growth.
 
-`scripts/reimport_merged_kg.sh` merges a current graph with a larger graph,
-preferring non-empty current values, deduplicates nodes/edges, starts Splash if
-needed, and imports the result.
+`scripts/reimport_merged_kg.sh` was removed with the wipe path (T18E); merge graphs
+into a new terms artifact and publish it as the next snapshot instead.
 
 ## Graph editing contract
 

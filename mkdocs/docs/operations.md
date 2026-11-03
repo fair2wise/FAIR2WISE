@@ -123,14 +123,9 @@ Back up the database only while Splash is stopped:
 cp splash_links/links.sqlite splash_links/links.sqlite.backup
 ```
 
-To intentionally erase the local database:
-
-```bash
-./scripts/wipe_splash_db.sh
-```
-
-The wipe tool is deliberately interactive and local-SQLite-only. PostgreSQL
-administration is outside its scope.
+There is no wipe tool any more (T18E): to start from an empty local Splash
+database, stop Splash and move `links.sqlite` aside yourself. A corpus is replaced
+through a reviewed publication plan, not by deleting a database.
 
 ## Rebuild/import workflow
 
@@ -147,13 +142,7 @@ cd splash_links
 pixi run python scripts/import_kg.py --dry-run ../storage/kg/example.json
 ```
 
-To merge the current code-enriched graph with the larger corpus and reimport:
-
-```bash
-./scripts/reimport_merged_kg.sh
-```
-
-Read the script's environment defaults before using it against valuable data.
+`scripts/reimport_merged_kg.sh` was removed with the wipe path (T18E).
 For the provenance consequences of rebuild/reimport and the security boundary
 around graph mutation, see [Data provenance](provenance.md) and
 [Security model](security.md).

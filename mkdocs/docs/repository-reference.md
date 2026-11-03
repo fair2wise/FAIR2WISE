@@ -50,7 +50,7 @@ Run these entry points from the repository root with `python3 -m`, for example
 | `extractor_agent.py` | Async Academy wrapper around local full/targeted extraction |
 | `debate_agent.py` | Evidence-gating decision and heuristic fallback |
 | `paper_evidence_agent.py` | Page-bounded answers over active downloaded PDFs |
-| `kg_update.py` | Terms-to-KG rebuild, Splash wipe/import/export/load |
+| `kg_update.py` | Terms-to-KG rebuild, post-extraction publication, Splash entity/link/export/load |
 | `session_memory.py` | Topic-aware durable conversational memory and compression |
 | `workflow_state.py` | Atomic durable workflow/pending state |
 | `__init__.py` | Package exports |
@@ -209,8 +209,7 @@ Root tests follow feature ownership:
   `test_source_repos.py` cover extraction;
 - `test_json2kg*.py`, `test_kg_rag_api*.py`, and
   `test_build_context_filtering.py` cover graph construction/retrieval;
-- `test_splash_*.py`, `test_kg_update.py`, and
-  `test_wipe_splash_db_script.py` cover graph-service integration/safety;
+- `test_splash_*.py`, and `test_kg_update.py` cover graph-service integration/safety;
 - `test_project_config.py`, `test_cborg_limiter.py`, and helper tests cover
   infrastructure;
 - `tests/deepeval/` contains opt-in LLM quality evaluations.

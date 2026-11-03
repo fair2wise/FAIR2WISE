@@ -36,7 +36,6 @@ extraction behavior.
 | `start_agent_frontend.sh` | Validate npm/Vite and run the Vite dev server (default port 5175) |
 | `install_pixi.sh` | Install Pixi if absent and initialize Splash |
 | `test_compose.sh` | Isolated Splash-stack smoke test (`compose.splash.yaml`) |
-| `wipe_splash_db.sh` | Guarded deletion of the local Splash SQLite database |
 
 ## Data acquisition and graph scripts
 
@@ -52,7 +51,6 @@ extraction behavior.
 | `promote_rsoxs_snapshot.py` | Copy live extract terms, json2kg the **copy** into `matkg_rsoxs_vN.json` |
 | `index_source_rag.py` | Build literature PDF + bl1101 ops-doc indexes (`storage/source_index/`) |
 | `build_kg.sh` | Extract terms and convert to graph using temp files/backups |
-| `reimport_merged_kg.sh` | Merge two graphs, start Splash if needed, and reimport |
 | `get_pdf_years.py` | Infer PDF year from arXiv filename, metadata, then text |
 | `analyze_kgs.py` | Compare graph growth and structural metrics across checkpoints |
 | `test_chat_apis.py` | Manual CBORG/Ollama client smoke utility |
@@ -163,5 +161,5 @@ See [NERSC and remote extraction](nersc.md) for sequencing and security.
 - Keep `.env` local; deployment scripts exclude it.
 - Prefer dry-run modes when available.
 - Stop Splash before copying or wiping its SQLite file.
-- `--allow-splash-wipe` is an explicit destructive capability; do not add it
-  to new automation without a guarded workflow.
+- `--allow-splash-wipe` and the wipe/reimport scripts were removed (T18E); a corpus
+  is replaced through a reviewed publication plan only.

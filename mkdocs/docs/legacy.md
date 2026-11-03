@@ -53,8 +53,8 @@ MatKG JSON directly (and Splash Links in the legacy editable mode).
 
 ## Splash Links
 
-`splash_links/`, `compose.splash.yaml`, `scripts/start_all.sh`,
-`scripts/wipe_splash_db.sh` and the `--kg-mode splash` paths are the legacy
+`splash_links/`, `compose.splash.yaml`, `scripts/start_all.sh`
+and the `--kg-mode splash` paths are the legacy
 editable graph mode. They stay runnable until the Splash retirement gate
 (T16B/H7 or H8, `docs/migration/plan_addenda.md` A2) and are never built into
 the `:local`, `:als-dev` or `:als-prod` images. See
