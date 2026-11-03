@@ -673,90 +673,90 @@
       "title": "Per-job log channel",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "status": "merged",
+      "merge_commit": "8b034f28b37d1d7d83d70d2f81f184b9eba10b91",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T34",
       "title": "Worker factory, library job kinds and capabilities",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (library package, library_service factory, local-only capabilities, nonce), uncommitted and not merged, so the row stays open until the integrator commit; verify/index/extract are fail-closed stubs until T35/T36/T39"
+      "status": "merged",
+      "merge_commit": "073b18e5c9c67bb3b314b1fdbca6c52f6d2cae59",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (library package, library_service factory, local-only capabilities, nonce), uncommitted and not merged, so the row stays open until the integrator commit; verify/index/extract are fail-closed stubs until T35/T36/T39 | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T35",
       "title": "Library catalog, upload and verify (supersedes T32)",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (LibraryService, catalog.sqlite, isolated PDF probe, /v1/library V56-V59, library_verify handler, F2W_LIBRARY_DIR profile wiring), uncommitted and not merged, so the row stays open until the integrator commit"
+      "status": "merged",
+      "merge_commit": "87048f9ac9fb547ee2072fb7274a3e90c72bf7d9",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (LibraryService, catalog.sqlite, isolated PDF probe, /v1/library V56-V59, library_verify handler, F2W_LIBRARY_DIR profile wiring), uncommitted and not merged, so the row stays open until the integrator commit | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T36",
       "title": "Library in the source index",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (library_index handler app/modules/library/indexer.py, locked atomic shared literature index with meta docs record, SourceIndex reload on meta change, catalog pages and index_status, HYBRID_RAG_LITERATURE_INDEX in the local profile and forbidden on ALS), uncommitted and not merged, so the row stays open until the integrator commit"
+      "status": "merged",
+      "merge_commit": "62e32ccd558c86f1b3647b13acb8ef3799cc516b",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (library_index handler app/modules/library/indexer.py, locked atomic shared literature index with meta docs record, SourceIndex reload on meta change, catalog pages and index_status, HYBRID_RAG_LITERATURE_INDEX in the local profile and forbidden on ALS), uncommitted and not merged, so the row stays open until the integrator commit | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T37",
       "title": "kg_to_terms and TermStore hardening",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "status": "merged",
+      "merge_commit": "8b034f28b37d1d7d83d70d2f81f184b9eba10b91",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T38",
       "title": "KG bundles, schemas, models and cost estimate",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "implemented 2026-11-02: app/modules/library/{bundles,schemas,estimate,ranking,kg_service}.py, app/api/routes_library_kgs.py, policies V70-V75, additive hooks in f2w_agent/api.py and api/main.py; see docs/migration/api/README.md section 2.0.1"
+      "status": "merged",
+      "merge_commit": "87048f9ac9fb547ee2072fb7274a3e90c72bf7d9",
+      "note": "implemented 2026-11-02: app/modules/library/{bundles,schemas,estimate,ranking,kg_service}.py, app/api/routes_library_kgs.py, policies V70-V75, additive hooks in f2w_agent/api.py and api/main.py; see docs/migration/api/README.md section 2.0.1 | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T39",
       "title": "library_extract job (resumable per PDF)",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "implemented 2026-11-02: app/modules/library/extraction.py (LibraryExtractor, per-bundle flock, fail-closed backend, unit key = sha256 + extractor/schema/model), handlers.extract_handler, wiring in api/main.py and workers/factories.py, tests/library/test_library_extract.py; no route, no policy row; see docs/migration/api/README.md section 2.0.1"
+      "status": "merged",
+      "merge_commit": "963886da93ce47b13609241934bffb4a3aa75a4c",
+      "note": "implemented 2026-11-02: app/modules/library/extraction.py (LibraryExtractor, per-bundle flock, fail-closed backend, unit key = sha256 + extractor/schema/model), handlers.extract_handler, wiring in api/main.py and workers/factories.py, tests/library/test_library_extract.py; no route, no policy row; see docs/migration/api/README.md section 2.0.1 | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T40",
       "title": "UI foundations for Library and Extraction (O-U4)",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "status": "merged",
+      "merge_commit": "63b285f9054930a4b8db973125e141dc0f040fb9",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T41",
       "title": "Library tab",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "status": "merged",
+      "merge_commit": "43b83da82432cd5b3d52e3af21035e942f5a8abb",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T42",
       "title": "Extraction tab",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "status": "merged",
+      "merge_commit": "a9eab07f345e7e100ba43355c0c9f5ef486135b5",
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T43",
@@ -781,18 +781,18 @@
       "title": "Harvester backend: library_harvest job, candidates, paywalled queue",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-03 from the owner request for a Harvester panel in the Library tab"
+      "status": "merged",
+      "merge_commit": "ab3d99080a5017af3045734b6a06aaa8899d1b75",
+      "note": "added 2026-11-03 from the owner request for a Harvester panel in the Library tab | landed on forge_merge 2026-11-03; owner review at H6"
     },
     {
       "id": "T46",
       "title": "Harvester panel in the Library tab",
       "source": "plan_addenda.md A8",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-11-03 from the owner request for a Harvester panel in the Library tab"
+      "status": "merged",
+      "merge_commit": "f820870256bed971dc8f67a2d3139df87367b751",
+      "note": "added 2026-11-03 from the owner request for a Harvester panel in the Library tab | landed on forge_merge 2026-11-03; owner review at H6"
     }
   ]
 }
