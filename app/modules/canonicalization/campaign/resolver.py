@@ -21,12 +21,15 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import hashlib
+import logging
 
 from ..adjudication import clamp_confidence, parse_json_object
 from ..candidate_search import estimate_tokens
 from ..migration import unsafe_reason
 from ..vocabulary import Vocabulary
 from .models import FRAMINGS, VERDICTS, TermEvidence, TermVerdict
+
+logger = logging.getLogger(__name__)
 
 REJECT_KINDS = (
     "software",
@@ -146,6 +149,7 @@ class StructuredTermResolver:
         try:
             raw = self.judge(prompt)
         except Exception as exc:  # noqa: BLE001
+            logger.warning("judge call failed: %s", type(exc).__name__)
             return verdict("abstain", reason=f"{type(exc).__name__}: {exc}", errors=("judge_failed",))
         payload = parse_json_object(raw)
         if payload is None:

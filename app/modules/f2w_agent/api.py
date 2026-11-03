@@ -2493,6 +2493,7 @@ def _search_openalex_publications(query: str, max_results: int) -> list[dict[str
         from pyalex import Works
         from pyalex import config as pyalex_config
     except Exception:
+        logger.debug("pyalex unavailable; no OpenAlex publication search", exc_info=True)
         return []
 
     mailto = os.environ.get("OPENALEX_EMAIL")
@@ -2504,7 +2505,8 @@ def _search_openalex_publications(query: str, max_results: int) -> list[dict[str
             .search(_sanitize_openalex_search(query))
             .get(per_page=min(max_results * 2, 50))
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning("OpenAlex publication search failed: %s", type(exc).__name__)
         return []
     publications = [_openalex_work_to_publication(work) for work in works or [] if isinstance(work, dict)]
     return [publication for publication in publications if publication.get("paper_title") or publication.get("doi")]

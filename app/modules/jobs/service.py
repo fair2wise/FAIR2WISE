@@ -331,6 +331,7 @@ class JobService:
                 except (
                     Exception
                 ):  # noqa: BLE001 - a lost lease ends the heartbeat; the runner sees LeaseLost itself
+                    logger.debug("heartbeat stopped: lease renewal failed", exc_info=True)
                     return
 
         threading.Thread(target=beat, name=f"heartbeat-{lease.resource}", daemon=True).start()

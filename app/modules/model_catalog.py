@@ -22,11 +22,14 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import logging
 import os
 import re
 import threading
 import time
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CBORG_BASE = "https://api.cborg.lbl.gov"
 #: Seconds a successful listing is reused before the endpoint is asked again.
@@ -132,6 +135,7 @@ def list_cborg_models_live(
                 **openai_http_kwargs(asynchronous=False),
             )
         except Exception as exc:  # noqa: BLE001 - client construction fault is "unavailable"
+            logger.warning("model listing unavailable (client construction): %s", type(exc).__name__)
             return ModelListing("cborg", "unavailable", error=_scrub(f"{type(exc).__name__}: {exc}", key))
     hold = slot or sync_slot
     try:
@@ -139,6 +143,7 @@ def list_cborg_models_live(
             page = client.models.list(timeout=timeout)
             models = tuple(sorted(set(_model_ids(page))))
     except Exception as exc:  # noqa: BLE001 - provider/network fault is "unavailable", never a list
+        logger.warning("model listing unavailable: %s", type(exc).__name__)
         return ModelListing("cborg", "unavailable", error=_scrub(f"{type(exc).__name__}: {exc}", key))
     return ModelListing("cborg", "live", models)
 

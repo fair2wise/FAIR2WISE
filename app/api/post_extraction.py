@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from pathlib import Path
 from typing import Any
 import uuid
@@ -44,6 +45,8 @@ from ..modules.graph.snapshot_manifest import SNAPSHOT_ID_RE
 from ..modules.schema.registry import SchemaRegistry
 from ..modules.security.authorization import DeploymentSettings, create_approval, local_operator_context
 from .operations import F2WOperations, default_approval_ttl
+
+logger = logging.getLogger(__name__)
 
 #: ``ApprovalRecord.reason`` of an approval the ``:local`` policy made for the operator.
 AUTO_SAFE_PLAN = "auto_safe_plan"
@@ -148,6 +151,7 @@ class PostExtractionPublisher:
         try:
             ref = self.freeze(Path(terms_path))
         except Exception as exc:  # a failed freeze leaves the session KG and the committed snapshots as they were
+            logger.warning("snapshot freeze failed: %s", type(exc).__name__, exc_info=True)
             return {"status": STATUS_ERROR, "stage": "freeze", "message": f"snapshot freeze failed: {exc}"}
         try:
             job_id = self.ops.submit_publication(ctx, ref, self.target).job_id

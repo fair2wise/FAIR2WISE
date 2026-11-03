@@ -18,10 +18,13 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 import json
+import logging
 from pathlib import Path
 import re
 from typing import Any, cast
 import uuid
+
+logger = logging.getLogger(__name__)
 
 MAX_SUMMARY_CHARS = 3000
 MAX_RECENT_TURNS = 12
@@ -510,6 +513,7 @@ class SessionMemory:
         try:
             raw = chat_fn(prompt)
         except Exception:
+            logger.debug("session summary model call failed", exc_info=True)
             return False
         obj = _parse_json_object(str(raw or ""))
         new_summary = _clip(obj.get("summary"), MAX_SUMMARY_CHARS)

@@ -71,6 +71,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import json
+import logging
 import math
 from pathlib import Path, PurePosixPath
 import re
@@ -92,6 +93,8 @@ from .reports import (
     top_items,
     utcnow,
 )
+
+logger = logging.getLogger(__name__)
 
 # =====================================================================================
 # Work identity (H3 K1)
@@ -1090,6 +1093,7 @@ class CorpusAuditTool:
         except ContractError as exc:
             return error_result(TOOL_AUDIT, exc, provenance_id=provenance_id)
         except Exception as exc:  # noqa: BLE001
+            logger.warning("corpus audit failed", exc_info=True)
             if is_control_flow(exc):
                 raise
             return error_result(TOOL_AUDIT, ContractError(ErrorCode.INTERNAL, f"corpus audit failed "

@@ -339,12 +339,14 @@ class DoclingParser:
         try:
             text = str(item.caption_text(doc) or "").strip()
         except Exception:  # noqa: BLE001 - a malformed caption reference must not lose the figure
+            logger.debug("caption text unreadable", exc_info=True)
             return "", None
         box = None
         for ref in getattr(item, "captions", None) or []:
             try:
                 _, cap_box = _docling_page_of(ref.resolve(doc))
             except Exception:  # noqa: BLE001
+                logger.debug("caption box unresolved", exc_info=True)
                 continue
             if cap_box is not None:
                 box = _docling_bbox(cap_box)

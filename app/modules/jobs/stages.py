@@ -13,11 +13,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import logging
 from typing import Any
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .pipeline import PauseBudget, PauseProvider, QuarantineStage, StageContext, StageResult, StageRun
+
+logger = logging.getLogger(__name__)
 
 
 def acquire_stage(
@@ -105,6 +108,7 @@ def chunked_stage(
                 missing.append(unit.unit_id)
                 continue
             except Exception as exc:  # noqa: BLE001 - one bad chunk must not lose the others
+                logger.warning("unit %s failed: %s", unit.unit_id, type(exc).__name__)
                 sc.fail_unit(unit.unit_id, unit.unit_key, type(exc).__name__)
                 missing.append(unit.unit_id)
                 continue

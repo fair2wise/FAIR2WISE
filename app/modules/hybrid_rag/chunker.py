@@ -4,9 +4,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from html import unescape
+import logging
 from pathlib import Path
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 CHUNKER_VERSION = "1.0.0"
 WINDOW_CHARS = 1200
@@ -70,6 +73,7 @@ def chunk_pdf_detailed(
     try:
         from ..literature.pdf_reader import open_pdf
     except Exception:
+        logger.debug("pdf reader unavailable", exc_info=True)
         return PdfChunks()
     pdf = Path(path)
     if not pdf.is_file():
@@ -77,6 +81,7 @@ def chunk_pdf_detailed(
     try:
         doc = open_pdf(pdf)
     except Exception:
+        logger.debug("could not open pdf %s", pdf, exc_info=True)
         return PdfChunks()
     chunks: list[dict[str, Any]] = []
     pages = 0
@@ -86,12 +91,14 @@ def chunk_pdf_detailed(
         try:
             title = str((doc.metadata or {}).get("title") or "")
         except Exception:
+            logger.debug("pdf metadata unreadable", exc_info=True)
             title = ""
         for page_no, page in enumerate(doc, start=1):
             pages = page_no
             try:
                 text = page.get_text("text") or ""
             except Exception:
+                logger.debug("page %d text unreadable", page_no, exc_info=True)
                 text = ""
             if page_no <= 2:
                 head.append(text)
@@ -241,10 +248,12 @@ def _html_sections(raw: str) -> list[tuple[str, str]]:
     try:
         from lxml import html as lhtml
     except Exception:
+        logger.debug("lxml unavailable; stripping html tags", exc_info=True)
         return [("", _strip_html(raw))]
     try:
         tree = lhtml.fromstring(raw.encode("utf-8", errors="replace"))
     except Exception:
+        logger.debug("html parse failed; stripping html tags", exc_info=True)
         return [("", _strip_html(raw))]
     sections: list[tuple[str, str]] = []
     current_heading = ""

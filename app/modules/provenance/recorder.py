@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import json
+import logging
 import threading
 from typing import Any, TypeVar, cast
 
@@ -26,6 +27,8 @@ from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.keys import digest
 from ..jobs.sqlite import OperationalDB
 from .events import GraphWriteEvent
+
+logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 SCHEMA = (
@@ -173,6 +176,7 @@ class AuditRecorder:
             try:
                 seq = self.log.append(event)
             except Exception as exc:  # noqa: BLE001 - any storage failure degrades the audit path
+                logger.warning("audit log not writable: %s", type(exc).__name__)
                 self._degraded_reason = f"{type(exc).__name__}: audit log not writable"
                 if event.critical:
                     raise AuditUnavailable(self._degraded_reason) from exc
@@ -193,6 +197,7 @@ class AuditRecorder:
             try:
                 self.log.append(self._spill[0])
             except Exception:  # noqa: BLE001
+                logger.debug("audit spill flush stopped; events stay queued", exc_info=True)
                 return
             self._spill.pop(0)
         if not self._spill and self._dropped == 0:
@@ -223,6 +228,7 @@ class AuditRecorder:
             try:
                 pending, last = self.log.pending_projection(), self.log.last_seq()
             except Exception:  # noqa: BLE001
+                logger.warning("audit log not readable", exc_info=True)
                 pending, last = -1, -1
                 self._degraded_reason = self._degraded_reason or "audit log not readable"
             healthy = not (self._spill or self._dropped or self._degraded_reason)

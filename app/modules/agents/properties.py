@@ -25,8 +25,11 @@ Usage:
 Author: David Abramov (@dabramov)
 """
 
+import logging
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class PhysicalPropertyExtractor:
@@ -494,6 +497,7 @@ class PropertyNormalizer:
                     norm_entry["uncertainty_value"] = round(unc_norm, 6)
 
             except Exception:
+                logger.debug("unit conversion failed for %s", prop, exc_info=True)
                 norm_entry["unit_conversion_failed"] = True
 
             normalized_entries.append(norm_entry)
