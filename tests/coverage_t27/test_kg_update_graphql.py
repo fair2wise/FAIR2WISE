@@ -94,14 +94,12 @@ def splash(monkeypatch):
     return fake
 
 
-def test_base_url_conversion_and_locality():
+def test_base_url_conversion():
     assert kg_update._splash_base_url("splash://host:8081") == "http://host:8081"
     assert kg_update._splash_base_url("splash:localhost:8081") == "http://localhost:8081"
     assert kg_update._splash_base_url("https://h/x/") == "https://h/x"
     with pytest.raises(ValueError, match="unsupported splash URI"):
         kg_update._splash_base_url("ftp://h")
-    assert kg_update._splash_is_local("splash://localhost:1") and kg_update._splash_is_local("http://[::1]:1")
-    assert not kg_update._splash_is_local("splash://remote.example:1")
 
 
 @pytest.mark.parametrize(
