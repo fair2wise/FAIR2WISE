@@ -93,7 +93,7 @@ def test_listing_reads_local_metadata_without_a_network(tmp_path, monkeypatch):
     assert by["a.pdf"]["title"] == "A real title" and by["a.pdf"]["doi"] == DOI
     assert by["10.1021_acs.macromol.0c01782.pdf"]["doi"] == DOI  # from the file name
     assert by["plain.pdf"]["title"] is None and by["plain.pdf"]["doi"] is None
-    assert all(p["verify_status"] == "unverified" and p["index_status"] is None for p in out["papers"])
+    assert all(p["verify_status"] == "unverified" and p["index_status"] == "not_indexed" for p in out["papers"])
     assert out["total"] == 3 and service._fetch is None  # the registry was never even built
     assert service.status()["paper_count"] == 3
 
@@ -354,5 +354,5 @@ def test_paper_facts_feed_the_t38_estimate_lookup(tmp_path):
     service, _ = make(tmp_path)
     paper = service.upload("Facts.pdf", pdf("facts"))["paper"]
     facts = service.paper_facts(paper["id"])
-    assert (facts.id, facts.name, facts.sha256, facts.pages) == (paper["id"], "Facts.pdf", paper["sha256"], None)
+    assert (facts.id, facts.name, facts.sha256, facts.pages) == (paper["id"], "Facts.pdf", paper["sha256"], 1)  # the upload probe stored the page count
     assert service.paper_facts("0" * 16) is None

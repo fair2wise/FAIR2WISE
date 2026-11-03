@@ -702,7 +702,7 @@
       "gate": "H6",
       "status": "open",
       "merge_commit": null,
-      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs"
+      "note": "added 2026-11-02 from the owner request for Library and Extraction tabs; implemented in the working tree 2026-11-02 (library_index handler app/modules/library/indexer.py, locked atomic shared literature index with meta docs record, SourceIndex reload on meta change, catalog pages and index_status, HYBRID_RAG_LITERATURE_INDEX in the local profile and forbidden on ALS), uncommitted and not merged, so the row stays open until the integrator commit"
     },
     {
       "id": "T37",

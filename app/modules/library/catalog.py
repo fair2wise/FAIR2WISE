@@ -21,7 +21,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS papers (
   relpath TEXT PRIMARY KEY, id TEXT NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, mtime REAL NOT NULL,
   title TEXT, doi TEXT, doi_source TEXT, meta_status TEXT NOT NULL DEFAULT 'pending',
-  index_status TEXT, first_seen REAL NOT NULL);
+  index_status TEXT, first_seen REAL NOT NULL, pages INTEGER, indexed_sha256 TEXT);
 CREATE INDEX IF NOT EXISTS papers_id ON papers(id);
 CREATE INDEX IF NOT EXISTS papers_sha ON papers(sha256);
 CREATE TABLE IF NOT EXISTS verifications (
@@ -58,6 +58,10 @@ class LibraryCatalog:
             except sqlite3.DatabaseError:  # pragma: no cover - a filesystem without WAL support
                 pass
             self._con.executescript(SCHEMA)
+            have = {row["name"] for row in self._con.execute("PRAGMA table_info(papers)")}
+            for column, kind in (("pages", "INTEGER"), ("indexed_sha256", "TEXT")):  # T36: catalogs made by T35
+                if column not in have:
+                    self._con.execute(f"ALTER TABLE papers ADD COLUMN {column} {kind}")
             self._con.commit()
 
     def _query(self, sql: str, args: Iterable[Any] = ()) -> list[sqlite3.Row]:
@@ -87,17 +91,45 @@ class LibraryCatalog:
         return dict(rows[0]) if rows else None
 
     def upsert_paper(self, *, relpath: str, sha256: str, size: int, mtime: float, title: str | None,
-                     doi: str | None, doi_source: str | None, meta_status: str) -> None:
-        """Insert or replace a row, keeping ``first_seen`` and the index status of unchanged bytes."""
+                     doi: str | None, doi_source: str | None, meta_status: str, pages: int | None = None) -> None:
+        """Insert or replace a row, keeping ``first_seen``, the index record and (for unchanged bytes) the page count.
+
+        The index record (``index_status`` and ``indexed_sha256``) survives a change of bytes so the paper
+        reads ``stale`` until the next index run; a page count is only kept for the same bytes.
+        """
         with self._lock:
             old = self.paper(relpath)
             first = old["first_seen"] if old else self._clock()
-            index_status = old["index_status"] if old and old["sha256"] == sha256 else None
+            index_status = old["index_status"] if old else None
+            indexed_sha = old["indexed_sha256"] if old else None
+            if pages is None and old and old["sha256"] == sha256:
+                pages = old["pages"]
             self._con.execute(
                 "INSERT OR REPLACE INTO papers (relpath,id,sha256,size,mtime,title,doi,doi_source,meta_status,"
-                "index_status,first_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "index_status,first_seen,pages,indexed_sha256) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (relpath, paper_id(relpath), sha256, int(size), float(mtime), title, doi, doi_source, meta_status,
-                 index_status, first))
+                 index_status, first, int(pages) if pages else None, indexed_sha))
+            self._con.commit()
+
+    def set_index_state(self, relpath: str, *, status: str | None, sha256: str | None, pages: int | None = None,
+                        title: str | None = None, doi: str | None = None) -> None:
+        """Record the outcome of indexing ``relpath`` (``ok`` / ``no_text``; ``None`` clears it).
+
+        ``pages`` fills a missing page count and ``title`` / ``doi`` fill missing local metadata (they never
+        replace a value a probe already found).
+        """
+        with self._lock:
+            self._con.execute("UPDATE papers SET index_status=?, indexed_sha256=? WHERE relpath=?",
+                              (status, sha256 if status else None, relpath))
+            if pages:
+                self._con.execute("UPDATE papers SET pages=? WHERE relpath=? AND (pages IS NULL OR pages=0)",
+                                  (int(pages), relpath))
+            if title:
+                self._con.execute("UPDATE papers SET title=? WHERE relpath=? AND (title IS NULL OR title='')",
+                                  (title, relpath))
+            if doi:
+                self._con.execute("UPDATE papers SET doi=?, doi_source=COALESCE(doi_source,'pdf') "
+                                  "WHERE relpath=? AND (doi IS NULL OR doi='')", (doi, relpath))
             self._con.commit()
 
     def prune(self, keep: Iterable[str]) -> int:
@@ -118,8 +150,9 @@ class LibraryCatalog:
             "LEFT JOIN verifications v ON v.sha256 = p.sha256 ORDER BY p.relpath")]
 
     def indexed_count(self) -> int:
-        """Papers whose ``index_status`` is ``ok`` (set by T36)."""
-        return int(self._query("SELECT COUNT(*) AS n FROM papers WHERE index_status='ok'")[0]["n"])
+        """Papers indexed with text (``index_status='ok'``) for their current bytes (not ``stale``)."""
+        return int(self._query("SELECT COUNT(*) AS n FROM papers WHERE index_status='ok' "
+                               "AND indexed_sha256=sha256")[0]["n"])
 
     # -- verification cache ----------------------------------------------------------------------
 

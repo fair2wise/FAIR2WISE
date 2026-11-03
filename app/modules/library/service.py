@@ -58,6 +58,9 @@ logger = logging.getLogger(__name__)
 
 #: Trusted startup setting naming the mounted papers folder (absolute path).
 LIBRARY_DIR_ENV = "F2W_LIBRARY_DIR"
+#: Trusted startup setting naming the literature index directory the library is chunked into (T36; the same
+#: variable ``hybrid_rag`` reads, absolute path, ``:local`` profile only).
+INDEX_DIR_ENV = "HYBRID_RAG_LITERATURE_INDEX"
 #: The ``FolderRoots`` label of the mount (never shown to a client).
 ROOT_LABEL = "library"
 #: Files probed per refresh at most (the rest stay ``pending``).
@@ -88,6 +91,16 @@ def _iso(epoch: float | None) -> str | None:
     return datetime.fromtimestamp(epoch, UTC).isoformat(timespec="seconds") if epoch else None
 
 
+def index_status_of(row: Mapping[str, Any]) -> str:
+    """``indexed`` / ``no_text`` for the bytes that were indexed, ``stale`` when the bytes changed since, else ``not_indexed``."""
+    status = row.get("index_status")
+    if not status:
+        return "not_indexed"
+    if row.get("indexed_sha256") != row.get("sha256"):
+        return "stale"
+    return "indexed" if status == "ok" else str(status)
+
+
 def clean_upload_name(filename: str | None) -> str:
     """The plain ``*.pdf`` file name of an uploaded name (directories dropped, ``.pdf`` appended when missing).
 
@@ -113,12 +126,15 @@ class LibraryService:
         max_upload_bytes: Upload size cap.
         max_probe: Files probed per refresh.
         clock: Epoch seconds, injectable.
+        index_dir: The literature index directory ``library_index`` writes (``None``: the job fails closed).
+        chunker: PDF reader and chunker of ``library_index`` (default ``hybrid_rag.chunker.chunk_pdf_detailed``).
     """
 
     def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,
                  fetch_factory: Callable[[], Fetch] | None = None, breaker: QuotaBreaker | None = None,
                  max_upload_bytes: int = DEFAULT_MAX_BODY_BYTES, max_probe: int = DEFAULT_MAX_PROBE,
-                 clock: Callable[[], float] = time.time) -> None:
+                 clock: Callable[[], float] = time.time, index_dir: Path | None = None,
+                 chunker: Callable[..., Any] | None = None) -> None:
         self.roots = FolderRoots.from_paths({ROOT_LABEL: library_dir}) if library_dir else FolderRoots()
         self.catalog = LibraryCatalog(catalog_path, clock=clock)
         self.settings = settings
@@ -131,23 +147,40 @@ class LibraryService:
         self._clock = clock
         self._refresh_lock = threading.RLock()
         self._upload_lock = threading.Lock()
+        self.index_dir = Path(index_dir) if index_dir else None
+        self._chunker = chunker
+        self._indexer: Any = None
+
+    @property
+    def indexer(self) -> Any:
+        """The :class:`~app.modules.library.indexer.LibraryIndexer` over this service (T36)."""
+        if self._indexer is None:
+            from .indexer import LibraryIndexer
+
+            self._indexer = LibraryIndexer(self, self.index_dir, chunker=self._chunker)
+        return self._indexer
 
     # -- construction ---------------------------------------------------------------------------
 
     @classmethod
     def from_startup(cls, startup: Mapping[str, str], workdir: Path, settings: Any, **kw: Any) -> LibraryService:
-        """Build from the trusted startup mapping: ``F2W_LIBRARY_DIR`` and the OpenAlex settings.
+        """Build from the trusted startup mapping: ``F2W_LIBRARY_DIR``, ``HYBRID_RAG_LITERATURE_INDEX`` and the OpenAlex settings.
 
         The catalog and the OpenAlex response cache live under ``<workdir>/library/``.
 
         Raises:
-            StartupConfigError: ``F2W_LIBRARY_DIR`` is not an absolute path.
+            StartupConfigError: ``F2W_LIBRARY_DIR`` or ``HYBRID_RAG_LITERATURE_INDEX`` is not an absolute path.
         """
         raw = (startup.get(LIBRARY_DIR_ENV) or "").strip()
         library_dir = Path(raw).expanduser() if raw else None
         if library_dir is not None and not library_dir.is_absolute():
             raise StartupConfigError(f"config_rejected: {LIBRARY_DIR_ENV} must be an absolute path")
         state = Path(workdir) / "library"
+        raw_index = (startup.get(INDEX_DIR_ENV) or "").strip()
+        index_dir = Path(raw_index).expanduser() if raw_index else None
+        if index_dir is not None and not index_dir.is_absolute():
+            raise StartupConfigError(f"config_rejected: {INDEX_DIR_ENV} must be an absolute path")
+        kw.setdefault("index_dir", index_dir)
         breaker = kw.pop("breaker", None)
         kw.setdefault("fetch_factory", _openalex_fetch_factory(
             startup, state / "openalex_cache.sqlite", breaker if breaker is not None else DEFAULT_BREAKER))
@@ -191,13 +224,15 @@ class LibraryService:
         doi: str | None = None
         source: str | None = None
         status = "pending"
+        pages: int | None = None
         if probe:
             result = self._probe(path)
             title = result.title or None
             doi, source = self._doi_from(path.name, result)
             status = result.status
+            pages = result.pages or None
         self.catalog.upsert_paper(relpath=relpath, sha256=sha256, size=size, mtime=mtime, title=title, doi=doi,
-                                  doi_source=source, meta_status=status)
+                                  doi_source=source, meta_status=status, pages=pages)
 
     def refresh(self, *, max_probe: int | None = None) -> dict[str, Any]:
         """Bring the catalog in line with the folder: hash new or changed files, probe up to ``max_probe`` of them.
@@ -251,7 +286,7 @@ class LibraryService:
             "title": row.get("verified_title") if verified and row.get("verified_title") else row["title"],
             "doi": row.get("verified_doi") if verified and row.get("verified_doi") else row["doi"],
             "verify_status": status, "verified_at": _iso(row.get("verified_at")),
-            "index_status": row["index_status"], "verify_detail": row.get("verify_detail"),
+            "index_status": index_status_of(row), "pages": row.get("pages"), "verify_detail": row.get("verify_detail"),
             "metadata_status": row["meta_status"],
         }
         out.update(override or {})
@@ -260,15 +295,16 @@ class LibraryService:
     def paper_facts(self, paper_id: str) -> Any:
         """Facts the T38 cost estimate needs of one paper (``PaperLookup``); ``None`` for an unknown id.
 
-        The catalog does not store page counts yet, so ``pages`` is ``None`` and the estimate reports the
-        paper under ``unknown_pages``.
+        ``pages`` is the catalog's page count (filled by the metadata probe or the index run); ``None`` while
+        unknown, and the estimate then reports the paper under ``unknown_pages``.
         """
         from .estimate import PaperFacts
 
         row = self.catalog.paper_by_id(paper_id)
         if row is None:
             return None
-        return PaperFacts(id=row["id"], name=Path(row["relpath"]).name, sha256=row["sha256"], pages=None)
+        return PaperFacts(id=row["id"], name=Path(row["relpath"]).name, sha256=row["sha256"],
+                         pages=int(row["pages"]) if row.get("pages") else None)
 
     def _paper_dto(self, relpath: str, override: Mapping[str, Any] | None = None) -> dict[str, Any]:
         for row in self.catalog.rows():
@@ -483,5 +519,5 @@ def _openalex_fetch_factory(startup: Mapping[str, str], cache_path: Path,
     return factory
 
 
-__all__ = ("DEFAULT_MAX_PROBE", "LIBRARY_DIR_ENV", "LibraryService", "NOT_MOUNTED", "ROOT_LABEL", "VerifyUnavailable",
-           "clean_upload_name")
+__all__ = ("DEFAULT_MAX_PROBE", "INDEX_DIR_ENV", "LIBRARY_DIR_ENV", "LibraryService", "NOT_MOUNTED", "ROOT_LABEL", "VerifyUnavailable",
+           "clean_upload_name", "index_status_of")

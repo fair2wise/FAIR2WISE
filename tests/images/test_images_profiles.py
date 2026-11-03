@@ -194,8 +194,11 @@ def test_forbidden_names_cover_the_app_rules(name):
         assert set(tiled_config._MANAGED_ONLY_VARS) <= forbidden and "F2W_LOCAL_BIND" in forbidden
         assert "F2W_FOLDER_ROOTS" in forbidden  # T32 (B4): folder browsing is a :local feature
         assert "F2W_LIBRARY_DIR" in forbidden  # T35 (A8): the library is a :local feature
+        assert "HYBRID_RAG_LITERATURE_INDEX" in forbidden  # T36 (A8): the library index is a :local feature
     else:
         assert "F2W_TILED_URL" in forbidden
+        env = raw(name)["env"]  # T36: the library index lives on the state volume
+        assert env["HYBRID_RAG_LITERATURE_INDEX"].startswith(env["F2W_WORKDIR"] + "/")
 
 
 @pytest.mark.parametrize("name", NAMES)

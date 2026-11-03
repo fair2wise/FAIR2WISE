@@ -11,7 +11,7 @@ from typing import Any
 from .chunker import CHUNKER_VERSION, chunk_pdf, chunk_text_document, iter_nonempty
 from .context import ContextBuilder
 from .evidence import Evidence, infer_intent, kg_evidence_from_hit
-from .index_store import SourceIndex, merge_chunks, write_index
+from .index_store import SourceIndex, index_lock, merge_chunks, write_index
 from .ranker import EvidenceRanker
 from .retriever import PaperRetriever
 from .sources import (
@@ -81,6 +81,9 @@ def build_literature_index(
 ) -> dict[str, Any]:
     """Build or incrementally refresh the literature chunk index and return its metadata.
 
+    Runs under the index directory lock, and keeps the library indexer's ``docs`` record (T36) in
+    ``meta.json`` while rewriting it. Library chunks (corpus ``library``) survive an incremental run.
+
     Args:
         dest: Index directory; defaults to `literature_index_root(root)`.
         root: Repository root used to locate documents.
@@ -91,9 +94,16 @@ def build_literature_index(
     """
     base = Path(root or repo_root())
     out = Path(dest or literature_index_root(base))
+    with index_lock(out):
+        return _build_literature_index_locked(out, base, mode=mode, limit=limit, incremental=incremental)
+
+
+def _build_literature_index_locked(out: Path, base: Path, *, mode: str, limit: int, incremental: bool) -> dict[str, Any]:
     docs = select_literature_docs(root=base, mode=mode, limit=limit)
     existing = SourceIndex(out)
-    existing_chunks = existing.load() if incremental and existing.available else []
+    loaded = existing.load() if existing.available else []
+    # A full rebuild still keeps the library corpus (T36): it is not selected from the harvest manifest.
+    existing_chunks = loaded if incremental else [c for c in loaded if c.get("corpus") == "library"]
     known_sha = {
         str(chunk.get("doc_id")): str(chunk.get("sha256") or "")
         for chunk in existing_chunks
@@ -138,6 +148,7 @@ def build_literature_index(
             index_name="literature",
             corpus_revision=f"empty-{_utcnow()}",
             extra_meta={"mode": mode, "status": "no_pdfs"},
+            preserve_meta_keys=("docs",),
         )
         return meta
     if not new_chunks and existing.available:
@@ -155,6 +166,7 @@ def build_literature_index(
             "indexed_docs": replaced,
             "skipped_unchanged": skipped,
         },
+        preserve_meta_keys=("docs",),
     )
     return meta
 

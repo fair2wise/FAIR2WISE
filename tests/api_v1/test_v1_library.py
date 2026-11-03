@@ -49,7 +49,7 @@ def test_status_papers_upload_verify_roundtrip(lib, tmp_path):
     assert set(paper) >= {"id", "relpath", "file_name", "sha256", "size_bytes", "title", "doi", "verify_status",
                           "verified_at", "index_status"}
     assert paper["file_name"] == "a.pdf" and paper["title"] == "Local A" and paper["doi"] == DOI
-    assert paper["verify_status"] == "unverified" and paper["index_status"] is None
+    assert paper["verify_status"] == "unverified" and paper["index_status"] == "not_indexed"
     assert (folder / "a.pdf").is_file()
     dup = _upload(c, "renamed.pdf")
     assert dup.json()["duplicate"] is True and dup.json()["paper"]["id"] == paper["id"]

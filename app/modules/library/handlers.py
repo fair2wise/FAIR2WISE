@@ -1,4 +1,4 @@
-"""Real stage bodies for the library job kinds (A8): ``library_verify`` (T35).
+"""Real stage bodies for the library job kinds (A8): ``library_verify`` (T35), ``library_index`` (T36).
 
 ``register_library_jobs(job_service, settings, handlers=library_handlers(service))`` replaces the
 fail-closed stubs of T34. The API process registers the same handlers (submission validation) and the
@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from ..jobs.pipeline import StageContext, StageResult
-from .jobs import LIBRARY_KIND_CAPABILITIES, LIBRARY_VERIFY_KIND, StageHandler
+from .jobs import LIBRARY_INDEX_KIND, LIBRARY_KIND_CAPABILITIES, LIBRARY_VERIFY_KIND, StageHandler
 from .service import LibraryService
 
 #: Most unverified paper ids a verify run reports as incomplete (the rest are counted only).
@@ -39,9 +39,22 @@ def verify_handler(service: LibraryService) -> StageHandler:
     return run
 
 
+def index_handler(service: LibraryService) -> StageHandler:
+    """The ``library_index`` stage: chunk the library into the literature index (see :mod:`.indexer`).
+
+    Incremental by sha256 (an unchanged library writes nothing), one checkpointed unit per paper, so progress
+    and cancel work per PDF. A scanned PDF is reported ``no_text``, not a failure.
+    """
+    def run(ctx: StageContext) -> StageResult:
+        ctx.require(LIBRARY_KIND_CAPABILITIES[LIBRARY_INDEX_KIND])
+        return service.indexer.run(ctx)
+
+    return run
+
+
 def library_handlers(service: LibraryService) -> Mapping[str, StageHandler]:
-    """``kind -> stage body`` for the kinds implemented so far (T35: ``library_verify``)."""
-    return {LIBRARY_VERIFY_KIND: verify_handler(service)}
+    """``kind -> stage body`` for the kinds implemented so far (T35 ``library_verify``, T36 ``library_index``)."""
+    return {LIBRARY_VERIFY_KIND: verify_handler(service), LIBRARY_INDEX_KIND: index_handler(service)}
 
 
-__all__ = ("MAX_REPORTED_REMAINING", "library_handlers", "verify_handler")
+__all__ = ("MAX_REPORTED_REMAINING", "index_handler", "library_handlers", "verify_handler")

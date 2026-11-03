@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from html import unescape
 from pathlib import Path
 import re
@@ -37,34 +38,63 @@ def _strip_html(raw: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-def chunk_pdf(
+@dataclass(frozen=True)
+class PdfChunks:
+    """Chunks of one PDF plus what reading it learned (T36).
+
+    Attributes:
+        chunks: The page-aware chunk records (empty for a scanned or unreadable PDF).
+        pages: Page count (0 when the file could not be opened).
+        readable: Whether the file opened as a PDF.
+        meta_title: The Info-dictionary title, or ``""``.
+        first_text: Text of the first two pages (DOI candidates are looked for there).
+    """
+
+    chunks: list[dict[str, Any]] = field(default_factory=list)
+    pages: int = 0
+    readable: bool = False
+    meta_title: str = ""
+    first_text: str = ""
+
+
+def chunk_pdf_detailed(
     path: Path,
     *,
     work_id: str,
     doc_id: str,
     corpus: str = "literature",
     extra: dict[str, Any] | None = None,
-) -> list[dict[str, Any]]:
-    """Split one PDF into page-aware windows. Missing/unreadable files yield []."""
+) -> PdfChunks:
+    """:func:`chunk_pdf` that also reports the page count, the Info title and the first pages' text."""
     extra = extra or {}
     try:
         from ..literature.pdf_reader import open_pdf
     except Exception:
-        return []
+        return PdfChunks()
     pdf = Path(path)
     if not pdf.is_file():
-        return []
+        return PdfChunks()
     try:
         doc = open_pdf(pdf)
     except Exception:
-        return []
+        return PdfChunks()
     chunks: list[dict[str, Any]] = []
+    pages = 0
+    title = ""
+    head: list[str] = []
     try:
+        try:
+            title = str((doc.metadata or {}).get("title") or "")
+        except Exception:
+            title = ""
         for page_no, page in enumerate(doc, start=1):
+            pages = page_no
             try:
                 text = page.get_text("text") or ""
             except Exception:
                 text = ""
+            if page_no <= 2:
+                head.append(text)
             for idx, window in enumerate(_windows(text)):
                 chunks.append(
                     _chunk_record(
@@ -82,7 +112,19 @@ def chunk_pdf(
                 )
     finally:
         doc.close()
-    return chunks
+    return PdfChunks(chunks=chunks, pages=pages, readable=True, meta_title=title, first_text="\n".join(head))
+
+
+def chunk_pdf(
+    path: Path,
+    *,
+    work_id: str,
+    doc_id: str,
+    corpus: str = "literature",
+    extra: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Split one PDF into page-aware windows. Missing/unreadable files yield []."""
+    return chunk_pdf_detailed(path, work_id=work_id, doc_id=doc_id, corpus=corpus, extra=extra).chunks
 
 
 def chunk_text_document(

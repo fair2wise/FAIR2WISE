@@ -100,7 +100,7 @@ forwarded unchanged to `127.0.0.1:8080`, digest-only image, state + read-only wr
 | `/var/lib/fair2wise/state` | all | rw, uid 10001 | sessions, `session/operations/{jobs,curation,audit}.sqlite3`, traces. Required |
 | `/var/lib/fair2wise/tiled` | `:local` | rw, uid 10001 | catalog, writable storage, `secrets/writer.key`. Required |
 | `/run/secrets/tiled_writer` | ALS | ro | set `F2W_TILED_WRITER_SECRET_FILE`; regular file, mode `0600`/`0400`, owned by uid 10001 (preflight refuses group/world-readable or foreign-owned files) |
-| `/var/lib/fair2wise/source_index` | optional | ro | set `HYBRID_RAG_LITERATURE_INDEX` / `HYBRID_RAG_OPS_INDEX` |
+| `/var/lib/fair2wise/source_index` | optional | ro | set `HYBRID_RAG_LITERATURE_INDEX` / `HYBRID_RAG_OPS_INDEX`. `:local` (T36) sets `HYBRID_RAG_LITERATURE_INDEX=/var/lib/fair2wise/state/session/source_index/literature` on the state volume, written by the `library_index` job (corpus `library`); an operator override re-points it. Forbidden on ALS |
 
 Preflight refuses a required path that is missing, not writable, or not on a mount (named
 volumes inherit uid 10001 from the image; bind mounts must be owned by 10001).

@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 import json
 import math
+import os
 from pathlib import Path
 import re
+import time
 from typing import Any
 
 from .evidence import CHUNKER_VERSION, LEXICAL_INDEX_VERSION
@@ -67,8 +70,67 @@ class BM25Index:
         return out
 
 
+LOCK_NAME = ".index.lock"
+
+
+@contextmanager
+def index_lock(root: Path, *, timeout: float = 120.0, poll: float = 0.05) -> Iterator[None]:
+    """Exclusive advisory lock over the index directory ``root`` (created if missing), across processes.
+
+    Every read-modify-write of ``chunks.jsonl`` / ``meta.json`` (the literature builder and the library
+    indexer share one directory) holds it. It is not re-entrant: do not nest it for the same ``root``.
+
+    Raises:
+        TimeoutError: Another writer held the lock for longer than ``timeout`` seconds.
+    """
+    dest = Path(root)
+    dest.mkdir(parents=True, exist_ok=True)
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - non-POSIX platform: no advisory lock available
+        yield
+        return
+    fd = os.open(dest / LOCK_NAME, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"index lock busy: {dest}") from None
+                time.sleep(poll)
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+def _atomic_write(path: Path, write: Any) -> None:
+    """Write ``path`` through a temporary sibling and ``os.replace`` (a reader never sees a torn file)."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as handle:
+            write(handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+
+
 class SourceIndex:
-    """Lexical index for a single corpus. Missing files are not an error."""
+    """Lexical index for a single corpus. Missing files are not an error.
+
+    The loaded chunks and BM25 are cached and dropped when ``meta.json`` changes on disk (writers replace
+    ``chunks.jsonl`` first and ``meta.json`` last, both atomically), so a long-lived reader follows rebuilds.
+    """
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
@@ -76,6 +138,14 @@ class SourceIndex:
         self.meta_path = self.root / "meta.json"
         self._chunks: list[dict[str, Any]] | None = None
         self._bm25: BM25Index | None = None
+        self._sig: tuple[int, int, int] | None = None
+
+    def _meta_signature(self) -> tuple[int, int, int] | None:
+        try:
+            st = self.meta_path.stat()
+        except OSError:
+            return None
+        return (st.st_mtime_ns, st.st_size, st.st_ino)
 
     @property
     def available(self) -> bool:
@@ -94,10 +164,13 @@ class SourceIndex:
 
     def load(self) -> list[dict[str, Any]]:
         """Load and cache chunks (skipping blank, malformed or textless lines) and build the BM25 index."""
-        if self._chunks is not None:
+        sig = self._meta_signature()
+        if self._chunks is not None and sig == self._sig:
             return self._chunks
         chunks: list[dict[str, Any]] = []
         if not self.chunks_path.is_file():
+            self._sig = sig
+            self._bm25 = BM25Index([])
             self._chunks = chunks
             return chunks
         try:
@@ -114,8 +187,10 @@ class SourceIndex:
                         chunks.append(rec)
         except OSError:
             chunks = []
-        self._chunks = chunks
+        # The signature was taken before reading: a writer landing meanwhile triggers one more reload.
+        self._sig = sig
         self._bm25 = BM25Index([tokenize(chunk.get("text") or "") for chunk in chunks])
+        self._chunks = chunks
         return chunks
 
     def search(self, query: str, k: int = 20) -> list[tuple[dict[str, Any], float, str]]:
@@ -123,10 +198,11 @@ class SourceIndex:
         if not self.available:
             return []
         chunks = self.load()
-        if not chunks or self._bm25 is None:
+        bm25 = self._bm25
+        if not chunks or bm25 is None or bm25.n != len(chunks):
             return []
         q_tokens = tokenize(query)
-        bm25_scores = self._bm25.scores(q_tokens)
+        bm25_scores = bm25.scores(q_tokens)
         sci_hits = {tok.casefold() for tok in SCI_TOKEN_RE.findall(query or "")}
         ranked: list[tuple[float, int, str]] = []
         for i, chunk in enumerate(chunks):
@@ -154,8 +230,12 @@ def write_index(
     index_name: str,
     corpus_revision: str,
     extra_meta: dict[str, Any] | None = None,
+    preserve_meta_keys: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Write `chunks` as chunks.jsonl plus meta.json under `root` and return the metadata.
+
+    Both files are replaced atomically (chunks first, meta last). Callers that read-modify-write hold
+    :func:`index_lock`.
 
     Args:
         root: Index directory; created if missing.
@@ -163,6 +243,8 @@ def write_index(
         index_name: Name recorded in the metadata.
         corpus_revision: Corpus revision recorded in the metadata.
         extra_meta: Optional fields merged over the generated metadata.
+        preserve_meta_keys: Keys of the existing ``meta.json`` carried over when ``extra_meta`` does not set
+            them (the literature builder keeps the library indexer's ``docs`` record this way).
 
     Returns:
         The metadata dict that was written.
@@ -170,9 +252,16 @@ def write_index(
     dest = Path(root)
     dest.mkdir(parents=True, exist_ok=True)
     chunks_path = dest / "chunks.jsonl"
-    with chunks_path.open("w", encoding="utf-8") as handle:
+    carried: dict[str, Any] = {}
+    if preserve_meta_keys:
+        old = SourceIndex(dest).meta()
+        carried = {key: old[key] for key in preserve_meta_keys if key in old}
+
+    def _write_chunks(handle: Any) -> None:
         for chunk in chunks:
             handle.write(json.dumps(chunk, ensure_ascii=False) + "\n")
+
+    _atomic_write(chunks_path, _write_chunks)
     docs = sorted({str(chunk.get("doc_id") or "") for chunk in chunks if chunk.get("doc_id")})
     corpora = sorted({str(chunk.get("corpus") or "") for chunk in chunks})
     meta = {
@@ -186,9 +275,10 @@ def write_index(
         "corpora": corpora,
         "doc_ids": docs,
     }
+    meta.update(carried)
     if extra_meta:
         meta.update(extra_meta)
-    (dest / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _atomic_write(dest / "meta.json", lambda handle: handle.write(json.dumps(meta, indent=2, ensure_ascii=False) + "\n"))
     return meta
 
 
