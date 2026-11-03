@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 import hashlib
+import logging
 from pathlib import Path
 import time
 from typing import Any
@@ -31,6 +32,8 @@ from typing import Any
 from .ingested import IngestedLookup
 from .intake import INGESTABLE, RETRYABLE, IntakeReport
 from .safe_fetch import LocalIntakePolicy
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -203,6 +206,7 @@ def _process(
             if already_ingested is not None and verdict.status == "staged":
                 already_ingested.record(report.doi, source_sha256=operation, pipeline=pipeline)
         except Exception as exc:  # noqa: BLE001 - one bad paper must not stop the run
+            logger.warning("folder ingest failed for one paper: %s", type(exc).__name__, exc_info=True)
             verdict.status, verdict.detail = "failed:ingest", f"{type(exc).__name__}: {str(exc)[:200]}"
     verdict.duration_s = round(time.monotonic() - started, 3)
     if journal is not None:

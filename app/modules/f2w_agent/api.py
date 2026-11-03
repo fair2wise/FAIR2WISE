@@ -58,19 +58,15 @@ from .download_agent import (
 )
 from .extractor_agent import ExtractorAgent
 from .multi_kg import (
-    DEFAULT_JSON_GRAPH,
-    DEFAULT_JSON_GRAPH_PATHS,
     DEFAULT_KG_QUERY_HOPS,
     DEFAULT_KG_QUERY_MAX_NODES,
     MAX_KG_QUERY_HOPS,
-    XRAY_DEMO_GRAPH,
     clamp_kg_query_hops,
     clamp_kg_query_max_nodes,
     collect_graph_paths,
     default_json_graph_paths,
     graph_id_for_path,
     graph_label_for_id,
-    is_xray_demo_graph,
     normalize_graph_path,
     primary_json_graph_path,
     unique_graph_paths,
@@ -1026,9 +1022,9 @@ def _publications_for_graph_node(raw: dict[str, Any]) -> list[dict[str, Any]]:
         if existing is None:
             merged[key] = dict(publication)
             return
-        for field in _PUBLICATION_FIELDS:
-            if not existing.get(field) and publication.get(field):
-                existing[field] = publication[field]
+        for pub_field in _PUBLICATION_FIELDS:
+            if not existing.get(pub_field) and publication.get(pub_field):
+                existing[pub_field] = publication[pub_field]
         _merge_publication_pages(existing, publication)
 
     for publication in _node_publications(raw):
@@ -1352,12 +1348,12 @@ def _apply_node_field_updates(
         cleaned = [pub for pub in cleaned if pub]
         thing["publications"] = cleaned
         splash_props["publications"] = cleaned
-        for field in _PUBLICATION_FIELDS:
-            if field == "source_paper":
+        for pub_field in _PUBLICATION_FIELDS:
+            if pub_field == "source_paper":
                 continue
-            if field in thing and field not in {"authors", "institutions", "keywords"}:
+            if pub_field in thing and pub_field not in {"authors", "institutions", "keywords"}:
                 # Clear conflicting single-source fallback scalars when replacing the list.
-                if field in (
+                if pub_field in (
                     "publication_year",
                     "paper_title",
                     "doi",
@@ -1367,7 +1363,7 @@ def _apply_node_field_updates(
                     "pages_range",
                     "abstract_text",
                 ):
-                    thing[field] = None
+                    thing[pub_field] = None
         sources = sorted(
             {
                 str(pub.get("source_paper") or "").strip()
@@ -2348,12 +2344,12 @@ def _publication_relevance(query: str, publication: dict[str, Any]) -> float:
     if not query_tokens:
         return 0.0
     text_parts: list[str] = []
-    for field in ("paper_title", "abstract_text", "journal", "source_paper"):
-        value = publication.get(field)
+    for pub_field in ("paper_title", "abstract_text", "journal", "source_paper"):
+        value = publication.get(pub_field)
         if value:
             text_parts.append(str(value))
-    for field in ("keywords", "authors"):
-        values = publication.get(field)
+    for pub_field in ("keywords", "authors"):
+        values = publication.get(pub_field)
         if isinstance(values, list):
             text_parts.extend(str(value) for value in values)
     for node in publication.get("supporting_nodes") or []:
@@ -2422,9 +2418,9 @@ def _merge_publications_prefer_existing(
             merged[key] = pub
             order.append(key)
             return
-        for field in _PUBLICATION_FIELDS:
-            if not existing.get(field) and pub.get(field):
-                existing[field] = pub[field]
+        for pub_field in _PUBLICATION_FIELDS:
+            if not existing.get(pub_field) and pub.get(pub_field):
+                existing[pub_field] = pub[pub_field]
         if existing.get("supporting_nodes") or pub.get("supporting_nodes"):
             current = existing.setdefault("supporting_nodes", [])
             seen = {node.get("id") for node in current if isinstance(node, dict)}
@@ -2497,6 +2493,7 @@ def _search_openalex_publications(query: str, max_results: int) -> list[dict[str
         from pyalex import Works
         from pyalex import config as pyalex_config
     except Exception:
+        logger.debug("pyalex unavailable; no OpenAlex publication search", exc_info=True)
         return []
 
     mailto = os.environ.get("OPENALEX_EMAIL")
@@ -2508,7 +2505,8 @@ def _search_openalex_publications(query: str, max_results: int) -> list[dict[str
             .search(_sanitize_openalex_search(query))
             .get(per_page=min(max_results * 2, 50))
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning("OpenAlex publication search failed: %s", type(exc).__name__)
         return []
     publications = [_openalex_work_to_publication(work) for work in works or [] if isinstance(work, dict)]
     return [publication for publication in publications if publication.get("paper_title") or publication.get("doi")]
@@ -5064,24 +5062,6 @@ class AgentPipelineService:
             body = ""
         return preamble + (body or "Related retrieved nodes and technique vocabulary are on-topic, but the graph does not encode a full how-to or measurement record.")
 
-    async def _retired_deterministic_locked(
-        self,
-        question: str,
-        emit: ProgressEmitter | None,
-        *,
-        graph_source: str | None,
-        json_graph_path: str | None,
-    ) -> ChatResponse:
-        # Legacy workflow mode names are accepted by settings/configuration, but
-        # both resolve to this one canonical orchestrated implementation.
-        """Return the orchestrated ask-loop result for the retired deterministic path."""
-        return await self._ask_locked(
-            question,
-            emit,
-            graph_source=graph_source,
-            json_graph_path=json_graph_path,
-        )
-
     async def _ask_locked(
         self,
         question: str,
@@ -6281,7 +6261,6 @@ class AgentPipelineService:
             return response
 
         filename = downloaded_names[0] if downloaded_names else _safe_candidate_filename(best or {})
-        publication = self._candidate_publication(best or {}, filename)
         paper_id = str((best or {}).get("id") or (best or {}).get("doi") or filename)
         active_paper = {
             "paper_id": paper_id,

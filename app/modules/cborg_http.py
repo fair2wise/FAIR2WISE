@@ -37,8 +37,8 @@ def _probe_global_ipv6() -> str | None:
             return addr
         if addr:
             explicit_candidates.append(addr)
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("IPv6 route probe failed: %s", exc)
     finally:
         if sock is not None:
             sock.close()

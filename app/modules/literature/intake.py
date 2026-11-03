@@ -26,16 +26,21 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
+import logging
 from pathlib import Path
 import re
 from typing import Any
 
 from ..contracts.context import RequestContext
-from .licence import LicenceInfo, collect as collect_licence, licence_status as _licence_status
 from .legacy import LegacyIndex, doi_key, doi_only, looks_like_pdf
+from .licence import LicenceInfo
+from .licence import collect as collect_licence
+from .licence import licence_status as _licence_status
 from .openalex import is_quota_paused
 from .resolver_batch import title_similarity
 from .store import AssetKind, FileDocumentStore, StoreError, sha256_of
+
+logger = logging.getLogger(__name__)
 
 #: Leading pages searched for a DOI and title-checked (a references section would add other papers' DOIs).
 DOI_SEARCH_PAGES = 2
@@ -150,6 +155,7 @@ def pdf_first_pages_text(path: Path, pages: int = DOI_SEARCH_PAGES) -> str:
             for index in range(min(pages, doc.page_count)):
                 chunks.append(doc.load_page(index).get_text())
     except Exception:  # noqa: BLE001 - an unreadable PDF is a report, not a crash
+        logger.debug("pdf unreadable for DOI search: %s", path, exc_info=True)
         return ""
     return "\n".join(chunks)
 

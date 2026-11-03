@@ -904,6 +904,7 @@ def _catalog_runs(
         try:
             meta = dict(getattr(node, "metadata", None) or {})
         except Exception:
+            LOGGER.debug("catalog node metadata unreadable", exc_info=True)
             return None
         start = meta.get("start") if isinstance(meta.get("start"), dict) else meta
         if not isinstance(start, dict):
@@ -943,6 +944,7 @@ def _catalog_runs(
         try:
             keys = list(node)  # mapping-like container
         except Exception:
+            LOGGER.debug("catalog node is not iterable", exc_info=True)
             return
         for key in keys[:20]:
             if len(runs) >= limit:
@@ -950,6 +952,7 @@ def _catalog_runs(
             try:
                 child = node[key]
             except Exception:
+                LOGGER.debug("catalog child %s unreadable", key, exc_info=True)
                 continue
             walk(child, path + [str(key)], depth + 1)
 

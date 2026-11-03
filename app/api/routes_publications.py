@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.context import RequestContext
 from .auth import session_credential
-from .routes_common import Prefixed, context, dump, operations, project, project_dict
+from .routes_common import Prefixed, context, dump, operations, project_dict
 
 _SHA256 = r"^[0-9a-f]{64}$"
 

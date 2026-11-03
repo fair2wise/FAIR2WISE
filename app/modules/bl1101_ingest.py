@@ -2440,12 +2440,12 @@ def _ingest_repos(offline: bool) -> tuple[list[dict[str, Any]], list[dict[str, A
                     try:
                         item["file"] = str(py.relative_to(dest))
                     except ValueError:
-                        pass
+                        LOGGER.debug("symbol file %s is outside %s; path left as extracted", py, dest)
             for snip in py_snips:
                 try:
                     snip["source_file_path"] = str(py.relative_to(dest))
                 except ValueError:
-                    pass
+                    LOGGER.debug("snippet file %s is outside %s; path left as extracted", py, dest)
             symbols.extend(py_symbols)
             snippets.extend(py_snips)
         compose = []

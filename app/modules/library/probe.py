@@ -15,11 +15,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 import json
+import logging
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+
+logger = logging.getLogger(__name__)
 
 #: Leading pages read (a references section would add other papers' DOIs); matches ``intake.DOI_SEARCH_PAGES``.
 PROBE_PAGES = 2
@@ -137,7 +140,7 @@ def _limit_resources(timeout: int) -> None:
         if sys.platform.startswith("linux"):
             resource.setrlimit(resource.RLIMIT_AS, (4 << 30, 4 << 30))
     except (ImportError, ValueError, OSError):
-        pass
+        logger.debug("resource limits not applied", exc_info=True)
 
 
 def _child_main(argv: list[str]) -> int:

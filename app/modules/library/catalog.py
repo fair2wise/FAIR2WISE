@@ -11,11 +11,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 import hashlib
+import logging
 from pathlib import Path
 import sqlite3
 import threading
 import time
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS papers (
@@ -56,7 +59,7 @@ class LibraryCatalog:
             try:
                 self._con.execute("PRAGMA journal_mode=WAL")
             except sqlite3.DatabaseError:  # pragma: no cover - a filesystem without WAL support
-                pass
+                logger.debug("WAL journal mode unavailable for %s", self.path, exc_info=True)
             self._con.executescript(SCHEMA)
             have = {row["name"] for row in self._con.execute("PRAGMA table_info(papers)")}
             for column, kind in (("pages", "INTEGER"), ("indexed_sha256", "TEXT")):  # T36: catalogs made by T35

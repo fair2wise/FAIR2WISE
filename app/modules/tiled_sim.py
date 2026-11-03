@@ -37,7 +37,6 @@ from .bl1101_ingest import (
     beam_id,
     make_term,
     next_snapshot_version,
-    sha256_file,
     snapshot_paths,
     sort_graph,
     utc_now,

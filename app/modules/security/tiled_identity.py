@@ -40,8 +40,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
+import logging
 from typing import Any, Protocol, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
+
+logger = logging.getLogger(__name__)
 
 #: Tiled role name that makes a principal an F2W admin (0.2.18 authn_database/core.py:51).
 TILED_ADMIN_ROLE = "admin"
@@ -283,6 +286,7 @@ class TiledWhoamiAdapter:
                                             timeout=self._timeout)
                 body = response.json() if response.status_code == 200 else None
             except Exception:  # best effort: the version is evidence, not authority
+                logger.debug("Tiled library_version unreadable", exc_info=True)
                 return None
             version = body.get("library_version") if isinstance(body, Mapping) else None
             if isinstance(version, str) and version:

@@ -46,6 +46,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
+import logging
 import re
 import threading
 from typing import Any
@@ -64,6 +65,8 @@ from ..contracts import (
     ToolSpec,
     ToolStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 TOOL_NAME = "answer_from_knowledge"
 
@@ -394,6 +397,7 @@ def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any]
                 use_live_tiled=args.get("use_live_tiled"),
             )
         except Exception as exc:  # noqa: BLE001 - mapped to a typed result; original kept for legacy
+            logger.warning("tool call failed", exc_info=True)
             if is_control_flow(exc):
                 raise
             ledger.put(provenance_id, LegacyEntry(error=exc))

@@ -378,6 +378,7 @@ class PaperEvidenceAgent(Agent):
         try:
             result = _parse_json_object(self._chat(prompt))
         except Exception as exc:
+            logger.warning("paper evidence model call failed: %s", type(exc).__name__)
             return {
                 "status": "paper_llm_error", "sufficient": False,
                 "answer": f"The eligible PDF pages could not be evaluated: {exc}",

@@ -13,11 +13,11 @@ No Tiled, network, shell or Git process is used, and an existing snapshot is nev
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import json
 import logging
-import sys
-from collections.abc import Sequence
 from pathlib import Path
+import sys
 
 from ..cli_output import output
 from ..graph.snapshot import SnapshotRequest, create_snapshot

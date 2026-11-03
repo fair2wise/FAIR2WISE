@@ -4,9 +4,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 import hashlib
 import json
+import logging
 from pathlib import Path
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 GOLD_TITLE_NEEDLES = (
     "p3ht",
@@ -200,6 +203,7 @@ def collect_ops_docs(*, root: Path | None = None) -> list[dict[str, Any]]:
     try:
         from ..bl1101_ingest import REPO_SPECS
     except Exception:
+        logger.debug("bl1101 repo specs unavailable", exc_info=True)
         REPO_SPECS = ()
 
     skip_suffixes = {".h5", ".hdf5", ".env", ".pem", ".npy", ".npz"}

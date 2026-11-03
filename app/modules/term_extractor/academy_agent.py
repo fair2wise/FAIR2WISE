@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
-from academy.agent import Agent, action
+from academy.agent import action
 from academy.handle import Handle
 
 from .monitored_agent import MonitoredAgent

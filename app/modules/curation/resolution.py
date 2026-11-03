@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import hashlib
 import json
+import logging
 import threading
 from typing import Any, Protocol, cast
 import uuid
@@ -45,6 +46,8 @@ from .model_port import ModelCallError, ModelPort, ModelRef, ModelReply
 from .models import CaseState, ResolutionAttempt, Route
 from .review_schema import ReviewParseError, parse_review_response, validate_resolution
 from .store import CurationStore
+
+logger = logging.getLogger(__name__)
 
 PROMPT = (
     "You review one terminology case from a scientific paper. Use ONLY the evidence text. "
@@ -239,6 +242,7 @@ class ModelResolver:
         except ModelCallError as exc:
             error = exc
         except Exception as exc:  # noqa: BLE001 - an unexpected failure after sending is billing-unknown
+            logger.warning("model call failed after send: %s", type(exc).__name__)
             error = ModelCallError(type(exc).__name__, served=True)
         # Settlement happens exactly once for every reservation, success or failure.
         if reservation is not None:

@@ -306,8 +306,8 @@ def extract_pub_metadata(doc: PdfDocument, pdf_path: str) -> dict[str, Any]:
         rf"|\d{{1,2}}\s+{_MONTHS}\s*((?:19|20)\d{{2}})"
         rf"|((?:19|20)\d{{2}})\s*[-–]\s*\d{{1,2}}\s*[-–]\s*\d{{1,2}})",
         r"(?i)(?:published|accepted|received|revised)[^\n]{0,30}((?:19|20)\d{2})",
-        rf"(?i)(?:published|accepted|received|revised)[^\n]{{0,20}}"
-        rf"((?:19|20)\d{{2}})-\d{{2}}-\d{{2}}",
+        r"(?i)(?:published|accepted|received|revised)[^\n]{0,20}"
+        r"((?:19|20)\d{2})-\d{2}-\d{2}",
     ]
     for pat in explicit_patterns:
         m = re.search(pat, first_text)

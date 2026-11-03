@@ -35,7 +35,7 @@ mechanics (:mod:`.journal`, :mod:`.receipts`).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 import json

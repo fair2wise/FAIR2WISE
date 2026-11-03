@@ -50,6 +50,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 import json
+import logging
 from pathlib import Path
 import re
 import threading
@@ -74,6 +75,8 @@ from ..contracts import (
     ToolStatus,
 )
 from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
+
+logger = logging.getLogger(__name__)
 
 TOOL_NAME: Final = "lit_summarize_extracted_terms"
 OPERATION_VERSION = "1.0.0"
@@ -523,6 +526,7 @@ class PaperSummaryTool:
                 missing_topics=args.get("missing_topics"), relevant_node_names=args.get("relevant_node_names"),
             )
         except Exception as exc:  # noqa: BLE001 - typed result; original kept for the legacy adapter
+            logger.warning("summarizing extracted terms failed", exc_info=True)
             if is_control_flow(exc):
                 raise
             self.ledger.put(provenance_id, LedgerEntry(error=exc))

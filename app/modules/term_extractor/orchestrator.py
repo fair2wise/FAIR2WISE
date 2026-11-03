@@ -26,7 +26,7 @@ from .merge_index import DEFAULT_EMBED_MODEL, DEFAULT_MERGE_TOP_K, TermMergeInde
 from .models import ContextSnippet, RelationRecord, TermRecord
 from .prompts import build_page_prompt
 from .schema import SchemaHelper
-from .services import Services, build_services, extract_and_attach_properties
+from .services import build_services, extract_and_attach_properties
 from .store import TermStore
 from .tools import ToolState, build_tools
 

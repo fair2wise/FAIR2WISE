@@ -288,3 +288,100 @@ def test_main_writes_graph_for_valid_input(tmp_path, monkeypatch):
 
     graph = json.loads(output_json.read_text(encoding="utf-8"))
     assert graph["things"][0]["id"] == "matkg:CLITerm"
+
+
+# Moved from app/modules/json2kg.py (T27 F3.4): tests do not belong in production modules.
+
+def test_make_id_prefix_and_hyphens() -> None:
+    """Check IDs get the prefix and lose spaces, keeping hyphens."""
+    assert json2kg.make_id("P3HT") == "matkg:P3HT"
+    assert json2kg.make_id("Bulk Heterojunction OPV") == "matkg:BulkHeterojunctionOPV"
+    assert json2kg.make_id("pAQM-2TV") == "matkg:pAQM-2TV"
+
+
+def test_ensure_list_scalars_and_lists() -> None:
+    """Check None, scalars and lists are normalized to lists."""
+    assert json2kg.ensure_list(None) == []
+    assert json2kg.ensure_list(5) == [5]
+    assert json2kg.ensure_list([1, 2, 3]) == [1, 2, 3]
+
+
+def test_build_graph_copies_formula_and_properties() -> None:
+    """Check formula, formula_validation and properties are copied onto the node."""
+    raw = [{
+        "term": "X",
+        "definition": "Def",
+        "category": "Cat",
+        "formula": "H2O",
+        "formula_validation": {"status": "ok"},
+        "properties": [{"property": "density", "value": 1}]
+    }]
+    graph = json2kg.build_graph(raw)
+    node = {n['id']: n for n in graph['things']}['matkg:X']
+    assert node['formula'] == "H2O"
+    assert node['formula_validation']['status'] == "ok"
+    assert node['properties'][0]['property'] == "density"
+
+
+def test_build_graph_minimal_relation_yields_prefixed_edge() -> None:
+    """Check a single relation yields two nodes and one prefixed edge."""
+    raw = [{"term": "A", "relations": [{"related_term": "B", "relation": "TEST"}]}]
+    graph = json2kg.build_graph(raw)
+    assert len(graph["things"]) == 2
+    assert len(graph["associations"]) == 1
+    edge = graph["associations"][0]
+    assert edge["predicate"] == "rel:TEST"
+    assert edge["has_evidence"] is None
+
+
+def test_code_snippet_node_wired_to_term() -> None:
+    """CodeSnippet nodes built from code_snippets and wired to term nodes from same paper."""
+    terms = [{
+        "term": "peak detection",
+        "category": "ExperimentalTechnique",
+        "definition": "Identification of scattering peaks in 1D intensity profiles",
+        "pages": [1],
+        "source_papers": ["SCIPY_DOCS.pdf"],
+    }]
+    snips = [{
+        "function_name": "find_scattering_peaks",
+        "code_snippet": "import numpy as np\nfrom scipy.signal import find_peaks, peak_widths, savgol_filter\ndef find_scattering_peaks(q, intensity):\n    y = np.asarray(intensity, dtype=float)\n    y_smooth = savgol_filter(y, window_length=11, polyorder=3)\n    peaks, props = find_peaks(y_smooth, prominence=0.05 * np.max(y_smooth))\n    return peaks, props",
+        "code_language": "python",
+        "code_description": "Processes 1D scattering data by smoothing to identify peaks.",
+        "domain_features": [{
+            "feature_name": "scattering_technique",
+            "feature_value": "SAXS/WAXS",
+            "feature_units": None,
+            "feature_source_text": "Processes 1D scattering data",
+        }],
+        "page": 1,
+        "source_paper": "SCIPY_DOCS.pdf",
+    }]
+    graph = json2kg.build_graph(terms, code_snippets=snips)
+    snippets = [n for n in graph["things"] if n["category"] == "CodeSnippet"]
+    assert len(snippets) == 1
+    snippet = snippets[0]
+
+    assert "find_scattering_peaks" in snippet["code_snippet"]
+    assert snippet["code_language"] == "python"
+    assert snippet["function_name"] == "find_scattering_peaks"
+    assert snippet["domain_features"][0]["feature_name"] == "scattering_technique"
+
+    # edge wired from term node to snippet
+    has_code_edges = [e for e in graph["associations"] if e["predicate"] == "rel:has_code_snippet"]
+    assert len(has_code_edges) >= 1
+    assert any(e["object"] == snippet["id"] for e in has_code_edges)
+
+
+def test_cli_reads_input_and_writes_graph(tmp_path, monkeypatch) -> None:
+    """Check json2kg.main() reads the input JSON and writes the graph JSON."""
+    in_json = tmp_path / "in.json"
+    out_json = tmp_path / "out.json"
+    data = {"terms": [{"term": "X"}]}
+    in_json.write_text(json.dumps(data))
+    monkeypatch.setattr(sys, "argv", ["json2kg.py", str(in_json), str(out_json)])
+    json2kg.main()
+    out = json.loads(out_json.read_text())
+    assert "things" in out and "associations" in out
+    assert len(out["things"]) == 1
+    assert out["things"][0]["id"] == "matkg:X"

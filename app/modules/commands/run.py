@@ -12,8 +12,8 @@ Usage:
 import argparse
 import logging
 import os
-import sys
 from pathlib import Path
+import sys
 
 
 def parse_args() -> argparse.Namespace:

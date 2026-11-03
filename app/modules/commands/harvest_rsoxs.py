@@ -27,17 +27,17 @@ Usage (from repo root):
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import time
-import urllib.parse
-from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
-from collections.abc import Callable, Iterable
+import urllib.parse
 
 from ..resources import resource_root
 
@@ -48,10 +48,8 @@ Classifier = Callable[[str, str], str]
 REPO_ROOT = resource_root() or Path.cwd()
 
 from ..literature import download_pdfs as dl  # noqa: E402
-from ..literature.legacy_download import (  # noqa: E402
-    hardened_download_pdf as download_pdf,
-    hardened_get_json,
-)
+from ..literature.legacy_download import hardened_download_pdf as download_pdf  # noqa: E402
+from ..literature.legacy_download import hardened_get_json
 
 # Same allowlist as download_pdfs / DownloadAgent — keep harvest free of Academy imports.
 RELIABLE_PDF_HOSTS = dl.RELIABLE_PDF_HOSTS
@@ -549,7 +547,7 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
         doc.close()
         return " ".join(" ".join(parts).split())
     except Exception:
-        pass
+        LOGGER.debug("PyMuPDF text extraction failed for %s; trying pypdf", path, exc_info=True)
     try:
         from pypdf import PdfReader
 
@@ -564,9 +562,11 @@ def pdf_preview_text(path: Path, head_pages: int = 2, tail_pages: int = 2) -> st
             try:
                 parts.append(reader.pages[i].extract_text() or "")
             except Exception:
+                LOGGER.debug("pypdf page %d text unreadable", i, exc_info=True)
                 continue
         return " ".join(" ".join(parts).split())
     except Exception:
+        LOGGER.debug("pypdf text extraction failed for %s", path, exc_info=True)
         return ""
 
 
@@ -1048,7 +1048,8 @@ def search_openalex(
     classifier: Classifier | None = None,
 ) -> list[dict[str, Any]]:
     """Search OpenAlex phrase queries; optionally require OA and a PDF URL."""
-    from pyalex import Works, config as pyalex_config
+    from pyalex import Works
+    from pyalex import config as pyalex_config
 
     if mailto:
         pyalex_config.email = mailto
@@ -1119,7 +1120,8 @@ def search_openalex_authors(
     mailto: str | None,
 ) -> list[dict[str, Any]]:
     """OpenAlex author IDs → RSoXS works. Keep hits even without a PDF."""
-    from pyalex import Authors, Works, config as pyalex_config
+    from pyalex import Authors, Works
+    from pyalex import config as pyalex_config
 
     if mailto:
         pyalex_config.email = mailto
@@ -1578,7 +1580,8 @@ def _openalex_by_doi_or_title(query: str, mailto: str | None) -> dict[str, Any] 
     work = _crossref_by_doi_or_title(query)
     if work:
         return work
-    from pyalex import Works, config as pyalex_config
+    from pyalex import Works
+    from pyalex import config as pyalex_config
 
     if mailto:
         pyalex_config.email = mailto
@@ -2442,7 +2445,7 @@ def main() -> None:
 
         load_entrypoint_dotenv(__file__)
     except (OSError, ImportError):
-        pass
+        LOGGER.debug("entrypoint dotenv not loaded", exc_info=True)
     args = parse_args()
     dl.set_delay_floor(args.delay)
     logging.basicConfig(

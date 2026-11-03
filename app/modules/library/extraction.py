@@ -24,17 +24,16 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
-import json
 import logging
 import os
 from pathlib import Path
 from typing import Any
 
+from . import bundles as B
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.log_capture import CaptureBusy, capture_job_logs
 from ..jobs.pipeline import JobInterrupted, JobStopped, StageContext, StageResult
 from ..jobs.stages import WorkUnit, chunked_stage
-from . import bundles as B
 from .catalog import sha256_file
 from .kg_service import KgLibrary
 from .schemas import manifest_block, resolve_schema

@@ -77,7 +77,6 @@ from .snapshot_manifest import (
     sources_checksum,
     utc_iso,
 )
-from .snapshots import graph_id_for_snapshot
 
 ADOPTION_TOOL = ("app.modules.graph.adoption.adopt_legacy_flat_file "
                  "(legacy graph adopted byte for byte, not rebuilt; json2kg_sha256 is the adopting revision's)")

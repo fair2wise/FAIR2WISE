@@ -20,10 +20,10 @@ snippet node stays). Any other operation is a conflict (``unsupported_operation`
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import copy
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
-import copy
 
 from .edit_journal import EditJournal, EditRecord
 

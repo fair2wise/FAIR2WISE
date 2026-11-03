@@ -50,6 +50,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import logging
 from typing import Any, Literal, cast
 import uuid
 
@@ -69,6 +70,8 @@ from .reports import (
     top_items,
     utcnow,
 )
+
+logger = logging.getLogger(__name__)
 
 OPERATION_VERSION = "1.0.0"
 TOOL_STATS = "kg_compute_statistics"
@@ -746,6 +749,7 @@ class GraphOperationsTool:
             except ContractError as exc:
                 return error_result(name, exc, provenance_id=provenance_id)
             except Exception as exc:  # noqa: BLE001 - typed result, no server detail
+                logger.warning("%s failed", name, exc_info=True)
                 if is_control_flow(exc):
                     raise
                 return error_result(name, ContractError(ErrorCode.INTERNAL, f"{name} failed ({type(exc).__name__})"),

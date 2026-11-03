@@ -9,9 +9,9 @@ form-data``, the part must carry a ``filename``, and nothing is decoded or inter
 
 from __future__ import annotations
 
+from email import policy
 from email.message import Message
 from email.parser import BytesParser
-from email import policy
 
 from fastapi import HTTPException, Request
 

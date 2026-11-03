@@ -61,6 +61,7 @@ from .modules.security.authorization import DeploymentSettings
 
 if TYPE_CHECKING:  # the operations service is imported only by callers that pass one
     from .api.operations import F2WOperations
+    from .modules.security.tiled_identity import TiledCredential
 
 __all__ = ("F2WClient", "LiteratureAgent", "create_literature_agent")
 
@@ -169,7 +170,7 @@ class F2WClient:
 
     # -- request context ---------------------------------------------------------------
 
-    def context_for(self, credential: Any = None, **kw: Any) -> RequestContext:
+    def context_for(self, credential: TiledCredential | str | None = None, **kw: Any) -> RequestContext:
         """Resolve a request context with the profile rules (local-operator on ``:local``)."""
         return self._app.context(credential, **kw)
 

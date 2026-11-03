@@ -31,8 +31,8 @@ import os
 from pathlib import Path
 import threading
 import time
-import unicodedata
 from typing import Any
+import unicodedata
 import uuid
 
 from fastapi import HTTPException
@@ -424,10 +424,7 @@ class LibraryService:
                 handle.write(data)
             return self._probe(tmp)
         finally:
-            try:
-                tmp.unlink()
-            except FileNotFoundError:
-                pass
+            tmp.unlink(missing_ok=True)
 
     @staticmethod
     def _ensure_folder(root: Path, category: str, year: str) -> Path:
@@ -472,10 +469,7 @@ class LibraryService:
                 tmp.rename(target)
             return True
         finally:
-            try:
-                tmp.unlink()
-            except FileNotFoundError:
-                pass
+            tmp.unlink(missing_ok=True)
 
     # -- verify ------------------------------------------------------------------------------------
 
