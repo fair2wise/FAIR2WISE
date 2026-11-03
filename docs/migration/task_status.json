@@ -646,9 +646,9 @@
       "title": "OCR engine for figures (V-05)",
       "source": "plan_addenda.md A7",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "OCR engine for figures (V-05); pixi.toml and lock now carry python-multipart (d32497d), so the OCR dependency change can proceed"
+      "status": "merged",
+      "merge_commit": "2da69addcff2b08953c56bd9c5a061d2f52d83f8",
+      "merge_commit_subject": "Merge T30: Docling OCR engine for figures (opt-in, weights fetched at image build, degrades to current behaviour)"
     },
     {
       "id": "T31",
