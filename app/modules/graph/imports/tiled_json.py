@@ -710,11 +710,13 @@ def _run(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord, src: S
         finish(oid, op, tiled_id=lid)
     for i, op in enumerate(o for o in by_stage["links"] if o.kind == "retire_link"):
         oid = step("links", 1000 + i, op)
+        assert op.old_id is not None  # a retire op always names what it retires
         client.delete_link(state.link_rows[op.old_id], graph_id)
         finish(oid, op)
     fault("after_links", 0)
     for i, op in enumerate(by_stage["retire"]):
         oid = step("retire", i, op)
+        assert op.old_id is not None  # a retire op always names what it retires
         client.set_entity_uri(state.rows[op.old_id], graph_id,
                               lw.state_uri(graph_id, op.key, lw.RETIRED, tag), access)
         finish(oid, op)

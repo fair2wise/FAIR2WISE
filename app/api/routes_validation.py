@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.validation_settings import JudgeModelService
-from .routes_common import Prefixed, context, fresh_context, project
+from .routes_common import Prefixed, context, fresh_context, project, project_dict
 
 
 class JudgeModelUpdate(BaseModel):
@@ -47,13 +47,13 @@ def install(app: FastAPI) -> FastAPI:
     def get_judge_model(request: Request, refresh: bool = Query(default=False),
                         ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The deployment's judge model and the models the provider lists right now."""
-        return project(request, judge_service(request).view(ctx, refresh=refresh))
+        return project_dict(request, judge_service(request).view(ctx, refresh=refresh))
 
     @router.put("/judge-model")
     def put_judge_model(request: Request, body: JudgeModelUpdate,
                         ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Set or clear the judge; it must be in the provider's current list."""
-        return project(request, judge_service(request).update(ctx, body.judge_model))
+        return project_dict(request, judge_service(request).update(ctx, body.judge_model))
 
     return app
 

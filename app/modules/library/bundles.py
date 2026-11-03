@@ -363,7 +363,8 @@ def export_bundle(bundle: Bundle, release_dir: Path, schema: Mapping[str, Any] |
     schema_block = dict(bundle.manifest["schema"])
     if schema:
         schema_block.update({k: v for k, v in schema.items() if k in ("id", "version", "sha256", "path", "label")})
-    metadata = {**(kg.get("metadata") if isinstance(kg.get("metadata"), dict) else {}),
+    previous = kg.get("metadata")
+    metadata = {**(previous if isinstance(previous, dict) else {}),
                 "schema": schema_block["id"], "schema_info": schema_block, "f2w_bundle": bundle.name,
                 "topic": bundle.manifest.get("topic"), "model": bundle.manifest.get("model"),
                 "reconstructed": bool(bundle.manifest.get("reconstructed")), "exported_at": now_iso()}

@@ -35,7 +35,7 @@ from ..modules.jobs.paper_jobs import ENRICHMENT_KIND, PDF_PARSE_KIND, TOPIC_SWE
 from ..modules.security.authorization import Unauthenticated
 from .auth import request_context
 from .operations import job_event_json, job_log_json
-from .routes_common import Prefixed, context, dump, fresh_context, operations, project
+from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
 
 #: States in which a job stays until a person acts (the stream ends with ``waiting``).
 WAITING_STATES = frozenset({JobState.AWAITING_REVIEW, JobState.PAUSED_BUDGET, JobState.PAUSED_PROVIDER})
@@ -88,13 +88,13 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
         """Submit a job of a registered kind (idempotent for identical inputs)."""
         handle = operations(request).submit_job(ctx, body.kind, body.inputs,
                                                 settings_revision=body.settings_revision)
-        return project(request, dump(handle))
+        return project_dict(request, dump(handle))
 
     def _paper_route(path: str, kind: str, what: str) -> None:
         @router.post(path)
         def submit_paper_job(request: Request, body: PaperJobRequest,
                              ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
-            return project(request, dump(operations(request).submit_paper_job(
+            return project_dict(request, dump(operations(request).submit_paper_job(
                 ctx, kind, body.model_dump(exclude_none=True))))
 
         submit_paper_job.__doc__ = (f"Submit a ``{kind}`` job ({what}; ``jobs.admin``). Status is ``GET "
@@ -112,19 +112,19 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
                   ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Jobs the caller may see, most recently updated first."""
         jobs = operations(request).list_jobs(ctx, state=state, kind=kind, limit=limit)
-        return project(request, {"jobs": [dump(j) for j in jobs]})
+        return project_dict(request, {"jobs": [dump(j) for j in jobs]})
 
     @router.get("/{job_id}")
     def get_job(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The job handle."""
-        return project(request, dump(operations(request).get_job(ctx, job_id)))
+        return project_dict(request, dump(operations(request).get_job(ctx, job_id)))
 
     @router.get("/{job_id}/events")
     def job_events(request: Request, job_id: str, after: int = Query(default=-1, ge=-1),
                    ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Durable events after sequence ``after`` (polling)."""
         events = operations(request).job_events(ctx, job_id, after=after)
-        return project(request, {"job_id": job_id, "events": [job_event_json(e) for e in events]})
+        return project_dict(request, {"job_id": job_id, "events": [job_event_json(e) for e in events]})
 
     @router.get("/{job_id}/logs")
     def job_logs(request: Request, job_id: str, after: int = Query(default=-1, ge=-1),
@@ -132,29 +132,29 @@ def install(app: FastAPI, *, poll_seconds: float = 0.5, max_stream_seconds: floa
                  ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Log lines after ``seq`` ``after`` (polling; the SSE ``job_log`` frames carry the same lines)."""
         logs = operations(request).job_logs(ctx, job_id, after=after, limit=limit)
-        return project(request, {"job_id": job_id, "logs": [job_log_json(entry) for entry in logs]})
+        return project_dict(request, {"job_id": job_id, "logs": [job_log_json(entry) for entry in logs]})
 
     @router.get("/{job_id}/progress")
     def job_progress(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Per-phase progress."""
-        return project(request, operations(request).job_progress(ctx, job_id))
+        return project_dict(request, operations(request).job_progress(ctx, job_id))
 
     @router.get("/{job_id}/view")
     def job_view(request: Request, job_id: str, ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """Job status view: staged versus approved versus published (``F2WOperations.job_view``)."""
-        return project(request, operations(request).job_view(ctx, job_id))
+        return project_dict(request, operations(request).job_view(ctx, job_id))
 
     @router.post("/{job_id}/cancel")
     def cancel_job(request: Request, job_id: str, ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Cancel now, or stop at the next boundary when a worker holds the job."""
-        return project(request, dump(operations(request).cancel_job(ctx, job_id)))
+        return project_dict(request, dump(operations(request).cancel_job(ctx, job_id)))
 
     @router.post("/{job_id}/resume")
     def resume_job(request: Request, job_id: str, body: JobResumeRequest | None = Body(default=None),
                    ctx: RequestContext = Depends(fresh_context)) -> dict[str, Any]:
         """Re-queue a paused, review-resolved or failed job."""
         expected = body.expected_revision if body is not None else None
-        return project(request, dump(operations(request).resume_job(ctx, job_id, expected_revision=expected)))
+        return project_dict(request, dump(operations(request).resume_job(ctx, job_id, expected_revision=expected)))
 
     @router.get("/{job_id}/stream")
     async def stream_job(request: Request, job_id: str, after: int | None = Query(default=None, ge=-1),

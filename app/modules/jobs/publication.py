@@ -46,7 +46,7 @@ from .publish_ports import (
     RevisionProbe,
     SnapshotSource,
 )
-from .publish_store import Pointer, PublishStore
+from .publish_store import PlanRecord, Pointer, PublishStore
 from .service import JobService
 from .store import JobRecord
 
@@ -304,8 +304,14 @@ class Publication:
         approval = self._approval_for(sc, record)
         return StageResult(data={"approval_id": approval.approval_id, "resumed": self._import_started(sc)})
 
-    def _import(self, sc: StageContext) -> StageResult:
+    def _plan_record(self, sc: StageContext) -> PlanRecord:
         record = self.store.current_plan(sc.job.job_id)
+        if record is None:
+            raise ContractError(ErrorCode.NOT_FOUND, "no plan yet")
+        return record
+
+    def _import(self, sc: StageContext) -> StageResult:
+        record = self._plan_record(sc)
         approval = self._approval_for(sc, record)
         plan, ctx = record.plan, self.deps.ctx_for(sc.job)
         sc.require("graph.publish")
@@ -361,7 +367,7 @@ class Publication:
         return ApplyOutcome.from_dict((row.result if row else None) or {})
 
     def _verify(self, sc: StageContext) -> StageResult:
-        record = self.store.current_plan(sc.job.job_id)
+        record = self._plan_record(sc)
         ctx = self.deps.ctx_for(sc.job)
         verification = self.deps.step.verify(ctx, record.plan, self._outcome(sc))
         if not verification.ok:
@@ -378,7 +384,7 @@ class Publication:
         )
 
     def _receipt(self, sc: StageContext) -> StageResult:
-        record = self.store.current_plan(sc.job.job_id)
+        record = self._plan_record(sc)
         plan, ctx = record.plan, self.deps.ctx_for(sc.job)
         import_row = sc.store.stage(sc.job.job_id, "import")
         approval = (
@@ -414,7 +420,7 @@ class Publication:
         return StageResult(artifact_refs=(f"receipt:{stored.receipt_id}",), data=result)
 
     def _activate(self, sc: StageContext) -> StageResult:
-        record = self.store.current_plan(sc.job.job_id)
+        record = self._plan_record(sc)
         plan, ctx = record.plan, self.deps.ctx_for(sc.job)
         receipt = self.store.receipt_for(plan.plan_sha256, plan.target)
         if receipt is None or not receipt.verified:

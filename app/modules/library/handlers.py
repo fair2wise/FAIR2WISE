@@ -51,7 +51,8 @@ def index_handler(service: LibraryService) -> StageHandler:
     """
     def run(ctx: StageContext) -> StageResult:
         ctx.require(LIBRARY_KIND_CAPABILITIES[LIBRARY_INDEX_KIND])
-        return service.indexer.run(ctx)
+        result: StageResult = service.indexer.run(ctx)
+        return result
 
     return run
 

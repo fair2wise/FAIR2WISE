@@ -210,7 +210,7 @@ class TiledGraphBackend:
                         continue
                     link_key = literature_link_key(link)
                     other_key = literature_entity_key(other) if other else None
-                    if link_key is None or link_key[0] != graph_id or other_key is None \
+                    if other is None or link_key is None or link_key[0] != graph_id or other_key is None \
                             or other_key[0] != graph_id:
                         continue  # foreign link or endpoint: never visible in this scope
                     if other["id"] not in nodes:

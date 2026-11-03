@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.context import RequestContext
-from .routes_common import Prefixed, context, dump, fresh_context, operations, project
+from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
 
 
 class OperationJobRequest(BaseModel):
@@ -37,13 +37,13 @@ def install(app: FastAPI) -> FastAPI:
     def statistics(request: Request, ctx: RequestContext = Depends(context),
                    graph_id: str = Query(min_length=1, max_length=128)) -> dict[str, Any]:
         """``kg_compute_statistics``: structural statistics of one graph."""
-        return project(request, dump(operations(request).graph_statistics(ctx, graph_id)))
+        return project_dict(request, dump(operations(request).graph_statistics(ctx, graph_id)))
 
     @router.get("/compare")
     def compare(request: Request, ctx: RequestContext = Depends(context),
                 graph_ids: list[str] = Query(min_length=2, max_length=12)) -> dict[str, Any]:
         """``kg_compare_snapshots``: growth across graph versions in the given order."""
-        return project(request, dump(operations(request).compare_graphs(ctx, graph_ids)))
+        return project_dict(request, dump(operations(request).compare_graphs(ctx, graph_ids)))
 
     @router.get("/paper-subgraph")
     def paper_subgraph(request: Request, ctx: RequestContext = Depends(context),
@@ -53,7 +53,7 @@ def install(app: FastAPI) -> FastAPI:
                        max_edges: int | None = Query(default=None, ge=1, le=400)) -> dict[str, Any]:
         """``kg_paper_subgraph``: what one graph holds about one Work."""
         result = operations(request).paper_subgraph(ctx, graph_id, paper, max_nodes=max_nodes, max_edges=max_edges)
-        return project(request, dump(result))
+        return project_dict(request, dump(result))
 
     @router.get("/recent")
     def recent(request: Request, ctx: RequestContext = Depends(context),
@@ -61,14 +61,14 @@ def install(app: FastAPI) -> FastAPI:
                since: str | None = Query(default=None, max_length=40),
                limit: int | None = Query(default=None, ge=1, le=50)) -> dict[str, Any]:
         """``kg_recent_entities``: entities added to a live graph after ``since``."""
-        return project(request, dump(operations(request).recent_entities(ctx, graph_id, since=since, limit=limit)))
+        return project_dict(request, dump(operations(request).recent_entities(ctx, graph_id, since=since, limit=limit)))
 
     @router.get("/corpus-audit")
     def corpus_audit(request: Request, ctx: RequestContext = Depends(context),
                      corpus: str = Query(min_length=1, max_length=128),
                      sections: list[str] | None = Query(default=None, max_length=6)) -> dict[str, Any]:
         """``curate_audit_corpus``: read-only audit of one configured corpus."""
-        return project(request, dump(operations(request).audit_corpus(ctx, corpus, sections=sections)))
+        return project_dict(request, dump(operations(request).audit_corpus(ctx, corpus, sections=sections)))
 
     @router.post("/jobs")
     def submit_operation_job(request: Request, body: OperationJobRequest,
@@ -76,13 +76,13 @@ def install(app: FastAPI) -> FastAPI:
         """Submit a ``knowledge_operation`` job (whole population; ``ops.run``)."""
         handle = operations(request).submit_knowledge_operation(ctx, body.operation, body.args,
                                                                 corpus_scope=body.corpus_scope)
-        return project(request, dump(handle))
+        return project_dict(request, dump(handle))
 
     @router.get("/jobs/{job_id}")
     def operation_job_result(request: Request, job_id: str,
                              ctx: RequestContext = Depends(context)) -> dict[str, Any]:
         """The job handle and, once computed, the bounded report of a ``knowledge_operation`` job."""
-        return project(request, operations(request).knowledge_job_result(ctx, job_id))
+        return project_dict(request, operations(request).knowledge_job_result(ctx, job_id))
 
     return app
 

@@ -246,6 +246,7 @@ def _existing_numbers(corpus_dir: Path, storage_kg: Path, corpus: str) -> list[i
 
 
 def _choose_schema(request: SnapshotRequest, registry: SchemaRegistry) -> tuple[SchemaEntry, str]:
+    entry: SchemaEntry | None
     if request.schema_id:
         entry, source = registry.get(request.schema_id), "caller"
     else:
@@ -253,6 +254,8 @@ def _choose_schema(request: SnapshotRequest, registry: SchemaRegistry) -> tuple[
         source = "filename_pattern"
         if entry is None:
             entry, source = registry.get(DEFAULT_SCHEMA_ID), "default"
+    if entry is None:
+        raise SnapshotError("no schema can be bound: the default schema is not registered")
     if not entry.is_linkml or entry.known_broken:
         raise SnapshotError(f"{entry.path} cannot be bound: not a selectable LinkML schema")
     if entry.pending_review and not request.allow_pending_review_schema:
