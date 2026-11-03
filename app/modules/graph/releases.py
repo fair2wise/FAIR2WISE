@@ -84,6 +84,16 @@ _SECRET_PATTERNS = (
 _TOKEN = re.compile(r"[A-Za-z0-9+/=_-]{40,}")
 _HEX_ONLY = re.compile(r"^[0-9a-fA-F]+$")
 _ENTROPY_BITS = 4.5
+# D3.22 tuning. A long token is key-like only if it is high-entropy *and* shaped like random base62/base64:
+# character classes (lower, upper, digit, other) change between neighbours at least this often, and few characters
+# sit in long lowercase runs. Natural-language slugs used as ids ("snippetanalyzevolfractions...", chemical names,
+# ``RSoXSMeasurement-<uuid>``) have long lowercase runs and few class changes. UUIDs and 32+ digit hex runs
+# (commit ids, digests) are removed before scanning.
+_MIN_CLASS_CHANGE = 0.45
+_MAX_WORD_RUN_FRACTION = 0.25
+_UUID = re.compile(r"(?<![A-Za-z0-9])[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}(?![A-Za-z0-9])")
+_LONG_HEX = re.compile(r"(?<![A-Za-z0-9])[0-9a-fA-F]{32,}(?![A-Za-z0-9])")
+_WORD_RUN = re.compile(r"[a-z]{5,}")
 # R4: absolute local paths; not preceded by a name character so URL path segments do not match.
 _LOCAL_PATH = re.compile(
     r"(?<![A-Za-z0-9_.~-])(?:/Users/|/home/|/private/|/tmp/|/global/|/pscratch/)|\b[A-Za-z]:\\|file://"
@@ -105,6 +115,19 @@ def allowlist_key(path: str, node_id: str, field_name: str, value: str) -> str:
 def _entropy(text: str) -> float:
     counts = Counter(text)
     return -sum(c / len(text) * math.log2(c / len(text)) for c in counts.values())
+
+
+def _char_class(char: str) -> int:
+    return 0 if char.islower() else 1 if char.isupper() else 2 if char.isdigit() else 3
+
+
+def _key_like(token: str) -> bool:
+    """R3 entropy rule for one long token (see the D3.22 constants): random-looking, not slug-shaped."""
+    if _HEX_ONLY.match(token) or _entropy(token) < _ENTROPY_BITS:
+        return False
+    changes = sum(_char_class(a) != _char_class(b) for a, b in zip(token, token[1:])) / (len(token) - 1)
+    word_chars = sum(len(m.group()) for m in _WORD_RUN.finditer(token)) / len(token)
+    return changes >= _MIN_CLASS_CHANGE and word_chars < _MAX_WORD_RUN_FRACTION
 
 
 @dataclass(frozen=True)
@@ -236,8 +259,9 @@ def _string_findings(location: str, text: str, key: str | None) -> list[Finding]
             hit = True
             break
     if not hit:
-        for token in _TOKEN.findall(text):
-            if not _HEX_ONLY.match(token) and _entropy(token) >= _ENTROPY_BITS:
+        scanned = _LONG_HEX.sub(" ", _UUID.sub(" ", text))
+        for token in _TOKEN.findall(scanned):
+            if _key_like(token):
                 found.append(Finding("R3", "reject", location, "high-entropy token", key))
                 break
     if _LOCAL_PATH.search(text):

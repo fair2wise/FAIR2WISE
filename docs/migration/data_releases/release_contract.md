@@ -88,7 +88,7 @@ sha256 goes into `manifest.disclosure` and into the descriptor.
 |---|---|---|
 | R1 path allowlist | Only `storage/kg/<corpus>/v<N>/{graph,manifest,validation}.json` and the flat compat copy | Reject PDFs, images and crops, `*.db`/`*.sqlite`, parsed packages, `storage/source_index/`, `papers/`, `.env*`, job, trace or checkpoint stores |
 | R2 schema and hash | Manifest validates. Graph hash and compat copies match. Refs are repo-relative or `private:`. | Reject |
-| R3 secrets | Token regexes (`sk-…`, `AKIA…`, `ghp_…`, bearer tokens, `api_key=`, `password=`) plus an entropy heuristic over every string | Reject, unless an allowlist entry, keyed by sha256 of (path, node id, field, value), was reviewed |
+| R3 secrets | Token regexes (`sk-…`, `AKIA…`, `ghp_…`, bearer tokens, `api_key=`, `password=`) plus a tuned entropy rule over every string (D3.22: tokens of 40+ characters that are high-entropy and shaped like random base62/base64; slug-shaped ids, UUIDs and long hex runs do not match) | Reject, unless an allowlist entry, keyed by sha256 of (path, node id, field, value), was reviewed |
 | R4 local paths | Absolute paths (`/Users/`, `/home/`, `/private/`, `/tmp/`, `/global/`, `/pscratch/`, drive letters, `file://`) in any string | Reject, unless allowlisted as above (for example a reviewed path inside retained public GitHub code) |
 | R5 bearer URLs | Signed or tokenized URLs (`X-Amz-Signature`, `token=`, `sig=`) | Reject |
 | R6 evidence-snippet volume | Per value and per source paper: lengths of `context_snippets[].text`, `has_evidence`, `abstract_text`, long `description` and `feature_source_text` values | **Informational only (owner decision O-D1).** Recorded in the report and the manifest, never a blocker on its own. Never silently truncate. |
@@ -669,6 +669,13 @@ Open items for the owner: (a) a reviewed allowlist (keyed by `allowlist_key`) fo
 bl1101 R3/R4 hits and the R7 `DocumentChunk` flags, before those files can be adopted; (b) whether `matkg_rsoxs_v3`
 (nodes/edges, an `ingest_rsoxs_v3` product) gets a manifest `format` value of its own, or is adopted after a rebuild;
 (c) whether bl1101 v8/v9 are rebuilt in json2kg serialization (that is a new version, never an edit); (d) Q6 above.
+
+**D3.22 resolved (owner: "Tune the rule").** The R3 entropy rule no longer flags slug-shaped ids: a long token must be
+high-entropy, change character class between neighbours at least 45% of the time and have under 25% of its characters
+in lowercase runs of five or more; UUIDs and 32+ digit hex runs are removed first. On the tracked flat files the tuned
+rule reports no R3 finding (the `sk-`, `AKIA`, `ghp_`, bearer, `api_key` and `password` patterns are unchanged and
+unaffected). Limit: a random single-case base36 token is not caught by entropy alone; prefixed and assigned secrets
+still are. No allowlist and no data-file edit were needed for the entropy hits.
 
 **Images.** The nested `graph.json` copies are excluded from the build context by `.dockerignore`
 (`storage/kg/*/v*/graph.json`); manifests and validation reports ship. The flat copies stay the byte source in
