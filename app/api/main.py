@@ -260,7 +260,12 @@ def create_api_app(
         library_service = library if library is not None else LibraryService.from_startup(
             os.environ if startup_config is None else startup_config, Path(cfg.workdir), settings)
         app.state.f2w_library = library_service
-        library_handlers_ = library_handlers(library_service)
+        from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore
+        from ..modules.library.extraction import LibraryExtractor
+
+        startup_env = os.environ if startup_config is None else startup_config
+        library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(
+            library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env))
     register_library_jobs(operations.jobs, settings, handlers=library_handlers_)
     app.state.f2w_operations = operations
     runtime.on_scope_change(operations.notify_scope_change)

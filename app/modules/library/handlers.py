@@ -8,10 +8,14 @@ worker process runs them (``app.modules.workers.factories:library_service``).
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ..jobs.pipeline import StageContext, StageResult
-from .jobs import LIBRARY_INDEX_KIND, LIBRARY_KIND_CAPABILITIES, LIBRARY_VERIFY_KIND, StageHandler
+from .jobs import LIBRARY_EXTRACT_KIND, LIBRARY_INDEX_KIND, LIBRARY_KIND_CAPABILITIES, LIBRARY_VERIFY_KIND, StageHandler
 from .service import LibraryService
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .extraction import LibraryExtractor
 
 #: Most unverified paper ids a verify run reports as incomplete (the rest are counted only).
 MAX_REPORTED_REMAINING = 200
@@ -52,9 +56,24 @@ def index_handler(service: LibraryService) -> StageHandler:
     return run
 
 
-def library_handlers(service: LibraryService) -> Mapping[str, StageHandler]:
-    """``kind -> stage body`` for the kinds implemented so far (T35 ``library_verify``, T36 ``library_index``)."""
-    return {LIBRARY_VERIFY_KIND: verify_handler(service), LIBRARY_INDEX_KIND: index_handler(service)}
+def extract_handler(extractor: LibraryExtractor) -> StageHandler:
+    """The ``library_extract`` stage: term extraction per PDF into a KG bundle (see :mod:`.extraction`)."""
+    def run(ctx: StageContext) -> StageResult:
+        ctx.require(LIBRARY_KIND_CAPABILITIES[LIBRARY_EXTRACT_KIND])
+        return extractor.run(ctx)
+
+    return run
 
 
-__all__ = ("MAX_REPORTED_REMAINING", "index_handler", "library_handlers", "verify_handler")
+def library_handlers(service: LibraryService, *, extractor: LibraryExtractor | None = None) -> Mapping[str, StageHandler]:
+    """``kind -> stage body`` for the kinds implemented so far (T35 verify, T36 index, T39 extract).
+
+    ``library_extract`` is included only when an ``extractor`` is given; otherwise it stays the fail-closed stub.
+    """
+    out = {LIBRARY_VERIFY_KIND: verify_handler(service), LIBRARY_INDEX_KIND: index_handler(service)}
+    if extractor is not None:
+        out[LIBRARY_EXTRACT_KIND] = extract_handler(extractor)
+    return out
+
+
+__all__ = ("MAX_REPORTED_REMAINING", "extract_handler", "index_handler", "library_handlers", "verify_handler")

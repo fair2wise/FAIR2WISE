@@ -3,8 +3,8 @@
 Four kinds run in the worker process on ``:local`` only:
 
 * ``library_probe``: a no-op that completes at once (proves a worker claims and runs library jobs);
-* ``library_verify`` (T35), ``library_index`` (T36), ``library_extract`` (T39): stubs that fail closed (T35 and T36 now
-  supply real handlers through ``handlers=``; only ``library_extract`` remains a stub)
+* ``library_verify`` (T35), ``library_index`` (T36), ``library_extract`` (T39): stubs that fail closed (T35, T36 and T39 supply
+  real handlers through ``handlers=``; a kind without one stays a stub)
   with ``unsupported_capability`` until their task supplies a handler through ``handlers=``.
 
 Job identity is idempotent on identical inputs, so "rebuild" is a submission whose ``nonce``

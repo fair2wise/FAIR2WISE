@@ -51,7 +51,13 @@ def library_service(db_path: str, environ: Mapping[str, str] | None = None) -> J
     from ..library.service import LibraryService
 
     workdir = Path(env.get("F2W_WORKDIR") or Path(db_path).parent)
-    register_library_jobs(service, settings, handlers=library_handlers(LibraryService.from_startup(env, workdir, settings)))
+    from ..library.bundles import BUNDLES_DIRNAME, BundleStore
+    from ..library.extraction import LibraryExtractor
+
+    library = LibraryService.from_startup(env, workdir, settings)
+    # T39: library_extract runs here; the LLM backend comes from the worker's startup environment only.
+    extractor = LibraryExtractor(library, BundleStore(workdir / BUNDLES_DIRNAME), env=env)
+    register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor))
     return service
 
 
