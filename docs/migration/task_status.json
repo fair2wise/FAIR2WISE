@@ -510,7 +510,7 @@
       "gate": "H7",
       "status": "open",
       "merge_commit": null,
-      "note": "typing zero (mypy strict clean), coverage listed modules at 80% or more plus term_extractor/store.py and operations/__init__.py at 100%, docstring sweep merged; open: owner disposition of the sniff findings"
+      "note": "typing zero, ruff/isort/mypy/pyflakes gated, store.py and operations/__init__.py coverage at 100%, sniff-list rows fixed or deferred per the owner reply of 2026-11-03 (merged 43f67f7); open fix rows: F1.4 (ANN401 Any in 759 signatures), F1.6 (about 47 noqa without a reason), F2.4, F2.5 and F3.8 (human read-throughs), untriaged part of F4.2, and the full-suite coverage figure (F0.2/F5.5)"
     },
     {
       "id": "T22C",
