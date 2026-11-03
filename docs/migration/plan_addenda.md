@@ -474,6 +474,12 @@ decision in `docs/migration/reviews/H1/owner_decisions.md`.
   interface, offline-capable in the images (model files baked like MiniLM or an opt-in
   extra), used by the scale and axis readers. **Acceptance:** fixture figures read within
   the FIG tolerances; images without the extra degrade to the current behaviour.
+- **Implemented (owner decision 2026-11-03, "Docling's built-in OCR"):** `DoclingOcrEngine`
+  (`app/modules/vision/docling_ocr.py`) behind the existing `OcrEngine` protocol; RapidOCR with the `torch`
+  backend (no new dependency: `onnxruntime` is not locked); weights fetched at image build by
+  `scripts/fetch_docling_models.py` into `<artifacts>/RapidOcr` with registry SHA256 checks; selection by
+  `F2W_FIGURE_OCR_ENGINE` (default `auto`: on only when the weights exist). See `docker/profiles/README.md`
+  ("Figure OCR in the images"). The real-weights fixture test skips where the weights are absent.
 
 ### T31: Missing `/v1` routes (B5)
 - **Depends on:** T10, T19C. **Scope:** cost control, bulk review, vocabulary quality and
