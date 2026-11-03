@@ -160,6 +160,8 @@ RUN python -I -c "from huggingface_hub import snapshot_download as d; \
 # time at the commits pinned in scripts/fetch_docling_models.py (one list for the image and CI) into
 # the folder layout Docling reads through F2W_DOCLING_ARTIFACTS_PATH, so the image parses PDFs with
 # HF_HUB_OFFLINE=1 and never downloads at runtime. They are not part of the repository or pixi.lock.
+# The same script also fetches the figure-OCR checkpoints (T30: Docling's RapidOCR, torch backend,
+# English) into <artifacts>/RapidOcr, SHA256-verified against the locked rapidocr release's registry.
 ENV F2W_DOCLING_ARTIFACTS_PATH=/opt/fair2wise/docling
 COPY scripts/fetch_docling_models.py /tmp/fetch_docling_models.py
 RUN python -I /tmp/fetch_docling_models.py --dest /opt/fair2wise/docling && \

@@ -224,3 +224,20 @@ running image never downloads them. CI fetches the same pinned weights for the s
 conversions; those tests skip when the variable is unset. Bump a revision deliberately and rerun
 `tests/literature/test_docling_parser.py` and `tests/evals_binary`. How the parser's output compares
 with the old one: `docs/migration/reviews/H7/docling_parity.md`.
+
+## Figure OCR in the images (T30)
+
+The figure tools read text from the PDF text layer first; OCR runs only when a caller asks for it
+(`use_ocr`) and the text layer is insufficient, and every OCR span is tagged `ocr` (the kernels never
+believe a unit from it). The engine is Docling's built-in OCR (RapidOCR, `torch` backend, English; torch is
+already in the environment, `onnxruntime` is not), in `app/modules/vision/docling_ocr.py`. Its checkpoints go
+to `<F2W_DOCLING_ARTIFACTS_PATH>/RapidOcr` in the same build step as the parser weights
+(`scripts/fetch_docling_models.py`, `--no-ocr` skips them), each file verified against the SHA256 in the
+locked `rapidocr` release's registry; a running image never downloads them.
+
+`F2W_FIGURE_OCR_ENGINE` selects the engine: `auto` (default) uses Docling's OCR when the three checkpoints
+are on disk and otherwise behaves as before (`OCR engine` unavailable, retryable, figure reported as
+`ocr_unavailable`); `docling` forces it (unavailable if the weights are absent); `rapidocr` forces the old
+`rapidocr_onnxruntime` adapter; `none` disables OCR. Without Docling or the weights nothing is imported or
+downloaded and results are unchanged. Tests: `tests/vision/test_docling_ocr.py` (fake converter always; the
+real-weights test skips when `RapidOcr/` is absent).

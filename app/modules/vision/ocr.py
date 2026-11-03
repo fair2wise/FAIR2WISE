@@ -4,7 +4,8 @@ OCR is never silent: a caller opts in (``use_ocr``), a missing engine raises
 :class:`~.results.VisionUnavailable` (``UNAVAILABLE``, retryable), and every span
 produced is tagged ``source="ocr"`` so the kernels never believe a unit from it
 (OCR mangles the superscript exponent). The default engine imports ``rapidocr_onnxruntime``
-lazily; it is NOT a dependency of this package. Tests inject a fake engine.
+lazily; it is NOT a dependency of this package. Tests inject a fake engine. ``F2W_FIGURE_OCR_ENGINE``
+selects the default (:func:`default_engine`); Docling's built-in OCR is :mod:`.docling_ocr`.
 
 Method and confidence are recorded in :class:`OcrReading`; no image leaves the process.
 
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+import os
 from typing import Any, Protocol
 
 from .kernels.geometry import FigureFrame
@@ -68,8 +70,27 @@ class RapidOcrEngine:
         return out
 
 
+#: Selects the default engine: ``auto`` (default), ``docling``, ``rapidocr`` or ``none``.
+OCR_ENGINE_ENV = "F2W_FIGURE_OCR_ENGINE"
+
+
 def default_engine() -> OcrEngine:
-    """The default engine, or :class:`VisionUnavailable` (retryable) when not installed."""
+    """The configured engine, or :class:`VisionUnavailable` (retryable) when it cannot run.
+
+    ``F2W_FIGURE_OCR_ENGINE``: ``auto`` (default) uses Docling's built-in OCR when its weights are on disk
+    under ``F2W_DOCLING_ARTIFACTS_PATH`` and otherwise the lazy RapidOCR adapter (unavailable unless
+    ``rapidocr_onnxruntime`` is installed, as before); ``docling`` and ``rapidocr`` force one; ``none`` disables.
+    """
+    choice = os.environ.get(OCR_ENGINE_ENV, "auto").strip().lower() or "auto"
+    if choice not in ("auto", "docling", "rapidocr", "none"):
+        raise VisionUnavailable("OCR engine", f"unknown {OCR_ENGINE_ENV}={choice!r} (auto, docling, rapidocr, none)")
+    if choice == "none":
+        raise VisionUnavailable("OCR engine", f"disabled by {OCR_ENGINE_ENV}=none")
+    if choice != "rapidocr":
+        from .docling_ocr import DoclingOcrEngine, weights_available
+
+        if choice == "docling" or weights_available():
+            return DoclingOcrEngine()
     return RapidOcrEngine()
 
 
