@@ -77,8 +77,8 @@ jobs:
           # exit-zero treats all errors as warnings. Line length comes from .flake8 (115), the same
           # value every other flake8 run uses; the old 127 override made reports disagree (T27).
           flake8 . --count --exit-zero --max-complexity=10 --statistics
-      - name: Test with pytest
-        run: pytest
+      - name: Test with pytest (parallel; the slow scale tests run in the nightly job)
+        run: pytest -n auto -m "not slow"
       - name: Build MkDocs site strictly
         run: mkdocs build --strict -f mkdocs/mkdocs.yml
 
