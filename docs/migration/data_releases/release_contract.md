@@ -616,10 +616,13 @@ as follows.
 3. **Q3: approved and applied** through `.gitattributes` (`storage/kg/** -text`, `storage/kg/*.json -text`,
    `storage/terminology/*.json -text`, `docs/migration/data_releases/releases/** -text`).
 4. **Q4: applied** (owner decision O-R1).
-5. Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and JSON_KG_PUBLICATION_SPEC for E3. Still an integrator action.
-6. Where descriptors live: the release system, or a later commit under `docs/migration/data_releases/releases/`.
-   **Still pending.** `scripts/adopt_legacy_kg.py descriptor` only prints to stdout or to a path outside the
-   repository, so the answer decides where the output goes and nothing else. No real descriptor is committed.
+5. **Q5: drafted (owner, 2026-11-03: "Yes, draft them").** Errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4 and
+   JSON_KG_PUBLICATION_SPEC for E3 are in `docs/migration/reviews/H8/spec_errata_E3_draft.md`, for owner review. The
+   frozen documents are not edited until the owner approves the entries.
+6. **Q6: decided (owner, 2026-11-03): descriptors live under `docs/migration/data_releases/releases/`.** A descriptor
+   is committed there, in a later commit than the data it pins (a descriptor never names its own containing commit).
+   `scripts/adopt_legacy_kg.py descriptor` still prints to stdout or to a path outside the repository; writing the file
+   into `releases/` and committing it is an operator step. No real descriptor is committed yet.
 
 ### Adoption results [OBSERVED, 2026-10-30]
 
