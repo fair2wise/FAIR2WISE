@@ -42,7 +42,7 @@ class TermStore:
         self._save_lock = threading.Lock()
         self._tl = threading.local()
         self.metadata: dict[str, Any] = {
-            "extraction_date": datetime.datetime.utcnow().isoformat() + "Z",
+            "extraction_date": datetime.datetime.now(datetime.UTC).replace(tzinfo=None).isoformat() + "Z",
             "processed_files": 0,
             "processed_pages_total": 0,
             "processed_pages_with_terms": 0,
