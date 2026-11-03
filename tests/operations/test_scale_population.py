@@ -88,11 +88,13 @@ def _bounded(data):
 # -- the population exceeds any prompt -------------------------------------------------------------
 
 def test_populations_are_far_larger_than_a_model_context(big_graph, big_corpus, big_session):
-    assert big_graph.truth.entities >= 50_000 and big_graph.truth.edge_records >= 150_000
-    assert big_corpus.truth.term_entries >= 50_000 and big_session.truth.term_count >= 40_000
+    n = big_graph.profile.n  # full-size figure -> this profile's (identity at full size)
+    assert big_graph.truth.entities >= n(50_000) and big_graph.truth.edge_records >= n(150_000)
+    assert big_corpus.truth.term_entries >= n(50_000) and big_session.truth.term_count >= n(40_000)
     for pop in (big_graph, big_corpus):
-        assert pop.budget_multiple > 5, pop.path.name  # > 5 x a 1M-token context at 4 characters/token
-    assert sp.prompt_budget_multiple(big_session.path) > 2
+        # > 5 x the context (1M tokens at full size, scaled with the population) at 4 characters/token
+        assert pop.budget_multiple > 5, pop.path.name
+    assert sp.prompt_budget_multiple(big_session.path, big_session.profile.scale) > 2
 
 
 # -- graph statistics (kg_compute_statistics) ------------------------------------------------------
@@ -122,7 +124,8 @@ def test_statistics_tool_result_is_bounded_and_complete(big_graph):
     assert result.status is ToolStatus.OK
     body = _bounded(result.data)
     assert result.data["metrics"]["entities"] == big_graph.truth.entities
-    assert len(body) * 1000 < big_graph.path.stat().st_size  # the model sees < 0.1% of the population
+    # the model sees < 0.1% of the full population (< 1% of the one-tenth population)
+    assert len(body) * 1000 * big_graph.profile.scale < big_graph.path.stat().st_size
     assert sp.leaked(body + json.dumps(result.warnings)) == []
 
 
@@ -149,9 +152,11 @@ def test_paper_subgraph_totals_equal_ground_truth_while_the_preview_is_cut(big_g
 
 def test_growth_between_two_large_versions_equals_set_arithmetic(big_graph, tmp_path):
     payload = json.loads(big_graph.path.read_text(encoding="utf-8"))
-    v1 = dict(payload, things=payload["things"][5_000:], associations=payload["associations"][20_000:])
+    n = big_graph.profile.n
+    dropped, n_new, n_new_works = n(5_000), n(7_000), n(300)
+    v1 = dict(payload, things=payload["things"][dropped:], associations=payload["associations"][n(20_000):])
     extra = [{"id": f"syn:N{i:05d}", "name": f"New {i}", "category": "Category00",
-              "source_papers": [f"10.5555_new.{i % 300}.pdf"]} for i in range(7_000)]
+              "source_papers": [f"10.5555_new.{i % n_new_works}.pdf"]} for i in range(n_new)]
     v2 = dict(payload, things=payload["things"] + extra)
     backend = JsonGraphBackend({"v1": sp.write_json(tmp_path / "v1.json", v1),
                                 "v2": sp.write_json(tmp_path / "v2.json", v2)})
@@ -169,11 +174,11 @@ def test_growth_between_two_large_versions_equals_set_arithmetic(big_graph, tmp_
     assert (first["entities"], first["relations"], second["entities"], second["relations"]) == \
         (len(e1), len(r1), len(e2), len(r2))
     assert second["removed_entities"] == len(e1 - e2) == 0 and second["removed_relations"] == len(r1 - r2) == 0
-    assert second["legacy_growth"]["new_entities"] == len(e2 - e1) == 12_000
+    assert second["legacy_growth"]["new_entities"] == len(e2 - e1) == dropped + n_new
     assert second["legacy_growth"]["new_relations"] == len(r2 - r1)
     only_dropped = sum(1 for members in big_graph.truth.work_members.values()
-                       if all(int(m.rsplit("E", 1)[1]) < 5_000 for m in members))
-    assert second["new_works"] == 300 + only_dropped and report.coverage.completeness == "complete"
+                       if all(int(m.rsplit("E", 1)[1]) < dropped for m in members))
+    assert second["new_works"] == n_new_works + only_dropped and report.coverage.completeness == "complete"
     _bounded(report.to_data())
 
 
@@ -187,7 +192,8 @@ def test_corpus_audit_equals_ground_truth_over_every_term_entry(big_corpus):
     dup, summary = report.metrics["duplicate_works"], report.metrics["summary"]
     assert dup["distinct_works"] == summary["distinct_works"] == truth.distinct_works
     assert dup["paper_keys"] == truth.paper_keys and dup["works_with_multiple_keys"] == truth.works_with_multiple_keys
-    assert dup["legacy"]["arxiv_journal_near_dupes"] == 250  # every arXiv_-named preprint pairs with its journal
+    # every arXiv_-named preprint (odd Work number, w % 3 == 1) pairs with its journal
+    assert dup["legacy"]["arxiv_journal_near_dupes"] == sum(1 for w in range(truth.distinct_works) if w % 6 == 1)
     assert summary["legacy"]["total_entities"] == truth.term_entries
     assert summary["legacy"]["total_papers"] == truth.legacy_total_papers  # legacy unit: full filename strings
     assert sum(summary["legacy"]["papers_per_year"].values()) == truth.legacy_year_increments

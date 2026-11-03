@@ -35,6 +35,10 @@ from app.modules.schema.registry import RegistryError, SchemaRegistry
 
 from tests.snapshots.snapshot_fakes import COMMIT, EXPECTED, INPUTS, REPO
 
+# Subprocess environments here are explicit (a private HOME): hand them the suite's shared matplotlib cache
+# dir, otherwise every interpreter that imports matplotlib rebuilds the font cache (15-20 s on macOS).
+MPL_ENV = {"MPLCONFIGDIR": os.environ["MPLCONFIGDIR"]} if "MPLCONFIGDIR" in os.environ else {}
+
 SUCCESS_CASES = ("core_dict", "list_input", "empty_metadata", "custom_prefix")
 MANIFEST_SCHEMA = json.loads(
     (REPO / "docs/migration/data_releases/schemas/kg_snapshot_manifest.schema.json").read_text(encoding="utf-8"))
@@ -65,23 +69,40 @@ def test_graph_bytes_equal_the_frozen_json2kg_fixture(make, tmp_path, case):
         len(graph["things"]), len(graph["associations"]))
 
 
-def test_graph_identity_is_deterministic_across_runs_and_hash_seeds(make, tmp_path):
-    first = make(corpus="alpha")
-    second = make(corpus="beta")
-    assert first.graph_path.read_bytes() == second.graph_path.read_bytes()
+@pytest.fixture(scope="module")
+def fresh_interpreter_build(tmp_path_factory):
+    """One snapshot built in ONE fresh interpreter (PYTHONHASHSEED=4242, network refused, no shell).
+
+    A fresh interpreter imports the whole legacy json2kg helper chain (about 10 s), so the two tests
+    that need one (hash-seed determinism; no Tiled imports and no network) share this run.
+    """
+    tmp = tmp_path_factory.mktemp("fresh-interpreter")
     code = (
-        "import sys, pathlib\n"
+        "import sys, socket, pathlib\n"
+        "def refuse(*a, **k): raise AssertionError('network')\n"
+        "socket.socket.connect = refuse; socket.getaddrinfo = refuse; socket.create_connection = refuse\n"
         "from app.modules.graph.snapshot import SnapshotRequest, create_snapshot\n"
         "r = create_snapshot(SnapshotRequest('gamma', pathlib.Path(sys.argv[1]),\n"
         "    storage_kg=pathlib.Path(sys.argv[2]), terms_ref='x/y.json', code_commit='a'*40))\n"
+        "bad = sorted(m for m in sys.modules if m.split('.')[0] == 'tiled' or"
+        " m.startswith('app.modules.graph.backends') or m == 'app.modules.tiled_graph')\n"
+        "print('BAD', bad)\n"
+        "print('OK', r.snapshot_id)\n"
         "print(r.graph_sha256)\n"
     )
-    out = subprocess.run(
-        [sys.executable, "-c", code, str(INPUTS / "core_dict.terms.json"), str(tmp_path / "other_kg")],
-        cwd=tmp_path, capture_output=True, text=True, check=True,
-        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "PYTHONPATH": str(REPO), "PYTHONHASHSEED": "4242"},
-    ).stdout.strip().splitlines()[-1]
-    assert out == first.graph_sha256
+    return subprocess.run(
+        [sys.executable, "-c", code, str(INPUTS / "core_dict.terms.json"), str(tmp / "other_kg")],
+        cwd=tmp, capture_output=True, text=True, check=True,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp), "PYTHONPATH": str(REPO), "PYTHONHASHSEED": "4242",
+             **MPL_ENV},
+    ).stdout.splitlines()
+
+
+def test_graph_identity_is_deterministic_across_runs_and_hash_seeds(make, fresh_interpreter_build):
+    first = make(corpus="alpha")
+    second = make(corpus="beta")
+    assert first.graph_path.read_bytes() == second.graph_path.read_bytes()
+    assert fresh_interpreter_build[-1] == first.graph_sha256
 
 
 # ---------------------------------------------------------------- layout and manifest
@@ -495,25 +516,8 @@ def test_build_runs_with_tiled_absent_network_blocked_and_no_shell(make, monkeyp
     assert make().snapshot_id == "v1"
 
 
-def test_a_fresh_interpreter_builds_without_importing_tiled_or_the_tiled_backends(tmp_path):
-    code = (
-        "import sys, socket, pathlib\n"
-        "def refuse(*a, **k): raise AssertionError('network')\n"
-        "socket.socket.connect = refuse; socket.getaddrinfo = refuse; socket.create_connection = refuse\n"
-        "from app.modules.graph.snapshot import SnapshotRequest, create_snapshot\n"
-        "r = create_snapshot(SnapshotRequest('syn', pathlib.Path(sys.argv[1]),\n"
-        "    storage_kg=pathlib.Path(sys.argv[2]), terms_ref='a/b.json', code_commit='a'*40))\n"
-        "bad = sorted(m for m in sys.modules if m.split('.')[0] == 'tiled' or"
-        " m.startswith('app.modules.graph.backends') or m == 'app.modules.tiled_graph')\n"
-        "print('BAD', bad)\n"
-        "print('OK', r.snapshot_id)\n"
-    )
-    out = subprocess.run(
-        [sys.executable, "-c", code, str(INPUTS / "core_dict.terms.json"), str(tmp_path / "kg")],
-        cwd=tmp_path, capture_output=True, text=True, check=True,
-        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "PYTHONPATH": str(REPO)},
-    ).stdout.splitlines()
-    assert "OK v1" in out and "BAD []" in out
+def test_a_fresh_interpreter_builds_without_importing_tiled_or_the_tiled_backends(fresh_interpreter_build):
+    assert "OK v1" in fresh_interpreter_build and "BAD []" in fresh_interpreter_build
 
 
 def test_snapshot_modules_contain_no_tiled_or_shell_use():
@@ -530,7 +534,7 @@ def test_snapshot_modules_contain_no_tiled_or_shell_use():
 def _cli(args, tmp_path):
     return subprocess.run(
         [sys.executable, str(REPO / "scripts/build_kg_snapshot.py"), *map(str, args)], cwd=tmp_path,
-        capture_output=True, text=True, env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)})
+        capture_output=True, text=True, env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), **MPL_ENV})
 
 
 def test_cli_creates_a_snapshot_and_reports_json(tmp_path):

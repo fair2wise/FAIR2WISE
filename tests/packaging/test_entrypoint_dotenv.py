@@ -33,10 +33,16 @@ def _clean_env(**extra):
     return env
 
 
-@pytest.mark.parametrize("module", FORMER_IMPORT_LOADERS)
-def test_library_import_never_loads_dotenv(module):
+@pytest.fixture(scope="module")
+def library_import_calls():
+    """``{module: load_dotenv/find_dotenv callers during its import}`` from ONE fresh interpreter.
+
+    Importing each module in turn in a single interpreter (about 10 s of imports, versus one
+    interpreter per module) sees every import-time call: a module-level ``load_dotenv()`` runs when
+    the module is first imported, whichever module pulled it in, and is attributed to that import.
+    """
     code = (
-        "import json, sys\n"
+        "import importlib, json, sys\n"
         f"sys.path.insert(0, {str(REPO)!r})\n"
         "import dotenv, dotenv.main\n"
         "calls = []\n"
@@ -44,12 +50,21 @@ def test_library_import_never_loads_dotenv(module):
         "    calls.append(sys._getframe(1).f_code.co_filename)\n"
         "dotenv.load_dotenv = dotenv.main.load_dotenv = rec\n"
         "dotenv.find_dotenv = dotenv.main.find_dotenv = rec\n"
-        f"import {module}\n"
-        "print(json.dumps(calls))\n"
+        "seen = {}\n"
+        f"for name in {FORMER_IMPORT_LOADERS!r}:\n"
+        "    before = len(calls)\n"
+        "    importlib.import_module(name)\n"
+        "    seen[name] = calls[before:]\n"
+        "print(json.dumps(seen))\n"
     )
     out = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, check=True,
                          cwd="/", env=_clean_env())
-    assert json.loads(out.stdout.strip().splitlines()[-1]) == []
+    return json.loads(out.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.parametrize("module", FORMER_IMPORT_LOADERS)
+def test_library_import_never_loads_dotenv(module, library_import_calls):
+    assert library_import_calls[module] == []
 
 
 @pytest.mark.parametrize("script", LEGACY_ENTRY_POINTS)

@@ -96,7 +96,8 @@ def test_summary_counts_figure_and_table_records_once_under_page_eligibility(tmp
 
 def test_summary_at_scale_includes_figure_and_table_records(big_session):
     truth = big_session.truth
-    assert truth.figure_records > 1_000 and truth.table_records > 1_000
+    n = big_session.profile.n  # full-size figure -> this profile's
+    assert truth.figure_records > n(1_000) and truth.table_records > n(1_000)
     s = summarize_paper_terms(PaperScope(str(big_session.path), str(big_session.extra[0]), sp.ACTIVE)).summary
     assert s.term_count == truth.term_count  # the truth counts figure/table records exactly once each
 
@@ -153,7 +154,8 @@ def test_graph_counts_figure_and_table_derived_entities_once(tmp_path):
 
 def test_graph_at_scale_counts_figure_entities_with_the_rest(big_graph):
     truth = big_graph.truth
-    assert truth.figure_entities > 4_000 and truth.table_entities > 3_000
+    n = big_graph.profile.n  # full-size figure -> this profile's
+    assert truth.figure_entities > n(4_000) and truth.table_entities > n(3_000)
     # entities_with_citations in the truth counts each figure/table-derived entity once (no extra count).
     assert truth.entities_with_citations == sum(1 for i in range(truth.entities) if i % 50 != 7)
 
@@ -181,7 +183,8 @@ def outputs(big_graph, big_corpus, big_session, tmp_path_factory):
     store = FileDocumentStore(tmp_path_factory.mktemp("t19d-artifacts"))
     payload = json.loads(big_graph.path.read_text(encoding="utf-8"))
     older = sp.write_json(tmp_path_factory.mktemp("t19d-older") / "older.json",
-                          dict(payload, things=payload["things"][:30_000], associations=payload["associations"][:90_000]))
+                          dict(payload, things=payload["things"][:big_graph.profile.n(30_000)],
+                               associations=payload["associations"][:big_graph.profile.n(90_000)]))
     graph = GraphOperationsTool(JsonGraphBackend({"syn_big": big_graph.path, "syn_older": older}), artifact_store=store)
     corpus = CorpusAuditTool(mapping_corpus_resolver({"syn_big": str(big_corpus.path)}), artifact_store=store)
     executor = _executor(*graph.registrations(), corpus.registration(), PaperSummaryTool().registration())

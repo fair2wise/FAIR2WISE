@@ -29,7 +29,7 @@ import _legacy_ui_harness as H  # noqa: E402
 from _wiring_support import FORGED_HEADERS, make_cfg, other_user  # noqa: E402,F401
 from closure_support import loopback_guard  # noqa: E402
 from import_fakes import CountingClient, FakeClock as _FakeClock, MemoryTiled, snapshot_with_graph  # noqa: E402
-from tiled_server import start_tiled_instance, tiled_base, tiled_python  # noqa: E402,F401
+from tiled_server import start_tiled_instance, tiled_base, tiled_python, tiled_seeded_pool  # noqa: E402,F401
 from security_fakes import (  # noqa: E402
     STAGING, FakeTiledIdentityPort, ForbiddenIdentityPort, InMemoryCredentialStore, admin_user, local_settings,
     plain_user, staging_settings)
@@ -164,11 +164,8 @@ def w(request, monkeypatch, tmp_path, template):
         return
     if tiled_python() is None:
         pytest.skip("F2W_TILED_PYTHON is not set (needs tiled 0.2.18)")
-    inst = start_tiled_instance(request.getfixturevalue("tiled_base"))
-    try:
-        yield build_local(monkeypatch, tmp_path, template, instance=inst)
-    finally:
-        inst.destroy()
+    inst = request.getfixturevalue("tiled_seeded_pool").acquire()  # one server per worker, reset to the seed
+    yield build_local(monkeypatch, tmp_path, template, instance=inst)
 
 
 def live_nodes(client):

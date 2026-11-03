@@ -26,31 +26,46 @@ class Population:
     path: Path
     truth: Any
     extra: Tuple[Path, ...] = ()
+    profile: sp.Profile = sp.FULL
 
     @property
     def budget_multiple(self) -> float:
-        return sp.prompt_budget_multiple(self.path)
+        return sp.prompt_budget_multiple(self.path, self.profile.scale)
+
+
+@pytest.fixture(scope="session", params=[
+    pytest.param(sp.SMALL, id="small"),
+    pytest.param(sp.FULL, id="full", marks=pytest.mark.slow),
+])
+def profile(request) -> sp.Profile:
+    """Population size: one tenth (default suite) or the full T19D size (``slow``).
+
+    The three ``big_*`` populations all derive from this one fixture, so a test that uses
+    several of them runs once per size, never once per combination.
+    """
+    return request.param
 
 
 @pytest.fixture(scope="session")
-def big_graph(tmp_path_factory) -> Population:
-    payload, truth = sp.build_graph()
+def big_graph(tmp_path_factory, profile) -> Population:
+    payload, truth = sp.build_graph(profile.graph_entities, profile.graph_works, profile.graph_edges)
     path = sp.write_json(tmp_path_factory.mktemp("t19d-graph") / "syn_big.json", payload)
-    return Population(path, truth)
+    return Population(path, truth, profile=profile)
 
 
 @pytest.fixture(scope="session")
-def big_corpus(tmp_path_factory) -> Population:
-    payload, truth = sp.build_corpus()
+def big_corpus(tmp_path_factory, profile) -> Population:
+    payload, truth = sp.build_corpus(profile.corpus_terms, profile.corpus_works)
     path = sp.write_json(tmp_path_factory.mktemp("t19d-corpus") / "terms.json", payload)
-    return Population(path, truth)
+    return Population(path, truth, profile=profile)
 
 
 @pytest.fixture(scope="session")
-def big_session(tmp_path_factory) -> Population:
-    terms, manifest, truth = sp.build_session_terms()
+def big_session(tmp_path_factory, profile) -> Population:
+    terms, manifest, truth = sp.build_session_terms(profile.session_terms)
     root = tmp_path_factory.mktemp("t19d-session")
-    return Population(sp.write_json(root / "terms.json", terms), truth, (sp.write_json(root / "manifest.json", manifest),))
+    return Population(sp.write_json(root / "terms.json", terms), truth,
+                      (sp.write_json(root / "manifest.json", manifest),), profile=profile)
 
 
 @pytest.fixture(scope="session")

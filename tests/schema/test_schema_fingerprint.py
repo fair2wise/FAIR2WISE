@@ -1,6 +1,7 @@
 """T22B fingerprints: stable across runs, change when any import changes, bound into artifacts."""
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -45,7 +46,8 @@ def test_fingerprint_is_stable_in_a_fresh_interpreter_from_another_cwd(registry,
     )
     out = subprocess.run(
         [sys.executable, "-c", code], cwd=tmp_path, capture_output=True, text=True, check=True,
-        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "PYTHONPATH": str(REPO), "PYTHONHASHSEED": "7"},
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "PYTHONPATH": str(REPO), "PYTHONHASHSEED": "7",
+             **({"MPLCONFIGDIR": os.environ["MPLCONFIGDIR"]} if "MPLCONFIGDIR" in os.environ else {})},
     ).stdout.strip().splitlines()[-1]
     assert out.split(",") == [closure_fingerprint(registry.get(s)) for s in ("matkg_schema", "rsoxs_schema")]
 

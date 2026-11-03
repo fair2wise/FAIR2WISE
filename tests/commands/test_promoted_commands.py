@@ -118,6 +118,7 @@ def test_launch_facade_still_works(name: str, tmp_path: Path):
     """``python scripts/<name>.py --help`` runs the packaged implementation (no network, no .env)."""
     facade = EXPECTED[name][2]
     env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "F2W_DOTENV": "none"}
+    env.update({k: v for k, v in os.environ.items() if k == "MPLCONFIGDIR"})
     env.update({k: v for k, v in os.environ.items() if k.startswith("F2W_TILED_PYTHON")})
     args = ["--help"]
     out = subprocess.run([sys.executable, "-I", str(REPO / "scripts" / facade), *args], capture_output=True,

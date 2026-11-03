@@ -159,6 +159,9 @@ def build_graph(n_entities: int = 60_000, n_works: int = 2_400, n_edges: int = 1
                 seed: int = SEED) -> Tuple[Dict[str, Any], GraphTruth]:
     """The large json2kg-family graph and its exact figures."""
     rng = random.Random(seed)
+    factor = n_entities / 60_000  # the defects below scale with the population (1.0 at full size)
+    n_dangling, n_loops = round(400 * factor), round(300 * factor)
+    n_dups, n_incomplete = round(9_000 * factor), round(1_200 * factor)
     things: List[Dict[str, Any]] = []
     cats: Counter = Counter()
     work_members: Dict[int, Set[str]] = {}
@@ -214,29 +217,29 @@ def build_graph(n_entities: int = 60_000, n_works: int = 2_400, n_edges: int = 1
         triples.add((s, p, o))
         assoc.append({"subject": s, "predicate": p, "object": o, "has_evidence": None})
         complete_records += 1
-    for k in range(400):  # dangling: an endpoint with no node
+    for k in range(n_dangling):  # dangling: an endpoint with no node
         t = (f"syn:E{rng.randrange(n_entities):06d}", "rel:P00", f"syn:Ghost{k}")
         triples.add(t)
         assoc.append({"subject": t[0], "predicate": t[1], "object": t[2]})
         complete_records += 1
-    for k in range(300):  # self loops
+    for k in range(n_loops):  # self loops
         e = f"syn:E{rng.randrange(n_entities):06d}"
         t = (e, "rel:SAME_AS", e)
         triples.add(t)
         assoc.append({"subject": e, "predicate": "rel:SAME_AS", "object": e})
         complete_records += 1
     distinct_list = sorted(triples)
-    for k in range(9_000):  # duplicate records of existing triples
+    for k in range(n_dups):  # duplicate records of existing triples
         s, p, o = distinct_list[rng.randrange(len(distinct_list))]
         assoc.append({"subject": s, "predicate": p, "object": o, "has_evidence": f"dup{k}"})
         complete_records += 1
-    for k in range(1_200):  # incomplete records
+    for k in range(n_incomplete):  # incomplete records
         assoc.append({"subject": f"syn:E{k:06d}", "predicate": "" if k % 2 else None, "object": "syn:E000001"})
     rng.shuffle(assoc)
     in_rel = {s for s, _p, _o in triples} | {o for _s, _p, o in triples}
     truth = GraphTruth(
         entities=len(things), edge_records=len(assoc), relations=len(triples),
-        incomplete_edge_records=1_200, duplicate_edge_records=complete_records - len(triples),
+        incomplete_edge_records=n_incomplete, duplicate_edge_records=complete_records - len(triples),
         dangling_relations=sum(1 for s, _p, o in triples if s not in ids or o not in ids),
         self_loop_relations=sum(1 for s, _p, o in triples if s == o),
         unique_predicates=len({p for _s, p, _o in triples}),
@@ -418,9 +421,41 @@ def write_json(path: Path, payload: Any) -> Path:
     return path
 
 
-def prompt_budget_multiple(path: Path) -> float:
-    """How many 1M-token contexts the serialised population would fill (at 4 characters per token)."""
-    return path.stat().st_size / (CHARS_PER_TOKEN * PROMPT_BUDGET_TOKENS)
+def prompt_budget_multiple(path: Path, scale: float = 1.0) -> float:
+    """How many contexts the serialised population would fill (at 4 characters per token).
+
+    The context is 1M tokens at ``scale=1.0`` (the full populations); a reduced population
+    (:class:`Profile`) is held against a context reduced by the same factor, so it exceeds the
+    prompt budget by the same multiple.
+    """
+    return path.stat().st_size / (CHARS_PER_TOKEN * PROMPT_BUDGET_TOKENS * scale)
+
+
+@dataclass(frozen=True)
+class Profile:
+    """Sizes of the three populations. ``scale`` is the fraction of the full size (1.0 = T19D size)."""
+
+    name: str
+    scale: float
+    graph_entities: int
+    graph_works: int
+    graph_edges: int
+    corpus_terms: int
+    corpus_works: int
+    session_terms: int
+
+    def n(self, full_value: int) -> int:
+        """A full-size figure (record bound, slice, count) reduced to this profile."""
+        return max(1, round(full_value * self.scale))
+
+
+#: One tenth of the full size: the inline 7000-character bound, the scan bounds and the prompt
+#: budget are all scaled with it, so every ratio the tests assert is the same (the populations
+#: are still > 5 x the scaled context); runs in the default suite.
+SMALL = Profile("small", 0.1, 6_000, 240, 18_000, 6_000, 150, 12_000)
+#: The T19D populations (60k entities, 190k edge records, 120k session records): ``@pytest.mark.slow``.
+FULL = Profile("full", 1.0, 60_000, 2_400, 180_000, 60_000, 1_500, 120_000)
+PROFILES = {p.name: p for p in (SMALL, FULL)}
 
 
 def leaked(text: str) -> List[str]:
