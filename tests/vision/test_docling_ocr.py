@@ -2,6 +2,7 @@
 selection and degradation are checked without Docling, and a real-weights test skips when they are absent."""
 
 import hashlib
+from pathlib import Path
 import subprocess
 import sys
 from types import SimpleNamespace as NS
@@ -20,6 +21,9 @@ from app.modules.vision.ocr import (
     OCR_ENGINE_ENV, Detection, RapidOcrEngine, default_engine, read_bar_labels, read_figure_text,
 )
 from app.modules.vision.results import VisionUnavailable
+
+
+REPO = Path(__file__).resolve().parents[2]
 
 
 def cell(text, x0, y0, x1, y1, conf, origin="BOTTOMLEFT"):
@@ -180,7 +184,7 @@ def test_broken_model_load_is_unavailable(clean_env, tmp_path):
 
 
 def test_importing_the_engine_module_does_not_import_docling():
-    code = ("import sys, app.modules.vision.docling_ocr; "
+    code = (f"import sys; sys.path.insert(0, {str(REPO)!r}); import app.modules.vision.docling_ocr; "
             "sys.exit(any(m == 'docling' or m.startswith('docling.') for m in sys.modules))")
     assert subprocess.run([sys.executable, "-I", "-c", code], check=False).returncode == 0
 
@@ -188,11 +192,11 @@ def test_importing_the_engine_module_does_not_import_docling():
 # --- fetch script verification ------------------------------------------------------------------------------
 
 def test_fetch_script_verifies_checkpoints_against_the_registry(tmp_path):
-    sys.path.insert(0, "scripts")
+    sys.path.insert(0, str(REPO / "scripts"))
     try:
         import fetch_docling_models as fetch
     finally:
-        sys.path.remove("scripts")
+        sys.path.remove(str(REPO / "scripts"))
     (tmp_path / "a.pth").write_bytes(b"weights")
     good = hashlib.sha256(b"weights").hexdigest()
     registry = {"torch": {"det": {"a": {"model_dir": "https://h/x/a.pth", "SHA256": good.upper()}}}}
@@ -200,7 +204,7 @@ def test_fetch_script_verifies_checkpoints_against_the_registry(tmp_path):
     registry["torch"]["det"]["a"]["SHA256"] = "0" * 64
     with pytest.raises(ValueError, match="sha256"):
         fetch.verify_checkpoints(tmp_path, registry)
-    with pytest.raises(ValueError, match="not listed"):
+    with pytest.raises(ValueError, match="is listed in"):
         fetch.verify_checkpoints(tmp_path, {})
 
 
