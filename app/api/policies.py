@@ -153,6 +153,10 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="export a bundle to the configured release directory; explicit confirm in the body"),
     _v("V75", "POST", "/library/kgs/continue", "library.extract", on_als=False,
        note="create a bundle by continuing a bundle or a KG file (kg_to_terms reverse build)"),
+    # T18D (Q13, O-U3): the capability read behind the frozen UI's hidden Edit/Save controls. V56-V59 belong to
+    # another branch; this block is V60-V69.
+    _v("V60", "GET", "/capabilities", "chat.read_support",
+       note="caller's role, can_edit (graph.edit), can_save, can_upload; computed from the guards that answer 403"),
 )
 
 #: ``(METHOD, path) -> RoutePolicy`` for the ``/v1`` routes.

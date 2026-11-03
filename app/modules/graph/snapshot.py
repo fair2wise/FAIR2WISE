@@ -68,7 +68,9 @@ from .snapshot_manifest import (
     to_contract_manifest,
     utc_iso,
 )
-from .snapshots import graph_id_for_snapshot
+from .edit_journal import EditJournal
+from .edit_replay import ReplayResult, record_conflicts, replay_journal
+from .snapshots import graph_id_for_snapshot, serialize_like_json2kg
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +134,13 @@ class SnapshotRequest:
         allow_pending_review_schema: Bind a schema whose set is still pending owner review (T22C
             ``rsoxs_schema@0.3.0``...). Off by default: no build uses an unreviewed schema unless asked twice,
             by ``schema_id`` and by this flag.
+        edit_journal / journal_target / journal_scope: T18D (T23C left replay unwired). When a journal is
+            given, every edit it still owes the scope is replayed onto the rebuilt graph
+            (:func:`~app.modules.graph.edit_replay.replay_journal`) before the graph is frozen. Each edit
+            ends *kept*, *already present* or recorded as a ``conflict`` (the build still succeeds; the
+            conflicts block the next import until reviewed). Kept and already-present edits are advanced to
+            ``reconciled`` with this snapshot's id once the snapshot exists. ``journal_scope`` defaults to
+            ``(corpus,)``; ``journal_target`` is the Tiled target the edits were journaled against.
     """
 
     corpus: str
@@ -154,6 +163,9 @@ class SnapshotRequest:
     disclosure_allowlist: frozenset[str] = frozenset()
     registry: SchemaRegistry | None = None
     allow_pending_review_schema: bool = False
+    edit_journal: EditJournal | None = None
+    journal_target: str | None = None
+    journal_scope: Sequence[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -173,6 +185,8 @@ class SnapshotResult:
     validation_status: str
     disclosure: DisclosureReport
     warnings: list[str] = field(default_factory=list)
+    reconciled_edits: tuple[str, ...] = ()
+    edit_conflicts: tuple[str, ...] = ()
 
     @property
     def commit_ready(self) -> bool:
@@ -309,6 +323,21 @@ def _verified_parent(corpus_dir: Path, request: SnapshotRequest) -> Parent | Non
                       request.parent_relation))
 
 
+def _reconcile_edits(request: SnapshotRequest, replay: ReplayResult | None, snapshot_id: str,
+                     now: datetime) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """After the snapshot exists: carried edits become ``reconciled`` here, conflicts are journaled."""
+    journal = request.edit_journal
+    if journal is None or replay is None:
+        return (), ()
+    latest = journal.latest()
+    carried = [e for e in sorted({*replay.kept, *replay.already}) if latest[e].state != "reconciled"]
+    for edit_id in carried:
+        journal.advance(edit_id, "reconciled", now, reconciled_in=snapshot_id,
+                        note=f"carried into {request.corpus}/{snapshot_id}")
+    conflicts = record_conflicts(journal, replay, now)
+    return tuple(carried), tuple(conflicts)
+
+
 def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
     """Build a candidate graph from a terms file and freeze it as an immutable snapshot.
 
@@ -360,6 +389,16 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
         private_terms.unlink()
         graph_bytes = graph_file.read_bytes()
         graph = json.loads(graph_bytes.decode("utf-8"))
+        replay: ReplayResult | None = None
+        if request.edit_journal is not None:
+            replay = replay_journal(graph, request.edit_journal, target=request.journal_target or "",
+                                    scope=tuple(request.journal_scope or (request.corpus,)))
+            if replay.kept:
+                graph = replay.graph
+                graph_bytes = serialize_like_json2kg(graph)
+                graph_file.write_bytes(graph_bytes)
+            for conflict in replay.conflicts:
+                warnings.append(f"edit {conflict.edit_id} not carried: {conflict.reason}")
         stats = _graph_stats(graph_bytes)
 
         fingerprint = closure_fingerprint(entry)
@@ -430,12 +469,14 @@ def create_snapshot(request: SnapshotRequest) -> SnapshotResult:
                     raise SnapshotError(f"could not freeze snapshot: {exc.strerror}") from None
             else:
                 claimed_flat = None  # published: keep it
+                reconciled, conflicts = _reconcile_edits(request, replay, snapshot_id, now)
                 return SnapshotResult(
                     snapshot_id=snapshot_id, corpus=request.corpus, directory=final,
                     graph_path=final / "graph.json", manifest_path=final / "manifest.json",
                     validation_path=final / "validation.json", flat_path=flat, manifest=manifest,
                     contract_manifest=contract, graph_sha256=graph_sha,
-                    validation_status=report.status, disclosure=disclosure, warnings=warnings)
+                    validation_status=report.status, disclosure=disclosure, warnings=warnings,
+                    reconciled_edits=reconciled, edit_conflicts=conflicts)
             if claimed_flat is not None:
                 claimed_flat.unlink(missing_ok=True)
                 claimed_flat = None

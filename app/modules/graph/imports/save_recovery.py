@@ -50,10 +50,17 @@ from .corpus_scope import ReleaseState, ScopeState, read_scope_state, scope_dir
 from .journal import ImportJournal, Lease, operation_id
 from .tiled_json import Clock, FaultHook, _check_client, _writer_errors, target_for
 
-__all__ = ["SAVE_STEPS", "SaveResult", "execute_save", "recover_failed_saves", "save_tag"]
+__all__ = ["SAVE_STEPS", "SaveResult", "StaleRevision", "execute_save", "recover_failed_saves", "save_tag"]
 
 SAVE_STEPS = ("create_revision", "recreate_links", "retire_old", "promote_new", "delete_old_links")
 SAVE_CAPABILITY = "graph.edit"
+
+
+class StaleRevision(ContractError):
+    """The record changed since the edit was made (Q10: the legacy route answers 409, not the 502)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(ErrorCode.CONFLICT, message, retryable=False)
 
 
 def save_tag(edit_id: str) -> str:
@@ -133,7 +140,7 @@ def execute_save(ctx: RequestContext, record: ej.EditRecord, *, journal: ej.Edit
             if old is None:
                 raise ContractError(ErrorCode.NOT_FOUND, f"node {node_id!r} is not live in scope {scope!r}")
             if not lw.entity_matches(old, _node_spec(scope, before)):
-                raise ContractError(ErrorCode.CONFLICT, f"node {node_id!r} changed since the edit was made (409)")
+                raise StaleRevision(f"node {node_id!r} changed since the edit was made (409)")
             op_journal.append("save_started", edit_id=record.edit_id, tag=tag, old_tiled_id=old["id"])
             written = True
             result = _run_sequence(client, st, scope, node_id, old, new_spec, tag, access, op_journal, lease, fault)
