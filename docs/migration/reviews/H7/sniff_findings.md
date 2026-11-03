@@ -212,7 +212,7 @@ Commits (all on `forge_merge-T27c`, each with the Claude co-author trailer):
 | `6caf6bd` three untyped public defaults typed | F1.5 |
 | `b98ca0d` no silent `except: pass` left | F4.1 |
 | `5c8bd60` module loggers and logging where a handler converts a failure into a fallback | F4.3, F4.2 (part) |
-| CI commit (`ci(T27): gate ruff, isort and mypy`) | F0.1, F0.3, F0.5 |
+| `f759186` CI gate for ruff, isort and mypy | F0.1, F0.3, F0.5 |
 | `c364ff8` delete the uncalled `_retired_deterministic_locked` shim; regenerate `graph_publication.json` | F3.3 |
 
 Final state per row (fixed = done on this branch or earlier and re-verified; deferred and intentional = as accepted by
@@ -244,7 +244,7 @@ the owner through the 2026-11-03 reply):
 | F3.6 open TODO | defer / intentional | deferred: `term_extractor/dashboard.py:1005` (JS, event-driven `showConnection()`); the supervisor TODO is gone |
 | F3.7 pyflakes | fix | fixed: 24 findings (unused imports and assignments, an f-string without placeholders, `field` shadowed by a loop variable in four loops of `f2w_agent/api.py`); the three AUD-18 sites named in the row and F821 `history` were already gone |
 | F3.8 magic literals | open | **open**: needs a read-through |
-| F4.1 `except: pass` | fix | fixed: 25 handlers; 21 now log (debug, warning for the supervisor's audit-event emits), 5 `unlink` handlers became `unlink(missing_ok=True)`, the two `CancelledError` handlers keep their shutdown comment |
+| F4.1 `except: pass` | fix | fixed: 25 handlers; 18 now log (debug, warning for the supervisor's audit-event emits), 5 `unlink` handlers became `unlink(missing_ok=True)`, the two `CancelledError` handlers keep their shutdown comment |
 | F4.2 return/continue-only handlers | fix after triage | partly open: 166 handlers counted; the 12 `except Exception` ones that hide a network, parser, catalog or job failure now log; about 150 typed ones (`ValueError`/`TypeError` parse fallbacks, `OSError`, `JSONDecodeError`, `ContractError`, `StoreError`) were not triaged one by one and stay as they are |
 | F4.3 `except Exception` without a logger | fix | fixed for every handler that swallows (17 modules got a module logger and a log call). Handlers that re-raise or chain (`raise X from exc`, bare `raise` after cleanup) were left alone on purpose; `_tiled_entry.py` (stdlib-only, import list pinned), `agents/chebi.py` (standalone script), `json2kg.py` and `download_pdfs.py` (already log via the root logger) were not changed |
 | F4.4 `print()` | fix | fixed (ruff `T20` 0; the three stdlib-only scripts keep `print` with a reason) |
