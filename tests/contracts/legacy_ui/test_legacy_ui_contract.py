@@ -500,5 +500,9 @@ def test_graph_source_wire_tokens_in_ui_source():
     assert text[1] == "export type AgentGraphSource = 'splash_links' | 'json';"
     assert text[220] == "  return source === 'json' ? 'json' : 'splash';"
     assert text[224] == "  return source === 'json' ? 'json' : 'splash_links';"
-    gm = (REPO_ROOT / "ui/src/app/components/GraphMockup.tsx").read_text(encoding="utf-8").splitlines()
-    assert gm[662] == "  const canEdit = loadAgentSettings().graphSource !== 'json';"
+    # T18D: the Edit gate moved into canEditNode (json source never edits; a server `can_save: false` hides it too),
+    # so pin it by content, not by line number.
+    gm = (REPO_ROOT / "ui/src/app/components/GraphMockup.tsx").read_text(encoding="utf-8")
+    assert "  const canEdit = canEditNode(loadAgentSettings().graphSource, capabilities);" in gm.splitlines()
+    caps = (REPO_ROOT / "ui/src/app/components/capabilitiesApi.ts").read_text(encoding="utf-8")
+    assert "graphSource !== 'json' && (caps?.can_save ?? true)" in caps
