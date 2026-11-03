@@ -501,7 +501,7 @@
       "gate": "H8",
       "status": "open",
       "merge_commit": null,
-      "note": "legacy audit and porting toward H8 (plan_addenda A2)"
+      "note": "steps 2-5 merged at 9d1012488 (2026-11-03, owner H4 approval): prov_o, extract_terms_cli, 9 promoted commands, harvest scripts on the hardened downloader. Open: 16-file retire list and (r) reclassification (owner review), and tiled_graph, orchestrator/debate agents, download_agent, kg_update, bl1101_ingest, which the audit got wrong (reviews/H8/legacy_audit.md section 8)"
     },
     {
       "id": "T27",
@@ -510,7 +510,7 @@
       "gate": "H7",
       "status": "open",
       "merge_commit": null,
-      "note": "docstring, typing and coverage closure before H7 (plan_addenda A3)"
+      "note": "typing zero (mypy strict clean), coverage listed modules at 80% or more plus term_extractor/store.py and operations/__init__.py at 100%, docstring sweep merged; open: owner disposition of the sniff findings"
     },
     {
       "id": "T22C",
@@ -564,72 +564,72 @@
       "title": "Pin edit-relevant Tiled 0.2.18 facts",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "7d52461dce1cc3a12e436360ecdd9d7d592dbf5b",
+      "merge_commit_subject": "Merge T20C, T08C, T08D: Tiled 0.2.18 edit facts, corpus-scoped replacement import, guarded purge and Save recovery"
     },
     {
       "id": "T08C",
       "title": "Corpus-scoped replacement import (stage, switch, retire, revive)",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "7d52461dce1cc3a12e436360ecdd9d7d592dbf5b",
+      "merge_commit_subject": "Merge T20C, T08C, T08D: Tiled 0.2.18 edit facts, corpus-scoped replacement import, guarded purge and Save recovery"
     },
     {
       "id": "T08D",
       "title": "Guarded purge, corpus removal and the Save recovery job",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "7d52461dce1cc3a12e436360ecdd9d7d592dbf5b",
+      "merge_commit_subject": "Merge T20C, T08C, T08D: Tiled 0.2.18 edit facts, corpus-scoped replacement import, guarded purge and Save recovery"
     },
     {
       "id": "T23C",
       "title": "Edit reconciliation and rollback protection (F4/B26, Q15)",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "073b18e5c9c67bb3b314b1fdbca6c52f6d2cae59",
+      "merge_commit_subject": "Merge T23C and T10B: edit reconciliation, replacement rollback, corpus retire/purge jobs, paper job kinds"
     },
     {
       "id": "T18D",
       "title": "Legacy Save as journaled multi-write, plus the capability read (O-U3)",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "317411bcbd911177a368b987aa064330b1c523db",
+      "merge_commit_subject": "Merge T18D UI: Edit/Save controls hidden when the server reports can_save false"
     },
     {
       "id": "T18E",
       "title": "Post-extraction publication replaces splash_reimport (Q11)",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "d11ce7754f0bc3614df6d26aa5e3649b8939023e",
+      "merge_commit_subject": "Merge T18E: post-extraction publication replaces the Splash wipe path"
     },
     {
       "id": "T10B",
       "title": "Rollback, replacement, job kinds and auto re-plan in the publication job",
       "source": "plan_addenda.md A6",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "073b18e5c9c67bb3b314b1fdbca6c52f6d2cae59",
+      "merge_commit_subject": "Merge T23C and T10B: edit reconciliation, replacement rollback, corpus retire/purge jobs, paper job kinds"
     },
     {
       "id": "T29",
       "title": "Parsing, intake metadata and literature tooling",
       "source": "plan_addenda.md A7",
       "gate": "H5",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "6f4c719f8eae7f245adc45f25fcac18ac5863aa9",
+      "merge_commit_subject": "Merge T29: licence metadata, provenance-tagged literature statements, opt-in Langfuse exporter, dev scripts, hardened legacy downloader"
     },
     {
       "id": "T22D",
@@ -648,16 +648,16 @@
       "gate": "H6",
       "status": "open",
       "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "note": "OCR engine for figures (V-05); pixi.toml and lock now carry python-multipart (d32497d), so the OCR dependency change can proceed"
     },
     {
       "id": "T31",
       "title": "Missing /v1 routes (B5)",
       "source": "plan_addenda.md A7",
       "gate": "H6",
-      "status": "open",
-      "merge_commit": null,
-      "note": "added 2026-10-30 from owner decisions (register walk-through)"
+      "status": "merged",
+      "merge_commit": "05120707e3d5f1cf9e3eb777d7df5641091b36aa",
+      "merge_commit_subject": "Merge T31/T32: missing /v1 routes and :local-only folder routes"
     },
     {
       "id": "T32",
