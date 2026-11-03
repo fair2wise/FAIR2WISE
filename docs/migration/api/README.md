@@ -162,7 +162,8 @@ release-marker entity in Tiled) a rollback is a **replacement plan whose source 
 snapshot, so v5 to v4 to v5 restores the same Tiled UUIDs. The job plans, waits for the V18 approval, imports,
 verifies, receipts and activates like any publication; the pointer moves with `action = rollback`. The pointer-only
 `Publication.rollback` (V20) would leave the Tiled marker and the pointer disagreeing, so it answers 409 `conflict`
-on such a deployment and stays valid only for importers without a marker.
+with `reason = "rollback_replacement_required"` and a message naming `rollback_replacement` (V53) on such a deployment,
+and stays valid only for importers without a marker.
 
 **Marker and pointer agree after every step (TIL-14).** Before the pointer is switched the activate stage reads the
 live release marker from Tiled; if it does not name the snapshot and plan being activated the stage quarantines and

@@ -22,6 +22,20 @@ def test_routes_exist_with_publish_capability_and_refuse_without_a_replacement_i
     assert local.ops.jobs.store.list_jobs() == []
 
 
+def test_v20_pointer_only_rollback_answers_409_with_a_stable_reason_on_a_replacement_deployment(local):
+    """Owner decision 2026-11-03: V20 returns 409 there and points callers to rollback_replacement (V53)."""
+    c = local.client()
+    body = {"target": local.target, "reason": "x"}
+    before = c.post("/v1/publications/rollback", json=body)
+    assert before.json().get("reason") is None  # without a marker the old behavior and envelope are unchanged
+    local.ops._publication().replacement = True  # the deployment keeps a release marker
+    resp = c.post("/v1/publications/rollback", json=body)
+    assert resp.status_code == 409
+    assert resp.json()["code"] == "conflict" and resp.json()["reason"] == "rollback_replacement_required"
+    assert resp.json()["retryable"] is False
+    assert "rollback_replacement" in resp.json()["message"] and "/v1/publications/rollback-replacement" in resp.json()["message"]
+
+
 def test_the_rehearsal_gate_applies_to_the_new_routes(local):
     other = "http://127.0.0.1:59871/api#other"
     c = local.client()

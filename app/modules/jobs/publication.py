@@ -53,6 +53,8 @@ from .store import JobRecord
 logger = logging.getLogger(__name__)
 
 KIND = "publish"
+#: ``ContractError.reason`` of a pointer-only rollback refused because the deployment has a release marker.
+ROLLBACK_REPLACEMENT_REQUIRED = "rollback_replacement_required"
 #: Corpus removal (retire-all) and purge are separate jobs with their own plan and approval (Q3).
 RETIRE_KIND = "corpus_retire"
 PURGE_KIND = "corpus_purge"
@@ -748,7 +750,10 @@ class Publication:
             raise ContractError(
                 ErrorCode.CONFLICT,
                 "this deployment moves a Tiled release marker with the pointer; a pointer-only rollback would "
-                "leave them disagreeing (TIL-14): use rollback_replacement",
+                "leave them disagreeing (TIL-14): use rollback_replacement "
+                "(POST /v1/publications/rollback-replacement)",
+                retryable=False,
+                reason=ROLLBACK_REPLACEMENT_REQUIRED,
             )
         return self.deps.audit.guard(
             kind="pointer_rollback",
@@ -794,4 +799,4 @@ class Publication:
         )
 
 
-__all__ = ("KIND", "OPERATION_KIND_NAMES", "OPERATION_STAGES", "PURGE_KIND", "PUBLISH_STAGES", "RETIRE_KIND", "Publication", "PublicationDeps", "default_approval_verifier", "operation_id")
+__all__ = ("ROLLBACK_REPLACEMENT_REQUIRED", "KIND", "OPERATION_KIND_NAMES", "OPERATION_STAGES", "PURGE_KIND", "PUBLISH_STAGES", "RETIRE_KIND", "Publication", "PublicationDeps", "default_approval_verifier", "operation_id")

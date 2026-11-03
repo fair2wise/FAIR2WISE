@@ -66,6 +66,8 @@ def test_pointer_only_rollback_is_refused_when_a_marker_moves_with_the_pointer(w
     with pytest.raises(ContractError) as err:
         world.pub.rollback(world.ctx, world.target, reason="toggle")
     assert err.value.code is ErrorCode.CONFLICT and "marker" in str(err.value)
+    assert err.value.reason == "rollback_replacement_required" and "rollback_replacement" in str(err.value)
+    assert err.value.retryable is False
     assert world.agree()["agree"]
 
 

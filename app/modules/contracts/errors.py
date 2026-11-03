@@ -53,11 +53,16 @@ class ContractError(Exception):
         code: The stable error code.
         message: Human-readable summary, safe to show to the caller.
         retryable: Override for the code's default retryability.
+        reason: Optional stable sub-code under ``code`` (for example ``rollback_replacement_required`` under
+            ``conflict``); the HTTP error body carries it as ``reason`` only when set, so the envelope of every
+            other error is unchanged.
     """
 
-    def __init__(self, code: ErrorCode, message: str, *, retryable: bool | None = None) -> None:
+    def __init__(self, code: ErrorCode, message: str, *, retryable: bool | None = None,
+                 reason: str | None = None) -> None:
         super().__init__(message)
         self.code = code
+        self.reason = reason
         self.retryable = code in RETRYABLE_CODES if retryable is None else retryable
 
 
