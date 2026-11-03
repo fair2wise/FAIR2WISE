@@ -25,3 +25,10 @@ Interpretation notes (agent, for the owner to correct):
 | Question | Owner answer |
 |---|---|
 | Rollback V20 (pointer-only) on replacement-importer deployments, after the plain-language explanation (return 409 and point to `rollback_replacement`, or allow) | "let's do this" / "rollback_replacement undoes the replacement properly, in order" (read as: V20 returns 409 there and callers use `rollback_replacement`) |
+
+| Question | Owner answer |
+|---|---|
+| Partial Save recovery with a foreign link | "Keep it, finish the rest" |
+| Retire-all versus purge `include_previous` | "Retire all; purge excludes previous by default (Recommended)" |
+| Who may approve a plan that adopts legacy records | "Auto-approve on :local only" (note: this relaxes the earlier safe-plan definition, which excluded legacy adoption from auto-approval; ALS stays never-auto) |
+| Move `scripts/harvest_*.py` to the hardened downloader | "Yes, move them (Recommended)" |
