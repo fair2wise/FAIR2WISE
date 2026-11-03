@@ -7,6 +7,7 @@ import { LibraryPapersTable } from './LibraryPapersTable';
 const paper = (over: Partial<LibraryPaper> = {}): LibraryPaper => ({
   id: 'p1',
   relpath: 'a.pdf',
+  folder: '',
   file_name: 'a.pdf',
   sha256: 'x',
   size_bytes: 1,
@@ -66,5 +67,20 @@ describe('LibraryPapersTable', () => {
     expect(screen.getByRole('button', { name: 'Verify a.pdf' })).toBeDisabled();
     rerender(<LibraryPapersTable papers={[paper()]} verifyingId="p1" onVerify={() => undefined} />);
     expect(screen.getByRole('button', { name: 'Verify a.pdf' })).toBeDisabled();
+  });
+
+  it('shows the top-level folder, and Uncategorized for files in the root', () => {
+    render(
+      <LibraryPapersTable
+        papers={[
+          paper({ id: 'p1', folder: 'rsoxs', relpath: 'rsoxs/2013/a.pdf' }),
+          paper({ id: 'p2', file_name: 'b.pdf', relpath: 'b.pdf' }),
+        ]}
+        verifyingId={null}
+        onVerify={() => undefined}
+      />,
+    );
+    expect(screen.getByText('rsoxs')).toHaveAttribute('title', 'rsoxs/2013/a.pdf');
+    expect(screen.getByText('Uncategorized')).toBeInTheDocument();
   });
 });

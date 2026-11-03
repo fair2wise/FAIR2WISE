@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +10,11 @@ const paper = (id: string, over: Partial<LibraryPaper> = {}): LibraryPaper => ({
   verify_status: 'unverified', verified_at: null, index_status: null, ...over,
 });
 const PAPERS = [paper('alpha'), paper('beta', { doi: '10.1/xyz' }), paper('gamma')];
+const FOLDERED = [
+  paper('r1', { folder: 'rsoxs', relpath: 'rsoxs/2013/r1.pdf' }),
+  paper('r2', { folder: 'rsoxs', relpath: 'rsoxs/r2.pdf' }),
+  paper('t1', { folder: 'tomo', relpath: 'tomo/t1.pdf' }),
+];
 
 function Harness({ disabled = false }: { disabled?: boolean }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -57,5 +62,31 @@ describe('PaperPicker', () => {
     render(<Harness disabled />);
     expect(screen.getByRole('searchbox')).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: /Title alpha/ })).toBeDisabled();
+  });
+
+  it('offers no folder filter when every paper is in one folder', () => {
+    render(<Harness />);
+    expect(screen.queryByRole('radiogroup', { name: 'Paper folder' })).not.toBeInTheDocument();
+  });
+
+  it('narrows to one folder and selects just that folder', async () => {
+    function Foldered() {
+      const [sel, setSel] = useState<Set<string>>(new Set());
+      return <PaperPicker papers={FOLDERED} selected={sel} onChange={setSel} />;
+    }
+    render(<Foldered />);
+    const group = screen.getByRole('radiogroup', { name: 'Paper folder' });
+    expect(within(group).getByRole('radio', { name: /All \(3\)/ })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(within(group).getByRole('radio', { name: /rsoxs \(2\)/ }));
+    expect(within(group).getByRole('radio', { name: /rsoxs/ })).toHaveAttribute('aria-checked', 'true');
+    expect(within(group).getByRole('radio', { name: /All/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select all shown/ }));
+    expect(screen.getByTestId('paper-count')).toHaveTextContent('2 of 3 selected');
+  });
+
+  it('disables the folder filter when disabled', () => {
+    render(<PaperPicker papers={FOLDERED} selected={new Set()} onChange={() => {}} disabled />);
+    expect(screen.getByRole('radio', { name: /tomo/ })).toBeDisabled();
   });
 });

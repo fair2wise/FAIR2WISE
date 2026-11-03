@@ -113,6 +113,15 @@ def clean_upload_name(filename: str | None) -> str:
     return raw if raw.lower().endswith(".pdf") else raw + ".pdf"
 
 
+def folder_of(relpath: str) -> str:
+    """Category of a paper: its top-level folder under the library root (``rsoxs`` for ``rsoxs/2013/x.pdf``).
+
+    Files directly in the root have no category and report ``""``.
+    """
+    parts = relpath.split("/")
+    return parts[0] if len(parts) > 1 else ""
+
+
 class LibraryService:
     """Catalog, upload and verify over one mounted papers folder (see the module docstring).
 
@@ -282,7 +291,7 @@ class LibraryService:
         verified = status == "verified"
         out: dict[str, Any] = {
             "id": row["id"], "relpath": row["relpath"], "file_name": Path(row["relpath"]).name,
-            "sha256": row["sha256"], "size_bytes": row["size"],
+            "folder": folder_of(row["relpath"]), "sha256": row["sha256"], "size_bytes": row["size"],
             "title": row.get("verified_title") if verified and row.get("verified_title") else row["title"],
             "doi": row.get("verified_doi") if verified and row.get("verified_doi") else row["doi"],
             "verify_status": status, "verified_at": _iso(row.get("verified_at")),

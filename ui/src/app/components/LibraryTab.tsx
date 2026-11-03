@@ -1,9 +1,9 @@
 import { Library, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { TERMINAL_JOB_STATES } from './extractionApi';
 import { useJob } from './extractionHooks';
-import { uploadErrorMessage } from './libraryApi';
+import { paperFolders, uploadErrorMessage } from './libraryApi';
 import {
   libraryKeys,
   useIndexLibrary,
@@ -14,6 +14,7 @@ import {
   useVerifyPaper,
 } from './libraryHooks';
 import { useQueryClient } from '@tanstack/react-query';
+import { FolderFilter } from './library/FolderFilter';
 import { LibraryDropzone } from './library/LibraryDropzone';
 import { LibraryPapersTable } from './library/LibraryPapersTable';
 import { Button } from './ui/button';
@@ -95,7 +96,12 @@ export function LibraryTab() {
     if (errors.length > 0) setUploadError(errors.join(' '));
   };
 
-  const papers = papersQuery.data?.papers ?? [];
+  const allPapers = papersQuery.data?.papers ?? [];
+  const folders = useMemo(() => paperFolders(allPapers), [allPapers]);
+  const [folder, setFolder] = useState<string | null>(null);
+  // A folder that disappeared (files removed) falls back to "All" instead of an empty table.
+  const activeFolder = folder !== null && folders.some(entry => entry.name === folder) ? folder : null;
+  const papers = activeFolder === null ? allPapers : allPapers.filter(paper => paper.folder === activeFolder);
   const busyJob = jobRunning || verifyAll.isPending || indexAll.isPending;
   const actionsDisabled = !mounted || busyJob;
   const indexedCount = status?.indexed_count ?? null;
@@ -126,7 +132,7 @@ export function LibraryTab() {
             type="button"
             variant="outline"
             size="sm"
-            disabled={actionsDisabled || papers.length === 0}
+            disabled={actionsDisabled || allPapers.length === 0}
             onClick={() => submitJob('library_verify', verifyAll)}
           >
             Verify all
@@ -134,7 +140,7 @@ export function LibraryTab() {
           <Button
             type="button"
             size="sm"
-            disabled={actionsDisabled || papers.length === 0}
+            disabled={actionsDisabled || allPapers.length === 0}
             onClick={() => submitJob('library_index', indexAll)}
           >
             Index for QA
@@ -189,6 +195,9 @@ export function LibraryTab() {
         <p role="status" className="text-sm text-muted-foreground">
           Loading papers…
         </p>
+      ) : null}
+      {mounted && folders.length > 1 ? (
+        <FolderFilter folders={folders} total={allPapers.length} value={activeFolder} onChange={setFolder} />
       ) : null}
       {mounted && papersQuery.data ? (
         <LibraryPapersTable

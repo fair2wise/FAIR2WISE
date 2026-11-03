@@ -9,7 +9,7 @@ vi.mock('sonner', () => ({
 }));
 
 const paper = (over: Record<string, unknown> = {}) => ({
-  id: 'p1', relpath: 'a.pdf', file_name: 'a.pdf', sha256: 'x', size_bytes: 1, title: 'T', doi: null,
+  id: 'p1', relpath: 'a.pdf', folder: '', file_name: 'a.pdf', sha256: 'x', size_bytes: 1, title: 'T', doi: null,
   verify_status: 'unverified', verified_at: null, index_status: null, ...over,
 });
 
@@ -49,6 +49,30 @@ describe('LibraryTab', () => {
     renderTab();
     expect(await screen.findByText('a.pdf')).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ indexed$/)).not.toBeInTheDocument();
+  });
+
+  it('groups papers by top-level folder and filters the table by one', async () => {
+    routes['GET /v1/library/papers'].body = {
+      papers: [
+        paper({ id: 'r1', file_name: 'r1.pdf', folder: 'rsoxs', relpath: 'rsoxs/r1.pdf' }),
+        paper({ id: 't1', file_name: 't1.pdf', folder: 'tomo', relpath: 'tomo/t1.pdf' }),
+      ],
+      total: 2,
+    };
+    renderTab();
+    expect(await screen.findByText('r1.pdf')).toBeInTheDocument();
+    expect(screen.getByText('t1.pdf')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /tomo \(1\)/ }));
+    expect(screen.queryByText('r1.pdf')).not.toBeInTheDocument();
+    expect(screen.getByText('t1.pdf')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /All/ }));
+    expect(screen.getByText('r1.pdf')).toBeInTheDocument();
+  });
+
+  it('hides the folder filter when there is only one folder', async () => {
+    renderTab();
+    expect(await screen.findByText('a.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Folder' })).not.toBeInTheDocument();
   });
 
   it('shows the indexed count when reported', async () => {

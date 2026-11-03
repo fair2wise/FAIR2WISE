@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { LibraryPaper } from '../libraryApi';
+import { paperFolders, type LibraryPaper } from '../libraryApi';
+import { FolderFilter } from '../library/FolderFilter';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -26,7 +27,13 @@ export function paperMatches(paper: LibraryPaper, filter: string): boolean {
  */
 export function PaperPicker({ papers, selected, onChange, disabled = false }: PaperPickerProps) {
   const [filter, setFilter] = useState('');
-  const visible = useMemo(() => papers.filter(paper => paperMatches(paper, filter)), [papers, filter]);
+  const [folder, setFolder] = useState<string | null>(null);
+  const folders = useMemo(() => paperFolders(papers), [papers]);
+  const activeFolder = folder !== null && folders.some(entry => entry.name === folder) ? folder : null;
+  const visible = useMemo(
+    () => papers.filter(paper => (activeFolder === null || paper.folder === activeFolder) && paperMatches(paper, filter)),
+    [papers, filter, activeFolder],
+  );
   const allVisible = visible.length > 0 && visible.every(paper => selected.has(paper.id));
 
   const toggle = (id: string, on: boolean) => {
@@ -46,6 +53,16 @@ export function PaperPicker({ papers, selected, onChange, disabled = false }: Pa
 
   return (
     <div className="space-y-2">
+      {folders.length > 1 && (
+        <FolderFilter
+          folders={folders}
+          total={papers.length}
+          value={activeFolder}
+          onChange={setFolder}
+          label="Paper folder"
+          disabled={disabled}
+        />
+      )}
       <div className="flex items-center gap-3">
         <Input
           type="search"
@@ -69,7 +86,7 @@ export function PaperPicker({ papers, selected, onChange, disabled = false }: Pa
           className="disabled:cursor-not-allowed disabled:opacity-50"
         />
         <Label htmlFor="select-all-papers" className="text-sm">
-          Select all{filter.trim() ? ' shown' : ''}
+          Select all{filter.trim() || activeFolder !== null ? ' shown' : ''}
         </Label>
       </div>
       <ul aria-label="Papers" className="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">

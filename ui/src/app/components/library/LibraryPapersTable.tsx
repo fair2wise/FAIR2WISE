@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import type { LibraryPaper } from '../libraryApi';
+import { folderLabel, type LibraryPaper } from '../libraryApi';
 import { Button } from '../ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { IndexStatusBadge, VerifyStatusBadge } from './LibraryStatusBadges';
@@ -27,6 +27,7 @@ export function LibraryPapersTable({ papers, verifyingId, verifyDisabled = false
     <Table aria-label="Library papers">
       <TableHeader>
         <TableRow>
+          <TableHead>Folder</TableHead>
           <TableHead>File</TableHead>
           <TableHead>Title</TableHead>
           <TableHead>DOI</TableHead>
@@ -40,6 +41,9 @@ export function LibraryPapersTable({ papers, verifyingId, verifyDisabled = false
       <TableBody>
         {papers.map(paper => (
           <TableRow key={paper.id}>
+            <TableCell className="max-w-32 truncate" title={paper.relpath}>
+              {paper.folder === '' ? <span className="text-muted-foreground">{folderLabel('')}</span> : paper.folder}
+            </TableCell>
             <TableCell className="max-w-48 truncate" title={paper.file_name}>
               {paper.file_name}
             </TableCell>

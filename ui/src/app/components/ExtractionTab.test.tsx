@@ -8,7 +8,7 @@ const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi
 vi.mock('sonner', () => ({ toast: toastMock }));
 
 const paper = (id: string) => ({
-  id, relpath: `${id}.pdf`, file_name: `${id}.pdf`, sha256: id, size_bytes: 1, title: `Title ${id}`, doi: null,
+  id, relpath: `${id}.pdf`, folder: '', file_name: `${id}.pdf`, sha256: id, size_bytes: 1, title: `Title ${id}`, doi: null,
   verify_status: 'unverified', verified_at: null, index_status: null,
 });
 const job = (state: string, extra: Record<string, unknown> = {}) => ({

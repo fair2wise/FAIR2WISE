@@ -14,7 +14,7 @@ from app.modules.contracts.errors import ContractError, ErrorCode
 from app.modules.library.catalog import paper_id
 from app.modules.library.handlers import library_handlers
 from app.modules.library.probe import ProbeResult, clean_title, isolated_probe, probe_pdf
-from app.modules.library.service import NOT_MOUNTED, LibraryService, VerifyUnavailable, clean_upload_name
+from app.modules.library.service import NOT_MOUNTED, LibraryService, VerifyUnavailable, clean_upload_name, folder_of
 from app.modules.literature.openalex import OpenAlexNoData, QuotaBreaker
 from tests.literature.lit_fakes import have_pdf_stack, local_ctx, minimal_pdf_bytes, openalex_work
 from tests.security.security_fakes import local_settings
@@ -356,3 +356,19 @@ def test_paper_facts_feed_the_t38_estimate_lookup(tmp_path):
     facts = service.paper_facts(paper["id"])
     assert (facts.id, facts.name, facts.sha256, facts.pages) == (paper["id"], "Facts.pdf", paper["sha256"], 1)  # the upload probe stored the page count
     assert service.paper_facts("0" * 16) is None
+
+
+def test_papers_report_their_top_level_folder_as_the_category(tmp_path):
+    service, lib = make(tmp_path)
+    (lib / "rsoxs" / "2013").mkdir(parents=True)
+    (lib / "tomo").mkdir()
+    (lib / "rsoxs" / "2013" / "a.pdf").write_bytes(pdf("a"))
+    (lib / "tomo" / "b.pdf").write_bytes(pdf("b"))
+    (lib / "loose.pdf").write_bytes(pdf("c"))
+    by = {p["file_name"]: p for p in service.list_papers()["papers"]}
+    assert by["a.pdf"]["folder"] == "rsoxs" and by["b.pdf"]["folder"] == "tomo" and by["loose.pdf"]["folder"] == ""
+    assert by["a.pdf"]["relpath"] == "rsoxs/2013/a.pdf"
+
+
+def test_folder_of_helper():
+    assert folder_of("a.pdf") == "" and folder_of("rsoxs/a.pdf") == "rsoxs" and folder_of("rsoxs/2013/a.pdf") == "rsoxs"

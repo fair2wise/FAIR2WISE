@@ -30,6 +30,8 @@ export interface LibraryStatus {
 export interface LibraryPaper {
   id: string;
   relpath: string;
+  /** Top-level folder under the library root (the category, e.g. `rsoxs`); `''` for files in the root. */
+  folder: string;
   file_name: string;
   sha256: string;
   size_bytes: number;
@@ -150,4 +152,26 @@ export function uploadErrorMessage(error: unknown): string {
   if (status === 413) return `File too large: ${detail}`;
   if (status === 501) return 'The papers folder is not mounted on this server.';
   return detail;
+}
+
+
+/** One category of the library: a top-level folder and how many papers it holds. */
+export interface LibraryFolder {
+  /** Folder name; `''` is the root (shown as "Uncategorized"). */
+  name: string;
+  count: number;
+}
+
+/** Display name of a folder (`''` is the root, shown as "Uncategorized"). */
+export function folderLabel(name: string): string {
+  return name === '' ? 'Uncategorized' : name;
+}
+
+/** The distinct top-level folders of `papers` with their paper counts, sorted by name (root last). */
+export function paperFolders(papers: readonly LibraryPaper[]): LibraryFolder[] {
+  const counts = new Map<string, number>();
+  for (const paper of papers) counts.set(paper.folder ?? '', (counts.get(paper.folder ?? '') ?? 0) + 1);
+  return [...counts]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => (a.name === '' ? 1 : b.name === '' ? -1 : a.name.localeCompare(b.name)));
 }
