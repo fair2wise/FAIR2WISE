@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   cancelJob,
+  continueKg,
+  isValidKgName,
   estimateExtraction,
   exportKgBundle,
   fetchExtractionModels,
@@ -51,7 +53,7 @@ describe('extractionApi', () => {
     const fetcher = respond(200, { id: 'j', kind: 'library_extract', state: 'queued' });
     await startExtraction(
       {
-        kg_name: 'kg1', continue_from: null, topic: 't', schema: 's', model: 'm',
+        name: 'kg1', continue_from: null, topic: 't', schema: 's', model: 'm',
         paper_ids: ['a'], confirmation: 'c', nonce: 'n',
       },
       asFetch(fetcher),
@@ -61,9 +63,11 @@ describe('extractionApi', () => {
     expect(url).not.toContain('settings');
     expect(JSON.parse(init.body as string)).toEqual({
       kind: 'library_extract',
-      nonce: 'n',
       inputs: {
-        kg_name: 'kg1', continue_from: null, topic: 't', schema: 's', model: 'm', paper_ids: ['a'], confirmation: 'c',
+        params: {
+          name: 'kg1', continue_from: null, topic: 't', schema: 's', model: 'm', paper_ids: ['a'],
+          confirmation: 'c', nonce: 'n',
+        },
       },
     });
   });
@@ -88,6 +92,26 @@ describe('extractionApi', () => {
     const exp = respond(200, { name: 'kg', file_name: 'matkg_kg.json' });
     await exportKgBundle('kg', asFetch(exp));
     expect(call(exp)[0]).toContain('/v1/library/kgs/kg/export');
+    expect(JSON.parse(call(exp)[1].body as string)).toEqual({ confirm: true });
+  });
+
+  it('continues a bundle or a source file', async () => {
+    const fetcher = respond(200, { name: 'child', warnings: ['w'] });
+    const res = await continueKg({ name: 'child', parent: 'kg' }, asFetch(fetcher));
+    expect(res.warnings).toEqual(['w']);
+    const [url, init] = call(fetcher);
+    expect(url).toContain('/v1/library/kgs/continue');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ name: 'child', parent: 'kg' });
+  });
+
+  it('validates KG names', () => {
+    expect(isValidKgName('kg_1-a')).toBe(true);
+    expect(isValidKgName('a'.repeat(64))).toBe(true);
+    expect(isValidKgName('a'.repeat(65))).toBe(false);
+    expect(isValidKgName('_kg')).toBe(false);
+    expect(isValidKgName('')).toBe(false);
+    expect(isValidKgName('a b')).toBe(false);
   });
 
   it('surfaces a refused export', async () => {

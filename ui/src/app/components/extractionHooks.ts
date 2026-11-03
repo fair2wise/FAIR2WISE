@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   cancelJob,
+  continueKg,
   estimateExtraction,
   EXTRACT_JOB_KIND,
   exportKgBundle,
@@ -15,6 +16,7 @@ import {
   fetchSchemas,
   startExtraction,
   TERMINAL_JOB_STATES,
+  type ContinueKgRequest,
   type EstimateRequest,
   type JobInfo,
   type StartExtractionRequest,
@@ -105,4 +107,15 @@ export function useCancelJob() {
 /** Export a bundle to the release directory. */
 export function useExportKg() {
   return useMutation({ mutationFn: (name: string) => exportKgBundle(name) });
+}
+
+/** Create a child bundle from a bundle or a plain KG file (continue an existing KG). */
+export function useContinueKg() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: ContinueKgRequest) => continueKg(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: extractionKeys.bundles });
+    },
+  });
 }

@@ -68,13 +68,27 @@ export interface KgBundleSummary {
 /** `GET /v1/library/kgs`. */
 export interface KgBundlesResponse {
   bundles: KgBundleSummary[];
+  /** Plain KG files (`*.json` in the release directory) that can be continued into a new bundle. */
+  sources: string[];
+}
+
+/** KG bundle names: a letter or digit first, then letters, digits, `_` or `-`, at most 64 characters. */
+export const KG_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/** True when `name` is an acceptable KG bundle name (the server validates again). */
+export function isValidKgName(name: string): boolean {
+  return KG_NAME_PATTERN.test(name);
 }
 
 /** One extraction schema from the registry. */
 export interface SchemaChoice {
+  /** Registry id, e.g. `matkg_schema@0.3.1`; this is what the estimate and the job take. */
   name: string;
   label: string;
   description: string | null;
+  version?: string;
+  review_status?: string;
+  sha256?: string;
 }
 
 /** `GET /v1/library/schemas`. */
@@ -88,6 +102,8 @@ export interface ModelsResponse {
   models: string[];
   source: 'live' | 'unavailable' | string;
   error: string | null;
+  /** Provider backend name (e.g. `openai`), or null. */
+  backend?: string | null;
 }
 
 /** Body of `POST /v1/library/estimate` (pages times model). */
@@ -100,24 +116,51 @@ export interface EstimateRequest {
 /** Deterministic cost estimate; `confirmation` is echoed in the start request after the user confirms. */
 export interface EstimateResponse {
   pages: number;
+  /** Number of papers estimated. */
+  paper_count?: number;
+  /** Papers whose page count is unknown (the estimate is then a lower bound). */
+  unknown_pages?: number;
   model: string;
   estimated_tokens: number | null;
   estimated_cost_usd: number | null;
   confirmation: string;
 }
 
-/** Inputs of a `library_extract` job. */
+/**
+ * `params` of a `library_extract` job (T39). Assumed names, to be reconciled with the backend job:
+ * `name`, `paper_ids`, `model`, `schema`, `topic`, `continue_from`, `confirmation`, `nonce`.
+ */
 export interface StartExtractionRequest {
-  kg_name: string;
-  /** Parent bundle when continuing an existing KG; `null` for a new KG. */
+  /** Bundle name (the new bundle; for a continuation, the child created by `continueKg`). */
+  name: string;
+  /** Parent bundle name or source KG file when continuing; `null` for a new KG. */
   continue_from: string | null;
   topic: string | null;
-  /** Locked on continuation; the server rejects a change. */
+  /** Registry id such as `matkg_schema@0.3.1`; locked on continuation. */
   schema: string;
   model: string;
+  /** T35 library paper ids. */
   paper_ids: string[];
   confirmation: string;
+  /** Makes a deliberate re-run a new job (job identity is idempotent on identical inputs). */
   nonce?: string;
+}
+
+/** Body of `POST /v1/library/kgs/continue`: `name` plus exactly one of `parent` or `source`. */
+export interface ContinueKgRequest {
+  name: string;
+  /** Parent bundle name. */
+  parent?: string;
+  /** A `*.json` KG file in the release directory (one of `KgBundlesResponse.sources`). */
+  source?: string;
+  /** Required for a `source`; a `parent` keeps its locked schema. */
+  schema?: string;
+  topic?: string;
+}
+
+/** Response of `POST /v1/library/kgs/continue`: the new bundle plus any reverse-build warnings. */
+export interface ContinueKgResponse extends KgBundleSummary {
+  warnings: string[];
 }
 
 /** `POST /v1/library/kgs/{name}/export`: where the bundle was written (inside the release directory). */
@@ -148,8 +191,11 @@ export function estimateExtraction(request: EstimateRequest, fetcher: typeof fet
 
 /** Submit a `library_extract` job. */
 export function startExtraction(request: StartExtractionRequest, fetcher: typeof fetch = fetch): Promise<JobRef> {
-  const { nonce, ...inputs } = request;
-  return v1Json<JobRef>(v1Url('/v1/jobs'), jsonBody('POST', { kind: EXTRACT_JOB_KIND, inputs, nonce }), fetcher);
+  return v1Json<JobRef>(
+    v1Url('/v1/jobs'),
+    jsonBody('POST', { kind: EXTRACT_JOB_KIND, inputs: { params: request } }),
+    fetcher,
+  );
 }
 
 /** Fetch one job. */
@@ -175,9 +221,18 @@ export function cancelJob(jobId: string, fetcher: typeof fetch = fetch): Promise
   return v1Json<JobInfo>(v1Url(`/v1/jobs/${encodeURIComponent(jobId)}/cancel`), { method: 'POST' }, fetcher);
 }
 
-/** Export a bundle to the configured release directory as `matkg_<name>.json`. */
+/** Export a bundle to the configured release directory as `matkg_<name>.json` (sends `{confirm: true}`). */
 export function exportKgBundle(name: string, fetcher: typeof fetch = fetch): Promise<ExportResult> {
-  return v1Json<ExportResult>(v1Url(`/v1/library/kgs/${encodeURIComponent(name)}/export`), { method: 'POST' }, fetcher);
+  return v1Json<ExportResult>(
+    v1Url(`/v1/library/kgs/${encodeURIComponent(name)}/export`),
+    jsonBody('POST', { confirm: true }),
+    fetcher,
+  );
+}
+
+/** Create a bundle by continuing a bundle or a plain KG file (reverse build via `kg_to_terms`). */
+export function continueKg(request: ContinueKgRequest, fetcher: typeof fetch = fetch): Promise<ContinueKgResponse> {
+  return v1Json<ContinueKgResponse>(v1Url('/v1/library/kgs/continue'), jsonBody('POST', request), fetcher);
 }
 
 /** Options of `streamJobEvents`. */
