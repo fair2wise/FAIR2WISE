@@ -53,8 +53,8 @@ describe('extractionApi', () => {
     const fetcher = respond(200, { id: 'j', kind: 'library_extract', state: 'queued' });
     await startExtraction(
       {
-        name: 'kg1', continue_from: null, topic: 't', schema: 's', model: 'm',
-        paper_ids: ['a'], confirmation: 'c', nonce: 'n',
+        bundle: 'kg1', topic: 't', schema: 's', model: 'm',
+        papers: ['a'], confirmation: 'c', nonce: 'n',
       },
       asFetch(fetcher),
     );
@@ -65,7 +65,7 @@ describe('extractionApi', () => {
       kind: 'library_extract',
       inputs: {
         params: {
-          name: 'kg1', continue_from: null, topic: 't', schema: 's', model: 'm', paper_ids: ['a'],
+          bundle: 'kg1', topic: 't', schema: 's', model: 'm', papers: ['a'],
           confirmation: 'c', nonce: 'n',
         },
       },

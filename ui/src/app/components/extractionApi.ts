@@ -127,20 +127,19 @@ export interface EstimateResponse {
 }
 
 /**
- * `params` of a `library_extract` job (T39). Assumed names, to be reconciled with the backend job:
- * `name`, `paper_ids`, `model`, `schema`, `topic`, `continue_from`, `confirmation`, `nonce`.
+ * `params` of a `library_extract` job (T39): `bundle`, `papers`, `model`, `schema`, `topic`, `confirmation`
+ * and the client's `nonce`. A continuation first creates its child bundle with `continueKg`; the job then
+ * extracts into that existing bundle, so it carries no `continue_from`.
  */
 export interface StartExtractionRequest {
-  /** Bundle name (the new bundle; for a continuation, the child created by `continueKg`). */
-  name: string;
-  /** Parent bundle name or source KG file when continuing; `null` for a new KG. */
-  continue_from: string | null;
+  /** Bundle name (a new bundle; for a continuation, the child created by `continueKg`). */
+  bundle: string;
   topic: string | null;
   /** Registry id such as `matkg_schema@0.3.1`; locked on continuation. */
   schema: string;
   model: string;
   /** T35 library paper ids. */
-  paper_ids: string[];
+  papers: string[];
   confirmation: string;
   /** Makes a deliberate re-run a new job (job identity is idempotent on identical inputs). */
   nonce?: string;

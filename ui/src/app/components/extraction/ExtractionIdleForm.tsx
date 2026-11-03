@@ -119,9 +119,7 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
   async function handleStart() {
     if (!estimated) return;
     try {
-      let continueFrom: string | null = null;
       if (continuing) {
-        continueFrom = parentBundle ? parentBundle.name : parentSource;
         const created = await continueKg.mutateAsync({
           name,
           ...(parentBundle ? { parent: parentBundle.name } : { source: parentSource ?? '', schema }),
@@ -130,12 +128,11 @@ export function ExtractionIdleForm({ onStarted }: ExtractionIdleFormProps) {
         for (const warning of created.warnings ?? []) toast.warning(warning);
       }
       const job = await start.mutateAsync({
-        name,
-        continue_from: continueFrom,
+        bundle: name,
         topic: topic.trim() || null,
         schema,
         model: selectedModel,
-        paper_ids: selectedPapers,
+        papers: selectedPapers,
         confirmation: estimated.result.confirmation,
         nonce: newNonce(),
       });

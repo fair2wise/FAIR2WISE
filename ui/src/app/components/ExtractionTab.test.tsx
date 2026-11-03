@@ -105,7 +105,7 @@ describe('ExtractionTab idle', () => {
     const post = calls.find(c => c.method === 'POST' && c.path === '/v1/jobs');
     expect(post?.body).toMatchObject({
       kind: 'library_extract',
-      inputs: { params: { name: 'new-kg', paper_ids: ['p1'], model: 'm1', schema: 'matkg_schema@0.3.1', confirmation: 'tok', continue_from: null, topic: null } },
+      inputs: { params: { bundle: 'new-kg', papers: ['p1'], model: 'm1', schema: 'matkg_schema@0.3.1', confirmation: 'tok', topic: null } },
     });
     expect(calls.some(c => c.path === '/v1/library/kgs/continue')).toBe(false);
     expect(calls.some(c => c.method === 'PUT')).toBe(false);
@@ -179,7 +179,7 @@ describe('ExtractionTab idle', () => {
     expect(calls.find(c => c.path === '/v1/library/kgs/continue')?.body).toEqual({ name: 'new-kg', parent: 'old' });
     expect(toastMock.warning).toHaveBeenCalledWith('careful');
     expect(calls.find(c => c.method === 'POST' && c.path === '/v1/jobs')?.body).toMatchObject({
-      inputs: { params: { continue_from: 'old' } },
+      inputs: { params: { bundle: 'new-kg' } },
     });
   });
 
