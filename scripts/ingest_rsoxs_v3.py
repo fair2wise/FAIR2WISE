@@ -29,7 +29,7 @@ V2_KG_FILE = ROOT / "storage/kg/matkg_rsoxs_v2.json"
 OUTPUT_FILE = ROOT / "storage/kg/matkg_rsoxs_v3.json"
 
 # ---------------------------------------------------------------------------
-# PROV-O constants (mirroring app/modules/prov.py)
+# PROV-O constants (mirroring app/modules/provenance/prov_o.py)
 # ---------------------------------------------------------------------------
 
 PROV_NS = "http://www.w3.org/ns/prov#"
