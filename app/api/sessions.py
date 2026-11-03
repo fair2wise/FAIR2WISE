@@ -50,7 +50,7 @@ import hashlib
 import logging
 import secrets
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -66,6 +66,9 @@ from ..modules.security.tiled_identity import (
 )
 from .auth import SESSION_COOKIE, AccessRuntime, current_subject
 from .origin_gate import check_browser_origin
+
+if TYPE_CHECKING:  # annotation only; als_identity_wiring imports httpx when it builds a client
+    import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -389,7 +392,7 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
     return app
 
 
-def als_identity_wiring(settings: DeploymentSettings, http_client: Any = None, *, timeout: float = 5.0,
+def als_identity_wiring(settings: DeploymentSettings, http_client: httpx.Client | None = None, *, timeout: float = 5.0,
                         **store_kwargs: Any) -> tuple[TiledWhoamiAdapter, TiledSessionStore]:
     """Return the identity port and session store for an ALS deployment, both bound to its Tiled.
 

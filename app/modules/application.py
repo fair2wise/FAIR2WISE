@@ -50,6 +50,7 @@ from .security.authorization import DeploymentSettings, local_operator_context, 
 
 if TYPE_CHECKING:
     from .agent_runtime.checkpointer import ManagedCheckpointer
+    from .security.tiled_identity import TiledCredential
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +251,7 @@ class F2WApplication:
     # -- request context -------------------------------------------------------------
 
     def context(
-        self, credential: Any = None, *, request_id: str | None = None, session_id: str | None = None,
+        self, credential: TiledCredential | str | None = None, *, request_id: str | None = None, session_id: str | None = None,
         actor_kind: ActorKind = ActorKind.INTERACTIVE, run_id: str | None = None, require_fresh: bool = False,
     ) -> RequestContext:
         """Resolve the acting context through ``security.resolve_context``.

@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 import uuid
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan
@@ -64,6 +64,9 @@ from ..modules.security.authorization import (
     target_in_deployment,
 )
 from ..modules.security.tiled_identity import TiledCredential, TiledIdentityPort, normalize_tiled_target
+
+if TYPE_CHECKING:  # annotation only; the publication job is passed in by the caller
+    from ..modules.jobs.publication import Publication
 
 Clock = Callable[[], datetime]
 
@@ -159,7 +162,7 @@ class F2WOperations:
             wiring sets it on ``:local`` only; the folder methods refuse every other profile.
     """
 
-    def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Any = None,
+    def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Publication | None = None,
                  curation: Any = None, audit: Any = None, identity_port: TiledIdentityPort | None = None,
                  publication_gate: PublicationGate | None = None, clock: Clock = _utcnow,
                  approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: Any = None,
