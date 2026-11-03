@@ -5062,24 +5062,6 @@ class AgentPipelineService:
             body = ""
         return preamble + (body or "Related retrieved nodes and technique vocabulary are on-topic, but the graph does not encode a full how-to or measurement record.")
 
-    async def _retired_deterministic_locked(
-        self,
-        question: str,
-        emit: ProgressEmitter | None,
-        *,
-        graph_source: str | None,
-        json_graph_path: str | None,
-    ) -> ChatResponse:
-        # Legacy workflow mode names are accepted by settings/configuration, but
-        # both resolve to this one canonical orchestrated implementation.
-        """Return the orchestrated ask-loop result for the retired deterministic path."""
-        return await self._ask_locked(
-            question,
-            emit,
-            graph_source=graph_source,
-            json_graph_path=json_graph_path,
-        )
-
     async def _ask_locked(
         self,
         question: str,
