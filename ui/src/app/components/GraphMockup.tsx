@@ -20,6 +20,8 @@ import {
 import { PublicationList } from './PublicationList';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import { loadAgentSettings } from './agentSettings';
+import { canEditNode } from './capabilitiesApi';
+import { useCapabilities } from './capabilitiesHooks';
 import {
   fetchGraphNeighborhood,
   fetchGraphNodeDetail,
@@ -660,7 +662,8 @@ function NodeDetailPanel({
   const [targetSearching, setTargetSearching] = useState(false);
   const [targetSearchError, setTargetSearchError] = useState<string | null>(null);
   const color = node.color;
-  const canEdit = loadAgentSettings().graphSource !== 'json';
+  const capabilities = useCapabilities();
+  const canEdit = canEditNode(loadAgentSettings().graphSource, capabilities);
 
   useEffect(() => {
     let cancelled = false;
