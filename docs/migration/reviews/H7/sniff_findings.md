@@ -1,7 +1,9 @@
 # T27 sniff-test findings (H7 review packet)
 
-Status: **survey only, no code changed.** Dispositions below are *proposed*; the owner
-confirms each as `fix`, `defer` (with owner approval) or `intentional` before H7.
+Status: **not ready for H7 review: seven `fix` rows are still open** (F1.4, F1.6, F2.4, F2.5, F3.8, F4.2 remainder,
+F5.5/F0.2 coverage figure); see the closing log entry of 2026-11-03. The owner accepted every proposed disposition
+below as written on 2026-11-03 (`owner_decisions_2026-11-03.md`, eighth set), so `fix` rows are decided fixes,
+`defer` rows are deferred with owner approval and `intentional` rows are accepted as they are.
 
 Scope: `app/` excluding `app/modules/legacy/`, `__pycache__`, `graphify-out`
 (290 files, ~86k LOC, 3,601 functions, 653 classes). Standard applied: ALS Photon Science
@@ -190,3 +192,78 @@ approximate (the "silent handler" count in particular includes legitimate fallba
   filename (no directory) used to raise `FileNotFoundError` from `os.makedirs("")` and now succeeds; no real call
   site passes one.
 - `known_pyflakes.txt` is unchanged (18 entries). Binary-case manifest hashes regenerated.
+
+### 2026-11-03: owner accepted the dispositions; closing state per row (branch `forge_merge-T27c`)
+
+The owner replied "Accept proposals as written (Recommended)" to the T27 question, so each row's proposed
+disposition is now the owner's decision. Every row was re-measured against the branch tip before this entry
+(ruff, flake8 `--select=F`, isort, mypy `--strict`, AST scans, grep); the earlier log entries were not trusted.
+
+Gates at the end of this session: `ruff check app` 0, `mypy` 0 errors in 345 files, `isort --check-only app` clean,
+`flake8 --select=F` 0 (`known_pyflakes.txt` is empty), `D`/`UP`/`PTH`/`T20` 0.
+
+Commits (all on `forge_merge-T27c`, each with the Claude co-author trailer):
+
+| Commit | Rows |
+|---|---|
+| `d8b73ee` move the six inline tests of `json2kg.py` to `tests/test_json2kg.py`; delete commented-out code in `kg_rag_api.py` | F3.4, F3.5 |
+| `a812662` all pyflakes findings cleared, `known_pyflakes.txt` emptied | F3.7 |
+| `9b040aa` isort clean (`corpus_qa.py` added to isort `extend_skip`, it is byte-pinned) | F5.3, F0.5 |
+| `6caf6bd` three untyped public defaults typed | F1.5 |
+| `b98ca0d` no silent `except: pass` left | F4.1 |
+| `5c8bd60` module loggers and logging where a handler converts a failure into a fallback | F4.3, F4.2 (part) |
+| CI commit (`ci(T27): gate ruff, isort and mypy`) | F0.1, F0.3, F0.5 |
+| `c364ff8` delete the uncalled `_retired_deterministic_locked` shim; regenerate `graph_publication.json` | F3.3 |
+
+Final state per row (fixed = done on this branch or earlier and re-verified; deferred and intentional = as accepted by
+the owner through the 2026-11-03 reply):
+
+| Row | Disposition | Final state |
+|---|---|---|
+| F0.1 mypy config | fix | fixed: `[tool.mypy]` strict, tools in the pixi `quality` feature; the CI `python-quality` job now gates `mypy` (see note 1) |
+| F0.2 coverage config | fix | fixed (config, `coverage.txt` per-module report); the full-suite figure comes from the CI coverage step, still report only |
+| F0.3 CI lint | fix | fixed: pyflakes gate against an empty baseline, ruff and isort gates added; the `E`/`W` style codes stay ungated and `build-app.yml` keeps its report-only broad flake8 pass |
+| F0.4 line length | fix | fixed (115 everywhere) |
+| F0.5 isort | fix | fixed: 0 files, gated in CI |
+| F1.1 return annotations | fix | fixed (mypy strict, 0 `no-untyped-def`) |
+| F1.2 parameter annotations | fix | fixed |
+| F1.3 legacy typing generics | fix | fixed (ruff `UP` 0) |
+| F1.4 `Any` in signatures | fix | **open**: ruff `ANN401` reports 759 signature annotations; none carries the one-line reason and the `TypedDict`/dataclass replacement for fixed shapes is not done |
+| F1.5 untyped public defaults | fix | fixed: `credential: TiledCredential \| str \| None` (`public.py`, `application.py`), `publication: Publication \| None`, `http_client: httpx.Client \| None`; a `Protocol` was not needed |
+| F1.6 suppression markers | fix | partly open: all 44 `# type: ignore` carry a code; about 47 of 127 `# noqa` lines still name a code without a reason (mostly `BLE001`, `S608`, `E402`) |
+| F2.1 function docstrings | fix | fixed (ruff `D` 0 with `D105`/`D107` ignored by project policy) |
+| F2.2 class docstrings | fix | fixed |
+| F2.3 module docstrings | fix | fixed |
+| F2.4 docstring style consistency | fix | **open**: no per-module check was made |
+| F2.5 docstring vs implementation | open | **open**: needs a human read-through |
+| F3.1 long functions | defer | deferred with owner approval; code untouched (`create_app` and `build_tools` would stay as closures if ever split) |
+| F3.2 oversized modules | defer | deferred with owner approval; code untouched (`f2w_agent/api.py` is 7,267 lines now) |
+| F3.3 dead `_retired_deterministic_locked` | fix | fixed in `c364ff8`: the 292-line body had already gone, a ten-line shim was left and is now deleted; nothing called it |
+| F3.4 tests in production modules | fix | fixed: `json2kg.py` tests moved (renamed, `test_cli` uses `monkeypatch` for `sys.argv`); `agents/properties.py` holds none any more |
+| F3.5 commented-out code | fix | fixed for `kg_rag_api.py`; `extract_terms.py` is now under `legacy/` (out of scope); the other `ERA001` hits are comment tables, not code |
+| F3.6 open TODO | defer / intentional | deferred: `term_extractor/dashboard.py:1005` (JS, event-driven `showConnection()`); the supervisor TODO is gone |
+| F3.7 pyflakes | fix | fixed: 24 findings (unused imports and assignments, an f-string without placeholders, `field` shadowed by a loop variable in four loops of `f2w_agent/api.py`); the three AUD-18 sites named in the row and F821 `history` were already gone |
+| F3.8 magic literals | open | **open**: needs a read-through |
+| F4.1 `except: pass` | fix | fixed: 25 handlers; 21 now log (debug, warning for the supervisor's audit-event emits), 5 `unlink` handlers became `unlink(missing_ok=True)`, the two `CancelledError` handlers keep their shutdown comment |
+| F4.2 return/continue-only handlers | fix after triage | partly open: 166 handlers counted; the 12 `except Exception` ones that hide a network, parser, catalog or job failure now log; about 150 typed ones (`ValueError`/`TypeError` parse fallbacks, `OSError`, `JSONDecodeError`, `ContractError`, `StoreError`) were not triaged one by one and stay as they are |
+| F4.3 `except Exception` without a logger | fix | fixed for every handler that swallows (17 modules got a module logger and a log call). Handlers that re-raise or chain (`raise X from exc`, bare `raise` after cleanup) were left alone on purpose; `_tiled_entry.py` (stdlib-only, import list pinned), `agents/chebi.py` (standalone script), `json2kg.py` and `download_pdfs.py` (already log via the root logger) were not changed |
+| F4.4 `print()` | fix | fixed (ruff `T20` 0; the three stdlib-only scripts keep `print` with a reason) |
+| F4.5 f-strings in log calls | intentional | intentional |
+| F5.1 `os.path` | fix | fixed (ruff `PTH` 0) |
+| F5.2 argparse CLIs | defer | deferred as intentional legacy; untouched |
+| F5.3 import order | fix | fixed (isort clean) |
+| F5.4 test classes | intentional | intentional |
+| F5.5 coverage | open | open until the first full-suite CI coverage figure is read against the 80% target |
+
+Notes:
+
+1. The CI gate step (ruff, isort, mypy) cannot be run here; ruff, isort and mypy were run locally with the pixi-lock
+   versions in the cached venv and are clean. mypy depends on the installed runtime packages, so the first CI run is
+   the check.
+2. Behaviour changes: none intended. Log calls were added in `except` bodies (control flow identical; messages avoid
+   provider detail in `model_catalog`, curation resolution, judge, audit-log writes, OpenAlex and paper-evidence
+   handlers by logging only the exception type). `unlink()` inside `except FileNotFoundError` became
+   `unlink(missing_ok=True)`. Loop variables renamed in `f2w_agent/api.py`. No wire format, OpenAPI document,
+   `corpus_qa.py` or `ui/` change.
+3. T27 is **not** marked ready for H7 review. Remaining `fix` rows: F1.4, F1.6, F2.4, F2.5, F3.8, the untriaged part of
+   F4.2, and the coverage figure (F0.2/F5.5). F1.4 and the read-throughs (F2.5, F3.8) are the large ones.
