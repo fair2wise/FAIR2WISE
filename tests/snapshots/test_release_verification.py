@@ -381,3 +381,14 @@ def test_snapshot_creation_records_disclosure_status_and_blocks_commit_readiness
     assert waived.manifest.disclosure.waiver_ref == "owner:ok"
     # the frozen graph is the same bytes either way: readiness never edits the payload
     assert blocked.graph_path.read_bytes() == waived.graph_path.read_bytes()
+
+
+def test_flat_allowlist_admits_legacy_names_but_not_other_flat_files():
+    """D3.24: ``matkg_<anything>.json`` flat names are allowed; other flat files and odd names are not."""
+    legacy = ["storage/kg/matkg_deepseek-r1_14b_100_20250918_095748.json", "storage/kg/matkg_Qwen3_235b_147papers.json",
+              "storage/kg/matkg_with_code.json"]
+    bad = ["storage/kg/notmatkg.json", "storage/kg/matkg_.json", "storage/kg/matkg_x.json.bak",
+           "storage/kg/matkg_a b.json", "storage/kg/sub/matkg_x.json", "storage/kg/matkg_x.v1.json",
+           "storage/kg/matkg_x.pdf", "other/matkg_x.json", "/storage/kg/matkg_x.json"]
+    assert check_paths(legacy) == []
+    assert [f.location for f in check_paths(bad)] == bad

@@ -634,9 +634,13 @@ Tool: `app/modules/graph/adoption.py`, CLI `scripts/adopt_legacy_kg.py`. Run on 
 
 Adopted files get `graph.json` (a byte copy: same sha256, not a symlink, flat file untouched), `manifest.json`
 (`legacy_adoption`, one `unknown` extraction revision, no inputs, empty source set, schema `matkg_schema`, no invented
-hash) and `validation.json`. A name that is not `matkg_<corpus>_v<N>.json` becomes corpus `<name stem>`, snapshot `v1`
-and has no `compat_paths` entry, because the R1 flat allowlist admits only `matkg_<corpus>_v<N>.json`; its flat file is
-named in a descriptor with role `legacy_flat_graph`.
+hash) and `validation.json`. A name that is not `matkg_<corpus>_v<N>.json` becomes corpus `<name stem>` (the stem
+without `matkg_`, lower-cased, other characters mapped to `-`), snapshot `v1`. **D3.24 (owner, "Extend flat allowlist to
+legacy names"):** the R1 flat allowlist now admits `storage/kg/matkg_<name>.json` for any plain name (letters, digits,
+`_`, `-`), so such a file also gets a `compat_paths` entry and its flat path keeps working; a descriptor lists it as
+`compat_copy` like any other. The six files adopted in the first run were frozen before this rule; they keep the
+manifests they have (flat file named in a descriptor with role `legacy_flat_graph`) until a new snapshot replaces
+them. Nested `graph.json` copies are still not shipped in images (`.dockerignore`).
 
 **Adopted (6):**
 

@@ -48,7 +48,9 @@ _GIT_COMMIT = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _REPO_PATH = re.compile(r"^(?!/)(?!.*\.\.)(?!.*\\)[A-Za-z0-9._/-]+$")
 _SNAPSHOT_FILE = re.compile(r"^storage/kg/([a-z0-9][a-z0-9_-]*)/(v[1-9][0-9]*)/(graph|manifest|validation)\.json$")
-_FLAT_FILE = re.compile(r"^storage/kg/matkg_([a-z0-9][a-z0-9_-]*)_(v[1-9][0-9]*)\.json$")
+# D3.24 (owner 2026-11-03): the flat allowlist admits legacy names too, ``matkg_<anything>.json`` with a plain
+# name (letters, digits, ``_``, ``-``; no dots or separators), not only ``matkg_<corpus>_v<N>.json``.
+_FLAT_FILE = re.compile(r"^storage/kg/matkg_[A-Za-z0-9][A-Za-z0-9_-]*\.json$")
 SNAPSHOT_FILES = ("graph.json", "manifest.json", "validation.json")
 
 
@@ -181,7 +183,7 @@ class DisclosureReport:
 
 
 def check_paths(paths: Iterable[str]) -> list[Finding]:
-    """R1: only ``storage/kg/<corpus>/v<N>/{graph,manifest,validation}.json`` and the flat copy are allowed."""
+    """R1: only ``storage/kg/<corpus>/v<N>/{graph,manifest,validation}.json`` and flat ``matkg_<name>.json`` copies."""
     findings: list[Finding] = []
     for raw in paths:
         path = str(raw).replace("\\", "/")

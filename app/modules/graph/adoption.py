@@ -12,10 +12,10 @@ file ``F`` becomes ``storage/kg/<corpus>/v<N>/{graph.json,manifest.json,validati
   and schema validation, R3 secrets, R4 local paths, R5 bearer URLs, R7 raw bodies; R6 is informational per O-D1).
   Nothing is allowlisted here: an R3/R4 exception is an owner-reviewed decision, passed in by the caller.
 
-Naming: ``matkg_<corpus>_v<N>.json`` maps to ``<corpus>/v<N>`` and keeps its flat file as ``compat_paths``. Any
-other legacy name becomes corpus ``<slug of the stem>``, snapshot ``v1``; its flat file is not listed in
-``compat_paths`` because the T26B R1 path allowlist only admits ``matkg_<corpus>_v<N>.json`` flat names (the byte
-identity is still checked, and a descriptor names the flat file with role ``legacy_flat_graph``).
+Naming: ``matkg_<corpus>_v<N>.json`` maps to ``<corpus>/v<N>``. Any other legacy name becomes corpus ``<slug of
+the stem>``, snapshot ``v1`` (D3.24, owner 2026-11-03: the R1 flat allowlist is extended to legacy names). In both
+cases the flat file is listed in ``compat_paths`` so the paths readers use keep working; the nested ``graph.json``
+copy is never shipped in images (``.dockerignore``).
 
 The module never runs Git for writes and never overwrites a frozen directory.
 
@@ -238,9 +238,8 @@ def adopt_legacy_flat_file(
         raise SnapshotExistsError(f"{corpus}/{snapshot_id} already exists; frozen directories are never rewritten")
 
     rel_base = f"storage/kg/{corpus}/{snapshot_id}"
-    standard_flat = bool(_FLAT_NAME.match(flat.name))
     nested_paths = [f"{rel_base}/{name}" for name in SNAPSHOT_FILES]
-    disclosure = check_disclosure(graph, paths=nested_paths + ([f"storage/kg/{flat.name}"] if standard_flat else []),
+    disclosure = check_disclosure(graph, paths=[*nested_paths, f"storage/kg/{flat.name}"],
                                   allowlist=disclosure_allowlist)
     if not disclosure.commit_ready:
         counts = Counter(f.rule for f in disclosure.findings)
@@ -267,7 +266,7 @@ def adopt_legacy_flat_file(
         corpus=corpus, snapshot_id=snapshot_id, graph_id=graph_id_for_path(flat.name),
         graph=GraphBlock(sha256=graph_sha, size_bytes=len(blob), node_count=stats["nodes"],
                          edge_count=stats["edges"], codesnippet_count=stats["snippets"]),
-        compat_paths=[CompatPath(path=f"storage/kg/{flat.name}", sha256=graph_sha)] if standard_flat else None,
+        compat_paths=[CompatPath(path=f"storage/kg/{flat.name}", sha256=graph_sha)],
         parent=Parent(snapshot_id=flat.name[:-len(".json")], graph_sha256=graph_sha, relation="legacy_adoption"),
         created=Created(at=utc_iso(now or datetime.now(UTC)), tool=ADOPTION_TOOL, code_commit=code_commit,
                         json2kg_sha256=sha256_bytes(Path(json2kg.__file__).read_bytes()), run_id=run_id,
