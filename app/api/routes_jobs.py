@@ -60,6 +60,7 @@ class PaperJobRequest(BaseModel):
     limit: int | None = Field(default=None, ge=1, le=1_000_000)
     entity_ids: list[str] | None = Field(default=None, max_length=100_000)
     topics: list[str] | None = Field(default=None, max_length=1000)
+    year_from: int | None = Field(default=None, ge=1500, le=2200)
     paper_ids: list[str] | None = Field(default=None, max_length=100_000)
     force: bool | None = None
 

@@ -24,7 +24,7 @@ import uuid
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.sqlite import OperationalDB
 from .budgets import BudgetLedger
-from .models import CaseState, ResolutionAttempt, UncertaintyCase
+from .models import CaseState, ResolutionAttempt, Route, UncertaintyCase
 
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS artifacts (id TEXT PRIMARY KEY, corpus TEXT NOT NULL, publication_id TEXT NOT "
@@ -179,6 +179,25 @@ class CurationStore:
                 {"previous_state": row["state"], "decision_invalidated": True},
             )
             return case.id, True
+
+    def enqueue_for_review(self, case: UncertaintyCase) -> tuple[str, bool]:
+        """Enqueue a case that needs no resolver: a job's proposal goes straight to the review queue.
+
+        Same identity and revision rules as :meth:`enqueue` (an unchanged proposal is not duplicated; a changed
+        one is reset and discards the stale decision). A case that is already decided or in review stays as it is.
+
+        Returns:
+            ``(case_id, created_or_reset)``.
+        """
+        case_id, changed = self.enqueue(case)
+        if changed:
+            with self.db.tx() as con:
+                con.execute(
+                    "UPDATE uncertainty_cases SET state=?, route=?, group_key=?, updated=? WHERE id=? AND state=?",
+                    (CaseState.NEEDS_REVIEW.value, Route.REVIEW.value, case_id, self.clock(), case_id,
+                     CaseState.PENDING.value),
+                )
+        return case_id, changed
 
     def _event(self, con: Any, case_id: str, corpus: str, event_type: str, payload: dict[str, Any]) -> None:
         con.execute(

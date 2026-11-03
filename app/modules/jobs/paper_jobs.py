@@ -57,6 +57,7 @@ class TopicSweepParams(_Params):
     """Parameters of a ``topic_sweep`` job: sweep a corpus for topics."""
 
     topics: list[str] = Field(default_factory=list, max_length=1000)
+    year_from: int | None = Field(default=None, ge=1500, le=2200)
 
 
 class PdfParseParams(_Params):
