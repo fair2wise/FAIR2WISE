@@ -10,6 +10,8 @@ on:
   pull_request:
     branches: [ forge_merge ]
   workflow_dispatch: {}
+  schedule:
+    - cron: "17 6 * * *"  # nightly: the full-size scale tests (job python-slow-suite)
 
 permissions:
   contents: read
@@ -66,7 +68,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
-            python -m pytest tests/contracts -q -p no:cacheprovider --junitxml=contracts.xml
+            python -m pytest tests/contracts -n auto -m "not slow" -q -p no:cacheprovider --junitxml=contracts.xml
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with: { name: contracts-junit, path: contracts.xml }
@@ -90,12 +92,12 @@ jobs:
       - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
         # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
         run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
-      - name: Full suite (failures recorded, not hidden)
+      - name: Full suite, parallel, without the slow full-size scale tests (failures recorded, not hidden)
         run: |
           mkdir -p "$RUNNER_TEMP/home"
           env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
             HF_HUB_OFFLINE=1 F2W_DOCLING_ARTIFACTS_PATH="$RUNNER_TEMP/docling" \
-            python -m pytest -q -p no:cacheprovider --junitxml=full.xml; status=$?
+            python -m pytest -n auto -m "not slow" -q -p no:cacheprovider --junitxml=full.xml; status=$?
           test -s full.xml || exit "$status"
       - name: Compare with the known-failure set (the gate)
         run: python scripts/ci/compare_known_failures.py full.xml docs/migration/reviews/H0/known_failures.json
@@ -178,10 +180,40 @@ jobs:
             F2W_TILED_PYTHON="$PWD/.pixi/envs/tiled-server/bin/python" \
             python -m pytest tests/tiled tests/graph tests/graph_import tests/security_live tests/api_v1_live \
               tests/images tests/contracts/legacy_ui/closure \
-              -q -p no:cacheprovider --junitxml=tiled.xml
+              -n auto -m "not slow" -q -p no:cacheprovider --junitxml=tiled.xml
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         if: always()
         with: { name: tiled-junit, path: tiled.xml }
+
+  python-slow-suite:
+    # The full-size variants of the scale tests (pytest.mark.slow: 60k-entity populations, a 15k-entity
+    # disposable Tiled server). Nightly and on manual dispatch only; the default jobs run -m "not slow".
+    name: Slow full-size scale tests (nightly)
+    needs: guard
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: Install pixi (pinned release, sha256-verified)
+        run: scripts/ci/install_pixi.sh
+      - name: Install the locked dev environment (pixi.lock, --locked)
+        run: |
+          pixi install --locked -e dev
+          echo "$PWD/.pixi/envs/dev/bin" >> "$GITHUB_PATH"
+      - name: Isolated Tiled 0.2.18 server environment (locked)
+        run: |
+          pixi install --locked -e tiled-server
+          "$PWD/.pixi/envs/tiled-server/bin/python" -I -c "import sys, tiled; sys.exit(tiled.__version__ != '0.2.18')"
+      - name: Slow tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          env -i PATH="$PATH" HOME="$RUNNER_TEMP/home" TMPDIR="$RUNNER_TEMP" LANG=C.UTF-8 \
+            F2W_TILED_PYTHON="$PWD/.pixi/envs/tiled-server/bin/python" \
+            python -m pytest tests/operations -n auto -m slow -q -p no:cacheprovider --junitxml=slow.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with: { name: slow-junit, path: slow.xml }
 
   import-closure:
     name: Syntax check and legacy entrypoints
