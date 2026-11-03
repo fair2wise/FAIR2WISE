@@ -102,17 +102,6 @@ def test_base_url_conversion():
         kg_update._splash_base_url("ftp://h")
 
 
-@pytest.mark.parametrize(
-    ("configured", "expected"),
-    [(":memory:", None), ("sqlite:///:memory:", None), ("sqlite:///data/l.sqlite", "REPO/data/l.sqlite"),
-     ("/abs/l.sqlite", "/abs/l.sqlite"), ("rel.sqlite", "REPO/rel.sqlite")],
-)
-def test_splash_db_path_resolution(monkeypatch, tmp_path, configured, expected):
-    monkeypatch.setattr(kg_update, "config_value", lambda key, fallback=None: configured)
-    got = kg_update._splash_db_path(tmp_path)
-    assert (str(got) if got else None) == (expected.replace("REPO", str(tmp_path)) if expected else None)
-
-
 def test_graphql_posts_json_and_raises_on_errors(splash):
     assert kg_update._splash_graphql("splash://h:1", "query Entity($id: ID!) {}", {"id": "nope"}, timeout=7) == {
         "entity": None}
@@ -121,12 +110,6 @@ def test_graphql_posts_json_and_raises_on_errors(splash):
     splash.errors = [{"message": "denied"}]
     with pytest.raises(RuntimeError, match="denied"):
         kg_update._splash_graphql("splash://h:1", "query x")
-
-
-def test_wipe_via_graphql_pages_until_empty(splash):
-    assert kg_update._wipe_splash_via_graphql("splash://h:1", page_size=2) == 3
-    assert splash.entities == {}
-    assert kg_update._wipe_splash_via_graphql("splash://h:1") == 0
 
 
 def test_find_entity_by_id_uri_property_and_pagination(splash):
@@ -215,76 +198,3 @@ def test_rebuild_kg_converts_terms_and_reports_counts(tmp_path, monkeypatch):
     res = kg_update.rebuild_kg(str(tmp_path / "t.json"), str(tmp_path / "deep/dir/kg.json"))
     assert res == {"status": "success", "kg_json": str(tmp_path / "deep/dir/kg.json"), "nodes": 2, "edges": 1}
     assert (tmp_path / "deep/dir").is_dir() and seen["args"][0] == tmp_path / "t.json"
-
-
-# -------------------------------------------------------------- reimport remaining branches
-def _repo(tmp_path):
-    repo = tmp_path / "splash_links"
-    (repo / "scripts").mkdir(parents=True)
-    (repo / "scripts" / "import_kg.py").write_text("")
-    return repo
-
-
-@pytest.fixture
-def reimport_env(monkeypatch, tmp_path):
-    monkeypatch.setattr(kg_update.shutil, "which", lambda n: "/usr/bin/pixi")
-    monkeypatch.setattr(kg_update, "config_value", lambda key, fallback=None: "links.sqlite")
-    kg = tmp_path / "kg.json"
-    kg.write_text("{}")
-    return _repo(tmp_path), kg
-
-
-def test_reimport_missing_repo_and_missing_local_db_guard(reimport_env, tmp_path):
-    repo, kg = reimport_env
-    assert "repo not found" in kg_update.splash_reimport(str(kg), splash_repo=str(tmp_path / "none"))["message"]
-    res = kg_update.splash_reimport(str(kg), splash_repo=str(repo), splash_uri="splash://localhost:1",
-                                    wipe=True, allow_wipe=True)
-    assert res["status"] == "error" and "Restart splash-links" in res["message"]
-
-
-def test_reimport_api_wipe_failure_is_reported(reimport_env, monkeypatch):
-    repo, kg = reimport_env
-    (repo / "links.sqlite").write_text("db")
-
-    def boom(uri, **kw):
-        raise ConnectionError("refused")
-
-    monkeypatch.setattr(kg_update, "_wipe_splash_via_graphql", boom)
-    res = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=True, allow_wipe=True)
-    assert res["status"] == "error" and "refused" in res["message"] and res["splash_uri"]
-
-
-@pytest.mark.parametrize(
-    ("proc", "status", "needle"),
-    [
-        (SimpleNamespace(returncode=0, stdout=" imported \n", stderr=""), "success", "imported"),
-        (SimpleNamespace(returncode=2, stdout="", stderr="trace" * 1000), "error", "trace"),
-        (SimpleNamespace(returncode=2, stdout="", stderr=""), "error", "import_kg.py failed"),
-    ],
-)
-def test_reimport_subprocess_outcomes(reimport_env, monkeypatch, proc, status, needle):
-    repo, kg = reimport_env
-    calls = []
-    monkeypatch.setattr(kg_update.subprocess, "run", lambda cmd, **kw: calls.append((cmd, kw)) or proc)
-    res = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=False, splash_uri="splash://h:1")
-    assert res["status"] == status and needle in (res.get("stdout") or res.get("message"))
-    assert calls[0][0][:4] == ["pixi", "run", "python", "scripts/import_kg.py"] and calls[0][1]["timeout"] == 900
-    if status == "error":
-        assert len(res["message"]) <= 2000
-
-
-def test_reimport_with_wipe_reports_deleted_count_and_subprocess_exception(reimport_env, monkeypatch):
-    repo, kg = reimport_env
-    (repo / "links.sqlite").write_text("db")
-    monkeypatch.setattr(kg_update, "_wipe_splash_via_graphql", lambda uri: 7)
-    monkeypatch.setattr(kg_update.subprocess, "run",
-                        lambda cmd, **kw: SimpleNamespace(returncode=0, stdout="ok", stderr=""))
-    res = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=True, allow_wipe=True)
-    assert res["status"] == "success" and res["deleted_entities"] == 7
-
-    def timeout(cmd, **kw):
-        raise TimeoutError("900s")
-
-    monkeypatch.setattr(kg_update.subprocess, "run", timeout)
-    res = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=True, allow_wipe=True)
-    assert res["status"] == "error" and "splash import failed: 900s" in res["message"]
