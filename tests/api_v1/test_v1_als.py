@@ -126,7 +126,7 @@ def test_ordinary_user_is_refused_every_privileged_action_before_effects(als, he
         ("POST", "/v1/curation/cost-approvals/appr-x/revoke", None),
         ("GET", "/v1/curation/cases", None), ("GET", "/v1/curation/summary", None),
         ("GET", "/v1/audit/status", None), ("GET", "/v1/ops/status", None),
-        # T31 (B5): cost control, bulk review and recording a scale are curation.approve
+        # T31 (B5): cost-control PUT, bulk review and recording a scale are curation.approve; the GET is jobs.admin
         ("GET", "/v1/curation/cost-control", None),
         ("PUT", "/v1/curation/cost-control", {"enabled": True, "budget_cap_usd": 5}),
         ("POST", "/v1/curation/cases/bulk-review",
@@ -314,4 +314,4 @@ def test_admin_sets_the_cost_control_with_a_fresh_role_check(als):
     als.port.tokens["token-admin"].roles = ("user",)
     refused = admin.put("/v1/curation/cost-control", json={"enabled": False, "budget_cap_usd": None})
     assert refused.status_code == 403
-    assert admin.get("/v1/curation/cost-control").status_code == 403  # the read is curation.approve too
+    assert admin.get("/v1/curation/cost-control").status_code == 403  # the read is jobs.admin: a demoted admin loses it

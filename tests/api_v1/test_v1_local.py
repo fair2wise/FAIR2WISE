@@ -328,6 +328,13 @@ def test_bulk_review_reports_one_result_per_case(local):
     assert c.post("/v1/curation/cases/bulk-review", json=too_many).status_code == 422
 
 
+def test_cost_control_get_is_jobs_admin_and_put_stays_curation_approve():
+    """Owner decision 2026-11-03: the cost-control read moved from curation.approve to jobs.admin."""
+    rows = {p.route_id: p for p in API_ROUTE_POLICIES if p.route_id in ("V32", "V33")}
+    assert rows["V32"].method == "GET" and rows["V32"].capabilities == frozenset({"jobs.admin"})
+    assert rows["V33"].method == "PUT" and rows["V33"].capabilities == frozenset({"curation.approve"})
+
+
 def test_cost_control_read_set_and_audit(local):
     """T31 (B5): the donor cborg_control switch and cap, read with the ledger spend, set under audit."""
     c = local.client()

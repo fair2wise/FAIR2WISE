@@ -408,7 +408,7 @@ class F2WOperations:
                                 target=target, payload=dict(payload), run_id=ctx.run_id, mutation=mutation)
 
     def cost_control(self, ctx: RequestContext) -> dict[str, Any]:
-        """The remote-cost switch and cap (donor ``cborg_control``) with the ledger spend against that cap.
+        """The remote-cost switch and cap (donor ``cborg_control``) with the ledger spend against that cap (``jobs.admin``).
 
         ``configured`` is false when the deployment has no control file; the switch then reads
         as disabled (fail closed, as ``read_control``). ``spend`` is the ``BudgetLedger.summary``
@@ -416,7 +416,7 @@ class F2WOperations:
         """
         from ..modules.curation.control import read_control
 
-        require(ctx, "curation.approve")
+        require(ctx, "jobs.admin")  # owner 2026-11-03: the read is jobs.admin; the PUT stays curation.approve
         control = (read_control(self.control_path) if self.control_path is not None
                    else {"enabled": False, "budget_cap_usd": None})
         spend = self.curation.ledger.summary(cap_usd=control["budget_cap_usd"]) if self.curation is not None else None
