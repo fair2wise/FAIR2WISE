@@ -121,9 +121,9 @@ class PublicRootPath:
 
 def _install_kg_library(app: FastAPI, cfg: Any, judge_settings: Any) -> None:
     """T38: KG bundle routes (``:local`` only); the model catalog is the judge setting's (one provider cache)."""
+    from . import routes_library_kgs
     from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore
     from ..modules.library.kg_service import KgLibrary
-    from . import routes_library_kgs
 
     store = BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME)
     # The estimate resolves paper ids through the T35 catalog service (built just before on :local).
@@ -209,20 +209,20 @@ def create_api_app(
     """
     from . import routes_capabilities as capabilities
     from . import routes_folders as folders
+    from . import routes_jobs as jobs
     from . import routes_library as library_routes
     from . import routes_library_harvest
-    from . import routes_jobs as jobs
     from . import routes_operations as knowledge_routes
     from . import routes_publications as publications
     from . import routes_records as records
     from . import routes_review as review
     from . import routes_status as status
     from . import routes_validation as validation
-    from .folders import FOLDER_ROOTS_ENV, FolderRoots
     from ..modules.f2w_agent.api import create_app, effective_cors_origins
     from ..modules.library import register_library_jobs
     from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
+    from .folders import FOLDER_ROOTS_ENV, FolderRoots
 
     if extraction_publisher is not None:
         cfg.extraction_publisher = extraction_publisher
@@ -265,7 +265,7 @@ def create_api_app(
         from ..modules.library.extraction import LibraryExtractor
 
         startup_env = os.environ if startup_config is None else startup_config
-        from ..modules.library.harvest import HarvestStore, Harvester
+        from ..modules.library.harvest import Harvester, HarvestStore
 
         app.state.f2w_harvest = Harvester(library_service, HarvestStore(Path(cfg.workdir) / "library" / "harvest.sqlite"))
         library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(

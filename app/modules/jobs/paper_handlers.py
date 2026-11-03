@@ -22,8 +22,8 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from itertools import combinations
 import hashlib
+from itertools import combinations
 import json
 import logging
 import re

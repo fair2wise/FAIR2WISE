@@ -31,8 +31,10 @@ import re
 from typing import Any
 
 from ..contracts.context import RequestContext
-from .licence import LicenceInfo, collect as collect_licence, licence_status as _licence_status
 from .legacy import LegacyIndex, doi_key, doi_only, looks_like_pdf
+from .licence import LicenceInfo
+from .licence import collect as collect_licence
+from .licence import licence_status as _licence_status
 from .openalex import is_quota_paused
 from .resolver_batch import title_similarity
 from .store import AssetKind, FileDocumentStore, StoreError, sha256_of

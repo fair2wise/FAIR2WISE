@@ -31,14 +31,14 @@ Exit codes: 0 success, 2 refused (the reason code is printed), 1 usage or I/O er
 from __future__ import annotations
 
 import argparse
-import json
-import sys
-from pathlib import Path
-from typing import Any
 from collections.abc import Sequence
+import json
+from pathlib import Path
+import sys
+from typing import Any
 
-from ..graph import releases
 from ..cli_output import output
+from ..graph import releases
 from ..graph.releases import ReleaseRefused, ReleaseVerificationError
 
 EXIT_OK, EXIT_ERROR, EXIT_REFUSED = 0, 1, 2

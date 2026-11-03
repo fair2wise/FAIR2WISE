@@ -40,6 +40,8 @@ from app.modules.schema.loading import closure_fingerprint, load_helper
 from app.modules.schema.registry import DEFAULT_SCHEMA_ID, SchemaEntry, SchemaRegistry
 from app.modules.schema.validation import validate_graph
 
+from .edit_journal import EditJournal
+from .edit_replay import ReplayResult, record_conflicts, replay_journal
 from .releases import (
     SNAPSHOT_FILES,
     DisclosureReport,
@@ -68,8 +70,6 @@ from .snapshot_manifest import (
     to_contract_manifest,
     utc_iso,
 )
-from .edit_journal import EditJournal
-from .edit_replay import ReplayResult, record_conflicts, replay_journal
 from .snapshots import graph_id_for_snapshot, serialize_like_json2kg
 
 logger = logging.getLogger(__name__)

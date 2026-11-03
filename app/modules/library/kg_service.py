@@ -11,10 +11,10 @@ from pathlib import Path
 import re
 from typing import Any
 
+from . import bundles as B
 from ..contracts.errors import ContractError, ErrorCode
 from ..model_catalog import CachedModelCatalog
 from ..schema.registry import SchemaRegistry
-from . import bundles as B
 from .estimate import ModelPrice, PaperFacts, PaperLookup, estimate_extraction, verify_confirmation
 from .schemas import list_schemas, manifest_block, resolve_schema
 

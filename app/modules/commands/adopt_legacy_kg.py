@@ -19,16 +19,16 @@ No Git writes, no network, no Tiled. An existing frozen directory is never overw
 from __future__ import annotations
 
 import argparse
-import json
-import sys
-from datetime import datetime
-from pathlib import Path
 from collections.abc import Sequence
+from datetime import datetime
+import json
+from pathlib import Path
+import sys
 
+from ..cli_output import output
 from ..graph import adoption
 from ..graph.releases import ReleaseVerificationError
 from ..graph.snapshot import SnapshotError
-from ..cli_output import output
 from ..resources import resource_root
 
 REPO_ROOT = resource_root() or Path.cwd()

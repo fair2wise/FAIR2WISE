@@ -11,7 +11,14 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from ..jobs.pipeline import StageContext, StageResult
-from .jobs import LIBRARY_EXTRACT_KIND, LIBRARY_HARVEST_KIND, LIBRARY_INDEX_KIND, LIBRARY_KIND_CAPABILITIES, LIBRARY_VERIFY_KIND, StageHandler
+from .jobs import (
+    LIBRARY_EXTRACT_KIND,
+    LIBRARY_HARVEST_KIND,
+    LIBRARY_INDEX_KIND,
+    LIBRARY_KIND_CAPABILITIES,
+    LIBRARY_VERIFY_KIND,
+    StageHandler,
+)
 from .service import LibraryService
 
 if TYPE_CHECKING:  # pragma: no cover

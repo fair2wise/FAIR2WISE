@@ -25,17 +25,17 @@ Usage (from repo root, Lab VPN on, human-paced):
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 import json
 import logging
 import os
+from pathlib import Path
 import shutil
 import threading
 import time
-import webbrowser
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
-from collections.abc import Sequence
+import webbrowser
 
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
 from watchdog.events import FileSystemEventHandler

@@ -23,13 +23,13 @@ Repairs applied
 
 from __future__ import annotations
 
-import json
-import re
-import unicodedata
 from collections import defaultdict
 from datetime import date
+import json
 from pathlib import Path
+import re
 from typing import Any
+import unicodedata
 
 import typer
 

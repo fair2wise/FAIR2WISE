@@ -17,6 +17,7 @@ Nothing here imports the legacy agent; ``f2w_agent.api`` imports these three hoo
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
@@ -25,7 +26,6 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from ..contracts.errors import ContractError, ErrorCode
