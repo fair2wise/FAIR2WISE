@@ -1,6 +1,7 @@
 """The harvest scripts download and look up metadata only through the hardened transport (no network).
 
-Owner decision 2026-11-03 (T17B): ``scripts/harvest_*.py`` move onto the hardened downloader. The
+Owner decision 2026-11-03 (T17B): the harvest scripts (``commands/harvest_rsoxs.py`` and ``scripts/harvest_xray.py``,
+``scripts/harvest_tomo.py``) move onto the hardened downloader. The
 transport behaviour itself is covered by ``tests/literature/test_safe_fetch.py``,
 ``tests/test_download_parity.py`` and ``tests/literature/test_legacy_download_json.py``; these tests pin
 that the scripts reach it.
@@ -18,14 +19,15 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import harvest_rsoxs as hr  # noqa: E402
 import harvest_tomo as ht  # noqa: E402
 import harvest_xray as hx  # noqa: E402
 
+from app.modules.commands import harvest_rsoxs as hr  # noqa: E402
 from app.modules.literature import legacy_download  # noqa: E402
 from app.modules.literature.safe_fetch import NetworkPolicy, SafeFetcher  # noqa: E402
 
-SCRIPTS = [ROOT / "scripts" / f"harvest_{n}.py" for n in ("rsoxs", "xray", "tomo")]
+SCRIPTS = [ROOT / "app" / "modules" / "commands" / "harvest_rsoxs.py", ROOT / "scripts" / "harvest_xray.py",
+           ROOT / "scripts" / "harvest_tomo.py"]
 PDF = b"%PDF-1.4\nbody"
 
 

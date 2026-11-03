@@ -23,7 +23,7 @@ from app.modules.operations.corpus import (
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import harvest_rsoxs  # noqa: E402
+from app.modules.commands import harvest_rsoxs  # noqa: E402
 
 from app.modules.literature.intake import filename_doi_candidates  # noqa: E402
 

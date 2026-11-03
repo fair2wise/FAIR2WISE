@@ -14,7 +14,7 @@ from app.modules.graph.releases import (
     validate_commit_candidate,
     verify_release_dependencies,
 )
-from scripts import prepare_kg_release as cli
+from app.modules.commands import prepare_kg_release as cli
 from tests.releases.conftest import REPOSITORY, terms_with
 
 PAPER = b"%PDF-1.4 synthetic alpha"

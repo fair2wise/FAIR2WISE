@@ -18,7 +18,7 @@ import pytest
 from evals.binary import reports
 from evals.binary.labeling.basis import LabelSet, PaperLabels
 from evals.binary.runner import Runner, SubjectError, main as runner_main, snapshot_subject
-from scripts import prepare_kg_release as cli
+from app.modules.commands import prepare_kg_release as cli
 from tests.evals_binary import binary_helpers as H
 from tests.releases.conftest import REPOSITORY, Fixture, make_repo, terms_with, write_json
 

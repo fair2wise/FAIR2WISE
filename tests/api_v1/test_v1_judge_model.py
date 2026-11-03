@@ -205,7 +205,7 @@ def test_no_application_path_imports_or_names_the_binary_suite():
     root = Path(__file__).resolve().parents[2]
     # T26B release promotion records an executed report's verdict (plan D17/T26B); it parses the
     # report file, never imports the suite, and never gates the running app, so it may name it.
-    release_tooling = {"app/modules/graph/releases.py", "scripts/prepare_kg_release.py"}
+    release_tooling = {"app/modules/graph/releases.py", "app/modules/commands/prepare_kg_release.py"}
     imports_evals = re.compile(r"^\s*(from|import)\s+evals\b", re.M)
     files = [p for base in ("app", "scripts", "docker", ".github") for p in (root / base).rglob("*")
              if p.is_file() and p.suffix in (".py", ".yml", ".yaml", ".sh")]

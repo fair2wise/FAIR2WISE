@@ -11,8 +11,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-import harvest_rsoxs as hv
-import paper_finder as pf
+from app.modules.commands import harvest_rsoxs as hv
+from app.modules.commands import paper_finder as pf
 
 
 def _paper(

@@ -9,7 +9,7 @@ from list_missing_rsoxs_papers import (
     collect_missing_citations,
     verify_written_against_rtf,
 )
-from harvest_rsoxs import parse_pubtemp_rtf
+from app.modules.commands.harvest_rsoxs import parse_pubtemp_rtf
 
 _MINI_RTF = r"""{\rtf1\ansi
 \pard\plain \b \qc \s18\sa180\widctlpar \f43Refereed Journal Articles (2)\b0\par

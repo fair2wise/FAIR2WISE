@@ -4,9 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-
-from harvest_rsoxs import (
+from app.modules.commands.harvest_rsoxs import (
     classify_rsoxs,
     collapse_near_duplicates,
     detect_facility,
@@ -346,7 +344,7 @@ def test_required_reviews_and_sunday_are_kg_primary():
 
 
 def test_europepmc_fallback_from_pmc_html_gate():
-    from harvest_rsoxs import _europepmc_fallback_urls
+    from app.modules.commands.harvest_rsoxs import _europepmc_fallback_urls
 
     urls = _europepmc_fallback_urls(
         [
@@ -512,7 +510,7 @@ def test_openalex_doi_resolution_prefers_repositories_then_listed_publisher_pdfs
         assert headers and headers.get("User-Agent")
         return payload
 
-    monkeypatch.setattr("harvest_rsoxs.hardened_get_json", fake_get_json)
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.hardened_get_json", fake_get_json)
     urls, arxiv_id, sources = _openalex_oa_urls_for_doi(
         "https://doi.org/10.1021/acs.macromol.8b02198",
         "researcher@example.edu",
@@ -541,7 +539,7 @@ def test_resolve_oa_pdfs_records_openalex_provenance(monkeypatch):
             ["openalex"],
         )
 
-    monkeypatch.setattr("harvest_rsoxs._openalex_oa_urls_for_doi", fake_openalex)
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs._openalex_oa_urls_for_doi", fake_openalex)
     urls, sources = _resolve_oa_pdfs(paper, mailto="dev@localhost")
     assert urls == ["https://www.osti.gov/servlets/purl/1656507"]
     assert sources == ["openalex"]
@@ -551,20 +549,20 @@ def test_resolve_oa_pdfs_records_openalex_provenance(monkeypatch):
 
 
 def _mute_extra_oa(monkeypatch):
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_osti_oa_pdfs", lambda doi: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_osti_oa_pdfs", lambda doi: ([], []))
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_core_oa_pdfs", lambda doi, api_key=None: ([], [])
+        "app.modules.commands.harvest_rsoxs.dl.fetch_core_oa_pdfs", lambda doi, api_key=None: ([], [])
     )
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
+        "app.modules.commands.harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
     )
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_unpaywall_oa_pdfs", lambda *a, **k: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_unpaywall_oa_pdfs", lambda *a, **k: ([], []))
 
 
 def test_missing_pdf_dois_skips_existing_files_and_does_not_invent(monkeypatch):
     monkeypatch.setattr(
-        "harvest_rsoxs._pdf_on_disk",
+        "app.modules.commands.harvest_rsoxs._pdf_on_disk",
         lambda paper: paper.get("doi") == "https://doi.org/10.1234/has-file",
     )
     papers = [
@@ -614,15 +612,15 @@ def test_resolve_oa_uses_s2_cache_before_per_paper_network(monkeypatch):
         called["osti"] += 1
         return [], []
 
-    monkeypatch.setattr("harvest_rsoxs._openalex_oa_urls_for_doi", fake_openalex)
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_osti_oa_pdfs", fake_osti)
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs._openalex_oa_urls_for_doi", fake_openalex)
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_osti_oa_pdfs", fake_osti)
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_core_oa_pdfs", lambda doi, api_key=None: ([], [])
+        "app.modules.commands.harvest_rsoxs.dl.fetch_core_oa_pdfs", lambda doi, api_key=None: ([], [])
     )
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
+        "app.modules.commands.harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
     )
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
     urls, sources = _resolve_oa_pdfs(
         paper, mailto="dev@localhost", s2_cache=cache
     )
@@ -644,7 +642,7 @@ def test_resolve_oa_drops_publisher_hosts_from_s2_cache(monkeypatch):
         )
     }
     monkeypatch.setattr(
-        "harvest_rsoxs._openalex_oa_urls_for_doi", lambda *a, **k: ([], None, [])
+        "app.modules.commands.harvest_rsoxs._openalex_oa_urls_for_doi", lambda *a, **k: ([], None, [])
     )
     _mute_extra_oa(monkeypatch)
     urls, sources = _resolve_oa_pdfs(paper, mailto=None, s2_cache=cache)
@@ -656,20 +654,20 @@ def test_resolve_oa_drops_publisher_hosts_from_s2_cache(monkeypatch):
 def test_resolve_oa_falls_back_to_osti_when_empty(monkeypatch):
     paper = {"doi": "https://doi.org/10.1234/osti-only", "pdf_urls": []}
     monkeypatch.setattr(
-        "harvest_rsoxs._openalex_oa_urls_for_doi", lambda *a, **k: ([], None, [])
+        "app.modules.commands.harvest_rsoxs._openalex_oa_urls_for_doi", lambda *a, **k: ([], None, [])
     )
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_osti_oa_pdfs",
+        "app.modules.commands.harvest_rsoxs.dl.fetch_osti_oa_pdfs",
         lambda doi: (["https://www.osti.gov/servlets/purl/1656507"], ["osti"]),
     )
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_core_oa_pdfs", lambda doi, api_key=None: ([], [])
+        "app.modules.commands.harvest_rsoxs.dl.fetch_core_oa_pdfs", lambda doi, api_key=None: ([], [])
     )
     monkeypatch.setattr(
-        "harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
+        "app.modules.commands.harvest_rsoxs.dl.fetch_europepmc_search_oa_pdfs", lambda doi: ([], [])
     )
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
-    monkeypatch.setattr("harvest_rsoxs.dl.fetch_unpaywall_oa_pdfs", lambda *a, **k: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_crossref_tdm_pdfs", lambda doi: ([], []))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.dl.fetch_unpaywall_oa_pdfs", lambda *a, **k: ([], []))
     urls, sources = _resolve_oa_pdfs(paper, mailto="dev@localhost")
     assert urls == ["https://www.osti.gov/servlets/purl/1656507"]
     assert sources == ["osti"]
@@ -693,7 +691,7 @@ def test_search_arxiv_retries_same_query_after_429(monkeypatch):
     from types import SimpleNamespace
 
     sleeps: list[float] = []
-    monkeypatch.setattr("harvest_rsoxs.time.sleep", lambda secs: sleeps.append(secs))
+    monkeypatch.setattr("app.modules.commands.harvest_rsoxs.time.sleep", lambda secs: sleeps.append(secs))
 
     class _FakeResult:
         pdf_url = "https://arxiv.org/pdf/2401.00001"
