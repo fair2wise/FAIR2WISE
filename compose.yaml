@@ -51,6 +51,10 @@ services:
       F2W_GRAPH: storage/kg/matkg_rsoxs_v1.json,storage/kg/matkg_bl1101_v2.json
       F2W_SCHEMA: storage/schema/rsoxs_schema.yaml
       F2W_WORKDIR: /app/runs/ui_session_rsoxs
+      # Library folder (read-write) and the directory KG exports are written to.
+      # OPENALEX_API_KEY, when set in the host .env, arrives through env_file above.
+      F2W_LIBRARY_DIR: /app/library
+      F2W_KG_RELEASE_DIR: /app/runs/kg_releases
       F2W_TRACE_ENABLED: "0"
       F2W_TRACE_DIR: /app/runs/traces
       KG_RAG_BACKEND: cborg
@@ -67,6 +71,7 @@ services:
       - ./storage/kg/matkg_bl1101_v2.json:/app/storage/kg/matkg_bl1101_v2.json:ro
       - ./storage/schema/rsoxs_schema.yaml:/app/storage/schema/rsoxs_schema.yaml:ro
       - ./storage/schema/bl1101_schema.yaml:/app/storage/schema/bl1101_schema.yaml:ro
+      - ${F2W_LIBRARY_HOST_DIR:-./papers}:/app/library
       - agent-runs:/app/runs
       - agent-cache:/app/.cache
     healthcheck:

@@ -6,7 +6,9 @@
 # stored in the container configuration, so `docker inspect` shows it to the Docker user.
 #
 # Usage: scripts/run_local_container.sh [image] [dotenv-file]
-#   env: F2W_CONTAINER_NAME (f2w-local), F2W_HOST_PORT (8080),
+#   env: OPENALEX_API_KEY (passed through when exported; not read from the dotenv file),
+#        F2W_KG_RELEASE_DIR (where KG exports are written; default on the state volume),
+#        F2W_CONTAINER_NAME (f2w-local), F2W_HOST_PORT (8080),
 #        F2W_PAPERS_DIR (the repo's papers/ folder): mounted read-only at /data/papers and
 #        offered as the one folder root (F2W_FOLDER_ROOTS) of the folder routes.
 #        F2W_LIBRARY_HOST_DIR (default: the same papers/ folder): mounted read-write at
@@ -33,6 +35,10 @@ case "$value" in \"*\") value="${value#\"}"; value="${value%\"}";; \'*\') value=
 export CBORG_API_KEY="$value"
 unset line value
 
+# OpenAlex key: only if already exported by the caller (the dotenv file is never read for it).
+openalex_args=()
+[ -z "${OPENALEX_API_KEY:-}" ] || openalex_args=(-e OPENALEX_API_KEY)
+
 docker volume create f2w-local-state >/dev/null
 docker volume create f2w-local-tiled >/dev/null
 docker rm -f "$name" >/dev/null 2>&1 || true
@@ -40,6 +46,8 @@ docker run -d --name "$name" --stop-timeout 120 \
   -p "127.0.0.1:${port}:8080" \
   -e CBORG_API_KEY \
   -e F2W_FOLDER_ROOTS=/data/papers \
+  -e "F2W_KG_RELEASE_DIR=${F2W_KG_RELEASE_DIR:-/var/lib/fair2wise/state/kg_releases}" \
+  "${openalex_args[@]}" \
   -v "$papers":/data/papers:ro \
   -v "$library":/var/lib/fair2wise/library \
   -v f2w-local-state:/var/lib/fair2wise/state \
