@@ -50,3 +50,9 @@ Interpretation notes (agent, for the owner to correct):
 | Capability for the cost-control GET | "jobs.admin" |
 | Unported enrichment / topic-sweep / PDF-parse handlers | "is that from forge or f2w?" (not decided; answered: the donor is FORGE's graph-enrichment agent, whose code is not in this repo; asked again) |
 | Rebuild and restart the local container from the current tip | "Yes, rebuild and restart" |
+
+## Seventh set
+
+| Question | Owner answer |
+|---|---|
+| Test-suite speed-up (parallel run took the suite from 40 to 10 minutes; scale tests and subprocess tests dominate) | "Also shrink the scale tests" (over "Parallel default + slow marker (Recommended)" and "Parallel only") |
