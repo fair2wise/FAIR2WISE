@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fixtures"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from import_fakes import CountingClient, FakeClock, MemoryTiled  # noqa: E402
-from tiled_server import start_tiled_instance, tiled_base, tiled_python  # noqa: E402,F401
+from tiled_server import start_tiled_instance, tiled_base, tiled_python, tiled_seeded_pool  # noqa: E402,F401
 
 from app.modules.graph.imports import corpus_scope as cs  # noqa: E402
 from app.modules.graph.imports import tiled_json as tj  # noqa: E402
@@ -145,7 +145,7 @@ class Env:
 
 
 @pytest.fixture(params=["memory", "server"])
-def env(request, tmp_path, clock, fingerprints, tiled_base):  # noqa: F811
+def env(request, tmp_path, clock, fingerprints, tiled_base, tiled_seeded_pool):  # noqa: F811
     if request.param == "memory":
         client = MemoryTiled()
         client.add_forge_sentinel()
@@ -153,9 +153,8 @@ def env(request, tmp_path, clock, fingerprints, tiled_base):  # noqa: F811
         return
     if tiled_python() is None:
         pytest.skip("F2W_TILED_PYTHON is not set (needs tiled 0.2.18)")
-    inst = start_tiled_instance(tiled_base)  # seeded: includes the FORGE sentinel entities
-    try:
-        client = CountingClient.from_managed(inst.server)
-        yield Env(client, inst.url, tmp_path, clock, fingerprints, instance=inst)
-    finally:
-        inst.destroy()
+    # One seeded server per worker, reset to the seed for every test (same state as a fresh
+    # ``start_tiled_instance(tiled_base)``: seeded, includes the FORGE sentinel entities).
+    inst = tiled_seeded_pool.acquire()
+    client = CountingClient.from_managed(inst.server)
+    yield Env(client, inst.url, tmp_path, clock, fingerprints, instance=inst)

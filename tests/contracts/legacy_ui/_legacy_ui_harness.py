@@ -491,7 +491,8 @@ def install(monkeypatch, workspace: Path, repo_root: Path) -> Ctx:
     monkeypatch.setenv("F2W_TRACE_DIR", str(workspace / "traces"))
     monkeypatch.setenv("HYBRID_RAG_LITERATURE_INDEX", str(workspace / "missing-lit-index"))
     monkeypatch.setenv("HYBRID_RAG_OPS_INDEX", str(workspace / "missing-ops-index"))
-    monkeypatch.setenv("MPLCONFIGDIR", str(workspace / "mpl"))
+    # the suite-wide cache dir (tests/conftest.py): a per-workspace one rebuilds the font cache in every test
+    monkeypatch.setenv("MPLCONFIGDIR", os.environ.get("MPLCONFIGDIR") or str(workspace / "mpl"))
     monkeypatch.setattr(socket.socket, "connect", _blocked_connect)
     monkeypatch.setattr(socket.socket, "connect_ex", _blocked_connect)
     monkeypatch.setattr(socket, "create_connection", lambda *a, **k: _blocked_connect(None, *a))

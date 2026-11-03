@@ -3,7 +3,7 @@
 #
 # Install:  pixi install --locked            (default environment: application runtime)
 #           pixi install --locked -e dev     (runtime + tests + lint/type tools)
-# Run:      pixi run test | lint | typecheck | coverage   (see [tasks])
+# Run:      pixi run test | test-full | lint | typecheck | coverage   (see [tasks])
 # Update:   edit this file, then `pixi lock` and commit pixi.lock (never hand-edit it).
 #
 # pixi.lock records the sha256 of every conda package and PyPI artifact; images and CI install
@@ -330,7 +330,11 @@ legacy = { features = ["legacy"] }
 tiled-server = { features = ["tiled-server"], no-default-feature = true }
 
 [feature.dev.tasks]
-test = "python -m pytest -q -p no:cacheprovider --ignore=tests/deepeval"
+# Parallel by default (pytest-xdist); -n is not in pytest.ini so single-test debugging and coverage stay serial.
+# test: everything except the full-size scale tests (@pytest.mark.slow); test-full: those too.
+test = "python -m pytest -n auto -m 'not slow' -q -p no:cacheprovider --ignore=tests/deepeval"
+test-full = "python -m pytest -n auto -q -p no:cacheprovider --ignore=tests/deepeval"
+test-slow = "python -m pytest -n auto -m slow -q -p no:cacheprovider --ignore=tests/deepeval"
 lint = "flake8 app --exclude=app/modules/legacy,app/graphify-out --select=F"
 
 [feature.quality.tasks]

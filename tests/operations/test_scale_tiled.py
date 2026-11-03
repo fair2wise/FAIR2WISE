@@ -7,6 +7,12 @@ literature entities (18x the legacy 800-row Tiled listing cap) plus FORGE-owned 
 that must never count. The seeder batches GraphQL mutations (500 per request) with the
 identity mapping T08B uses; it is a test helper, not the importer.
 
+Two sizes (``TILED_PROFILES``): ``small`` (1 000 entities, just above the 800-row legacy cap, in the
+default suite: seeding the server dominates the run time) and ``full`` (15 000 / 6 000 entities,
+18x the cap; ``@pytest.mark.slow``, about 5 minutes of seeding). Every assertion is the same; the
+size-dependent figures (multiple of the legacy cap, prompt-budget multiple, the large scan bound)
+come from the profile.
+
 Parity: every operation that both backends support returns the same metrics from the live
 Tiled scan as from the frozen JSON snapshot of the same population, equal to the
 builder's ground truth; ``kg_recent_entities`` (Tiled only) counts every entity while its
@@ -17,6 +23,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -87,11 +94,37 @@ def _seed(instance, graph_id, payload):
     return tiled_ids
 
 
-@pytest.fixture(scope="module")
-def live(tiled_base, tmp_path_factory):
-    payload, _truth = sp.build_graph(n_entities=15_000, n_works=600, n_edges=22_000, seed=sp.SEED + 7)
+@dataclass(frozen=True)
+class TiledProfile:
+    """Size of the seeded population."""
+
+    name: str
+    entities: int
+    works: int
+    edges: int
+    older: int  # entities in the earlier version
+    forge: int  # FORGE-owned entities (and as many FORGE links)
+    cap_multiple: float  # the live graph must exceed this many legacy listing caps
+    big_bound: int  # the second scan bound: above the entity count, below the whole population
+    prompt_scale: float  # fraction of the full population (the prompt budget is scaled with it)
+
+
+TILED_PROFILES = {
+    "small": TiledProfile("small", 1_000, 40, 1_500, 400, 40, 1.2, 1_300, 1_000 / 15_000),
+    "full": TiledProfile("full", 15_000, 600, 22_000, 6_000, 300, 18, 20_000, 1.0),
+}
+
+
+@pytest.fixture(scope="module", params=[
+    pytest.param("small", id="small"),
+    pytest.param("full", id="full", marks=pytest.mark.slow),
+])
+def live(request, tiled_base, tmp_path_factory):
+    prof = TILED_PROFILES[request.param]
+    payload, _truth = sp.build_graph(n_entities=prof.entities, n_works=prof.works, n_edges=prof.edges,
+                                     seed=sp.SEED + 7)
     full = _clean(payload)
-    older = _clean(payload, keep_entities=6_000)
+    older = _clean(payload, keep_entities=prof.older)
     root = tmp_path_factory.mktemp("t19d-tiled-json")
     full_path = sp.write_json(root / "t2.json", full)
     frozen = JsonGraphBackend({"syn_t2": full_path, "syn_t1": sp.write_json(root / "t1.json", older)})
@@ -102,16 +135,16 @@ def live(tiled_base, tmp_path_factory):
             _seed(inst, "syn_t1", older)
             forge = _batched(inst, "entity", [{"entityType": "ESAF", "name": f"FORGE record {i}",
                                                "uri": f"forge:t19d/{i}", "properties": {"owner": "forge"}}
-                                              for i in range(300)])
+                                              for i in range(prof.forge)])
             _batched(inst, "link", [{"subjectId": ids[full["things"][i]["id"]], "predicate": "forge:usedIn",
-                                     "objectId": forge[i], "properties": {"owner": "forge"}} for i in range(300)])
+                                     "objectId": forge[i], "properties": {"owner": "forge"}} for i in range(prof.forge)])
             return len(forge) * 2
 
         forge_rows = measure("tiled/seed", seed_all,
                              population=f"{len(full['things']) + len(older['things'])} entities, "
-                                        f"{len(full['associations']) + len(older['associations'])} links, 600 FORGE rows")
+                                        f"{len(full['associations']) + len(older['associations'])} links, {2 * prof.forge} FORGE rows")
         yield {"inst": inst, "frozen": frozen, "full": full, "older": older, "forge_rows": forge_rows,
-               "budget_multiple": sp.prompt_budget_multiple(full_path)}
+               "profile": prof, "budget_multiple": sp.prompt_budget_multiple(full_path, prof.prompt_scale)}
     finally:
         inst.destroy()
 
@@ -123,14 +156,15 @@ def _tiled(live, **kw):
 def test_live_statistics_equal_frozen_json_over_the_whole_graph(live):
     ctx = local_ctx()
     report = measure("kg_compute_statistics/tiled", lambda: compute_statistics(
-        _tiled(live), ctx, "syn_t2", ScanControl(UNBOUNDED)), population="15k entities, ~22k links, live paging")
+        _tiled(live), ctx, "syn_t2", ScanControl(UNBOUNDED)), population=f"{live['profile'].entities} entities, ~{live['profile'].edges} links, live paging")
     frozen = compute_statistics(live["frozen"], ctx, "syn_t2", ScanControl(UNBOUNDED))
     assert report.metrics == frozen.metrics
     full = live["full"]
-    assert report.metrics["entities"] == len(full["things"]) > 18 * LEGACY_TILED_CAP
+    assert report.metrics["entities"] == len(full["things"]) > live["profile"].cap_multiple * LEGACY_TILED_CAP
     assert report.metrics["edge_records"] == len(full["associations"])
     assert report.coverage.completeness == "complete" and report.coverage.exactness == "live_unisolated"
-    assert live["budget_multiple"] > 2  # the live graph alone would fill two 1M-token contexts
+    # the live graph alone would fill two contexts (1M tokens at full size, scaled with the population)
+    assert live["budget_multiple"] > 2
     older = live["older"]
     every_row = (len(full["things"]) + len(full["associations"]) + len(older["things"]) +
                  len(older["associations"]) + live["forge_rows"])
@@ -152,7 +186,7 @@ def test_live_growth_and_subgraph_equal_frozen_json(live):
     grow = measure("kg_compare_snapshots/tiled", lambda: compare_snapshots(
         _tiled(live), ctx, ["syn_t1", "syn_t2"], ScanControl(UNBOUNDED)))
     assert grow.metrics == compare_snapshots(live["frozen"], ctx, ["syn_t1", "syn_t2"], ScanControl(UNBOUNDED)).metrics
-    assert grow.metrics["steps"][1]["legacy_growth"]["new_entities"] == 9_000
+    assert grow.metrics["steps"][1]["legacy_growth"]["new_entities"] == len(live["full"]["things"]) - len(live["older"]["things"])
     key = live["full"]["things"][0]["source_papers"][0].rsplit("/", 1)[-1]
     sub = measure("kg_paper_subgraph/tiled", lambda: paper_subgraph(
         _tiled(live), ctx, "syn_t2", key, max_nodes=3, control=ScanControl(UNBOUNDED)))
@@ -170,8 +204,9 @@ def test_recent_entities_count_every_live_entity_while_the_preview_is_cut(live):
     assert report.coverage.completeness == "complete"
 
 
-@pytest.mark.parametrize("bound", [LEGACY_TILED_CAP, 20_000])
-def test_capped_live_scan_is_partial(live, bound):
+@pytest.mark.parametrize("which", ["legacy_cap", "large"])
+def test_capped_live_scan_is_partial(live, which):
+    bound = LEGACY_TILED_CAP if which == "legacy_cap" else live["profile"].big_bound
     report = compute_statistics(_tiled(live, page_size=250), local_ctx(), "syn_t2", ScanControl(bound))
     assert report.coverage.completeness == "partial" and report.coverage.records_scanned == bound
     assert any(f"scan bound of {bound}" in r for r in report.coverage.reasons)

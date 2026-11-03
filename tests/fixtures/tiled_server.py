@@ -268,6 +268,71 @@ def seed_catalog(instance: TiledTestInstance) -> Dict[str, Any]:
     return receipt
 
 
+class SeededServerPool:
+    """One seeded single-user server per process (an xdist worker), reset to the seed between tests.
+
+    Starting a server costs about 5 s (the Tiled import, catalog creation, readiness polling);
+    deleting every row and re-running :func:`seed_catalog` costs well under a second. A test
+    that uses :meth:`acquire` therefore sees exactly what ``start_tiled_instance(base)`` gives it
+    (a seeded catalog with the FORGE sentinel and fresh UUIDs, nothing else), without a process
+    start. ``acquire`` verifies the reset (the catalog holds the seed rows and nothing more) and a
+    server that died or was stopped by the previous test is replaced by a fresh one. Tests that
+    stop, restart, kill or destroy the server, or that need another variant (``auth=True``, a
+    fixed port, an unseeded catalog), keep using :func:`start_tiled_instance`.
+    """
+
+    def __init__(self, base: Path) -> None:
+        self.base = base
+        self.instance: Optional[TiledTestInstance] = None
+        self.starts = 0
+
+    def _usable(self) -> bool:
+        inst = self.instance
+        if inst is None or inst.server.process is None or inst.server.process.poll() is not None:
+            return False
+        return bool(lifecycle.check_health(inst.url, timeout=2.0))
+
+    def acquire(self) -> TiledTestInstance:
+        """A server in the freshly seeded state (reset, or newly started when none is usable)."""
+        if self._usable():
+            assert self.instance is not None
+            try:
+                self._reset(self.instance)
+                return self.instance
+            except Exception:  # a half-reset server is never reused
+                pass
+        self.close()
+        self.instance = start_tiled_instance(self.base)
+        self.starts += 1
+        return self.instance
+
+    def _reset(self, inst: TiledTestInstance) -> None:
+        from app.modules.graph.backends.tiled_mutations import TiledMutationClient
+
+        client = TiledMutationClient.from_managed(inst.server)
+        for kind, rows in (("deleteLink", client.scan_links()), ("deleteEntity", client.scan_entities())):
+            for start in range(0, len(rows), 200):
+                chunk = rows[start:start + 200]
+                body = " ".join(f"d{j}: {kind}(id: $i{j})" for j in range(len(chunk)))
+                decl = ", ".join(f"$i{j}: ID!" for j in range(len(chunk)))
+                inst.graphql(f"mutation({decl}) {{ {body} }}", {f"i{j}": row["id"] for j, row in enumerate(chunk)})
+        if client.scan_entities() or client.scan_links():
+            raise RuntimeError("the shared Tiled test server was not emptied")
+        inst.seed_receipt = seed_catalog(inst)
+        expected = inst.seed_receipt
+        if len(client.scan_entities()) != expected["entities"] or len(client.scan_links()) != expected["links"]:
+            raise RuntimeError("the shared Tiled test server was not reset to the seed")
+
+    def close(self) -> None:
+        """Destroy the pooled server (its root and a receipt)."""
+        inst, self.instance = self.instance, None
+        if inst is not None:
+            try:
+                inst.destroy()
+            except Exception:
+                pass
+
+
 @atexit.register
 def _stop_leftovers() -> None:  # pragma: no cover - safety net for aborted sessions
     for instance in list(_LIVE.values()):
@@ -292,6 +357,14 @@ def _managed(base: Path, **kwargs: Any) -> Iterator[TiledTestInstance]:
 def tiled_base(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Session fixture base; every instance root and receipt lives below it."""
     return tmp_path_factory.mktemp("f2w-tiled-base")
+
+
+@pytest.fixture(scope="session")
+def tiled_seeded_pool(tiled_base: Path) -> Iterator[SeededServerPool]:
+    """The per-process :class:`SeededServerPool` (one server per xdist worker, started lazily)."""
+    pool = SeededServerPool(tiled_base)
+    yield pool
+    pool.close()
 
 
 @pytest.fixture

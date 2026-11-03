@@ -1,6 +1,8 @@
 """T19D: totals are never top-k samples; truncation never changes a total; a capped scan is partial.
 
-On the large populations (``scale_population``):
+On the large populations (``scale_population``; one tenth of the full size by default, the
+full size under ``@pytest.mark.slow``: every bound below is the full-size figure reduced by
+``Profile.n``, so the ratios to the population are the same):
 
 * OPS-04: shortening the display (preview caps, smaller result bounds, ``max_nodes``,
   ``max_terms``) never changes a metric, ``coverage`` or the completeness flag, and the
@@ -87,7 +89,8 @@ def test_smaller_result_bounds_shorten_previews_only(stats, big_graph, limit):
 
 
 def test_preview_examples_are_not_the_totals(stats, big_graph):
-    assert len(stats.preview["dangling_relations"]) == 10 < stats.metrics["dangling_relations"] == 400
+    dangling = big_graph.profile.n(400)
+    assert len(stats.preview["dangling_relations"]) == 10 < stats.metrics["dangling_relations"] == dangling
     hist = stats.metrics["entities_by_category"]
     assert len(hist) == 25 < stats.metrics["category_count"] == big_graph.truth.category_count == 40
     assert sum(hist.values()) < stats.metrics["entities"]  # a top-25 histogram is not the population
@@ -127,8 +130,9 @@ def test_query_scoped_summary_keeps_the_full_count(big_session):
 
 # -- OPS-03: a capped or stopped scan is partial ---------------------------------------------------
 
-@pytest.mark.parametrize("bound", [1, 60_000, 250_000])
-def test_inline_bound_below_the_population_is_partial(big_graph, bound):
+@pytest.mark.parametrize("full_bound", [1, 60_000, 250_000])
+def test_inline_bound_below_the_population_is_partial(big_graph, full_bound):
+    bound = big_graph.profile.n(full_bound)
     truth = big_graph.truth
     total = truth.entities + truth.edge_records
     report = compute_statistics(_backend(big_graph), local_ctx(), "syn_big", ScanControl(bound))
@@ -150,9 +154,10 @@ def test_bound_equal_to_the_population_is_complete(big_graph):
 
 
 def test_inline_tool_bound_is_partial_never_ok(big_graph):
-    tool = GraphOperationsTool(_backend(big_graph), max_records=100_000)
+    bound = big_graph.profile.n(100_000)
+    tool = GraphOperationsTool(_backend(big_graph), max_records=bound)
     result = _executor(*tool.registrations()).execute(local_ctx(), TOOL_STATS, {"graph_id": "syn_big"})
-    assert result.status is ToolStatus.PARTIAL and result.data["coverage"]["records_scanned"] == 100_000
+    assert result.status is ToolStatus.PARTIAL and result.data["coverage"]["records_scanned"] == bound
     assert result.data["metrics"]["entities"] == big_graph.truth.entities  # entities read, edges cut short
     assert result.data["metrics"]["relations"] < big_graph.truth.relations
 
@@ -165,9 +170,10 @@ def test_deadline_stops_a_large_scan_as_partial(big_graph):
         ticks["n"] += 1
         return start + timedelta(milliseconds=ticks["n"])
 
-    control = ScanControl(UNBOUNDED, deadline=start + timedelta(seconds=30), clock=clock)
+    deadline_ticks = big_graph.profile.n(30_000)  # 30 s of 1 ms ticks at full size
+    control = ScanControl(UNBOUNDED, deadline=start + timedelta(milliseconds=deadline_ticks), clock=clock)
     report = compute_statistics(_backend(big_graph), local_ctx(), "syn_big", control)
-    assert report.coverage.completeness == "partial" and report.coverage.records_scanned == 29_999
+    assert report.coverage.completeness == "partial" and report.coverage.records_scanned == deadline_ticks - 1
     assert any("deadline" in r for r in report.coverage.reasons)
 
 
@@ -189,8 +195,9 @@ def test_absent_work_after_a_partial_scan_is_unknown_not_absent(big_graph):
     assert result.status is ToolStatus.UNAVAILABLE and result.retryable
 
 
-@pytest.mark.parametrize("bound", [1, 20_000])
-def test_capped_corpus_audit_is_partial_and_says_how_much(big_corpus, bound):
+@pytest.mark.parametrize("full_bound", [1, 20_000])
+def test_capped_corpus_audit_is_partial_and_says_how_much(big_corpus, full_bound):
+    bound = big_corpus.profile.n(full_bound)
     report = audit_corpus(CorpusSource("syn_big", str(big_corpus.path)), control=ScanControl(bound))
     cov = report.coverage
     assert cov.completeness == "partial" and cov.records_scanned == bound
@@ -215,8 +222,9 @@ def _admission():
 @pytest.mark.usefixtures("_admission")
 def test_job_covers_the_population_the_inline_bound_cannot(big_graph, big_corpus, tmp_path):
     truth = big_graph.truth
-    graph_tool = GraphOperationsTool(_backend(big_graph), max_records=100_000)
-    corpus_tool = CorpusAuditTool(mapping_corpus_resolver({"syn_big": str(big_corpus.path)}), max_records=10_000)
+    graph_tool = GraphOperationsTool(_backend(big_graph), max_records=big_graph.profile.n(100_000))
+    corpus_tool = CorpusAuditTool(mapping_corpus_resolver({"syn_big": str(big_corpus.path)}),
+                                  max_records=big_corpus.profile.n(10_000))
     inline = _executor(*graph_tool.registrations()).execute(local_ctx(), TOOL_STATS, {"graph_id": "syn_big"})
     assert inline.status is ToolStatus.PARTIAL
     store = JobStore(tmp_path / "jobs.sqlite3")

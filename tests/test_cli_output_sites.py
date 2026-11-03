@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -27,7 +28,8 @@ def _drain(capsys) -> tuple[str, str]:
 
 
 def _env(home: Path, **extra: str) -> dict[str, str]:
-    return {"PATH": "/usr/bin:/bin", "HOME": str(home), "F2W_DOTENV": "off", **extra}
+    return {"PATH": "/usr/bin:/bin", "HOME": str(home), "F2W_DOTENV": "off",
+            **{k: v for k, v in os.environ.items() if k == "MPLCONFIGDIR"}, **extra}
 
 
 # ── agents/chebi.py ──────────────────────────────────────────────────────────

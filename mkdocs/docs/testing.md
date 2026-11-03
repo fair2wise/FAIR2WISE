@@ -3,6 +3,31 @@
 The repository has three test surfaces: root Python tests, Splash Links tests,
 and frontend Vitest tests.
 
+## Running the tests
+
+Tests run in parallel by default (pytest-xdist, one worker per core):
+
+```bash
+pixi run -e dev test         # pytest -n auto -m "not slow": the default, fast run
+pixi run -e dev test-full    # pytest -n auto: also the full-size scale tests
+pixi run -e dev test-slow    # only the tests marked slow
+```
+
+- `-n` is deliberately not in `pytest.ini`: debug one test serially with
+  `python -m pytest path::test -p no:cacheprovider`, and run coverage without `-n`.
+- Run pytest from a clean export of the tree, not from a checkout holding a `.env`
+  (entry points load it); CI uses `env -i` with a private `HOME`.
+- Scale tests (`tests/operations/test_scale_*.py`, `test_figure_evidence.py`,
+  `test_repeated_works.py`, `test_no_code_generation.py`) run on populations one tenth of
+  the full size by default; every bound (scan bound, inline result bound, prompt budget) is scaled
+  by the same factor (`Profile.n` in `tests/operations/scale_population.py`). The full-size variants
+  carry `@pytest.mark.slow` (parameter id `full`) and run in `test-full` and in the nightly CI job.
+- Server-backed graph tests share one seeded disposable Tiled server per xdist worker
+  (`SeededServerPool` in `tests/fixtures/tiled_server.py`), reset to the seed before each test; tests that
+  stop, restart or kill a server, or need an auth/ACL variant, start their own.
+- Tests must be xdist-safe: no fixed ports, no shared fixed file paths (use `tmp_path`); a subprocess
+  with a private `HOME` should pass `MPLCONFIGDIR` through, or it rebuilds matplotlib's font cache.
+
 ## Root Python suite
 
 ```bash

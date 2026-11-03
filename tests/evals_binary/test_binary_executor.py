@@ -141,8 +141,13 @@ def test_environment_is_allow_listed():
     assert env == {"PATH": "/bin", "HOME": "/h", "F2W_TILED_PYTHON": "/t/python"}
 
 
+#: The real oracle run starts two pytest interpreters (collect, run) and imports the selected module in each;
+#: tests/evals/test_term_substring.py imports the whole agent stack (about 10 s each), this one only json/ast.
+REAL_ORACLE = "tests/migration/test_paper_scope_inventory.py"
+
+
 def test_real_subprocess_runs_a_real_oracle_test():
-    out = PytestNodeExecutor(timeout=300).run_selectors({"k": [f"{F}::test_exact_semiconductor_matches"]})["k"]
+    out = PytestNodeExecutor(timeout=300).run_selectors({"k": [f"{REAL_ORACLE}::test_summary_counts_match_rows"]})["k"]
     assert (out.execution_state, out.verdict) == ("completed", "PASS"), out.actual
 
 

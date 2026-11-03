@@ -46,8 +46,29 @@ def loopback_guard(monkeypatch: Any) -> None:
     monkeypatch.setattr(socket, "create_connection", create_connection)
 
 
-def dead_port() -> socket.socket:
-    """A bound, never-listening 127.0.0.1 socket: connections to its port are refused."""
+class _ClosedPort:
+    """Stands in for the socket :func:`dead_port` used to return (``getsockname`` / ``close``)."""
+
+    def __init__(self, port: int) -> None:
+        self._port = port
+
+    def getsockname(self) -> tuple[str, int]:
+        return ("127.0.0.1", self._port)
+
+    def close(self) -> None:
+        """Nothing to release."""
+
+
+def dead_port() -> _ClosedPort:
+    """A just-released ephemeral 127.0.0.1 port: connections to it are refused at once.
+
+    (A bound but never-listening socket is not refused on macOS: every connect waits for its
+    timeout, about 8 s each, which made the UI04 test take 30-50 s.)
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(("127.0.0.1", 0))
-    return sock
+    try:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    finally:
+        sock.close()
+    return _ClosedPort(port)
