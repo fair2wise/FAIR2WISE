@@ -49,8 +49,6 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 import numpy as np
 import openai
-
-# from nvtx import annotate
 from rapidfuzz import fuzz
 import requests
 import uvicorn
@@ -361,7 +359,6 @@ def create_fastapi_app(
         return clients[0]
 
     rag_c = Conversation(RAG_SYSTEM)
-    # base_c = Conversation(BASELINE_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file, out_dir=gaps_dir)  # disabled when the directory is read-only
 
     def _project(ctx: RequestContext, payload: dict[str, Any], sources: ModelTurnSources) -> Any:
@@ -1902,14 +1899,6 @@ async def answer(
 
 async def main_async(args: argparse.Namespace) -> None:
     """Async entry point: interactive loop, one-shot question, or competency batch."""
-    # ap = argparse.ArgumentParser()
-    # ap.add_argument("--graph", type=Path, default=GRAPH_FILE)
-    # ap.add_argument("--question", type=str, help="One-shot question, then exit")
-    # ap.add_argument("--competency", action="store_true", help="Run full competency Q set")
-    # ap.add_argument("--api", action="store_true", help="Run as FastAPI server")
-
-    # args = ap.parse_args()
-
     kg = KnowledgeGraph(str(args.graph))
     gap_tracker = MissingNodeTracker(str(args.graph))
     cli = make_chat_client(backend=args.backend, model=args.model)
