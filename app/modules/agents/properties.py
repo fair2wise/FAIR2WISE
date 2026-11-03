@@ -300,7 +300,6 @@ class PropertyNormalizer:
             raw_val = e.get("raw_value")
             raw_unit = e.get("raw_unit")
             unc = e.get("uncertainty")
-            target_unit = self.TARGET_UNITS.get(prop)
 
             norm_entry = dict(e)  # copy original fields
             norm_entry.update({

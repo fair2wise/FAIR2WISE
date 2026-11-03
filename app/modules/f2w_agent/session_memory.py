@@ -315,7 +315,6 @@ class SessionMemory:
         """Return prompt context. This is conversational memory, not evidence."""
         if not self.has_context():
             return ""
-        current_id = self.data.get("current_topic_id")
         current = self._current_topic()
         lines: list[str] = []
         summary = _clip(self.data.get("summary"), 1000)

@@ -697,8 +697,6 @@ class DownloadAgent(Agent):
         validate_downloads: bool | None = None,
     ) -> dict[str, Any]:
         """Download ranked candidates to ``target_dir`` and append JSONL records."""
-        from ..literature import download_pdfs as dl
-
         validate = self._validate_downloads if validate_downloads is None else validate_downloads
 
         target = Path(target_dir)

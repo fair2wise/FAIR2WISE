@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.validation_settings import JudgeModelService
-from .routes_common import Prefixed, context, fresh_context, project, project_dict
+from .routes_common import Prefixed, context, fresh_context, project_dict
 
 
 class JudgeModelUpdate(BaseModel):

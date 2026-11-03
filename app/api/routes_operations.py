@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.context import RequestContext
-from .routes_common import Prefixed, context, dump, fresh_context, operations, project, project_dict
+from .routes_common import Prefixed, context, dump, fresh_context, operations, project_dict
 
 
 class OperationJobRequest(BaseModel):

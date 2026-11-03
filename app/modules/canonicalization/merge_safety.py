@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from functools import lru_cache, cache
+from functools import cache
 import os
 import re
 import unicodedata
