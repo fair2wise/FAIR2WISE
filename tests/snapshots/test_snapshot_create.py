@@ -10,7 +10,7 @@ import socket
 import subprocess
 import sys
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import jsonschema
@@ -113,7 +113,7 @@ def test_manifest_binds_graph_schema_extraction_corpus_and_validation(make, stor
     revisions = [{"extractor": "extract_terms", "version": "2.1", "model": "m1", "run_ids": ["r1"]},
                  {"extractor": "extract_terms", "version": "2.1", "model": "m2"}]
     result = make(corpus="rsoxs", extraction_revisions=revisions, source_sha256=shas, run_id="run-7",
-                  profile="ci", now=datetime(2026, 10, 14, 1, 2, 3, tzinfo=timezone.utc))
+                  profile="ci", now=datetime(2026, 10, 14, 1, 2, 3, tzinfo=UTC))
     m = result.manifest
     graph_sha = _sha(result.graph_path)
     assert (m.graph.sha256, m.graph.size_bytes) == (graph_sha, result.graph_path.stat().st_size)
