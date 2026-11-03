@@ -107,10 +107,11 @@ jobs:
 
   python-quality:
     # T27 (docs/migration/reviews/H7/sniff_findings.md): measures typing, docstring, pathlib,
-    # print, import-order and coverage findings. Report only: every tool step tolerates its own
-    # failure so the numbers are always produced; promote a step to a gate once its count is 0.
+    # print, import-order and coverage findings. The report steps tolerate their own failure so the
+    # numbers are always produced; ruff, isort and mypy are at 0 and the gate step below keeps them there
+    # (it runs after the reports and the artifact is uploaded either way). Coverage stays report only.
     # Configuration lives in pyproject.toml; tool versions are locked in pixi.lock (feature `quality`).
-    name: Code quality report (T27, not gating)
+    name: Code quality (T27: ruff, isort, mypy gate; coverage reported)
     needs: guard
     runs-on: ubuntu-latest
     steps:
@@ -130,6 +131,11 @@ jobs:
           echo "isort files needing changes: $(grep -c '^ERROR' quality/isort.txt || true)"
       - name: Types (mypy --strict)
         run: mypy 2>&1 | tee quality/mypy.txt | tail -n 3 || true
+      - name: Gate (ruff, isort and mypy --strict are at 0 findings)
+        run: |
+          ruff check app
+          isort --check-only app
+          mypy
       - name: Docling model weights (pinned commits, scripts/fetch_docling_models.py)
         # Not in the repo or the lock: the parser tests that run real Docling conversions read them from here.
         run: python scripts/fetch_docling_models.py --dest "$RUNNER_TEMP/docling"
