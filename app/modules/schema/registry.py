@@ -176,7 +176,7 @@ ENTRYPOINT_DEFAULTS: tuple[EntrypointDefault, ...] = (
     EntrypointDefault("agent-backend-script", "scripts/start_agent_backend.sh",
                       'SCHEMA="${F2W_SCHEMA:-storage/schema/matkg_schema.yaml}"',
                       "matkg_schema", "env", NORMALIZER_TERM_EXTRACTOR),
-    EntrypointDefault("scripts-run", "scripts/run.py", '"--schema", default="storage/schema/matkg_schema.yaml"',
+    EntrypointDefault("scripts-run", "app/modules/commands/run.py", '"--schema", default="storage/schema/matkg_schema.yaml"',
                       "matkg_schema", "default", NORMALIZER_TERM_EXTRACTOR),
     EntrypointDefault("f2w-agent-cli", "app/modules/f2w_agent/cli.py",
                       'p.add_argument("--schema", default="storage/schema/matkg_schema.yaml")',

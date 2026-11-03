@@ -6233,7 +6233,7 @@
    "donor": null,
    "task_graph_owners": [],
    "f2w_locations": [
-    "app/modules/extract_terms.py",
+    "app/modules/legacy/extract_terms_cli.py",
     "app/modules/term_extractor/",
     "app/modules/extraction/strategies/legacy_f2w.py"
    ],
@@ -6298,7 +6298,7 @@
    "donor": null,
    "task_graph_owners": [],
    "f2w_locations": [
-    "app/modules/prov.py"
+    "app/modules/provenance/prov_o.py"
    ],
    "tests": [
     "tests/test_prov.py"
