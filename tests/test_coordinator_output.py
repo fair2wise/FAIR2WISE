@@ -100,7 +100,7 @@ def _coord(tmp_path, **cfg):
 @pytest.fixture(autouse=True)
 def _kg(monkeypatch):
     monkeypatch.setattr(coord_mod.kg_update, "rebuild_kg", lambda t, k: {"nodes": 4, "edges": 5})
-    monkeypatch.setattr(coord_mod.kg_update, "splash_reimport",
+    monkeypatch.setattr(coord_mod.kg_update, "publish_extraction",
                         lambda *a, **k: {"status": "ok", "db_path": "/x/db"})
 
 
@@ -220,7 +220,7 @@ def test_legacy_reload_fallback_and_splash(tmp_path, capsys):
 
 
 def test_legacy_splash_no_db_note_and_error(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr(coord_mod.kg_update, "splash_reimport", lambda *a, **k: {"status": "error"})
+    monkeypatch.setattr(coord_mod.kg_update, "publish_extraction", lambda *a, **k: {"status": "error"})
     _legacy(tmp_path, capsys, HEAD + TAIL + "[round 1] splash reimport: error\n"
             "[stop] splash reimport failed: {'status': 'error'}\n", [OK], kg_mode="splash")
 
@@ -228,7 +228,7 @@ def test_legacy_splash_no_db_note_and_error(tmp_path, capsys, monkeypatch):
 def test_legacy_splash_exception(tmp_path, capsys, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("sp")
-    monkeypatch.setattr(coord_mod.kg_update, "splash_reimport", boom)
+    monkeypatch.setattr(coord_mod.kg_update, "publish_extraction", boom)
     _legacy(tmp_path, capsys, HEAD + TAIL + "[stop] splash reimport failed: sp\n", [OK], kg_mode="splash")
 
 
@@ -372,10 +372,10 @@ def test_agentic_rebuild_splash_reload_failures(tmp_path, capsys, monkeypatch):
     _ag(tmp_path / "a", capsys, pre + "[stop] KG rebuild failed: bb\n", [OK], Debate(SEL), **kw)
     monkeypatch.setattr(coord_mod.kg_update, "rebuild_kg", lambda t, k: {"nodes": 4, "edges": 5})
     kb = pre + "[round 1] KG rebuilt: 4 nodes, 5 edges\n"
-    monkeypatch.setattr(coord_mod.kg_update, "splash_reimport", boom)
+    monkeypatch.setattr(coord_mod.kg_update, "publish_extraction", boom)
     _ag(tmp_path / "b", capsys, kb + "[stop] splash reimport failed: bb\n", [OK], Debate(SEL),
         kg_mode="splash", **kw)
-    monkeypatch.setattr(coord_mod.kg_update, "splash_reimport", lambda *a, **k: {"status": "error", "message": "em"})
+    monkeypatch.setattr(coord_mod.kg_update, "publish_extraction", lambda *a, **k: {"status": "error", "message": "em"})
     _ag(tmp_path / "c", capsys, kb + "[round 1] splash reimport: error\n[stop] splash reimport failed: em\n",
         [OK], Debate(SEL), kg_mode="splash", **kw)
     _ag(tmp_path / "d", capsys, kb + "[stop] KG reload failed: rl\n", None, Debate(SEL),

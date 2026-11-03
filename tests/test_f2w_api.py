@@ -1771,7 +1771,7 @@ def test_agentic_path_downloads_only_approved_candidate_then_answers(tmp_path, m
     monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
     monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
     monkeypatch.setattr(api_mod.kg_update, "rebuild_kg", fake_rebuild)
-    monkeypatch.setattr(api_mod.kg_update, "splash_reimport", lambda *args, **kwargs: {"status": "success"})
+    monkeypatch.setattr(api_mod.kg_update, "publish_extraction", lambda *args, **kwargs: {"status": "success"})
 
     service = api_mod.AgentPipelineService(
         CoordinatorConfig(
@@ -2017,7 +2017,7 @@ def test_agentic_targeted_extraction_records_partial_manifest(tmp_path, monkeypa
     monkeypatch.setattr(api_mod, "ExtractorAgent", AgenticExtractor)
     monkeypatch.setattr(api_mod, "EvidenceDebateAgent", AgenticDebate)
     monkeypatch.setattr(api_mod.kg_update, "rebuild_kg", fake_rebuild)
-    monkeypatch.setattr(api_mod.kg_update, "splash_reimport", lambda *args, **kwargs: {"status": "success"})
+    monkeypatch.setattr(api_mod.kg_update, "publish_extraction", lambda *args, **kwargs: {"status": "success"})
 
     service = api_mod.AgentPipelineService(
         CoordinatorConfig(

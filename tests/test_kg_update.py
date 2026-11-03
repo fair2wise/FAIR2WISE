@@ -1,111 +1,49 @@
+"""``kg_update``: the Splash wipe path is retired (T18E, owner decision Q11) and publication replaces it.
+
+The last binary known failure (``test_splash_reimport_refuses_wipe_without_explicit_allow``) is retired by
+``test_the_splash_wipe_path_no_longer_exists``.
+"""
+import re
 from pathlib import Path
 
-from app.modules.f2w_agent import kg_update
+from app.modules.f2w_agent import cli, coordinator, kg_update
+
+REPO = Path(__file__).resolve().parents[1]
 
 
-def _splash_repo(tmp_path):
-    repo = tmp_path / "splash_links"
-    scripts = repo / "scripts"
-    scripts.mkdir(parents=True)
-    (scripts / "import_kg.py").write_text("print('import')\n")
-    return repo
+def test_the_splash_wipe_path_no_longer_exists():
+    for name in ("splash_reimport", "_wipe_splash_via_graphql", "_splash_db_path", "_splash_is_local"):
+        assert not hasattr(kg_update, name), name
+    assert "allow_splash_wipe" not in coordinator.CoordinatorConfig.__dataclass_fields__
+    assert "--allow-splash-wipe" not in cli.build_parser().format_help()
+    # A mutation that deletes Splash entities is not defined anywhere in the module either.
+    assert "deleteEntity" not in Path(kg_update.__file__).read_text(encoding="utf-8")
 
 
-def test_splash_reimport_refuses_wipe_without_explicit_allow(tmp_path):
-    repo = _splash_repo(tmp_path)
-    db = repo / "links.sqlite"
-    db.write_text("old db")
-    kg = tmp_path / "kg.json"
-    kg.write_text('{"things": [], "associations": []}')
-
-    result = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=True, allow_wipe=False)
-
-    assert result["status"] == "error"
-    assert "--allow-splash-wipe" in result["message"]
-    assert result["db_path"] == str(db)
-    assert db.read_text() == "old db"
+def test_no_image_script_or_doc_entrypoint_passes_the_wipe_flag():
+    scripts = [p for p in (REPO / "scripts").rglob("*") if p.is_file()]
+    scripts += [REPO / "Dockerfile", REPO / "compose.yaml", REPO / "docker-compose.yml"]
+    scripts += [p for p in (REPO / "docker").rglob("*") if p.is_file()]
+    hits = [str(p.relative_to(REPO)) for p in scripts
+            if re.search(r"allow[-_]splash[-_]wipe|ALLOW_SPLASH_WIPE", p.read_text(encoding="utf-8", errors="ignore"),
+                         re.IGNORECASE)]
+    assert hits == []
+    assert not (REPO / "scripts" / "wipe_splash_db.sh").exists()
+    assert not (REPO / "scripts" / "reimport_merged_kg.sh").exists()
 
 
-def test_splash_reimport_validates_import_script(tmp_path):
-    repo = tmp_path / "splash_links"
-    repo.mkdir()
-    kg = tmp_path / "kg.json"
-    kg.write_text('{"things": [], "associations": []}')
-
-    result = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=False)
-
-    assert result["status"] == "error"
-    assert "import script not found" in result["message"]
+def test_publish_extraction_without_a_publisher_publishes_and_deletes_nothing():
+    result = kg_update.publish_extraction("terms.json")
+    assert result["status"] == "skipped" and "not re-imported" in result["message"]
 
 
-def test_splash_reimport_reports_db_path_when_pixi_missing(tmp_path, monkeypatch):
-    repo = _splash_repo(tmp_path)
-    db = repo / "links.sqlite"
-    db.write_text("old db")
-    kg = tmp_path / "kg.json"
-    kg.write_text('{"things": [], "associations": []}')
-    monkeypatch.setattr(kg_update.shutil, "which", lambda name: None)
+def test_publish_extraction_hands_the_terms_and_caller_to_the_publisher():
+    seen = []
 
-    result = kg_update.splash_reimport(str(kg), splash_repo=str(repo), wipe=True, allow_wipe=True)
+    class Publisher:
+        def publish(self, ctx, terms):
+            seen.append((ctx, terms))
+            return {"status": "awaiting_review", "message": "m"}
 
-    assert result["status"] == "error"
-    assert result["message"] == "pixi not found on PATH"
-    assert result["db_path"] == str(db)
-    assert db.exists()
-
-
-def test_splash_reimport_wipes_through_api_not_sqlite_unlink(tmp_path, monkeypatch):
-    repo = _splash_repo(tmp_path)
-    db = repo / "links.sqlite"
-    db.write_text("old db")
-    kg = tmp_path / "kg.json"
-    kg.write_text('{"things": [], "associations": []}')
-    calls = []
-
-    class Proc:
-        returncode = 0
-        stdout = "imported"
-        stderr = ""
-
-    monkeypatch.setattr(kg_update.shutil, "which", lambda name: "/usr/bin/pixi")
-    monkeypatch.setattr(kg_update, "_wipe_splash_via_graphql", lambda uri: calls.append(uri) or 7)
-    monkeypatch.setattr(kg_update.subprocess, "run", lambda *args, **kwargs: Proc())
-
-    result = kg_update.splash_reimport(
-        str(kg),
-        splash_repo=str(repo),
-        splash_uri="splash://localhost:8081",
-        wipe=True,
-        allow_wipe=True,
-    )
-
-    assert result["status"] == "success"
-    assert result["deleted_entities"] == 7
-    assert calls == ["splash://localhost:8081"]
-    assert db.read_text() == "old db"
-
-
-def test_splash_reimport_reports_missing_live_sqlite_handle(tmp_path, monkeypatch):
-    repo = _splash_repo(tmp_path)
-    db = repo / "links.sqlite"
-    kg = tmp_path / "kg.json"
-    kg.write_text('{"things": [], "associations": []}')
-
-    monkeypatch.setattr(kg_update.shutil, "which", lambda name: "/usr/bin/pixi")
-    monkeypatch.setattr(
-        kg_update,
-        "_wipe_splash_via_graphql",
-        lambda uri: (_ for _ in ()).throw(AssertionError("wipe should not run")),
-    )
-
-    result = kg_update.splash_reimport(
-        str(kg),
-        splash_repo=str(repo),
-        splash_uri="splash://localhost:8081",
-        wipe=True,
-        allow_wipe=True,
-    )
-
-    assert result["status"] == "error"
-    assert "DB file is missing" in result["message"]
-    assert result["db_path"] == str(db)
+    result = kg_update.publish_extraction("terms.json", publisher=Publisher(), ctx="caller")
+    assert result == {"status": "awaiting_review", "message": "m"} and seen == [("caller", "terms.json")]

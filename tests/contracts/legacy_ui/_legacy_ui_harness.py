@@ -378,7 +378,9 @@ def _install_splash_fakes(monkeypatch, ctx: Ctx, kg_update) -> None:
         Path(kg).write_text(json.dumps(data), encoding="utf-8")
         return {"status": "success", "nodes": len(data["things"]), "edges": len(data["associations"])}
 
-    def splash_reimport(*args, **kwargs):
+    def publish_extraction(*args, **kwargs):
+        # T18E: the post-extraction publication replaced splash_reimport; the recorded call-count key keeps its
+        # frozen name (fixtures/index.json, the e2e specs) so the contract's counts do not move.
         ctx.bump("kg_update.splash_reimport")
         return {"status": "success"}
 
@@ -390,7 +392,7 @@ def _install_splash_fakes(monkeypatch, ctx: Ctx, kg_update) -> None:
     monkeypatch.setattr(kg_update, "splash_delete_link", delete_link)
     monkeypatch.setattr(kg_update, "load_splash_graph", load_splash_graph)
     monkeypatch.setattr(kg_update, "rebuild_kg", rebuild_kg)
-    monkeypatch.setattr(kg_update, "splash_reimport", splash_reimport)
+    monkeypatch.setattr(kg_update, "publish_extraction", publish_extraction)
 
 
 class FakePlanner:
@@ -698,7 +700,7 @@ def flows() -> Dict[str, Dict[str, Any]]:
                 ("chat_action_stream_extraction_yes", "POST", "/chat/action/stream",
                  {"json": {"decision": "yes", "kind": "extraction", "session_id": SID,
                            "client_turn_id": "turn-action-ex-1", "parent_turn_id": "turn-action-dl-1"}},
-                 "approved targeted extraction -> rebuild -> splash_reimport -> reload -> answered"),
+                 "approved targeted extraction -> rebuild -> publish_extraction -> reload -> answered"),
                 ("chat_action_no_pending", "POST", "/chat/action",
                  {"json": {"decision": "yes", "kind": "extraction", "session_id": SID,
                            "client_turn_id": "turn-action-none-1"}},
