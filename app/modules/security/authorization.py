@@ -1069,7 +1069,7 @@ def create_approval(ctx: RequestContext, plan: ChangePlan, settings: DeploymentS
                     approver_credential: TiledCredential | None = None,
                     requester: Principal | None = None, operation_id: str | None = None,
                     limits: Mapping[str, int] | None = None, expires_at: datetime | None = None,
-                    capability: str = "curation.approve") -> ApprovalRecord:
+                    capability: str = "curation.approve", reason: str | None = None) -> ApprovalRecord:
     """Record an explicit human approval of ``plan`` by the caller in ``ctx``.
 
     Local: requested_by/approved_by are local-operator, ``executed_as`` is the writer,
@@ -1089,6 +1089,8 @@ def create_approval(ctx: RequestContext, plan: ChangePlan, settings: DeploymentS
         limits: Numeric limits on the operation.
         expires_at: Approval expiry.
         capability: Capability that authorizes approving.
+        reason: Recorded on a local approval a deployment policy made for the operator (T18E ``auto_safe_plan``).
+            Refused on ALS: an ALS approval is always one verified admin's.
 
     Returns:
         The validated approval record.
@@ -1110,7 +1112,9 @@ def create_approval(ctx: RequestContext, plan: ChangePlan, settings: DeploymentS
     )
     if settings.is_local:
         return ApprovalRecord(requested_by=LOCAL_OPERATOR, approved_by=LOCAL_OPERATOR,
-                              approved_at=clock(), **common)
+                              approved_at=clock(), reason=reason, **common)
+    if reason is not None:
+        raise ContractError(ErrorCode.DENIED, "a policy approval reason is valid on the local profile only")
     identity = verify_identity(settings, approver_credential, identity_port=identity_port, clock=clock,
                                require_fresh=True)
     if identity.subject != ctx.principal.subject:

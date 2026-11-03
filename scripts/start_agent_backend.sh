@@ -258,7 +258,6 @@ ARGS=(
   --workflow-mode "$WORKFLOW_MODE"
   --extraction-mode "$EXTRACTION_MODE"
   --targeted-max-pages "$TARGETED_MAX_PAGES"
-  --allow-splash-wipe
 )
 IFS=',' read -ra GRAPH_LIST <<< "$GRAPH"
 for g in "${GRAPH_LIST[@]}"; do

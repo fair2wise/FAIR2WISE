@@ -24,6 +24,7 @@ Only the YAML is parsed; nothing here talks to GitHub or Docker.
 
 from __future__ import annotations
 
+import importlib
 import re
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Tuple
@@ -555,8 +556,8 @@ def test_full_suite_is_gated_by_compare_known_failures_not_hidden(forge_ci: Dict
     assert "if" not in gate
 
 
-def test_known_failure_set_is_down_to_the_splash_wipe_entry() -> None:
+def test_known_failure_set_is_empty_since_the_splash_wipe_path_was_retired() -> None:
+    """T18E (Q11): the last known failure was the splash wipe test; the wipe path no longer exists."""
     known = yaml.safe_load((REPO / "docs/migration/reviews/H0/known_failures.json").read_text(encoding="utf-8"))
-    ids = [k["id"] for k in known["known_failures"]]
-    assert ids == ["tests.test_kg_update::test_splash_reimport_refuses_wipe_without_explicit_allow"]
-    assert all(k["reason"] for k in known["known_failures"])
+    assert known["known_failures"] == []
+    assert not hasattr(importlib.import_module("app.modules.f2w_agent.kg_update"), "splash_reimport")

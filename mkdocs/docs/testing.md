@@ -30,7 +30,7 @@ Major coverage areas:
 | KG conversion/retrieval | `test_json2kg*.py`, `test_bl1101_ingest.py`, `test_kg_rag_api*.py`, `test_build_context_filtering.py` |
 | Splash integration | `test_splash_helpers.py`, `test_splash_fallback.py`, `test_kg_update.py` |
 | Settings/sessions | `test_agent_settings.py`, session cases in `test_f2w_api.py` |
-| Utilities/safety | `test_project_config.py`, `test_cborg_limiter.py`, `test_wipe_splash_db_script.py` |
+| Utilities/safety | `test_project_config.py`, `test_cborg_limiter.py` |
 | Compatibility API | `test_fastapi_endpoints.py`, `test_chat_clients.py` |
 
 Tests use temporary files and monkeypatched HTTP/LLM clients to keep the

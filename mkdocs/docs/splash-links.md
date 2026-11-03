@@ -179,13 +179,6 @@ The application receives a `postgresql+psycopg2://...` URL through
 
 ## Reset safety
 
-From the repository root:
-
-```bash
-./scripts/wipe_splash_db.sh
-```
-
-The utility only accepts a local SQLite database within the Splash workspace,
-refuses in-memory/remote/outside paths, refuses a managed or listening Splash
-service, requires the exact confirmation `WIPE splash_links`, and removes SQLite
-WAL/SHM/journal sidecars with the database.
+`scripts/wipe_splash_db.sh` was removed (T18E, owner decision Q11): nothing in the
+images or scripts wipes a Splash database. To start from an empty local database, stop
+Splash and move `links.sqlite` aside yourself.

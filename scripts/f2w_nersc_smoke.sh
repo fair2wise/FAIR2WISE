@@ -29,5 +29,4 @@ python3 -m app.modules.launchers.f2w_agent \
   --max-rounds "${F2W_MAX_ROUNDS:-1}" \
   --max-papers "${F2W_MAX_PAPERS:-1}" \
   --workers "${F2W_WORKERS:-1}" \
-  --allow-splash-wipe \
   ask "$QUESTION"

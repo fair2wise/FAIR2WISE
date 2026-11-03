@@ -53,10 +53,10 @@ FAIR2WISE next presents a separate extraction decision.
 
 !!! warning "Back up valuable graph data first"
 
-    Approved extraction rebuilds the cumulative session graph and, in Splash
-    mode, wipes/reimports Splash from that graph. This is a replacement, not an
-    append/upsert; data absent from the cumulative terms artifact can be
-    removed. Follow the backup step in
+    Approved extraction rebuilds the cumulative session graph and publishes
+    it to Tiled as a reviewed replacement plan (T18E; Splash is no longer wiped).
+    This is a replacement, not an append/upsert; data absent from the cumulative
+    terms artifact is retired by the plan once it is approved. Follow the backup step in
     [Fresh-machine deployment](deployment.md#upgrade-procedure) before using
     this workflow against a graph with irreplaceable manual edits.
 

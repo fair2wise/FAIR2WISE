@@ -153,6 +153,7 @@ def create_api_app(
     folder_roots: Any | None = None,
     library: Any | None = None,
     tiled_save: Any | None = None,
+    extraction_publisher: Any | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -197,6 +198,9 @@ def create_api_app(
             profile they are absent (404) and a configured value is ignored with a warning.
         tiled_save: A :class:`~app.modules.graph.legacy_save.SaveTarget` (T18D), attached to the legacy service (the
             ``create_app`` signature is pinned): the UI Save becomes a journaled multi-write on Tiled with no Splash call.
+        extraction_publisher: A :class:`~app.api.post_extraction.PostExtractionPublisher` (T18E): after an approved
+            extraction the legacy ``splash_reimport_*`` phases publish ``v<N+1>`` to Tiled under the profile's approval
+            policy. Without one the phases report ``skipped``; there is no Splash wipe.
 
     Raises:
         StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
@@ -219,6 +223,8 @@ def create_api_app(
     from ..modules.operations.knowledge import OPERATION_JOB_KIND, KnowledgeOperations, knowledge_job_context
     from ..modules.validation_settings import JudgeModelService, JudgeModelStore, judge_settings_path
 
+    if extraction_publisher is not None:
+        cfg.extraction_publisher = extraction_publisher
     if tiled_save is not None:
         cfg.tiled_save = tiled_save     # read by the service before it builds its session graph (no Splash call)
     app = create_app(cfg, cors_origins=cors_origins, deployment=deployment, startup_config=startup_config,
