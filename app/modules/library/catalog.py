@@ -132,6 +132,17 @@ class LibraryCatalog:
                                   "WHERE relpath=? AND (doi IS NULL OR doi='')", (doi, relpath))
             self._con.commit()
 
+    def fill_identity(self, relpath: str, *, title: str | None, doi: str | None, source: str) -> None:
+        """Fill a missing title or DOI from what the registry told the harvester (never replaces a probe's value)."""
+        with self._lock:
+            if title:
+                self._con.execute("UPDATE papers SET title=? WHERE relpath=? AND (title IS NULL OR title='')",
+                                  (title, relpath))
+            if doi:
+                self._con.execute("UPDATE papers SET doi=?, doi_source=? WHERE relpath=? AND (doi IS NULL OR doi='')",
+                                  (doi, source, relpath))
+            self._con.commit()
+
     def prune(self, keep: Iterable[str]) -> int:
         """Delete rows whose relpath is not in ``keep`` (the file is gone); returns how many."""
         keep_set = set(keep)

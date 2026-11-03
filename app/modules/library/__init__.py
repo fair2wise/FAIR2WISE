@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from .jobs import (
     LIBRARY_EXTRACT_KIND,
+    LIBRARY_HARVEST_KIND,
     LIBRARY_INDEX_KIND,
     LIBRARY_KIND_CAPABILITIES,
     LIBRARY_PROBE_KIND,
@@ -22,6 +23,7 @@ from .jobs import (
 
 __all__ = (
     "LIBRARY_EXTRACT_KIND",
+    "LIBRARY_HARVEST_KIND",
     "LIBRARY_INDEX_KIND",
     "LIBRARY_KIND_CAPABILITIES",
     "LIBRARY_PROBE_KIND",

@@ -56,7 +56,8 @@ def _service(tmp_path: Path, settings: DeploymentSettings | None = None) -> JobS
 
 
 def test_capabilities_are_local_only() -> None:
-    assert LOCAL_ONLY_CAPABILITIES == {"library.read", "library.upload", "library.index", "library.extract"}
+    assert LOCAL_ONLY_CAPABILITIES == {"library.read", "library.upload", "library.index", "library.extract",
+                                        "library.harvest"}
     assert set(LIBRARY_KIND_CAPABILITIES.values()) <= LOCAL_ONLY_CAPABILITIES
     assert _local_ctx().capabilities >= LOCAL_ONLY_CAPABILITIES
     assert not capabilities_for(_identity(admin=True)) & LOCAL_ONLY_CAPABILITIES

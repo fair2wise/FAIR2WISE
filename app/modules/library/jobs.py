@@ -3,7 +3,7 @@
 Four kinds run in the worker process on ``:local`` only:
 
 * ``library_probe``: a no-op that completes at once (proves a worker claims and runs library jobs);
-* ``library_verify`` (T35), ``library_index`` (T36), ``library_extract`` (T39): stubs that fail closed (T35, T36 and T39 supply
+* ``library_verify`` (T35), ``library_index`` (T36), ``library_extract`` (T39), ``library_harvest`` (T45): stubs that fail closed (T35, T36 and T39 supply
   real handlers through ``handlers=``; a kind without one stays a stub)
   with ``unsupported_capability`` until their task supplies a handler through ``handlers=``.
 
@@ -27,6 +27,7 @@ LIBRARY_PROBE_KIND = "library_probe"
 LIBRARY_VERIFY_KIND = "library_verify"
 LIBRARY_INDEX_KIND = "library_index"
 LIBRARY_EXTRACT_KIND = "library_extract"
+LIBRARY_HARVEST_KIND = "library_harvest"
 
 #: Job kind to the capability that submits it (all local-operator only, ``LOCAL_ONLY_CAPABILITIES``).
 LIBRARY_KIND_CAPABILITIES: Mapping[str, str] = {
@@ -34,6 +35,7 @@ LIBRARY_KIND_CAPABILITIES: Mapping[str, str] = {
     LIBRARY_VERIFY_KIND: "library.upload",
     LIBRARY_INDEX_KIND: "library.index",
     LIBRARY_EXTRACT_KIND: "library.extract",
+    LIBRARY_HARVEST_KIND: "library.harvest",
 }
 
 #: Name of the ``params`` entry that makes an otherwise identical submission a new job.
@@ -44,7 +46,7 @@ StageHandler = Callable[[StageContext], StageResult]
 
 #: Which task supplies each stub kind's real handler (named in the failure message).
 _OWNER_TASK: Mapping[str, str] = {LIBRARY_VERIFY_KIND: "T35", LIBRARY_INDEX_KIND: "T36",
-                                  LIBRARY_EXTRACT_KIND: "T39"}
+                                  LIBRARY_EXTRACT_KIND: "T39", LIBRARY_HARVEST_KIND: "T45"}
 
 
 def not_implemented(kind: str) -> StageHandler:
@@ -119,6 +121,6 @@ def register_library_jobs(job_service: Any, settings: Any, *,
     return tuple(registered)
 
 
-__all__ = ("LIBRARY_EXTRACT_KIND", "LIBRARY_INDEX_KIND", "LIBRARY_KIND_CAPABILITIES", "LIBRARY_PROBE_KIND",
+__all__ = ("LIBRARY_EXTRACT_KIND", "LIBRARY_HARVEST_KIND", "LIBRARY_INDEX_KIND", "LIBRARY_KIND_CAPABILITIES", "LIBRARY_PROBE_KIND",
            "LIBRARY_VERIFY_KIND", "NONCE_PARAM", "StageHandler", "library_inputs", "not_implemented",
            "register_library_jobs")

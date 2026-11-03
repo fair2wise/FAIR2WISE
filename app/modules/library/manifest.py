@@ -31,15 +31,16 @@ def _doi_key(doi: str | None) -> str:
     return raw
 
 
-def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year: int | None, now: str) -> dict[str, Any]:
+def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year: int | None, now: str,
+         source: str = "upload", arxiv_id: str | None = None) -> dict[str, Any]:
     return {
         "doi": f"https://doi.org/{_doi_key(doi)}" if doi else None,
-        "arxiv_id": None,
+        "arxiv_id": arxiv_id,
         "title": title,
         "abstract": None,
         "publication_year": year,
         "publication_date": None,
-        "source": "upload",
+        "source": source,
         "pdf_path": f"{PDF_PATH_PREFIX}/{relpath}",
         "pdf_urls": [],
         "tiled_uri": None,
@@ -51,7 +52,7 @@ def _row(*, relpath: str, sha256: str, doi: str | None, title: str | None, year:
 
 
 def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: str | None, title: str | None,
-                  year: int | None, now: str) -> dict[str, Any]:
+                  year: int | None, now: str, source: str = "upload", arxiv_id: str | None = None) -> dict[str, Any]:
     """Add the uploaded paper to ``<root>/<category>/manifest.json`` (created when the category is new).
 
     Args:
@@ -63,6 +64,8 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
         title: Title read locally, if any.
         year: The year the paper was filed under, or ``None`` for the ``unknown`` folder.
         now: ISO timestamp recorded as ``downloaded_at``.
+        source: The row's ``source`` (``upload`` or the registry a harvest found it in).
+        arxiv_id: The arXiv id when known.
 
     Returns:
         ``{"updated": bool, "path": "<category>/manifest.json", "detail": str}``; ``updated`` is false when the
@@ -98,7 +101,8 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
                     if same:
                         out["detail"] = "already listed in the manifest"
                         return out
-                papers.append(_row(relpath=relpath, sha256=sha256, doi=doi, title=title, year=year, now=now))
+                papers.append(_row(relpath=relpath, sha256=sha256, doi=doi, title=title, year=year, now=now,
+                                   source=source, arxiv_id=arxiv_id))
                 tmp = manifest.with_suffix(".json.tmp")
                 tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
                 os.replace(tmp, manifest)

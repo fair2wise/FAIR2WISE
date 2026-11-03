@@ -685,6 +685,42 @@ React Testing Library). The owner decisions are fixed; this addendum records the
   **Scope:** enable the library routes and tabs for verified ALS admins, with a mount policy and a disclosure
   review for uploaded PDFs reaching other users through Source RAG. Not built under A8.
 
+### T45: Harvester backend (`library_harvest` job, candidates, paywalled queue)
+- **Depends on:** T34, T35, T33. **Blocks:** T46, T43.
+- **Owner answers (2026-11-03):** the schema only **labels** the run (recorded with it so Extraction can default to
+  it; it does not change search or ranking); open-access PDFs are **auto-downloaded** for tier A/B hits up to a
+  maximum the operator sets; paywalled hits go to a **queue in the tab** (no server-side publisher request).
+- **Scope:** new job kind `library_harvest` (capability `library.harvest`, `:local` only, runs in the worker).
+  `params`: `topic` (1-200 chars), `category` (a library folder name, created on first filing), `schema`
+  (registry id, label only, optional), `sources` (subset of `arxiv`, `openalex`; default both), `max_downloads`
+  (1-200, default 20), `per_query` (1-100, default 50), `nonce`. Stages: search each source (arXiv through the
+  pinned `arxiv` package, OpenAlex through `OpenAlexClient.fetch` under the shared quota breaker; a source that
+  cannot run is logged and skipped), merge and dedupe by DOI/arXiv id, drop papers already in the library (by
+  DOI), score each candidate against the topic (generic tiers: A = every topic term present and at least half in
+  the title; B = at least 60 % of the terms present in title or abstract; C = the rest, never downloaded), then
+  for tier A then B in score order download the open-access PDF (every hop checked by `NetworkPolicy`, byte and
+  time limits, `%PDF-` check) and file it with `LibraryService.upload(..., folder=category)` (year folder and
+  category manifest as in A8 uploads). A tier A/B hit without a usable open-access PDF becomes `paywalled`. Every
+  candidate and its outcome is stored in a sidecar `<workdir>/library/harvest.sqlite` (run id = job id).
+  Paywalled hits are completed by a person: the tab shows the landing URL (opened in the user's own browser),
+  the user saves the PDF and drops it on the candidate, and the server files it like an upload.
+- **Routes (policy rows V76-V79, `:local` only):** `GET /v1/library/harvest/runs`,
+  `GET /v1/library/harvest/runs/{run_id}/candidates`, `POST /v1/library/harvest/candidates/{id}/pdf`
+  (multipart `file`; files into the run's category), `POST /v1/library/harvest/candidates/{id}/dismiss`.
+- **Acceptance:** fake arXiv and OpenAlex (no network in tests), a socket-blocking test; tiering, dedupe,
+  max-downloads, paywalled/failed/in-library outcomes, per-source failure isolation, SSRF refusal of a private
+  OA URL, filing by year, candidate PDF drop and dismiss, policy rows and route counts.
+
+### T46: Harvester panel in the Library tab
+- **Depends on:** T40, T41, T45. **Blocks:** T43.
+- **Scope:** the Library tab gets two panels switched by a tablist ("Papers" with the table and uploader, and
+  "Harvester"). Harvester: topic, category (existing or new), schema (label), sources, max downloads, Start;
+  then a run view (progress, live log, cancel) and a results table per run with the status of every candidate
+  (downloaded, in library, failed, skipped) and the **paywalled queue**: "Open publisher" link (new tab,
+  `rel="noopener noreferrer"`), a PDF drop slot per candidate, Dismiss. Past runs are listed and reopened.
+- **Acceptance:** component tests per state, ARIA tablist and `aria-pressed`/disabled styling, Playwright specs
+  in both configs with mocks, no `localStorage` use.
+
 ### Order for A8
 T33 and T37 first (parallel), then T34 and T40 against mocked routes, then T35 and T38, then T36 and T41, then
 T39 and T42, then T43. Tests assert 31 `/v1` routes and 19 legacy routes, so route-count edits merge in the

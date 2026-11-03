@@ -344,7 +344,8 @@ class LibraryService:
 
     # -- upload ------------------------------------------------------------------------------------
 
-    def upload(self, filename: str | None, data: bytes, folder: str | None = None) -> dict[str, Any]:
+    def upload(self, filename: str | None, data: bytes, folder: str | None = None, *,
+               known: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Store one PDF in the mounted folder and catalogue it.
 
         The bytes are already read (``read_upload_limited``); this checks the PDF magic, the name and the
@@ -354,6 +355,9 @@ class LibraryService:
         (``rsoxs/2013/x.pdf``; ``rsoxs/unknown/x.pdf`` when no year can be read locally), a new category is
         created on first use, and the category's ``manifest.json`` gets a row for it. Without ``folder`` the
         paper goes into the library root, as before.
+
+        ``known`` is what the caller already knows of the paper (the harvester has it from the registry):
+        ``year`` replaces the local year guess, and ``title``, ``doi`` and ``source`` fill the manifest row.
 
         Returns:
             ``{"paper": dto, "duplicate": bool}``; a duplicate writes nothing. A filed paper also carries
@@ -380,7 +384,8 @@ class LibraryService:
             directory, result, year = root, None, None
             if category:
                 result = self._probe_bytes(root, data)
-                year = guess_year(name, result.page_text, result.meta_text)
+                year = known.get("year") if known and known.get("year") else None
+                year = int(year) if year else guess_year(name, result.page_text, result.meta_text)
                 directory = self._ensure_folder(root, category, year_folder(year))
             stem, suffix = name[:-4], name[-4:]
             target: Path | None = None
@@ -397,12 +402,17 @@ class LibraryService:
             stat = target.stat()
             relpath = target.relative_to(root).as_posix()
             self._record(target, relpath, sha, stat.st_size, round(stat.st_mtime, 3), probe=True, result=result)
+            if known:
+                self.catalog.fill_identity(relpath, title=known.get("title"), doi=known.get("doi"),
+                                           source=str(known.get("source") or "upload"))
             out: dict[str, Any] = {"paper": self._paper_dto(relpath), "duplicate": False}
             if category:
                 paper = out["paper"]
                 out["manifest"] = record_upload(
-                    root, relpath.split("/", 1)[0], relpath=relpath, sha256=sha, doi=paper.get("doi"),
-                    title=paper.get("title"), year=year, now=datetime.now(UTC).isoformat())
+                    root, relpath.split("/", 1)[0], relpath=relpath, sha256=sha,
+                    doi=(known or {}).get("doi") or paper.get("doi"), title=(known or {}).get("title") or paper.get("title"),
+                    year=year, now=datetime.now(UTC).isoformat(), source=str((known or {}).get("source") or "upload"),
+                    arxiv_id=(known or {}).get("arxiv_id"))
             return out
 
     def _probe_bytes(self, root: Path, data: bytes) -> ProbeResult:

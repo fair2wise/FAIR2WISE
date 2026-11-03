@@ -57,7 +57,10 @@ def library_service(db_path: str, environ: Mapping[str, str] | None = None) -> J
     library = LibraryService.from_startup(env, workdir, settings)
     # T39: library_extract runs here; the LLM backend comes from the worker's startup environment only.
     extractor = LibraryExtractor(library, BundleStore(workdir / BUNDLES_DIRNAME), env=env)
-    register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor))
+    from ..library.harvest import HarvestStore, Harvester
+
+    harvester = Harvester(library, HarvestStore(workdir / "library" / "harvest.sqlite"))
+    register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor, harvester=harvester))
     return service
 
 

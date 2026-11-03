@@ -30,7 +30,8 @@ ADMIN_CAPABILITIES = frozenset({
 #: Library capabilities (A8/T34): held by the local operator only. They are in the vocabulary but never
 #: granted to an ALS principal, admin or not (``capabilities_for``; ``RequestContext`` refuses them in
 #: ``tiled_authenticated`` mode). ALS-admin support for the library is T44, deferred.
-LOCAL_ONLY_CAPABILITIES = frozenset({"library.read", "library.upload", "library.index", "library.extract"})
+LOCAL_ONLY_CAPABILITIES = frozenset({"library.read", "library.upload", "library.index", "library.extract",
+                                    "library.harvest"})
 
 #: Frozen capability vocabulary (docs/migration/authentication/access_contract.md section 6).
 #: Reading private sources (``source.read``) is deliberately *not* a capability: it can

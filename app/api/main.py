@@ -210,6 +210,7 @@ def create_api_app(
     from . import routes_capabilities as capabilities
     from . import routes_folders as folders
     from . import routes_library as library_routes
+    from . import routes_library_harvest
     from . import routes_jobs as jobs
     from . import routes_operations as knowledge_routes
     from . import routes_publications as publications
@@ -264,8 +265,12 @@ def create_api_app(
         from ..modules.library.extraction import LibraryExtractor
 
         startup_env = os.environ if startup_config is None else startup_config
+        from ..modules.library.harvest import HarvestStore, Harvester
+
+        app.state.f2w_harvest = Harvester(library_service, HarvestStore(Path(cfg.workdir) / "library" / "harvest.sqlite"))
         library_handlers_ = library_handlers(library_service, extractor=LibraryExtractor(
-            library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env))
+            library_service, BundleStore(Path(cfg.workdir) / BUNDLES_DIRNAME), env=startup_env),
+            harvester=app.state.f2w_harvest)
     register_library_jobs(operations.jobs, settings, handlers=library_handlers_)
     app.state.f2w_operations = operations
     runtime.on_scope_change(operations.notify_scope_change)
@@ -289,6 +294,7 @@ def create_api_app(
             operations.folders = folder_roots if folder_roots is not None else FolderRoots.from_startup(startup)
         folders.install(app)
         library_routes.install(app)  # T35 (A8): library catalog/upload/verify, local profile only
+        routes_library_harvest.install(app)  # T45 (A8): Harvester runs and the paywalled queue
         _install_kg_library(app, cfg, judge_settings)
     elif folder_roots is not None or (startup.get(FOLDER_ROOTS_ENV) or "").strip():
         logger.warning("%s is ignored on %s: folder browsing is a local-profile feature (owner decision B4)",

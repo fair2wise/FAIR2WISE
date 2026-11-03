@@ -153,6 +153,14 @@ API_ROUTE_POLICIES: tuple[RoutePolicy, ...] = (
        note="export a bundle to the configured release directory; explicit confirm in the body"),
     _v("V75", "POST", "/library/kgs/continue", "library.extract", on_als=False,
        note="create a bundle by continuing a bundle or a KG file (kg_to_terms reverse build)"),
+    # T45 (A8): the Harvester's runs and paywalled queue under /v1/library/harvest; :local only. V76-V79.
+    _v("V76", "GET", "/library/harvest/runs", "library.read", on_als=False, note="harvest runs with status counts"),
+    _v("V77", "GET", "/library/harvest/runs/{run_id}/candidates", "library.read", on_als=False,
+       note="the candidates of a run: tier, status, landing URL (never fetched for a paywalled paper)"),
+    _v("V78", "POST", "/library/harvest/candidates/{candidate_id}/pdf", "library.upload", on_als=False,
+       note="file a PDF a person saved for a paywalled candidate into the run's category (multipart)"),
+    _v("V79", "POST", "/library/harvest/candidates/{candidate_id}/dismiss", "library.upload", on_als=False,
+       note="dismiss a paywalled candidate"),
     # T18D (Q13, O-U3): the capability read behind the frozen UI's hidden Edit/Save controls. V56-V59 belong to
     # another branch; this block is V60-V69.
     _v("V60", "GET", "/capabilities", "chat.read_support",
