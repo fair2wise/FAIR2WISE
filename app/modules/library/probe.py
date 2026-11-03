@@ -12,6 +12,7 @@ that opens a socket. DOI candidates are derived by the caller with
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import json
 import os
@@ -19,7 +20,6 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-from typing import Callable
 
 #: Leading pages read (a references section would add other papers' DOIs); matches ``intake.DOI_SEARCH_PAGES``.
 PROBE_PAGES = 2

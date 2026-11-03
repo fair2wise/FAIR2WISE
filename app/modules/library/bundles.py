@@ -78,7 +78,7 @@ def _write_json(path: Path, data: Any) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False, sort_keys=False)
             handle.write("\n")
-        os.replace(tmp, path)
+        Path(tmp).replace(path)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise

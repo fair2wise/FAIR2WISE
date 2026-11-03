@@ -12,7 +12,6 @@ from __future__ import annotations
 import fcntl
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +73,7 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
     manifest = root / category / "manifest.json"
     out = {"updated": False, "path": f"{category}/manifest.json", "detail": ""}
     try:
-        with open(root / category / ".manifest.lock", "a+") as lock:
+        with (root / category / ".manifest.lock").open("a+") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             try:
                 if manifest.is_file():
@@ -105,7 +104,7 @@ def record_upload(root: Path, category: str, *, relpath: str, sha256: str, doi: 
                                    source=source, arxiv_id=arxiv_id))
                 tmp = manifest.with_suffix(".json.tmp")
                 tmp.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
-                os.replace(tmp, manifest)
+                tmp.replace(manifest)
                 out.update(updated=True, detail="added to the manifest")
                 return out
             finally:

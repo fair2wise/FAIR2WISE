@@ -117,7 +117,7 @@ def _atomic_write(path: Path, write: Any) -> None:
             write(handle)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp, path)
+        tmp.replace(path)
     finally:
         try:
             tmp.unlink()

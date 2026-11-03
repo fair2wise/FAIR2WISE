@@ -425,7 +425,7 @@ class LibraryService:
             return self._probe(tmp)
         finally:
             try:
-                os.unlink(tmp)
+                tmp.unlink()
             except FileNotFoundError:
                 pass
 
@@ -469,11 +469,11 @@ class LibraryService:
             except OSError:  # a filesystem without hard links: rename after an existence check
                 if os.path.lexists(target):
                     return False
-                os.rename(tmp, target)
+                tmp.rename(target)
             return True
         finally:
             try:
-                os.unlink(tmp)
+                tmp.unlink()
             except FileNotFoundError:
                 pass
 
