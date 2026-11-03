@@ -10,7 +10,7 @@ from collections import Counter
 import json
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -24,7 +24,7 @@ _KEY_LITERAL = re.compile(r"(?i)api.?key\w*['\"]?\s*[:=]\s*'your-[a-z-]+'")
 
 
 def _graph(name: str) -> dict[str, Any]:
-    return json.loads((KG / name).read_bytes().decode("utf-8"))
+    return cast(dict[str, Any], json.loads((KG / name).read_bytes().decode("utf-8")))
 
 
 @pytest.mark.parametrize("name", SCRUBBED)
