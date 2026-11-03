@@ -32,3 +32,12 @@ Interpretation notes (agent, for the owner to correct):
 | Retire-all versus purge `include_previous` | "Retire all; purge excludes previous by default (Recommended)" |
 | Who may approve a plan that adopts legacy records | "Auto-approve on :local only" (note: this relaxes the earlier safe-plan definition, which excluded legacy adoption from auto-approval; ALS stays never-auto) |
 | Move `scripts/harvest_*.py` to the hardened downloader | "Yes, move them (Recommended)" |
+
+## Fifth set
+
+| Question | Owner answer |
+|---|---|
+| T26A Q5: may the agent draft errata to plan 4.14, GIT_KG_PROMOTION_SPEC 4, JSON_KG_PUBLICATION_SPEC for E3 | "Yes, draft them (Recommended)" (draft for owner review; frozen docs untouched until approved) |
+| T26A Q6: where release descriptors live | "Under docs/migration/data_releases/releases/ (Recommended)" |
+| D3.23: handling of bl1101 v1-v7 `api_key` literal / `/tmp/` strings | "Scrub the literals from the files" |
+| D3.23: matkg_rsoxs_v3 format, bl1101 v8/v9 serialization | "Rebuild them (Recommended)" |
