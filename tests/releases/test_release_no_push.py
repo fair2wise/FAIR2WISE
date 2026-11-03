@@ -31,7 +31,7 @@ from tests.releases.conftest import REPOSITORY, git
 from tests.snapshots.snapshot_fakes import REPO
 
 MODULE = REPO / "app/modules/graph/releases.py"
-SCRIPT = REPO / "scripts/prepare_kg_release.py"
+SCRIPT = REPO / "app/modules/commands/prepare_kg_release.py"
 WRITING = ("push", "commit", "add", "tag", "fetch", "pull", "remote", "update-ref", "update-index", "reset",
            "checkout", "merge", "rebase", "config", "send-pack", "gc", "notes", "stash", "rm", "mv", "am")
 
@@ -116,7 +116,7 @@ def test_static_no_git_write_or_push_call_in_the_module_or_the_script():
 
 
 def test_the_cli_has_no_push_commit_or_tag_option(capsys):
-    from scripts import prepare_kg_release as cli
+    from app.modules.commands import prepare_kg_release as cli
 
     for argv in (["push"], ["commit"], ["prepare", "--push"], ["verify-committed", "--push"], ["export", "--tag"]):
         with pytest.raises(SystemExit) as exit_:

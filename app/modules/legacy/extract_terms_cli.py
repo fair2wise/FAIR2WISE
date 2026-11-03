@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""LLM-driven extraction of materials-science terms from PDFs.
+"""LLM-driven extraction of materials-science terms from PDFs (archived standalone extractor).
+
+DEPRECATED (T17B, owner approval 2026-11-03): moved from ``app/modules/extract_terms.py`` unchanged in
+behaviour. The canonical term extraction is ``app/modules/term_extractor/`` (``term_extractor.schema.SchemaHelper``
+is the canonical normaliser, selected by default through ``schema.registry``) and ``app/modules/extraction/``.
+This module stays importable and runnable until H8 retires it: it is the ``NORMALIZER_LEGACY`` implementation
+of ``schema.loading.load_helper`` (its ``SchemaHelper`` diverges on rsoxs_schema.yaml, T22A F4) and the
+``extract-terms-cli`` entry point.
 
 Combines a chat backend (Ollama or CBORG) with LinkML schema validation,
 ChEBI enrichment and property normalization, and writes the results as JSON.
-Also runnable as a script (`python3 app/modules/extract_terms.py ...`).
+Also runnable as a script (`python3 app/modules/legacy/extract_terms_cli.py ...`).
 """
 
 if __name__ == "__main__" and not __package__:
-    # Checkout script launch (`python3 app/modules/extract_terms.py ...`, documented in
-    # README.md): re-run as the package module `app.modules.extract_terms` so its
+    # Checkout script launch (`python3 app/modules/legacy/extract_terms_cli.py ...`, documented in
+    # README.md): re-run as the package module `app.modules.legacy.extract_terms_cli` so its
     # relative imports resolve under one name. sys.path[0] is the script's own
     # directory (app/modules); replace it with the repo root instead of adding
     # app/ or app/modules to sys.path.
@@ -16,8 +23,8 @@ if __name__ == "__main__" and not __package__:
     import runpy as _runpy
     import sys as _sys
 
-    _sys.path[0] = str(_Path(__file__).resolve().parents[2])
-    _runpy.run_module("app.modules.extract_terms", run_name="__main__", alter_sys=True)
+    _sys.path[0] = str(_Path(__file__).resolve().parents[3])
+    _runpy.run_module("app.modules.legacy.extract_terms_cli", run_name="__main__", alter_sys=True)
     raise SystemExit(0)
 from abc import ABC, abstractmethod
 import argparse
@@ -39,13 +46,13 @@ import openai
 from rapidfuzz import fuzz, process  # still used by SchemaHelper for class/slot matching
 import requests
 
-from .agents.chebi import ChebiOboLookup
-from .agents.chem_checker import ChemicalFormulaValidator
-from .agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
-from .cborg_http import openai_http_kwargs, require_cborg_api_key
-from .cli_output import output
-from .literature.pdf_reader import PdfDocument, open_pdf
-from .term_extractor.merge_index import (
+from ..agents.chebi import ChebiOboLookup
+from ..agents.chem_checker import ChemicalFormulaValidator
+from ..agents.properties import PhysicalPropertyExtractor, PropertyNormalizer
+from ..cborg_http import openai_http_kwargs, require_cborg_api_key
+from ..cli_output import output
+from ..literature.pdf_reader import PdfDocument, open_pdf
+from ..term_extractor.merge_index import (
     DEFAULT_EMBED_MODEL,
     DEFAULT_MERGE_TOP_K,
     TermMergeIndex,
@@ -62,7 +69,7 @@ from .term_extractor.merge_index import (
 # ----------------------------------------
 if __name__ == "__main__":
     # CLI entry only: load .env explicitly. Library imports never load .env.
-    from .dotenv_entry import load_entrypoint_dotenv
+    from ..dotenv_entry import load_entrypoint_dotenv
 
     load_entrypoint_dotenv(__file__)
 
@@ -116,8 +123,8 @@ class CBorgChatClient(ChatClient):
         """Send a prompt to CBORG and return the response text."""
         # Shared admission (H1-3): this client bypassed the CBORG cap before; it joins
         # it only when F2W_SHARED_ADMISSION is on, so legacy behavior is unchanged.
-        from .cborg_limiter import sync_slot
-        from .llm_admission import shared_admission_enabled
+        from ..cborg_limiter import sync_slot
+        from ..llm_admission import shared_admission_enabled
 
         with sync_slot(enabled=shared_admission_enabled()):
             return self._chat_unadmitted(prompt, temperature=temperature, timeout=timeout)
@@ -131,7 +138,7 @@ class CBorgChatClient(ChatClient):
             timeout=timeout,
             stream=True,
         )
-        from .cborg_http import collect_stream_text
+        from ..cborg_http import collect_stream_text
 
         return collect_stream_text(resp)
 
@@ -321,7 +328,7 @@ class SchemaHelper:
             schema_path: Path to a LinkML YAML schema.
             fuzzy_cutoff: RapidFuzz score cutoff (0–100) for fuzzy matching.
         """
-        from .resources import resolve_resource
+        from ..resources import resolve_resource
 
         self.schema_path = schema_path
         self.fuzzy_cutoff = fuzzy_cutoff

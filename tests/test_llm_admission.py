@@ -141,7 +141,7 @@ def test_orchestrator_cborg_openai_joins_cap_only_with_flag(monkeypatch):
 
 
 def test_extract_terms_cborg_client_takes_slot_with_flag(monkeypatch):
-    from app.modules import extract_terms
+    from app.modules.legacy import extract_terms_cli as extract_terms
 
     client = extract_terms.CBorgChatClient.__new__(extract_terms.CBorgChatClient)
     seen = []
@@ -173,6 +173,6 @@ def test_cborg_clients_fail_closed_without_key(monkeypatch, factory):
     elif factory == "async":
         from app.modules.kg_rag_api import CBorgClient as CBorgChatClient
     else:
-        from app.modules.extract_terms import CBorgChatClient
+        from app.modules.legacy.extract_terms_cli import CBorgChatClient
     with pytest.raises(RuntimeError, match="CBORG_API_KEY is not set"):
         CBorgChatClient(model="lbl/cborg-chat")

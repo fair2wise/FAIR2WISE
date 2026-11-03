@@ -276,10 +276,7 @@ def test_descriptor_validation_reports_schema_errors(committed):
 
 
 def test_descriptor_cli_prints_to_stdout_and_refuses_paths_inside_the_repo(committed, tmp_path, capsys):
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("adopt_legacy_kg_cli", REPO / "scripts" / "adopt_legacy_kg.py")
-    cli = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(cli)
+    from app.modules.commands import adopt_legacy_kg as cli
     repo, commit = committed
     base = ["descriptor", "--repo", str(repo), "--commit", commit, "--corpus", "legacyfix", "--snapshot", "v1",
             "--repository", "github.com/example/fixture"]

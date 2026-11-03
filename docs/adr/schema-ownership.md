@@ -53,7 +53,7 @@ No donor (FORGE) Pydantic classes become a scientific authority. Existing caller
 | Contract | Authority | Validation style |
 | --- | --- | --- |
 | Scientific LinkML (base + overlays) | `storage/schema/*.yaml` via the registry | SchemaView closure; SchemaHelper normalization at extraction |
-| Reference vocabularies (PROV-O) | `prov_vocabulary.yaml` + `app/modules/prov.py` | YAML shape checks (as in `tests/test_prov.py`); never imported into LinkML |
+| Reference vocabularies (PROV-O) | `prov_vocabulary.yaml` + `app/modules/provenance/prov_o.py` | YAML shape checks (as in `tests/test_prov.py`); never imported into LinkML |
 | Ingest mapping / seed / example data | `bl1101_motor_stage_map.yaml`, `tiled_sim_seed.yaml`, `xray_seed_instances.yaml` | Loader-specific YAML schemas; separate versions (`version: 4`, `seed: 20260916`) |
 | Parser/job records | `term_extractor/models.py`, `message.py`, extraction manifest, `trace.py` (`SCHEMA_VERSION=1`), workflow state | Their own record versions; a mapping to LinkML requires an explicit, lossless adapter |
 | API / UI DTOs | `f2w_agent/api.py` Pydantic models (`GraphPayload`, `GraphNode`, ...) | Frozen for old-UI compatibility (D11); adapters, not schema edits |

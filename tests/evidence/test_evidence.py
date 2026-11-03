@@ -264,7 +264,7 @@ def test_adapted_files_carry_bsd3_attribution():
 
 def test_importing_evidence_has_no_side_effects():
     code = ("import sys; import app.modules.evidence; "
-            "bad = [m for m in ('fitz', 'openai', 'httpx', 'langchain_core', 'app.modules.extract_terms') "
+            "bad = [m for m in ('fitz', 'openai', 'httpx', 'langchain_core', 'app.modules.legacy.extract_terms_cli') "
             "if m in sys.modules]; print(bad)")
     out = subprocess.run([sys.executable, "-c", code], cwd=REPO, capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "[]"

@@ -6,7 +6,7 @@ strings in data files or code.
 
 Usage example::
 
-    from app.modules.prov import WAS_GENERATED_BY, extraction_activity
+    from app.modules.provenance.prov_o import WAS_GENERATED_BY, extraction_activity
 
     act = extraction_activity("run-42", "deepseek-r1:32b", "2026-09-21T00:00:00Z")
     edge = {

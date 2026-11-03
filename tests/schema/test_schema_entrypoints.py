@@ -38,7 +38,7 @@ def test_legacy_normalizer_entrypoints_are_recorded():
     assert legacy == {"extract-terms-cli", "run-pipeline-cborg"}
     assert all(e.normalizer in (NORMALIZER_LEGACY, NORMALIZER_TERM_EXTRACTOR) for e in ENTRYPOINT_DEFAULTS)
     # the legacy path is real: extract_terms defines its own SchemaHelper class
-    assert "class SchemaHelper" in (REPO / "app/modules/extract_terms.py").read_text(encoding="utf-8")
+    assert "class SchemaHelper" in (REPO / "app/modules/legacy/extract_terms_cli.py").read_text(encoding="utf-8")
 
 
 def test_graph_filename_pattern_selection_matches_multi_kg(registry):

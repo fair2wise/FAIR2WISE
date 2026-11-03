@@ -26,7 +26,7 @@ from app.modules.operations.corpus import (
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import corpus_qa  # noqa: E402
+from app.modules.commands import corpus_qa  # noqa: E402
 
 _ALPHABET = string.ascii_lowercase + "  -:"
 

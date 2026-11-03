@@ -14,7 +14,7 @@ REPO = Path(__file__).resolve().parents[2]
 # Modules that called load_dotenv() at import (directly or through kg_rag_api) before T04.
 FORMER_IMPORT_LOADERS = [
     "app.modules.kg_rag_api",
-    "app.modules.extract_terms",
+    "app.modules.legacy.extract_terms_cli",
     "app.modules.f2w_agent.cli",
     "app.modules.f2w_agent.api",
     "app.modules.f2w_agent.coordinator",

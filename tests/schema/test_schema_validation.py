@@ -62,7 +62,7 @@ def test_rsoxs_schema_normalization_is_frozen(rsoxs_helper):
 def test_legacy_extract_terms_normalizer_diverges_on_the_same_schema(registry):
     """F4: extract_terms.SchemaHelper lacks the RSoXS aliases, so it keeps Thing under rsoxs_schema.yaml."""
     legacy = load_helper(registry.get("rsoxs_schema"), implementation=NORMALIZER_LEGACY)
-    assert type(legacy).__module__ == "app.modules.extract_terms"
+    assert type(legacy).__module__ == "app.modules.legacy.extract_terms_cli"
     assert _outcome(legacy, TERMS[0]) == ("Thing", "RSoXS", FROZEN_RELATIONS)
     current = load_helper(registry.get("rsoxs_schema"), implementation=NORMALIZER_TERM_EXTRACTOR)
     assert _outcome(current, TERMS[0])[0] == "RSoXSMeasurement"

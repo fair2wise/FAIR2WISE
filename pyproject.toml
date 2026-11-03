@@ -8,8 +8,8 @@
 # the images). The ranges below are the PyPI packaging metadata for `pip install fair2wise[...]`
 # and mirror the direct dependencies in pixi.toml; they are not a lock.
 #
-# Not packaged: app/modules/legacy/ (archived, no __init__.py), app/run_pipeline_cborg.py
-# (checkout-only script), scripts/, storage/, config.yml. Schemas, vocabularies and
+# Packaged but archived: app/modules/legacy/ (deprecated originals moved by T17B, excluded from lint/typing).
+# Not packaged: app/run_pipeline_cborg.py (checkout-only script), scripts/, storage/, config.yml. Schemas, vocabularies and
 # config.yml resolve from F2W_RESOURCE_ROOT (repo root in a checkout); see
 # app/modules/resources.py.
 [build-system]
@@ -92,6 +92,21 @@ full = [
   "fair2wise[api,agents,semantic,parser,tiled,figures]",
 ]
 
+# Operator console scripts (T17B, owner approval 2026-11-03). The implementations are the modules under
+# app/modules/commands/ (plus literature.download_pdfs); the files in scripts/ remain as launch facades.
+# No command takes a secret on its command line.
+[project.scripts]
+f2w-run = "f2w.modules.commands.run:cli"
+f2w-tiled-server = "f2w.modules.commands.tiled_server:main"
+f2w-harvest = "f2w.modules.commands.harvest_rsoxs:main"
+f2w-paper-finder = "f2w.modules.commands.paper_finder:main"
+f2w-corpus-qa = "f2w.modules.commands.corpus_qa:_main_app"
+f2w-download-pdfs = "f2w.modules.literature.download_pdfs:main"
+f2w-repair-corpus = "f2w.modules.commands.repair_corpus:main"
+f2w-kg-snapshot = "f2w.modules.commands.build_kg_snapshot:main"
+f2w-kg-release = "f2w.modules.commands.prepare_kg_release:main"
+f2w-kg-adopt = "f2w.modules.commands.adopt_legacy_kg:main"
+
 [tool.setuptools]
 package-dir = { "f2w" = "app" }
 # Every app/ directory with an __init__.py (tests/packaging checks this list).
@@ -103,6 +118,7 @@ packages = [
   "f2w.modules.agents",
   "f2w.modules.canonicalization",
   "f2w.modules.canonicalization.campaign",
+  "f2w.modules.commands",
   "f2w.modules.contracts",
   "f2w.modules.deployment",
   "f2w.modules.evidence",
@@ -114,6 +130,7 @@ packages = [
   "f2w.modules.graph.imports",
   "f2w.modules.hybrid_rag",
   "f2w.modules.jobs",
+  "f2w.modules.legacy",
   "f2w.modules.launchers",
   "f2w.modules.curation",
   "f2w.modules.library",
@@ -157,6 +174,8 @@ convention = "google"
 "tests/**" = ["D", "T20"]
 "scripts/**" = ["D", "T20"]
 "examples/**" = ["D", "T20"]
+# Byte-pinned to the T19A baseline (see the mypy override for corpus_qa below).
+"app/modules/commands/corpus_qa.py" = ["D", "T20", "UP", "PTH"]
 
 [tool.isort]
 # ALS section 3: stdlib, third-party, local, alphabetical inside each group (`import x` and
@@ -183,9 +202,16 @@ module = [
   "langchain_openai.*", "langgraph.*", "linkml_runtime.*", "mp_api.*", "obonet.*", "pyalex.*",
   "pymatgen.*", "rapidfuzz.*", "rapidocr_onnxruntime.*", "sentence_transformers.*", "tiled.*",
   "torch.*", "watchdog.*", "pypdfium2.*", "docling.*", "docling_core.*",
-  "rdkit.*", "pynvml.*", "globus_compute_sdk.*",
+  "rdkit.*", "pynvml.*", "globus_compute_sdk.*", "pypdf.*",
 ]
 ignore_missing_imports = true
+
+# corpus_qa.py is promoted byte-for-byte (T17B): tests/operations/test_corpus_audit.py::test_cli_is_unchanged pins its
+# SHA-256 to the T19A baseline (operations_inventory.json OP02), so it cannot be annotated or reformatted until the
+# owner re-baselines the pin. Typing and docstrings for it are deferred with that decision.
+[[tool.mypy.overrides]]
+module = ["app.modules.commands.corpus_qa"]
+ignore_errors = true
 
 [tool.coverage.run]
 source = ["app"]

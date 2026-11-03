@@ -1,8 +1,8 @@
 # T17B legacy audit (H8 review packet)
 
-Status: **audit only (T17B step 1). No file was moved, ported, promoted or deleted.**
-T17B depends on H4, which is not approved; steps 2-5 (port, move to `app/modules/legacy/`,
-promote scripts, retire) start after H4. The dispositions below are proposals for the owner.
+Status: **audit (T17B step 1); steps 2-5 partly executed after the owner's H4 approval of 2026-11-03,
+see section 8 for what was done and what the audit got wrong.** The dispositions in sections 1-7 are
+the original proposals; section 8 supersedes them where they differ.
 
 Date: 2026-11-02. Tip audited: `forge_merge` at `1c9aa81`. Baseline: companion
 `f2w_baseline_manifest.json` (B01-B36; archive `222b1e7`, 2026-09-29). "Pre-framework" means
@@ -149,3 +149,44 @@ audit; it is part of step 5.
 Owner decisions needed before step 2: confirm or reclassify every (r) row; approve the (d)
 list for the H8 packet (no deletion before H8); say whether the NERSC scripts are still used;
 confirm the `[project.scripts]` names proposed in section 4.
+
+## 8. Execution record (T17B steps 2-5, branch `forge_merge-T17B`, owner approval 2026-11-03)
+
+Approved: class-(a) moves, class-(b) ports, the 11 script promotions and moving `scripts/harvest_*.py` onto the
+hardened downloader. **Not** approved and not touched: the 16-file retire list (d) and the (r) reclassification.
+
+### Done
+
+| Item | Result |
+|---|---|
+| `scripts/harvest_{rsoxs,xray,tomo}.py` | PDFs through `literature.legacy_download.hardened_download_pdf`; Crossref/OpenAlex lookups through the new `hardened_get_json` (policy on every hop, 8 MiB cap). No `requests`/`urllib.request` left in the three scripts (`tests/test_harvest_hardened.py`). |
+| `prov.py` (a) | **Not moved to `legacy/`.** The audit's premise (a canonical twin in `provenance/`) is wrong: `provenance/` is the audit-log package; nothing else defines the PROV-O constants and helpers, and `docs/adr/schema-ownership.md` names the file the authority. Moved (history-preserving rename) to `app/modules/provenance/prov_o.py` instead; behaviour unchanged. |
+| `extract_terms.py` (a+b) | Moved to `app/modules/legacy/extract_terms_cli.py` (the name `legacy/extract_terms.py` is taken by an older file). The canonical normaliser `term_extractor.schema.SchemaHelper` already is the registry default; the divergent copy stays as `NORMALIZER_LEGACY` (T22A F4). `legacy/` is now a package (`f2w.modules.legacy`) so that path works from a wheel. |
+| 9 scripts promoted | `run`, `tiled_server`, `harvest_rsoxs`, `paper_finder`, `corpus_qa`, `repair_corpus`, `build_kg_snapshot`, `prepare_kg_release`, `adopt_legacy_kg` moved to `app/modules/commands/` with `[project.scripts]` entries; `f2w-download-pdfs` points at `literature.download_pdfs:main`. `scripts/<name>.py` stays as a launch facade. The audit's "11" promote rows are 10 console scripts (7 named singly plus the release trio). |
+
+### Not done, with the reason (owner decision needed)
+
+| File | Audit class | Finding |
+|---|---|---|
+| `tiled_graph.py` | (a) | Not only `tiled_sim` imports it: `f2w_agent/api.py` and `f2w_agent/retrieval_agent.py` import `TiledLookupGraph`, `lookup_experiment_identity`, `probe_tiled_status`, `load_tiled_config`, `coerce_local_tiled_uri`, `is_experiment_identity_question` and more, and `graph/backends/tiled*.py` has none of them (it is the write/import path). The live lookup and probe have no canonical home. |
+| `orchestrator_agent.py`, `debate_agent.py` | (a) | The audit's own condition ("confirm `api.py` no longer routes through it") fails: `f2w_agent/api.py` constructs `WorkflowOrchestratorAgent` and `EvidenceDebateAgent` and imports private helpers; `coordinator.py` imports `EvidenceDebateAgent`. Both are exported lazily from `f2w_agent/__init__.py`. |
+| `download_agent.py` | (b) | The port step is already done (T29: `hardened_download_pdf`, `tests/test_download_parity.py`). Moving it is blocked: `api.py`, `coordinator.py`, `f2w_agent/__init__.py` import `DownloadAgent` and four helpers live. |
+| `kg_update.py` | (b) | Still imported by `api.py`, `coordinator.py` and `library/extraction.py`; `graph/legacy_save.py` covers only the Save path. |
+| `bl1101_ingest.py` | (b) | `hybrid_rag/sources.py` imports `REPO_SPECS`, `tiled_sim.py` imports it; ingestion (GitHub walk, chunking, graph assembly) has no framework home. A real port is a multi-day task. |
+
+Each of these is imported by `f2w_agent/api.py`, which class (r) retains as the browser contract, so moving them
+under `legacy/` would make a retained, live module import from the archive. Options for the owner: (1) reclassify
+them (r) (stay), (2) keep `legacy/` copies plus re-exporting shims at the old path (H8 already contemplates removing
+shims), or (3) fund real ports: `tiled_lookup` under `graph/backends/`, `routing`/`debate` under `agent_runtime/`
+and `curation/`, `kg_update` under `graph/`, `bl1101` under `graph/imports/`.
+
+### Open items found while doing this
+
+* `literature/download_pdfs.py` still has its own `requests`-based `download_pdf` (kept as the parity oracle of
+  `tests/test_download_parity.py`) and `requests` resolvers (Unpaywall, OpenAlex, Crossref, Semantic Scholar, CORE,
+  OSTI, Europe PMC). The `f2w-download-pdfs` CLI and `run_arxiv_workflow` still download through it. Decision:
+  switch its two call sites to the hardened fetcher and keep the old function only in the test.
+* `corpus_qa.py` is promoted byte-for-byte because `test_cli_is_unchanged` pins its SHA-256 (OP02); it is excluded
+  from mypy strict and the ruff D/UP/PTH/T20 rules until that pin is re-baselined.
+* `scripts/harvest_xray.py` and `scripts/harvest_tomo.py` stay in `scripts/` (audit: leave) but import the packaged
+  `harvest_rsoxs`.

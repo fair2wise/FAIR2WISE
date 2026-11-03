@@ -61,7 +61,7 @@ fi
 echo ""
 echo "[1/2] Running term extraction..."
 rm -f "$TERMS_TMP"
-python3 app/modules/extract_terms.py \
+python3 app/modules/legacy/extract_terms_cli.py \
     --pdf-dir "$PDF_DIR" \
     --output "$TERMS_TMP" \
     --backend cborg \

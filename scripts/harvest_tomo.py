@@ -33,8 +33,8 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-import download_pdfs as dl  # noqa: E402
-import harvest_rsoxs as hr  # noqa: E402
+from app.modules.commands import harvest_rsoxs as hr  # noqa: E402
+from app.modules.literature import download_pdfs as dl  # noqa: E402
 
 LOGGER = logging.getLogger("harvest_tomo")
 
@@ -490,7 +490,7 @@ def harvest(
         last_url = ""
         for url in urls:
             last_url = url
-            ok = dl.download_pdf(url, str(dest))
+            ok = hr.download_pdf(url, str(dest))
             if ok:
                 break
         if not ok:

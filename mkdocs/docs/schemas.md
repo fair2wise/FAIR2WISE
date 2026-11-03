@@ -35,7 +35,7 @@ in `papers/tomo/` (`scripts/harvest_tomo.py`).
 ## `prov_vocabulary.yaml`
 
 This file documents the locked `prov:` compact terms used in data
-(`prov:wasGeneratedBy`, `prov:used`, …). Helpers live in `app/modules/prov.py`.
+(`prov:wasGeneratedBy`, `prov:used`, …). Helpers live in `app/modules/provenance/prov_o.py`.
 
 It is **not** a LinkML schema. LinkML `SchemaDefinition` rejects unknown
 top-level keys such as `prov_vocabulary:`. Do **not** `imports:` this file and

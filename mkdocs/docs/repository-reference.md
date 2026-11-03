@@ -68,7 +68,7 @@ move into a focused module rather than expanding route handlers.
 | `app/modules/bl1101_ingest.py` | ALS 11.0.1.2 ops ingest (blueprint, ALS page, pinned GitHub cache) |
 | `app/modules/project_config.py` | Cached YAML/env configuration helpers |
 | `app/modules/cborg_limiter.py` | Shared synchronous/asynchronous CBORG concurrency cap |
-| `app/modules/extract_terms.py` | Standalone schema-aware extraction pipeline |
+| `app/modules/legacy/extract_terms_cli.py` | Standalone schema-aware extraction pipeline |
 | `app/run_pipeline_cborg.py` | Incremental model/checkpoint evaluation |
 
 `scripts/app/modules/kg_rag_api.py` is a copied compatibility version. The

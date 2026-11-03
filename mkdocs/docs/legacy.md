@@ -8,6 +8,7 @@ reproducibility and reference. They are not imported by the current
 |---|---|
 | `build_onto.py` | Convert SKOS/material graphs to ontology/OWL forms, optionally using ROBOT |
 | `extract_terms.py` | Early Ollama-only term extractor |
+| `extract_terms_cli.py` | Schema-aware standalone extractor (moved from `app/modules/extract_terms.py`, T17B; the `NORMALIZER_LEGACY` normaliser and `extract-terms-cli` entry point) |
 | `extract_terms_linkml.py` | Earlier LinkML-aware extractor |
 | `extract_terms_linkml_jun3.py` | Dated extraction snapshot |
 | `extracted_terms_json2kg_with_context.py` | Earlier terms-to-KG converter preserving context |
@@ -19,7 +20,7 @@ reproducibility and reference. They are not imported by the current
 
 | Legacy concern | Current implementation |
 |---|---|
-| Term extraction | `app/modules/term_extractor/` or `app/modules/extract_terms.py` |
+| Term extraction | `app/modules/term_extractor/` or `app/modules/legacy/extract_terms_cli.py` |
 | Graph conversion | `app/modules/json2kg.py` |
 | RAG and model clients | `app/modules/kg_rag_api.py` |
 | NERSC agent workflow | `app.modules.launchers.f2w_agent` plus `scripts/run_nersc_3agent.sh` |

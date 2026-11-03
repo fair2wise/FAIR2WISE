@@ -185,7 +185,7 @@ def test_extract_terms_script_summary_line(tmp_path):
     proc = subprocess.run(
         [
             sys.executable,
-            str(REPO / "app/modules/extract_terms.py"),
+            str(REPO / "app/modules/legacy/extract_terms_cli.py"),
             "--pdf-dir", "empty",
             "--output", "res/out.json",
             "--backend", "ollama",

@@ -12,7 +12,7 @@ import threading
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
-from app.modules.extract_terms import LLMTermExtractor
+from app.modules.legacy.extract_terms_cli import LLMTermExtractor
 
 from tests.evidence.evidence_fixtures import PAGE_TEXTS
 

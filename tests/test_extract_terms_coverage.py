@@ -25,7 +25,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from app.modules.extract_terms import (
+from app.modules.legacy.extract_terms_cli import (
     CBorgChatClient,
     LLMTermExtractor,
     OllamaChatClient,
@@ -182,7 +182,7 @@ class TestOllamaChatClient:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"message": {"content": "hello ollama"}}
 
-        with patch("app.modules.extract_terms.requests.post", return_value=mock_resp) as mock_post:
+        with patch("app.modules.legacy.extract_terms_cli.requests.post", return_value=mock_resp) as mock_post:
             client = OllamaChatClient(model="llama3", base_url="http://localhost:11434")
             result = client.chat("test prompt", temperature=0.1, timeout=30)
 
@@ -197,7 +197,7 @@ class TestOllamaChatClient:
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = req.HTTPError("500")
 
-        with patch("app.modules.extract_terms.requests.post", return_value=mock_resp):
+        with patch("app.modules.legacy.extract_terms_cli.requests.post", return_value=mock_resp):
             client = OllamaChatClient(model="llama3", base_url="http://localhost:11434")
             with pytest.raises(req.HTTPError):
                 client.chat("prompt")
@@ -207,7 +207,7 @@ class TestOllamaChatClient:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = {"message": {}}  # no "content" key
 
-        with patch("app.modules.extract_terms.requests.post", return_value=mock_resp):
+        with patch("app.modules.legacy.extract_terms_cli.requests.post", return_value=mock_resp):
             client = OllamaChatClient(model="llama3", base_url="http://localhost:11434")
             result = client.chat("prompt")
 
@@ -225,7 +225,7 @@ class TestCBorgChatClient:
         chunk = MagicMock()
         chunk.choices = [first, last]
 
-        with patch("app.modules.extract_terms.openai.OpenAI") as mock_openai:
+        with patch("app.modules.legacy.extract_terms_cli.openai.OpenAI") as mock_openai:
             mock_openai.return_value.chat.completions.create.return_value = [chunk]
             client = CBorgChatClient(model="lbl/cborg-chat", api_key="key")
             result = client.chat("hello", temperature=0.0, timeout=60)
@@ -241,7 +241,7 @@ class TestCBorgChatClient:
         chunk = MagicMock()
         chunk.choices = [choice]
 
-        with patch("app.modules.extract_terms.openai.OpenAI") as mock_openai:
+        with patch("app.modules.legacy.extract_terms_cli.openai.OpenAI") as mock_openai:
             mock_openai.return_value.chat.completions.create.return_value = [chunk]
             client = CBorgChatClient(model="lbl/cborg-chat", api_key="key")
             result = client.chat("hello")
@@ -251,12 +251,12 @@ class TestCBorgChatClient:
 
 class TestMakeChatClient:
     def test_cborg_backend_returns_cborg_client(self):
-        with patch("app.modules.extract_terms.openai.OpenAI"):
+        with patch("app.modules.legacy.extract_terms_cli.openai.OpenAI"):
             client = make_chat_client("cborg", "lbl/cborg-chat", cborg_api_key="key")
         assert isinstance(client, CBorgChatClient)
 
     def test_cborg_openai_alias_also_returns_cborg_client(self):
-        with patch("app.modules.extract_terms.openai.OpenAI"):
+        with patch("app.modules.legacy.extract_terms_cli.openai.OpenAI"):
             client = make_chat_client("cborg-openai", "lbl/model", cborg_api_key="k")
         assert isinstance(client, CBorgChatClient)
 
@@ -446,7 +446,7 @@ class TestProcessPdf:
         e.fuzzy_merge = MagicMock(return_value=None)
         e._save_terms_threadsafe = MagicMock()
 
-        with patch("app.modules.extract_terms.open_pdf", return_value=doc):
+        with patch("app.modules.legacy.extract_terms_cli.open_pdf", return_value=doc):
             count = e.process_pdf("/fake/paper.pdf")
 
         assert count == 1
@@ -457,7 +457,7 @@ class TestProcessPdf:
     def test_fitz_open_failure_returns_zero(self, tmp_path):
         e = _bare_extractor(tmp_path)
 
-        with patch("app.modules.extract_terms.open_pdf", side_effect=RuntimeError("corrupt pdf")):
+        with patch("app.modules.legacy.extract_terms_cli.open_pdf", side_effect=RuntimeError("corrupt pdf")):
             count = e.process_pdf("/fake/bad.pdf")
 
         assert count == 0
@@ -475,7 +475,7 @@ class TestProcessPdf:
             "issue": None, "pages_range": None, "abstract_text": None, "keywords": [],
         })
 
-        with patch("app.modules.extract_terms.open_pdf", return_value=doc):
+        with patch("app.modules.legacy.extract_terms_cli.open_pdf", return_value=doc):
             count = e.process_pdf("/fake/paper.pdf")
 
         assert count == 0
@@ -506,7 +506,7 @@ class TestProcessPdf:
         })
         e._save_terms_threadsafe = MagicMock()
 
-        with patch("app.modules.extract_terms.open_pdf", return_value=doc):
+        with patch("app.modules.legacy.extract_terms_cli.open_pdf", return_value=doc):
             e.process_pdf("/fake/paper.pdf")
 
         # Both terms should now have the doi and paper_title backfilled

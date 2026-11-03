@@ -31,7 +31,7 @@ from tests.runtime.runtime_fakes import als_ctx, local_ctx
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-import corpus_qa  # noqa: E402
+from app.modules.commands import corpus_qa  # noqa: E402
 
 TERMINOLOGY = REPO / "storage" / "terminology"
 CANARY_DEF = "SYNTHETIC-DEFINITION-CANARY-7731"
@@ -246,5 +246,5 @@ def test_cli_is_unchanged():
     inventory = json.loads((REPO / "docs" / "migration" / "operations_inventory.json").read_text(encoding="utf-8"))
     items = inventory["items"] if isinstance(inventory, dict) else inventory
     (op02,) = [item for item in items if item.get("id") == "OP02"]
-    source = (REPO / "scripts" / "corpus_qa.py").read_bytes()
+    source = (REPO / "app" / "modules" / "commands" / "corpus_qa.py").read_bytes()
     assert hashlib.sha256(source).hexdigest() == op02["sha256"]
