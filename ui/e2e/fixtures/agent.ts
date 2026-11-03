@@ -195,6 +195,8 @@ export interface MockAgentOptions {
   judgeModels?: string[] | 'forbidden';
   /** Captures PUT /v1/validation/judge-model bodies. */
   judgePuts?: Array<Record<string, unknown>>;
+  /** T18D: GET /v1/capabilities `can_save` (default true); 'absent' makes the route 404 (older server). */
+  canSave?: boolean | 'absent';
 }
 
 export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
@@ -225,6 +227,15 @@ export async function mockAgent(page: Page, options: MockAgentOptions = {}) {
       const body = request.postDataJSON() as Record<string, unknown>;
       Object.assign(settings, body);
       await route.fulfill(json(settings));
+      return;
+    }
+
+    if (path === '/v1/capabilities' && method === 'GET' && options.canSave !== 'absent') {
+      const canSave = options.canSave ?? true;
+      await route.fulfill(json({
+        role: canSave ? 'local_operator' : 'user', profile: canSave ? 'local' : 'als',
+        can_edit: canSave, can_save: canSave, can_upload: canSave,
+      }));
       return;
     }
 
