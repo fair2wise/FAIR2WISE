@@ -15,6 +15,34 @@ Run launcher modules from the repository root:
 python3 -m app.modules.launchers.f2w_agent status
 ```
 
+## Console scripts (T17B)
+
+`pip install fair2wise` installs these commands. Each is implemented in the packaged module shown (under
+`app/modules/commands/` unless noted); the file of the same name in `scripts/` remains as a launch facade, so
+`python scripts/<name>.py ...` in a checkout is unchanged. No command takes a key, token or password as an
+argument: credentials come from the environment (`CBORG_API_KEY`, `F2W_TILED_*` files) or a file the environment
+names.
+
+| Command | Module | Use |
+|---|---|---|
+| `f2w-run` | `commands.run` | Local modular term extraction |
+| `f2w-tiled-server` | `commands.tiled_server` | Managed Tiled lifecycle (`start`, `status`, `stop`, `check`, `upgrade-catalog`) |
+| `f2w-harvest` | `commands.harvest_rsoxs` | Harvest open-access RSoXS PDFs |
+| `f2w-paper-finder` | `commands.paper_finder` | Human-paced review queue for paywalled papers |
+| `f2w-corpus-qa` | `commands.corpus_qa` | Extracted-terms QA audit (byte-pinned to the T19A baseline) |
+| `f2w-repair-corpus` | `commands.repair_corpus` | Write a repaired copy of an extracted-terms file |
+| `f2w-download-pdfs` | `literature.download_pdfs` | Search arXiv/OpenAlex and download PDFs |
+| `f2w-kg-snapshot` | `commands.build_kg_snapshot` | Freeze a versioned JSON KG snapshot |
+| `f2w-kg-release` | `commands.prepare_kg_release` | Prepare, verify and export a KG release (never commits or pushes) |
+| `f2w-kg-adopt` | `commands.adopt_legacy_kg` | Adopt legacy flat KG files as releases |
+
+`harvest_rsoxs`, `harvest_xray` and `harvest_tomo` download PDFs through the hardened fetcher
+(`literature.legacy_download.hardened_download_pdf`, the one `DownloadAgent` uses) and read Crossref and OpenAlex
+metadata through `hardened_get_json`. Compared with the former private `requests`/`urllib` code: every URL and every
+redirect hop must be http(s) on port 80/443 with no credentials and a public address (loopback, private,
+link-local and CGNAT hosts are refused); redirects are limited to five; a PDF is capped at 100 MiB and 120 s and must
+start with `%PDF-`; metadata answers are capped at 8 MiB; refused or non-PDF answers are not retried.
+
 ## Other entry points
 
 | File | Use |
