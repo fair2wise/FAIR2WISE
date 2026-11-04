@@ -48,6 +48,7 @@ import uuid
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.evidence import EvidenceRef, MatchType, SourceLocator
+from ..json_types import JsonValue
 from .content_access import SourceAccessScope, SourceKind
 
 # --------------------------------------------------------------------------- configuration
@@ -223,7 +224,7 @@ def citation_tokens(text: str) -> list[str]:
     return CITATION_RE.findall(str(text or ""))
 
 
-def _digest(value: Any) -> dict[str, Any] | None:
+def _digest(value: object) -> dict[str, Any] | None:
     """SHA-256 and length of ``value`` (joined if a list of messages); ``None`` stays ``None``."""
     if value is None:
         return None
@@ -234,7 +235,7 @@ def _digest(value: Any) -> dict[str, Any] | None:
     return {"sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "chars": len(text)}
 
 
-def _basename(path: Any) -> str:
+def _basename(path: object) -> str:
     """Last component of a path-like value (no directories reach the user)."""
     return re.split(r"[/\\]", str(path))[-1]
 
@@ -651,7 +652,7 @@ class DisclosureProjector:
             return text
         return _ABS_PATH_RE.sub(lambda m: self.roots.redact(m.group(0)), text)
 
-    def _safe_str(self, value: Any, limit: int | None = None) -> Any:
+    def _safe_str(self, value: object, limit: int | None = None) -> JsonValue:
         if not isinstance(value, str):
             return value
         text = _SECRET_RE.sub("[redacted]", self.redact_paths(value))
@@ -660,7 +661,7 @@ class DisclosureProjector:
     def _typed(self, code: ErrorCode, viewer: Viewer) -> str:
         return f"{_CODE_MESSAGES[code]} (error: {code.value}; ref: {viewer.correlation_id})"
 
-    def project_error_message(self, message: Any, viewer: Viewer, *, code: ErrorCode = ErrorCode.INTERNAL) -> str:
+    def project_error_message(self, message: object, viewer: Viewer, *, code: ErrorCode = ErrorCode.INTERNAL) -> str:
         """Return a user-safe error message.
 
         Messages that look like raw exception text, carry secrets or exceed
@@ -689,7 +690,7 @@ class DisclosureProjector:
                                                                        code=ErrorCode.INVALID_INPUT)
         return ErrorCode.INTERNAL, self._typed(ErrorCode.INTERNAL, viewer)
 
-    def project_http_error(self, status_code: int, body: Any, viewer: Viewer) -> Any:
+    def project_http_error(self, status_code: int, body: object, viewer: Viewer) -> JsonValue:
         """Project an error body (``{"detail": ...}`` or plain text), keeping its shape."""
         code = _STATUS_CODES.get(int(status_code), ErrorCode.INTERNAL)
         if isinstance(body, Mapping) and "detail" in body:
@@ -706,10 +707,10 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ generic scrub
 
-    def _artifact_value(self, value: Any) -> bool:
+    def _artifact_value(self, value: object) -> bool:
         return isinstance(value, str) and bool(_ARTIFACT_VALUE_RE.search(value.strip()))
 
-    def _scrub(self, value: Any, *, depth: int, limit: int | None = None) -> Any:
+    def _scrub(self, value: object, *, depth: int, limit: int | None = None) -> JsonValue:
         """Drop private keys and artifact values, redact paths, clip strings (unknown data)."""
         if depth > 8:
             return None
@@ -873,13 +874,13 @@ class DisclosureProjector:
 
     def project_text(
         self,
-        text: Any,
+        text: object,
         viewer: Viewer,
         *,
         evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
         sources: Sequence[SourceRef] = (),
         state: _ResponseState | None = None,
-    ) -> Any:
+    ) -> JsonValue:
         """Project answer-like text: verify quotes, bound them, clip source echo.
 
         Citation tokens are never removed or rewritten.
@@ -963,7 +964,7 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ graph
 
-    def project_publication(self, pub: Any) -> Any:
+    def project_publication(self, pub: object) -> JsonValue:
         """Bibliographic record: drop private keys, cut ``abstract_text``, redact paths."""
         if not isinstance(pub, Mapping):
             return pub
@@ -979,7 +980,7 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1, limit=self.budget.max_property_chars)
         return out
 
-    def _project_properties(self, props: Any) -> Any:
+    def _project_properties(self, props: object) -> JsonValue:
         limit = self.budget.max_property_chars
         if isinstance(props, list):
             out = []
@@ -996,24 +997,24 @@ class DisclosureProjector:
             return self._scrub(props, depth=0, limit=limit)
         return props
 
-    def _project_code(self, value: Any) -> Any:
+    def _project_code(self, value: object) -> JsonValue:
         if not isinstance(value, str):
             return value
         return _clip(value, self.budget.max_code_snippet_chars)
 
-    def _project_url(self, value: Any) -> Any:
+    def _project_url(self, value: object) -> JsonValue:
         if not isinstance(value, str) or not value:
             return value
         if self._artifact_value(value) or not re.match(r"(?i)^https?://", value):
             return None
         return value
 
-    def _project_repo_path(self, value: Any) -> Any:
+    def _project_repo_path(self, value: object) -> JsonValue:
         if isinstance(value, str) and _ABS_PATH_RE.fullmatch(value):
             return self.roots.redact(value)
         return value
 
-    def project_linked_snippet(self, snippet: Any) -> Any:
+    def project_linked_snippet(self, snippet: object) -> JsonValue:
         """Project a ``LinkedCodeSnippet`` dict."""
         if not isinstance(snippet, Mapping):
             return snippet
@@ -1031,9 +1032,9 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1)
         return out
 
-    def project_graph_node(self, node: Any, viewer: Viewer, *,
+    def project_graph_node(self, node: object, viewer: Viewer, *,
                            evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
-                           sources: Sequence[SourceRef] = (), state: _ResponseState | None = None) -> Any:
+                           sources: Sequence[SourceRef] = (), state: _ResponseState | None = None) -> JsonValue:
         """Project a ``GraphNode`` dict, keeping its key order and wire shape."""
         if not isinstance(node, Mapping):
             return node
@@ -1061,8 +1062,8 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1)
         return out
 
-    def project_graph_payload(self, payload: Any, viewer: Viewer, *, state: _ResponseState | None = None,
-                              sources: Sequence[SourceRef] = ()) -> Any:
+    def project_graph_payload(self, payload: object, viewer: Viewer, *, state: _ResponseState | None = None,
+                              sources: Sequence[SourceRef] = ()) -> JsonValue:
         """Project ``GraphPayload`` (or the SSE ``{nodes, edges}`` graph)."""
         if not isinstance(payload, Mapping):
             return payload
@@ -1079,7 +1080,7 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ chat
 
-    def _project_candidate(self, cand: Any) -> Any:
+    def _project_candidate(self, cand: object) -> JsonValue:
         if not isinstance(cand, Mapping):
             return None
         out = {k: cand.get(k) for k in ("id", "doi", "title", "publication_year", "score", "repository")
@@ -1088,7 +1089,7 @@ class DisclosureProjector:
             out["abstract"] = _clip(str(cand.get("abstract") or ""), self.budget.max_pending_abstract_chars)
         return self._scrub(out, depth=1)
 
-    def project_pending(self, pending: Any) -> Any:
+    def project_pending(self, pending: object) -> JsonValue:
         """Project the pending download/extraction card (``ChatResponse.pending``)."""
         if not isinstance(pending, Mapping):
             return pending
@@ -1104,7 +1105,7 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1)
         return out
 
-    def _pending_paper(self, paper: Any) -> Any:
+    def _pending_paper(self, paper: object) -> JsonValue:
         if not isinstance(paper, Mapping):
             return paper
         out: dict[str, Any] = {}
@@ -1122,7 +1123,7 @@ class DisclosureProjector:
     _VERDICT_KEYS = ("status", "sufficient", "direct_evidence_count", "no_evidence", "graph_source_requested",
                      "graph_source_used", "leeway_used")
 
-    def _project_verdict(self, verdict: Any) -> Any:
+    def _project_verdict(self, verdict: object) -> JsonValue:
         if not isinstance(verdict, Mapping):
             return None
         out: dict[str, Any] = {k: verdict[k] for k in self._VERDICT_KEYS if k in verdict}
@@ -1141,7 +1142,7 @@ class DisclosureProjector:
             out["error_code"] = ErrorCode.INTERNAL.value
         return out
 
-    def _project_round(self, rnd: Any) -> Any:
+    def _project_round(self, rnd: object) -> JsonValue:
         """``rounds[]`` summary (ADR 4.2): counts, ids, statuses, typed errors."""
         if not isinstance(rnd, Mapping):
             return None
@@ -1203,12 +1204,12 @@ class DisclosureProjector:
 
     def project_chat_response(
         self,
-        payload: Any,
+        payload: object,
         viewer: Viewer,
         *,
         evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
         sources: Sequence[SourceRef] = (),
-    ) -> Any:
+    ) -> JsonValue:
         """Project a ``ChatResponse`` dict (``/chat``, ``/chat/action``, SSE ``complete``/``error``)."""
         if not isinstance(payload, Mapping):
             return payload
@@ -1247,7 +1248,7 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ SSE
 
-    def project_progress(self, data: Any, viewer: Viewer) -> Any:
+    def project_progress(self, data: object, viewer: Viewer) -> JsonValue:
         """Project SSE ``progress`` data (also used for trace ``progress[].data``)."""
         if not isinstance(data, Mapping):
             return data
@@ -1267,9 +1268,9 @@ class DisclosureProjector:
                 out[key] = self._scrub(value, depth=1)
         return out
 
-    def project_sse_event(self, event: str, data: Any, viewer: Viewer, *,
+    def project_sse_event(self, event: str, data: object, viewer: Viewer, *,
                           evidence: Sequence[tuple[EvidenceRef, str | None]] = (),
-                          sources: Sequence[SourceRef] = ()) -> Any:
+                          sources: Sequence[SourceRef] = ()) -> JsonValue:
         """Project one SSE event's data, keeping the event name and key order."""
         if event == "progress":
             return self.project_progress(data, viewer)
@@ -1280,8 +1281,8 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ traces
 
-    def project_trace_for(self, record: Any, context: RequestContext, *,
-                          sources: Sequence[SourceRef] = ()) -> Any:
+    def project_trace_for(self, record: object, context: RequestContext, *,
+                          sources: Sequence[SourceRef] = ()) -> JsonValue:
         """Return the trace for ``GET /traces/{turn_id}`` as this caller may see it.
 
         Owner decision (2026-10-12): admins get the raw trace from the route. A
@@ -1296,7 +1297,7 @@ class DisclosureProjector:
             return record
         return self.project_trace(record, Viewer.from_context(context), sources=sources)
 
-    def project_trace(self, record: Any, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> Any:
+    def project_trace(self, record: object, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> JsonValue:
         """Project a trace detail record for ``GET /traces/{turn_id}`` (ADR 4.3).
 
         Prompts, merged context and raw model outputs become SHA-256 digests and
@@ -1424,7 +1425,7 @@ class DisclosureProjector:
 
     # ------------------------------------------------------------------ other DTOs
 
-    def _redact_value_paths(self, value: Any) -> Any:
+    def _redact_value_paths(self, value: object) -> JsonValue:
         if isinstance(value, str):
             return self.redact_paths(value)
         if isinstance(value, list):
@@ -1433,7 +1434,7 @@ class DisclosureProjector:
             return {k: self._redact_value_paths(v) for k, v in value.items()}
         return value
 
-    def project_settings(self, payload: Any, viewer: Viewer) -> Any:
+    def project_settings(self, payload: object, viewer: Viewer) -> JsonValue:
         """Project ``AgentSettingsResponse``: opaque paths, scrubbed Tiled error, no URI credentials."""
         if not isinstance(payload, Mapping):
             return payload
@@ -1448,13 +1449,13 @@ class DisclosureProjector:
                 out[key] = self._redact_value_paths(value)
         return out
 
-    def project_paths_only(self, payload: Any) -> Any:
+    def project_paths_only(self, payload: object) -> JsonValue:
         """Project DTOs whose only internal-only content is local paths (health, session reset)."""
         return self._redact_value_paths(payload)
 
     # ------------------------------------------------------------------ /v1 bodies
 
-    def project_api_response(self, body: Any) -> Any:
+    def project_api_response(self, body: object) -> JsonValue:
         """Project a ``/v1`` response body or ``job_event`` SSE payload (AUD-06).
 
         ``/v1`` DTOs are typed, but several carry text derived from sources or from the
@@ -1477,15 +1478,15 @@ class DisclosureProjector:
         return self._scrub_api(body, depth=0)
 
     @staticmethod
-    def _api_section_names(key: str, value: Any) -> bool:
+    def _api_section_names(key: str, value: object) -> bool:
         return key.lower() == "sections" and isinstance(value, (list, tuple)) and all(
             isinstance(item, str) and _SECTION_NAME_RE.fullmatch(item) for item in value)
 
     @staticmethod
-    def _api_artifact_value(value: Any) -> bool:
+    def _api_artifact_value(value: object) -> bool:
         return isinstance(value, str) and bool(_API_ARTIFACT_VALUE_RE.search(value.strip()))
 
-    def _scrub_api(self, value: Any, *, depth: int) -> Any:
+    def _scrub_api(self, value: object, *, depth: int) -> JsonValue:
         if depth > 16:
             return None
         if isinstance(value, Mapping):
@@ -1504,7 +1505,7 @@ class DisclosureProjector:
             return self._safe_str(value)
         return value
 
-    def project_model_chat(self, payload: Any, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> Any:
+    def project_model_chat(self, payload: object, viewer: Viewer, *, sources: Sequence[SourceRef] = ()) -> JsonValue:
         """Project model-compatible proxy responses (``/api/chat``, ``/v1/chat/completions``)."""
         if not isinstance(payload, Mapping):
             return payload
@@ -1528,9 +1529,9 @@ class DisclosureProjector:
             out["error"] = self.project_error_message(out["error"], viewer, code=ErrorCode.INVALID_INPUT)
         return out
 
-    def project_route_response(self, method: str, path: str, status_code: int, body: Any,
+    def project_route_response(self, method: str, path: str, status_code: int, body: object,
                                viewer: Viewer, *, sources: Sequence[SourceRef] = (),
-                               evidence: Sequence[tuple[EvidenceRef, str | None]] = ()) -> Any:
+                               evidence: Sequence[tuple[EvidenceRef, str | None]] = ()) -> JsonValue:
         """Dispatch a legacy route response body to its projection.
 
         Args:
@@ -1590,7 +1591,7 @@ class DisclosureProjector:
         """
         private: list[dict[str, Any]] = []
 
-        def refs(owner: str, items: Any) -> list[dict[str, Any]]:
+        def refs(owner: str, items: object) -> list[dict[str, Any]]:
             out = []
             for idx, item in enumerate(items if isinstance(items, list) else []):
                 item = item if isinstance(item, Mapping) else {"text": str(item)}
