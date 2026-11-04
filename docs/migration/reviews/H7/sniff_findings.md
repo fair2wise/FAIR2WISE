@@ -1,6 +1,6 @@
 # T27 sniff-test findings (H7 review packet)
 
-Status: **not ready for H7 review: four `fix` rows are still open** (F1.4, F2.4, F2.5, F3.8); F1.6, F4.2 and the
+Status: **not ready for H7 review: three `fix` rows are still open** (F2.4, F2.5, F3.8); F1.4, F1.6, F4.2 and the
 coverage figure (F0.2/F5.5) were closed on 2026-11-04 (last log entry). The owner accepted every proposed disposition
 below as written on 2026-11-03 (`owner_decisions_2026-11-03.md`, eighth set), so `fix` rows are decided fixes,
 `defer` rows are deferred with owner approval and `intentional` rows are accepted as they are.
@@ -228,7 +228,7 @@ the owner through the 2026-11-03 reply):
 | F1.1 return annotations | fix | fixed (mypy strict, 0 `no-untyped-def`) |
 | F1.2 parameter annotations | fix | fixed |
 | F1.3 legacy typing generics | fix | fixed (ruff `UP` 0) |
-| F1.4 `Any` in signatures | fix | **open**: ruff `ANN401` reports 759 signature annotations; none carries the one-line reason and the `TypedDict`/dataclass replacement for fixed shapes is not done |
+| F1.4 `Any` in signatures | fix | fixed 2026-11-04 (branch `forge_merge-T27d`): ANN401 765 -> 0 in `app` (corpus_qa.py exempt, SHA-256 pinned); 149 signatures keep `Any` on a line with `# noqa: ANN401  # Any: <reason>`; the rule is enabled in `pyproject.toml` so new code cannot add one |
 | F1.5 untyped public defaults | fix | fixed: `credential: TiledCredential \| str \| None` (`public.py`, `application.py`), `publication: Publication \| None`, `http_client: httpx.Client \| None`; a `Protocol` was not needed |
 | F1.6 suppression markers | fix | fixed 2026-11-04: all 44 `# type: ignore` carry a code; the 46 `# noqa` lines that lacked a reason: 45 now have one (22 `BLE001`, 9 `S608`, 9 `E402`, one each of `PLC0415`, `S314`, `SLF001`, `A002`, `S603`) and one unneeded `I001` was removed |
 | F2.1 function docstrings | fix | fixed (ruff `D` 0 with `D105`/`D107` ignored by project policy) |
@@ -292,3 +292,45 @@ Notes:
   `jobs/replacement_step` 79.6). Per-package and per-module numbers are in `coverage.txt`. Closing the gap needs new
   tests (not part of this task); the plan acceptance (no in-scope module below 80%) is therefore still unmet.
 - No behaviour change; no test files, `corpus_qa.py`, `ui/` or frozen files touched.
+
+### 2026-11-04: F1.4 `Any` in signatures (branch `forge_merge-T27d`)
+
+- Measure: `python -m ruff check app --select ANN401 --statistics`: 765 at the branch point (forge_merge `a332d47`), **0
+  after** (`--ignore-noqa`: 150, of which 149 carry a reason and one is `corpus_qa.py`, which is byte-pinned and listed
+  in the ruff per-file ignores with the other pinned-file exemptions).
+- Rule enabled: `select = [..., "ANN401"]` in `[tool.ruff.lint]`; per-file ignores only for `tests/`, `scripts/`,
+  `examples/` and `corpus_qa.py`. No `app` module is exempt, so the list of unfinished modules is empty.
+- Shared aliases live in `app/modules/contracts/json_types.py` (the one place `Any` is spelled for them, each with a
+  comment): `JsonValue` (decoded JSON or a JSON-like record), `JsonObject` (`dict[str, Any]`) and `Untyped` (untyped
+  third-party object, lazily imported attribute). They sit in `contracts` because `security/` modules may import only
+  `contracts` (tests/disclosure and tests/runtime pin that). About 130 signatures use them.
+- Real types introduced: `object` for parameters that are only inspected (about 300, each validated per site by
+  mypy), the real class or a Protocol for injected collaborators (`Admission`, `ChatModel`/`BoundChatModel` in
+  `agent_runtime/chat_model.py`, `ToolPack`/`ToolPackOne`, `EvidenceSource`, `UploadSource`, `RoundResolver`,
+  `ToolInvocation`, `DocumentStore`, `JobService`, `TiledIdentityPort`, `DeploymentSettings`, `CurationStore`,
+  `FolderRoots`, `KnowledgeOperations`, `JobHandle`, `ReadOutcome`, `sqlite3.Connection`/`Row`), PEP 695 generics for
+  pass-through helpers (`note_retrieval`, `note_paper_evidence`, `_await_with_deadline`, `_choice`, `_guarded`), and
+  concrete returns for `public.py`, `operations.py`, `application.py` and `supervisor.py` (about 15 redundant `cast`s
+  removed as a result).
+- Where the 149 retained `Any` signatures are, by reason: forwarded `**kwargs` (about 30: `FastAPI` route decorators,
+  `JobService.register`, `F2WApplication`, `json.dumps`, settings constructors), PEP 562 `__getattr__` hooks (4),
+  decorator pass-through (4), untyped third-party or donor objects (docling, pypdfium2, lxml, faiss, arxiv, pyalex,
+  SentenceTransformer, networkx, donor `KnowledgeGraph`, `Orchestrator`, legacy `AgentPipelineService`), duck-typed
+  collaborators that tests replace with fakes, the backend ports in `operations/graph.py` and `knowledge.py` (JSON
+  and Tiled backends expose `graph_ids`/`snapshot`/`client` beyond `GraphPort`; no shared Protocol yet), and a few
+  places where a real type needs a control-flow change (`curation/resolution.py` reply, `jobs/sqlite.py` `one`).
+  Largest remaining: `operations/knowledge.py` 10, `literature/parsers.py` 7, `public.py` 6, `operations/graph.py` 6,
+  `operations/reports.py` 5.
+- Per top module (before -> after retained): `security/disclosure.py` 65 -> 0, `public.py` 49 -> 6,
+  `runtime_bridge/qa_route.py` 27 -> 3, `operations/knowledge.py` 26 -> 10, `f2w_agent/api.py` 26 -> 2,
+  `application.py` 18 -> 1, `api/operations.py` 18 -> 1, `vision/tools.py` 16 -> 3, `security/authorization.py` 15 -> 4,
+  `api/legacy_ui.py` 15 -> 1, `literature/parsers.py` 13 -> 7, `f2w_agent/trace.py` 13 -> 1, `api/main.py` 13 -> 1,
+  `operations/graph.py` 12 -> 6, `operations/reports.py` 11 -> 5, `operations/corpus.py` 11 -> 0,
+  `agent_runtime/executor.py` 11 -> 3, `bl1101_ingest.py` 7 -> 4.
+- No behaviour change: only annotations, imports under `TYPE_CHECKING`, removal of redundant `cast`s (one
+  `cast(int, ...)` and a few `cast(Protocol, ...)` added where a value was already narrowed by a runtime check), and
+  PEP 695 type parameters. The pinned OpenAPI fixtures (`tests/contracts/legacy_ui/fixtures/openapi_*.json`) pass
+  unchanged. `mypy` 0 errors (348 files), `ruff check app` 0, isort unchanged (the one file that fails isort
+  locally, `vision/docling_ocr.py`, fails on forge_merge too: environment-dependent third-party classification).
+  Not-slow suite from a clean export: 6333 passed, 54 skipped, 4 xfailed, 0 failed. No test files, `corpus_qa.py`,
+  `ui/` or frozen files touched.
