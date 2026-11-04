@@ -53,3 +53,7 @@ docker run -d --name "$name" --stop-timeout 120 \
   -v f2w-local-state:/var/lib/fair2wise/state \
   -v f2w-local-tiled:/var/lib/fair2wise/tiled \
   "$image"
+
+# The Library's KG export needs its release directory to exist (the app never creates it).
+release_dir="${F2W_KG_RELEASE_DIR:-/var/lib/fair2wise/state/kg_releases}"
+docker exec "$name" mkdir -p "$release_dir" >/dev/null 2>&1 || true
