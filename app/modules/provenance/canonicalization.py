@@ -42,7 +42,7 @@ def git_sha(cwd: Path | None = None) -> str:
             check=False,
         )
         return done.stdout.strip() if done.returncode == 0 else ""
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError):  # git unavailable: no revision
         return ""
 
 

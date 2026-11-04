@@ -35,6 +35,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import hashlib
 import json
+import logging
 from pathlib import Path
 from typing import Any, cast
 
@@ -49,6 +50,8 @@ from ..ports import ContractError, ErrorCode
 from .corpus_scope import ReleaseState, ScopeState, read_scope_state, scope_dir
 from .journal import ImportJournal, Lease, operation_id
 from .tiled_json import Clock, FaultHook, _check_client, _writer_errors, target_for
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["SAVE_STEPS", "SaveResult", "StaleRevision", "execute_save", "recover_failed_saves", "save_tag"]
 
@@ -218,7 +221,8 @@ def _journal_rows(path: Path) -> list[dict[str, Any]]:
     for line in path.read_text(encoding="utf-8").splitlines():
         try:
             out.append(json.loads(line))
-        except ValueError:
+        except ValueError as exc:
+            logger.debug("corrupt recovery line skipped: %s", type(exc).__name__)
             continue
     return out
 

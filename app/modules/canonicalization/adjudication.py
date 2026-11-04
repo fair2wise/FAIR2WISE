@@ -163,7 +163,7 @@ def parse_json_object(raw: Any) -> dict[str, Any] | None:
         return None
     try:
         value = json.loads(text[start:end_incl])
-    except (ValueError, TypeError):
+    except (ValueError, TypeError):  # the reply is not JSON
         return None
     return value if isinstance(value, dict) else None
 

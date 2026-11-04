@@ -9,10 +9,13 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import UTC, datetime
 import json
+import logging
 import os
 from pathlib import Path
 import tempfile
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 STATE_VERSION = 1
 
@@ -61,7 +64,8 @@ class WorkflowStateStore:
             return state
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("workflow state unreadable; starting from a fresh state: %s", type(exc).__name__)
             return state
         if not isinstance(raw, dict):
             return state

@@ -162,7 +162,7 @@ def _read_cap(provider: str) -> int:
     raw = os.environ.get(_CAP_ENV.get(provider, f"F2W_{provider.upper()}_MAX_CONCURRENCY"), "5")
     try:
         value = int(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # unparsable setting: default
         return 5
     return value if value > 0 else 5
 

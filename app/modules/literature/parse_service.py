@@ -136,7 +136,8 @@ class ParseService:
         fields = {k: data[k] for k in ParseRecord.__dataclass_fields__ if k in data}
         try:
             return ParseRecord(**fields)
-        except TypeError:
+        except TypeError as exc:
+            logger.debug("parse record does not match the record schema: %s", type(exc).__name__)
             return None
 
     def _verified(self, ctx: RequestContext, record: ParseRecord) -> bool:
@@ -288,7 +289,8 @@ class ParseService:
 def _read_json(path: Path) -> dict[str, Any] | None:
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        logger.debug("parse record unreadable or not JSON: %s", type(exc).__name__)
         return None
     return data if isinstance(data, dict) else None
 

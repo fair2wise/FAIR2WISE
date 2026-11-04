@@ -283,7 +283,7 @@ def _load_repo_env() -> None:
         return
     try:
         from dotenv import load_dotenv
-    except ImportError:
+    except ImportError:  # python-dotenv not installed: use the process environment
         return
     load_dotenv(env_path, override=False)
 

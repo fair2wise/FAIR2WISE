@@ -312,7 +312,7 @@ def _wait_for_stable_file(
     for _ in range(checks * 6):
         try:
             size = path.stat().st_size
-        except FileNotFoundError:
+        except FileNotFoundError:  # the file vanished while settling
             return False
         if size == last_size and size > 0:
             stable_count += 1

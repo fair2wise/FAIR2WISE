@@ -205,7 +205,7 @@ class LibraryService:
             return None
         try:
             return self.roots.resolve(ROOT_LABEL, None)[0]
-        except ContractError:
+        except ContractError:  # no configured library root
             return None
 
     @property
@@ -271,7 +271,8 @@ class LibraryService:
                 if row is None or row["size"] != doc["size"] or abs(row["mtime"] - doc["modified"]) > 0.0015:
                     try:
                         sha = sha256_file(path)
-                    except OSError:
+                    except OSError as exc:
+                        logger.debug("library paper unreadable; not hashed: %s", type(exc).__name__)
                         continue
                     self._record(path, rel, sha, int(doc["size"]), float(doc["modified"]), probe=False)
                     row = self.catalog.paper(rel)
@@ -461,7 +462,7 @@ class LibraryService:
                 os.fsync(handle.fileno())
             try:
                 os.link(tmp, target)  # atomic, fails if the name exists
-            except FileExistsError:
+            except FileExistsError:  # another writer already took the name
                 return False
             except OSError:  # a filesystem without hard links: rename after an existence check
                 if os.path.lexists(target):

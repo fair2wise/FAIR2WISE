@@ -86,7 +86,8 @@ def load_harvest_papers(manifest_path: Path) -> list[dict[str, Any]]:
         return []
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("papers manifest unreadable or not JSON: %s", type(exc).__name__)
         return []
     papers = data.get("papers") if isinstance(data, dict) else data
     if isinstance(papers, dict):

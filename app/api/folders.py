@@ -84,7 +84,7 @@ def _entry(path: Path, relative: PurePosixPath) -> dict[str, Any] | None:
             return {"name": path.name, "relative_path": str(relative), "kind": "link", "size": None,
                     "modified": None, "document": False}
         stat = path.stat()
-    except OSError:
+    except OSError:  # entry vanished or is unreadable: left out of the listing
         return None
     if path.is_dir():
         kind, size, document = "directory", None, False
@@ -243,7 +243,7 @@ class FolderRoots:
                     continue
                 try:
                     stat = file.stat()
-                except OSError:
+                except OSError:  # entry vanished or is unreadable: left out of the listing
                     continue
                 documents.append({"relative_path": str(relative / file.relative_to(resolved).as_posix()),
                                   "size": stat.st_size, "modified": round(stat.st_mtime, 3)})

@@ -57,7 +57,7 @@ def _origin_host(origin: str) -> tuple[str, int] | None:
     try:
         parts = urlsplit(origin.strip())
         port = parts.port
-    except ValueError:
+    except ValueError:  # malformed Origin: not an allowed origin
         return None
     scheme = parts.scheme.lower()
     if scheme not in ("http", "https") or not parts.hostname:
@@ -73,7 +73,7 @@ def _host_header(value: str, scheme: str) -> tuple[str, int] | None:
     try:
         parts = urlsplit(f"//{first}")
         port = parts.port
-    except ValueError:
+    except ValueError:  # malformed Host header: no authority
         return None
     if not parts.hostname:
         return None

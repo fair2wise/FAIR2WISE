@@ -302,7 +302,7 @@ def condition_bin(value: Any, tolerance: float) -> str | None:
     """The tolerance bin of an angle or temperature value (``"150 C"`` and ``150`` agree), or ``None``."""
     try:
         number = float(str(value).rstrip("CcKk °").strip())
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # a non-numeric condition has no bin
         return None
     return f"{round(number / tolerance) * tolerance:.2f}"
 

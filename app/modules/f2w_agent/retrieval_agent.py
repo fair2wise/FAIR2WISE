@@ -260,7 +260,7 @@ def _parse_judge(raw: str) -> dict[str, Any]:
     for m in matches:
         try:
             obj = json.loads(m.group(0))
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # try the next candidate
             continue
         if isinstance(obj, dict) and "sufficient" in obj:
             obj.setdefault("answer", None)
@@ -321,7 +321,7 @@ def _beam_path_nodeinfos(kg: Any) -> list[Any]:
             continue
         try:
             indexed.append((int(index), str(nid), raw))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # non-integer model output is ignored
             continue
     if not indexed:
         # Walk directed successors from nodes that emit beam_path_next.

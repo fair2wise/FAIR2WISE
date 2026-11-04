@@ -126,7 +126,7 @@ def _loads_object(text: str) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         try:
             parsed = json.loads(text, strict=False)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # unparsable even in non-strict mode: no JSON object
             return None
     return parsed if isinstance(parsed, dict) else None
 

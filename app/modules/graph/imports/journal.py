@@ -19,12 +19,15 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, cast
 import uuid
 
 from ..ports import ContractError, ErrorCode
+
+logger = logging.getLogger(__name__)
 
 Clock = Callable[[], datetime]
 
@@ -55,9 +58,10 @@ class Lease:
     def _read(self) -> dict[str, Any] | None:
         try:
             return cast(dict[str, Any], json.loads(self.path.read_text(encoding="utf-8")))  # Any: JSON payload
-        except FileNotFoundError:
+        except FileNotFoundError:  # no journal yet
             return None
-        except ValueError:
+        except ValueError as exc:
+            logger.warning("lease file is not valid JSON; treated as expired: %s", type(exc).__name__)
             return {"token": None, "expires_at": "1970-01-01T00:00:00+00:00", "generation": 0}
 
     def _write(self, generation: int) -> None:
@@ -121,7 +125,8 @@ class ImportJournal:
         for line in self.path.read_text(encoding="utf-8").splitlines():
             try:
                 out.append(json.loads(line))
-            except ValueError:
+            except ValueError as exc:
+                logger.debug("corrupt journal line skipped: %s", type(exc).__name__)
                 continue
         return out
 

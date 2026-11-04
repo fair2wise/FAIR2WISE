@@ -188,7 +188,7 @@ def abstract_from_inverted_index(inv_idx: dict[str, list[int]] | None) -> str:
             for pos in positions:
                 try:
                     word_pos.append((int(pos), str(word)))
-                except (TypeError, ValueError):
+                except (TypeError, ValueError):  # a non-numeric position is ignored
                     continue
     word_pos.sort()
     return " ".join(word for _, word in word_pos)
@@ -290,7 +290,7 @@ def retry_after_seconds(resp: Any) -> float | None:
         return None
     try:
         seconds = float(raw)
-    except ValueError:
+    except ValueError:  # a date-form Retry-After is not parsed
         return None
     return seconds if seconds >= 0 else None
 
@@ -358,7 +358,7 @@ class ResponseCache:
             return None
         try:
             return cast(dict[str, Any], json.loads(row[0]))  # Any: cached JSON payload
-        except ValueError:
+        except ValueError:  # a corrupt cache row is a miss
             return None
 
     def put(self, key: str, data: Mapping[str, Any]) -> None:
@@ -424,7 +424,7 @@ class OpenAlexSettings:
         def num(name: str, default: float) -> float:
             try:
                 return float(values.get(name, default))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # unparsable setting: default
                 return default
         return cls(api_key=str(values.get("OPENALEX_API_KEY") or ""),
                    mailto=str(values.get("OPENALEX_EMAIL") or ""),

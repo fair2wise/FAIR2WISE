@@ -131,7 +131,7 @@ def _is_valid_pdf(path: Path) -> bool:
             return False
         with path.open("rb") as fh:
             return fh.read(5).startswith(PDF_MAGIC)
-    except OSError:
+    except OSError:  # an unreadable file is not a PDF
         return False
 
 
@@ -291,7 +291,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
         return {}
     try:
         obj = json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # reply is not JSON: no object
         return {}
     return obj if isinstance(obj, dict) else {}
 

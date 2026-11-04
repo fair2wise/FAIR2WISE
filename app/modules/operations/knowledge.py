@@ -400,7 +400,7 @@ def directory_corpus_resolver(directory: str | Path) -> CorpusResolver:
         path = (base / f"{name}.json")
         try:
             path.resolve().relative_to(base.resolve())
-        except ValueError:
+        except ValueError:  # escapes the base directory
             return None
         if not path.is_file():
             return None

@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 import json
+import logging
 import math
 import os
 from pathlib import Path
@@ -13,6 +14,8 @@ import time
 from typing import Any
 
 from .evidence import CHUNKER_VERSION, LEXICAL_INDEX_VERSION
+
+logger = logging.getLogger(__name__)
 
 TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+./_-]{1,}", re.IGNORECASE)
 SCI_TOKEN_RE = re.compile(
@@ -140,7 +143,7 @@ class SourceIndex:
     def _meta_signature(self) -> tuple[int, int, int] | None:
         try:
             st = self.meta_path.stat()
-        except OSError:
+        except OSError:  # no meta file yet
             return None
         return (st.st_mtime_ns, st.st_size, st.st_ino)
 
@@ -155,7 +158,8 @@ class SourceIndex:
             return {}
         try:
             data = json.loads(self.meta_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("index meta unreadable or not JSON: %s", type(exc).__name__)
             return {}
         return data if isinstance(data, dict) else {}
 
@@ -178,7 +182,8 @@ class SourceIndex:
                         continue
                     try:
                         rec = json.loads(line)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as exc:
+                        logger.debug("corrupt index line skipped: %s", type(exc).__name__)
                         continue
                     if isinstance(rec, dict) and rec.get("text"):
                         chunks.append(rec)

@@ -79,7 +79,7 @@ def _extract_terms_json_from_text(text: str) -> dict[str, Any]:
     for match in matches:
         try:
             obj = json.loads(match.group(0))
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # reply is not JSON: no object
             continue
         if isinstance(obj, dict) and isinstance(obj.get("terms"), list):
             return obj

@@ -105,7 +105,7 @@ class AuditLog:
                     ("probe", "{}", GENESIS, GENESIS, self._clock()),
                 )
                 raise _ProbeDone()
-        except _ProbeDone:
+        except _ProbeDone:  # the probe rolls back by design
             return
 
     def events(
