@@ -17,9 +17,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..json_types import Untyped
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 #: ``fitz``-style metadata keys, in the order PyMuPDF reported them, mapped from PDF Info keys.
 _METADATA_KEYS = {
@@ -66,7 +69,7 @@ class PdfUnavailable(ImportError):
 class PdfPage:
     """One page of a :class:`PdfDocument` (0-based ``number``)."""
 
-    def __init__(self, document: PdfDocument, number: int, page: Any) -> None:
+    def __init__(self, document: PdfDocument, number: int, page: Any) -> None:  # noqa: ANN401  # Any: pypdfium2 page (untyped third-party)
         """Wrap a pypdfium2 page; created by :meth:`PdfDocument.load_page`, not directly."""
         self._document = document
         self._page = page
@@ -206,7 +209,7 @@ class PdfPage:
 class PdfDocument:
     """An open PDF: ``len()``, indexing, ``metadata`` and context-manager use like ``fitz.Document``."""
 
-    def __init__(self, document: Any) -> None:
+    def __init__(self, document: Any) -> None:  # noqa: ANN401  # Any: pypdfium2 document (untyped third-party)
         """Wrap a pypdfium2 document; use :func:`open_pdf` to create one."""
         self._document = document
         self._pages: dict[int, PdfPage] = {}
@@ -239,7 +242,7 @@ class PdfDocument:
         """Same as :meth:`load_page`."""
         return self.load_page(number)
 
-    def __iter__(self) -> Any:
+    def __iter__(self) -> Iterator[PdfPage]:
         """Iterate the pages in order."""
         for number in range(len(self)):
             yield self.load_page(number)

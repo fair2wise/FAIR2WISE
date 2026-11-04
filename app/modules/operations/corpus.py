@@ -535,7 +535,7 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
     words: dict[int, set[str]] = {}
     bags: dict[int, Counter[str]] = {}
 
-    def word_set(title: Any) -> set[str]:
+    def word_set(title: JsonValue) -> set[str]:
         key = id(title)
         if key not in words:
             words[key] = set(_normalise(title).split())

@@ -35,9 +35,12 @@ from enum import StrEnum
 import json
 import os
 import time
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from .mode import RuntimeConfigError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 QA_ROUTE_ENV = "F2W_QA_ROUTE"
 PLANNING_LABEL = "supervisor-plan"
@@ -82,14 +85,14 @@ class PinnedArgsService:
     unchanged. Every other attribute is the wrapped service's.
     """
 
-    def __init__(self, inner: Any) -> None:
+    def __init__(self, inner: Any) -> None:  # noqa: ANN401  # Any: legacy QA service (untyped donor object)
         self.inner = inner
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401  # Any: attribute delegation to the wrapped legacy service
         return getattr(self.inner, name)
 
-    async def query(self, question: str, *, history: Any = None, source_rag: object = None,
-                    use_live_tiled: object = None) -> Any:
+    async def query(self, question: str, *, history: Sequence[Mapping[str, str]] | None = None, source_rag: object = None,
+                    use_live_tiled: object = None) -> Any:  # noqa: ANN401  # Any: legacy verdict (untyped donor structure)
         """Run the wrapped service's query, substituting the pinned turn's arguments if one is set."""
         pinned = _PINNED.get()
         if pinned is not None:
@@ -147,11 +150,11 @@ class _BoundPlanner:
         self.owner = owner
         self.tools = tools
 
-    def _bound(self) -> Any:
+    def _bound(self) -> Any:  # noqa: ANN401  # Any: model pair
         model = self.owner.current()
         return model, (model.bind_tools(self.tools) if self.tools else model)
 
-    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
+    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: model reply
         model, bound = self._bound()
         started = time.perf_counter()
         try:
@@ -162,7 +165,7 @@ class _BoundPlanner:
         _record(model, messages, reply, started, None)
         return reply
 
-    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: model reply
         model, bound = self._bound()
         started = time.perf_counter()
         try:
@@ -186,7 +189,7 @@ class TracedPlanningModel:
     def __init__(self, provider: Callable[[], Any]) -> None:
         self._provider = provider
 
-    def current(self) -> Any:
+    def current(self) -> Any:  # noqa: ANN401  # Any: model
         """Return the chat model the provider resolves right now."""
         return self._provider()
 
@@ -194,11 +197,11 @@ class TracedPlanningModel:
         """Return a traced planner bound to `tools`; extra keyword arguments are ignored."""
         return _BoundPlanner(self, list(tools))
 
-    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
+    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: model reply
         """Invoke the current model on `messages` through a traced planner with no tools bound."""
         return _BoundPlanner(self, []).invoke(messages, *args, **kwargs)
 
-    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: model reply
         """Async variant of :meth:`invoke`."""
         return await _BoundPlanner(self, []).ainvoke(messages, *args, **kwargs)
 
@@ -212,7 +215,7 @@ def pipeline_planning_model(pipeline: object) -> Callable[[], Any]:
     """
     cache: dict[Any, Any] = {}
 
-    def current() -> Any:
+    def current() -> Any:  # noqa: ANN401  # Any: model
         runtime = getattr(pipeline, "runtime", None)
         backend = str(getattr(runtime, "backend", None) or "cborg")
         active = getattr(pipeline, "_active_model", None)

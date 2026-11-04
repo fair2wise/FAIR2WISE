@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from . import bundles as B
 from ..contracts.errors import ContractError, ErrorCode
@@ -37,6 +37,9 @@ from ..jobs.stages import WorkUnit, chunked_stage
 from .catalog import sha256_file
 from .kg_service import KgLibrary
 from .schemas import manifest_block, resolve_schema
+
+if TYPE_CHECKING:
+    from .service import LibraryService
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +79,7 @@ def resolve_backend(env: Mapping[str, str]) -> dict[str, str] | None:
 OrchestratorFactory = Callable[..., Any]
 
 
-def default_orchestrator_factory(*, model: str, output_file: str, schema_path: str, backend: Mapping[str, str]) -> Any:
+def default_orchestrator_factory(*, model: str, output_file: str, schema_path: str, backend: Mapping[str, str]) -> Any:  # noqa: ANN401  # Any: term_extractor Orchestrator (untyped donor class)
     """Build the real :class:`~app.modules.term_extractor.Orchestrator` (the only place a client is made)."""
     from ..f2w_agent.coordinator import default_workers
     from ..term_extractor import Orchestrator
@@ -134,7 +137,7 @@ class LibraryExtractor:
         kg: Confirmation checker; default a :class:`KgLibrary` over ``store`` and ``service``.
     """
 
-    def __init__(self, service: Any, store: B.BundleStore, *, env: Mapping[str, str] | None = None,
+    def __init__(self, service: LibraryService, store: B.BundleStore, *, env: Mapping[str, str] | None = None,
                  factory: OrchestratorFactory | None = None, kg: KgLibrary | None = None) -> None:
         self.service = service
         self.store = store

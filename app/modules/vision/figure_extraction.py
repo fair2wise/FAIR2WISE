@@ -115,7 +115,7 @@ def figure_id_of(figure: ParsedFigure) -> str:
 
 
 def _assign_panels(
-    image: Any, layer: FigureTextLayer, caption: str
+    image: Any, layer: FigureTextLayer, caption: str  # noqa: ANN401  # Any: PIL or numpy image (optional extras, untyped)
 ) -> tuple[list[PanelBox], list[str], list[Uncertainty]]:
     """Segment panels and name them: text-layer letters first, then caption reading order, else unlabelled."""
     height, width = image.shape
@@ -144,9 +144,9 @@ def _assign_panels(
 
 
 def analyze_figure(
-    doc: Any,
+    doc: Any,  # noqa: ANN401  # Any: pypdfium2 document (untyped third-party)
     figure: ParsedFigure,
-    info: Any = None,
+    info: Any = None,  # noqa: ANN401  # Any: page info
     *,
     work_id: str = "",
     source_sha256: str = "",

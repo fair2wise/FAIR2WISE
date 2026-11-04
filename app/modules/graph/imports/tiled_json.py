@@ -140,7 +140,7 @@ class SourceSnapshot:
         return ids + [i for i in chain if i not in ids]
 
 
-def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str]:
+def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str]:  # noqa: ANN401  # Any: schema registry (duck-typed)
     """Import fingerprints of every selectable registered schema in use (computed, not hard-coded).
 
     Includes each base schema's fingerprint from before the H3 S4 licence-line change, so a snapshot built

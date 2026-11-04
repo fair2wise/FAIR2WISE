@@ -253,7 +253,7 @@ class SourceAccessAuthority:
         if grant.work_ids and (work_id is None or work_id not in grant.work_ids):
             raise SourceAccessDenied("work outside grant scope")
 
-    def is_authorized(self, context: Any, grant: Any, *, kind: SourceKind,
+    def is_authorized(self, context: RequestContext, grant: Any, *, kind: SourceKind,  # noqa: ANN401  # Any: access grant (duck-typed; supplied by the caller's policy)
                       corpus: str | None = None, work_id: str | None = None) -> bool:
         """Boolean form of :meth:`check`."""
         try:

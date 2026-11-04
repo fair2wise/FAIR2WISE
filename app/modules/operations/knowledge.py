@@ -74,6 +74,8 @@ from .reports import (
 )
 
 if TYPE_CHECKING:
+    from ..jobs.store import JobRecord
+    from ..security.tiled_identity import TiledIdentityPort
     from ..security.authorization import DeploymentSettings
 
 #: Capability every Knowledge Operation read needs (T19C contract).
@@ -108,7 +110,7 @@ class DynamicJsonGraphs:
         self._backend: Any = None
         self._lock = threading.Lock()
 
-    def _current(self) -> Any:
+    def _current(self) -> Any:  # noqa: ANN401  # Any: graph port
         from ..graph.backends.json import JsonGraphBackend
 
         files = tuple(str(Path(p)) for p in self._provider() if p)
@@ -118,7 +120,7 @@ class DynamicJsonGraphs:
                 self._files = files
             return self._backend
 
-    def capabilities(self) -> Any:
+    def capabilities(self) -> Any:  # noqa: ANN401  # Any: capabilities
         """The JSON backend's capabilities (complete listing, snapshot-isolated)."""
         return self._current().capabilities()
 
@@ -126,7 +128,7 @@ class DynamicJsonGraphs:
         """Graph ids of the current selection."""
         return cast(list[str], self._current().graph_ids())  # Any: backend is created lazily
 
-    def snapshot(self, ctx: RequestContext, graph_id: str) -> Any:
+    def snapshot(self, ctx: RequestContext, graph_id: str) -> Any:  # noqa: ANN401  # Any: graph snapshot (port-defined)
         """The loaded snapshot of ``graph_id`` (scope-checked; ``NOT_FOUND`` outside the selection)."""
         return self._current().snapshot(ctx, graph_id)
 
@@ -155,7 +157,7 @@ class CompositeGraphPort:
     is shadowed by the JSON graph (warned once; see the module docstring).
     """
 
-    def __init__(self, json_port: Any, tiled: object = None, *,
+    def __init__(self, json_port: Any, tiled: object = None, *,  # noqa: ANN401  # Any: graph port
                  ttl: float = TILED_DISCOVERY_TTL, max_scan: int = TILED_DISCOVERY_MAX_SCAN,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._json = json_port
@@ -183,7 +185,7 @@ class CompositeGraphPort:
         return tuple(self._warnings)
 
     @property
-    def json_port(self) -> Any:
+    def json_port(self) -> Any:  # noqa: ANN401  # Any: graph port
         """The JSON GraphPort."""
         return self._json
 
@@ -197,7 +199,7 @@ class CompositeGraphPort:
 
     # -- Tiled side -------------------------------------------------------------------------------
 
-    def tiled_backend(self) -> Any | None:
+    def tiled_backend(self) -> Any | None:  # noqa: ANN401  # Any: graph port
         """The Tiled GraphPort, resolving it through the factory when needed (``None`` if absent)."""
         with self._lock:
             if self._backend is not None or self._factory is None:
@@ -267,7 +269,7 @@ class CompositeGraphPort:
                                 "(JSON is read; the Tiled copy is not listed)")
         return json_ids + [g for g in tiled_ids if g not in json_ids]
 
-    def resolve(self, graph_id: str) -> Any:
+    def resolve(self, graph_id: str) -> Any:  # noqa: ANN401  # Any: graph port
         """The backend holding ``graph_id`` (JSON first).
 
         Raises:
@@ -281,7 +283,7 @@ class CompositeGraphPort:
                 return backend
         raise ContractError(ErrorCode.NOT_FOUND, f"graph {graph_id!r} is not configured")
 
-    def capabilities(self, graph_id: str | None = None) -> Any:
+    def capabilities(self, graph_id: str | None = None) -> Any:  # noqa: ANN401  # Any: capabilities
         """Capabilities of the backend serving ``graph_id`` (the JSON backend's when no id is given)."""
         if graph_id is None:
             return self._json.capabilities()
@@ -323,13 +325,13 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     if tiled_settings.mode == "external":
         external = tiled_settings.external
 
-        def from_external() -> Any | None:
+        def from_external() -> TiledGraphBackend | None:
             return TiledGraphBackend(TiledGraphClient.from_external(external), **backend_kw)
 
         return from_external
     managed = tiled_settings.managed
 
-    def from_managed() -> Any | None:
+    def from_managed() -> TiledGraphBackend | None:
         from ..deployment.tiled_lifecycle import find_managed
 
         server = find_managed(managed)
@@ -340,7 +342,7 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     return from_managed
 
 
-def resolve_tiled_settings(settings: DeploymentSettings, environ: Any = None) -> tuple[Any | None, str | None]:
+def resolve_tiled_settings(settings: DeploymentSettings, environ: Any = None) -> tuple[Any | None, str | None]:  # noqa: ANN401  # Any: environment mapping
     """``(TiledSettings, None)`` for the deployment, or ``(None, reason)`` when Tiled is not usable.
 
     Args:
@@ -576,7 +578,7 @@ class KnowledgeOperations:
             raise ContractError(ErrorCode.INVALID_INPUT, f"invalid arguments for {operation}: {problem}")
 
 
-def knowledge_job_context(settings: DeploymentSettings, *, identity_port: Any = None,
+def knowledge_job_context(settings: DeploymentSettings, *, identity_port: TiledIdentityPort | None = None,
                           credential_lookup: Callable[[str], Any] | None = None,
                           clock: Callable[[], Any] | None = None) -> Callable[[Any], RequestContext]:
     """``context_for_job`` for :func:`~.reports.register_operation_jobs` (trusted wiring).
@@ -590,7 +592,7 @@ def knowledge_job_context(settings: DeploymentSettings, *, identity_port: Any = 
     from ..contracts.context import ActorKind
     from ..security.authorization import local_operator_context, resolve_context, worker_context
 
-    def context_for_job(job: Any) -> RequestContext:
+    def context_for_job(job: JobRecord) -> RequestContext:
         if settings.is_local:
             return local_operator_context(settings, request_id=job.job_id, actor_kind=ActorKind.WORKER,
                                           run_id=job.job_id)

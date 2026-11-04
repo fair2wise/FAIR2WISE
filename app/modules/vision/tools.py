@@ -76,7 +76,7 @@ class PaperSource(Protocol):
 class StoredPaperSource:
     """:class:`PaperSource` over the T05 store, legacy index and parse service (stored papers only)."""
 
-    def __init__(self, store: Any, index: Any, parse_service: Any) -> None:
+    def __init__(self, store: Any, index: Any, parse_service: Any) -> None:  # noqa: ANN401  # Any: duck-typed source store (tests inject fakes)
         self.store, self.index, self.parse_service = store, index, parse_service
 
     def load(self, ctx: RequestContext, doi: str) -> LoadedPaper:
@@ -306,13 +306,13 @@ class VisionToolset:
 
     def read_scale(self, inv: ToolInvocation) -> ToolResult:
         """``vision_read_scale``."""
-        def pick(p: Any) -> dict[str, Any]:
+        def pick(p: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: panel record (analysis result structure)
             return {"scale": p.scale.as_dict() if p.scale else None}
         return self._run(VISION_TOOL_NAMES[2], inv, lambda f: self._panels(f, inv, pick))
 
     def read_qrange(self, inv: ToolInvocation) -> ToolResult:
         """``vision_read_qrange``."""
-        def pick(p: Any) -> dict[str, Any]:
+        def pick(p: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: panel record (analysis result structure)
             return {"q_range": p.qrange.as_dict() if p.qrange else None}
         return self._run(VISION_TOOL_NAMES[3], inv, lambda f: self._panels(f, inv, pick))
 

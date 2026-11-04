@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 def acquire_stage(
-    acquirer: Any,
-    store: Any,
+    acquirer: Any,  # noqa: ANN401  # Any: duck-typed acquirer (tests inject fakes)
+    store: Any,  # noqa: ANN401  # Any: duck-typed store (tests inject fakes)
     *,
     doi_of: Callable[[StageContext], str],
     ctx_for: Callable[[StageContext], RequestContext],

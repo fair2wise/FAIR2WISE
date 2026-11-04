@@ -27,10 +27,13 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..json_types import JsonValue
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +157,7 @@ class BundleStore:
         clock: Returns the ISO timestamp stored in manifests (injectable for tests).
     """
 
-    def __init__(self, root: Path, *, clock: Any = now_iso) -> None:
+    def __init__(self, root: Path, *, clock: Callable[[], str] = now_iso) -> None:
         self.root = Path(root)
         self._clock = clock
 

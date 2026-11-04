@@ -141,7 +141,7 @@ class LibraryService:
         chunker: PDF reader and chunker of ``library_index`` (default ``hybrid_rag.chunker.chunk_pdf_detailed``).
     """
 
-    def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,
+    def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,  # noqa: ANN401  # Any: deployment settings
                  fetch_factory: Callable[[], Fetch] | None = None, breaker: QuotaBreaker | None = None,
                  max_upload_bytes: int = DEFAULT_MAX_BODY_BYTES, max_probe: int = DEFAULT_MAX_PROBE,
                  clock: Callable[[], float] = time.time, index_dir: Path | None = None,
@@ -163,7 +163,7 @@ class LibraryService:
         self._indexer: Any = None
 
     @property
-    def indexer(self) -> Any:
+    def indexer(self) -> Any:  # noqa: ANN401  # Any: donor indexer (untyped legacy class)
         """The :class:`~app.modules.library.indexer.LibraryIndexer` over this service (T36)."""
         if self._indexer is None:
             from .indexer import LibraryIndexer
@@ -305,7 +305,7 @@ class LibraryService:
         out.update(override or {})
         return out
 
-    def paper_facts(self, paper_id: str) -> Any:
+    def paper_facts(self, paper_id: str) -> Any:  # noqa: ANN401  # Any: paper facts
         """Facts the T38 cost estimate needs of one paper (``PaperLookup``); ``None`` for an unknown id.
 
         ``pages`` is the catalog's page count (filled by the metadata probe or the index run); ``None`` while

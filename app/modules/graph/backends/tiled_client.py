@@ -74,7 +74,7 @@ class TiledGraphClient:
 
     def __init__(self, base_url: str, *, profile: str,
                  credential: object = None, scheme: str = "Apikey",
-                 timeout: float = 10.0, verify: bool | str = True, session: Any = None) -> None:
+                 timeout: float = 10.0, verify: bool | str = True, session: Any = None) -> None:  # noqa: ANN401  # Any: HTTP session
         try:
             self.base_url = validate_external_url(profile, base_url)
         except TiledConfigError as exc:
@@ -103,7 +103,7 @@ class TiledGraphClient:
                    timeout=cfg.timeout, verify=str(cfg.ca_bundle) if cfg.ca_bundle else True, session=session)
 
     @classmethod
-    def from_managed(cls, server: Any, *, session: Any = None) -> TiledGraphClient:
+    def from_managed(cls, server: Any, *, session: requests.Session | None = None) -> TiledGraphClient:
         """Client for a running managed server (``tiled_lifecycle.ManagedServer``)."""
         from app.modules.deployment import tiled_lifecycle
 

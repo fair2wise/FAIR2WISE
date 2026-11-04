@@ -59,7 +59,7 @@ def load_schema_view(entry: SchemaEntry, *, allow_known_broken: bool = False) ->
 
 def load_helper(
     entry: SchemaEntry, *, implementation: str = NORMALIZER_TERM_EXTRACTOR, fuzzy_cutoff: int = 80
-) -> Any:  # Any: either of two SchemaHelper implementations
+) -> Any:  # noqa: ANN401  # Any: either of two SchemaHelper implementations
     """Construct the existing ``SchemaHelper`` for ``entry``.
 
     Args:

@@ -82,7 +82,7 @@ def _scrub(text: str, secret: str | None = None, limit: int = 200) -> str:
     return out if len(out) <= limit else out[: limit - 3] + "..."
 
 
-def _model_ids(page: Any) -> Iterable[str]:
+def _model_ids(page: Any) -> Iterable[str]:  # noqa: ANN401  # Any: OpenAI SDK page object (untyped here)
     data = getattr(page, "data", None)
     if data is None and isinstance(page, dict):
         data = page.get("data")
@@ -100,7 +100,7 @@ def list_cborg_models_live(
     *,
     api_key: str | None = None,
     base_url: str | None = None,
-    client: Any = None,
+    client: Any = None,  # noqa: ANN401  # Any: OpenAI-compatible SDK client (injected; untyped here)
     timeout: float = 15.0,
     slot: Callable[[], Any] | None = None,
 ) -> ModelListing:

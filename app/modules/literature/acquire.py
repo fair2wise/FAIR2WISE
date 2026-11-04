@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 import logging
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 import httpx
 
@@ -36,6 +36,9 @@ from .legacy import LegacyIndex, doi_key, doi_only
 from .openalex import OpenAlexSettings
 from .safe_fetch import SafeFetcher
 from .store import FileDocumentStore
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +66,7 @@ class AcquireResult:
         return asdict(self)
 
 
-def _f2w_urls() -> Any:
+def _f2w_urls() -> ModuleType:
     # Imported lazily: download_pdfs configures logging when imported (T04 module, kept as-is).
     from . import download_pdfs
 

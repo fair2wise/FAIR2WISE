@@ -231,7 +231,7 @@ class ReadOutcome:
         """Evidence IDs in retrieval order."""
         return self.result.evidence_ids
 
-    def to_legacy(self) -> Any:
+    def to_legacy(self) -> Any:  # noqa: ANN401  # Any: the unchanged legacy verdict (untyped donor structure)
         """Return exactly what the legacy call returned, or raise exactly what it raised.
 
         Raises:
@@ -382,7 +382,7 @@ def exception_to_result(exc: BaseException, *, provenance_id: str | None = None)
 
 # -- tool implementation ----------------------------------------------------------
 
-def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any], Awaitable[ToolResult]]:
+def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any], Awaitable[ToolResult]]:  # noqa: ANN401  # Any: legacy QA service (untyped donor object)
     """Return the async tool implementation bound to one retrieval service and ledger.
 
     The implementation holds no provider admission slot itself: the existing

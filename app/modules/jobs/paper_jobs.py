@@ -146,7 +146,7 @@ def build_pipeline(kind: str, handler: PaperJobHandler, context_for_job: Callabl
                                required_capability=PAPER_JOB_CAPABILITY)])
 
 
-def register_paper_jobs(job_service: Any, handlers: Mapping[str, PaperJobHandler],
+def register_paper_jobs(job_service: Any, handlers: Mapping[str, PaperJobHandler],  # noqa: ANN401  # Any: job service
                         context_for_job: Callable[[Any], RequestContext], *,
                         kinds: Iterable[str] = PAPER_JOB_KINDS, **kwargs: object) -> list[Any]:
     """Register the paper job kinds that have a handler on ``job_service`` (trusted wiring only).

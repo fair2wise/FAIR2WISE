@@ -112,7 +112,7 @@ def index_lock(root: Path, *, timeout: float = 120.0, poll: float = 0.05) -> Ite
         os.close(fd)
 
 
-def _atomic_write(path: Path, write: Any) -> None:
+def _atomic_write(path: Path, write: Any) -> None:  # noqa: ANN401  # Any: writer callback
     """Write ``path`` through a temporary sibling and ``os.replace`` (a reader never sees a torn file)."""
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
@@ -259,7 +259,7 @@ def write_index(
         old = SourceIndex(dest).meta()
         carried = {key: old[key] for key in preserve_meta_keys if key in old}
 
-    def _write_chunks(handle: Any) -> None:
+    def _write_chunks(handle: Any) -> None:  # noqa: ANN401  # Any: binary file handle
         for chunk in chunks:
             handle.write(json.dumps(chunk, ensure_ascii=False) + "\n")
 

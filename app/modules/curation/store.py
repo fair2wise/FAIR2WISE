@@ -247,7 +247,7 @@ class CurationStore:
             leased = [con.execute("SELECT * FROM uncertainty_cases WHERE id=?", (i,)).fetchone() for i in ids]
         return [self._row(r) for r in leased]
 
-    def _owned(self, con: sqlite3.Connection, case_id: str, token: str) -> Any:
+    def _owned(self, con: sqlite3.Connection, case_id: str, token: str) -> Any:  # noqa: ANN401  # Any: sqlite row
         row = con.execute("SELECT * FROM uncertainty_cases WHERE id=?", (case_id,)).fetchone()
         if (
             row is None

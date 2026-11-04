@@ -75,7 +75,7 @@ class OperationalDB:
         with self._lock:
             return self._con.execute(sql, tuple(params)).fetchall()
 
-    def one(self, sql: str, params: Sequence[Any] = ()) -> Any:
+    def one(self, sql: str, params: Sequence[Any] = ()) -> Any:  # noqa: ANN401  # Any: sqlite row
         """Run a read-only statement and return the first row or ``None``."""
         with self._lock:
             return self._con.execute(sql, tuple(params)).fetchone()

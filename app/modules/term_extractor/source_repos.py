@@ -225,7 +225,7 @@ class GitHubSourceClient:
         self,
         *,
         token: str | None = None,
-        session: Any = None,
+        session: requests.Session | None = None,
         timeout: int = 30,
     ) -> None:
         self.token = token if token is not None else os.environ.get("GITHUB_TOKEN")

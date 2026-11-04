@@ -63,12 +63,12 @@ def _xp_elems(node: Any, query: str) -> list[Any]:  # noqa: ANN401  # Any: XML e
     return list(node.xpath(query))
 
 
-def _xp_strs(node: Any, query: str) -> list[str]:
+def _xp_strs(node: Any, query: str) -> list[str]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     """Run an XPath that selects text nodes or attribute values (strings)."""
     return [str(v) for v in node.xpath(query)]
 
 
-def _texts(node: Any) -> list[str]:
+def _texts(node: Any) -> list[str]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     """Return the text fragments of an lxml element (``itertext`` is typed str | bytes)."""
     return [str(t) for t in node.itertext()]
 
@@ -726,7 +726,7 @@ def canonical_stage_name(name: str) -> str:
     return STAGE_NAME_ALIASES.get(key, raw)
 
 
-def _svg_coord(el: Any, attr: str) -> float:
+def _svg_coord(el: Any, attr: str) -> float:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     try:
         return float(el.get(attr) or 0.0)
     except (TypeError, ValueError):

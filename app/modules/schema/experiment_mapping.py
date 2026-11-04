@@ -153,7 +153,7 @@ def _quote(builder: _Builder, document: ParsedDocument, ref: EvidenceRef, work_i
 
 
 def map_validated_records(
-    validation: Any,
+    validation: Any,  # noqa: ANN401  # Any: validated document (duck-typed record_validation result)
     document: ParsedDocument,
     *,
     work_id: str,

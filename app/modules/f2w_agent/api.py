@@ -3191,7 +3191,7 @@ class AgentPipelineService:
             results=results,
         )
 
-    def ensure_tiled_lookup(self, node_id: str) -> Any:
+    def ensure_tiled_lookup(self, node_id: str) -> Any:  # noqa: ANN401  # Any: a TiledLookupGraph or a donor KnowledgeGraph (untyped legacy class)
         """Reuse the in-memory Tiled graph; only page GraphQL when it is empty."""
         graphs = getattr(self.retrieval, "_graphs", None)
         if not isinstance(graphs, dict):

@@ -57,7 +57,7 @@ class RetrievalSettings:
     tiled_uri: str | None = None
 
 
-def build_retrieval_agent(settings: RetrievalSettings) -> Any:
+def build_retrieval_agent(settings: RetrievalSettings) -> Any:  # noqa: ANN401  # Any: retrieval agent
     """Construct an existing ``RetrievalAgent`` from ``settings`` (imported lazily)."""
     from ..f2w_agent.retrieval_agent import RetrievalAgent
 
@@ -113,7 +113,7 @@ class LegacyRetrievalService:
         self.calls = 0
 
     @property
-    def agent(self) -> Any:
+    def agent(self) -> Any:  # noqa: ANN401  # Any: retrieval agent
         """The retrieval agent the next query uses (built on first access from settings)."""
         if self._provider is not None:
             return self._provider()

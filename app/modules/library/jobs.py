@@ -22,6 +22,7 @@ from ..jobs.keys import OperationInputs
 from ..jobs.pipeline import Pipeline, StageContext, StageResult, StageSpec
 
 if TYPE_CHECKING:
+    from ..jobs.service import JobService
     from ..security.authorization import DeploymentSettings
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ def library_inputs(params: Mapping[str, Any] | None = None, *, nonce: str | None
     return OperationInputs(corpus_scope=tuple(corpus_scope), params=merged)
 
 
-def register_library_jobs(job_service: Any, settings: DeploymentSettings, *,
+def register_library_jobs(job_service: JobService, settings: DeploymentSettings, *,
                           handlers: Mapping[str, StageHandler] | None = None) -> tuple[str, ...]:
     """Register the library job kinds on ``job_service`` (trusted wiring), on ``:local`` only.
 

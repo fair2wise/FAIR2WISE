@@ -370,7 +370,7 @@ def build_adoption_descriptor(repo: Path, data_commit: str, corpus: str, snapsho
     manifest = release.manifest
     base = f"storage/kg/{corpus}/{snapshot_id}"
 
-    def entry(role: str, path: str, art: Any) -> dict[str, Any]:
+    def entry(role: str, path: str, art: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: legacy artifact record (untyped donor structure)
         return {"role": role, "path": path, "sha256": art.sha256, "git_blob": art.git_blob,
                 "size_bytes": len(art.data)}
 

@@ -367,7 +367,7 @@ class DownloadAgent(Agent):
         download_delay_seconds: float | None = None,
         validate_downloads: bool | None = None,
         document_store: object = None,
-        legacy_index: Any = None,
+        legacy_index: Any = None,  # noqa: ANN401  # Any: donor legacy index object (untyped, duck-typed)
         store_context: object = None,
     ) -> None:
         """Configure OA search, polite delays, and optional PDF semantic validation.

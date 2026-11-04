@@ -28,6 +28,7 @@ from .keys import OperationInputs, changed_inputs, stage_key
 from .store import JobRecord, JobStore, Lease, LeaseLost
 
 if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
     from ..agent_runtime.admission import Admission
     from threading import Event
 
@@ -219,7 +220,7 @@ class StageContext:
         self._authority = authority
         self._interrupt = interrupt
 
-    def provider_slot(self, provider: str) -> Any:
+    def provider_slot(self, provider: str) -> AbstractContextManager[Any]:
         """Shared-admission slot for ``provider`` (the quota chat, workers and evaluations all share)."""
         if self.admission is None:
             raise RuntimeError("no admission configured for this job kind")

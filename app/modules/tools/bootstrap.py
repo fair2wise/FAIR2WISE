@@ -82,7 +82,7 @@ def _demo_tools(corpus: Mapping[str, Mapping[str, str]]) -> Sequence[tuple[ToolS
 
 
 def build_registry(
-    ctx_or_config: Any = None,
+    ctx_or_config: Any = None,  # noqa: ANN401  # Any: a RequestContext or a config object, per registered tool (duck-typed)
     *,
     include: Iterable[str] = (DEMO_LITERATURE,),
     demo_corpus: Mapping[str, Mapping[str, str]] | None = None,

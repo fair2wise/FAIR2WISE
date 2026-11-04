@@ -43,7 +43,7 @@ import logging
 import os
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import uuid
 
 from ..contracts import ActorKind, RequestContext
@@ -51,6 +51,9 @@ from ..security.authorization import DeploymentSettings
 from .mode import RuntimeConfigError
 from .qa_route import QaRoute, TracedPlanningModel, pipeline_planning_model, qa_route
 from .retrieval import LegacyRetrievalService
+
+if TYPE_CHECKING:
+    from ..operations.knowledge import KnowledgeOperations
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +94,7 @@ class LegacyReadPath:
         route: ``QaRoute``; ``SUPERVISOR`` needs an application built with a chat model.
     """
 
-    def __init__(self, application: Any, *, context_factory: Callable[[], RequestContext],
+    def __init__(self, application: Any, *, context_factory: Callable[[], RequestContext],  # noqa: ANN401  # Any: application
                  route: QaRoute = QaRoute.DIRECT) -> None:
         if route is QaRoute.SUPERVISOR and getattr(application, "supervisor", None) is None:
             raise ValueError("the supervisor QA route needs an application with a chat model")
@@ -127,7 +130,7 @@ class LegacyReadPath:
 planning_model_provider: Callable[[Any], Callable[[], Any]] = pipeline_planning_model
 
 
-def active_json_graph_files(pipeline: Any) -> list[str]:
+def active_json_graph_files(pipeline: Any) -> list[str]:  # noqa: ANN401  # Any: legacy AgentPipelineService (untyped donor object)
     """The JSON graph files of ``pipeline``'s active runtime (T25D per-user selection), existing ones only.
 
     Empty when the active graph source is not ``json`` (Splash/Tiled mode has no JSON snapshot
@@ -148,8 +151,8 @@ def active_json_graph_files(pipeline: Any) -> list[str]:
     return out
 
 
-def build_knowledge_operations(pipeline: Any, settings: DeploymentSettings | None = None,
-                               environ: Mapping[str, str] | None = None) -> Any:
+def build_knowledge_operations(pipeline: Any, settings: DeploymentSettings | None = None,  # noqa: ANN401  # Any: legacy AgentPipelineService (untyped donor object)
+                               environ: Mapping[str, str] | None = None) -> KnowledgeOperations:
     """``KnowledgeOperations`` following ``pipeline``'s active graph selection and ``storage/terminology``.
 
     The deployment's Tiled graphs are served beside the JSON selection (D3.17) when the
@@ -178,7 +181,7 @@ def build_knowledge_operations(pipeline: Any, settings: DeploymentSettings | Non
     return knowledge
 
 
-def build_legacy_read_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> LegacyReadPath:
+def build_legacy_read_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> LegacyReadPath:  # noqa: ANN401  # Any: legacy AgentPipelineService (untyped donor object)
     """Build the langgraph-mode read path for one ``AgentPipelineService`` instance.
 
     Raises:

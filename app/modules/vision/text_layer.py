@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..json_types import Untyped
 from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
@@ -27,12 +27,15 @@ from .kernels.geometry import FigureFrame, spans_inside
 from .kernels.types import TextSpan
 from .results import Box, Uncertainty, VisionUnavailable, box4
 
+if TYPE_CHECKING:
+    from ..literature.pdf_reader import PdfDocument
+
 DEFAULT_RENDER_SCALE = 2.0
 #: Minimum spans inside a figure for its text layer to count as usable.
 MIN_TEXT_SPANS = 3
 
 
-def open_pdf(data: bytes) -> Any:
+def open_pdf(data: bytes) -> PdfDocument:
     """Open PDF bytes with pypdfium2 (lazy import; :class:`VisionUnavailable` when absent)."""
     try:
         from ..literature.pdf_reader import PdfUnavailable
@@ -60,7 +63,7 @@ class PageGeometry:
                 "rotation": self.rotation, "units": "pt", "origin": "top-left"}
 
 
-def page_geometry(doc: Any, page_number: int, info: PageInfo | None = None) -> PageGeometry:
+def page_geometry(doc: Any, page_number: int, info: PageInfo | None = None) -> PageGeometry:  # noqa: ANN401  # Any: pdf document
     """Geometry of 1-based ``page_number``; the PDF's own size wins over the parser's."""
     page = doc[page_number - 1]
     return PageGeometry(page_number, float(page.width), float(page.height),
@@ -79,13 +82,13 @@ def to_topleft(bbox: BoundingBox, page_height: float) -> Box:
     raise ValueError(f"unsupported bbox origin {bbox.coord_origin!r}")
 
 
-def page_spans(doc: Any, page_number: int) -> list[TextSpan]:
+def page_spans(doc: Any, page_number: int) -> list[TextSpan]:  # noqa: ANN401  # Any: pdf document
     """Every text-layer span on a page, verbatim, boxed in top-left points."""
     page = doc[page_number - 1]
     return [TextSpan(span.text, box4(span.bbox), page_number, "text_layer") for span in page.get_spans()]
 
 
-def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
+def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:  # noqa: ANN401  # Any: pdf document
     """Fallback localization from embedded raster images when the parser gave no bbox.
 
     Returns the union of image boxes only when they form ONE cluster of area; several

@@ -88,7 +88,7 @@ PUBLISH_STATE_BY_STATUS = {
 def publish_extraction(
     terms_json: str,
     *,
-    publisher: Any | None = None,
+    publisher: Any | None = None,  # noqa: ANN401  # Any: post-extraction publisher
     ctx: object = None,
 ) -> dict[str, Any]:
     """Publish the corpus an extraction run just rebuilt (T18E; replaces the Splash wipe-and-reimport, Q11).

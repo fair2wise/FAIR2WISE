@@ -933,7 +933,7 @@ def _catalog_runs(
             },
         }
 
-    def walk(node: Any, path: list[str], depth: int) -> None:
+    def walk(node: Any, path: list[str], depth: int) -> None:  # noqa: ANN401  # Any: Tiled container or array node (untyped third-party)
         """DFS the catalog tree, collecting up to *limit* BlueskyRun entries."""
         if len(runs) >= limit or depth > 3:
             return

@@ -301,7 +301,7 @@ def _has_direct_evidence(kg: object, node_info: object) -> bool:
     return False
 
 
-def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> list[Any]:
+def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> list[Any]:  # noqa: ANN401  # Any: donor KnowledgeGraph (untyped legacy class)
     """Call ``retrieve_nodes`` with hops/max_nodes, falling back if the signature is older."""
     try:
         return krag.retrieve_nodes(question, kg, hops=hops, max_nodes=max_nodes)
@@ -1449,7 +1449,7 @@ class RetrievalAgent(Agent):
 
     async def _synthesize_leeway_answer(
         self,
-        cli: Any,
+        cli: Any,  # noqa: ANN401  # Any: LLM client object (OpenAI-compatible SDK, untyped here)
         question: str,
         ctx: str,
         history: list[dict[str, str]] | None,

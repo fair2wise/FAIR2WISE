@@ -16,7 +16,10 @@ from pathlib import Path
 import sqlite3
 import threading
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ class LibraryCatalog:
         clock: Epoch seconds, injectable.
     """
 
-    def __init__(self, path: str | Path, *, clock: Any = time.time) -> None:
+    def __init__(self, path: str | Path, *, clock: Callable[[], float] = time.time) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._clock = clock

@@ -65,6 +65,7 @@ from .policies import (
 from .registry import RegisteredTool, ToolRegistry, effective_capabilities
 
 if TYPE_CHECKING:
+    from ..contracts.ports import DocumentStore
     from .admission import Admission
 
 logger = logging.getLogger(__name__)
@@ -233,7 +234,7 @@ class ToolExecutor:
         event_sink: EventSink | None = None,
         admission: Admission | None = None,
         limits: RuntimeLimits | None = None,
-        artifact_store: Any = None,
+        artifact_store: DocumentStore | None = None,
         clock: Callable[[], datetime] = utcnow,
         sleep: Callable[[float], None] = time.sleep,
         asleep: Callable[[float], Awaitable[None]] = asyncio.sleep,

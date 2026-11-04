@@ -8,11 +8,14 @@ from pathlib import Path
 import queue
 import threading
 import time
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from flask import Flask, Response, request, send_from_directory
 
 from .message import Log, Registration, Stats, UserPrompt
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _ASSETS_PATH = Path(__file__).parent / 'assets'
 _ASSETS_DIR = str(_ASSETS_PATH)
@@ -1285,7 +1288,7 @@ class Dashboard:
         def events() -> Response:
             q = self._subscribe()
 
-            def stream() -> Any:
+            def stream() -> Iterator[str]:
                 try:
                     yield f'event: init\ndata: {json.dumps(self._snapshot())}\n\n'
                     while True:

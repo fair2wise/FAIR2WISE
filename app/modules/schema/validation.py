@@ -17,7 +17,7 @@ import copy
 from dataclasses import dataclass, field
 import hashlib
 import json
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from .loading import closure_fingerprint, load_helper, pre_s4_fingerprint
 from .registry import (
@@ -26,6 +26,9 @@ from .registry import (
     SchemaEntry,
     SchemaRegistry,
 )
+
+if TYPE_CHECKING:
+    from ..json_types import JsonValue
 
 CONTRACT_ERROR = "contract_error"
 LEGACY_WARNING = "legacy_warning"
@@ -100,12 +103,12 @@ def check_binding(
     raise SchemaBindingError(f"schema {entry.schema_id}@{claimed[:12]} not registered (stale or unknown)")
 
 
-def normalize_term(helper: Any, term: Mapping[str, Any]) -> dict[str, Any]:
+def normalize_term(helper: Any, term: Mapping[str, Any]) -> dict[str, Any]:  # noqa: ANN401  # Any: SchemaHelper (two implementations, duck-typed)
     """Run the existing ``validate_and_fix_term`` on a deep copy of ``term`` and return the result."""
     return cast(dict[str, Any], helper.validate_and_fix_term(copy.deepcopy(dict(term))))  # Any: untyped helper
 
 
-def relation_is_valid(helper: Any, subject_class: str, predicate: str, object_class: str) -> bool:
+def relation_is_valid(helper: Any, subject_class: str, predicate: str, object_class: str) -> bool:  # noqa: ANN401  # Any: SchemaHelper (two implementations, duck-typed)
     """The existing domain/range check (``SchemaHelper.check_relation_validity``) unchanged."""
     return bool(helper.check_relation_validity(subject_class, predicate, object_class))
 
@@ -161,13 +164,13 @@ def _lists(payload: Mapping[str, Any]) -> tuple[Any, Any]:  # Any: node/edge lis
 
 
 def validate_graph(
-    payload: Any,
+    payload: JsonValue,
     entry: SchemaEntry,
     *,
     registry: SchemaRegistry | None = None,
     claimed_fingerprint: str | None = None,
     selection_source: str = "caller",
-    helper: Any = None,
+    helper: Any = None,  # noqa: ANN401  # Any: SchemaHelper (two implementations, duck-typed)
     implementation: str = NORMALIZER_TERM_EXTRACTOR,
     fingerprint: str | None = None,
 ) -> GraphValidationReport:

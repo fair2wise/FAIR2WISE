@@ -308,7 +308,7 @@ class LocalIntakePolicy:
                 return True
         return False
 
-    def require_allowed(self, path: Any) -> Path:
+    def require_allowed(self, path: Any) -> Path:  # noqa: ANN401  # Any: path
         """Return the resolved file path, or raise ``ValueError`` (outside roots, symlink, too large)."""
         candidate = Path(path).expanduser()
         lexical = Path(candidate.absolute())
@@ -324,7 +324,7 @@ class LocalIntakePolicy:
             raise ValueError(f"{candidate.name} exceeds the {self.max_bytes}-byte intake limit")
         return resolved
 
-    def require_allowed_folder(self, path: Any) -> Path:
+    def require_allowed_folder(self, path: Any) -> Path:  # noqa: ANN401  # Any: path
         """Return the resolved directory, or raise ``ValueError`` (donor ``require_allowed_folder``)."""
         resolved = self.require_allowed(path)
         if not resolved.is_dir():

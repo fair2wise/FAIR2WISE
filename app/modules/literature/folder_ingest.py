@@ -101,7 +101,7 @@ def ingest_folder(
     files: Sequence[Path] | None = None,
     glob: str = "*.pdf",
     limit: int = 0,
-    journal: Any = None,
+    journal: Any = None,  # noqa: ANN401  # Any: journal
     job_id: str = "",
     already_ingested: IngestedLookup | None = None,
     pipeline: str = "",
@@ -159,7 +159,7 @@ def _process(
     intake: Callable[[Path], IntakeReport],
     apply: bool,
     ingest_one: Callable[[IntakeReport], dict[str, Any]] | None,
-    journal: Any,
+    journal: Any,  # noqa: ANN401  # Any: journal
     job_id: str,
     already_ingested: IngestedLookup | None,
     pipeline: str,
