@@ -34,7 +34,7 @@ from pathlib import Path
 import shutil
 import threading
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import webbrowser
 
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
@@ -43,6 +43,9 @@ from watchdog.observers import Observer
 
 from . import harvest_rsoxs as hv  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 from ..json_types import Untyped
+
+if TYPE_CHECKING:
+    from watchdog.events import FileSystemEvent
 
 LOGGER = logging.getLogger("paper_finder")
 
@@ -348,13 +351,13 @@ class StagingWatcher(FileSystemEventHandler):
                 self._detected.append(path)
                 LOGGER.info("Detected download (offer Assign): %s", path.name)
 
-    def on_created(self, event: Any) -> None:
+    def on_created(self, event: FileSystemEvent) -> None:
         """Watchdog hook: record a newly created file."""
         if event.is_directory:
             return
         self._maybe_record(Path(str(event.src_path)))
 
-    def on_moved(self, event: Any) -> None:
+    def on_moved(self, event: FileSystemEvent) -> None:
         """Watchdog hook: record a file moved into the watched folder."""
         if event.is_directory:
             return

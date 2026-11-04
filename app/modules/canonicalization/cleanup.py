@@ -103,7 +103,7 @@ class CleanupProposal:
 
 
 def propose_cleanup(
-    rows: GraphRows, vocab: Vocabulary, *, resolver: Any = None, limit: int = 0
+    rows: GraphRows, vocab: Vocabulary, *, resolver: Any = None, limit: int = 0  # noqa: ANN401  # Any: term resolver
 ) -> CleanupProposal:
     """Propose an action per candidate term; optionally one resolver vote for undecided terms."""
     folded = fold_terms(GraphRows([n for n in rows.nodes if not check_context_row(n)], rows.edges))

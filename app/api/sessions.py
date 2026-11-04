@@ -167,7 +167,7 @@ class TiledSessionStore:
                 out.append({"provider": item["provider"], "mode": str(item.get("mode") or "")})
         return out
 
-    def _tokens(self, resp: Any) -> tuple[str, str | None, datetime | None]:
+    def _tokens(self, resp: Any) -> tuple[str, str | None, datetime | None]:  # noqa: ANN401  # Any: Tiled token response
         """Read ``access_token``/``refresh_token``/``expires_in`` from a Tiled token response."""
         try:
             body = resp.json()

@@ -57,7 +57,7 @@ PAGES_DIR = CACHE_DIR / "pages"
 WORK_DIR = CACHE_DIR / "work"
 
 
-def _xp_elems(node: Any, query: str) -> list[Any]:
+def _xp_elems(node: Any, query: str) -> list[Any]:  # noqa: ANN401  # Any: XML element
     """Run an XPath that selects elements; lxml stubs type the result as a wide union."""
     # Any: lxml-stubs return a union of bool/float/str/list for xpath(); element queries yield lists.
     return list(node.xpath(query))

@@ -33,7 +33,7 @@ def _record_id(index: int, name: str) -> str:
 
 def validation_from_quantities(
     accepted: Sequence[tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
-) -> Any:
+) -> Any:  # noqa: ANN401  # Any: document validation
     """A :class:`~.record_validation.DocumentValidation` of observations for accepted quantities.
 
     Each observation carries its *decided* tag as ``status`` (so 0.3.0
@@ -67,14 +67,14 @@ def validation_from_quantities(
 
 def map_to_schema_set(
     validation: object,
-    document: Any,
+    document: Any,  # noqa: ANN401  # Any: document validation
     *,
     work_id: str,
     source_paper: str,
     schema_set: str,
     schema_id: str = DEFAULT_MAPPING_SCHEMA,
     allow_pending_review: bool = False,
-    registry: Any = None,
+    registry: Any = None,  # noqa: ANN401  # Any: schema registry
 ) -> dict[str, Any]:
     """Map accepted records onto ``schema_id@schema_set`` (explicit selection only).
 

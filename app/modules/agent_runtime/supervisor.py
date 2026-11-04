@@ -61,7 +61,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 import json
 import logging
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
@@ -94,6 +94,9 @@ from .registry import RegisteredTool, ToolRegistry, effective_capabilities
 from .skills import SkillRegistry
 from .state import LiteratureState, RunContext, as_run_context
 
+if TYPE_CHECKING:
+    from ..contracts.tools import ToolSpec
+
 logger = logging.getLogger(__name__)
 
 #: Default system prompt of :func:`build_literature_supervisor` when a caller injects none.
@@ -119,7 +122,7 @@ PlanResolver = Callable[[RequestContext, str, Mapping[str, Any]], ChangePlan | N
 _FAILING = {ToolStatus.DENIED, ToolStatus.INVALID, ToolStatus.UNAVAILABLE, ToolStatus.ERROR}
 
 
-def tool_definition(spec: Any) -> dict[str, Any]:
+def tool_definition(spec: ToolSpec) -> dict[str, Any]:
     """OpenAI-style function definition for ``bind_tools`` from a ``ToolSpec``."""
     description = f"{spec.description}\nWhen to use: {spec.when_to_use}\nWhen not to use: {spec.when_not_to_use}"
     return {"type": "function",

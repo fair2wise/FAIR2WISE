@@ -267,7 +267,7 @@ class ModelResolver:
             return
         self._record(case, token, reply, fingerprint, result)
 
-    def _record(self, case: dict[str, Any], token: str, reply: Any, fingerprint: str, result: RunResult) -> None:
+    def _record(self, case: dict[str, Any], token: str, reply: Any, fingerprint: str, result: RunResult) -> None:  # noqa: ANN401  # Any: model reply
         cost = 0.0 if self.ref.local else reply.cost_usd  # only a local model is known to be free
         base: dict[str, Any] = dict(
             case_id=case["id"],
@@ -313,7 +313,7 @@ class ModelResolver:
         )
 
     def _note(
-        self, case: dict[str, Any], reply: Any, error: ModelCallError | None, reservation: str | None
+        self, case: dict[str, Any], reply: Any, error: ModelCallError | None, reservation: str | None  # noqa: ANN401  # Any: model reply
     ) -> None:
         if self.recorder is None:
             return

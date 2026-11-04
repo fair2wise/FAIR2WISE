@@ -66,6 +66,7 @@ from .origin_gate import OriginGateMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
 
 if TYPE_CHECKING:
+    from ..modules.graph.legacy_save import SaveTarget
     from ..modules.f2w_agent.coordinator import CoordinatorConfig
     from ..modules.library.service import LibraryService
     from ..modules.operations.knowledge import KnowledgeOperations
@@ -163,7 +164,7 @@ def create_api_app(
     model_api_root_path: str | None = None,
     folder_roots: FolderRoots | None = None,
     library: LibraryService | None = None,
-    tiled_save: Any | None = None,
+    tiled_save: SaveTarget | None = None,
     extraction_publisher: PostExtractionPublisher | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.

@@ -52,7 +52,7 @@ def require_gate(name: str) -> None:
 
 def authorize_apply(
     gate: str,
-    plan: Any,
+    plan: Any,  # noqa: ANN401  # Any: change plan
     approval: ApprovalRecord | None,
     *,
     current_source_revision: str,
@@ -96,7 +96,7 @@ def authorize_apply(
     return cast(ChangePlan, change_plan)
 
 
-def authorize_vocabulary_change(gate: str, subject_revision: str, approval: Any, *, current_revision: str) -> None:
+def authorize_vocabulary_change(gate: str, subject_revision: str, approval: Any, *, current_revision: str) -> None:  # noqa: ANN401  # Any: approval record
     """Gate for vocabulary activation/promotion, which bind to a content revision, not a graph plan.
 
     ``approval`` is a :class:`~.vocabulary.VocabularyApproval`. Refuses when the gate is closed, no

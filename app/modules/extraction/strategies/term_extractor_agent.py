@@ -24,16 +24,19 @@ Two input modes, both existing entry points:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..contract import ChunkCoverage, ExtractionResult, ExtractionSource, frozen_copy
 from .legacy_f2w import mentions_for_term
+
+if TYPE_CHECKING:
+    from ...json_types import JsonValue
 
 STRATEGY_NAME = "f2w_term_extractor_agent"
 STRATEGY_VERSION = "term_extractor-orchestrator-2.1"
 
 
-def _as_dict(record: Any) -> dict[str, Any]:
+def _as_dict(record: JsonValue) -> dict[str, Any]:
     return record.to_dict() if hasattr(record, "to_dict") else dict(record)
 
 
@@ -47,7 +50,7 @@ class TermExtractorAgentStrategy:
     name = STRATEGY_NAME
     version = STRATEGY_VERSION
 
-    def __init__(self, orchestrator: Any) -> None:
+    def __init__(self, orchestrator: Any) -> None:  # noqa: ANN401  # Any: the term_extractor Orchestrator (untyped donor code)
         self.orchestrator = orchestrator
 
     def _inference(self) -> dict[str, Any]:

@@ -50,7 +50,7 @@ Judge = Callable[[str], str]
 class ChatJudge:
     """Adapter from an existing F2W chat client to a ``judge(prompt) -> str`` callable."""
 
-    def __init__(self, client: Any, *, temperature: float = 0.0, timeout: int = 240) -> None:
+    def __init__(self, client: Any, *, temperature: float = 0.0, timeout: int = 240) -> None:  # noqa: ANN401  # Any: chat client
         if client is None:
             raise ValueError("a chat client is required; there is no default provider")
         self.client = client
@@ -157,7 +157,7 @@ def _keep(group: TermGroup, method: str, reason: str) -> GroupVerdict:
     )
 
 
-def parse_json_object(raw: Any) -> dict[str, Any] | None:
+def parse_json_object(raw: JsonValue) -> dict[str, Any] | None:
     """The first JSON object in ``raw`` (tolerates prose or fences), else ``None``."""
     text = str(raw or "").strip()
     start, end = text.find("{"), text.rfind("}")

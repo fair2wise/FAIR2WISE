@@ -47,7 +47,7 @@ import logging
 import os
 from pathlib import Path
 import threading
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
@@ -83,6 +83,9 @@ from .auth import (
     request_context,
 )
 from .source_text import TurnSources
+
+if TYPE_CHECKING:
+    from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
 
@@ -345,7 +348,7 @@ class LegacyUiGuard:
             raise StartupConfigError("config_rejected: F2W_RUNTIME=langgraph is local-only on the legacy UI API "
                                      "until its read path carries the verified ALS context")
 
-    async def _http_error_handler(self, request: Request, exc: Exception) -> Any:
+    async def _http_error_handler(self, request: Request, exc: Exception) -> Response:
         """Project ``HTTPException.detail`` (paths, raw exception text) and keep the legacy shape."""
         assert isinstance(exc, StarletteHTTPException)
         detail: Any = exc.detail
@@ -454,7 +457,7 @@ class LegacyUiGuard:
         issuer = ctx.principal.issuer or self.settings.tiled_target or ""
         return f"{issuer}|{ctx.principal.subject}"
 
-    def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> tuple[Any, frozenset[str]]:
+    def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> tuple[Any, frozenset[str]]:  # noqa: ANN401  # Any: request model of the settings route (duck-typed in tests)
         """R03: check the fields' capabilities; drop ignored fields; decode opaque paths (T25D plan).
 
         On ALS a non-admin's deployment-wide fields are ignored (warning), not refused, so the
@@ -617,7 +620,7 @@ class LegacyUiGuard:
         return [dict(e, actor=ctx.principal.subject) for e in events]
 
 
-def build_guard(workdir: Any, *, session_key: Callable[[str | None], str],
+def build_guard(workdir: str | Path, *, session_key: Callable[[str | None], str],
                 deployment: DeploymentSettings | None = None,
                 startup_config: Mapping[str, str] | None = None,
                 identity_port: TiledIdentityPort | None = None,

@@ -46,6 +46,7 @@ from .legacy_ui import deployment_settings_from
 from .operations import F2WOperations, build_operations
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from ..modules.operations.knowledge import KnowledgeOperations
 
 
@@ -276,7 +277,7 @@ def build_knowledge(project_root: str, graph_files: list[str] | None = None) -> 
     return KnowledgeOperations.from_graph_files(lambda: files, corpus=corpus)
 
 
-def main(argv: list[str] | None = None, *, environ: Any | None = None) -> int:
+def main(argv: list[str] | None = None, *, environ: Mapping[str, str] | None = None) -> int:
     """Entry point; prints JSON and returns ``0``, or ``2`` with ``{"code", "message"}`` on a refusal."""
     args = build_parser().parse_args(argv)
     try:

@@ -154,7 +154,7 @@ class CampaignOutcome:
 def run_campaign(
     source: RowSource,
     vocabulary: Vocabulary,
-    resolver: Any,
+    resolver: Any,  # noqa: ANN401  # Any: term resolver
     *,
     campaign_id: str,
     scope: Sequence[str],

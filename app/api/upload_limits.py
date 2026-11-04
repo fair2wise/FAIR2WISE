@@ -41,7 +41,7 @@ def _too_large(limit: int) -> HTTPException:
     return HTTPException(status_code=413, detail=f"request body exceeds the {limit} byte limit")
 
 
-async def read_upload_limited(file: Any, max_bytes: int = DEFAULT_MAX_BODY_BYTES) -> bytes:
+async def read_upload_limited(file: Any, max_bytes: int = DEFAULT_MAX_BODY_BYTES) -> bytes:  # noqa: ANN401  # Any: multipart upload
     """Read an ``UploadFile`` completely, refusing once it exceeds ``max_bytes``.
 
     The multipart-reported ``file.size`` is client-controlled, so the chunked read enforces

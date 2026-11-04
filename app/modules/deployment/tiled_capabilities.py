@@ -174,7 +174,7 @@ def _auth_header(credential: str | None, scheme: str) -> dict[str, str]:
 class _Http:
     """Tiny wrapper so every request has a timeout and TLS setting, and errors map to codes."""
 
-    def __init__(self, base: str, *, session: Any = None, timeout: float = 10.0, verify: bool | str = True):
+    def __init__(self, base: str, *, session: Any = None, timeout: float = 10.0, verify: bool | str = True):  # noqa: ANN401  # Any: HTTP session
         if session is None:
             import requests
 
@@ -185,7 +185,7 @@ class _Http:
         self.timeout = timeout
         self.verify = verify
 
-    def request(self, method: str, path: str, **kwargs: object) -> Any:
+    def request(self, method: str, path: str, **kwargs: object) -> Any:  # noqa: ANN401  # Any: HTTP response
         import requests
 
         try:

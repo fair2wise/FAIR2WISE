@@ -70,7 +70,7 @@ def fresh_context(request: Request) -> RequestContext:
     return ctx
 
 
-def project(request: Request, payload: Any) -> JsonValue:
+def project(request: Request, payload: JsonValue) -> JsonValue:
     """Project a ``/v1`` body with the app's one disclosure projector (D19, AUD-06).
 
     :meth:`~app.modules.security.disclosure.DisclosureProjector.project_api_response`:

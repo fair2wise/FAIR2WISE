@@ -34,11 +34,14 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 import logging
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+if TYPE_CHECKING:
+    from starlette.requests import Request
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +135,7 @@ def refusal_response(reason: str) -> JSONResponse:
                         status_code=403)
 
 
-def check_browser_origin(request: Any, *, allowed_origins: Iterable[str] = (),
+def check_browser_origin(request: Request, *, allowed_origins: Iterable[str] = (),
                          allowed_origin_regex: str | None = None) -> JSONResponse | None:
     """Return a 403 response for a cross-site state-changing ``request``, else ``None``."""
     headers = {k.lower(): v for k, v in request.headers.items()}
