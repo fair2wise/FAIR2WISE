@@ -3795,12 +3795,12 @@ class AgentPipelineService:
             tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
         query = self.retrieval.query
         try:
-            return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled)))
+            return note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled))
         except TypeError:
             try:
-                return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question, history=history)))
+                return note_retrieval(self.retrieval, await query(question, history=history))
             except TypeError:
-                return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question)))
+                return note_retrieval(self.retrieval, await query(question))
 
     def _trace_env(self) -> dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""

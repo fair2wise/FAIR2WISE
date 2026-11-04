@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 import random
 import re
-from typing import Any, cast
+from typing import Any, cast, TypeVar
 from urllib.parse import urlparse
 import uuid
 
@@ -104,7 +104,10 @@ def load_seed(path: Path | None = None) -> dict[str, Any]:
     return data
 
 
-def _choice(rng: random.Random, items: Sequence[Any]) -> Any:
+_T = TypeVar("_T")
+
+
+def _choice(rng: random.Random, items: Sequence[_T]) -> _T:
     """Return a uniformly random item from a non-empty sequence."""
     if not items:
         raise ValueError("empty choice list")

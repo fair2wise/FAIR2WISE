@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 import uuid
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan
@@ -94,6 +94,9 @@ H5_MESSAGE = ("publication to {target} is gated at H5: only approved rehearsal t
               "Tiled) are enabled on this deployment")
 #: Decisions one bulk review may carry (T31).
 MAX_BULK_REVIEW = 200
+
+
+_T = TypeVar("_T")
 
 
 def _utcnow() -> datetime:
@@ -411,7 +414,7 @@ class F2WOperations:
             raise ContractError(ErrorCode.DENIED, f"{what} is done by a human, not a worker, delegate or model")
 
     def _guarded(self, ctx: RequestContext, *, kind: str, target: str, payload: Mapping[str, Any],
-                 mutation: Callable[[], Any]) -> Any:
+                 mutation: Callable[[], _T]) -> _T:
         """Run ``mutation`` write-ahead audited when audit is configured (as ``review_case``)."""
         if self.audit is None:
             return mutation()
@@ -545,13 +548,13 @@ class F2WOperations:
         store = self._scales()
         if ctx.principal.subject != LOCAL_OPERATOR and corpus not in ctx.corpus_scope:
             raise ContractError(ErrorCode.DENIED, "corpus is outside the caller's scope")
-        return cast(dict[str, Any], self._guarded(
+        return self._guarded(
             ctx, kind="figure_scale", target=corpus,
             payload={"work_id": work_id, "figure_id": figure_id, "panel_index": panel_index},
             mutation=lambda: store.record(corpus=corpus, work_id=work_id, figure_id=figure_id,
                                           panel_index=panel_index, nm_per_px=nm_per_px, bar_length_px=bar_length_px,
                                           bar_length_nm=bar_length_nm, length_source=length_source, note=note,
-                                          recorded_by=ctx.principal.subject)))
+                                          recorded_by=ctx.principal.subject))
 
     def list_figure_scales(self, ctx: RequestContext, *, corpus: str | None = None, work_id: str | None = None,
                            figure_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:

@@ -37,7 +37,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, cast, TYPE_CHECKING
+from typing import Any, cast, TYPE_CHECKING, TypeVar
 
 from ..contracts import (
     ApprovalRecord,
@@ -497,7 +497,11 @@ class _DeadlineExceeded(Exception):
     pass
 
 
-async def _await_with_deadline(awaitable: Any, deadline: datetime | None, clock: Callable[[], datetime]) -> Any:
+_T = TypeVar("_T")
+
+
+async def _await_with_deadline(awaitable: Awaitable[_T], deadline: datetime | None,
+                               clock: Callable[[], datetime]) -> _T:
     if deadline is None:
         return await awaitable
     remaining = (deadline - clock()).total_seconds()
