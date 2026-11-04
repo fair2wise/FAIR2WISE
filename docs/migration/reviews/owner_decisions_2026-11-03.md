@@ -72,3 +72,10 @@ Interpretation notes (agent, for the owner to correct):
 | Tiled step of the end-to-end test | "I want both :local-only publish into container's own tiled, and import exported json through the existing json-to-tiled import path" |
 | matkg_rsoxs_v4.json | "Merge v4 as a new version" |
 | Five legacy files (tiled_graph, orchestrator/debate agents, download_agent, kg_update, bl1101_ingest) | "reclassify as retained, stay in place. add a note in the addendum we want real ports" |
+
+| Question | Owner answer |
+|---|---|
+| OCR model files from modelscope.cn at image build | "Allow it for both local and CI" |
+| bl1101 v8/v9 | "Scrub and re-serialize in place (Recommended)" |
+| E3 spec errata | "i dont know what this means" (not decided; explained and asked again) |
+| Apply adapter for accepted proposals | "Not yet" |
