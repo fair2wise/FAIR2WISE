@@ -53,6 +53,7 @@ from .qa_route import QaRoute, TracedPlanningModel, pipeline_planning_model, qa_
 from .retrieval import LegacyRetrievalService
 
 if TYPE_CHECKING:
+    from ..application import F2WApplication
     from ..operations.knowledge import KnowledgeOperations
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,7 @@ class LegacyReadPath:
         route: ``QaRoute``; ``SUPERVISOR`` needs an application built with a chat model.
     """
 
-    def __init__(self, application: Any, *, context_factory: Callable[[], RequestContext],  # noqa: ANN401  # Any: application
+    def __init__(self, application: F2WApplication, *, context_factory: Callable[[], RequestContext],
                  route: QaRoute = QaRoute.DIRECT) -> None:
         if route is QaRoute.SUPERVISOR and getattr(application, "supervisor", None) is None:
             raise ValueError("the supervisor QA route needs an application with a chat model")

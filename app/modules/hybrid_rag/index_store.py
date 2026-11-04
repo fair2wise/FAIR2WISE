@@ -11,9 +11,13 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .evidence import CHUNKER_VERSION, LEXICAL_INDEX_VERSION
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import TextIO
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +116,7 @@ def index_lock(root: Path, *, timeout: float = 120.0, poll: float = 0.05) -> Ite
         os.close(fd)
 
 
-def _atomic_write(path: Path, write: Any) -> None:  # noqa: ANN401  # Any: writer callback
+def _atomic_write(path: Path, write: Callable[[TextIO], object]) -> None:
     """Write ``path`` through a temporary sibling and ``os.replace`` (a reader never sees a torn file)."""
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     try:
@@ -259,7 +263,7 @@ def write_index(
         old = SourceIndex(dest).meta()
         carried = {key: old[key] for key in preserve_meta_keys if key in old}
 
-    def _write_chunks(handle: Any) -> None:  # noqa: ANN401  # Any: binary file handle
+    def _write_chunks(handle: TextIO) -> None:
         for chunk in chunks:
             handle.write(json.dumps(chunk, ensure_ascii=False) + "\n")
 

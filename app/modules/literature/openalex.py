@@ -283,7 +283,7 @@ def seconds_to_utc_midnight(now: float) -> float:
     return (midnight - current).total_seconds()
 
 
-def retry_after_seconds(resp: Any) -> float | None:  # noqa: ANN401  # Any: HTTP response
+def retry_after_seconds(resp: httpx.Response) -> float | None:
     """The integer ``Retry-After`` a response names, else ``None`` (dates are not parsed)."""
     try:
         raw = str(resp.headers.get("retry-after", "")).strip()
@@ -298,7 +298,7 @@ def retry_after_seconds(resp: Any) -> float | None:  # noqa: ANN401  # Any: HTTP
     return seconds if seconds >= 0 else None
 
 
-def quota_pause_seconds(resp: Any, now: float) -> float | None:  # noqa: ANN401  # Any: HTTP response
+def quota_pause_seconds(resp: httpx.Response, now: float) -> float | None:
     """How long to pause when ``resp`` says the allowance is spent, else ``None``."""
     status = getattr(resp, "status_code", 0)
     retry_after = retry_after_seconds(resp)

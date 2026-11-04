@@ -31,7 +31,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import unicodedata
 import uuid
 
@@ -55,6 +55,9 @@ from .arrange import guess_year, is_valid_folder_name, year_folder
 from .catalog import LibraryCatalog, sha256_file
 from .manifest import record_upload
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
+
+if TYPE_CHECKING:
+    from .estimate import PaperFacts
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +308,7 @@ class LibraryService:
         out.update(override or {})
         return out
 
-    def paper_facts(self, paper_id: str) -> Any:  # noqa: ANN401  # Any: paper facts
+    def paper_facts(self, paper_id: str) -> PaperFacts | None:
         """Facts the T38 cost estimate needs of one paper (``PaperLookup``); ``None`` for an unknown id.
 
         ``pages`` is the catalog's page count (filled by the metadata probe or the index run); ``None`` while

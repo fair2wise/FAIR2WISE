@@ -19,7 +19,7 @@ import hashlib
 import json
 import sqlite3
 import time
-from typing import Any
+from typing import Any, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode
@@ -247,7 +247,7 @@ class CurationStore:
             leased = [con.execute("SELECT * FROM uncertainty_cases WHERE id=?", (i,)).fetchone() for i in ids]
         return [self._row(r) for r in leased]
 
-    def _owned(self, con: sqlite3.Connection, case_id: str, token: str) -> Any:  # noqa: ANN401  # Any: sqlite row
+    def _owned(self, con: sqlite3.Connection, case_id: str, token: str) -> sqlite3.Row:
         row = con.execute("SELECT * FROM uncertainty_cases WHERE id=?", (case_id,)).fetchone()
         if (
             row is None
@@ -256,7 +256,7 @@ class CurationStore:
             or row["lease_until"] < self.clock()
         ):
             raise LeaseNotOwned()
-        return row
+        return cast(sqlite3.Row, row)
 
     def route_case(
         self, case_id: str, token: str, route: str, group_key: str = "", state: CaseState = CaseState.PENDING

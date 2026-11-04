@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -31,6 +31,9 @@ from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .keys import OperationInputs
 from .pipeline import Pipeline, StageContext, StageResult, StageSpec
+
+if TYPE_CHECKING:
+    from .service import JobService
 
 ENRICHMENT_KIND = "enrichment"
 TOPIC_SWEEP_KIND = "topic_sweep"
@@ -146,9 +149,10 @@ def build_pipeline(kind: str, handler: PaperJobHandler, context_for_job: Callabl
                                required_capability=PAPER_JOB_CAPABILITY)])
 
 
-def register_paper_jobs(job_service: Any, handlers: Mapping[str, PaperJobHandler],  # noqa: ANN401  # Any: job service
+def register_paper_jobs(job_service: JobService, handlers: Mapping[str, PaperJobHandler],
                         context_for_job: Callable[[Any], RequestContext], *,
-                        kinds: Iterable[str] = PAPER_JOB_KINDS, **kwargs: object) -> list[Any]:
+                        kinds: Iterable[str] = PAPER_JOB_KINDS,
+                        **kwargs: Any) -> list[Any]:  # noqa: ANN401  # Any: forwarded verbatim to JobService.register
     """Register the paper job kinds that have a handler on ``job_service`` (trusted wiring only).
 
     A kind without a handler is not registered, so submitting it is refused (``UNSUPPORTED_CAPABILITY``

@@ -27,7 +27,7 @@ import logging
 from pathlib import Path
 import socket
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -35,6 +35,9 @@ import httpx
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .store import AssetKind, AssetTooLarge, FileDocumentStore, StoreError
+
+if TYPE_CHECKING:
+    import os
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +311,7 @@ class LocalIntakePolicy:
                 return True
         return False
 
-    def require_allowed(self, path: Any) -> Path:  # noqa: ANN401  # Any: path
+    def require_allowed(self, path: str | os.PathLike[str]) -> Path:
         """Return the resolved file path, or raise ``ValueError`` (outside roots, symlink, too large)."""
         candidate = Path(path).expanduser()
         lexical = Path(candidate.absolute())

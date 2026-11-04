@@ -27,7 +27,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..f2w_agent.retrieval_agent import RetrievalAgent
 
 
 @dataclass(frozen=True)
@@ -57,7 +60,7 @@ class RetrievalSettings:
     tiled_uri: str | None = None
 
 
-def build_retrieval_agent(settings: RetrievalSettings) -> Any:  # noqa: ANN401  # Any: retrieval agent
+def build_retrieval_agent(settings: RetrievalSettings) -> RetrievalAgent:
     """Construct an existing ``RetrievalAgent`` from ``settings`` (imported lazily)."""
     from ..f2w_agent.retrieval_agent import RetrievalAgent
 
