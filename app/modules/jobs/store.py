@@ -18,7 +18,7 @@ recovery of running jobs whose lease expired.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
@@ -226,7 +226,7 @@ class JobStore:
             )
         return lease
 
-    def _check_lease(self, con: sqlite3.Connection, lease: Lease) -> None:
+    def _check_lease(self, con: sqlite3.Connection, lease: Lease, *, allow_expired: bool = False) -> None:
         row = con.execute(
             "SELECT token, fence, expires_at FROM leases WHERE resource=?", (lease.resource,)
         ).fetchone()
@@ -234,7 +234,7 @@ class JobStore:
             row is None
             or row["token"] != lease.token
             or row["fence"] != lease.fence
-            or row["expires_at"] < self.clock()
+            or (not allow_expired and row["expires_at"] < self.clock())
         ):
             raise LeaseLost(lease.resource)
 
@@ -243,10 +243,15 @@ class JobStore:
         with self.db.tx(immediate=False) as con:
             self._check_lease(con, lease)
 
-    def renew_lease(self, lease: Lease, ttl: float | None = None) -> Lease:
-        """Extend the lease; refused once expired or superseded (a stale owner cannot revive it)."""
+    def renew_lease(self, lease: Lease, ttl: float | None = None, *, allow_expired: bool = False) -> Lease:
+        """Extend the lease; refused once expired or superseded (a stale owner cannot revive it).
+
+        ``allow_expired`` is for the owner's own heartbeat only: a lease that lapsed (the process was
+        suspended, the clock jumped) but was never taken over still carries this owner's token and fence,
+        so it can safely be extended. A lease another owner acquired is refused either way.
+        """
         with self.db.tx() as con:
-            self._check_lease(con, lease)
+            self._check_lease(con, lease, allow_expired=allow_expired)
             expires = self.clock() + (ttl or self.lease_seconds)
             con.execute("UPDATE leases SET expires_at=? WHERE resource=?", (expires, lease.resource))
         return Lease(lease.resource, lease.owner, lease.token, lease.fence, expires)
@@ -361,9 +366,17 @@ class JobStore:
         return [self._record(r) for r in rows]
 
     def claim_next(
-        self, owner: str, *, kinds: Sequence[str] | None = None, ttl: float | None = None
+        self,
+        owner: str,
+        *,
+        kinds: Sequence[str] | None = None,
+        ttl: float | None = None,
+        exclude: Collection[str] = (),
     ) -> tuple[Lease, JobRecord] | None:
-        """Lease the next runnable job: ``queued``, or ``running`` whose owner's lease expired."""
+        """Lease the next runnable job: ``queued``, or ``running`` whose owner's lease expired.
+
+        ``exclude`` lists job ids the caller must not claim (jobs it already runs, or is backing off from).
+        """
         now = self.clock()
         rows = self.db.query(
             "SELECT job_id, kind, state FROM jobs WHERE state IN ('queued', 'running') "
@@ -371,6 +384,8 @@ class JobStore:
         )
         for row in rows:
             if kinds is not None and row["kind"] not in kinds:
+                continue
+            if row["job_id"] in exclude:
                 continue
             lease = self.acquire_lease(self.job_resource(row["job_id"]), owner, ttl)
             if lease is None:
