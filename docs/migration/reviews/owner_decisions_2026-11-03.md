@@ -63,3 +63,12 @@ Interpretation notes (agent, for the owner to correct):
 |---|---|
 | T27 sniff findings: handling of the remaining rows | "Accept proposals as written (Recommended)" (each row's proposed disposition in `reviews/H7/sniff_findings.md` becomes the owner's decision) |
 | T30: OCR engine behind the figure-OCR interface | "Docling's built-in OCR" |
+
+## Ninth set (2026-11-04)
+
+| Question | Owner answer |
+|---|---|
+| Live end-to-end run: harvest and capped paid extraction | "yes you can run a live harvest and extraction with cborg, but ONLY use a free model such as "cborg-chat". you are NOT ALLOWED to use a paid cborg model right now: https://cborg.lbl.gov/models/" |
+| Tiled step of the end-to-end test | "I want both :local-only publish into container's own tiled, and import exported json through the existing json-to-tiled import path" |
+| matkg_rsoxs_v4.json | "Merge v4 as a new version" |
+| Five legacy files (tiled_graph, orchestrator/debate agents, download_agent, kg_update, bl1101_ingest) | "reclassify as retained, stay in place. add a note in the addendum we want real ports" |
