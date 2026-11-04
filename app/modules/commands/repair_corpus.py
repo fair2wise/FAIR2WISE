@@ -54,12 +54,11 @@ MATERIAL_KEYWORDS = {
     "polymer", "thin film", "nanoparticle", "film",
 }
 MATERIAL_FORMULA_RE = re.compile(
-    r"^[A-Z][a-z]?\d*|"          # starts with element symbol
-    r"poly\(|poly[- ]|"           # poly(...), poly-, poly
-    r"P3HT|PCBM|PC61BM|PC71BM|"  # common polymer abbreviations
-    r"P[A-Z]{2,}|"                # polymer abbreviations like PTB7
-    r"\bfilm\b|\bnanoparticle\b|\bnano\b",
-    re.IGNORECASE,
+    r"^(?:[A-Z][a-z]?\d*){2,}$|"   # chemical formula: TiO2, NaCl, Na3Bi (case-sensitive)
+    r"^[A-Z][a-z]?\d+$|"            # a single element with a count: C60
+    r"P3HT|PCBM|PC61BM|PC71BM|"    # common polymer abbreviations
+    r"\bP[A-Z]{2,}\d*\b|"          # polymer abbreviations like PTB7 (case-sensitive)
+    r"(?i:poly\(|poly[- ]|\bfilm\b|\bnanoparticle\b|\bnano\b)",
 )
 
 
