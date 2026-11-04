@@ -144,13 +144,13 @@ def run_route(
     )
 
 
-class _TermResolver(Protocol):
+class RoundResolver(Protocol):
     """The one resolver method ``run_round`` needs (``StructuredTermResolver`` or a test double)."""
 
     def resolve(self, ev: TermEvidence, *, round_key: str, framing: str = ...) -> TermVerdict: ...
 
 
-def run_round(run: CampaignRun, resolver: _TermResolver, number: int) -> RoundRecord:
+def run_round(run: CampaignRun, resolver: RoundResolver, number: int) -> RoundRecord:
     """One bounded round: framing menu_first, then evidence_first for later rounds; retains every vote.
 
     At most ``run.max_terms_per_round`` terms are asked; the rest wait (still pending, still visible).

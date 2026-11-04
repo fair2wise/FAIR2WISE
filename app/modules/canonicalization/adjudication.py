@@ -27,13 +27,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Any, cast, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup
 from .merge_safety import check_merge
 
 if TYPE_CHECKING:
+    from ..extraction.structured_output import SyncChatClient
     from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ Judge = Callable[[str], str]
 class ChatJudge:
     """Adapter from an existing F2W chat client to a ``judge(prompt) -> str`` callable."""
 
-    def __init__(self, client: Any, *, temperature: float = 0.0, timeout: int = 240) -> None:  # noqa: ANN401  # Any: chat client
+    def __init__(self, client: SyncChatClient, *, temperature: float = 0.0, timeout: int = 240) -> None:
         if client is None:
             raise ValueError("a chat client is required; there is no default provider")
         self.client = client
@@ -59,7 +60,7 @@ class ChatJudge:
 
     def __call__(self, prompt: str) -> str:
         """Send `prompt` to the chat client and return its reply."""
-        return cast(str, self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout))
+        return self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout)
 
 
 _GROUP_PROMPT = """You are consolidating a controlled vocabulary for a scattering \

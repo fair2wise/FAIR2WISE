@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
@@ -33,6 +33,14 @@ DEFAULT_MAX_BODY_BYTES = 100 * 1024 * 1024
 #: same bodies nginx would.
 LEGACY_MAX_BODY_BYTES = 128 * 1024 * 1024
 _CHUNK_BYTES = 1 << 20
+
+
+class UploadSource(Protocol):
+    """An uploaded file that can be read in chunks (a Starlette ``UploadFile`` or a parsed multipart part)."""
+
+    async def read(self, size: int) -> bytes:
+        """Read up to ``size`` bytes."""
+        ...
 #: Stable error code of an oversized body (413).
 TOO_LARGE_CODE = "payload_too_large"
 
@@ -41,7 +49,7 @@ def _too_large(limit: int) -> HTTPException:
     return HTTPException(status_code=413, detail=f"request body exceeds the {limit} byte limit")
 
 
-async def read_upload_limited(file: Any, max_bytes: int = DEFAULT_MAX_BODY_BYTES) -> bytes:  # noqa: ANN401  # Any: multipart upload
+async def read_upload_limited(file: UploadSource, max_bytes: int = DEFAULT_MAX_BODY_BYTES) -> bytes:
     """Read an ``UploadFile`` completely, refusing once it exceeds ``max_bytes``.
 
     The multipart-reported ``file.size`` is client-controlled, so the chunked read enforces

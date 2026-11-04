@@ -85,6 +85,7 @@ from .auth import (
 from .source_text import TurnSources
 
 if TYPE_CHECKING:
+    from ..modules.f2w_agent.api import AgentSettingsUpdate
     from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
@@ -457,7 +458,7 @@ class LegacyUiGuard:
         issuer = ctx.principal.issuer or self.settings.tiled_target or ""
         return f"{issuer}|{ctx.principal.subject}"
 
-    def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> tuple[Any, frozenset[str]]:  # noqa: ANN401  # Any: request model of the settings route (duck-typed in tests)
+    def settings_update(self, request: Request, ctx: RequestContext, update: AgentSettingsUpdate) -> tuple[Any, frozenset[str]]:
         """R03: check the fields' capabilities; drop ignored fields; decode opaque paths (T25D plan).
 
         On ALS a non-admin's deployment-wide fields are ignored (warning), not refused, so the

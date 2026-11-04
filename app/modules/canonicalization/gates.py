@@ -15,10 +15,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, cast
+from typing import Any, TYPE_CHECKING
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..extraction import H3_GATES as _EXTRACTION_GATES
+
+if TYPE_CHECKING:
+    from .migration import ScopedMergePlan
+    from .vocabulary import VocabularyApproval
 
 _GATES: dict[str, Any] = {
     "apply_merge": False,
@@ -52,7 +56,7 @@ def require_gate(name: str) -> None:
 
 def authorize_apply(
     gate: str,
-    plan: Any,  # noqa: ANN401  # Any: change plan
+    plan: ScopedMergePlan,
     approval: ApprovalRecord | None,
     *,
     current_source_revision: str,
@@ -93,10 +97,10 @@ def authorize_apply(
         raise ApplyRefused("stale_source", "source revision changed since the plan was made")
     if plan.vocabulary_revision != current_vocabulary_revision:
         raise ApplyRefused("stale_vocabulary", "vocabulary revision changed since the plan was made")
-    return cast(ChangePlan, change_plan)
+    return change_plan
 
 
-def authorize_vocabulary_change(gate: str, subject_revision: str, approval: Any, *, current_revision: str) -> None:  # noqa: ANN401  # Any: approval record
+def authorize_vocabulary_change(gate: str, subject_revision: str, approval: VocabularyApproval | None, *, current_revision: str) -> None:
     """Gate for vocabulary activation/promotion, which bind to a content revision, not a graph plan.
 
     ``approval`` is a :class:`~.vocabulary.VocabularyApproval`. Refuses when the gate is closed, no

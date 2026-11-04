@@ -16,9 +16,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
+
+if TYPE_CHECKING:
+    from .record_validation import DocumentValidation
 
 #: Schema sets this module can map onto (explicit selection only). 0.3.1 (T22D) also fills the
 #: normalized-value slots on QuantityValue from ``normalize_quantity`` (D1.4).
@@ -33,7 +36,7 @@ def _record_id(index: int, name: str) -> str:
 
 def validation_from_quantities(
     accepted: Sequence[tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
-) -> Any:  # noqa: ANN401  # Any: document validation
+) -> DocumentValidation:
     """A :class:`~.record_validation.DocumentValidation` of observations for accepted quantities.
 
     Each observation carries its *decided* tag as ``status`` (so 0.3.0
