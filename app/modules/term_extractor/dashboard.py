@@ -1233,7 +1233,7 @@ class Dashboard:
         """Dismiss a prompt by submitting an empty response."""
         self.submit_response(prompt_id, '')
 
-    def set_shutdown_callback(self, callback: Any) -> None:
+    def set_shutdown_callback(self, callback: object) -> None:
         """Set a callable(agent_id: str) invoked when the power button is clicked."""
         self._shutdown_callback = callback
 
@@ -1252,7 +1252,7 @@ class Dashboard:
             except ValueError:
                 logger.debug("subscriber already removed")
 
-    def _broadcast(self, event: str, data: Any) -> None:
+    def _broadcast(self, event: str, data: object) -> None:
         msg = f'event: {event}\ndata: {json.dumps(data)}\n\n'
         with self._lock:
             dead = []

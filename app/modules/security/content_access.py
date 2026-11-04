@@ -217,7 +217,7 @@ class SourceAccessAuthority:
     def check(
         self,
         context: RequestContext,
-        grant: Any,
+        grant: object,
         *,
         kind: SourceKind,
         corpus: str | None = None,
@@ -330,7 +330,7 @@ class SourceAccessScope:
         return reader()
 
 
-def user_surface_source_access(*_args: Any, **_kwargs: Any) -> bool:
+def user_surface_source_access(*_args: object, **_kwargs: object) -> bool:
     """Return whether a user-facing surface may receive source bodies: always ``False``.
 
     Exists so serializers can state the rule explicitly. No profile, admin role,

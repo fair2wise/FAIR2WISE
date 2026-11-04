@@ -71,7 +71,7 @@ def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _write_json(path: Path, data: Any) -> None:
+def _write_json(path: Path, data: object) -> None:
     """Atomic JSON write (temp file in the same directory, then ``os.replace``)."""
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:

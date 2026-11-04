@@ -469,7 +469,7 @@ def requested_entity_types(question: str) -> list[str]:
     return matched
 
 
-def _flatten_props(value: Any) -> str:
+def _flatten_props(value: object) -> str:
     """Recursively flatten a nested property dict/list/scalar to a single string."""
     if value is None:
         return ""
@@ -480,7 +480,7 @@ def _flatten_props(value: Any) -> str:
     return str(value)
 
 
-def _normalize_identity(value: Any) -> str:
+def _normalize_identity(value: object) -> str:
     """Collapse whitespace and punctuation so ESAF/proposal strings compare loosely."""
     return re.sub(r"[\s_\-:]+", " ", str(value or "").strip().lower())
 
@@ -548,7 +548,7 @@ def tiled_lookup_candidates(node_id: str) -> list[str]:
     return out
 
 
-def resolve_tiled_node_id(kg: Any, node_id: str) -> str | None:
+def resolve_tiled_node_id(kg: object, node_id: str) -> str | None:
     """Map a citation or overlay id onto a node key in *kg*, if one exists."""
     nodes = getattr(kg, "nodes", {}) or {}
     if not isinstance(nodes, dict) or not node_id:
@@ -582,7 +582,7 @@ def resolve_tiled_node_id(kg: Any, node_id: str) -> str | None:
 
 
 def tiled_neighborhood_ids(
-    kg: Any,
+    kg: object,
     seeds: Sequence[str],
     hops: int = CITE_FOCUS_HOPS,
 ) -> list[str]:
@@ -899,7 +899,7 @@ def _catalog_runs(
     runs: list[dict[str, Any]] = []
     error: str | None = None
 
-    def _as_run(node: Any, path: list[str]) -> dict[str, Any] | None:
+    def _as_run(node: object, path: list[str]) -> dict[str, Any] | None:
         """Build a BlueskyRun-shaped dict from a catalog node, or None if not a run."""
         try:
             meta = dict(getattr(node, "metadata", None) or {})

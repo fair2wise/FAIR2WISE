@@ -267,7 +267,7 @@ class VisionToolset:
         return ToolResult(tool=tool, status=ToolStatus.PARTIAL if (warnings or any_unc) else ToolStatus.OK,
                           data=data, evidence=outcome.evidence, warnings=tuple(warnings), provenance_id=provenance)
 
-    def _run(self, tool: str, inv: Any, render: Callable[[FigureAnalysis], dict[str, Any]],
+    def _run(self, tool: str, inv: object, render: Callable[[FigureAnalysis], dict[str, Any]],
              kinds: Sequence[SourceKind] = _FIG_KINDS) -> ToolResult:
         try:
             paper = self._load(inv, kinds)
@@ -289,11 +289,11 @@ class VisionToolset:
         return {**self._head(f), "panels": rows}
 
     # -- tools --------------------------------------------------------------------------------------------
-    def extract_figures(self, inv: Any) -> ToolResult:
+    def extract_figures(self, inv: object) -> ToolResult:
         """``vision_extract_figures``."""
         return self._run(VISION_TOOL_NAMES[0], inv, lambda f: f.as_dict())
 
-    def classify_figure(self, inv: Any) -> ToolResult:
+    def classify_figure(self, inv: object) -> ToolResult:
         """``vision_classify_figure``: figure verdict, panel verdicts and the units a consumer should act on."""
         def render(f: FigureAnalysis) -> dict[str, Any]:
             row = self._panels(f, inv, lambda p: {"classification": p.classification})
@@ -301,13 +301,13 @@ class VisionToolset:
                     "classification_units": list(f.classification_units)}
         return self._run(VISION_TOOL_NAMES[1], inv, render)
 
-    def read_scale(self, inv: Any) -> ToolResult:
+    def read_scale(self, inv: object) -> ToolResult:
         """``vision_read_scale``."""
         def pick(p: Any) -> dict[str, Any]:
             return {"scale": p.scale.as_dict() if p.scale else None}
         return self._run(VISION_TOOL_NAMES[2], inv, lambda f: self._panels(f, inv, pick))
 
-    def read_qrange(self, inv: Any) -> ToolResult:
+    def read_qrange(self, inv: object) -> ToolResult:
         """``vision_read_qrange``."""
         def pick(p: Any) -> dict[str, Any]:
             return {"q_range": p.qrange.as_dict() if p.qrange else None}

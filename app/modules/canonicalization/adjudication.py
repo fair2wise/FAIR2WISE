@@ -168,7 +168,7 @@ def parse_json_object(raw: Any) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def _strings(value: Any) -> list[str]:
+def _strings(value: object) -> list[str]:
     return [str(v).strip() for v in value if str(v).strip()] if isinstance(value, list) else []
 
 

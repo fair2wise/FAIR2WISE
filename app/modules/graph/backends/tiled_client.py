@@ -73,7 +73,7 @@ class TiledGraphClient:
     """
 
     def __init__(self, base_url: str, *, profile: str,
-                 credential: Any | None = None, scheme: str = "Apikey",
+                 credential: object = None, scheme: str = "Apikey",
                  timeout: float = 10.0, verify: Any = True, session: Any = None) -> None:
         try:
             self.base_url = validate_external_url(profile, base_url)
@@ -93,7 +93,7 @@ class TiledGraphClient:
         return f"TiledGraphClient({self.base_url!r}, profile={self.profile!r})"
 
     @classmethod
-    def from_external(cls, cfg: ExternalTiledConfig, *, session: Any = None) -> TiledGraphClient:
+    def from_external(cls, cfg: ExternalTiledConfig, *, session: object = None) -> TiledGraphClient:
         """Client for an external (connect-only) target; the secret file is read per request."""
         secret_file = cfg.writer_secret_file
         provider: Callable[[], str] | None = None

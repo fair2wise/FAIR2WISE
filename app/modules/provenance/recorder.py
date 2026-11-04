@@ -71,7 +71,7 @@ class AuditLog:
     """Append-only, hash-chained SQLite audit log."""
 
     def __init__(
-        self, path: Any = ":memory:", *, clock: Callable[[], float], db: OperationalDB | None = None
+        self, path: object = ":memory:", *, clock: Callable[[], float], db: OperationalDB | None = None
     ) -> None:
         self.db = db or OperationalDB(path)
         self._clock = clock

@@ -135,7 +135,7 @@ class PublicationGate:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, H5_MESSAGE.format(target=target))
 
 
-def _json(model: Any) -> Any:
+def _json(model: object) -> Any:
     return model.model_dump(mode="json") if hasattr(model, "model_dump") else model
 
 
@@ -167,7 +167,7 @@ class F2WOperations:
                  publication_gate: PublicationGate | None = None, clock: Clock = _utcnow,
                  approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: Any = None,
                  scales: Any = None, control_path: Path | None = None, quality_dir: Path | None = None,
-                 folders: Any = None) -> None:
+                 folders: object = None) -> None:
         """Bind the services; see the class docstring for the arguments.
 
         Raises:
@@ -795,7 +795,7 @@ class F2WOperations:
         return {"job": _json(handle), "result": result, "artifact_refs": refs}
 
     def register_knowledge_jobs(self, context_for_job: Callable[[Any], RequestContext], *,
-                                artifact_store: Any = None, **kwargs: Any) -> Any:
+                                artifact_store: object = None, **kwargs: object) -> Any:
         """Register the ``knowledge_operation`` job kind over this deployment's operations (trusted wiring)."""
         from ..modules.operations.reports import register_operation_jobs
 
@@ -841,7 +841,7 @@ def build_operations(settings: DeploymentSettings, root: str | Path, *,
                      clock: Clock = _utcnow, owner: str = "api",
                      publication_gate: PublicationGate | None = None,
                      credential_lookup: Callable[[str], Any] | None = None,
-                     knowledge: Any = None) -> F2WOperations:
+                     knowledge: object = None) -> F2WOperations:
     """Build the default operations over SQLite stores under ``root`` (created if missing).
 
     Registers **no** job kind and no publication: real pipeline handlers need H3 and real

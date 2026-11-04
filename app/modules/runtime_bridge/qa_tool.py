@@ -255,7 +255,7 @@ def outcome_from_ledger(result: ToolResult, ledger: LegacyResultLedger, *, pop: 
 
 # -- mapping ----------------------------------------------------------------------
 
-def _strs(value: Any) -> list[str]:
+def _strs(value: object) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [str(v) for v in value if v is not None and str(v).strip()]
     if isinstance(value, str) and value.strip():
@@ -312,7 +312,7 @@ def kg_evidence(pairs: Sequence[tuple[str, str]]) -> tuple[EvidenceRef, ...]:
     return tuple(refs)
 
 
-def citation_tokens(answer: Any) -> list[str]:
+def citation_tokens(answer: object) -> list[str]:
     """Citation tokens in ``answer``, verbatim, in order of first appearance."""
     if not isinstance(answer, str):
         return []
@@ -325,7 +325,7 @@ def _fail(code: ErrorCode, message: str, *, provenance_id: str | None, retryable
                       warnings=(message[:300],), provenance_id=provenance_id)
 
 
-def verdict_to_result(verdict: Any, *, provenance_id: str | None = None) -> ToolResult:
+def verdict_to_result(verdict: object, *, provenance_id: str | None = None) -> ToolResult:
     """Map a legacy ``RetrievalAgent.query`` verdict to a ``ToolResult`` (see module table)."""
     if not isinstance(verdict, Mapping):
         return _fail(ErrorCode.INTERNAL, f"retrieval returned a malformed verdict ({type(verdict).__name__})",

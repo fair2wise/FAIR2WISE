@@ -177,7 +177,7 @@ def _dt(value: float) -> datetime:
     return datetime.fromtimestamp(value, tz=UTC)
 
 
-def _json(value: Any) -> str:
+def _json(value: object) -> str:
     return canonical_json(value)
 
 
@@ -193,7 +193,7 @@ class JobStore:
 
     def __init__(
         self,
-        path: Any = ":memory:",
+        path: object = ":memory:",
         *,
         lease_seconds: float = 120.0,
         clock: Callable[[], float] = time.time,

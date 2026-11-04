@@ -55,7 +55,7 @@ SCHEMA = (
 )
 
 
-def _json(value: Any) -> str:
+def _json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
@@ -70,7 +70,7 @@ class CurationStore:
     """Cases, attempts, approvals and the budget ledger over one operational database."""
 
     def __init__(
-        self, path: Any = ":memory:", *, clock: Callable[[], float] = time.time, db: OperationalDB | None = None
+        self, path: object = ":memory:", *, clock: Callable[[], float] = time.time, db: OperationalDB | None = None
     ) -> None:
         self.db = db or OperationalDB(path)
         self.clock = clock

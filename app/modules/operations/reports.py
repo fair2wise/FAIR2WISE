@@ -145,7 +145,7 @@ class OperationReport(BaseModel):
 
 # -- D19 guard -----------------------------------------------------------------------
 
-def check_no_source_material(payload: Any, *, where: str = "report") -> None:
+def check_no_source_material(payload: object, *, where: str = "report") -> None:
     """Raise ``INTERNAL`` if ``payload`` carries a source-body or path-like key, or an absolute path.
 
     Reports carry computed counts, ids, labels and bibliographic keys only. The check runs
@@ -389,7 +389,7 @@ def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], 
 
 
 def register_operation_jobs(job_service: Any, run: OperationFn, context_for_job: Callable[[Any], RequestContext],
-                            *, artifact_store: Any = None, **kwargs: Any) -> Any:
+                            *, artifact_store: object = None, **kwargs: object) -> Any:
     """Register :data:`OPERATION_JOB_KIND` on ``job_service`` (trusted wiring only)."""
     pipeline = build_operation_pipeline(run, context_for_job, artifact_store=artifact_store)
     return job_service.register(OPERATION_JOB_KIND, pipeline, capability=OPERATION_JOB_CAPABILITY, **kwargs)

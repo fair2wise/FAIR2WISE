@@ -92,7 +92,7 @@ def list_pdfs(folder: Path, *, glob: str = "*.pdf", limit: int = 0) -> list[Path
 
 
 def ingest_folder(
-    folder: Any,
+    folder: object,
     *,
     policy: LocalIntakePolicy,
     intake: Callable[[Path], IntakeReport],

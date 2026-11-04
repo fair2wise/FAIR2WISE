@@ -89,7 +89,7 @@ def publish_extraction(
     terms_json: str,
     *,
     publisher: Any | None = None,
-    ctx: Any | None = None,
+    ctx: object = None,
 ) -> dict[str, Any]:
     """Publish the corpus an extraction run just rebuilt (T18E; replaces the Splash wipe-and-reimport, Q11).
 

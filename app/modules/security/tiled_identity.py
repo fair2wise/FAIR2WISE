@@ -192,7 +192,7 @@ class TiledIdentityPort(Protocol):
         ...
 
 
-def identity_from_whoami(payload: Any, *, issuer: str, now: datetime,
+def identity_from_whoami(payload: object, *, issuer: str, now: datetime,
                          credential_expires_at: datetime | None = None,
                          tiled_library_version: str | None = None) -> VerifiedIdentity:
     """Map a tiled 0.2.18 ``whoami`` JSON body to a :class:`VerifiedIdentity`.

@@ -274,7 +274,7 @@ class ModelTurnSources:
         """PDF names the regions belong to (the grant's ``work_ids``)."""
         return sorted({name for name, _version in self._text})
 
-    def read(self, source_version: str, locator: Any) -> str | None:
+    def read(self, source_version: str, locator: object) -> str | None:
         """Retained text of one region; only ever called by a ``QuoteVerifier`` under a grant."""
         for (_name, version), text in self._text.items():
             if version == source_version:
@@ -289,8 +289,8 @@ def create_fastapi_app(
     *,
     deployment: Any | None = None,
     startup_config: dict[str, str] | None = None,
-    identity_port: Any | None = None,
-    credential_store: Any | None = None,
+    identity_port: object = None,
+    credential_store: object = None,
     clock: Callable[[], Any] | None = None,
     gaps_dir: str | Path | None = None,
 ) -> FastAPI:
@@ -670,7 +670,7 @@ def snippet_text(txt: str, length: int, hints: Sequence[str] | None) -> str:
     return txt[:length]
 
 
-def format_domain_features(features: Any, *, multiline: bool = False) -> str:
+def format_domain_features(features: object, *, multiline: bool = False) -> str:
     """Format schema-driven CodeSnippet domain features for search and context."""
     if not isinstance(features, list):
         return ""

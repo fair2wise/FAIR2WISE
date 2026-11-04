@@ -145,7 +145,7 @@ class FigureTextLayer:
         }
 
 
-def text_layer_for(doc: Any, figure: ParsedFigure, info: PageInfo | None = None,
+def text_layer_for(doc: object, figure: ParsedFigure, info: PageInfo | None = None,
                    *, default_scale: float = DEFAULT_RENDER_SCALE) -> FigureTextLayer:
     """Locate one parsed figure on its page and collect the text-layer spans inside it."""
     fid = figure.figure_id or f"fig-p{figure.page:03d}-{figure.index:02d}"
@@ -181,7 +181,7 @@ def text_layer_for(doc: Any, figure: ParsedFigure, info: PageInfo | None = None,
                            tuple(inside), len(everything) - len(inside), (w_px, h_px), tuple(issues))
 
 
-def page_text_spans_outside(layer: FigureTextLayer, doc: Any) -> Sequence[TextSpan]:
+def page_text_spans_outside(layer: FigureTextLayer, doc: object) -> Sequence[TextSpan]:
     """Page spans outside the figure frame (caption/body), for callers needing the surround."""
     if layer.frame is None or layer.size_px is None:
         return ()

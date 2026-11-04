@@ -104,11 +104,11 @@ def _writer_errors() -> Iterator[None]:
                             "graph writes are blocked", retryable=False) from None
 
 
-def _canon(value: Any) -> str:
+def _canon(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _sha(value: Any) -> str:
+def _sha(value: object) -> str:
     return hashlib.sha256(_canon(value).encode()).hexdigest()
 
 
@@ -685,7 +685,7 @@ def _run(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord, src: S
         journal.append("intent", op_id=oid, kind=op.kind, key=op.key, replay=oid in done)
         return oid
 
-    def finish(oid: str, op: Op, **extra: Any) -> None:
+    def finish(oid: str, op: Op, **extra: object) -> None:
         journal.append("done", op_id=oid, kind=op.kind, key=op.key, **extra)
 
     by_stage = {s: [o for o in ops if o.stage == s] for s in STAGES}

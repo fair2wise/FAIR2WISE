@@ -111,11 +111,11 @@ def _local_address() -> str | None:
     return "::"
 
 
-def _stream_piece(value: Any) -> str:
+def _stream_piece(value: object) -> str:
     return value if isinstance(value, str) and value else ""
 
 
-def stream_chunk_text(chunk: Any) -> str:
+def stream_chunk_text(chunk: object) -> str:
     """Text from one streamed chat chunk. Uses the last choice, then its delta."""
     choices = getattr(chunk, "choices", None) or []
     if not choices:

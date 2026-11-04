@@ -41,7 +41,7 @@ def load_project_config() -> dict[str, Any]:
         return yaml.safe_load(handle) or {}
 
 
-def get_config(path: str, fallback: Any = None) -> Any:
+def get_config(path: str, fallback: object = None) -> Any:
     """Return a nested config value using a dotted path."""
     value: Any = load_project_config()
     for part in path.split("."):
@@ -51,7 +51,7 @@ def get_config(path: str, fallback: Any = None) -> Any:
     return value
 
 
-def _env_names(entry: Any) -> Iterable[str]:
+def _env_names(entry: object) -> Iterable[str]:
     if not isinstance(entry, dict):
         return ()
     env = entry.get("env")
@@ -62,7 +62,7 @@ def _env_names(entry: Any) -> Iterable[str]:
     return ()
 
 
-def _default_value(entry: Any, fallback: Any = None) -> Any:
+def _default_value(entry: object, fallback: object = None) -> Any:
     if isinstance(entry, dict):
         if "default" in entry:
             return entry["default"]
@@ -74,7 +74,7 @@ def _default_value(entry: Any, fallback: Any = None) -> Any:
     return fallback
 
 
-def as_bool(value: Any) -> bool:
+def as_bool(value: object) -> bool:
     """Coerce env/config values to bool."""
     if isinstance(value, bool):
         return value
@@ -87,7 +87,7 @@ def as_bool(value: Any) -> bool:
 
 def config_value(
     path: str,
-    fallback: Any = None,
+    fallback: object = None,
     *,
     cast: Callable[[Any], Any] | None = None,
 ) -> Any:

@@ -445,7 +445,7 @@ def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,
     return stamp(report, started)
 
 
-def compare_snapshots(port: Any, ctx: RequestContext, graph_ids: Sequence[str],
+def compare_snapshots(port: object, ctx: RequestContext, graph_ids: Sequence[str],
                       control: ScanControl | None = None) -> OperationReport:
     """``kg_compare_snapshots``: growth between consecutive graphs, in the given order."""
     started = utcnow()
@@ -504,7 +504,7 @@ def compare_snapshots(port: Any, ctx: RequestContext, graph_ids: Sequence[str],
     return stamp(report, started)
 
 
-def paper_subgraph(port: Any, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int = 50,
+def paper_subgraph(port: object, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int = 50,
                    max_edges: int = 100, control: ScanControl | None = None) -> OperationReport:
     """``kg_paper_subgraph``: entities citing one Work and the relations among them."""
     started = utcnow()
@@ -563,7 +563,7 @@ def _parse_time(value: str) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
-def recent_entities(port: Any, ctx: RequestContext, graph_id: str, *, since: str = "", limit: int = 25,
+def recent_entities(port: object, ctx: RequestContext, graph_id: str, *, since: str = "", limit: int = 25,
                     control: ScanControl | None = None) -> OperationReport:
     """``kg_recent_entities``: entities created after ``since`` (all when empty), newest first."""
     started = utcnow()
@@ -690,7 +690,7 @@ class GraphOperationsTool:
     specs = GRAPH_SPECS
     skill = ANALYZE_KNOWLEDGE_GRAPH_SKILL
 
-    def __init__(self, port: Any, *, graph_ids: Sequence[str] | None = None, artifact_store: Any = None,
+    def __init__(self, port: object, *, graph_ids: Sequence[str] | None = None, artifact_store: object = None,
                  max_records: int = 500_000) -> None:
         self.port = port
         self._graph_ids = None if graph_ids is None else tuple(graph_ids)

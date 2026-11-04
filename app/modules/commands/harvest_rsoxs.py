@@ -577,7 +577,7 @@ def _annotate_work(work: dict[str, Any]) -> dict[str, Any]:
     return work
 
 
-def _reconstruct_abstract(inverted_index: Any) -> str:
+def _reconstruct_abstract(inverted_index: object) -> str:
     """Rebuild an OpenAlex inverted-index abstract into a space-joined string."""
     if not inverted_index or not isinstance(inverted_index, dict):
         return ""

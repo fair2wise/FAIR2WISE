@@ -92,7 +92,7 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _write_json(path: Path, data: Any) -> None:
+def _write_json(path: Path, data: object) -> None:
     B._write_json(path, data)  # noqa: SLF001 - the bundle package's atomic writer
 
 

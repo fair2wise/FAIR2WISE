@@ -296,7 +296,7 @@ class PipelineRunner:
         pipeline: Pipeline,
         *,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: Any = None,
+        admission: object = None,
         extra: Mapping[str, Any] | None = None,
         on_denied: Callable[[JobRecord, str], None] | None = None,
         interrupt: Any | None = None,

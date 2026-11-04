@@ -30,7 +30,7 @@ class OperationalDB:
         schema: SQL script run once at open (``CREATE TABLE IF NOT EXISTS ...``).
     """
 
-    def __init__(self, path: Any, *, busy_timeout: float = 30.0, schema: Sequence[str] = ()) -> None:
+    def __init__(self, path: object, *, busy_timeout: float = 30.0, schema: Sequence[str] = ()) -> None:
         target = str(path)
         if target != ":memory:":
             Path(target).parent.mkdir(parents=True, exist_ok=True)

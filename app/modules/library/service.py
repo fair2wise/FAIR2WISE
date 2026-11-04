@@ -84,7 +84,7 @@ class VerifyUnavailable(Exception):
 class _NullStore:
     """``prepare_local_pdf`` only asks ``exists`` when ``apply`` is false; nothing is ever stored."""
 
-    def exists(self, ctx: Any, ref: str) -> bool:
+    def exists(self, ctx: object, ref: str) -> bool:
         """Never a duplicate: the library has no candidate store."""
         return False
 

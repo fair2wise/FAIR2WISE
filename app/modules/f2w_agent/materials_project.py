@@ -229,7 +229,7 @@ def _parse_ok(token: str) -> bool:
         return False
 
 
-def _normalize_doc(doc: Any) -> dict[str, Any]:
+def _normalize_doc(doc: object) -> dict[str, Any]:
     """Flatten an MP summary document or dict into citation-ready fields."""
     data = doc if isinstance(doc, dict) else getattr(doc, "model_dump", lambda: {})()
     if not data and hasattr(doc, "material_id"):

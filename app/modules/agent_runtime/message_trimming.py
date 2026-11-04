@@ -54,13 +54,13 @@ def media_placeholder(block: dict[str, Any]) -> str:
     return f"[{what} -- {_RESTORE_HINT}]"
 
 
-def _is_media_block(block: Any) -> bool:
+def _is_media_block(block: object) -> bool:
     if not isinstance(block, dict) or block.get("type") == "text":
         return False
     return "base64" in block or "url" in block
 
 
-def strip_media_from_content(content: Any) -> Any:
+def strip_media_from_content(content: object) -> Any:
     """Replace media blocks with placeholders; returns ``content`` itself when unchanged."""
     if not isinstance(content, list) or not any(_is_media_block(b) for b in content):
         return content
@@ -159,12 +159,12 @@ def trim_stale_tool_results(
     return for_model, replacements
 
 
-def is_orphan_repair(message: Any) -> bool:
+def is_orphan_repair(message: object) -> bool:
     """Whether ``message`` is a repaired earlier message rather than a new one."""
     return bool((getattr(message, "response_metadata", None) or {}).get(ORPHAN_REPAIR_MARKER))
 
 
-def _text_of(content: Any) -> str:
+def _text_of(content: object) -> str:
     if isinstance(content, str):
         return content
     if not isinstance(content, list):

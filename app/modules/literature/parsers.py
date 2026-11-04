@@ -170,7 +170,7 @@ class DoclingParser:
         images_scale: float = 2.0,
         min_figure_side: int = 120,
         do_table_structure: bool = True,
-        converter: Any | None = None,
+        converter: object = None,
     ) -> None:
         self.artifacts_path = artifacts_path
         self.images_scale = images_scale
@@ -235,7 +235,7 @@ class DoclingParser:
 
     def document_from_docling(
         self,
-        doc: Any,
+        doc: object,
         *,
         pdf_path: Path,
         work_dir: Path,
@@ -335,7 +335,7 @@ class DoclingParser:
     # -- figures and tables -----------------------------------------------------------------------
 
     @staticmethod
-    def _caption(item: Any, doc: Any) -> tuple[str, BoundingBox | None]:
+    def _caption(item: Any, doc: object) -> tuple[str, BoundingBox | None]:
         try:
             text = str(item.caption_text(doc) or "").strip()
         except Exception:  # noqa: BLE001 - a malformed caption reference must not lose the figure

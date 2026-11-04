@@ -152,7 +152,7 @@ class CompositeGraphPort:
     is shadowed by the JSON graph (warned once; see the module docstring).
     """
 
-    def __init__(self, json_port: Any, tiled: Any | TiledBackendFactory | None = None, *,
+    def __init__(self, json_port: Any, tiled: object = None, *,
                  ttl: float = TILED_DISCOVERY_TTL, max_scan: int = TILED_DISCOVERY_MAX_SCAN,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._json = json_port
@@ -337,7 +337,7 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     return from_managed
 
 
-def resolve_tiled_settings(settings: Any, environ: Any = None) -> tuple[Any | None, str | None]:
+def resolve_tiled_settings(settings: object, environ: Any = None) -> tuple[Any | None, str | None]:
     """``(TiledSettings, None)`` for the deployment, or ``(None, reason)`` when Tiled is not usable.
 
     Args:
@@ -422,7 +422,7 @@ class KnowledgeOperations:
     """
 
     def __init__(self, graph: GraphOperationsTool, corpus: CorpusAuditTool | None = None, *,
-                 artifact_store: Any = None) -> None:
+                 artifact_store: object = None) -> None:
         if not isinstance(graph, GraphOperationsTool):
             raise TypeError("graph must be an operations.graph.GraphOperationsTool")
         if corpus is not None and not isinstance(corpus, CorpusAuditTool):
@@ -437,7 +437,7 @@ class KnowledgeOperations:
     # -- construction helpers -----------------------------------------------------------------
 
     @classmethod
-    def from_storage(cls, root: str | Path, *, artifact_store: Any = None,
+    def from_storage(cls, root: str | Path, *, artifact_store: object = None,
                      graph_max_records: int = 500_000) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` (graphs) and ``<root>/storage/terminology`` (corpora).
 
@@ -451,8 +451,8 @@ class KnowledgeOperations:
         return cls(graph, corpus, artifact_store=artifact_store)
 
     @classmethod
-    def from_deployment(cls, settings: Any, environ: Any = None, root: str | Path | None = None, *,
-                        artifact_store: Any = None, graph_max_records: int = 500_000,
+    def from_deployment(cls, settings: object, environ: object = None, root: str | Path | None = None, *,
+                        artifact_store: object = None, graph_max_records: int = 500_000,
                         discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` *and* the deployment's Tiled graphs (D3.17).
 
@@ -484,8 +484,8 @@ class KnowledgeOperations:
 
     @classmethod
     def from_graph_files(cls, provider: GraphFilesProvider, *, corpus: CorpusAuditTool | None = None,
-                         artifact_store: Any = None, graph_max_records: int = 500_000,
-                         tiled: Any | TiledBackendFactory | None = None,
+                         artifact_store: object = None, graph_max_records: int = 500_000,
+                         tiled: object = None,
                          discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations following a caller-supplied graph selection (T25D: the active runtime's files).
 
@@ -546,7 +546,7 @@ class KnowledgeOperations:
         return self._dispatch(ctx, operation, dict(args), control)
 
     def result(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
-               control: ScanControl | None = None, artifact_store: Any = None) -> ToolResult:
+               control: ScanControl | None = None, artifact_store: object = None) -> ToolResult:
         """The bounded typed result of one operation: what the agent Tool returns for the same call.
 
         ``status`` is ``OK`` for a complete scan and ``PARTIAL`` for a stopped one; refusals and

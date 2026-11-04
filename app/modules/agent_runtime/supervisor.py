@@ -164,7 +164,7 @@ def _refused(record: Mapping[str, Any], code: ErrorCode, message: str) -> ToolOu
     return ToolOutcome(result=_fail(record["tool"], code, message), key=call_key(record["tool"], record["args"]))
 
 
-def _parse_approval(value: Any) -> ApprovalRecord | None:
+def _parse_approval(value: object) -> ApprovalRecord | None:
     if isinstance(value, ApprovalRecord):
         return value
     if isinstance(value, Mapping):
@@ -240,7 +240,7 @@ def build_literature_supervisor(
             raise ContractError(ErrorCode.DENIED, "this thread belongs to another principal or session")
         return {} if current else {"owner": key}
 
-    def resolve_plan(ctx: RequestContext, name: str, args: Any) -> ChangePlan | None:
+    def resolve_plan(ctx: RequestContext, name: str, args: object) -> ChangePlan | None:
         if plan_resolver is None or not isinstance(args, Mapping):
             return None
         return plan_resolver(ctx, name, args)

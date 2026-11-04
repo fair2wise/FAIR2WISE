@@ -38,7 +38,7 @@ class _Page:
     def __init__(self, text: str) -> None:
         self._text = text
 
-    def get_text(self, *_args: Any, **_kwargs: Any) -> str:
+    def get_text(self, *_args: object, **_kwargs: object) -> str:
         return self._text
 
 

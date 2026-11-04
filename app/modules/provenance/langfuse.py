@@ -141,7 +141,7 @@ class LangfuseExporter:
             return None
 
     def _span(self, trace_id: str, name: str, kind: str, *, metadata: Mapping[str, Any] | None = None,
-              input: Any = None, output: Any = None, error: bool = False) -> None:  # noqa: A002
+              input: object = None, output: object = None, error: bool = False) -> None:  # noqa: A002
         span = self._client.start_observation(
             trace_context={"trace_id": trace_id}, name=name, as_type=kind, input=input, output=output,
             metadata=dict(metadata or {}), level="ERROR" if error else None)

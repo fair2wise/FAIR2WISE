@@ -154,7 +154,7 @@ class ExtractionResult:
         }
 
 
-def frozen_copy(value: Any) -> Any:
+def frozen_copy(value: object) -> Any:
     """Deep copy so a result never aliases a strategy's mutable state."""
     return copy.deepcopy(value)
 

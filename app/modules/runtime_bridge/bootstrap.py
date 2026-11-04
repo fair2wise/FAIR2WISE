@@ -72,7 +72,7 @@ QA_DELEGATION_PROMPT = (
 
 
 def build_read_registry(
-    service: Any, ledger: LegacyResultLedger, *, name: str = "f2w", freeze: bool = True,
+    service: object, ledger: LegacyResultLedger, *, name: str = "f2w", freeze: bool = True,
     paper_summary: Any = None, literature: Any = None, vision: Any = None, knowledge: Any = None,
 ) -> ToolRegistry:
     """Fresh registry holding ``answer_from_knowledge`` bound to ``service`` and ``ledger``.

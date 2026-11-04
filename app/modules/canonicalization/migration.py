@@ -79,7 +79,7 @@ class MergeTarget(Protocol):
         ...
 
 
-def sha256_json(value: Any) -> str:
+def sha256_json(value: object) -> str:
     """Return the SHA-256 hex digest of ``value`` as canonical JSON (sorted keys, compact, sets as lists)."""
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=list).encode()

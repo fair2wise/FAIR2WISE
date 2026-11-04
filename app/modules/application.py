@@ -155,9 +155,9 @@ class F2WApplication:
         self,
         *,
         settings: DeploymentSettings,
-        retrieval: Any,
-        chat_model: Any = None,
-        checkpointer: Any = None,
+        retrieval: object,
+        chat_model: object = None,
+        checkpointer: object = None,
         event_sink: Any = None,
         admission: Any = None,
         limits: Any = None,
@@ -220,7 +220,7 @@ class F2WApplication:
 
     # -- lifecycle ----------------------------------------------------------------
 
-    def _open_checkpointer(self, checkpointer: Any) -> Any:
+    def _open_checkpointer(self, checkpointer: object) -> Any:
         from .agent_runtime.checkpointer import ManagedCheckpointer
 
         if checkpointer is None:
@@ -245,7 +245,7 @@ class F2WApplication:
     def __enter__(self) -> F2WApplication:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.close()
 
     # -- request context -------------------------------------------------------------

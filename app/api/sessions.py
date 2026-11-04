@@ -119,7 +119,7 @@ class TiledSessionStore:
         max_sessions: Oldest sessions are dropped beyond this many.
     """
 
-    def __init__(self, tiled_target: str, http_client: Any, *, clock: Callable[[], datetime] = _utcnow,
+    def __init__(self, tiled_target: str, http_client: object, *, clock: Callable[[], datetime] = _utcnow,
                  timeout: float = 10.0, cookie_path: str = DEFAULT_COOKIE_PATH, cookie_secure: bool = True,
                  max_sessions: int = DEFAULT_MAX_SESSIONS) -> None:
         """Bind the Tiled target (normalized) and the HTTP client; the arguments are described on the class."""
@@ -142,7 +142,7 @@ class TiledSessionStore:
 
     # ------------------------------------------------------------------ Tiled calls
 
-    def _call(self, method: str, path: str, **kwargs: Any) -> Any:
+    def _call(self, method: str, path: str, **kwargs: object) -> Any:
         """Call the bound Tiled; transport failures are ``UNAVAILABLE``."""
         try:
             return getattr(self._client, method)(self.tiled_target + path, timeout=self._timeout, **kwargs)

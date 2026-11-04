@@ -66,7 +66,7 @@ def validation_from_quantities(
 
 
 def map_to_schema_set(
-    validation: Any,
+    validation: object,
     document: Any,
     *,
     work_id: str,

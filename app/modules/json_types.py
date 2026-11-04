@@ -14,3 +14,5 @@ from typing import Any
 JsonValue = Any
 # Any: a JSON object whose values are decided by the producer (model output, stored record, wire payload).
 JsonObject = dict[str, Any]
+# Any: a deliberately dynamic value: an untyped third-party object, a lazily imported attribute or a wrapped callable's result.
+Untyped = Any

@@ -106,7 +106,7 @@ class PaperReader:
         self.acquirer = acquirer
 
     @staticmethod
-    def _require(scope: Any, kind: SourceKind, doi: str) -> None:
+    def _require(scope: object, kind: SourceKind, doi: str) -> None:
         if not isinstance(scope, SourceAccessScope):
             raise SourceAccessDenied("reading a paper needs a trusted source-access scope")
         scope.require(kind, work_id=doi_key(doi))
@@ -130,7 +130,7 @@ class PaperReader:
         return self.parse_service.load(ctx, record), status
 
     def read_paper(
-        self, ctx: RequestContext, doi: str, *, scope: Any, work: Mapping[str, Any] | None = None
+        self, ctx: RequestContext, doi: str, *, scope: object, work: Mapping[str, Any] | None = None
     ) -> PaperOverview:
         """Acquire (if allowed and needed), parse, and list the paper's sections."""
         self._require(scope, SourceKind.PDF_BYTES, doi)
@@ -149,7 +149,7 @@ class PaperReader:
         )
 
     def read_paper_section(
-        self, ctx: RequestContext, doi: str, section: str, *, scope: Any, max_chars: int = DEFAULT_SECTION_CHARS
+        self, ctx: RequestContext, doi: str, section: str, *, scope: object, max_chars: int = DEFAULT_SECTION_CHARS
     ) -> SectionText:
         """One section, matched case-insensitively (exact name first, then substring), bounded."""
         self._require(scope, SourceKind.PDF_BYTES, doi)

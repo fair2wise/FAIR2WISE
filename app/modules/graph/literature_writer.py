@@ -31,7 +31,7 @@ RELEASE_TYPE = "f2w:Release"
 RELEASE_NODE = "~release"
 
 
-def canonical(value: Any) -> str:
+def canonical(value: object) -> str:
     """Canonical JSON used to compare stored and desired properties."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 

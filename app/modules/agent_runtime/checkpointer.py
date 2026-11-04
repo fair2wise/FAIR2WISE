@@ -134,7 +134,7 @@ class ManagedCheckpointer:
         self.open()
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.close(force=True)
 
 

@@ -94,7 +94,7 @@ class LegacyRetrievalService:
 
     def __init__(
         self,
-        agent: Any = None,
+        agent: object = None,
         *,
         agent_provider: Callable[[], Any] | None = None,
         settings: RetrievalSettings | None = None,
@@ -125,7 +125,7 @@ class LegacyRetrievalService:
                     self._agent = self._factory(self._settings)
         return self._agent
 
-    def _tiled_uri(self, agent: Any) -> str | None:
+    def _tiled_uri(self, agent: object) -> str | None:
         if self._tiled_uri_provider is not None:
             return self._tiled_uri_provider()
         if self._settings is not None and self._settings.tiled_uri is not None:

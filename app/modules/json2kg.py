@@ -99,7 +99,7 @@ def make_id(term: str, prefix: str = "matkg") -> str:
     return f"{prefix}:{cleaned}"
 
 
-def ensure_list(val: Any) -> list[Any]:
+def ensure_list(val: object) -> list[Any]:
     """Guarantee that the return is a list.
 
     - None     → []
@@ -111,7 +111,7 @@ def ensure_list(val: Any) -> list[Any]:
     return val if isinstance(val, list) else [val]
 
 
-def normalize_domain_features(features: Any) -> list[dict[str, Any]]:
+def normalize_domain_features(features: object) -> list[dict[str, Any]]:
     """Normalize schema-driven CodeSnippet domain feature entries."""
     normalized: list[dict[str, Any]] = []
     for feature in ensure_list(features):

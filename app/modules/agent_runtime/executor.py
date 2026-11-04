@@ -166,7 +166,7 @@ class ToolOutcome:
     attempts: int = 0
 
 
-def call_key(tool_name: str, tool_input: Any) -> str:
+def call_key(tool_name: str, tool_input: object) -> str:
     """Stable identity for one tool call, for repeat detection (donor ``_call_key``)."""
     try:
         return f"{tool_name}({json.dumps(tool_input, sort_keys=True, default=str)})"
@@ -228,7 +228,7 @@ class ToolExecutor:
         *,
         approval_check: ApprovalCheck | None = None,
         event_sink: EventSink | None = None,
-        admission: Any = None,
+        admission: object = None,
         limits: RuntimeLimits | None = None,
         artifact_store: Any = None,
         clock: Callable[[], datetime] = utcnow,
@@ -416,7 +416,7 @@ class ToolExecutor:
             return classify_exception(entry.name, cast(Exception, exc))  # control-flow BaseExceptions re-raised above
         return self._normalize(entry.spec, raw)
 
-    def _normalize(self, spec: ToolSpec, raw: Any) -> ToolResult:
+    def _normalize(self, spec: ToolSpec, raw: object) -> ToolResult:
         if isinstance(raw, ToolResult):
             result = raw if raw.tool == spec.name else raw.model_copy(update={"tool": spec.name})
         elif raw is None or (isinstance(raw, Mapping) and not raw):
@@ -510,13 +510,13 @@ async def _await_with_deadline(awaitable: Any, deadline: datetime | None, clock:
         raise
 
 
-def _close(awaitable: Any) -> None:
+def _close(awaitable: object) -> None:
     close = getattr(awaitable, "close", None)
     if callable(close):
         close()
 
 
-def _validate(schema: Mapping[str, Any], instance: Any) -> str | None:
+def _validate(schema: Mapping[str, Any], instance: object) -> str | None:
     from jsonschema import Draft202012Validator
 
     error = next(iter(Draft202012Validator(schema).iter_errors(instance)), None)

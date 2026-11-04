@@ -469,7 +469,7 @@ def make_term(
     definition: str,
     source: str,
     relations: list[dict[str, Any]] | None = None,
-    **extra: Any,
+    **extra: object,
 ) -> dict[str, Any]:
     """Build one term record in the shape the ``json2kg`` graph builder expects.
 
@@ -733,7 +733,7 @@ def _svg_coord(el: Any, attr: str) -> float:
         return 0.0
 
 
-def parse_sheet_a_svg_order(tree: Any) -> list[str]:
+def parse_sheet_a_svg_order(tree: object) -> list[str]:
     """Sheet A SVG left-to-right, top-to-bottom. This is beam order, not A′ DOM."""
     labels: list[tuple[float, float, str]] = []
     for text_el in _xp_elems(tree, "//section[@id='sheet-a']//figure//svg//text[contains(@class,'big')]"):
@@ -775,7 +775,7 @@ def parse_arrow_sequence(text: str) -> list[str]:
     return names
 
 
-def parse_figcaption_beam_path(tree: Any) -> list[str]:
+def parse_figcaption_beam_path(tree: object) -> list[str]:
     """Return the beam-path chain documented in the Sheet A figcaptions, or ``[]`` if none."""
     captions = _xp_elems(tree, "//section[@id='sheet-a']//figcaption")
     text = " ".join(re.sub(r"\s+", " ", " ".join(_texts(el))) for el in captions)

@@ -103,7 +103,7 @@ class AuditEvent(BaseModel):
     detail: str = Field(default="", max_length=500)
 
 
-def args_digest(args: Any) -> str:
+def args_digest(args: object) -> str:
     """SHA-256 of canonical JSON for ``args``."""
     body = json.dumps(args, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(body.encode()).hexdigest()
@@ -115,7 +115,7 @@ def make_event(
     *,
     at: datetime,
     spec: ToolSpec | None = None,
-    args: Any = None,
+    args: object = None,
     plan: ChangePlan | None = None,
     approval: ApprovalRecord | None = None,
     error_code: ErrorCode | None = None,

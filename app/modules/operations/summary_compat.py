@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 _SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
-def _session_id(pipeline: Any) -> str | None:
+def _session_id(pipeline: object) -> str | None:
     key = str(getattr(pipeline, "_active_session_key", "") or "")
     return key if _SESSION_RE.match(key) else None
 

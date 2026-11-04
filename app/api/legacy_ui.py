@@ -144,7 +144,7 @@ class OpaquePaths:
         self.roots = PathRoots(tuple(pairs))
 
     @staticmethod
-    def is_opaque(value: Any) -> bool:
+    def is_opaque(value: object) -> bool:
         """Return whether ``value`` is an ``f2w://`` id."""
         return isinstance(value, str) and value.strip().startswith(OPAQUE_PREFIX)
 
@@ -338,7 +338,7 @@ class LegacyUiGuard:
         app.add_exception_handler(StarletteHTTPException, self._http_error_handler)
         return app
 
-    def check_service(self, service: Any) -> None:
+    def check_service(self, service: object) -> None:
         """Refuse startup when the T03 langgraph read path would run without a verified principal."""
         if not self.is_local and getattr(service, "_read_path", None) is not None:
             raise StartupConfigError("config_rejected: F2W_RUNTIME=langgraph is local-only on the legacy UI API "
@@ -509,11 +509,11 @@ class LegacyUiGuard:
             out["exposure_warning"] = self.settings.exposure_warning
         return cast(dict[str, Any], out)
 
-    def project_paths(self, payload: Any) -> Any:
+    def project_paths(self, payload: object) -> Any:
         """Session reset/delete bodies: only local paths are internal."""
         return self.projector.project_paths_only(payload)
 
-    def project_route(self, ctx: RequestContext, method: str, path: str, payload: Any) -> Any:
+    def project_route(self, ctx: RequestContext, method: str, path: str, payload: object) -> Any:
         """Graph, search, upload and publication bodies through ``project_route_response``."""
         return self.projector.project_route_response(method, path, 200, payload, self.viewer(ctx))
 
@@ -600,7 +600,7 @@ class LegacyUiGuard:
         return self._require_owner(request, ctx, owner,
                                    "trace.read_own", "trace.read_any")
 
-    def project_trace(self, ctx: RequestContext, record: Any) -> Any:
+    def project_trace(self, ctx: RequestContext, record: object) -> Any:
         """R17 body: raw for ``trace.read_any``, projected otherwise (``project_trace_for``)."""
         return self.projector.project_trace_for(record, ctx)
 

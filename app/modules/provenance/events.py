@@ -30,7 +30,7 @@ _SECRET_KEY = re.compile(r"(api[_-]?key|secret|token|passw(or)?d|credential|auth
 _SECRET_VALUE = re.compile(r"(sk-[A-Za-z0-9]{12,}|Bearer\s+\S+|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+)")
 
 
-def redact(value: Any, *, _depth: int = 0) -> Any:
+def redact(value: object, *, _depth: int = 0) -> Any:
     """Copy of ``value`` with secrets removed and size bounded."""
     if _depth > MAX_DEPTH:
         return "[truncated]"
@@ -56,7 +56,7 @@ def redact(value: Any, *, _depth: int = 0) -> Any:
     return redact(str(value), _depth=_depth + 1)
 
 
-def _digest(value: Any) -> str:
+def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 

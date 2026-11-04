@@ -88,8 +88,8 @@ class PinnedArgsService:
     def __getattr__(self, name: str) -> Any:
         return getattr(self.inner, name)
 
-    async def query(self, question: str, *, history: Any = None, source_rag: Any = None,
-                    use_live_tiled: Any = None) -> Any:
+    async def query(self, question: str, *, history: Any = None, source_rag: object = None,
+                    use_live_tiled: object = None) -> Any:
         """Run the wrapped service's query, substituting the pinned turn's arguments if one is set."""
         pinned = _PINNED.get()
         if pinned is not None:
@@ -113,12 +113,12 @@ def unpin_args(token: contextvars.Token[dict[str, Any] | None]) -> None:
 
 # -- traced planning model --------------------------------------------------------
 
-def _role(message: Any) -> str:
+def _role(message: object) -> str:
     return {"system": "system", "human": "user", "ai": "assistant", "tool": "tool"}.get(
         str(getattr(message, "type", "")), str(getattr(message, "type", "")))
 
 
-def _content(message: Any) -> str:
+def _content(message: object) -> str:
     content = getattr(message, "content", "")
     text = content if isinstance(content, str) else json.dumps(content, default=str)
     calls = getattr(message, "tool_calls", None)
@@ -128,7 +128,7 @@ def _content(message: Any) -> str:
     return text
 
 
-def _record(model: Any, messages: Sequence[Any], reply: Any, started: float,
+def _record(model: object, messages: Sequence[Any], reply: object, started: float,
             error: BaseException | None) -> None:
     from ..f2w_agent.trace import record_llm_call
 
@@ -151,7 +151,7 @@ class _BoundPlanner:
         model = self.owner.current()
         return model, (model.bind_tools(self.tools) if self.tools else model)
 
-    def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
         model, bound = self._bound()
         started = time.perf_counter()
         try:
@@ -162,7 +162,7 @@ class _BoundPlanner:
         _record(model, messages, reply, started, None)
         return reply
 
-    async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
         model, bound = self._bound()
         started = time.perf_counter()
         try:
@@ -190,20 +190,20 @@ class TracedPlanningModel:
         """Return the chat model the provider resolves right now."""
         return self._provider()
 
-    def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> _BoundPlanner:
+    def bind_tools(self, tools: Sequence[Any], **kwargs: object) -> _BoundPlanner:
         """Return a traced planner bound to `tools`; extra keyword arguments are ignored."""
         return _BoundPlanner(self, list(tools))
 
-    def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
         """Invoke the current model on `messages` through a traced planner with no tools bound."""
         return _BoundPlanner(self, []).invoke(messages, *args, **kwargs)
 
-    async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> Any:
         """Async variant of :meth:`invoke`."""
         return await _BoundPlanner(self, []).ainvoke(messages, *args, **kwargs)
 
 
-def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
+def pipeline_planning_model(pipeline: object) -> Callable[[], Any]:
     """Provider of the planning chat model for ``pipeline``'s current backend and model.
 
     Reuses the existing LangChain builder ``term_extractor.Orchestrator._build_llm``

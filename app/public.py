@@ -115,9 +115,9 @@ class F2WClient:
         cls,
         settings: DeploymentSettings,
         *,
-        retrieval: Any,
-        chat_model: Any = None,
-        checkpointer: Any = None,
+        retrieval: object,
+        chat_model: object = None,
+        checkpointer: object = None,
         operations: F2WOperations | None = None,
         **options: Any,
     ) -> F2WClient:
@@ -165,7 +165,7 @@ class F2WClient:
     def __enter__(self) -> F2WClient:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.close()
 
     # -- request context ---------------------------------------------------------------
@@ -180,7 +180,7 @@ class F2WClient:
         """Existing F2W QA answer (``ReadOutcome``; ``.to_legacy()`` gives the legacy verdict)."""
         return await self._app.answer_from_knowledge(ctx, question, **kw)
 
-    def answer_from_knowledge_sync(self, ctx: RequestContext, question: str, **kw: Any) -> Any:
+    def answer_from_knowledge_sync(self, ctx: RequestContext, question: str, **kw: object) -> Any:
         """Synchronous :meth:`answer_from_knowledge`; raises inside a running event loop."""
         return self._app.answer_from_knowledge_sync(ctx, question, **kw)
 
@@ -202,7 +202,7 @@ class F2WClient:
     async def summarize_paper_terms(
         self,
         ctx: RequestContext,
-        scope: Any,
+        scope: object,
         *,
         max_terms: int | None = None,
         query: str = "",
@@ -508,7 +508,7 @@ class F2WClient:
 
     # -- disclosure (D19) ------------------------------------------------------------------------------
 
-    def disclose(self, payload: Any) -> Any:
+    def disclose(self, payload: object) -> Any:
         """Project a result for a person the way the ``/v1`` routes do (``project_api_response``).
 
         ``payload`` may be a ``ToolResult``, a bundle or any JSON-ready value; Pydantic models are
@@ -589,11 +589,11 @@ def create_literature_agent(
     *,
     client: F2WClient | None = None,
     settings: DeploymentSettings | None = None,
-    retrieval: Any = None,
-    chat_model: Any = None,
-    checkpointer: Any = None,
-    sync_model: Any = None,
-    async_model: Any = None,
+    retrieval: object = None,
+    chat_model: object = None,
+    checkpointer: object = None,
+    sync_model: object = None,
+    async_model: object = None,
     **options: Any,  # Any: forwarded F2WApplication keyword arguments
 ) -> LiteratureAgent:
     """Return a :class:`LiteratureAgent` over ``client`` or over a new client.

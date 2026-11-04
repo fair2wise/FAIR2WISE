@@ -75,7 +75,7 @@ def merge_into_source_metadata(
     return True
 
 
-def publications_from_source_metadata(source_metadata: Any) -> list[dict[str, Any]]:
+def publications_from_source_metadata(source_metadata: object) -> list[dict[str, Any]]:
     """Convert source-scoped metadata map into embedded publication records."""
     if not isinstance(source_metadata, dict):
         return []
@@ -116,7 +116,7 @@ def extract_snippets_json_from_text(text: str) -> dict[str, Any]:
     return {"snippets": []}
 
 
-def normalize_domain_features(features: Any, schema_helper: Any) -> list[dict[str, str | None]]:
+def normalize_domain_features(features: object, schema_helper: Any) -> list[dict[str, str | None]]:
     """Keep only schema-allowed CodeSnippet domain features."""
     try:
         ctx = schema_helper.get_code_domain_feature_context()

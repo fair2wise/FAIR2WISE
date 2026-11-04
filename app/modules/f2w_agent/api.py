@@ -630,7 +630,7 @@ def default_ollama_model_name() -> str:
     return default_runtime_model("ollama")
 
 
-def _string_value(value: Any, default: str = "") -> str:
+def _string_value(value: object, default: str = "") -> str:
     """Coerce a value to a stripped string, or a default if empty."""
     if value is None:
         return default
@@ -1512,7 +1512,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, A
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> dict[str, Any]:
+def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any]:
     """Serialize an in-memory lookup graph (Tiled) into the UI node contract."""
     wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
     empty: dict[str, Any] = {"nodes": [], "edges": []}
@@ -1571,7 +1571,7 @@ def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_neighborhood_from_lookup(kg: Any, node_id: str) -> GraphPayload:
+def graph_neighborhood_from_lookup(kg: object, node_id: str) -> GraphPayload:
     """3-hop Tiled identity subgraph for cite-click / node select."""
     subset = graph_subset_from_lookup(kg, [node_id])
     return GraphPayload(
@@ -2161,7 +2161,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
     return obj if isinstance(obj, dict) else {}
 
 
-def _coerce_bool(value: Any) -> bool:
+def _coerce_bool(value: object) -> bool:
     """Coerce a value to bool, treating true/yes/1 strings as True."""
     if isinstance(value, bool):
         return value
@@ -2304,7 +2304,7 @@ def _looks_contextual_followup(question: str) -> bool:
 
 def _select_candidates_by_indices(
     candidates: list[dict[str, Any]],
-    indices: Any,
+    indices: object,
 ) -> list[dict[str, Any]]:
     """Pick candidate dicts whose indices appear in the given list."""
     if isinstance(indices, int):
@@ -2391,7 +2391,7 @@ def _rank_publications(query: str, publications: list[dict[str, Any]], max_resul
     return [publication for _, publication in ranked[:max_results]]
 
 
-def _normalize_doi(value: Any) -> str:
+def _normalize_doi(value: object) -> str:
     """Strip a doi.org URL prefix from a DOI string."""
     doi = str(value or "").strip()
     return re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.I).strip()
@@ -2566,25 +2566,25 @@ class _NoSplash:
         return {"id": matkg_id}
 
     @staticmethod
-    def splash_update_entity(*_args: Any, **_kwargs: Any) -> None:
+    def splash_update_entity(*_args: object, **_kwargs: object) -> None:
         """No-op."""
 
     @staticmethod
-    def splash_create_entity(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+    def splash_create_entity(*_args: object, **kwargs: object) -> dict[str, Any]:
         """No-op; returns a placeholder id."""
         return {"id": str(kwargs.get("uri") or "new")}
 
     @staticmethod
-    def splash_create_link(*_args: Any, **_kwargs: Any) -> None:
+    def splash_create_link(*_args: object, **_kwargs: object) -> None:
         """No-op."""
 
     @staticmethod
-    def splash_find_links(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
+    def splash_find_links(*_args: object, **_kwargs: object) -> list[dict[str, Any]]:
         """No Splash links exist."""
         return []
 
     @staticmethod
-    def splash_delete_link(*_args: Any, **_kwargs: Any) -> bool:
+    def splash_delete_link(*_args: object, **_kwargs: object) -> bool:
         """No-op."""
         return False
 
@@ -3385,7 +3385,7 @@ class AgentPipelineService:
             if target_entity is None:
                 raise FileNotFoundError(f"Splash entity not found for node: {target}")
 
-            def is_exact(raw: Any) -> bool:
+            def is_exact(raw: object) -> bool:
                 """Return True if an association matches the source, predicate, and target."""
                 if not isinstance(raw, dict):
                     return False
@@ -4200,7 +4200,7 @@ class AgentPipelineService:
         emit: ProgressEmitter | None,
         event: str,
         message: str,
-        **data: Any,
+        **data: object,
     ) -> None:
         """Send a named progress event if an emitter is provided."""
         payload = dict(data)

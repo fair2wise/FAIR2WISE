@@ -45,7 +45,7 @@ class NoOpAdmission:
         yield
 
 
-def ensure_admission(admission: Any) -> Any:
+def ensure_admission(admission: object) -> Any:
     """Return ``admission`` or a :class:`NoOpAdmission`, rejecting objects without both slots.
 
     Raises:

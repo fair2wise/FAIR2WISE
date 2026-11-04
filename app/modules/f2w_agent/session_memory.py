@@ -87,7 +87,7 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _clip(text: Any, limit: int) -> str:
+def _clip(text: object, limit: int) -> str:
     """Collapse whitespace and truncate ``text`` to ``limit`` characters."""
     value = re.sub(r"\s+", " ", str(text or "")).strip()
     if len(value) <= limit:
@@ -126,7 +126,7 @@ def _default_memory() -> dict[str, Any]:
     }
 
 
-def _extract_entities(*texts: Any) -> list[str]:
+def _extract_entities(*texts: object) -> list[str]:
     """Pull likely entity tokens from text, skipping conversational stopwords."""
     candidates: list[str] = []
     for text in texts:

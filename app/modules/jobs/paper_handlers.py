@@ -298,7 +298,7 @@ def build_record(path: str, meta: Mapping[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def condition_bin(value: Any, tolerance: float) -> str | None:
+def condition_bin(value: object, tolerance: float) -> str | None:
     """The tolerance bin of an angle or temperature value (``"150 C"`` and ``150`` agree), or ``None``."""
     try:
         number = float(str(value).rstrip("CcKk °").strip())
@@ -518,7 +518,7 @@ class EnrichmentHandler:
         return run.result()
 
     def _edge(self, source: str, target: str, relation: str, evidence: str, confidence: float,
-              **props: Any) -> dict[str, Any]:
+              **props: object) -> dict[str, Any]:
         edge: dict[str, Any] = {"source": source, "target": target, "relation_type": relation,
                                 "confidence": confidence, "evidence": evidence}
         if props:

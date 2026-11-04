@@ -132,7 +132,7 @@ class ReceiptStore:
                 continue
         return out
 
-    def find(self, **match: Any) -> list[ReceiptArtifact]:
+    def find(self, **match: object) -> list[ReceiptArtifact]:
         """Receipts whose receipt/extras fields equal ``match`` (for example ``plan_sha256=...``)."""
         out = []
         for art in self.all():

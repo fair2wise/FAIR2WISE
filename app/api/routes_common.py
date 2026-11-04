@@ -83,13 +83,13 @@ def project(request: Request, payload: Any) -> Any:
     return guard.projector.project_api_response(payload)
 
 
-def project_dict(request: Request, payload: Any) -> dict[str, Any]:
+def project_dict(request: Request, payload: object) -> dict[str, Any]:
     """:func:`project` for a route declared to return a JSON object."""
     projected: dict[str, Any] = project(request, payload)
     return projected
 
 
-def dump(model: Any) -> Any:
+def dump(model: object) -> Any:
     """JSON-ready form of a Pydantic model (other values unchanged)."""
     return model.model_dump(mode="json") if hasattr(model, "model_dump") else model
 

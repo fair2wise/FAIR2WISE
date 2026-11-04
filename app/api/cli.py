@@ -161,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _dump(value: Any) -> Any:
+def _dump(value: object) -> Any:
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
     if isinstance(value, list):

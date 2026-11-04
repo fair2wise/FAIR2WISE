@@ -119,7 +119,7 @@ class PublicRootPath:
         await self.app(scope, receive, send)
 
 
-def _install_kg_library(app: FastAPI, cfg: Any, judge_settings: Any) -> None:
+def _install_kg_library(app: FastAPI, cfg: Any, judge_settings: object) -> None:
     """T38: KG bundle routes (``:local`` only); the model catalog is the judge setting's (one provider cache)."""
     from . import routes_library_kgs
     from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore
@@ -135,7 +135,7 @@ def create_api_app(
     cfg: Any,
     *,
     cors_origins: list[str] | None = None,
-    deployment: Any | None = None,
+    deployment: object = None,
     startup_config: dict[str, str] | None = None,
     identity_port: Any | None = None,
     credential_store: Any | None = None,
@@ -147,13 +147,13 @@ def create_api_app(
     sse_poll_seconds: float = 0.5,
     sse_max_seconds: float = 300.0,
     judge_settings: Any | None = None,
-    knowledge_operations: Any | None = None,
+    knowledge_operations: object = None,
     model_api: bool = False,
     model_api_root_path: str | None = None,
-    folder_roots: Any | None = None,
+    folder_roots: object = None,
     library: Any | None = None,
     tiled_save: Any | None = None,
-    extraction_publisher: Any | None = None,
+    extraction_publisher: object = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -327,7 +327,7 @@ def create_api_app(
     return app
 
 
-def run_api(cfg: Any, *, host: str, port: int, cors_origins: list[str] | None = None,
+def run_api(cfg: object, *, host: str, port: int, cors_origins: list[str] | None = None,
             root_path: str | None = None) -> None:
     """Serve :func:`create_api_app` with uvicorn (``cli api --jobs-api``).
 

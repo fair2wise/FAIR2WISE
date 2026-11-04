@@ -80,7 +80,7 @@ def _build_converter(artifacts: Path) -> Any:
     return converter
 
 
-def _png_bytes(image: Any) -> bytes:
+def _png_bytes(image: object) -> bytes:
     import numpy as np
     from PIL import Image
 

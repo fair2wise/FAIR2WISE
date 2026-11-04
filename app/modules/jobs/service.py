@@ -66,7 +66,7 @@ class JobService:
         store: JobStore,
         *,
         owner: str = "worker",
-        admission: Any = None,
+        admission: object = None,
         heartbeat_interval: float | None = None,
         settings: DeploymentSettings | None = None,
         identity_port: Any | None = None,
@@ -98,7 +98,7 @@ class JobService:
         *,
         capability: str | None = None,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: Any = None,
+        admission: object = None,
         extra: Mapping[str, Any] | None = None,
         on_denied: Callable[[JobRecord, str], None] | None = None,
     ) -> RegisteredKind:

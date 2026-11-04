@@ -272,7 +272,7 @@ def _dedupe_urls(urls: Iterable[str]) -> list[str]:
     return out
 
 
-def arxiv_id_from_text(*parts: Any) -> str | None:
+def arxiv_id_from_text(*parts: object) -> str | None:
     """Return the first arXiv id found in the joined text parts, or None."""
     blob = " ".join(str(part or "") for part in parts)
     match = _ARXIV_ID_RE.search(blob)
@@ -601,7 +601,7 @@ def fetch_semantic_scholar_batch_oa_pdfs(
     return out
 
 
-def select_core_oa_pdfs(payload: Any) -> tuple[list[str], list[str]]:
+def select_core_oa_pdfs(payload: object) -> tuple[list[str], list[str]]:
     """CORE search/work JSON → allowlisted PDF URLs."""
     works: list[dict[str, Any]] = []
     if isinstance(payload, dict):
@@ -651,7 +651,7 @@ def fetch_core_oa_pdfs(doi: str, api_key: str | None, *, timeout: float = 15.0) 
     return select_core_oa_pdfs(body)
 
 
-def select_osti_oa_pdfs(payload: Any) -> tuple[list[str], list[str]]:
+def select_osti_oa_pdfs(payload: object) -> tuple[list[str], list[str]]:
     """OSTI records JSON → allowlisted PURL / repository PDFs."""
     records: list[dict[str, Any]] = []
     if isinstance(payload, list):
