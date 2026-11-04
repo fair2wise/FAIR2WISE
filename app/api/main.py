@@ -166,6 +166,7 @@ def create_api_app(
     library: LibraryService | None = None,
     tiled_save: SaveTarget | None = None,
     extraction_publisher: PostExtractionPublisher | None = None,
+    local_publication: bool = False,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -213,6 +214,10 @@ def create_api_app(
         extraction_publisher: A :class:`~app.api.post_extraction.PostExtractionPublisher` (T18E): after an approved
             extraction the legacy ``splash_reimport_*`` phases publish ``v<N+1>`` to Tiled under the profile's approval
             policy. Without one the phases report ``skipped``; there is no Splash wipe.
+        local_publication: Trusted wiring flag (``run_api`` sets it; never read from a request, setting or
+            environment value). On the ``:local`` profile only, with a managed Tiled whose loopback URL is the
+            deployment's own Tiled target, wire the real publication job and put exactly that target in the H5
+            gate (:mod:`app.api.local_publication`). ALS profiles and every other target stay gated.
 
     Raises:
         StartupConfigError: As ``create_app``, ``operations`` bound to other settings,
@@ -253,6 +258,16 @@ def create_api_app(
         raise StartupConfigError("config_rejected: operations are bound to another deployment profile or target")
     if operations.identity_port is None:
         operations.identity_port = identity_port
+    if local_publication and settings.is_local:
+        from .local_publication import install_local_publication, post_extraction_publisher
+
+        wired = install_local_publication(
+            operations, environ=os.environ if startup_config is None else startup_config,
+            workdir=Path(cfg.workdir), ops_root=operations_root or Path(cfg.workdir) / "operations", clock=clock)
+        if wired is not None and extraction_publisher is None and getattr(cfg, "extraction_publisher", None) is None:
+            auto = post_extraction_publisher(operations, wired)
+            if auto is not None:
+                cfg.extraction_publisher = auto
     if knowledge_operations is not None and operations.knowledge is not None:
         raise StartupConfigError("config_rejected: knowledge_operations given but operations already carry one")
     if operations.knowledge is None:
@@ -376,7 +391,7 @@ def run_api(cfg: object, *, host: str, port: int, cors_origins: list[str] | None
         identity_port, credential_store = als_identity_wiring(settings, cookie_path=layout.prefix or "/")
     app = create_api_app(cfg, cors_origins=cors_origins, deployment=settings, identity_port=identity_port,
                          credential_store=credential_store, model_api=True,
-                         model_api_root_path=layout.model_api_root_path)
+                         model_api_root_path=layout.model_api_root_path, local_publication=True)
     warn_if_exposed(app, host)  # AUD-16: :local beyond loopback serves raw traces to every caller
     uvicorn.run(app, host=host, port=port, **options)
 

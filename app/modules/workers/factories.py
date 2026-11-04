@@ -61,6 +61,14 @@ def library_service(db_path: str, environ: Mapping[str, str] | None = None) -> J
 
     harvester = Harvester(library, HarvestStore(workdir / "library" / "harvest.sqlite"))
     register_library_jobs(service, settings, handlers=library_handlers(library, extractor=extractor, harvester=harvester))
+    # Owner decision 2026-11-04: ``:local`` publishes into the image's own Tiled, so this worker must run the
+    # publication kind the API process registers (same stores, same gate; a no-op without a matching managed Tiled).
+    from ...api.local_publication import build_local_publication, managed_tiled_from
+
+    managed = managed_tiled_from(env)
+    if managed is not None:
+        if build_local_publication(service, settings, managed, workdir=workdir, ops_root=Path(db_path).parent) is None:
+            logger.warning("local publication not registered on the worker: the managed Tiled is not this deployment's target")
     return service
 
 
