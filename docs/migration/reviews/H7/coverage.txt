@@ -1,28 +1,28 @@
 T27 item 4: test coverage for modules below 80% (H7 review packet)
 =====================================================================
 
-READ THIS FIRST. This is the FULL-SUITE figure (F0.2/F5.5), measured on 2026-11-04 on branch
-forge_merge-T27e (forge_merge a332d47 plus the T27e lint/handler commits, no test changes), from a clean
+READ THIS FIRST. This is the FULL-SUITE figure (F0.2/F5.5), re-measured on 2026-11-04 on branch
+forge_merge-T27f (forge_merge plus the T27f test commits and one repair_corpus fix), from a clean
 `git archive` export, not-slow tests, `tests --ignore=tests/deepeval` under xdist (-n 4) with
 `--cov=app --cov-report=term --cov-report=json:<path>` (directory form; pyproject [tool.coverage]:
 branch = false, so these are LINE figures; omit = legacy/, graphify-out, run_pipeline_cborg.py,
-canonicalization/migration.py). Result: 6330 passed, 45 skipped, 4 xfailed, 0 failed (8m35s).
-This replaces the earlier per-module group measurements.
+canonicalization/migration.py). Result: 6588 passed, 45 skipped, 4 xfailed, 0 failed (10m20s with coverage
+on a loaded machine; the 258 new tests take 12s serial). The earlier T27e measurement (6330 passed, 90.8%)
+is superseded; its ten below-80% modules are all closed (table below).
 
-TOTAL  49840 statements, 4595 missed, line coverage 90.8% (345 files measured, 10 below 80%)
-Target (plan_addenda.md, T27 item 4): no in-scope module below 80% line coverage. The total is above
-the target; 10 modules are still below it (list below).
+TOTAL  49840 statements, 3365 missed, line coverage 93.2% (345 files measured, 0 below 80%)
+Target (plan_addenda.md, T27 item 4): no in-scope module below 80% line coverage. Met.
 
 Per package (statements, covered, line coverage)
 
 package                                      stmts  covered    cover%
 app (top-level files)                          237      225     94.9%
-app/api                                       2849     2676     93.9%
+app/api                                       2849     2695     94.6%
 app/modules (top-level files)                 4322     4074     94.3%
 app/modules/agent_runtime                     1288     1208     93.8%
 app/modules/agents                             385      370     96.1%
 app/modules/canonicalization                  1906     1795     94.2%
-app/modules/commands                          2676     1487     55.6%
+app/modules/commands                          2676     2644     98.8%
 app/modules/contracts                          504      495     98.2%
 app/modules/curation                          1044      988     94.6%
 app/modules/deployment                         956      867     90.7%
@@ -31,9 +31,9 @@ app/modules/extraction                        1106     1035     93.6%
 app/modules/f2w_agent                         6997     6108     87.3%
 app/modules/graph                             4756     4382     92.1%
 app/modules/hybrid_rag                         897      838     93.4%
-app/modules/jobs                              2496     2316     92.8%
+app/modules/jobs                              2496     2347     94.0%
 app/modules/launchers                          112      111     99.1%
-app/modules/library                           1887     1725     91.4%
+app/modules/library                           1887     1748     92.6%
 app/modules/literature                        4887     4521     92.5%
 app/modules/operations                        1859     1760     94.7%
 app/modules/provenance                         474      449     94.7%
@@ -45,29 +45,42 @@ app/modules/term_extractor                    2655     2566     96.6%
 app/modules/tools                               48       39     81.2%
 app/modules/vision                            1586     1478     93.2%
 app/modules/workers                            147      137     93.2%
-TOTAL                                        49840    45245     90.8%
+TOTAL                                        49840    46475     93.2%
 
-Modules below 80% (statements, missed, line coverage); sorted by coverage
+The ten modules that were below 80% (before = T27e measurement of 2026-11-04, after = T27f)
 
-module                                                stmts  missed   cover%
-app/modules/commands/repair_corpus.py                   222     190    14.4%
-app/modules/commands/run.py                              77      53    31.2%
-app/modules/commands/tiled_server.py                     64      44    31.2%
-app/modules/commands/harvest_rsoxs.py                  1375     669    51.3%
-app/api/routes_library_harvest.py                        45      19    57.8%
-app/modules/commands/build_kg_snapshot.py                47      16    66.0%
-app/modules/commands/paper_finder.py                    331      98    70.4%
-app/modules/commands/corpus_qa.py                       405     110    72.8%
-app/modules/library/probe.py                             84      20    76.2%
-app/modules/jobs/replacement_step.py                    152      31    79.6%
+module                                                stmts  missed before%  missed after%
+app/modules/commands/repair_corpus.py                   222     190   14.4       1   99.5
+app/modules/commands/run.py                              77      53   31.2       0  100.0
+app/modules/commands/tiled_server.py                     64      44   31.2       0  100.0
+app/modules/commands/harvest_rsoxs.py                  1375     669   51.3      22   98.4
+app/api/routes_library_harvest.py                        45      19   57.8       0  100.0
+app/modules/commands/build_kg_snapshot.py                47      16   66.0       0  100.0
+app/modules/commands/paper_finder.py                    331      98   70.4       0  100.0
+app/modules/commands/corpus_qa.py                       405     110   72.8       0  100.0
+app/modules/library/probe.py                             84      20   76.2       0  100.0
+app/modules/jobs/replacement_step.py                    152      31   79.6       0  100.0
 
-Reading the gap list
-  commands/ is the whole gap: seven of the ten modules are CLI entry points (repair_corpus, run, tiled_server,
-  harvest_rsoxs, build_kg_snapshot, paper_finder, corpus_qa); the package is 55.6% and drags no other package
-  below 87%. commands/corpus_qa.py is SHA-256 pinned and cannot be edited, but a test file may still cover it.
-  The other three are api/routes_library_harvest.py (57.8), library/probe.py (76.2) and
-  jobs/replacement_step.py (79.6, 31 missed lines).
-  No tests were written in this task (report only); the in-scope gap is these ten modules.
+Modules below 80%: none.
+
+Reading the result
+  The CLI entry points were the whole gap and are now covered through fakes: argv/--help/bad-argument
+  handling, each branch, exit codes, files written, arguments passed on. tiled_server and run assert the
+  settings, argument and environment hand-off at the lifecycle/extractor boundary (no server is started,
+  the API key comes from the environment only and never appears in argv or logs); harvest_rsoxs runs against
+  fake `arxiv`/`pyalex` modules and a fake PDF downloader. corpus_qa.py is SHA-256 pinned and was not edited
+  (tests only). No live service is needed by any remaining uncovered line; the 22 lines left in
+  harvest_rsoxs.py and 1 in repair_corpus.py are defensive guards (empty-id / malformed-record returns).
+  New tests: tests/coverage_t27/test_command_*.py, test_harvest_routes.py, test_library_probe_extra.py,
+  test_replacement_step_extra.py, harvest_fakes.py (258 tests).
+
+Application change found by the new tests
+  commands/repair_corpus.py: MATERIAL_FORMULA_RE was compiled with re.IGNORECASE, so its "starts with an element
+      symbol" and "P[A-Z]{2,}" alternatives matched any label starting with a letter ("Zebra", "Pressure").
+      Every untyped term that no keyword caught became Material and the needs_review flag could never be set
+      (that branch was dead). The formula/abbreviation parts are now case-sensitive (words stay
+      case-insensitive); regression cases are in tests/coverage_t27/test_command_repair_corpus.py. Repaired
+      outputs will now keep unclassifiable labels as Thing with needs_review=true, as the docstring says.
 
 Exceptions and deferrals (proposed for the owner's coverage-exception list)
 -----------------------------------------------------------------------------
