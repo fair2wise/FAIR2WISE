@@ -111,6 +111,8 @@ def test_export_writes_schema_metadata_and_refuses_foreign_files(store, tmp_path
     out = json.loads((release / name).read_text())
     assert out["metadata"]["schema"] == "matkg_schema@0.3.1" and out["metadata"]["f2w_bundle"] == "alpha"
     assert out["things"] == _kg()["things"]
+    raw = (release / name).read_text(encoding="utf-8")
+    assert raw == json.dumps(json.loads(raw), indent=2, ensure_ascii=False)  # the serialization release adoption asserts
     assert "metadata" not in json.loads(bundle.file(B.KG_FILE).read_text())  # the bundle copy is untouched
     assert B.export_bundle(bundle, release) == name  # re-export of its own file is allowed
     (release / "matkg_beta.json").write_text("{}")

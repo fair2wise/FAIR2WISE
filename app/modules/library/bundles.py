@@ -78,13 +78,18 @@ def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _write_json(path: Path, data: object) -> None:
-    """Atomic JSON write (temp file in the same directory, then ``os.replace``)."""
+def _write_json(path: Path, data: object, *, trailing_newline: bool = True) -> None:
+    """Atomic JSON write (temp file in the same directory, then ``os.replace``).
+
+    ``trailing_newline=False`` writes the standard KG serialization, exactly
+    ``json.dumps(data, indent=2, ensure_ascii=False)`` (what release adoption asserts for flat files).
+    """
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False, sort_keys=False)
-            handle.write("\n")
+            if trailing_newline:
+                handle.write("\n")
         Path(tmp).replace(path)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
@@ -376,7 +381,7 @@ def export_bundle(bundle: Bundle, release_dir: Path, schema: Mapping[str, Any] |
                 "schema": schema_block["id"], "schema_info": schema_block, "f2w_bundle": bundle.name,
                 "topic": bundle.manifest.get("topic"), "model": bundle.manifest.get("model"),
                 "reconstructed": bool(bundle.manifest.get("reconstructed")), "exported_at": now_iso()}
-    _write_json(target, {**kg, "metadata": metadata})
+    _write_json(target, {**kg, "metadata": metadata}, trailing_newline=False)  # adoption wants this serialization
     return target.name
 
 
