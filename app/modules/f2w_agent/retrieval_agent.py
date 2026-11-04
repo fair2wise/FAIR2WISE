@@ -422,7 +422,7 @@ class RetrievalAgent(Agent):
 
     def _annotate_kg(
         self,
-        kg: Any,
+        kg: Any,  # noqa: ANN401  # Any: donor KnowledgeGraph (untyped legacy class)
         path: str,
         *,
         existing: dict[str, Any] | None = None,

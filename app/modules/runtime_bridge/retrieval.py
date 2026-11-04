@@ -139,7 +139,7 @@ class LegacyRetrievalService:
         history: Sequence[dict[str, str]] | None = None,
         source_rag: bool | None = None,
         use_live_tiled: bool | None = None,
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401  # Any: legacy verdict (untyped donor structure)
         """Run the existing retrieval/QA query and return its verdict object unchanged.
 
         Mirrors ``AgentPipelineService._query_retrieval`` (api.py): when a

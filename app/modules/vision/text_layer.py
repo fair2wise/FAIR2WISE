@@ -102,7 +102,7 @@ def locate_figure_on_page(doc: PdfDocument, page_number: int) -> Box | None:
     return boxes[0]
 
 
-def render_gray(doc: Any, page_number: int, region: Box, scale: float) -> Untyped:
+def render_gray(doc: PdfDocument, page_number: int, region: Box, scale: float) -> Untyped:
     """Render ``region`` (top-left points) to a 2-D uint8 numpy array at ``scale`` px/pt.
 
     The array is the pipeline's internal working image; it is never returned or stored.

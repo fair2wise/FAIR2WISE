@@ -147,7 +147,9 @@ def run_route(
 class RoundResolver(Protocol):
     """The one resolver method ``run_round`` needs (``StructuredTermResolver`` or a test double)."""
 
-    def resolve(self, ev: TermEvidence, *, round_key: str, framing: str = ...) -> TermVerdict: ...
+    def resolve(self, ev: TermEvidence, *, round_key: str, framing: str = ...) -> TermVerdict:
+        """Return the verdict for one term's evidence."""
+        ...
 
 
 def run_round(run: CampaignRun, resolver: RoundResolver, number: int) -> RoundRecord:

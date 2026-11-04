@@ -47,7 +47,7 @@ import logging
 from pathlib import Path
 import re
 import threading
-from typing import Any, TypeVar
+from typing import Any
 
 from ..modules.contracts.evidence import SourceLocator
 from ..modules.security.disclosure import SourceRef
@@ -244,10 +244,7 @@ def current_turn() -> TurnSources | None:
     return _CURRENT.get()
 
 
-_T = TypeVar("_T")
-
-
-def note_retrieval(agent: object, verdict: _T) -> _T:
+def note_retrieval[T](agent: object, verdict: T) -> T:
     """Record the merged context ``agent`` used for ``verdict``; returns ``verdict`` unchanged."""
     sources = _CURRENT.get()
     if sources is not None:
@@ -258,7 +255,7 @@ def note_retrieval(agent: object, verdict: _T) -> _T:
     return verdict
 
 
-def note_paper_evidence(pdf_path: object, result: _T) -> _T:
+def note_paper_evidence[T](pdf_path: object, result: T) -> T:
     """Record the pages a paper-evidence ``result`` used or cited; returns ``result`` unchanged."""
     sources = _CURRENT.get()
     if sources is not None and isinstance(result, Mapping):

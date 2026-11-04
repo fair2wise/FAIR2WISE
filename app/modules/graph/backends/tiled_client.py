@@ -103,7 +103,7 @@ class TiledGraphClient:
                    timeout=cfg.timeout, verify=str(cfg.ca_bundle) if cfg.ca_bundle else True, session=session)
 
     @classmethod
-    def from_managed(cls, server: Any, *, session: requests.Session | None = None) -> TiledGraphClient:
+    def from_managed(cls, server: Any, *, session: requests.Session | None = None) -> TiledGraphClient:  # noqa: ANN401  # Any: managed Tiled server handle (duck-typed)
         """Client for a running managed server (``tiled_lifecycle.ManagedServer``)."""
         from app.modules.deployment import tiled_lifecycle
 

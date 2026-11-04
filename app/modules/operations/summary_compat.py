@@ -156,7 +156,7 @@ class LegacySummaryPath:
         raise ContractError(code, "; ".join(result.warnings) or f"{TOOL_NAME} was not run ({code.value})")
 
 
-def build_legacy_summary_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> LegacySummaryPath:
+def build_legacy_summary_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> LegacySummaryPath:  # noqa: ANN401  # Any: legacy AgentPipelineService (untyped donor object)
     """Build the summary adapter for one ``AgentPipelineService`` (``:local`` only).
 
     The registry comes from the runtime bridge bootstrap (``answer_from_knowledge``

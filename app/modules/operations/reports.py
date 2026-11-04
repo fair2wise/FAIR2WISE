@@ -357,7 +357,7 @@ def operation_dispatch(*suites: Any) -> OperationFn:  # noqa: ANN401  # Any: ope
 
 
 def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], RequestContext], *,
-                             artifact_store: Any = None, max_records: int = 5_000_000) -> Pipeline:
+                             artifact_store: Any = None, max_records: int = 5_000_000) -> Pipeline:  # noqa: ANN401  # Any: document store
     """One-stage pipeline that runs a registered operation as a durable, cancellable job.
 
     The job's ``inputs.params`` must be ``{"operation": <tool name>, "args": {...}}``.

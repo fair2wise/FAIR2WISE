@@ -110,7 +110,7 @@ class LegacyReadPath:
         history: list[dict[str, str]] | None = None,
         source_rag: bool | None = None,
         use_live_tiled: bool | None = None,
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401  # Any: legacy verdict (untyped donor structure)
         """Answer ``question`` with the same contract as ``AgentPipelineService._query_retrieval``'s agent call.
 
         Returns the legacy verdict unchanged or raises the original exception.
