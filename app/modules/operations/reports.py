@@ -39,11 +39,15 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 import json
 import re
-from typing import Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolStatus
+
+if TYPE_CHECKING:
+    from ..jobs.pipeline import Pipeline, StageContext
+    from ..jobs.service import JobService, RegisteredKind
 
 REPORT_SCHEMA: Final = "f2w-operation-report/1"
 #: Bound on ``len(json.dumps(ToolResult.data))``; below the executor's 8000-character inline bound.
@@ -145,7 +149,7 @@ class OperationReport(BaseModel):
 
 # -- D19 guard -----------------------------------------------------------------------
 
-def check_no_source_material(payload: Any, *, where: str = "report") -> None:
+def check_no_source_material(payload: object, *, where: str = "report") -> None:
     """Raise ``INTERNAL`` if ``payload`` carries a source-body or path-like key, or an absolute path.
 
     Reports carry computed counts, ids, labels and bibliographic keys only. The check runs
@@ -260,7 +264,7 @@ def error_result(tool: str, exc: ContractError, *, provenance_id: str | None = N
 
 # -- artifacts -----------------------------------------------------------------------
 
-def store_report_artifact(store: Any, ctx: RequestContext, report: OperationReport) -> str | None:
+def store_report_artifact(store: Any, ctx: RequestContext, report: OperationReport) -> str | None:  # noqa: ANN401  # Any: injected artifact store; callers pass any object with the DocumentStore methods (duck-typed)
     """Store the full report as a private JSON artifact and return its ``sha256:`` ref.
 
     ``store`` is the injected ``DocumentStore`` (``FileDocumentStore`` or the executor's
@@ -329,7 +333,7 @@ class ScanControl:
 OperationFn = Callable[[RequestContext, str, Mapping[str, Any], ScanControl | None], OperationReport]
 
 
-def operation_dispatch(*suites: Any) -> OperationFn:
+def operation_dispatch(*suites: Any) -> OperationFn:  # noqa: ANN401  # Any: operation suites are duck-typed (each exposes names() and run())
     """One :data:`OperationFn` over operation suites (``GraphOperationsTool``, ``CorpusAuditTool``).
 
     Each suite provides ``operation_names()`` and ``compute_operation(ctx, name, args, control)``.
@@ -353,7 +357,7 @@ def operation_dispatch(*suites: Any) -> OperationFn:
 
 
 def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], RequestContext], *,
-                             artifact_store: Any = None, max_records: int = 5_000_000) -> Any:
+                             artifact_store: Any = None, max_records: int = 5_000_000) -> Pipeline:  # noqa: ANN401  # Any: injected artifact store; callers pass any object with the DocumentStore methods (duck-typed)
     """One-stage pipeline that runs a registered operation as a durable, cancellable job.
 
     The job's ``inputs.params`` must be ``{"operation": <tool name>, "args": {...}}``.
@@ -365,7 +369,7 @@ def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], 
     """
     from ..jobs.pipeline import Pipeline, StageResult, StageSpec
 
-    def compute(stage_ctx: Any) -> Any:
+    def compute(stage_ctx: StageContext) -> Any:  # noqa: ANN401  # Any: StageSpec accepts any callable; this one returns a StageResult built from loosely typed records
         params = dict(stage_ctx.inputs.params or {})
         operation = str(params.get("operation") or "")
         args = dict(params.get("args") or {})
@@ -388,8 +392,9 @@ def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], 
                                required_capability=OPERATION_JOB_CAPABILITY)])
 
 
-def register_operation_jobs(job_service: Any, run: OperationFn, context_for_job: Callable[[Any], RequestContext],
-                            *, artifact_store: Any = None, **kwargs: Any) -> Any:
+def register_operation_jobs(job_service: JobService, run: OperationFn, context_for_job: Callable[[Any], RequestContext],
+                            *, artifact_store: object = None,
+                            **kwargs: Any) -> RegisteredKind:  # noqa: ANN401  # Any: forwarded verbatim to JobService.register
     """Register :data:`OPERATION_JOB_KIND` on ``job_service`` (trusted wiring only)."""
     pipeline = build_operation_pipeline(run, context_for_job, artifact_store=artifact_store)
     return job_service.register(OPERATION_JOB_KIND, pipeline, capability=OPERATION_JOB_CAPABILITY, **kwargs)

@@ -39,7 +39,7 @@ class IngestJournal:
         clock: Epoch seconds, injectable.
     """
 
-    def __init__(self, path: Any, *, lease_seconds: float = 120.0, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, path: object, *, lease_seconds: float = 120.0, clock: Callable[[], float] = time.time) -> None:
         target = str(path)
         if target != ":memory:":
             Path(target).parent.mkdir(parents=True, exist_ok=True)

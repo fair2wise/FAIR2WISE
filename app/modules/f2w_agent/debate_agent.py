@@ -53,7 +53,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
     return obj if isinstance(obj, dict) else {}
 
 
-def _normalize_objections(value: Any) -> list[str]:
+def _normalize_objections(value: object) -> list[str]:
     """Coerce a string or list of objections into stripped non-empty strings."""
     if isinstance(value, str):
         value = [value]
@@ -62,7 +62,7 @@ def _normalize_objections(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
-def _selected_indices(value: Any, candidate_count: int) -> list[int]:
+def _selected_indices(value: object, candidate_count: int) -> list[int]:
     """Parse unique in-range candidate indices from an int or list."""
     if isinstance(value, int):
         value = [value]

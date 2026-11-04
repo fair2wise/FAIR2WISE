@@ -20,10 +20,13 @@ import json
 import logging
 from pathlib import Path
 import re
-from typing import Any
+from typing import TYPE_CHECKING
 import xml.etree.ElementTree as ET  # noqa: S405 - input is a local operator-run service; expat refuses entity bombs
 
 from .statements import Basis, ProvenanceStatement
+
+if TYPE_CHECKING:
+    import requests
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +143,7 @@ def _cache_file(pdf: Path, cache_dir: Path | None) -> Path:
     return (cache_dir or pdf.parent) / f"{digest}.refs.{REFERENCE_PARSER_VERSION.replace('/', '_')}.json"
 
 
-def grobid_references(pdf: Path, *, base_url: str = "", http: Any = None, timeout: float = 180.0,
+def grobid_references(pdf: Path, *, base_url: str = "", http: requests.Session | None = None, timeout: float = 180.0,
                       cache_dir: Path | None = None) -> list[ParsedReference] | None:
     """GROBID ``processReferences`` for one PDF, cached by content hash and parser version.
 

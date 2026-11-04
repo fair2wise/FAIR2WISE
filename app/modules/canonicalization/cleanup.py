@@ -23,13 +23,16 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .campaign.evidence import GraphRows, assemble, fold_terms
 from .campaign.models import Decision, TermEvidence
 from .migration import PlanDraft, apply_cleanup, plan_migration  # noqa: F401 - apply_cleanup re-exported
 from .quarantine import check_context_row, classify_surface
 from .vocabulary import Vocabulary
+
+if TYPE_CHECKING:
+    from .campaign.rounds import RoundResolver
 
 MIN_NOVEL_EDGES = 3
 MIN_REJECT_EDGES = 5
@@ -103,7 +106,7 @@ class CleanupProposal:
 
 
 def propose_cleanup(
-    rows: GraphRows, vocab: Vocabulary, *, resolver: Any = None, limit: int = 0
+    rows: GraphRows, vocab: Vocabulary, *, resolver: RoundResolver | None = None, limit: int = 0
 ) -> CleanupProposal:
     """Propose an action per candidate term; optionally one resolver vote for undecided terms."""
     folded = fold_terms(GraphRows([n for n in rows.nodes if not check_context_row(n)], rows.edges))

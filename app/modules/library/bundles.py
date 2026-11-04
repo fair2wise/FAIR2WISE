@@ -27,9 +27,13 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
+from ..contracts.json_types import JsonValue
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +78,7 @@ def now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _write_json(path: Path, data: Any) -> None:
+def _write_json(path: Path, data: object) -> None:
     """Atomic JSON write (temp file in the same directory, then ``os.replace``)."""
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
@@ -87,7 +91,7 @@ def _write_json(path: Path, data: Any) -> None:
         raise
 
 
-def _read_json(path: Path) -> Any:
+def _read_json(path: Path) -> JsonValue:
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -153,7 +157,7 @@ class BundleStore:
         clock: Returns the ISO timestamp stored in manifests (injectable for tests).
     """
 
-    def __init__(self, root: Path, *, clock: Any = now_iso) -> None:
+    def __init__(self, root: Path, *, clock: Callable[[], str] = now_iso) -> None:
         self.root = Path(root)
         self._clock = clock
 

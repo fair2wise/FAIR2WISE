@@ -65,7 +65,7 @@ def caption_length_for(caption: str, label: str, n_panels: int) -> tuple[float |
 
 
 def read_scales(
-    image: Any,
+    image: object,
     panels: Sequence[PanelBox],
     caption: str,
     spans_by_panel: Mapping[int, Sequence[TextSpan]],

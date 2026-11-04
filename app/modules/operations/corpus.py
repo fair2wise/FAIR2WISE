@@ -75,7 +75,7 @@ import logging
 import math
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import unicodedata
 import uuid
 
@@ -93,6 +93,10 @@ from .reports import (
     top_items,
     utcnow,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
+    from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -112,19 +116,19 @@ _ARXIV_OLD = re.compile(r"^([a-z][a-z.-]*)[_/](\d{7})(?:v\d+)?$", re.IGNORECASE)
 _ARXIV_DOI = re.compile(r"^10\.48550/arxiv\.(.+)$", re.IGNORECASE)
 
 
-def content_hash_key(value: Any) -> str:
+def content_hash_key(value: object) -> str:
     """Lowercased 64-hex sha256 from ``<hex>`` or ``sha256:<hex>``; ``""`` for anything else."""
     match = _SHA256_HEX.match(str(value or "").strip())
     return match.group(1).lower() if match else ""
 
 
-def paper_key(value: Any) -> str:
+def paper_key(value: object) -> str:
     """The basename a record cites (``a/b/x.pdf`` -> ``x.pdf``); ``""`` for empty values."""
     text = str(value or "").strip().replace("\\", "/")
     return PurePosixPath(text).name if text else ""
 
 
-def doi_key(value: Any) -> str:
+def doi_key(value: object) -> str:
     """Lowercased bare DOI (``doi.org`` URL / ``doi:`` prefix removed), or ``""``."""
     text = str(value or "").strip()
     text = re.sub(r"^(?:https?://)?(?:dx\.)?doi\.org/", "", text, flags=re.IGNORECASE)
@@ -132,7 +136,7 @@ def doi_key(value: Any) -> str:
     return text if text.startswith("10.") and "/" in text else ""
 
 
-def arxiv_key(value: Any) -> str:
+def arxiv_key(value: object) -> str:
     """Lowercased arXiv id with the version suffix stripped (``harvest_rsoxs._arxiv_key``)."""
     if not value:
         return ""
@@ -173,7 +177,7 @@ def titles_near_duplicate(a: str, b: str, threshold: float = TITLE_THRESHOLD) ->
     return len(ta & tb) / len(ta | tb) >= threshold
 
 
-def first_author_key(authors: Any) -> str:
+def first_author_key(authors: object) -> str:
     """Normalized surname of the first listed author (``harvest_rsoxs._first_author_key``)."""
     if isinstance(authors, list) and authors:
         first = authors[0]
@@ -235,7 +239,7 @@ def same_work(left: PaperRecord, right: PaperRecord, *, use_content_hash: bool =
     return True
 
 
-def _valid_year(value: Any) -> int | None:
+def _valid_year(value: JsonValue) -> int | None:
     try:
         year = int(value)
     except (TypeError, ValueError):
@@ -531,7 +535,7 @@ def _near_duplicate_pairs(arxiv: Mapping[str, Any], journal: Mapping[str, Any]) 
     words: dict[int, set[str]] = {}
     bags: dict[int, Counter[str]] = {}
 
-    def word_set(title: Any) -> set[str]:
+    def word_set(title: JsonValue) -> set[str]:
         key = id(title)
         if key not in words:
             words[key] = set(_normalise(title).split())
@@ -579,7 +583,7 @@ def _is_arxiv(key: str) -> bool:
     return "arxiv" in key.lower() or key.startswith("10.48550")
 
 
-def _try_float(value: Any) -> float | None:
+def _try_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
@@ -589,7 +593,7 @@ def _try_float(value: Any) -> float | None:
     return None
 
 
-def _label(value: Any) -> str:
+def _label(value: object) -> str:
     text = str(value if value is not None else "")
     return text if len(text) <= _LABEL_CHARS else text[:_LABEL_CHARS - 1] + "…"
 
@@ -1053,7 +1057,7 @@ class CorpusAuditTool:
     spec = CURATE_AUDIT_CORPUS
     skill = AUDIT_LITERATURE_CORPUS_SKILL
 
-    def __init__(self, resolver: CorpusResolver, *, artifact_store: Any = None, max_records: int = 2_000_000) -> None:
+    def __init__(self, resolver: CorpusResolver, *, artifact_store: object = None, max_records: int = 2_000_000) -> None:
         self._resolver = resolver
         self._store = artifact_store
         self._max = max_records
@@ -1083,7 +1087,7 @@ class CorpusAuditTool:
         control = control or ScanControl(self._max, deadline=ctx.deadline)
         return audit_corpus(source, sections=tuple(args.get("sections") or CORPUS_SECTIONS), control=control)
 
-    def run(self, inv: Any) -> ToolResult:
+    def run(self, inv: ToolInvocation) -> ToolResult:
         """Executor entry point."""
         provenance_id = f"f2w-op:{uuid.uuid4().hex}"
         try:

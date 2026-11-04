@@ -217,7 +217,7 @@ class SourceAccessAuthority:
     def check(
         self,
         context: RequestContext,
-        grant: Any,
+        grant: object,
         *,
         kind: SourceKind,
         corpus: str | None = None,
@@ -253,7 +253,7 @@ class SourceAccessAuthority:
         if grant.work_ids and (work_id is None or work_id not in grant.work_ids):
             raise SourceAccessDenied("work outside grant scope")
 
-    def is_authorized(self, context: Any, grant: Any, *, kind: SourceKind,
+    def is_authorized(self, context: RequestContext, grant: Any, *, kind: SourceKind,  # noqa: ANN401  # Any: access grant (duck-typed; supplied by the caller's policy)
                       corpus: str | None = None, work_id: str | None = None) -> bool:
         """Boolean form of :meth:`check`."""
         try:
@@ -330,7 +330,7 @@ class SourceAccessScope:
         return reader()
 
 
-def user_surface_source_access(*_args: Any, **_kwargs: Any) -> bool:
+def user_surface_source_access(*_args: object, **_kwargs: object) -> bool:
     """Return whether a user-facing surface may receive source bodies: always ``False``.
 
     Exists so serializers can state the rule explicitly. No profile, admin role,

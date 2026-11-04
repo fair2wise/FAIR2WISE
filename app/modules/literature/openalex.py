@@ -36,11 +36,14 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
 from ..contracts.errors import ContractError, ErrorCode
+
+if TYPE_CHECKING:
+    from .licence import LicenceInfo
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +283,7 @@ def seconds_to_utc_midnight(now: float) -> float:
     return (midnight - current).total_seconds()
 
 
-def retry_after_seconds(resp: Any) -> float | None:
+def retry_after_seconds(resp: httpx.Response) -> float | None:
     """The integer ``Retry-After`` a response names, else ``None`` (dates are not parsed)."""
     try:
         raw = str(resp.headers.get("retry-after", "")).strip()
@@ -295,7 +298,7 @@ def retry_after_seconds(resp: Any) -> float | None:
     return seconds if seconds >= 0 else None
 
 
-def quota_pause_seconds(resp: Any, now: float) -> float | None:
+def quota_pause_seconds(resp: httpx.Response, now: float) -> float | None:
     """How long to pause when ``resp`` says the allowance is spent, else ``None``."""
     status = getattr(resp, "status_code", 0)
     retry_after = retry_after_seconds(resp)
@@ -738,7 +741,7 @@ class BulkResult:
     batches: int = 0
 
 
-def _licence_from_openalex(work: Mapping[str, Any]) -> Any:
+def _licence_from_openalex(work: Mapping[str, Any]) -> LicenceInfo:
     from .licence import from_openalex
 
     return from_openalex(work)

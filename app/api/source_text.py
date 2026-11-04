@@ -129,7 +129,7 @@ class TurnSources:
 
     # ------------------------------------------------------------------ capture
 
-    def add_merged_context(self, merged_context: Any) -> None:
+    def add_merged_context(self, merged_context: object) -> None:
         """Keep the ``[PDF: ...]`` chunk blocks of a retrieval merged context."""
         if not isinstance(merged_context, str) or "[PDF:" not in merged_context:
             return
@@ -139,7 +139,7 @@ class TurnSources:
                 previous = self._chunks.get(key)
                 self._chunks[key] = text if previous is None or text in previous else previous + "\n" + text
 
-    def add_pdf_pages(self, pdf_path: Any, pages: Sequence[Any]) -> None:
+    def add_pdf_pages(self, pdf_path: object, pages: Sequence[Any]) -> None:
         """Keep paper-evidence pages of ``pdf_path`` (a server path from workflow state)."""
         if not pdf_path:
             return
@@ -244,7 +244,7 @@ def current_turn() -> TurnSources | None:
     return _CURRENT.get()
 
 
-def note_retrieval(agent: Any, verdict: Any) -> Any:
+def note_retrieval[T](agent: object, verdict: T) -> T:
     """Record the merged context ``agent`` used for ``verdict``; returns ``verdict`` unchanged."""
     sources = _CURRENT.get()
     if sources is not None:
@@ -255,7 +255,7 @@ def note_retrieval(agent: Any, verdict: Any) -> Any:
     return verdict
 
 
-def note_paper_evidence(pdf_path: Any, result: Any) -> Any:
+def note_paper_evidence[T](pdf_path: object, result: T) -> T:
     """Record the pages a paper-evidence ``result`` used or cited; returns ``result`` unchanged."""
     sources = _CURRENT.get()
     if sources is not None and isinstance(result, Mapping):

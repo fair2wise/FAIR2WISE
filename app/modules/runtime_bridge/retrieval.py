@@ -27,7 +27,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..f2w_agent.retrieval_agent import RetrievalAgent
 
 
 @dataclass(frozen=True)
@@ -57,7 +60,7 @@ class RetrievalSettings:
     tiled_uri: str | None = None
 
 
-def build_retrieval_agent(settings: RetrievalSettings) -> Any:
+def build_retrieval_agent(settings: RetrievalSettings) -> RetrievalAgent:
     """Construct an existing ``RetrievalAgent`` from ``settings`` (imported lazily)."""
     from ..f2w_agent.retrieval_agent import RetrievalAgent
 
@@ -94,7 +97,7 @@ class LegacyRetrievalService:
 
     def __init__(
         self,
-        agent: Any = None,
+        agent: object = None,
         *,
         agent_provider: Callable[[], Any] | None = None,
         settings: RetrievalSettings | None = None,
@@ -113,7 +116,7 @@ class LegacyRetrievalService:
         self.calls = 0
 
     @property
-    def agent(self) -> Any:
+    def agent(self) -> Any:  # noqa: ANN401  # Any: provider-injected retrieval agent (tests pass fakes; the donor agent is untyped)
         """The retrieval agent the next query uses (built on first access from settings)."""
         if self._provider is not None:
             return self._provider()
@@ -125,7 +128,7 @@ class LegacyRetrievalService:
                     self._agent = self._factory(self._settings)
         return self._agent
 
-    def _tiled_uri(self, agent: Any) -> str | None:
+    def _tiled_uri(self, agent: object) -> str | None:
         if self._tiled_uri_provider is not None:
             return self._tiled_uri_provider()
         if self._settings is not None and self._settings.tiled_uri is not None:
@@ -139,7 +142,7 @@ class LegacyRetrievalService:
         history: Sequence[dict[str, str]] | None = None,
         source_rag: bool | None = None,
         use_live_tiled: bool | None = None,
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401  # Any: legacy verdict (untyped donor structure)
         """Run the existing retrieval/QA query and return its verdict object unchanged.
 
         Mirrors ``AgentPipelineService._query_retrieval`` (api.py): when a

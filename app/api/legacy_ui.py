@@ -47,13 +47,14 @@ import logging
 import os
 from pathlib import Path
 import threading
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..modules.contracts.context import ADMIN_CAPABILITIES, DeploymentProfile, RequestContext
+from ..modules.contracts.json_types import JsonValue
 from ..modules.security.authorization import (
     DeploymentSettings,
     StartupConfigError,
@@ -82,6 +83,11 @@ from .auth import (
     request_context,
 )
 from .source_text import TurnSources
+
+if TYPE_CHECKING:
+    from starlette.responses import Response
+
+    from ..modules.f2w_agent.api import AgentSettingsUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +131,7 @@ class OpaquePaths:
         **roots: ``label=absolute_path``. Only these roots are resolvable.
     """
 
-    def __init__(self, **roots: Any) -> None:
+    def __init__(self, **roots: Any) -> None:  # noqa: ANN401  # Any: label=path pairs; values are str or Path
         """Register the roots; empty values are skipped and relative paths resolve against the cwd."""
         self._roots: dict[str, Path] = {}
         pairs: list[tuple[str, str]] = []
@@ -144,11 +150,11 @@ class OpaquePaths:
         self.roots = PathRoots(tuple(pairs))
 
     @staticmethod
-    def is_opaque(value: Any) -> bool:
+    def is_opaque(value: object) -> bool:
         """Return whether ``value`` is an ``f2w://`` id."""
         return isinstance(value, str) and value.strip().startswith(OPAQUE_PREFIX)
 
-    def decode(self, value: Any) -> Any:
+    def decode(self, value: JsonValue) -> JsonValue:
         """Return the server path for an ``f2w://`` id; other values are returned unchanged.
 
         Raises:
@@ -338,13 +344,13 @@ class LegacyUiGuard:
         app.add_exception_handler(StarletteHTTPException, self._http_error_handler)
         return app
 
-    def check_service(self, service: Any) -> None:
+    def check_service(self, service: object) -> None:
         """Refuse startup when the T03 langgraph read path would run without a verified principal."""
         if not self.is_local and getattr(service, "_read_path", None) is not None:
             raise StartupConfigError("config_rejected: F2W_RUNTIME=langgraph is local-only on the legacy UI API "
                                      "until its read path carries the verified ALS context")
 
-    async def _http_error_handler(self, request: Request, exc: Exception) -> Any:
+    async def _http_error_handler(self, request: Request, exc: Exception) -> Response:
         """Project ``HTTPException.detail`` (paths, raw exception text) and keep the legacy shape."""
         assert isinstance(exc, StarletteHTTPException)
         detail: Any = exc.detail
@@ -453,7 +459,7 @@ class LegacyUiGuard:
         issuer = ctx.principal.issuer or self.settings.tiled_target or ""
         return f"{issuer}|{ctx.principal.subject}"
 
-    def settings_update(self, request: Request, ctx: RequestContext, update: Any) -> tuple[Any, frozenset[str]]:
+    def settings_update(self, request: Request, ctx: RequestContext, update: AgentSettingsUpdate) -> tuple[Any, frozenset[str]]:
         """R03: check the fields' capabilities; drop ignored fields; decode opaque paths (T25D plan).
 
         On ALS a non-admin's deployment-wide fields are ignored (warning), not refused, so the
@@ -509,11 +515,11 @@ class LegacyUiGuard:
             out["exposure_warning"] = self.settings.exposure_warning
         return cast(dict[str, Any], out)
 
-    def project_paths(self, payload: Any) -> Any:
+    def project_paths(self, payload: object) -> JsonValue:
         """Session reset/delete bodies: only local paths are internal."""
         return self.projector.project_paths_only(payload)
 
-    def project_route(self, ctx: RequestContext, method: str, path: str, payload: Any) -> Any:
+    def project_route(self, ctx: RequestContext, method: str, path: str, payload: object) -> JsonValue:
         """Graph, search, upload and publication bodies through ``project_route_response``."""
         return self.projector.project_route_response(method, path, 200, payload, self.viewer(ctx))
 
@@ -554,7 +560,7 @@ class LegacyUiGuard:
         return projector, refs, grant
 
     def _with_turn(self, ctx: RequestContext, sources: TurnSources | None,
-                   project: Callable[[DisclosureProjector, list[SourceRef]], Any]) -> Any:
+                   project: Callable[[DisclosureProjector, list[SourceRef]], Any]) -> JsonValue:
         projector, refs, grant = self.turn_projector(ctx, sources)
         try:
             return project(projector, refs)
@@ -600,7 +606,7 @@ class LegacyUiGuard:
         return self._require_owner(request, ctx, owner,
                                    "trace.read_own", "trace.read_any")
 
-    def project_trace(self, ctx: RequestContext, record: Any) -> Any:
+    def project_trace(self, ctx: RequestContext, record: object) -> JsonValue:
         """R17 body: raw for ``trace.read_any``, projected otherwise (``project_trace_for``)."""
         return self.projector.project_trace_for(record, ctx)
 
@@ -616,7 +622,7 @@ class LegacyUiGuard:
         return [dict(e, actor=ctx.principal.subject) for e in events]
 
 
-def build_guard(workdir: Any, *, session_key: Callable[[str | None], str],
+def build_guard(workdir: str | Path, *, session_key: Callable[[str | None], str],
                 deployment: DeploymentSettings | None = None,
                 startup_config: Mapping[str, str] | None = None,
                 identity_port: TiledIdentityPort | None = None,

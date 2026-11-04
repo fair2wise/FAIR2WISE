@@ -19,19 +19,23 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from ..contracts.json_types import Untyped
 from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
 from .kernels.geometry import FigureFrame, spans_inside
 from .kernels.types import TextSpan
 from .results import Box, Uncertainty, VisionUnavailable, box4
+
+if TYPE_CHECKING:
+    from ..literature.pdf_reader import PdfDocument
 
 DEFAULT_RENDER_SCALE = 2.0
 #: Minimum spans inside a figure for its text layer to count as usable.
 MIN_TEXT_SPANS = 3
 
 
-def open_pdf(data: bytes) -> Any:
+def open_pdf(data: bytes) -> PdfDocument:
     """Open PDF bytes with pypdfium2 (lazy import; :class:`VisionUnavailable` when absent)."""
     try:
         from ..literature.pdf_reader import PdfUnavailable
@@ -59,7 +63,7 @@ class PageGeometry:
                 "rotation": self.rotation, "units": "pt", "origin": "top-left"}
 
 
-def page_geometry(doc: Any, page_number: int, info: PageInfo | None = None) -> PageGeometry:
+def page_geometry(doc: PdfDocument, page_number: int, info: PageInfo | None = None) -> PageGeometry:
     """Geometry of 1-based ``page_number``; the PDF's own size wins over the parser's."""
     page = doc[page_number - 1]
     return PageGeometry(page_number, float(page.width), float(page.height),
@@ -78,13 +82,13 @@ def to_topleft(bbox: BoundingBox, page_height: float) -> Box:
     raise ValueError(f"unsupported bbox origin {bbox.coord_origin!r}")
 
 
-def page_spans(doc: Any, page_number: int) -> list[TextSpan]:
+def page_spans(doc: PdfDocument, page_number: int) -> list[TextSpan]:
     """Every text-layer span on a page, verbatim, boxed in top-left points."""
     page = doc[page_number - 1]
     return [TextSpan(span.text, box4(span.bbox), page_number, "text_layer") for span in page.get_spans()]
 
 
-def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
+def locate_figure_on_page(doc: PdfDocument, page_number: int) -> Box | None:
     """Fallback localization from embedded raster images when the parser gave no bbox.
 
     Returns the union of image boxes only when they form ONE cluster of area; several
@@ -98,7 +102,7 @@ def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
     return boxes[0]
 
 
-def render_gray(doc: Any, page_number: int, region: Box, scale: float) -> Any:
+def render_gray(doc: PdfDocument, page_number: int, region: Box, scale: float) -> Untyped:
     """Render ``region`` (top-left points) to a 2-D uint8 numpy array at ``scale`` px/pt.
 
     The array is the pipeline's internal working image; it is never returned or stored.
@@ -145,7 +149,7 @@ class FigureTextLayer:
         }
 
 
-def text_layer_for(doc: Any, figure: ParsedFigure, info: PageInfo | None = None,
+def text_layer_for(doc: PdfDocument, figure: ParsedFigure, info: PageInfo | None = None,
                    *, default_scale: float = DEFAULT_RENDER_SCALE) -> FigureTextLayer:
     """Locate one parsed figure on its page and collect the text-layer spans inside it."""
     fid = figure.figure_id or f"fig-p{figure.page:03d}-{figure.index:02d}"
@@ -181,7 +185,7 @@ def text_layer_for(doc: Any, figure: ParsedFigure, info: PageInfo | None = None,
                            tuple(inside), len(everything) - len(inside), (w_px, h_px), tuple(issues))
 
 
-def page_text_spans_outside(layer: FigureTextLayer, doc: Any) -> Sequence[TextSpan]:
+def page_text_spans_outside(layer: FigureTextLayer, doc: PdfDocument) -> Sequence[TextSpan]:
     """Page spans outside the figure frame (caption/body), for callers needing the surround."""
     if layer.frame is None or layer.size_px is None:
         return ()

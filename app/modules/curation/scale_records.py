@@ -18,8 +18,9 @@ human source, ``needs_review`` cleared by the human reading) (BSD-3-Clause).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 import math
+import sqlite3
 import time
 from typing import Any
 import uuid
@@ -68,7 +69,7 @@ class ScaleRecordStore:
                 con.execute(statement.rstrip(";\n"))
 
     @staticmethod
-    def _row(row: Any) -> dict[str, Any]:
+    def _row(row: Sequence[object]) -> dict[str, Any]:
         return dict(zip(FIELDS, tuple(row), strict=True))
 
     def record(self, *, corpus: str, work_id: str, figure_id: str, panel_index: int, nm_per_px: float,

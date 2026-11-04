@@ -17,6 +17,7 @@ from typing import Any
 from linkml_runtime.utils.schemaview import SchemaView
 import yaml
 
+from ..contracts.json_types import JsonValue
 from .registry import (
     NORMALIZER_LEGACY,
     NORMALIZER_TERM_EXTRACTOR,
@@ -58,7 +59,7 @@ def load_schema_view(entry: SchemaEntry, *, allow_known_broken: bool = False) ->
 
 def load_helper(
     entry: SchemaEntry, *, implementation: str = NORMALIZER_TERM_EXTRACTOR, fuzzy_cutoff: int = 80
-) -> Any:  # Any: either of two SchemaHelper implementations
+) -> Any:  # noqa: ANN401  # Any: either of two SchemaHelper implementations
     """Construct the existing ``SchemaHelper`` for ``entry``.
 
     Args:
@@ -83,7 +84,7 @@ def load_helper(
     return SchemaHelper(str(entry.abs_path), fuzzy_cutoff=fuzzy_cutoff)
 
 
-def load_yaml_asset(entry: SchemaEntry) -> Any:
+def load_yaml_asset(entry: SchemaEntry) -> JsonValue:
     """Parse a non-LinkML asset (vocabulary, mapping, seed, example) with ``yaml.safe_load``."""
     if entry.is_linkml:
         raise RegistryError(f"{entry.path} is a LinkML schema; use load_schema_view")

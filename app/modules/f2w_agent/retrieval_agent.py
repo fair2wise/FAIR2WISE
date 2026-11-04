@@ -120,7 +120,7 @@ _OPS_LAYOUT_RE = re.compile(
     re.IGNORECASE,
 )
 
-def _coerce_bool(value: Any) -> bool:
+def _coerce_bool(value: object) -> bool:
     """Coerce JSON/bool/string flags to bool; unknown strings are false."""
     if isinstance(value, bool):
         return value
@@ -129,7 +129,7 @@ def _coerce_bool(value: Any) -> bool:
     return bool(value)
 
 
-def _coerce_missing_topics(value: Any) -> list[str]:
+def _coerce_missing_topics(value: object) -> list[str]:
     """Normalize judge ``missing_topics`` to a list of non-empty strings."""
     if isinstance(value, str):
         value = [value]
@@ -272,7 +272,7 @@ def _parse_judge(raw: str) -> dict[str, Any]:
     return {"sufficient": False, "answer": None, "missing_topics": [], "raw": raw}
 
 
-def _has_direct_evidence(kg: Any, node_info: Any) -> bool:
+def _has_direct_evidence(kg: object, node_info: object) -> bool:
     """Evidence strong enough to ask the judge.
 
     Snippets and publications still count. For conceptual questions, a non-empty
@@ -301,7 +301,7 @@ def _has_direct_evidence(kg: Any, node_info: Any) -> bool:
     return False
 
 
-def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> list[Any]:
+def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> list[Any]:  # noqa: ANN401  # Any: donor KnowledgeGraph (untyped legacy class)
     """Call ``retrieve_nodes`` with hops/max_nodes, falling back if the signature is older."""
     try:
         return krag.retrieve_nodes(question, kg, hops=hops, max_nodes=max_nodes)
@@ -309,7 +309,7 @@ def _call_retrieve_nodes(question: str, kg: Any, hops: int, max_nodes: int) -> l
         return krag.retrieve_nodes(question, kg)
 
 
-def _beam_path_nodeinfos(kg: Any) -> list[Any]:
+def _beam_path_nodeinfos(kg: object) -> list[Any]:
     """Promote documented beam-path stages so layout answers can list them in order."""
     indexed: list[tuple[int, str, dict[str, Any]]] = []
     nodes = getattr(kg, "nodes", {}) or {}
@@ -422,7 +422,7 @@ class RetrievalAgent(Agent):
 
     def _annotate_kg(
         self,
-        kg: Any,
+        kg: Any,  # noqa: ANN401  # Any: donor KnowledgeGraph (untyped legacy class)
         path: str,
         *,
         existing: dict[str, Any] | None = None,
@@ -794,7 +794,7 @@ class RetrievalAgent(Agent):
         return hits
 
     @staticmethod
-    def _rsoxs_popular_nodes(kg: Any, graph_id: str, max_n: int) -> list[ScoredHit]:
+    def _rsoxs_popular_nodes(kg: object, graph_id: str, max_n: int) -> list[ScoredHit]:
         """Return the most evidence-rich nodes from a science/RSoXS KG.
 
         When BM25 returns few rsoxs hits for a literature-intent query (because
@@ -1449,7 +1449,7 @@ class RetrievalAgent(Agent):
 
     async def _synthesize_leeway_answer(
         self,
-        cli: Any,
+        cli: Any,  # noqa: ANN401  # Any: LLM client object (OpenAI-compatible SDK, untyped here)
         question: str,
         ctx: str,
         history: list[dict[str, str]] | None,

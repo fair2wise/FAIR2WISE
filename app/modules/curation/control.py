@@ -55,7 +55,7 @@ class ResolverSettings:
             raise ValueError("reserve_usd_per_call must be finite and non-negative")
 
     @classmethod
-    def from_control(cls, control: dict[str, Any], **overrides: Any) -> ResolverSettings:
+    def from_control(cls, control: dict[str, Any], **overrides: Any) -> ResolverSettings:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Build from a control mapping (see :func:`read_control`)."""
         return cls(
             remote_enabled=bool(control.get("enabled")), budget_cap_usd=control.get("budget_cap_usd"), **overrides

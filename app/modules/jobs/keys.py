@@ -20,6 +20,8 @@ import json
 import re
 from typing import Any
 
+from ..contracts.json_types import JsonValue
+
 #: Input fields a stage may depend on.
 INPUT_FIELDS = (
     "corpus_scope",
@@ -42,7 +44,7 @@ class SecretInKey(ValueError):
     """A key input looked like a credential and was refused."""
 
 
-def _scan(value: Any, path: str) -> None:
+def _scan(value: object, path: str) -> None:
     if isinstance(value, Mapping):
         for name, item in value.items():
             if _SECRET_NAME.search(str(name)):
@@ -55,10 +57,10 @@ def _scan(value: Any, path: str) -> None:
         raise SecretInKey(f"value at {path} looks like a credential")
 
 
-def canonical_json(value: Any) -> str:
+def canonical_json(value: object) -> str:
     """Deterministic JSON used for hashing."""
 
-    def default(item: Any) -> Any:
+    def default(item: object) -> JsonValue:
         if isinstance(item, (set, frozenset)):
             return sorted(item)
         return str(item)
@@ -66,7 +68,7 @@ def canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=default, ensure_ascii=False)
 
 
-def digest(value: Any) -> str:
+def digest(value: object) -> str:
     """SHA-256 hex digest of canonical JSON."""
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 

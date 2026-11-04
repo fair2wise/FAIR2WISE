@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..vision.kernels.units import (
     INVERSE_UNIT_TO_NM_INV,
@@ -22,6 +22,9 @@ from ..vision.kernels.units import (
     fold_length,
     normalise_unit,
 )
+
+if TYPE_CHECKING:
+    from ..contracts.json_types import JsonValue
 
 TWO_PI = 2.0 * math.pi
 LENGTH = "length"
@@ -59,7 +62,7 @@ class NormalizedQuantity:
         }
 
 
-def _finite_positive(value: Any) -> float:
+def _finite_positive(value: JsonValue) -> float:
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -69,7 +72,7 @@ def _finite_positive(value: Any) -> float:
     return number
 
 
-def science_normalize_quantity(value: Any, unit: str, kind: str | None = None) -> NormalizedQuantity:
+def science_normalize_quantity(value: JsonValue, unit: str, kind: str | None = None) -> NormalizedQuantity:
     """Normalize a length to nm or an inverse length to nm^-1.
 
     Args:
@@ -95,14 +98,14 @@ def science_normalize_quantity(value: Any, unit: str, kind: str | None = None) -
     return NormalizedQuantity(folded, out_unit, inferred, number, str(unit), key, factor)
 
 
-def science_q_to_spacing(q: Any, unit: str) -> dict[str, Any]:
+def science_q_to_spacing(q: object, unit: str) -> dict[str, Any]:
     """Real-space spacing ``d = 2 pi / q`` in nm from q in nm^-1 or A^-1 (with provenance)."""
     norm = science_normalize_quantity(q, unit, INVERSE_LENGTH)
     d_nm = TWO_PI / norm.value
     return {"d_nm": d_nm, "d_angstrom": d_nm * 10.0, "q": norm.as_dict(), "formula": "d = 2*pi/q"}
 
 
-def science_spacing_to_q(d: Any, unit: str) -> dict[str, Any]:
+def science_spacing_to_q(d: object, unit: str) -> dict[str, Any]:
     """Inverse of :func:`science_q_to_spacing`: ``q = 2 pi / d``, in nm^-1 and A^-1."""
     norm = science_normalize_quantity(d, unit, LENGTH)
     q_nm = TWO_PI / norm.value

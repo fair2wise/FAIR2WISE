@@ -27,7 +27,7 @@ import logging
 from pathlib import Path
 import socket
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin, urlsplit
 
 import httpx
@@ -35,6 +35,9 @@ import httpx
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from .store import AssetKind, AssetTooLarge, FileDocumentStore, StoreError
+
+if TYPE_CHECKING:
+    import os
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +285,7 @@ class LocalIntakePolicy:
     allow_symlinks: bool = False
 
     @classmethod
-    def from_paths(cls, roots: Iterable[Any], **kw: Any) -> LocalIntakePolicy:
+    def from_paths(cls, roots: Iterable[Any], **kw: Any) -> LocalIntakePolicy:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Build from configured root paths (resolved once)."""
         resolved: list[Path] = []
         for root in roots:
@@ -308,7 +311,7 @@ class LocalIntakePolicy:
                 return True
         return False
 
-    def require_allowed(self, path: Any) -> Path:
+    def require_allowed(self, path: str | os.PathLike[str]) -> Path:
         """Return the resolved file path, or raise ``ValueError`` (outside roots, symlink, too large)."""
         candidate = Path(path).expanduser()
         lexical = Path(candidate.absolute())
@@ -324,7 +327,7 @@ class LocalIntakePolicy:
             raise ValueError(f"{candidate.name} exceeds the {self.max_bytes}-byte intake limit")
         return resolved
 
-    def require_allowed_folder(self, path: Any) -> Path:
+    def require_allowed_folder(self, path: Any) -> Path:  # noqa: ANN401  # Any: accepts str, Path or any os.PathLike from untyped callers
         """Return the resolved directory, or raise ``ValueError`` (donor ``require_allowed_folder``)."""
         resolved = self.require_allowed(path)
         if not resolved.is_dir():

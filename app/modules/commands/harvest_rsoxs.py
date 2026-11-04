@@ -577,7 +577,7 @@ def _annotate_work(work: dict[str, Any]) -> dict[str, Any]:
     return work
 
 
-def _reconstruct_abstract(inverted_index: Any) -> str:
+def _reconstruct_abstract(inverted_index: object) -> str:
     """Rebuild an OpenAlex inverted-index abstract into a space-joined string."""
     if not inverted_index or not isinstance(inverted_index, dict):
         return ""
@@ -920,7 +920,7 @@ def _arxiv_throttle_wait(attempt: int) -> float:
     ))
 
 
-def _work_from_arxiv_result(result: Any) -> dict[str, Any] | None:
+def _work_from_arxiv_result(result: Any) -> dict[str, Any] | None:  # noqa: ANN401  # Any: arxiv.Result (untyped third-party object)
     """Map an arxiv.Result into the harvest work dict, or None if the PDF URL is bad."""
     short_id = str(result.get_short_id()).strip()
     pdf_url = str(result.pdf_url or f"https://arxiv.org/pdf/{short_id}").strip()
@@ -1017,7 +1017,7 @@ def _normalize_openalex_work(
     return work
 
 
-def _paginate_works(query_obj: Any, per_query: int) -> list[dict[str, Any]]:
+def _paginate_works(query_obj: Any, per_query: int) -> list[dict[str, Any]]:  # noqa: ANN401  # Any: pyalex query object (untyped third-party)
     """Fetch up to ``per_query`` OpenAlex works via paginate, falling back to ``get``."""
     results: list[dict[str, Any]] = []
     try:

@@ -38,7 +38,7 @@ class _Page:
     def __init__(self, text: str) -> None:
         self._text = text
 
-    def get_text(self, *_args: Any, **_kwargs: Any) -> str:
+    def get_text(self, *_args: object, **_kwargs: object) -> str:
         return self._text
 
 
@@ -65,7 +65,7 @@ class LegacyF2WStrategy:
     name = STRATEGY_NAME
     version = STRATEGY_VERSION
 
-    def __init__(self, extractor: Any) -> None:
+    def __init__(self, extractor: Any) -> None:  # noqa: ANN401  # Any: the legacy term extractor (untyped donor code)
         self.extractor = extractor
 
     def _inference(self) -> dict[str, Any]:

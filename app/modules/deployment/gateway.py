@@ -190,7 +190,7 @@ def validate_upstream(value: str) -> str:
     return text
 
 
-def validate_listen_port(value: Any) -> int:
+def validate_listen_port(value: object) -> int:
     """Return the gateway listen port as an int (``1..65535``).
 
     Raises:
@@ -210,7 +210,7 @@ def gateway_port_from_env(env: Mapping[str, str]) -> int:
 
 def render_nginx_conf(template: str, *, upstream: str = DEFAULT_API_UPSTREAM,
                       layout: PublicLayout = PublicLayout(DEFAULT_PUBLIC_PREFIX),
-                      listen_port: Any = DEFAULT_GATEWAY_PORT) -> str:
+                      listen_port: object = DEFAULT_GATEWAY_PORT) -> str:
     """Fill ``${F2W_API_UPSTREAM}`` and ``${F2W_GATEWAY_PORT}`` in ``docker/nginx.conf`` and check it.
 
     The official nginx image does the same substitution with ``envsubst`` when the file is

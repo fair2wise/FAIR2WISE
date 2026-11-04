@@ -134,9 +134,9 @@ def _decision(
     action_name: str,
     reason: str,
     *,
-    paper_id: Any = None,
-    candidate_index: Any = None,
-    classification: Any = None,
+    paper_id: object = None,
+    candidate_index: object = None,
+    classification: object = None,
 ) -> dict[str, Any]:
     """Build a validated-shape orchestration decision dict."""
     decision = {

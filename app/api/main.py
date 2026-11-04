@@ -53,7 +53,7 @@ from datetime import UTC, datetime
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -64,6 +64,18 @@ from .auth import undeclared_routes, warn_if_exposed
 from .operations import F2WOperations, PublicationGate, build_operations
 from .origin_gate import OriginGateMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
+
+if TYPE_CHECKING:
+    from ..modules.f2w_agent.coordinator import CoordinatorConfig
+    from ..modules.graph.legacy_save import SaveTarget
+    from ..modules.library.service import LibraryService
+    from ..modules.operations.knowledge import KnowledgeOperations
+    from ..modules.security.authorization import DeploymentSettings
+    from ..modules.security.tiled_identity import TiledIdentityPort
+    from ..modules.validation_settings import JudgeModelService
+    from .auth import CredentialStore
+    from .folders import FolderRoots
+    from .post_extraction import PostExtractionPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +131,7 @@ class PublicRootPath:
         await self.app(scope, receive, send)
 
 
-def _install_kg_library(app: FastAPI, cfg: Any, judge_settings: Any) -> None:
+def _install_kg_library(app: FastAPI, cfg: CoordinatorConfig, judge_settings: JudgeModelService | None) -> None:
     """T38: KG bundle routes (``:local`` only); the model catalog is the judge setting's (one provider cache)."""
     from . import routes_library_kgs
     from ..modules.library.bundles import BUNDLES_DIRNAME, BundleStore
@@ -132,13 +144,13 @@ def _install_kg_library(app: FastAPI, cfg: Any, judge_settings: Any) -> None:
 
 
 def create_api_app(
-    cfg: Any,
+    cfg: Any,  # noqa: ANN401  # Any: the coordinator config gains tiled_save/extraction_publisher attributes at wiring time
     *,
     cors_origins: list[str] | None = None,
-    deployment: Any | None = None,
+    deployment: DeploymentSettings | None = None,
     startup_config: dict[str, str] | None = None,
-    identity_port: Any | None = None,
-    credential_store: Any | None = None,
+    identity_port: TiledIdentityPort | None = None,
+    credential_store: CredentialStore | None = None,
     clock: Callable[[], datetime] | None = None,
     operations: F2WOperations | None = None,
     operations_root: Path | None = None,
@@ -146,14 +158,14 @@ def create_api_app(
     max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     sse_poll_seconds: float = 0.5,
     sse_max_seconds: float = 300.0,
-    judge_settings: Any | None = None,
-    knowledge_operations: Any | None = None,
+    judge_settings: JudgeModelService | None = None,
+    knowledge_operations: KnowledgeOperations | None = None,
     model_api: bool = False,
     model_api_root_path: str | None = None,
-    folder_roots: Any | None = None,
-    library: Any | None = None,
-    tiled_save: Any | None = None,
-    extraction_publisher: Any | None = None,
+    folder_roots: FolderRoots | None = None,
+    library: LibraryService | None = None,
+    tiled_save: SaveTarget | None = None,
+    extraction_publisher: PostExtractionPublisher | None = None,
 ) -> FastAPI:
     """Build the F2W API: the legacy UI routes plus ``/v1`` over the shared operations.
 
@@ -327,7 +339,7 @@ def create_api_app(
     return app
 
 
-def run_api(cfg: Any, *, host: str, port: int, cors_origins: list[str] | None = None,
+def run_api(cfg: object, *, host: str, port: int, cors_origins: list[str] | None = None,
             root_path: str | None = None) -> None:
     """Serve :func:`create_api_app` with uvicorn (``cli api --jobs-api``).
 

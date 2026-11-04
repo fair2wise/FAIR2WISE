@@ -49,7 +49,7 @@ from dataclasses import dataclass
 import logging
 import re
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from ..agent_runtime.executor import is_control_flow
@@ -65,6 +65,9 @@ from ..contracts import (
     ToolSpec,
     ToolStatus,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +231,7 @@ class ReadOutcome:
         """Evidence IDs in retrieval order."""
         return self.result.evidence_ids
 
-    def to_legacy(self) -> Any:
+    def to_legacy(self) -> Any:  # noqa: ANN401  # Any: the unchanged legacy verdict (untyped donor structure)
         """Return exactly what the legacy call returned, or raise exactly what it raised.
 
         Raises:
@@ -255,7 +258,7 @@ def outcome_from_ledger(result: ToolResult, ledger: LegacyResultLedger, *, pop: 
 
 # -- mapping ----------------------------------------------------------------------
 
-def _strs(value: Any) -> list[str]:
+def _strs(value: object) -> list[str]:
     if isinstance(value, (list, tuple)):
         return [str(v) for v in value if v is not None and str(v).strip()]
     if isinstance(value, str) and value.strip():
@@ -312,7 +315,7 @@ def kg_evidence(pairs: Sequence[tuple[str, str]]) -> tuple[EvidenceRef, ...]:
     return tuple(refs)
 
 
-def citation_tokens(answer: Any) -> list[str]:
+def citation_tokens(answer: object) -> list[str]:
     """Citation tokens in ``answer``, verbatim, in order of first appearance."""
     if not isinstance(answer, str):
         return []
@@ -325,7 +328,7 @@ def _fail(code: ErrorCode, message: str, *, provenance_id: str | None, retryable
                       warnings=(message[:300],), provenance_id=provenance_id)
 
 
-def verdict_to_result(verdict: Any, *, provenance_id: str | None = None) -> ToolResult:
+def verdict_to_result(verdict: object, *, provenance_id: str | None = None) -> ToolResult:
     """Map a legacy ``RetrievalAgent.query`` verdict to a ``ToolResult`` (see module table)."""
     if not isinstance(verdict, Mapping):
         return _fail(ErrorCode.INTERNAL, f"retrieval returned a malformed verdict ({type(verdict).__name__})",
@@ -379,7 +382,7 @@ def exception_to_result(exc: BaseException, *, provenance_id: str | None = None)
 
 # -- tool implementation ----------------------------------------------------------
 
-def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any], Awaitable[ToolResult]]:
+def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any], Awaitable[ToolResult]]:  # noqa: ANN401  # Any: legacy QA service (untyped donor object)
     """Return the async tool implementation bound to one retrieval service and ledger.
 
     The implementation holds no provider admission slot itself: the existing
@@ -388,7 +391,7 @@ def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any]
     slot here would double-count one call.
     """
 
-    async def answer_from_knowledge(inv: Any) -> ToolResult:
+    async def answer_from_knowledge(inv: ToolInvocation) -> ToolResult:
         args = inv.args
         provenance_id = ledger.new_id()
         try:

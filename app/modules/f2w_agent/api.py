@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -33,6 +33,7 @@ from ...api.source_text import capture_turn, note_paper_evidence, note_retrieval
 from ...api.upload_limits import LEGACY_MAX_BODY_BYTES, MaxBodySizeMiddleware
 from ..contracts.context import DeploymentProfile, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
+from ..contracts.json_types import Untyped
 from ..graph.legacy_save import SaveTarget, StaleSave, TiledSaveBackend
 from ..hybrid_rag.pipeline import hybrid_rag_enabled
 from ..project_config import config_value, get_config
@@ -109,6 +110,12 @@ from .trace import (
     tracing_enabled,
 )
 from .workflow_state import WorkflowStateStore
+
+if TYPE_CHECKING:
+    from ...api.auth import CredentialStore
+    from ..contracts.json_types import JsonValue
+    from ..security.authorization import DeploymentSettings
+    from ..security.tiled_identity import TiledIdentityPort
 
 logger = logging.getLogger(__name__)
 
@@ -630,7 +637,7 @@ def default_ollama_model_name() -> str:
     return default_runtime_model("ollama")
 
 
-def _string_value(value: Any, default: str = "") -> str:
+def _string_value(value: object, default: str = "") -> str:
     """Coerce a value to a stripped string, or a default if empty."""
     if value is None:
         return default
@@ -638,7 +645,7 @@ def _string_value(value: Any, default: str = "") -> str:
     return text or default
 
 
-def _optional_int(value: Any) -> int | None:
+def _optional_int(value: JsonValue) -> int | None:
     """Parse a value as int, or return None if missing or invalid."""
     if value in (None, ""):
         return None
@@ -1513,7 +1520,7 @@ def graph_subset_from_file(graph_path: Path, node_ids: list[str]) -> dict[str, A
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> dict[str, Any]:
+def graph_subset_from_lookup(kg: object, wanted: Sequence[str]) -> dict[str, Any]:
     """Serialize an in-memory lookup graph (Tiled) into the UI node contract."""
     wanted_ids = [str(node_id) for node_id in wanted if str(node_id).strip()]
     empty: dict[str, Any] = {"nodes": [], "edges": []}
@@ -1572,7 +1579,7 @@ def graph_subset_from_lookup(kg: Any, wanted: Sequence[str]) -> dict[str, Any]:
     return {"nodes": nodes, "edges": edges}
 
 
-def graph_neighborhood_from_lookup(kg: Any, node_id: str) -> GraphPayload:
+def graph_neighborhood_from_lookup(kg: object, node_id: str) -> GraphPayload:
     """3-hop Tiled identity subgraph for cite-click / node select."""
     subset = graph_subset_from_lookup(kg, [node_id])
     return GraphPayload(
@@ -2162,7 +2169,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
     return obj if isinstance(obj, dict) else {}
 
 
-def _coerce_bool(value: Any) -> bool:
+def _coerce_bool(value: object) -> bool:
     """Coerce a value to bool, treating true/yes/1 strings as True."""
     if isinstance(value, bool):
         return value
@@ -2305,7 +2312,7 @@ def _looks_contextual_followup(question: str) -> bool:
 
 def _select_candidates_by_indices(
     candidates: list[dict[str, Any]],
-    indices: Any,
+    indices: object,
 ) -> list[dict[str, Any]]:
     """Pick candidate dicts whose indices appear in the given list."""
     if isinstance(indices, int):
@@ -2392,7 +2399,7 @@ def _rank_publications(query: str, publications: list[dict[str, Any]], max_resul
     return [publication for _, publication in ranked[:max_results]]
 
 
-def _normalize_doi(value: Any) -> str:
+def _normalize_doi(value: object) -> str:
     """Strip a doi.org URL prefix from a DOI string."""
     doi = str(value or "").strip()
     return re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.I).strip()
@@ -2568,25 +2575,25 @@ class _NoSplash:
         return {"id": matkg_id}
 
     @staticmethod
-    def splash_update_entity(*_args: Any, **_kwargs: Any) -> None:
+    def splash_update_entity(*_args: object, **_kwargs: object) -> None:
         """No-op."""
 
     @staticmethod
-    def splash_create_entity(*_args: Any, **kwargs: Any) -> dict[str, Any]:
+    def splash_create_entity(*_args: object, **kwargs: object) -> dict[str, Any]:
         """No-op; returns a placeholder id."""
         return {"id": str(kwargs.get("uri") or "new")}
 
     @staticmethod
-    def splash_create_link(*_args: Any, **_kwargs: Any) -> None:
+    def splash_create_link(*_args: object, **_kwargs: object) -> None:
         """No-op."""
 
     @staticmethod
-    def splash_find_links(*_args: Any, **_kwargs: Any) -> list[dict[str, Any]]:
+    def splash_find_links(*_args: object, **_kwargs: object) -> list[dict[str, Any]]:
         """No Splash links exist."""
         return []
 
     @staticmethod
-    def splash_delete_link(*_args: Any, **_kwargs: Any) -> bool:
+    def splash_delete_link(*_args: object, **_kwargs: object) -> bool:
         """No-op."""
         return False
 
@@ -3184,7 +3191,7 @@ class AgentPipelineService:
             results=results,
         )
 
-    def ensure_tiled_lookup(self, node_id: str) -> Any:
+    def ensure_tiled_lookup(self, node_id: str) -> Any:  # noqa: ANN401  # Any: a TiledLookupGraph or a donor KnowledgeGraph (untyped legacy class)
         """Reuse the in-memory Tiled graph; only page GraphQL when it is empty."""
         graphs = getattr(self.retrieval, "_graphs", None)
         if not isinstance(graphs, dict):
@@ -3222,7 +3229,7 @@ class AgentPipelineService:
         self._rebuild_agents()
 
     @property
-    def _splash(self) -> Any:
+    def _splash(self) -> Untyped:
         """The Splash client module, or the no-op stand-in when Saves go to Tiled (T18D: no Splash call)."""
         return kg_update if self.tiled_save is None else _TILED_SAVE_NO_SPLASH
 
@@ -3387,7 +3394,7 @@ class AgentPipelineService:
             if target_entity is None:
                 raise FileNotFoundError(f"Splash entity not found for node: {target}")
 
-            def is_exact(raw: Any) -> bool:
+            def is_exact(raw: object) -> bool:
                 """Return True if an association matches the source, predicate, and target."""
                 if not isinstance(raw, dict):
                     return False
@@ -3788,12 +3795,12 @@ class AgentPipelineService:
             tiled_setter(tiled_enabled, uri=self.runtime.tiled_uri)
         query = self.retrieval.query
         try:
-            return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled)))
+            return note_retrieval(self.retrieval, await query(question, history=history, source_rag=enabled))
         except TypeError:
             try:
-                return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question, history=history)))
+                return note_retrieval(self.retrieval, await query(question, history=history))
             except TypeError:
-                return cast(dict[str, Any], note_retrieval(self.retrieval, await query(question)))
+                return note_retrieval(self.retrieval, await query(question))
 
     def _trace_env(self) -> dict[str, Any]:
         """Git sha, models, settings, and graph fingerprints for the open turn."""
@@ -4202,7 +4209,7 @@ class AgentPipelineService:
         emit: ProgressEmitter | None,
         event: str,
         message: str,
-        **data: Any,
+        **data: object,
     ) -> None:
         """Send a named progress event if an emitter is provided."""
         payload = dict(data)
@@ -4421,7 +4428,7 @@ class AgentPipelineService:
             publications_override=[],
         )
 
-    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``summarize_extracted_terms``, through the T19B Tool adapter in langgraph mode.
 
         Default mode, or a replaced module-level ``summarize_extracted_terms``: that name, as before.
@@ -6661,10 +6668,10 @@ def create_app(
     cfg: CoordinatorConfig,
     *,
     cors_origins: list[str] | None = None,
-    deployment: Any | None = None,
+    deployment: DeploymentSettings | None = None,
     startup_config: dict[str, str] | None = None,
-    identity_port: Any | None = None,
-    credential_store: Any | None = None,
+    identity_port: TiledIdentityPort | None = None,
+    credential_store: CredentialStore | None = None,
     clock: Callable[[], Any] | None = None,
 ) -> FastAPI:
     """Build the FastAPI app with CORS and agent pipeline routes.

@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..growth import ObservationLog
 from ..migration import PlanDraft, sha256_json
@@ -35,6 +35,9 @@ from .models import (
     TermVerdict,
     Vote,
 )
+
+if TYPE_CHECKING:
+    from .rounds import RoundResolver
 
 DEFAULT_MAX_ROUNDS = 2
 DEFAULT_MAX_TERMS_PER_ROUND = 500
@@ -154,7 +157,7 @@ class CampaignOutcome:
 def run_campaign(
     source: RowSource,
     vocabulary: Vocabulary,
-    resolver: Any,
+    resolver: RoundResolver,
     *,
     campaign_id: str,
     scope: Sequence[str],

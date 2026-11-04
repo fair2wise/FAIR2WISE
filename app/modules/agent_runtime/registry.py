@@ -65,7 +65,7 @@ class RegisteredTool:
         return self.spec.name
 
 
-def _module_root(fn: Any) -> str:
+def _module_root(fn: object) -> str:
     module = getattr(fn, "__module__", None) or getattr(type(fn), "__module__", "") or ""
     return module.split(".")[0]
 

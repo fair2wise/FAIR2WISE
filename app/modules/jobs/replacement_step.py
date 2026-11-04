@@ -79,7 +79,7 @@ class ReplacementPublishStep:
     def _plan_path(self, plan_sha256: str) -> Path:
         return self.state_dir / "job-plans" / f"{plan_sha256}.json"
 
-    def _remember(self, kind: str, plan: Any) -> ChangePlan:
+    def _remember(self, kind: str, plan: Any) -> ChangePlan:  # noqa: ANN401  # Any: ReplacementPlan, RetireAllPlan or PurgePlan (no shared base class)
         self._plans[plan.change.plan_sha256] = (kind, plan)
         path = self._plan_path(plan.change.plan_sha256)
         path.parent.mkdir(parents=True, exist_ok=True)

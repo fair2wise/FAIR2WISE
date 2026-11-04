@@ -22,6 +22,8 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..contracts.json_types import JsonValue
+
 EVENT_VERSION = 1
 MAX_STRING = 500
 MAX_ITEMS = 40
@@ -30,7 +32,7 @@ _SECRET_KEY = re.compile(r"(api[_-]?key|secret|token|passw(or)?d|credential|auth
 _SECRET_VALUE = re.compile(r"(sk-[A-Za-z0-9]{12,}|Bearer\s+\S+|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+)")
 
 
-def redact(value: Any, *, _depth: int = 0) -> Any:
+def redact(value: object, *, _depth: int = 0) -> JsonValue:
     """Copy of ``value`` with secrets removed and size bounded."""
     if _depth > MAX_DEPTH:
         return "[truncated]"
@@ -56,7 +58,7 @@ def redact(value: Any, *, _depth: int = 0) -> Any:
     return redact(str(value), _depth=_depth + 1)
 
 
-def _digest(value: Any) -> str:
+def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
@@ -95,7 +97,7 @@ class GraphWriteEvent(BaseModel):
     at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
-    def build(cls, *, payload: Mapping[str, Any] | None = None, **fields: Any) -> GraphWriteEvent:
+    def build(cls, *, payload: Mapping[str, Any] | None = None, **fields: Any) -> GraphWriteEvent:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Construct with the payload redacted and digested."""
         body = dict(payload or {})
         safe = redact(body)

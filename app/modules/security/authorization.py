@@ -215,7 +215,7 @@ class DeploymentSettings:
 
     @classmethod
     def for_disposable_test_target(cls, profile: DeploymentProfile | str, *, tiled_target: str,
-                                   writer_identity: str, **kwargs: Any) -> DeploymentSettings:
+                                   writer_identity: str, **kwargs: Any) -> DeploymentSettings:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Test-only ALS settings bound to an application-owned disposable Tiled (T25C).
 
         Every ALS rule runs unchanged (profile, mode, identity, approvals, route policy);
@@ -266,7 +266,7 @@ class DeploymentSettings:
         return NETWORK_EXPOSURE_WARNING if self.is_local and self.local_bind == "network" else None
 
 
-def is_loopback_host(host: Any) -> bool:
+def is_loopback_host(host: object) -> bool:
     """``True`` for ``localhost`` and loopback IP literals (``127.0.0.0/8``, ``::1``)."""
     name = str(host or "").strip().strip("[]").lower()
     if name == "localhost":
@@ -277,7 +277,7 @@ def is_loopback_host(host: Any) -> bool:
         return False
 
 
-def local_bind_warning(settings: DeploymentSettings, host: Any) -> str | None:
+def local_bind_warning(settings: DeploymentSettings, host: object) -> str | None:
     """The warning to log when a server binds ``settings`` at ``host`` beyond loopback (AUD-16).
 
     ``None`` on the ALS profiles (sign-in and the gateway apply) and for loopback hosts.
@@ -564,13 +564,13 @@ def requires(*capabilities: str, ctx_arg: str = "ctx") -> Callable[[F], F]:
     def decorate(func: F) -> F:
         if inspect.iscoroutinefunction(func):
             @functools.wraps(func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def async_wrapper(*args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: decorator pass-through; returns whatever the wrapped coroutine returns
                 require(_find_context(args, kwargs, ctx_arg), *needed)
                 return await func(*args, **kwargs)
             wrapper: Any = async_wrapper
         else:
             @functools.wraps(func)
-            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            def sync_wrapper(*args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: decorator pass-through; returns whatever the wrapped function returns
                 require(_find_context(args, kwargs, ctx_arg), *needed)
                 return func(*args, **kwargs)
             wrapper = sync_wrapper
@@ -625,7 +625,7 @@ class RoutePolicy:
         return self.on_local if settings.is_local else self.on_als
 
 
-def _p(route_id: str, surface: str, method: str, path: str, *caps: str, **kw: Any) -> RoutePolicy:
+def _p(route_id: str, surface: str, method: str, path: str, *caps: str, **kw: Any) -> RoutePolicy:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Build a :class:`RoutePolicy`, validating capability names."""
     return RoutePolicy(route_id, surface, method, path, _check_names(caps), **kw)
 
@@ -979,15 +979,15 @@ class JobAuthority:
         """The ``subject -> current credential`` lookup this authority re-verifies with (``None`` on local)."""
         return self._lookup
 
-    def for_job(self, job: Any) -> Callable[[Any, Sequence[str]], RequestContext]:
+    def for_job(self, job: object) -> Callable[[Any, Sequence[str]], RequestContext]:
         """The authority of one run of ``job`` (a stopped run never resumes effects)."""
         return _JobRunAuthority(self, job)
 
-    def __call__(self, job: Any, capabilities: Sequence[str]) -> RequestContext:
+    def __call__(self, job: object, capabilities: Sequence[str]) -> RequestContext:
         """One-off check (a runner that does not call :meth:`for_job`)."""
         return self.for_job(job)(job, capabilities)
 
-    def _start(self, job: Any) -> WorkerAuthority:
+    def _start(self, job: object) -> WorkerAuthority:
         """Build the run's worker authority from the initiating subject's current credential."""
         settings = self.settings
         subject = str(getattr(job, "created_by", "") or "")
@@ -1019,13 +1019,13 @@ class JobAuthority:
 class _JobRunAuthority:
     """Per-run state of :class:`JobAuthority`: the worker authority is built on first use."""
 
-    def __init__(self, parent: JobAuthority, job: Any) -> None:
+    def __init__(self, parent: JobAuthority, job: object) -> None:
         self._parent = parent
         self._job_id = getattr(job, "job_id", None)
         self._worker: WorkerAuthority | None = None
         self.stopped_reason: str | None = None
 
-    def __call__(self, job: Any, capabilities: Sequence[str]) -> RequestContext:
+    def __call__(self, job: object, capabilities: Sequence[str]) -> RequestContext:
         if self.stopped_reason is not None:
             raise ContractError(ErrorCode.DENIED, f"worker stopped: {self.stopped_reason}")
         if getattr(job, "job_id", None) != self._job_id:

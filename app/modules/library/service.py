@@ -31,7 +31,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import unicodedata
 import uuid
 
@@ -55,6 +55,9 @@ from .arrange import guess_year, is_valid_folder_name, year_folder
 from .catalog import LibraryCatalog, sha256_file
 from .manifest import record_upload
 from .probe import DEFAULT_TIMEOUT_SECONDS, Probe, ProbeResult, isolated_probe
+
+if TYPE_CHECKING:
+    from .estimate import PaperFacts
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +87,7 @@ class VerifyUnavailable(Exception):
 class _NullStore:
     """``prepare_local_pdf`` only asks ``exists`` when ``apply`` is false; nothing is ever stored."""
 
-    def exists(self, ctx: Any, ref: str) -> bool:
+    def exists(self, ctx: object, ref: str) -> bool:
         """Never a duplicate: the library has no candidate store."""
         return False
 
@@ -141,7 +144,7 @@ class LibraryService:
         chunker: PDF reader and chunker of ``library_index`` (default ``hybrid_rag.chunker.chunk_pdf_detailed``).
     """
 
-    def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,
+    def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,  # noqa: ANN401  # Any: None for catalog-only construction; worker_context needs it
                  fetch_factory: Callable[[], Fetch] | None = None, breaker: QuotaBreaker | None = None,
                  max_upload_bytes: int = DEFAULT_MAX_BODY_BYTES, max_probe: int = DEFAULT_MAX_PROBE,
                  clock: Callable[[], float] = time.time, index_dir: Path | None = None,
@@ -163,7 +166,7 @@ class LibraryService:
         self._indexer: Any = None
 
     @property
-    def indexer(self) -> Any:
+    def indexer(self) -> Any:  # noqa: ANN401  # Any: donor indexer (untyped legacy class)
         """The :class:`~app.modules.library.indexer.LibraryIndexer` over this service (T36)."""
         if self._indexer is None:
             from .indexer import LibraryIndexer
@@ -174,7 +177,7 @@ class LibraryService:
     # -- construction ---------------------------------------------------------------------------
 
     @classmethod
-    def from_startup(cls, startup: Mapping[str, str], workdir: Path, settings: Any, **kw: Any) -> LibraryService:
+    def from_startup(cls, startup: Mapping[str, str], workdir: Path, settings: Any, **kw: Any) -> LibraryService:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Build from the trusted startup mapping: ``F2W_LIBRARY_DIR``, ``HYBRID_RAG_LITERATURE_INDEX`` and the OpenAlex settings.
 
         The catalog and the OpenAlex response cache live under ``<workdir>/library/``.
@@ -305,7 +308,7 @@ class LibraryService:
         out.update(override or {})
         return out
 
-    def paper_facts(self, paper_id: str) -> Any:
+    def paper_facts(self, paper_id: str) -> PaperFacts | None:
         """Facts the T38 cost estimate needs of one paper (``PaperLookup``); ``None`` for an unknown id.
 
         ``pages`` is the catalog's page count (filled by the metadata probe or the index run); ``None`` while

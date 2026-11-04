@@ -22,6 +22,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
+import sqlite3
 import time
 from typing import Any, cast
 import uuid
@@ -177,7 +178,7 @@ def _dt(value: float) -> datetime:
     return datetime.fromtimestamp(value, tz=UTC)
 
 
-def _json(value: Any) -> str:
+def _json(value: object) -> str:
     return canonical_json(value)
 
 
@@ -193,7 +194,7 @@ class JobStore:
 
     def __init__(
         self,
-        path: Any = ":memory:",
+        path: object = ":memory:",
         *,
         lease_seconds: float = 120.0,
         clock: Callable[[], float] = time.time,
@@ -225,7 +226,7 @@ class JobStore:
             )
         return lease
 
-    def _check_lease(self, con: Any, lease: Lease) -> None:
+    def _check_lease(self, con: sqlite3.Connection, lease: Lease) -> None:
         row = con.execute(
             "SELECT token, fence, expires_at FROM leases WHERE resource=?", (lease.resource,)
         ).fetchone()
@@ -269,7 +270,7 @@ class JobStore:
         """Lease resource name of a job."""
         return f"job:{job_id}"
 
-    def _record(self, row: Any) -> JobRecord:
+    def _record(self, row: sqlite3.Row) -> JobRecord:
         return JobRecord(
             job_id=row["job_id"],
             kind=row["kind"],
@@ -477,7 +478,7 @@ class JobStore:
 
     # --- stages -----------------------------------------------------------------------
 
-    def _stage(self, row: Any) -> StageRecord:
+    def _stage(self, row: sqlite3.Row) -> StageRecord:
         return StageRecord(
             job_id=row["job_id"],
             stage=row["stage"],
@@ -646,7 +647,7 @@ class JobStore:
                 )
 
     @staticmethod
-    def _retries(con: Any, job_id: str, stage: str) -> int:
+    def _retries(con: sqlite3.Connection, job_id: str, stage: str) -> int:
         row = con.execute("SELECT attempts FROM job_stages WHERE job_id=? AND stage=?", (job_id, stage)).fetchone()
         return max(0, (row[0] if row else 1) - 1)
 
@@ -749,7 +750,7 @@ class JobStore:
 
     def _emit(
         self,
-        con: Any,
+        con: sqlite3.Connection,
         job_id: str,
         stage: str,
         outcome: StageOutcome,

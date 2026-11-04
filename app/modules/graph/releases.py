@@ -196,7 +196,7 @@ def check_paths(paths: Iterable[str]) -> list[Finding]:
     return findings
 
 
-def _walk(value: Any, where: str) -> Iterator[tuple[str, str]]:
+def _walk(value: object, where: str) -> Iterator[tuple[str, str]]:
     """Yield ``(location, string)`` for every string in a JSON value."""
     if isinstance(value, str):
         yield where, value
@@ -583,7 +583,7 @@ def git_blob_id(data: bytes, object_format: str = "sha1") -> str:
     return hashlib.new(object_format, b"blob %d\0" % len(data) + data).hexdigest()
 
 
-def canonical_json_bytes(doc: Any) -> bytes:
+def canonical_json_bytes(doc: object) -> bytes:
     """Sorted keys, two-space indent, UTF-8, trailing newline (records, reports, descriptors)."""
     return (json.dumps(doc, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
 
@@ -717,7 +717,7 @@ _CROP_FIELDS = frozenset({"crop", "crops", "crop_path", "crop_url", "crop_ref", 
 _DATA_IMAGE = re.compile(r"(?i)\bdata:image/")
 
 
-def _walk_keys(value: Any, where: str) -> Iterator[tuple[str, str, Any]]:
+def _walk_keys(value: object, where: str) -> Iterator[tuple[str, str, Any]]:
     """``(location, key, value)`` for every mapping entry at any depth."""
     if isinstance(value, Mapping):
         for key, item in value.items():
@@ -955,7 +955,7 @@ def _locators(graph: Mapping[str, Any]) -> tuple[Counter[str], int]:
     return counts, unlocated
 
 
-def _asset_status(ref: Any, sha256: Any, evidence_root: Path | None) -> tuple[str, str | None]:
+def _asset_status(ref: object, sha256: object, evidence_root: Path | None) -> tuple[str, str | None]:
     if not isinstance(ref, str) or not _PRIVATE_REF.match(ref) or not isinstance(sha256, str) or not _SHA256.match(
             sha256):
         return "invalid", "inventory_entry_needs_private_ref_and_sha256"

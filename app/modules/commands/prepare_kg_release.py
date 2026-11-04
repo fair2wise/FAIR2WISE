@@ -38,6 +38,7 @@ import sys
 from typing import Any
 
 from ..cli_output import output
+from ..contracts.json_types import JsonValue
 from ..graph import releases
 from ..graph.releases import ReleaseRefused, ReleaseVerificationError
 
@@ -79,7 +80,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _load_json(path: Path | None) -> Any:
+def _load_json(path: Path | None) -> JsonValue:
     return None if path is None else json.loads(path.read_text(encoding="utf-8"))
 
 

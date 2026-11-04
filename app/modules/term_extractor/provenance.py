@@ -17,9 +17,12 @@ import json
 import logging
 from pathlib import Path
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..literature.pdf_reader import PdfDocument
+
+if TYPE_CHECKING:
+    from ..extraction.structured_output import SyncChatClient
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +78,7 @@ def merge_into_source_metadata(
     return True
 
 
-def publications_from_source_metadata(source_metadata: Any) -> list[dict[str, Any]]:
+def publications_from_source_metadata(source_metadata: object) -> list[dict[str, Any]]:
     """Convert source-scoped metadata map into embedded publication records."""
     if not isinstance(source_metadata, dict):
         return []
@@ -116,7 +119,7 @@ def extract_snippets_json_from_text(text: str) -> dict[str, Any]:
     return {"snippets": []}
 
 
-def normalize_domain_features(features: Any, schema_helper: Any) -> list[dict[str, str | None]]:
+def normalize_domain_features(features: object, schema_helper: Any) -> list[dict[str, str | None]]:  # noqa: ANN401  # Any: SchemaHelper (two implementations, duck-typed)
     """Keep only schema-allowed CodeSnippet domain features."""
     try:
         ctx = schema_helper.get_code_domain_feature_context()
@@ -145,7 +148,7 @@ def normalize_domain_features(features: Any, schema_helper: Any) -> list[dict[st
     return normalized
 
 
-def _prepare_code_snippet_prompt(page_text: str, schema_helper: Any) -> str:
+def _prepare_code_snippet_prompt(page_text: str, schema_helper: Any) -> str:  # noqa: ANN401  # Any: SchemaHelper (two implementations, duck-typed)
     """Prompt for scientific CONTEXT around code snippets (no code bodies)."""
     max_len = 6000
     text = page_text[-max_len:] if len(page_text) > max_len else page_text
@@ -201,8 +204,8 @@ Output JSON:
 
 def extract_code_snippets(
     page_text: str,
-    chat_client: Any,
-    schema_helper: Any,
+    chat_client: SyncChatClient,
+    schema_helper: Any,  # noqa: ANN401  # Any: SchemaHelper (two implementations, duck-typed)
     *,
     source_paper: str = "",
     page: int = 0,

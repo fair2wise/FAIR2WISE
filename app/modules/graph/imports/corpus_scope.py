@@ -981,7 +981,7 @@ def _run(plan: ReplacementPlan, approval: ApprovalRecord, src: SourceSnapshot, c
         journal.append("intent", op_id=oid, kind=op.kind, key=op.key, replay=oid in done)
         return oid
 
-    def finish(oid: str, op: ScopeOp, **extra: Any) -> None:
+    def finish(oid: str, op: ScopeOp, **extra: object) -> None:
         journal.append("done", op_id=oid, kind=op.kind, key=op.key, **extra)
 
     def link_spec_for(key: str) -> lw.LinkSpec:

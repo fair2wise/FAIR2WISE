@@ -54,7 +54,7 @@ import logging
 from pathlib import Path
 import re
 import threading
-from typing import Any, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 import uuid
 
 from pydantic import BaseModel, ConfigDict
@@ -75,6 +75,10 @@ from ..contracts import (
     ToolStatus,
 )
 from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
+    from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +285,7 @@ class SummaryOutcome:
     legacy: dict[str, Any]
 
 
-def _int(value: Any) -> int:
+def _int(value: JsonValue) -> int:
     try:
         return max(0, int(value))
     except (TypeError, ValueError):
@@ -514,7 +518,7 @@ class PaperSummaryTool:
             return pinned
         return self._resolver(ctx) if self._resolver is not None else None
 
-    def run(self, inv: Any) -> ToolResult:
+    def run(self, inv: ToolInvocation) -> ToolResult:
         """Executor entry point: ``fn(invocation)``; arguments are already schema-validated."""
         scope = self.resolve(inv.ctx)
         if scope is None:

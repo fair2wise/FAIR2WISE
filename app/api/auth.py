@@ -153,7 +153,7 @@ class AccessRuntime:
             self.notify_scope_change({"subject": subject, "reason": "role_downgraded"})
 
 
-def warn_if_exposed(app: Any, host: Any) -> str | None:
+def warn_if_exposed(app: object, host: object) -> str | None:
     """Log and return the AUD-16 warning when ``app`` (``:local``) is about to serve beyond loopback.
 
     Called by both ``run_api`` entry points with the uvicorn bind host. Apps without an

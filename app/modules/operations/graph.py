@@ -51,7 +51,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import logging
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 import uuid
 
 from ..agent_runtime.executor import is_control_flow
@@ -70,6 +70,9 @@ from .reports import (
     top_items,
     utcnow,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +175,7 @@ def _row_from_data(node_id: str, name: str, category: str, data: Mapping[str, An
                      publication_dois=tuple(pubs), created_at=created_at)
 
 
-def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl | None = None) -> GraphScan:
+def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl | None = None) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     """Read every entity and edge of ``graph_id`` through ``port`` within ``control``'s bounds.
 
     Raises:
@@ -197,7 +200,7 @@ def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanContr
     raise CapabilityError("complete_listing", getattr(port.capabilities(), "backend", "unknown"))
 
 
-def _scan_json(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:
+def _scan_json(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     snap = port.snapshot(ctx, graph_id)
     scan = GraphScan(graph_id=graph_id, backend="json", revision=f"sha256:{snap.sha256}", exactness="snapshot")
     for node_id, node in snap.nodes.items():
@@ -214,7 +217,7 @@ def _scan_json(port: Any, ctx: RequestContext, graph_id: str, control: ScanContr
     return scan
 
 
-def _scan_iterators(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:
+def _scan_iterators(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     caps = port.capabilities()
     scan = GraphScan(graph_id=graph_id, backend=caps.backend, revision=f"{caps.backend}-live",
                      exactness="snapshot" if caps.complete_listing else "live_unisolated")
@@ -238,7 +241,7 @@ def _stopped(scan: GraphScan, control: ScanControl, phase: str) -> GraphScan:
     return scan
 
 
-def _pages(client: Any, query: str, field_name: str, page_size: int, control: ScanControl
+def _pages(client: Any, query: str, field_name: str, page_size: int, control: ScanControl  # noqa: ANN401  # Any: Tiled client (untyped third-party)
            ) -> Iterable[dict[str, Any] | None]:
     """Yield rows of one listing; yields ``None`` once when ``control`` stops the scan."""
     offset = 0
@@ -254,7 +257,7 @@ def _pages(client: Any, query: str, field_name: str, page_size: int, control: Sc
         offset += len(rows)
 
 
-def _scan_tiled(port: Any, graph_id: str, control: ScanControl) -> GraphScan:
+def _scan_tiled(port: Any, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     from ..graph.identity_adapter import literature_entity_key, literature_link_key, strip_reserved
 
     started = utcnow().isoformat()
@@ -424,7 +427,7 @@ def _identity_warnings(scans: Sequence[GraphScan]) -> list[str]:
     return out
 
 
-def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,
+def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
                        control: ScanControl | None = None) -> OperationReport:
     """``kg_compute_statistics`` over one graph."""
     started = utcnow()
@@ -445,7 +448,7 @@ def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,
     return stamp(report, started)
 
 
-def compare_snapshots(port: Any, ctx: RequestContext, graph_ids: Sequence[str],
+def compare_snapshots(port: object, ctx: RequestContext, graph_ids: Sequence[str],
                       control: ScanControl | None = None) -> OperationReport:
     """``kg_compare_snapshots``: growth between consecutive graphs, in the given order."""
     started = utcnow()
@@ -504,7 +507,7 @@ def compare_snapshots(port: Any, ctx: RequestContext, graph_ids: Sequence[str],
     return stamp(report, started)
 
 
-def paper_subgraph(port: Any, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int = 50,
+def paper_subgraph(port: object, ctx: RequestContext, graph_id: str, paper: str, *, max_nodes: int = 50,
                    max_edges: int = 100, control: ScanControl | None = None) -> OperationReport:
     """``kg_paper_subgraph``: entities citing one Work and the relations among them."""
     started = utcnow()
@@ -563,7 +566,7 @@ def _parse_time(value: str) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
-def recent_entities(port: Any, ctx: RequestContext, graph_id: str, *, since: str = "", limit: int = 25,
+def recent_entities(port: object, ctx: RequestContext, graph_id: str, *, since: str = "", limit: int = 25,
                     control: ScanControl | None = None) -> OperationReport:
     """``kg_recent_entities``: entities created after ``since`` (all when empty), newest first."""
     started = utcnow()
@@ -690,7 +693,7 @@ class GraphOperationsTool:
     specs = GRAPH_SPECS
     skill = ANALYZE_KNOWLEDGE_GRAPH_SKILL
 
-    def __init__(self, port: Any, *, graph_ids: Sequence[str] | None = None, artifact_store: Any = None,
+    def __init__(self, port: object, *, graph_ids: Sequence[str] | None = None, artifact_store: object = None,
                  max_records: int = 500_000) -> None:
         self.port = port
         self._graph_ids = None if graph_ids is None else tuple(graph_ids)
@@ -740,7 +743,7 @@ class GraphOperationsTool:
         raise ContractError(ErrorCode.INVALID_INPUT, f"unknown graph operation {operation!r}")
 
     def _runner(self, name: str) -> Callable[[Any], ToolResult]:
-        def run(inv: Any) -> ToolResult:
+        def run(inv: ToolInvocation) -> ToolResult:
             provenance_id = f"f2w-op:{uuid.uuid4().hex}"
             try:
                 report = self.compute(inv.ctx, name, inv.args)

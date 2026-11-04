@@ -6,7 +6,7 @@ from typing import Any
 import obonet
 
 
-def load_chebi_obo(obo_path: str) -> Any:  # Any: networkx graph (untyped)
+def load_chebi_obo(obo_path: str) -> Any:  # noqa: ANN401  # Any: networkx graph (untyped)
     """Load the ChEBI OBO into a networkx graph using obonet.
 
     Each node is keyed by its OBO ID (e.g. 'CHEBI:15377'),

@@ -24,7 +24,7 @@ MAX_METRIC_LINES = 40
 MAX_PREVIEW_ITEMS = 10
 
 
-def _fmt(value: Any) -> str:
+def _fmt(value: object) -> str:
     if isinstance(value, float):
         return f"{value:.4g}"
     if isinstance(value, (list, tuple)):

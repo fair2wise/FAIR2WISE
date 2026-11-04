@@ -57,6 +57,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.contracts.json_types import Untyped
 from ..modules.security.authorization import CLOCK_SKEW_TOLERANCE, DeploymentSettings, StartupConfigError
 from ..modules.security.tiled_identity import (
     ABOUT_PATH,
@@ -119,7 +120,7 @@ class TiledSessionStore:
         max_sessions: Oldest sessions are dropped beyond this many.
     """
 
-    def __init__(self, tiled_target: str, http_client: Any, *, clock: Callable[[], datetime] = _utcnow,
+    def __init__(self, tiled_target: str, http_client: object, *, clock: Callable[[], datetime] = _utcnow,
                  timeout: float = 10.0, cookie_path: str = DEFAULT_COOKIE_PATH, cookie_secure: bool = True,
                  max_sessions: int = DEFAULT_MAX_SESSIONS) -> None:
         """Bind the Tiled target (normalized) and the HTTP client; the arguments are described on the class."""
@@ -142,7 +143,7 @@ class TiledSessionStore:
 
     # ------------------------------------------------------------------ Tiled calls
 
-    def _call(self, method: str, path: str, **kwargs: Any) -> Any:
+    def _call(self, method: str, path: str, **kwargs: object) -> Untyped:
         """Call the bound Tiled; transport failures are ``UNAVAILABLE``."""
         try:
             return getattr(self._client, method)(self.tiled_target + path, timeout=self._timeout, **kwargs)
@@ -166,7 +167,7 @@ class TiledSessionStore:
                 out.append({"provider": item["provider"], "mode": str(item.get("mode") or "")})
         return out
 
-    def _tokens(self, resp: Any) -> tuple[str, str | None, datetime | None]:
+    def _tokens(self, resp: httpx.Response) -> tuple[str, str | None, datetime | None]:
         """Read ``access_token``/``refresh_token``/``expires_in`` from a Tiled token response."""
         try:
             body = resp.json()
@@ -393,7 +394,7 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
 
 
 def als_identity_wiring(settings: DeploymentSettings, http_client: httpx.Client | None = None, *, timeout: float = 5.0,
-                        **store_kwargs: Any) -> tuple[TiledWhoamiAdapter, TiledSessionStore]:
+                        **store_kwargs: Any) -> tuple[TiledWhoamiAdapter, TiledSessionStore]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Return the identity port and session store for an ALS deployment, both bound to its Tiled.
 
     Pass both to ``create_app(identity_port=..., credential_store=...)``. ``http_client``

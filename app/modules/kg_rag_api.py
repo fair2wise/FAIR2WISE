@@ -82,14 +82,26 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .cborg_limiter import async_slot  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .cli_output import output  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .literature.pdf_reader import open_pdf  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from .cborg_http import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    openai_http_kwargs,
+    require_cborg_api_key,
+)
+from .cborg_limiter import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    async_slot,
+)
+from .cli_output import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    output,
+)
+from .contracts.json_types import JsonValue
+from .literature.pdf_reader import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    open_pdf,
+)
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+
+    from .security.authorization import DeploymentSettings
 
 if __name__ == "__main__":
     # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):
@@ -274,7 +286,7 @@ class ModelTurnSources:
         """PDF names the regions belong to (the grant's ``work_ids``)."""
         return sorted({name for name, _version in self._text})
 
-    def read(self, source_version: str, locator: Any) -> str | None:
+    def read(self, source_version: str, locator: object) -> str | None:
         """Retained text of one region; only ever called by a ``QuoteVerifier`` under a grant."""
         for (_name, version), text in self._text.items():
             if version == source_version:
@@ -287,10 +299,10 @@ def create_fastapi_app(
     backend: str = LLM_BACKEND,
     model: str | None = None,
     *,
-    deployment: Any | None = None,
+    deployment: DeploymentSettings | None = None,
     startup_config: dict[str, str] | None = None,
-    identity_port: Any | None = None,
-    credential_store: Any | None = None,
+    identity_port: object = None,
+    credential_store: object = None,
     clock: Callable[[], Any] | None = None,
     gaps_dir: str | Path | None = None,
 ) -> FastAPI:
@@ -361,7 +373,7 @@ def create_fastapi_app(
     rag_c = Conversation(RAG_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file, out_dir=gaps_dir)  # disabled when the directory is read-only
 
-    def _project(ctx: RequestContext, payload: dict[str, Any], sources: ModelTurnSources) -> Any:
+    def _project(ctx: RequestContext, payload: dict[str, Any], sources: ModelTurnSources) -> JsonValue:
         """Project a chat body for ``ctx`` with the turn's PDF windows as verifiable source regions."""
         viewer = Viewer.from_context(ctx)
         refs = sources.refs()
@@ -409,7 +421,7 @@ def create_fastapi_app(
         return rag_resp
 
     @app.post("/api/chat", response_model=None)
-    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)) -> Any:
+    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)) -> JsonValue:
         """Handle incoming chat request: retrieve KG context, call LLM, return response."""
         body = await req.json()
         messages = body.get("messages", [])
@@ -426,7 +438,7 @@ def create_fastapi_app(
         }, ModelTurnSources(snippets))
 
     @app.post("/v1/chat/completions", response_model=None)
-    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)) -> Any:
+    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)) -> JsonValue:
         """Handle OpenAI-compatible chat completions for Open WebUI."""
         body = await req.json()
         messages = body.get("messages", [])
@@ -670,7 +682,7 @@ def snippet_text(txt: str, length: int, hints: Sequence[str] | None) -> str:
     return txt[:length]
 
 
-def format_domain_features(features: Any, *, multiline: bool = False) -> str:
+def format_domain_features(features: object, *, multiline: bool = False) -> str:
     """Format schema-driven CodeSnippet domain features for search and context."""
     if not isinstance(features, list):
         return ""
@@ -951,7 +963,9 @@ class NodeInfo:
 
 
 # ───────────────────── PDF cache ─────────────────────
-from functools import lru_cache  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from functools import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    lru_cache,
+)
 
 
 @lru_cache(maxsize=MAX_PDF_CACHE)

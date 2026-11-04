@@ -63,7 +63,7 @@ class MappingRow:
     instrument_category: str | None = None
 
 
-def _annotation(cls: Any, tag: str) -> str | None:  # Any: linkml ClassDefinition (untyped)
+def _annotation(cls: Any, tag: str) -> str | None:  # noqa: ANN401  # Any: linkml ClassDefinition (untyped)
     ann = (cls.annotations or {}).get(tag)
     value = getattr(ann, "value", ann)
     return str(value) if value is not None else None

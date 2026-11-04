@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from ..contracts.errors import ErrorCode
@@ -14,6 +14,9 @@ from .normalize import (
     science_q_to_spacing,
     science_spacing_to_q,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 TOOL_VERSION = "1.0.0"
 _VALUE = {"type": "number", "exclusiveMinimum": 0}
@@ -47,7 +50,7 @@ SCIENCE_TOOL_SPECS: tuple[ToolSpec, ...] = (
 
 
 def _wrap(tool: str, fn: Callable[[Any], dict[str, Any]]) -> Callable[[Any], ToolResult]:
-    def run(inv: Any) -> ToolResult:
+    def run(inv: ToolInvocation) -> ToolResult:
         provenance = f"science:{uuid.uuid4().hex}"
         try:
             data = fn(inv.args)

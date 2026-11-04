@@ -27,11 +27,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup
 from .merge_safety import check_merge
+
+if TYPE_CHECKING:
+    from ..contracts.json_types import JsonValue
+    from ..extraction.structured_output import SyncChatClient
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +51,7 @@ Judge = Callable[[str], str]
 class ChatJudge:
     """Adapter from an existing F2W chat client to a ``judge(prompt) -> str`` callable."""
 
-    def __init__(self, client: Any, *, temperature: float = 0.0, timeout: int = 240) -> None:
+    def __init__(self, client: SyncChatClient, *, temperature: float = 0.0, timeout: int = 240) -> None:
         if client is None:
             raise ValueError("a chat client is required; there is no default provider")
         self.client = client
@@ -56,7 +60,7 @@ class ChatJudge:
 
     def __call__(self, prompt: str) -> str:
         """Send `prompt` to the chat client and return its reply."""
-        return cast(str, self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout))
+        return self.client.chat(prompt, temperature=self.temperature, timeout=self.timeout)
 
 
 _GROUP_PROMPT = """You are consolidating a controlled vocabulary for a scattering \
@@ -154,7 +158,7 @@ def _keep(group: TermGroup, method: str, reason: str) -> GroupVerdict:
     )
 
 
-def parse_json_object(raw: Any) -> dict[str, Any] | None:
+def parse_json_object(raw: JsonValue) -> dict[str, Any] | None:
     """The first JSON object in ``raw`` (tolerates prose or fences), else ``None``."""
     text = str(raw or "").strip()
     start, end = text.find("{"), text.rfind("}")
@@ -168,11 +172,11 @@ def parse_json_object(raw: Any) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def _strings(value: Any) -> list[str]:
+def _strings(value: object) -> list[str]:
     return [str(v).strip() for v in value if str(v).strip()] if isinstance(value, list) else []
 
 
-def clamp_confidence(value: Any) -> float:
+def clamp_confidence(value: JsonValue) -> float:
     """Confidence in [0, 1]; unreadable is 0.0 (it must not clear the apply floor)."""
     try:
         return max(0.0, min(1.0, float(value)))

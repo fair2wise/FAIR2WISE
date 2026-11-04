@@ -31,6 +31,7 @@ from pathlib import Path
 import time
 from typing import Any, Protocol, cast, runtime_checkable
 
+from ..contracts.json_types import Untyped
 from .parsed_document import (
     BoundingBox,
     PageInfo,
@@ -123,7 +124,7 @@ def _inside(inner: Sequence[float], outer: Sequence[float], *, pad: float = 1.0)
     return outer[0] - pad <= cx <= outer[2] + pad and outer[1] - pad <= cy <= outer[3] + pad
 
 
-def _docling_bbox(bbox: Any, *, origin: str | None = None) -> BoundingBox:
+def _docling_bbox(bbox: Any, *, origin: str | None = None) -> BoundingBox:  # noqa: ANN401  # Any: docling bounding box (untyped third-party)
     """A Docling ``BoundingBox`` as ours, keeping its own origin (BOTTOMLEFT or TOPLEFT) and units."""
     coord = str(getattr(bbox.coord_origin, "value", bbox.coord_origin) or "BOTTOMLEFT")
     return BoundingBox(
@@ -136,7 +137,7 @@ def _docling_bbox(bbox: Any, *, origin: str | None = None) -> BoundingBox:
     )
 
 
-def _docling_page_of(item: Any) -> tuple[int | None, Any | None]:
+def _docling_page_of(item: Any) -> tuple[int | None, Any | None]:  # noqa: ANN401  # Any: docling item (untyped third-party)
     """First provenance page number and box of a Docling item (``(None, None)`` without provenance)."""
     prov = getattr(item, "prov", None) or []
     if not prov:
@@ -170,7 +171,7 @@ class DoclingParser:
         images_scale: float = 2.0,
         min_figure_side: int = 120,
         do_table_structure: bool = True,
-        converter: Any | None = None,
+        converter: object = None,
     ) -> None:
         self.artifacts_path = artifacts_path
         self.images_scale = images_scale
@@ -192,7 +193,7 @@ class DoclingParser:
             "do_table_structure": self.do_table_structure,
         }
 
-    def _converter(self) -> Any:
+    def _converter(self) -> Untyped:
         if self._converter_instance is None:
             from docling.datamodel.base_models import InputFormat
             from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -235,7 +236,7 @@ class DoclingParser:
 
     def document_from_docling(
         self,
-        doc: Any,
+        doc: object,
         *,
         pdf_path: Path,
         work_dir: Path,
@@ -273,7 +274,7 @@ class DoclingParser:
     # -- pages and text ---------------------------------------------------------------------------
 
     @staticmethod
-    def _pages(doc: Any, reader: Any | None) -> list[PageInfo]:
+    def _pages(doc: Any, reader: Any | None) -> list[PageInfo]:  # noqa: ANN401  # Any: docling document (untyped third-party)
         pages: list[PageInfo] = []
         for number in sorted(doc.pages):
             size = doc.pages[number].size
@@ -284,7 +285,7 @@ class DoclingParser:
         return pages
 
     @staticmethod
-    def _sections(doc: Any) -> tuple[list[ParsedSection], list[str]]:
+    def _sections(doc: Any) -> tuple[list[ParsedSection], list[str]]:  # noqa: ANN401  # Any: docling document (untyped third-party)
         """Sections from Docling's reading order: headings open a section, body text joins it."""
         from docling_core.types.doc.labels import DocItemLabel
 
@@ -335,7 +336,7 @@ class DoclingParser:
     # -- figures and tables -----------------------------------------------------------------------
 
     @staticmethod
-    def _caption(item: Any, doc: Any) -> tuple[str, BoundingBox | None]:
+    def _caption(item: Any, doc: object) -> tuple[str, BoundingBox | None]:  # noqa: ANN401  # Any: docling item (untyped third-party)
         try:
             text = str(item.caption_text(doc) or "").strip()
         except Exception:  # noqa: BLE001 - a malformed caption reference must not lose the figure
@@ -353,7 +354,7 @@ class DoclingParser:
                 break
         return text, box
 
-    def _figures(self, doc: Any, reader: Any | None, pages: list[PageInfo], work_dir: Path, stem: str) -> list[ParsedFigure]:
+    def _figures(self, doc: Any, reader: Any | None, pages: list[PageInfo], work_dir: Path, stem: str) -> list[ParsedFigure]:  # noqa: ANN401  # Any: docling document (untyped third-party)
         out: list[ParsedFigure] = []
         height_of = {p.number: p.height for p in pages}
         per_page: Counter[int] = Counter()
@@ -416,7 +417,7 @@ class DoclingParser:
             return None
         return (bbox.left, page_height - bbox.top, bbox.right, page_height - bbox.bottom)
 
-    def _tables(self, doc: Any, work_dir: Path, stem: str) -> list[ParsedTable]:
+    def _tables(self, doc: Any, work_dir: Path, stem: str) -> list[ParsedTable]:  # noqa: ANN401  # Any: docling document (untyped third-party)
         out: list[ParsedTable] = []
         per_page: Counter[int] = Counter()
         for table in doc.tables:

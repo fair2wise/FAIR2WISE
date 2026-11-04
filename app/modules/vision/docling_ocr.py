@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+from ..contracts.json_types import Untyped
 from ..literature.parsers import DOCLING_ARTIFACTS_ENV
 from .ocr import Detection
 from .results import VisionUnavailable
@@ -55,13 +56,13 @@ def weights_available(path: str | Path | None = None) -> bool:
     return all(any(part in n and n.endswith(".pth") for n in names) for part in ("det", "cls", "rec"))
 
 
-def _docling_stream(png: bytes) -> Any:
+def _docling_stream(png: bytes) -> Untyped:
     from docling.datamodel.base_models import DocumentStream
 
     return DocumentStream(name="figure.png", stream=BytesIO(png))
 
 
-def _build_converter(artifacts: Path) -> Any:
+def _build_converter(artifacts: Path) -> Untyped:
     """A Docling image converter with full-page RapidOCR, reading only from ``artifacts``."""
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import OcrMode, PdfPipelineOptions, RapidOcrOptions
@@ -80,7 +81,7 @@ def _build_converter(artifacts: Path) -> Any:
     return converter
 
 
-def _png_bytes(image: Any) -> bytes:
+def _png_bytes(image: object) -> bytes:
     import numpy as np
     from PIL import Image
 
@@ -90,7 +91,7 @@ def _png_bytes(image: Any) -> bytes:
     return out.getvalue()
 
 
-def _top_left_box(rect: Any, page_height: float) -> tuple[float, float, float, float]:
+def _top_left_box(rect: Any, page_height: float) -> tuple[float, float, float, float]:  # noqa: ANN401  # Any: pypdfium2 rectangle (untyped third-party)
     xs = [rect.r_x0, rect.r_x1, rect.r_x2, rect.r_x3]
     ys = [rect.r_y0, rect.r_y1, rect.r_y2, rect.r_y3]
     if str(getattr(rect.coord_origin, "value", rect.coord_origin)).upper() == "BOTTOMLEFT":
@@ -113,7 +114,7 @@ class DoclingOcrEngine:
 
     name = "docling-rapidocr"
 
-    def __init__(self, artifacts_path: str | Path | None = None, *, converter: Any = None,
+    def __init__(self, artifacts_path: str | Path | None = None, *, converter: Any = None,  # noqa: ANN401  # Any: docling DocumentConverter (optional extra, untyped)
                  source_factory: Callable[[bytes], Any] | None = None) -> None:
         self._source_factory = source_factory or _docling_stream
         if converter is not None:
@@ -130,7 +131,7 @@ class DoclingOcrEngine:
         except Exception as exc:   # ImportError, FileNotFoundError, torch/rapidocr load errors
             raise VisionUnavailable(_CAPABILITY, f"Docling OCR could not start: {type(exc).__name__}: {exc}") from exc
 
-    def detect(self, image: Any) -> Sequence[Detection]:
+    def detect(self, image: Any) -> Sequence[Detection]:  # noqa: ANN401  # Any: PIL or numpy image (optional extras, untyped)
         """OCR a 2-D uint8 image; boxes are in the image's own pixels (top-left origin)."""
         height, width = int(image.shape[0]), int(image.shape[1])
         try:

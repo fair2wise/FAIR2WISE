@@ -104,11 +104,11 @@ def _writer_errors() -> Iterator[None]:
                             "graph writes are blocked", retryable=False) from None
 
 
-def _canon(value: Any) -> str:
+def _canon(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
-def _sha(value: Any) -> str:
+def _sha(value: object) -> str:
     return hashlib.sha256(_canon(value).encode()).hexdigest()
 
 
@@ -140,7 +140,7 @@ class SourceSnapshot:
         return ids + [i for i in chain if i not in ids]
 
 
-def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str]:
+def default_supported_schema_fingerprints(registry: Any = None) -> frozenset[str]:  # noqa: ANN401  # Any: schema registry (duck-typed: donor object or typed record)
     """Import fingerprints of every selectable registered schema in use (computed, not hard-coded).
 
     Includes each base schema's fingerprint from before the H3 S4 licence-line change, so a snapshot built
@@ -401,7 +401,7 @@ def _plan_body(detail: Mapping[str, Any], *, snapshot_id: str, input_sha256: str
     }
 
 
-def build_change_plan(detail: Mapping[str, Any], **kw: Any) -> ChangePlan:
+def build_change_plan(detail: Mapping[str, Any], **kw: Any) -> ChangePlan:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Deterministic :class:`ChangePlan` for ``detail``; ``plan_sha256`` covers every field below."""
     body = _plan_body(detail, **kw)
     digest = _sha(body)
@@ -685,7 +685,7 @@ def _run(ctx: RequestContext, plan: ImportPlan, approval: ApprovalRecord, src: S
         journal.append("intent", op_id=oid, kind=op.kind, key=op.key, replay=oid in done)
         return oid
 
-    def finish(oid: str, op: Op, **extra: Any) -> None:
+    def finish(oid: str, op: Op, **extra: object) -> None:
         journal.append("done", op_id=oid, kind=op.kind, key=op.key, **extra)
 
     by_stage = {s: [o for o in ops if o.stage == s] for s in STAGES}

@@ -61,17 +61,21 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 import json
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_config
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import get_runtime
 from langgraph.types import interrupt
 
 from ..contracts import ApprovalRecord, ChangePlan, ContractError, ErrorCode, RequestContext, ToolStatus
-from .admission import ensure_admission
+from ..contracts.json_types import Untyped
+from ..contracts.ports import DocumentStore
+from .admission import Admission, ensure_admission
+from .chat_model import ChatModel
 from .checkpointer import owner_key
 from .executor import RuntimeLimits, ToolExecutor, ToolOutcome, TurnLedger, _fail, call_key
 from .message_trimming import current_turn_start, is_orphan_repair, prepare_for_model
@@ -89,6 +93,9 @@ from .policies import (
 from .registry import RegisteredTool, ToolRegistry, effective_capabilities
 from .skills import SkillRegistry
 from .state import LiteratureState, RunContext, as_run_context
+
+if TYPE_CHECKING:
+    from ..contracts.tools import ToolSpec
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +122,7 @@ PlanResolver = Callable[[RequestContext, str, Mapping[str, Any]], ChangePlan | N
 _FAILING = {ToolStatus.DENIED, ToolStatus.INVALID, ToolStatus.UNAVAILABLE, ToolStatus.ERROR}
 
 
-def tool_definition(spec: Any) -> dict[str, Any]:
+def tool_definition(spec: ToolSpec) -> dict[str, Any]:
     """OpenAI-style function definition for ``bind_tools`` from a ``ToolSpec``."""
     description = f"{spec.description}\nWhen to use: {spec.when_to_use}\nWhen not to use: {spec.when_not_to_use}"
     return {"type": "function",
@@ -164,7 +171,7 @@ def _refused(record: Mapping[str, Any], code: ErrorCode, message: str) -> ToolOu
     return ToolOutcome(result=_fail(record["tool"], code, message), key=call_key(record["tool"], record["args"]))
 
 
-def _parse_approval(value: Any) -> ApprovalRecord | None:
+def _parse_approval(value: object) -> ApprovalRecord | None:
     if isinstance(value, ApprovalRecord):
         return value
     if isinstance(value, Mapping):
@@ -179,19 +186,19 @@ def _parse_approval(value: Any) -> ApprovalRecord | None:
 def build_literature_supervisor(
     *,
     registry: ToolRegistry,
-    chat_model: Any,
-    checkpointer: Any = None,
+    chat_model: ChatModel,
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
     event_sink: EventSink | None = None,
     limits: RuntimeLimits | None = None,
     system_prompt: str = PLACEHOLDER_SYSTEM_PROMPT,
     skills: SkillRegistry | None = None,
-    admission: Any = None,
+    admission: Admission | None = None,
     provider: str = "default",
     approval_check: ApprovalCheck | None = None,
     plan_resolver: PlanResolver | None = None,
-    artifact_store: Any = None,
+    artifact_store: DocumentStore | None = None,
     clock: Callable[[], datetime] = utcnow,
-) -> Any:
+) -> Untyped:
     """Build the compiled literature supervisor graph.
 
     Args:
@@ -241,7 +248,7 @@ def build_literature_supervisor(
             raise ContractError(ErrorCode.DENIED, "this thread belongs to another principal or session")
         return {} if current else {"owner": key}
 
-    def resolve_plan(ctx: RequestContext, name: str, args: Any) -> ChangePlan | None:
+    def resolve_plan(ctx: RequestContext, name: str, args: object) -> ChangePlan | None:
         if plan_resolver is None or not isinstance(args, Mapping):
             return None
         return plan_resolver(ctx, name, args)

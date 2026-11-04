@@ -19,12 +19,19 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
+from ..contracts.json_types import JsonValue
 from .keys import OperationInputs, changed_inputs, stage_key
 from .store import JobRecord, JobStore, Lease, LeaseLost
+
+if TYPE_CHECKING:
+    from contextlib import AbstractContextManager
+    from threading import Event
+
+    from ..agent_runtime.admission import Admission
 
 logger = logging.getLogger(__name__)
 
@@ -198,9 +205,9 @@ class StageContext:
         op_key: str,
         *,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: Any = None,
+        admission: Admission | None = None,
         extra: Mapping[str, Any] | None = None,
-        interrupt: Any | None = None,
+        interrupt: Event | None = None,
     ) -> None:
         self.store = store
         self.lease = lease
@@ -214,7 +221,7 @@ class StageContext:
         self._authority = authority
         self._interrupt = interrupt
 
-    def provider_slot(self, provider: str) -> Any:
+    def provider_slot(self, provider: str) -> AbstractContextManager[Any]:
         """Shared-admission slot for ``provider`` (the quota chat, workers and evaluations all share)."""
         if self.admission is None:
             raise RuntimeError("no admission configured for this job kind")
@@ -228,7 +235,7 @@ class StageContext:
         if self.store.stop_requested(self.job.job_id):
             raise JobStopped("stop requested")
 
-    def require(self, *capabilities: str) -> Any:
+    def require(self, *capabilities: str) -> JsonValue:
         """Re-authorize the initiating subject before an effect (workers never keep stale authority).
 
         Raises:
@@ -296,10 +303,10 @@ class PipelineRunner:
         pipeline: Pipeline,
         *,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: Any = None,
+        admission: Admission | None = None,
         extra: Mapping[str, Any] | None = None,
         on_denied: Callable[[JobRecord, str], None] | None = None,
-        interrupt: Any | None = None,
+        interrupt: Event | None = None,
     ) -> None:
         self._interrupt = interrupt
         self.store = store

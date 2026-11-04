@@ -16,12 +16,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import re
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..merge_safety import fold, is_acronym_of
 from ..migration import sha256_json
 from ..vocabulary import Vocabulary
 from .models import MenuEntry, Snippet, TermEvidence, term_key
+
+if TYPE_CHECKING:
+    from ...contracts.json_types import JsonValue
 
 SNIPPET_WIDTH = 140
 MAX_SNIPPET_CHARS = 280
@@ -87,7 +90,7 @@ def build_menu(
     entries = vocab.entries_for(category) if category else []
     key = fold(surface)
 
-    def rank(entry: Any) -> float:
+    def rank(entry: JsonValue) -> float:
         names = (entry.display_name, *entry.aliases)
         best = max(SequenceMatcher(None, key, fold(n)).ratio() for n in names)
         if any(is_acronym_of(surface, n) or is_acronym_of(n, surface) for n in names):

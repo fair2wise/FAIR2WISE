@@ -104,7 +104,7 @@ def infer_intent(question: str, *, layout: bool = False, numeric: bool = False) 
     return "factual"
 
 
-def kg_evidence_from_hit(hit: Any) -> Evidence:
+def kg_evidence_from_hit(hit: object) -> Evidence:
     """Wrap a knowledge-graph search hit as ``Evidence``.
 
     Fields are read with ``getattr`` fallbacks to ``hit.payload`` (or ``hit`` itself),

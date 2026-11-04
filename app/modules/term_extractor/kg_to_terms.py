@@ -162,7 +162,7 @@ class KgToTermsResult:
     dropped_terms: list[str] = field(default_factory=list)
 
 
-def _is_empty(value: Any) -> bool:
+def _is_empty(value: object) -> bool:
     """Return True for the values ``copy_passthrough_slots`` treats as absent."""
     return value in (None, "", [], {})
 
@@ -407,7 +407,7 @@ def _term_from_node(
     return term, effective_prefix
 
 
-def _split_evidence(value: Any) -> list[str]:
+def _split_evidence(value: object) -> list[str]:
     """Split a ``has_evidence`` edge value back into the evidence list."""
     if _is_empty(value):
         return []

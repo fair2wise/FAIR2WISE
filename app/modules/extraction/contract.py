@@ -24,6 +24,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..contracts.json_types import JsonValue
 from ..evidence.records import ReportedQuantity
 from ..literature.parsed_document import ParsedDocument
 
@@ -154,7 +155,7 @@ class ExtractionResult:
         }
 
 
-def frozen_copy(value: Any) -> Any:
+def frozen_copy(value: object) -> JsonValue:
     """Deep copy so a result never aliases a strategy's mutable state."""
     return copy.deepcopy(value)
 

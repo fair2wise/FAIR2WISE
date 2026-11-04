@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 import json
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -183,7 +183,7 @@ class LiteratureEvidenceBundle(BaseModel):
         """JSON-ready form."""
         return self.model_dump(mode="json")
 
-    def to_json(self, **kw: Any) -> str:
+    def to_json(self, **kw: Any) -> str:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Stable JSON text (sorted keys)."""
         kw.setdefault("sort_keys", True)
         return json.dumps(self.to_dict(), **kw)
@@ -239,6 +239,20 @@ def _evidence(record: EvidenceRecord, *, include_quotes: bool) -> BundledEvidenc
         quote=ref.quote if include_quotes else None, parser_revision=ref.parser_revision,
         strategy=record.strategy, caveats=tuple(dict.fromkeys(caveats)), status=record.status,
     )
+
+
+class EvidenceSource(Protocol):
+    """A candidate evidence source: ``evidence_id -> EvidenceRecord`` and ``quantity_id -> QuantityRecord`` maps."""
+
+    @property
+    def evidence(self) -> Mapping[str, EvidenceRecord]:
+        """Candidate evidence records by id."""
+        ...
+
+    @property
+    def quantities(self) -> Mapping[str, QuantityRecord]:
+        """Candidate quantity records by id."""
+        ...
 
 
 def build_bundle(

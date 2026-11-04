@@ -274,15 +274,15 @@ class TiledGraphBackend:
         """Publication is T08B; this read adapter never writes."""
         raise CapabilityError("apply_plan", BACKEND)
 
-    def update_entity_properties(self, *args: Any, **kwargs: Any) -> None:
+    def update_entity_properties(self, *args: object, **kwargs: object) -> None:
         """Entity properties are create-only on 0.2.18."""
         raise CapabilityError("update_entity_properties", BACKEND)
 
-    def compare_and_swap(self, *args: Any, **kwargs: Any) -> None:
+    def compare_and_swap(self, *args: object, **kwargs: object) -> None:
         """0.2.18 has no revisions or conditional writes."""
         raise CapabilityError("compare_and_swap", BACKEND)
 
-    def delete_owned(self, *args: Any, **kwargs: Any) -> None:
+    def delete_owned(self, *args: object, **kwargs: object) -> None:
         """No owner-checked deletion on 0.2.18 without an access policy."""
         raise CapabilityError("owned_deletion", BACKEND)
 

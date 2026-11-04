@@ -33,23 +33,28 @@ from __future__ import annotations
 from collections.abc import Callable
 import logging
 import re
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 import uuid
 
 from ..contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus
 from .papers import MAX_TERMS_CAP, TOOL_NAME, PaperScope, PaperScopeResolver, PaperSummaryTool, pinned_paper_scope
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from ..agent_runtime.executor import ToolExecutor
 
 logger = logging.getLogger(__name__)
 
 _SESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
-def _session_id(pipeline: Any) -> str | None:
+def _session_id(pipeline: object) -> str | None:
     key = str(getattr(pipeline, "_active_session_key", "") or "")
     return key if _SESSION_RE.match(key) else None
 
 
-def session_paper_resolver(pipeline: Any) -> PaperScopeResolver:
+def session_paper_resolver(pipeline: Any) -> PaperScopeResolver:  # noqa: ANN401  # Any: legacy AgentPipelineService (untyped donor object)
     """Resolve the active extracted paper from an ``AgentPipelineService``'s session state.
 
     Uses exactly what ``api.py`` passes: ``pipeline.coord.session_terms``,
@@ -85,7 +90,7 @@ class LegacySummaryPath:
         context_factory: Returns the server-built ``RequestContext`` for one call.
     """
 
-    def __init__(self, executor: Any, tool: PaperSummaryTool, *,
+    def __init__(self, executor: ToolExecutor, tool: PaperSummaryTool, *,
                  context_factory: Callable[[], RequestContext]) -> None:
         if executor.registry.get(TOOL_NAME) is None:
             raise ValueError(f"the executor's registry does not hold {TOOL_NAME}")
@@ -151,7 +156,7 @@ class LegacySummaryPath:
         raise ContractError(code, "; ".join(result.warnings) or f"{TOOL_NAME} was not run ({code.value})")
 
 
-def build_legacy_summary_path(pipeline: Any, environ: Any | None = None) -> LegacySummaryPath:
+def build_legacy_summary_path(pipeline: Any, environ: Mapping[str, str] | None = None) -> LegacySummaryPath:  # noqa: ANN401  # Any: legacy AgentPipelineService (untyped donor object)
     """Build the summary adapter for one ``AgentPipelineService`` (``:local`` only).
 
     The registry comes from the runtime bridge bootstrap (``answer_from_knowledge``

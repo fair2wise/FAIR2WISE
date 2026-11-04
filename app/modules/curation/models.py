@@ -45,7 +45,7 @@ class Route(StrEnum):
     EXTRACTION = "extraction"
 
 
-def _json(value: Any) -> str:
+def _json(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 

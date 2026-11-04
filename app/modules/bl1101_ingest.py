@@ -57,18 +57,18 @@ PAGES_DIR = CACHE_DIR / "pages"
 WORK_DIR = CACHE_DIR / "work"
 
 
-def _xp_elems(node: Any, query: str) -> list[Any]:
+def _xp_elems(node: Any, query: str) -> list[Any]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     """Run an XPath that selects elements; lxml stubs type the result as a wide union."""
     # Any: lxml-stubs return a union of bool/float/str/list for xpath(); element queries yield lists.
     return list(node.xpath(query))
 
 
-def _xp_strs(node: Any, query: str) -> list[str]:
+def _xp_strs(node: Any, query: str) -> list[str]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     """Run an XPath that selects text nodes or attribute values (strings)."""
     return [str(v) for v in node.xpath(query)]
 
 
-def _texts(node: Any) -> list[str]:
+def _texts(node: Any) -> list[str]:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     """Return the text fragments of an lxml element (``itertext`` is typed str | bytes)."""
     return [str(t) for t in node.itertext()]
 
@@ -469,7 +469,7 @@ def make_term(
     definition: str,
     source: str,
     relations: list[dict[str, Any]] | None = None,
-    **extra: Any,
+    **extra: object,
 ) -> dict[str, Any]:
     """Build one term record in the shape the ``json2kg`` graph builder expects.
 
@@ -726,14 +726,14 @@ def canonical_stage_name(name: str) -> str:
     return STAGE_NAME_ALIASES.get(key, raw)
 
 
-def _svg_coord(el: Any, attr: str) -> float:
+def _svg_coord(el: Any, attr: str) -> float:  # noqa: ANN401  # Any: lxml element (untyped third-party object)
     try:
         return float(el.get(attr) or 0.0)
     except (TypeError, ValueError):
         return 0.0
 
 
-def parse_sheet_a_svg_order(tree: Any) -> list[str]:
+def parse_sheet_a_svg_order(tree: object) -> list[str]:
     """Sheet A SVG left-to-right, top-to-bottom. This is beam order, not A′ DOM."""
     labels: list[tuple[float, float, str]] = []
     for text_el in _xp_elems(tree, "//section[@id='sheet-a']//figure//svg//text[contains(@class,'big')]"):
@@ -775,7 +775,7 @@ def parse_arrow_sequence(text: str) -> list[str]:
     return names
 
 
-def parse_figcaption_beam_path(tree: Any) -> list[str]:
+def parse_figcaption_beam_path(tree: object) -> list[str]:
     """Return the beam-path chain documented in the Sheet A figcaptions, or ``[]`` if none."""
     captions = _xp_elems(tree, "//section[@id='sheet-a']//figcaption")
     text = " ".join(re.sub(r"\s+", " ", " ".join(_texts(el))) for el in captions)

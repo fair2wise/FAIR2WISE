@@ -102,7 +102,7 @@ class WorkflowStateStore:
         finally:
             Path(tmp_name).unlink(missing_ok=True)
 
-    def update(self, **values: Any) -> dict[str, Any]:
+    def update(self, **values: object) -> dict[str, Any]:
         """Merge *values* into state, persist, and return a snapshot."""
         self.data.update(values)
         self.save()

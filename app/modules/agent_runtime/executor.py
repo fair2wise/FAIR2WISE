@@ -37,7 +37,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from ..contracts import (
     ApprovalRecord,
@@ -63,6 +63,10 @@ from .policies import (
     utcnow,
 )
 from .registry import RegisteredTool, ToolRegistry, effective_capabilities
+
+if TYPE_CHECKING:
+    from ..contracts.ports import DocumentStore
+    from .admission import Admission
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +140,7 @@ class ToolInvocation:
     ctx: RequestContext
     spec: ToolSpec
     args: dict[str, Any]
-    admission: Any
+    admission: Admission
     artifact_store: Any = None
     deadline: datetime | None = None
     attempt: int = 1
@@ -166,7 +170,7 @@ class ToolOutcome:
     attempts: int = 0
 
 
-def call_key(tool_name: str, tool_input: Any) -> str:
+def call_key(tool_name: str, tool_input: object) -> str:
     """Stable identity for one tool call, for repeat detection (donor ``_call_key``)."""
     try:
         return f"{tool_name}({json.dumps(tool_input, sort_keys=True, default=str)})"
@@ -228,9 +232,9 @@ class ToolExecutor:
         *,
         approval_check: ApprovalCheck | None = None,
         event_sink: EventSink | None = None,
-        admission: Any = None,
+        admission: Admission | None = None,
         limits: RuntimeLimits | None = None,
-        artifact_store: Any = None,
+        artifact_store: DocumentStore | None = None,
         clock: Callable[[], datetime] = utcnow,
         sleep: Callable[[float], None] = time.sleep,
         asleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -247,11 +251,11 @@ class ToolExecutor:
 
     # -- public API -------------------------------------------------------------
 
-    def execute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:
+    def execute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Run one call synchronously and return its :class:`ToolResult`."""
         return self.execute_call(ctx, name, args, **kw).result
 
-    async def aexecute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:
+    async def aexecute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Run one call asynchronously and return its :class:`ToolResult`."""
         return (await self.aexecute_call(ctx, name, args, **kw)).result
 
@@ -416,7 +420,7 @@ class ToolExecutor:
             return classify_exception(entry.name, cast(Exception, exc))  # control-flow BaseExceptions re-raised above
         return self._normalize(entry.spec, raw)
 
-    def _normalize(self, spec: ToolSpec, raw: Any) -> ToolResult:
+    def _normalize(self, spec: ToolSpec, raw: object) -> ToolResult:
         if isinstance(raw, ToolResult):
             result = raw if raw.tool == spec.name else raw.model_copy(update={"tool": spec.name})
         elif raw is None or (isinstance(raw, Mapping) and not raw):
@@ -494,7 +498,8 @@ class _DeadlineExceeded(Exception):
     pass
 
 
-async def _await_with_deadline(awaitable: Any, deadline: datetime | None, clock: Callable[[], datetime]) -> Any:
+async def _await_with_deadline[T](awaitable: Awaitable[T], deadline: datetime | None,
+                                 clock: Callable[[], datetime]) -> T:
     if deadline is None:
         return await awaitable
     remaining = (deadline - clock()).total_seconds()
@@ -510,13 +515,13 @@ async def _await_with_deadline(awaitable: Any, deadline: datetime | None, clock:
         raise
 
 
-def _close(awaitable: Any) -> None:
+def _close(awaitable: object) -> None:
     close = getattr(awaitable, "close", None)
     if callable(close):
         close()
 
 
-def _validate(schema: Mapping[str, Any], instance: Any) -> str | None:
+def _validate(schema: Mapping[str, Any], instance: object) -> str | None:
     from jsonschema import Draft202012Validator
 
     error = next(iter(Draft202012Validator(schema).iter_errors(instance)), None)
@@ -544,7 +549,7 @@ class _Audit:
         ))
 
     def best_effort(
-        self, kind: AuditKind, at: datetime, code: ErrorCode | None, detail: str, **kw: Any,
+        self, kind: AuditKind, at: datetime, code: ErrorCode | None, detail: str, **kw: Any,  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     ) -> None:
         try:
             self.emit(kind, at, code, detail, **kw)

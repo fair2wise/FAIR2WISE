@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
@@ -36,6 +36,9 @@ from .legacy import LegacyIndex, doi_key, doi_only
 from .openalex import OpenAlexSettings
 from .safe_fetch import SafeFetcher
 from .store import FileDocumentStore
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +66,7 @@ class AcquireResult:
         return asdict(self)
 
 
-def _f2w_urls() -> Any:
+def _f2w_urls() -> ModuleType:
     # Imported lazily: download_pdfs configures logging when imported (T04 module, kept as-is).
     from . import download_pdfs
 
@@ -120,7 +123,7 @@ class PaperAcquirer:
             logger.warning("stored source for %s failed its checksum; treating as absent", doi_key(doi))
         return None
 
-    def _lookup(self, name: str, url: str, result: AcquireResult, **kw: Any) -> dict[str, Any] | None:
+    def _lookup(self, name: str, url: str, result: AcquireResult, **kw: Any) -> dict[str, Any] | None:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         try:
             response = self.http.get(url, timeout=15.0, **kw)
         except httpx.HTTPError as exc:

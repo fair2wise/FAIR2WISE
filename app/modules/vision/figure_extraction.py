@@ -23,10 +23,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.evidence import EvidenceRef, SourceLocator
-from ..literature.parsed_document import ParsedDocument, ParsedFigure
+from ..literature.parsed_document import PageInfo, ParsedDocument, ParsedFigure
 from .classification import ChatAdapter, classify_text_context
 from .classification_units import Unit, resolve_units
 from .kernels.geometry import spans_inside
@@ -37,6 +37,9 @@ from .qrange import QRangeFinding, read_qranges
 from .results import BLOCKING, EXTRACTION_VERSION, Box, Uncertainty, VisionUnavailable, box4, evidence, locator
 from .scale import ScaleFinding, read_scales
 from .text_layer import FigureTextLayer, open_pdf, render_gray, text_layer_for
+
+if TYPE_CHECKING:
+    from ..literature.pdf_reader import PdfDocument
 
 CAPTION_CHARS = 600
 ALPHABET = "abcdefgh"
@@ -115,7 +118,7 @@ def figure_id_of(figure: ParsedFigure) -> str:
 
 
 def _assign_panels(
-    image: Any, layer: FigureTextLayer, caption: str
+    image: Any, layer: FigureTextLayer, caption: str  # noqa: ANN401  # Any: PIL or numpy image (optional extras, untyped)
 ) -> tuple[list[PanelBox], list[str], list[Uncertainty]]:
     """Segment panels and name them: text-layer letters first, then caption reading order, else unlabelled."""
     height, width = image.shape
@@ -144,9 +147,9 @@ def _assign_panels(
 
 
 def analyze_figure(
-    doc: Any,
+    doc: PdfDocument,
     figure: ParsedFigure,
-    info: Any = None,
+    info: PageInfo | None = None,
     *,
     work_id: str = "",
     source_sha256: str = "",

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 import re
-from typing import Any
 
 from .growth import definitions
 from .vocabulary import CATEGORIES, Vocabulary
@@ -87,7 +86,7 @@ def classify_surface(
     return None
 
 
-def check_context_row(row: Any) -> dict[str, str] | None:
+def check_context_row(row: object) -> dict[str, str] | None:
     """Structural quarantine for an input row: ``{"code", "detail"}`` or ``None`` when well formed."""
     if not isinstance(row, Mapping):
         return {"code": "malformed:not_a_mapping", "detail": type(row).__name__}

@@ -32,6 +32,7 @@ import logging
 from typing import Any
 
 from ..contracts.context import RequestContext
+from ..contracts.json_types import Untyped
 from ..security.disclosure import DisclosureProjector, Viewer
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class LangfuseSettings:
 ClientFactory = Callable[[LangfuseSettings], Any]
 
 
-def default_client_factory(settings: LangfuseSettings) -> Any:
+def default_client_factory(settings: LangfuseSettings) -> Untyped:
     """Build the real client; imports ``langfuse`` lazily (an optional dependency)."""
     try:
         from langfuse import Langfuse  # type: ignore[import-not-found,unused-ignore]
@@ -141,7 +142,7 @@ class LangfuseExporter:
             return None
 
     def _span(self, trace_id: str, name: str, kind: str, *, metadata: Mapping[str, Any] | None = None,
-              input: Any = None, output: Any = None, error: bool = False) -> None:  # noqa: A002 - parameter names mirror the Langfuse observation API (input/output)
+              input: object = None, output: object = None, error: bool = False) -> None:  # noqa: A002 - parameter names mirror the Langfuse observation API (input/output)
         span = self._client.start_observation(
             trace_context={"trace_id": trace_id}, name=name, as_type=kind, input=input, output=output,
             metadata=dict(metadata or {}), level="ERROR" if error else None)

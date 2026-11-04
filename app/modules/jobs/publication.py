@@ -28,7 +28,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.context import ActorKind, RequestContext
@@ -49,6 +49,9 @@ from .publish_ports import (
 from .publish_store import PlanRecord, Pointer, PublishStore
 from .service import JobService
 from .store import JobRecord
+
+if TYPE_CHECKING:
+    from .publish_store import PlanRecord
 
 logger = logging.getLogger(__name__)
 
@@ -224,10 +227,10 @@ class Publication:
         )
 
     @staticmethod
-    def _effect_id(record: Any) -> str:
+    def _effect_id(record: PlanRecord | None) -> str:
         return f"apply:{record.plan.plan_sha256}" if record is not None else "apply:none"
 
-    def _freshness(self, sc: StageContext, record: Any, *, check_target: bool) -> list[str]:
+    def _freshness(self, sc: StageContext, record: Any, *, check_target: bool) -> list[str]:  # noqa: ANN401  # Any: plan record: a PlanRecord or None
         """Reasons the plan no longer matches the world (empty when fresh)."""
         plan, reasons = record.plan, []
         ref = str(self._params(sc)["snapshot_ref"])
@@ -272,7 +275,7 @@ class Publication:
         sc.store.invalidate(sc.lease, sc.job.job_id, PUBLISH_STAGES, f"stale: {text}")
         raise RestartStages(f"plan is stale ({text}); recomputing the plan for a new review")
 
-    def _approval_for(self, sc: StageContext, record: Any) -> ApprovalRecord:
+    def _approval_for(self, sc: StageContext, record: PlanRecord) -> ApprovalRecord:
         now = datetime.fromtimestamp(self.deps.clock(), tz=UTC)
         for approval in reversed(self.store.valid_approvals(sc.job.job_id, record.plan)):
             try:

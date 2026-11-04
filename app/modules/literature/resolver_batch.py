@@ -215,11 +215,11 @@ def _title_year_agree(ref: ReferenceLike, title: str, year: object) -> bool:
         return True
 
 
-def _crossref_year(item: dict[str, Any]) -> Any:
+def _crossref_year(item: dict[str, Any]) -> int | None:
     for name in ("issued", "published-print", "published-online"):
         parts = (item.get(name) or {}).get("date-parts") or [[None]]
         if parts and parts[0] and parts[0][0]:
-            return parts[0][0]
+            return cast(int, parts[0][0])
     return None
 
 
@@ -255,7 +255,7 @@ class BatchResolver:
 
     # -- OpenAlex -------------------------------------------------------------------------------
 
-    def _oa_params(self, **extra: Any) -> dict[str, Any]:
+    def _oa_params(self, **extra: object) -> dict[str, Any]:
         return {"select": OA_SELECT, **extra, **self.openalex.settings.auth_params()}
 
     def _oa_get(self, path: str, params: dict[str, Any]) -> httpx.Response:
@@ -352,7 +352,7 @@ class BatchResolver:
 
     # -- Crossref -------------------------------------------------------------------------------
 
-    def _crossref_params(self, **extra: Any) -> dict[str, Any]:
+    def _crossref_params(self, **extra: object) -> dict[str, Any]:
         return {**extra, **({"mailto": self.mailto} if self.mailto else {})}
 
     def crossref_doi(self, doi: str) -> dict[str, Any] | None:

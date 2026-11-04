@@ -302,7 +302,7 @@ def adopt_legacy_flat_file(
     return outcome
 
 
-def adopt_legacy_directory(storage_kg: Path, *, only: Sequence[str] | None = None, **kwargs: Any) -> list[AdoptionOutcome]:
+def adopt_legacy_directory(storage_kg: Path, *, only: Sequence[str] | None = None, **kwargs: Any) -> list[AdoptionOutcome]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Adopt every top-level entry of ``storage_kg`` that passes; list the rest with the exact rule.
 
     Directories (already nested snapshots) are not entries. Order is by file name, so a run is deterministic.
@@ -370,7 +370,7 @@ def build_adoption_descriptor(repo: Path, data_commit: str, corpus: str, snapsho
     manifest = release.manifest
     base = f"storage/kg/{corpus}/{snapshot_id}"
 
-    def entry(role: str, path: str, art: Any) -> dict[str, Any]:
+    def entry(role: str, path: str, art: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: legacy artifact record (untyped donor structure)
         return {"role": role, "path": path, "sha256": art.sha256, "git_blob": art.git_blob,
                 "size_bytes": len(art.data)}
 

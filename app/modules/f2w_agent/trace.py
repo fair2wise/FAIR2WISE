@@ -26,6 +26,8 @@ import time
 from typing import Any, cast
 import uuid
 
+from ..contracts.json_types import JsonValue
+
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 1
@@ -172,7 +174,7 @@ def bind_context(fn: Callable[..., Any]) -> Callable[..., Any]:
     """
     ctx = contextvars.copy_context()
 
-    def wrapped(*args: Any, **kwargs: Any) -> Any:
+    def wrapped(*args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: decorator pass-through; returns whatever the wrapped callable returns
         return ctx.run(lambda: fn(*args, **kwargs))
 
     return wrapped
@@ -216,13 +218,13 @@ def _secret_values() -> list[str]:
     return found
 
 
-def redact(value: Any) -> Any:
+def redact(value: object) -> JsonValue:
     """Remove API keys, tokens, and known secret values from ``value``."""
     secrets = _secret_values()
     return _redact(value, secrets)
 
 
-def _redact(value: Any, secrets: Sequence[str]) -> Any:
+def _redact(value: object, secrets: Sequence[str]) -> JsonValue:
     if isinstance(value, Mapping):
         cleaned: dict[str, Any] = {}
         for key, item in value.items():
@@ -416,7 +418,7 @@ class TurnTrace:
                     continue
                 current[key] = value
 
-    def note_request(self, **fields: Any) -> None:
+    def note_request(self, **fields: object) -> None:
         """Record request fields given as keyword arguments; see :meth:`merge_request`."""
         self.merge_request(fields)
 
@@ -563,7 +565,7 @@ class TurnTrace:
         with self._lock:
             self.data["errors"].append(entry)
 
-    def attach_response(self, response: Any) -> None:
+    def attach_response(self, response: object) -> None:
         """Copy the final response into the record.
 
         Reads ``answer``, ``publications``, ``pending``, ``status``, ``sufficient``
@@ -678,7 +680,7 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> dict[str, Any
     }
 
 
-def _final_sufficient(response: Mapping[str, Any], retrieval: Mapping[str, Any]) -> Any:
+def _final_sufficient(response: Mapping[str, Any], retrieval: Mapping[str, Any]) -> JsonValue:
     if "sufficient" in response and response.get("sufficient") is not None:
         return response.get("sufficient")
     return retrieval.get("sufficient")
@@ -709,7 +711,7 @@ def _append_jsonl(path: Path, record: Mapping[str, Any]) -> None:
             handle.write(line)
 
 
-def _json_default(value: Any) -> str:
+def _json_default(value: object) -> str:
     return str(value)
 
 
@@ -780,7 +782,7 @@ def finish_turn() -> None:
     collector.finish()
 
 
-def note_request(**fields: Any) -> None:
+def note_request(**fields: object) -> None:
     """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.note_request(**fields))
 
@@ -843,7 +845,7 @@ def record_llm_call(
         logger.warning("Trace LLM record failed: %s", exc)
 
 
-def attach_response(response: Any) -> None:
+def attach_response(response: object) -> None:
     """Module-level wrapper that forwards to the active turn's collector; no-op when no turn is open, the turn is finished, or the collector raises (logged, never propagated)."""
     _call(lambda collector: collector.attach_response(response))
 

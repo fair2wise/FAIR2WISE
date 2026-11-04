@@ -34,7 +34,7 @@ from pathlib import Path
 import shutil
 import threading
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import webbrowser
 
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for
@@ -42,6 +42,10 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from . import harvest_rsoxs as hv  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from ..contracts.json_types import Untyped
+
+if TYPE_CHECKING:
+    from watchdog.events import FileSystemEvent
 
 LOGGER = logging.getLogger("paper_finder")
 
@@ -347,13 +351,13 @@ class StagingWatcher(FileSystemEventHandler):
                 self._detected.append(path)
                 LOGGER.info("Detected download (offer Assign): %s", path.name)
 
-    def on_created(self, event: Any) -> None:
+    def on_created(self, event: FileSystemEvent) -> None:
         """Watchdog hook: record a newly created file."""
         if event.is_directory:
             return
         self._maybe_record(Path(str(event.src_path)))
 
-    def on_moved(self, event: Any) -> None:
+    def on_moved(self, event: FileSystemEvent) -> None:
         """Watchdog hook: record a file moved into the watched folder."""
         if event.is_directory:
             return
@@ -619,7 +623,7 @@ def create_app(state: QueueState) -> Flask:
         )
 
     @app.get("/detected")
-    def detected() -> Any:
+    def detected() -> Untyped:
         """Local staging filenames only. No publisher URLs."""
         st = _state()
         with st.lock:
@@ -627,7 +631,7 @@ def create_app(state: QueueState) -> Flask:
         return jsonify({"detected": names})
 
     @app.post("/action")
-    def action() -> Any:
+    def action() -> Untyped:
         st = _state()
         manifest = st.load_manifest()
         paper, _, _ = st.current(manifest)

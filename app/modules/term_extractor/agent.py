@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_graph(
-    llm: Any = None,  # Any: LangChain chat model
+    llm: Any = None,  # noqa: ANN401  # Any: LangChain chat model
     tools: Sequence[Any] | None = None,  # Any: LangChain tools
 ) -> CompiledStateGraph[MessagesState, None, MessagesState, MessagesState]:
     """Compile a LangGraph that alternates an LLM agent node with a tool node.

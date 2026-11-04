@@ -272,7 +272,7 @@ def _dedupe_urls(urls: Iterable[str]) -> list[str]:
     return out
 
 
-def arxiv_id_from_text(*parts: Any) -> str | None:
+def arxiv_id_from_text(*parts: object) -> str | None:
     """Return the first arXiv id found in the joined text parts, or None."""
     blob = " ".join(str(part or "") for part in parts)
     match = _ARXIV_ID_RE.search(blob)
@@ -507,7 +507,7 @@ def _json_headers() -> dict[str, str]:
     wait=wait_exponential(multiplier=1, min=1, max=45),
     retry=retry_if_exception_type((requests.RequestException,)),
 )
-def _oa_get(url: str, **kwargs: Any) -> requests.Response:
+def _oa_get(url: str, **kwargs: Any) -> requests.Response:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     _respect_rate_limit(url)
     timeout = kwargs.pop("timeout", 15.0)
     response = requests.get(url, timeout=timeout, **kwargs)
@@ -522,7 +522,7 @@ def _oa_get(url: str, **kwargs: Any) -> requests.Response:
     wait=wait_exponential(multiplier=1, min=1, max=45),
     retry=retry_if_exception_type((requests.RequestException,)),
 )
-def _oa_post(url: str, **kwargs: Any) -> requests.Response:
+def _oa_post(url: str, **kwargs: Any) -> requests.Response:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     _respect_rate_limit(url)
     timeout = kwargs.pop("timeout", 30.0)
     response = requests.post(url, timeout=timeout, **kwargs)
@@ -601,7 +601,7 @@ def fetch_semantic_scholar_batch_oa_pdfs(
     return out
 
 
-def select_core_oa_pdfs(payload: Any) -> tuple[list[str], list[str]]:
+def select_core_oa_pdfs(payload: object) -> tuple[list[str], list[str]]:
     """CORE search/work JSON → allowlisted PDF URLs."""
     works: list[dict[str, Any]] = []
     if isinstance(payload, dict):
@@ -651,7 +651,7 @@ def fetch_core_oa_pdfs(doi: str, api_key: str | None, *, timeout: float = 15.0) 
     return select_core_oa_pdfs(body)
 
 
-def select_osti_oa_pdfs(payload: Any) -> tuple[list[str], list[str]]:
+def select_osti_oa_pdfs(payload: object) -> tuple[list[str], list[str]]:
     """OSTI records JSON → allowlisted PURL / repository PDFs."""
     records: list[dict[str, Any]] = []
     if isinstance(payload, list):

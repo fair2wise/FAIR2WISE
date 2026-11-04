@@ -21,12 +21,12 @@ import logging
 from pathlib import Path
 import tempfile
 import time
-from typing import Any
 from urllib.parse import urljoin
 
 import httpx
 
 from ..contracts.context import AuthorizationMode, DeploymentProfile, Principal, RequestContext
+from ..contracts.json_types import JsonValue
 from .safe_fetch import BlockedURL, NetworkPolicy, SafeFetcher
 from .store import FileDocumentStore, StoreError
 
@@ -102,7 +102,7 @@ class JSONFetchError(Exception):
 
 def hardened_get_json(url: str, *, headers: dict[str, str] | None = None, timeout: float = 30.0,
                       policy: NetworkPolicy | None = None, client: httpx.Client | None = None,
-                      max_bytes: int = JSON_MAX_BYTES) -> Any:
+                      max_bytes: int = JSON_MAX_BYTES) -> JsonValue:
     """GET ``url`` and parse the body as JSON under the same egress policy as the PDF fetcher.
 
     Used by the harvest scripts for Crossref and OpenAlex metadata lookups, which previously went through

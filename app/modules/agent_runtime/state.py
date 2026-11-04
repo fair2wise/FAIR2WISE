@@ -76,7 +76,7 @@ class RunContext:
     tools: frozenset[str] | None = None
 
 
-def as_run_context(value: Any) -> RunContext:
+def as_run_context(value: object) -> RunContext:
     """Accept a :class:`RunContext` or a bare ``RequestContext``.
 
     Raises:

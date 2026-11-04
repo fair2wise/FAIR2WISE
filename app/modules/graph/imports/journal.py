@@ -108,7 +108,7 @@ class ImportJournal:
         self.path = Path(path)
         self.clock = clock
 
-    def append(self, event: str, **fields: Any) -> None:
+    def append(self, event: str, **fields: object) -> None:
         """Durably append one record."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         line = json.dumps({"at": self.clock().isoformat(), "event": event, **fields}, sort_keys=True)

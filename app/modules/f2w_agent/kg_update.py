@@ -14,9 +14,13 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib import request
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from ...api.post_extraction import PostExtractionPublisher
+    from ..contracts.context import RequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +92,8 @@ PUBLISH_STATE_BY_STATUS = {
 def publish_extraction(
     terms_json: str,
     *,
-    publisher: Any | None = None,
-    ctx: Any | None = None,
+    publisher: PostExtractionPublisher | None = None,
+    ctx: RequestContext | None = None,
 ) -> dict[str, Any]:
     """Publish the corpus an extraction run just rebuilt (T18E; replaces the Splash wipe-and-reimport, Q11).
 
@@ -118,7 +122,7 @@ def publish_extraction(
             "message": f"{JSON_ONLY_INDICATOR}: no Tiled publication target is configured; "
                        "the Splash graph is not re-imported",
         }
-    result = dict(cast(dict[str, Any], publisher.publish(ctx, terms_json)))
+    result = dict(publisher.publish(ctx, terms_json))
     state = PUBLISH_STATE_BY_STATUS.get(str(result.get("status")))
     if state is not None:
         result.setdefault("publish_state", state)

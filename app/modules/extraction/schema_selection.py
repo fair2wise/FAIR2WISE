@@ -16,9 +16,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
+
+if TYPE_CHECKING:
+    from .record_validation import DocumentValidation
 
 #: Schema sets this module can map onto (explicit selection only). 0.3.1 (T22D) also fills the
 #: normalized-value slots on QuantityValue from ``normalize_quantity`` (D1.4).
@@ -33,7 +36,7 @@ def _record_id(index: int, name: str) -> str:
 
 def validation_from_quantities(
     accepted: Sequence[tuple[ReportedQuantity, EvidenceRecord, TagDecision]],
-) -> Any:
+) -> DocumentValidation:
     """A :class:`~.record_validation.DocumentValidation` of observations for accepted quantities.
 
     Each observation carries its *decided* tag as ``status`` (so 0.3.0
@@ -66,15 +69,15 @@ def validation_from_quantities(
 
 
 def map_to_schema_set(
-    validation: Any,
-    document: Any,
+    validation: object,
+    document: Any,  # noqa: ANN401  # Any: validated document (duck-typed; callers pass the donor or the typed record)
     *,
     work_id: str,
     source_paper: str,
     schema_set: str,
     schema_id: str = DEFAULT_MAPPING_SCHEMA,
     allow_pending_review: bool = False,
-    registry: Any = None,
+    registry: Any = None,  # noqa: ANN401  # Any: schema registry (duck-typed: donor object or typed record)
 ) -> dict[str, Any]:
     """Map accepted records onto ``schema_id@schema_set`` (explicit selection only).
 

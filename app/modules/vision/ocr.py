@@ -44,7 +44,7 @@ class OcrEngine(Protocol):
 
     name: str
 
-    def detect(self, image: Any) -> Sequence[Detection]:  # pragma: no cover - protocol
+    def detect(self, image: object) -> Sequence[Detection]:  # pragma: no cover - protocol
         """Detect text in ``image``."""
 
 
@@ -60,7 +60,7 @@ class RapidOcrEngine:
             raise VisionUnavailable("OCR engine", "install rapidocr-onnxruntime to enable use_ocr") from exc
         self._engine = RapidOCR()
 
-    def detect(self, image: Any) -> Sequence[Detection]:
+    def detect(self, image: object) -> Sequence[Detection]:
         """Run RapidOCR and convert its polygons to axis-aligned boxes."""
         result, _ = self._engine(image)
         out: list[Detection] = []
@@ -114,7 +114,7 @@ class OcrReading:
                 "min_confidence": self.min_confidence}
 
 
-def read_figure_text(image: Any, frame: FigureFrame, *, engine: OcrEngine, page: int = 0,
+def read_figure_text(image: object, frame: FigureFrame, *, engine: OcrEngine, page: int = 0,
                      detections: Sequence[Detection] | None = None,
                      min_confidence: float = MIN_CONFIDENCE) -> OcrReading:
     """OCR the rendered figure and return spans in the figure's page frame (points, top-left)."""
@@ -131,7 +131,7 @@ def read_figure_text(image: Any, frame: FigureFrame, *, engine: OcrEngine, page:
     return OcrReading(tuple(spans), tuple(confs), getattr(engine, "name", type(engine).__name__))
 
 
-def read_bar_labels(image: Any, frame: FigureFrame, *, engine: OcrEngine, page: int = 0,
+def read_bar_labels(image: object, frame: FigureFrame, *, engine: OcrEngine, page: int = 0,
                     detections: Sequence[Detection] | None = None) -> OcrReading:
     """The subset of OCR spans that read as a length (e.g. ``"200 nm"``): candidate bar labels."""
     full = read_figure_text(image, frame, engine=engine, page=page, detections=detections)

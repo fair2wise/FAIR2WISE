@@ -101,7 +101,7 @@ def link_properties(graph_id: str, edge_key: str, data: Mapping[str, Any]) -> di
     return {**body, OWNER_KEY: LITERATURE_OWNER, GRAPH_KEY: graph_id, EDGE_KEY: edge_key}
 
 
-def edge_id(subject: Any, predicate: Any, obj: Any, occurrence: int = 0) -> str:
+def edge_id(subject: object, predicate: object, obj: object, occurrence: int = 0) -> str:
     """Stable id of the ``occurrence``-th edge with this triple in its graph."""
     digest = hashlib.sha256(json.dumps([subject, predicate, obj], ensure_ascii=False).encode()).hexdigest()[:32]
     return f"e:{digest}" if occurrence == 0 else f"e:{digest}#{occurrence}"

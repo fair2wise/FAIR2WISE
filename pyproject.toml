@@ -161,7 +161,9 @@ extend-exclude = ["app/modules/legacy", "app/graphify-out", "ui", "storage", "pa
 [tool.ruff.lint]
 # UP: pyupgrade (builtin generics, X | None); T20: print(); PTH: pathlib over os.path;
 # D: pydocstyle (Google convention, ALS dev standards section 2).
-select = ["UP", "T20", "PTH", "D"]
+# ANN401: no bare `Any` in a signature. Use JsonValue/JsonObject/Untyped from app.modules.contracts.json_types
+# or a real type; where Any is right, say why on the line: `# noqa: ANN401  # Any: <reason>` (T27, F1.4).
+select = ["UP", "T20", "PTH", "D", "ANN401"]
 ignore = [
   "D105",  # magic-method docstrings add noise
   "D107",  # __init__ is documented on the class
@@ -171,11 +173,11 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "T20"]
-"scripts/**" = ["D", "T20"]
-"examples/**" = ["D", "T20"]
+"tests/**" = ["D", "T20", "ANN401"]
+"scripts/**" = ["D", "T20", "ANN401"]
+"examples/**" = ["D", "T20", "ANN401"]
 # Byte-pinned to the T19A baseline (see the mypy override for corpus_qa below).
-"app/modules/commands/corpus_qa.py" = ["D", "T20", "UP", "PTH"]
+"app/modules/commands/corpus_qa.py" = ["D", "T20", "UP", "PTH", "ANN401"]
 
 [tool.isort]
 # ALS section 3: stdlib, third-party, local, alphabetical inside each group (`import x` and

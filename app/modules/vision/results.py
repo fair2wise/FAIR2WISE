@@ -73,7 +73,7 @@ def locator(page: int | None, figure: str | None = None, panel: str | None = Non
     )
 
 
-def evidence(work_id: str, source_sha256: str, loc: SourceLocator, kind: str, value: Any = "") -> EvidenceRef:
+def evidence(work_id: str, source_sha256: str, loc: SourceLocator, kind: str, value: object = "") -> EvidenceRef:
     """A derived-finding evidence record (no quote: the value is derived, not quoted)."""
     key = f"{work_id}|{source_sha256}|{kind}|{loc.model_dump_json()}|{value}"
     digest = hashlib.sha256(key.encode()).hexdigest()

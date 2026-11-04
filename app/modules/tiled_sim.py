@@ -104,7 +104,7 @@ def load_seed(path: Path | None = None) -> dict[str, Any]:
     return data
 
 
-def _choice(rng: random.Random, items: Sequence[Any]) -> Any:
+def _choice[T](rng: random.Random, items: Sequence[T]) -> T:
     """Return a uniformly random item from a non-empty sequence."""
     if not items:
         raise ValueError("empty choice list")

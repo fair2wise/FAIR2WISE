@@ -27,11 +27,14 @@ import hashlib
 import logging
 from pathlib import Path
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .ingested import IngestedLookup
 from .intake import INGESTABLE, RETRYABLE, IntakeReport
 from .safe_fetch import LocalIntakePolicy
+
+if TYPE_CHECKING:
+    from .journal import IngestJournal
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +95,7 @@ def list_pdfs(folder: Path, *, glob: str = "*.pdf", limit: int = 0) -> list[Path
 
 
 def ingest_folder(
-    folder: Any,
+    folder: object,
     *,
     policy: LocalIntakePolicy,
     intake: Callable[[Path], IntakeReport],
@@ -101,7 +104,7 @@ def ingest_folder(
     files: Sequence[Path] | None = None,
     glob: str = "*.pdf",
     limit: int = 0,
-    journal: Any = None,
+    journal: IngestJournal | None = None,
     job_id: str = "",
     already_ingested: IngestedLookup | None = None,
     pipeline: str = "",
@@ -159,7 +162,7 @@ def _process(
     intake: Callable[[Path], IntakeReport],
     apply: bool,
     ingest_one: Callable[[IntakeReport], dict[str, Any]] | None,
-    journal: Any,
+    journal: IngestJournal | None,
     job_id: str,
     already_ingested: IngestedLookup | None,
     pipeline: str,

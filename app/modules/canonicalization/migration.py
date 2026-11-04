@@ -25,13 +25,16 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from .campaign.models import Decision, TermEvidence
 from .gates import ApplyRefused, authorize_apply
 from .merge_safety import check_merge
 from .vocabulary import Vocabulary
+
+if TYPE_CHECKING:
+    from ..contracts.json_types import JsonValue
 
 PLAN_VERSION = "t07-plan-1"
 MAX_PLAN_OPS = 500
@@ -79,7 +82,7 @@ class MergeTarget(Protocol):
         ...
 
 
-def sha256_json(value: Any) -> str:
+def sha256_json(value: object) -> str:
     """Return the SHA-256 hex digest of ``value`` as canonical JSON (sorted keys, compact, sets as lists)."""
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=list).encode()
@@ -242,7 +245,7 @@ def plan_migration(
     return PlanDraft(plan, tuple(held))
 
 
-def unsafe_reason(entry: Any, variants: Sequence[str]) -> str:
+def unsafe_reason(entry: JsonValue, variants: Sequence[str]) -> str:
     """Why folding ``variants`` into ``entry`` is refused, or ``""``. Every variant must be safe."""
     names = (entry.display_name, *entry.aliases)
     for variant in variants:

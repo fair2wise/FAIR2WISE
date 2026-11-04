@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:  # lazy exports to keep import light; Any: the lazily imported class
+def __getattr__(name: str) -> Any:  # noqa: ANN401  # Any: PEP 562 lazy-export hook; the lazily imported class depends on the name
     """Load Academy agent classes on first attribute access."""
     if name == "RetrievalAgent":
         from .retrieval_agent import RetrievalAgent

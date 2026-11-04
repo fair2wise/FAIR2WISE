@@ -30,7 +30,7 @@ class OperationalDB:
         schema: SQL script run once at open (``CREATE TABLE IF NOT EXISTS ...``).
     """
 
-    def __init__(self, path: Any, *, busy_timeout: float = 30.0, schema: Sequence[str] = ()) -> None:
+    def __init__(self, path: object, *, busy_timeout: float = 30.0, schema: Sequence[str] = ()) -> None:
         target = str(path)
         if target != ":memory:":
             Path(target).parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +75,7 @@ class OperationalDB:
         with self._lock:
             return self._con.execute(sql, tuple(params)).fetchall()
 
-    def one(self, sql: str, params: Sequence[Any] = ()) -> Any:
+    def one(self, sql: str, params: Sequence[Any] = ()) -> Any:  # noqa: ANN401  # Any: first row of a caller-chosen statement, or None; aggregate-query callers index it without a None check
         """Run a read-only statement and return the first row or ``None``."""
         with self._lock:
             return self._con.execute(sql, tuple(params)).fetchone()

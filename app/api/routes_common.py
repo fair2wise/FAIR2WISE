@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.contracts.json_types import JsonValue
 from .auth import fresh_request_context, request_context
 from .operations import F2WOperations
 
@@ -34,15 +35,15 @@ class Prefixed:
         self.app = app
         self.prefix = prefix
 
-    def get(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+    def get(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``app.get(prefix + path)``."""
         return self.app.get(self.prefix + path, **kw)
 
-    def post(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+    def post(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``app.post(prefix + path)``."""
         return self.app.post(self.prefix + path, **kw)
 
-    def put(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+    def put(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``app.put(prefix + path)``."""
         return self.app.put(self.prefix + path, **kw)
 
@@ -69,7 +70,7 @@ def fresh_context(request: Request) -> RequestContext:
     return ctx
 
 
-def project(request: Request, payload: Any) -> Any:
+def project(request: Request, payload: JsonValue) -> JsonValue:
     """Project a ``/v1`` body with the app's one disclosure projector (D19, AUD-06).
 
     :meth:`~app.modules.security.disclosure.DisclosureProjector.project_api_response`:
@@ -83,13 +84,13 @@ def project(request: Request, payload: Any) -> Any:
     return guard.projector.project_api_response(payload)
 
 
-def project_dict(request: Request, payload: Any) -> dict[str, Any]:
+def project_dict(request: Request, payload: object) -> dict[str, Any]:
     """:func:`project` for a route declared to return a JSON object."""
     projected: dict[str, Any] = project(request, payload)
     return projected
 
 
-def dump(model: Any) -> Any:
+def dump(model: object) -> JsonValue:
     """JSON-ready form of a Pydantic model (other values unchanged)."""
     return model.model_dump(mode="json") if hasattr(model, "model_dump") else model
 

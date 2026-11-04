@@ -17,7 +17,7 @@ MAX_LLM_PAGES = 8
 MAX_PAGE_CHARS = 7000
 
 
-def _tokens(text: Any) -> set[str]:
+def _tokens(text: object) -> set[str]:
     """Return lowercase alphanumeric tokens, dropping common question stopwords."""
     return {
         token

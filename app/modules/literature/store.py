@@ -156,7 +156,7 @@ def ref_for_bytes(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def atomic_write_json(path: Path, payload: Any) -> None:
+def atomic_write_json(path: Path, payload: object) -> None:
     """Write JSON to ``path`` through a temp file in the same directory, then rename."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-", suffix=".json")

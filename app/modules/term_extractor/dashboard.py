@@ -8,11 +8,14 @@ from pathlib import Path
 import queue
 import threading
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from flask import Flask, Response, request, send_from_directory
 
 from .message import Log, Registration, Stats, UserPrompt
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 _ASSETS_PATH = Path(__file__).parent / 'assets'
 _ASSETS_DIR = str(_ASSETS_PATH)
@@ -1233,7 +1236,7 @@ class Dashboard:
         """Dismiss a prompt by submitting an empty response."""
         self.submit_response(prompt_id, '')
 
-    def set_shutdown_callback(self, callback: Any) -> None:
+    def set_shutdown_callback(self, callback: object) -> None:
         """Set a callable(agent_id: str) invoked when the power button is clicked."""
         self._shutdown_callback = callback
 
@@ -1252,7 +1255,7 @@ class Dashboard:
             except ValueError:
                 logger.debug("subscriber already removed")
 
-    def _broadcast(self, event: str, data: Any) -> None:
+    def _broadcast(self, event: str, data: object) -> None:
         msg = f'event: {event}\ndata: {json.dumps(data)}\n\n'
         with self._lock:
             dead = []
@@ -1285,7 +1288,7 @@ class Dashboard:
         def events() -> Response:
             q = self._subscribe()
 
-            def stream() -> Any:
+            def stream() -> Iterator[str]:
                 try:
                     yield f'event: init\ndata: {json.dumps(self._snapshot())}\n\n'
                     while True:

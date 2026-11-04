@@ -33,7 +33,7 @@ import hashlib
 import json
 import logging
 import threading
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode
@@ -46,6 +46,9 @@ from .model_port import ModelCallError, ModelPort, ModelRef, ModelReply
 from .models import CaseState, ResolutionAttempt, Route
 from .review_schema import ReviewParseError, parse_review_response, validate_resolution
 from .store import CurationStore
+
+if TYPE_CHECKING:
+    from ..agent_runtime.admission import Admission
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +142,7 @@ class ModelResolver:
         route: Route,
         ref: ModelRef,
         settings: ResolverSettings,
-        admission: Any,
+        admission: Admission,
         approval: CostApproval | None = None,
         outbound_policy: OutboundPolicy | None = None,
         recorder: AuditRecorder | None = None,
@@ -264,7 +267,7 @@ class ModelResolver:
             return
         self._record(case, token, reply, fingerprint, result)
 
-    def _record(self, case: dict[str, Any], token: str, reply: Any, fingerprint: str, result: RunResult) -> None:
+    def _record(self, case: dict[str, Any], token: str, reply: Any, fingerprint: str, result: RunResult) -> None:  # noqa: ANN401  # Any: ModelReply, or None on the error path; narrowing it needs a control-flow change
         cost = 0.0 if self.ref.local else reply.cost_usd  # only a local model is known to be free
         base: dict[str, Any] = dict(
             case_id=case["id"],
@@ -310,7 +313,7 @@ class ModelResolver:
         )
 
     def _note(
-        self, case: dict[str, Any], reply: Any, error: ModelCallError | None, reservation: str | None
+        self, case: dict[str, Any], reply: Any, error: ModelCallError | None, reservation: str | None  # noqa: ANN401  # Any: ModelReply, or None on the error path; narrowing it needs a control-flow change
     ) -> None:
         if self.recorder is None:
             return

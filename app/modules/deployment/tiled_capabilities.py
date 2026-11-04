@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 import hashlib
 import json
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from .tiled_config import (
     PINNED_TILED_VERSION,
@@ -33,6 +33,9 @@ from .tiled_config import (
     normalize_base_url,
     read_secret_file,
 )
+
+if TYPE_CHECKING:
+    import requests
 
 GRAPHQL_PATH = "/api/graphql"
 ABOUT_PATH = "/api/v1/"
@@ -174,7 +177,8 @@ def _auth_header(credential: str | None, scheme: str) -> dict[str, str]:
 class _Http:
     """Tiny wrapper so every request has a timeout and TLS setting, and errors map to codes."""
 
-    def __init__(self, base: str, *, session: Any = None, timeout: float = 10.0, verify: Any = True):
+    def __init__(self, base: str, *, session: requests.Session | None = None, timeout: float = 10.0,
+                 verify: bool | str = True):
         if session is None:
             import requests
 
@@ -185,7 +189,8 @@ class _Http:
         self.timeout = timeout
         self.verify = verify
 
-    def request(self, method: str, path: str, **kwargs: Any) -> Any:
+    def request(self, method: str, path: str,
+                **kwargs: Any) -> Any:  # noqa: ANN401  # Any: forwarded to requests.Session.request; returns its Response
         import requests
 
         try:
@@ -230,7 +235,7 @@ def _type_names(http: _Http, name: str, headers: Mapping[str, str]) -> tuple[str
     return tuple(sorted(str(row.get("name")) for row in rows if isinstance(row, dict)))
 
 
-def check_health(base_url: str, *, session: Any = None, timeout: float = 2.0) -> bool:
+def check_health(base_url: str, *, session: requests.Session | None = None, timeout: float = 2.0) -> bool:
     """``GET /healthz`` returns ``{"status": "ready"}`` (process liveness only)."""
     http = _Http(normalize_base_url(base_url), session=session, timeout=timeout)
     try:
@@ -250,9 +255,9 @@ def check_capabilities(
     credential: str | None = None,
     scheme: str = "Apikey",
     require_writer_role: str | None = None,
-    session: Any = None,
+    session: requests.Session | None = None,
     timeout: float = 10.0,
-    verify: Any = True,
+    verify: bool | str = True,
 ) -> CapabilityReport:
     """Run C1-C4 and C6 against ``base_url`` (read-only).
 
@@ -391,7 +396,7 @@ def _check_writer(http: _Http, headers: Mapping[str, str], providers: tuple[str,
     return str(principal["uuid"]), roles
 
 
-def connect_external(cfg: ExternalTiledConfig, *, session: Any = None) -> CapabilityReport:
+def connect_external(cfg: ExternalTiledConfig, *, session: requests.Session | None = None) -> CapabilityReport:
     """Connect to an external (central or fixture) Tiled: check it, never manage it.
 
     Reads the writer credential from ``cfg.writer_secret_file`` at call time. On an

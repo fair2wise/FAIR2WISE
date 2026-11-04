@@ -41,8 +41,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
 import logging
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
+
+if TYPE_CHECKING:
+    import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +195,7 @@ class TiledIdentityPort(Protocol):
         ...
 
 
-def identity_from_whoami(payload: Any, *, issuer: str, now: datetime,
+def identity_from_whoami(payload: object, *, issuer: str, now: datetime,
                          credential_expires_at: datetime | None = None,
                          tiled_library_version: str | None = None) -> VerifiedIdentity:
     """Map a tiled 0.2.18 ``whoami`` JSON body to a :class:`VerifiedIdentity`.
@@ -272,7 +275,7 @@ class TiledWhoamiAdapter:
       scopes for Tiled's own checks until it expires.
     """
 
-    def __init__(self, tiled_target: str, http_client: Any, *, timeout: float = 5.0) -> None:
+    def __init__(self, tiled_target: str, http_client: httpx.Client, *, timeout: float = 5.0) -> None:
         self.tiled_target = normalize_tiled_target(tiled_target)
         self._client = http_client
         self._timeout = timeout
@@ -324,7 +327,7 @@ class TiledWhoamiAdapter:
                                     tiled_library_version=self.library_version())
 
 
-def _detail(response: Any) -> str:
+def _detail(response: httpx.Response) -> str:
     """Return the FastAPI ``detail`` string of an error response, or ``""``."""
     try:
         body = response.json()

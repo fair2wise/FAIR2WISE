@@ -35,9 +35,15 @@ from enum import StrEnum
 import json
 import os
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from .mode import RuntimeConfigError
+
+if TYPE_CHECKING:
+    from langchain_core.messages import AIMessage
+    from ..agent_runtime.chat_model import BoundChatModel
+    from ..agent_runtime.chat_model import ChatModel
+    from collections.abc import Sequence
 
 QA_ROUTE_ENV = "F2W_QA_ROUTE"
 PLANNING_LABEL = "supervisor-plan"
@@ -82,14 +88,14 @@ class PinnedArgsService:
     unchanged. Every other attribute is the wrapped service's.
     """
 
-    def __init__(self, inner: Any) -> None:
+    def __init__(self, inner: Any) -> None:  # noqa: ANN401  # Any: legacy QA service (untyped donor object)
         self.inner = inner
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> Any:  # noqa: ANN401  # Any: attribute delegation to the wrapped legacy service
         return getattr(self.inner, name)
 
-    async def query(self, question: str, *, history: Any = None, source_rag: Any = None,
-                    use_live_tiled: Any = None) -> Any:
+    async def query(self, question: str, *, history: Sequence[Mapping[str, str]] | None = None, source_rag: object = None,
+                    use_live_tiled: object = None) -> Any:  # noqa: ANN401  # Any: legacy verdict (untyped donor structure)
         """Run the wrapped service's query, substituting the pinned turn's arguments if one is set."""
         pinned = _PINNED.get()
         if pinned is not None:
@@ -113,12 +119,12 @@ def unpin_args(token: contextvars.Token[dict[str, Any] | None]) -> None:
 
 # -- traced planning model --------------------------------------------------------
 
-def _role(message: Any) -> str:
+def _role(message: object) -> str:
     return {"system": "system", "human": "user", "ai": "assistant", "tool": "tool"}.get(
         str(getattr(message, "type", "")), str(getattr(message, "type", "")))
 
 
-def _content(message: Any) -> str:
+def _content(message: object) -> str:
     content = getattr(message, "content", "")
     text = content if isinstance(content, str) else json.dumps(content, default=str)
     calls = getattr(message, "tool_calls", None)
@@ -128,7 +134,7 @@ def _content(message: Any) -> str:
     return text
 
 
-def _record(model: Any, messages: Sequence[Any], reply: Any, started: float,
+def _record(model: object, messages: Sequence[Any], reply: object, started: float,
             error: BaseException | None) -> None:
     from ..f2w_agent.trace import record_llm_call
 
@@ -147,11 +153,11 @@ class _BoundPlanner:
         self.owner = owner
         self.tools = tools
 
-    def _bound(self) -> Any:
+    def _bound(self) -> tuple[ChatModel, BoundChatModel]:
         model = self.owner.current()
         return model, (model.bind_tools(self.tools) if self.tools else model)
 
-    def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> AIMessage:
         model, bound = self._bound()
         started = time.perf_counter()
         try:
@@ -162,7 +168,7 @@ class _BoundPlanner:
         _record(model, messages, reply, started, None)
         return reply
 
-    async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> AIMessage:
         model, bound = self._bound()
         started = time.perf_counter()
         try:
@@ -183,36 +189,36 @@ class TracedPlanningModel:
             never at construction, so building this handle needs no credentials.
     """
 
-    def __init__(self, provider: Callable[[], Any]) -> None:
+    def __init__(self, provider: Callable[[], ChatModel]) -> None:
         self._provider = provider
 
-    def current(self) -> Any:
+    def current(self) -> ChatModel:
         """Return the chat model the provider resolves right now."""
         return self._provider()
 
-    def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> _BoundPlanner:
+    def bind_tools(self, tools: Sequence[Any], **kwargs: object) -> _BoundPlanner:
         """Return a traced planner bound to `tools`; extra keyword arguments are ignored."""
         return _BoundPlanner(self, list(tools))
 
-    def invoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    def invoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> AIMessage:
         """Invoke the current model on `messages` through a traced planner with no tools bound."""
         return _BoundPlanner(self, []).invoke(messages, *args, **kwargs)
 
-    async def ainvoke(self, messages: Sequence[Any], *args: Any, **kwargs: Any) -> Any:
+    async def ainvoke(self, messages: Sequence[Any], *args: object, **kwargs: object) -> AIMessage:
         """Async variant of :meth:`invoke`."""
         return await _BoundPlanner(self, []).ainvoke(messages, *args, **kwargs)
 
 
-def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
+def pipeline_planning_model(pipeline: object) -> Callable[[], ChatModel]:
     """Provider of the planning chat model for ``pipeline``'s current backend and model.
 
     Reuses the existing LangChain builder ``term_extractor.Orchestrator._build_llm``
     (CBORG with the fail-closed key check, or Ollama). Built lazily on the first
     planning call and rebuilt when the UI settings change backend or model.
     """
-    cache: dict[Any, Any] = {}
+    cache: dict[tuple[str, str], ChatModel] = {}
 
-    def current() -> Any:
+    def current() -> ChatModel:
         runtime = getattr(pipeline, "runtime", None)
         backend = str(getattr(runtime, "backend", None) or "cborg")
         active = getattr(pipeline, "_active_model", None)
@@ -230,7 +236,8 @@ def pipeline_planning_model(pipeline: Any) -> Callable[[], Any]:
                 ollama_url=str(getattr(cfg, "ollama_url", None) or "http://localhost:11434"),
             )
             cache.clear()
-            cache[key] = Orchestrator._build_llm(cast(Orchestrator, spec))  # duck-typed self: reads only these attributes
+            # duck-typed self: reads only these attributes; the LangChain model satisfies ChatModel structurally
+            cache[key] = cast(ChatModel, Orchestrator._build_llm(cast(Orchestrator, spec)))
         return cache[key]
 
     return current

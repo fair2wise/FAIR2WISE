@@ -25,7 +25,7 @@ from collections.abc import Callable, Sequence
 from datetime import timedelta
 import logging
 import re
-from typing import Any, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Any, NamedTuple, Protocol
 import uuid
 
 from ..contracts.context import RequestContext
@@ -47,6 +47,9 @@ from .orientation import OrientationStatement, find_statements, read_orientation
 from .results import VisionUnavailable, locator
 from .skill import VISION_TOOL_NAMES as _SKILL_NAMES
 from .tables import extract_tables
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,7 @@ class PaperSource(Protocol):
 class StoredPaperSource:
     """:class:`PaperSource` over the T05 store, legacy index and parse service (stored papers only)."""
 
-    def __init__(self, store: Any, index: Any, parse_service: Any) -> None:
+    def __init__(self, store: Any, index: Any, parse_service: Any) -> None:  # noqa: ANN401  # Any: duck-typed source store (tests inject fakes)
         self.store, self.index, self.parse_service = store, index, parse_service
 
     def load(self, ctx: RequestContext, doi: str) -> LoadedPaper:
@@ -220,7 +223,7 @@ class VisionToolset:
         return tuple(zip(self.specs, fns))
 
     # -- shared -------------------------------------------------------------------------------------------
-    def _load(self, inv: Any, kinds: Sequence[SourceKind]) -> LoadedPaper:
+    def _load(self, inv: ToolInvocation, kinds: Sequence[SourceKind]) -> LoadedPaper:
         if self.scope_provider is None:
             raise ContractError(ErrorCode.DENIED, "no trusted source-access scope is configured", retryable=False)
         scope = self.scope_provider(inv.ctx)
@@ -229,14 +232,14 @@ class VisionToolset:
             scope.require(kind, work_id=key)
         return self.source.load(inv.ctx, inv.args["doi"])
 
-    def _outcome(self, inv: Any, paper: LoadedPaper) -> ExtractionOutcome:
+    def _outcome(self, inv: ToolInvocation, paper: LoadedPaper) -> ExtractionOutcome:
         a = inv.args
         figure_ids = (a["figure_id"],) if a.get("figure_id") else ()
         return extract_figures(paper.document, paper.pdf_bytes, work_id=paper.work_id, figure_ids=figure_ids,
                                page=a.get("page"), use_ocr=bool(a.get("use_ocr", False)),
                                ocr_engine=self.ocr_engine, model=self.model)
 
-    def _figures_result(self, tool: str, inv: Any, paper: LoadedPaper, outcome: ExtractionOutcome,
+    def _figures_result(self, tool: str, inv: ToolInvocation, paper: LoadedPaper, outcome: ExtractionOutcome,
                         render: Callable[[FigureAnalysis], dict[str, Any]]) -> ToolResult:
         a = inv.args
         provenance = f"vision:{uuid.uuid4().hex}"
@@ -267,7 +270,7 @@ class VisionToolset:
         return ToolResult(tool=tool, status=ToolStatus.PARTIAL if (warnings or any_unc) else ToolStatus.OK,
                           data=data, evidence=outcome.evidence, warnings=tuple(warnings), provenance_id=provenance)
 
-    def _run(self, tool: str, inv: Any, render: Callable[[FigureAnalysis], dict[str, Any]],
+    def _run(self, tool: str, inv: ToolInvocation, render: Callable[[FigureAnalysis], dict[str, Any]],
              kinds: Sequence[SourceKind] = _FIG_KINDS) -> ToolResult:
         try:
             paper = self._load(inv, kinds)
@@ -281,7 +284,7 @@ class VisionToolset:
                 "geometry": f.geometry, "text_layer": {"status": f.text_status, "n_spans": f.n_text_spans},
                 "uncertainties": [u.as_dict() for u in f.uncertainties]}
 
-    def _panels(self, f: FigureAnalysis, inv: Any, pick: Callable[[Any], dict[str, Any]]) -> dict[str, Any]:
+    def _panels(self, f: FigureAnalysis, inv: ToolInvocation, pick: Callable[[Any], dict[str, Any]]) -> dict[str, Any]:
         want = inv.args.get("panel")
         rows = [{"panel_id": p.panel_id, "label": p.label or None, "label_source": p.label_source,
                  "locator": p.locator.model_dump(exclude_none=True), **pick(p)}
@@ -289,11 +292,11 @@ class VisionToolset:
         return {**self._head(f), "panels": rows}
 
     # -- tools --------------------------------------------------------------------------------------------
-    def extract_figures(self, inv: Any) -> ToolResult:
+    def extract_figures(self, inv: ToolInvocation) -> ToolResult:
         """``vision_extract_figures``."""
         return self._run(VISION_TOOL_NAMES[0], inv, lambda f: f.as_dict())
 
-    def classify_figure(self, inv: Any) -> ToolResult:
+    def classify_figure(self, inv: ToolInvocation) -> ToolResult:
         """``vision_classify_figure``: figure verdict, panel verdicts and the units a consumer should act on."""
         def render(f: FigureAnalysis) -> dict[str, Any]:
             row = self._panels(f, inv, lambda p: {"classification": p.classification})
@@ -301,19 +304,19 @@ class VisionToolset:
                     "classification_units": list(f.classification_units)}
         return self._run(VISION_TOOL_NAMES[1], inv, render)
 
-    def read_scale(self, inv: Any) -> ToolResult:
+    def read_scale(self, inv: ToolInvocation) -> ToolResult:
         """``vision_read_scale``."""
-        def pick(p: Any) -> dict[str, Any]:
+        def pick(p: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: panel record (analysis result structure)
             return {"scale": p.scale.as_dict() if p.scale else None}
         return self._run(VISION_TOOL_NAMES[2], inv, lambda f: self._panels(f, inv, pick))
 
-    def read_qrange(self, inv: Any) -> ToolResult:
+    def read_qrange(self, inv: ToolInvocation) -> ToolResult:
         """``vision_read_qrange``."""
-        def pick(p: Any) -> dict[str, Any]:
+        def pick(p: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: panel record (analysis result structure)
             return {"q_range": p.qrange.as_dict() if p.qrange else None}
         return self._run(VISION_TOOL_NAMES[3], inv, lambda f: self._panels(f, inv, pick))
 
-    def read_orientation(self, inv: Any) -> ToolResult:
+    def read_orientation(self, inv: ToolInvocation) -> ToolResult:
         """``vision_read_orientation``: source statements (caption + citing prose) and inference candidates."""
         tool = VISION_TOOL_NAMES[4]
         try:
@@ -348,7 +351,7 @@ class VisionToolset:
         except Exception as exc:  # noqa: BLE001 - any extractor failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(tool, exc)
 
-    def extract_tables(self, inv: Any) -> ToolResult:
+    def extract_tables(self, inv: ToolInvocation) -> ToolResult:
         """``vision_extract_tables``."""
         tool = VISION_TOOL_NAMES[5]
         try:
