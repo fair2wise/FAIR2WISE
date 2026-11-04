@@ -328,7 +328,7 @@ def _detail(response: Any) -> str:
     """Return the FastAPI ``detail`` string of an error response, or ``""``."""
     try:
         body = response.json()
-    except ValueError:
+    except ValueError:  # an error body that is not JSON has no detail
         return ""
     detail = body.get("detail") if isinstance(body, Mapping) else None
     return detail if isinstance(detail, str) else ""

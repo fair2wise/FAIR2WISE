@@ -48,7 +48,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
         return {}
     try:
         obj = json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # reply is not JSON: no object
         return {}
     return obj if isinstance(obj, dict) else {}
 
@@ -72,7 +72,7 @@ def _selected_indices(value: Any, candidate_count: int) -> list[int]:
     for item in value:
         try:
             idx = int(item)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # non-integer model output is ignored
             continue
         if 0 <= idx < candidate_count and idx not in indices:
             indices.append(idx)

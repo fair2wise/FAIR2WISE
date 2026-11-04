@@ -335,7 +335,7 @@ class LiteratureToolset:
         wanted = [d.strip() for d in inv.args["dois"].split(",") if d.strip()]
         try:
             lookup = self.client.lookup_dois(wanted)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any client failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(LIT_GET_PAPERS_BY_DOI.name, exc)
         if lookup.unavailable and not lookup.papers and not lookup.not_found:
             return _failure(LIT_GET_PAPERS_BY_DOI.name, ProviderUnavailable("openalex", "unreachable"))
@@ -355,7 +355,7 @@ class LiteratureToolset:
             found = self.client.find_citing_papers(
                 inv.args["openalex_id"], max_results=min(int(inv.args.get("max_results", 10)), MAX_PAPERS)
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any client failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(LIT_FIND_CITING_PAPERS.name, exc)
         return _papers(LIT_FIND_CITING_PAPERS.name, found)
 
@@ -365,7 +365,7 @@ class LiteratureToolset:
             found = self.client.find_related_papers(
                 inv.args["paper_id"], max_results=min(int(inv.args.get("max_results", 10)), 20)
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any client failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(LIT_FIND_RELATED_PAPERS.name, exc)
         return _papers(LIT_FIND_RELATED_PAPERS.name, found)
 
@@ -390,7 +390,7 @@ class LiteratureToolset:
             overview = self.reader.read_paper(inv.ctx, inv.args["doi"], scope=self._scope(inv.ctx))
         except (ContractError, ParseFailed) as exc:
             return _failure(LIT_READ_PAPER.name, exc)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any client failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(LIT_READ_PAPER.name, exc)
         data = overview.as_dict()
         data["hint"] = "Call lit_read_paper_section for the text of one section."
@@ -406,7 +406,7 @@ class LiteratureToolset:
             section = self.reader.read_paper_section(
                 inv.ctx, inv.args["doi"], inv.args["section"], scope=self._scope(inv.ctx)
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any client failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(LIT_READ_PAPER_SECTION.name, exc)
         return ToolResult(
             tool=LIT_READ_PAPER_SECTION.name,

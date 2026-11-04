@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -20,6 +21,8 @@ from pydantic import BaseModel, ConfigDict
 from app.modules.contracts.changes import ImportReceipt
 
 from ..ports import ContractError, ErrorCode
+
+logger = logging.getLogger(__name__)
 
 
 class ReceiptExtras(BaseModel):
@@ -128,7 +131,8 @@ class ReceiptStore:
         for path in sorted(self.root.glob("*.json")) if self.root.exists() else []:
             try:
                 out.append(self.read(path.stem))
-            except ContractError:
+            except ContractError as exc:
+                logger.debug("unreadable import receipt skipped: %s", type(exc).__name__)
                 continue
         return out
 

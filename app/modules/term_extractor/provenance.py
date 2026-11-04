@@ -111,7 +111,7 @@ def extract_snippets_json_from_text(text: str) -> dict[str, Any]:
             obj = json.loads(snippet)
             if isinstance(obj, dict) and "snippets" in obj:
                 return obj
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # this snippet is not JSON: try the next
             continue
     return {"snippets": []}
 

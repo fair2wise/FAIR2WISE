@@ -41,7 +41,7 @@ from flask import Flask, jsonify, redirect, render_template_string, request, url
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from . import harvest_rsoxs as hv  # noqa: E402
+from . import harvest_rsoxs as hv  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 
 LOGGER = logging.getLogger("paper_finder")
 
@@ -312,7 +312,7 @@ def _wait_for_stable_file(
     for _ in range(checks * 6):
         try:
             size = path.stat().st_size
-        except FileNotFoundError:
+        except FileNotFoundError:  # the file vanished while settling
             return False
         if size == last_size and size > 0:
             stable_count += 1

@@ -172,7 +172,8 @@ def extract_python_blocks(source: str) -> list[SourceBlock]:
     """Extract exact function/class source blocks from Python source."""
     try:
         tree = ast.parse(source)
-    except SyntaxError:
+    except SyntaxError as exc:
+        logger.debug("python source does not parse; no blocks: %s", type(exc).__name__)
         return []
     lines = source.splitlines()
     blocks: list[SourceBlock] = []

@@ -197,7 +197,7 @@ class MonitoredAgent(Agent):
         gpu: list[dict[str, Any]] = []
 
         try:
-            import pynvml  # noqa: PLC0415
+            import pynvml  # noqa: PLC0415 - optional pynvml import kept inside the GPU probe so hosts without it still start
 
             pynvml.nvmlInit()
             for i in range(pynvml.nvmlDeviceGetCount()):

@@ -163,7 +163,7 @@ def parse_json_object(raw: Any) -> dict[str, Any] | None:
         return None
     try:
         value = json.loads(text[start:end_incl])
-    except (ValueError, TypeError):
+    except (ValueError, TypeError):  # the reply is not JSON
         return None
     return value if isinstance(value, dict) else None
 
@@ -188,7 +188,7 @@ def adjudicate_group(
         return _keep(group, "no_model", "no model available to adjudicate")
     try:
         raw = judge(build_group_prompt(group, contexts))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - judge is an arbitrary callable; any failure keeps the group unmerged
         logger.warning("group judge failed on %r: %s", group.representative, exc)
         return _keep(group, "llm_failed", f"{type(exc).__name__}: {exc}")
     payload = parse_json_object(raw)
@@ -271,7 +271,7 @@ def adjudicate_mention(
     tokens = estimate_tokens(prompt)
     try:
         raw = judge(prompt)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - judge is an arbitrary callable; any failure is a judge_failed verdict
         return MentionVerdict("judge_failed", reason=f"{type(exc).__name__}: {exc}", prompt_tokens=tokens)
     payload = parse_json_object(raw)
     if payload is None:

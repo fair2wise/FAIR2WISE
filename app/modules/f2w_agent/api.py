@@ -1175,7 +1175,7 @@ def _read_graph_json(graph_path: Path) -> dict[str, Any] | None:
     """Load and cache parsed JSON for a graph file, keyed by mtime and size."""
     try:
         stat = graph_path.stat()
-    except OSError:
+    except OSError:  # graph file absent
         return None
     key = str(graph_path)
     cached = _GRAPH_JSON_CACHE.get(key)
@@ -1183,7 +1183,8 @@ def _read_graph_json(graph_path: Path) -> dict[str, Any] | None:
         return cached[2]
     try:
         data = json.loads(graph_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("graph file unreadable or not JSON: %s", type(exc).__name__)
         return None
     if not isinstance(data, dict):
         return None
@@ -2156,7 +2157,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
         return {}
     try:
         obj = json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # reply is not JSON: no object
         return {}
     return obj if isinstance(obj, dict) else {}
 
@@ -2315,7 +2316,7 @@ def _select_candidates_by_indices(
     for item in indices:
         try:
             idx = int(item)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # non-integer model output is ignored
             continue
         if 0 <= idx < len(candidates):
             selected.append(candidates[idx])
@@ -2518,7 +2519,8 @@ def publications_for_selected_nodes(graph_path: Path, node_ids: list[str]) -> li
         return []
     try:
         data = json.loads(graph_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("graph file unreadable or not JSON: %s", type(exc).__name__)
         return []
     raw_nodes, _ = _kg_raw_parts(data)
     if not isinstance(raw_nodes, list):
@@ -5768,7 +5770,7 @@ class AgentPipelineService:
             value: Any = pending.get("recommended_candidate_index")
             try:
                 index = int(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # non-integer model output is ignored
                 return None
             return index if 0 <= index < len(candidates) and index not in failed else None
         return next(

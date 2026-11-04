@@ -349,7 +349,7 @@ class PipelineRunner:
         except LeaseLost:
             logger.warning("job %s: lease lost; stopping without further mutation", job_id)
             raise
-        except _Ended as ended:
+        except _Ended as ended:  # a deliberate early end carries its final state
             return ended.state
         except JobInterrupted as exc:
             stage_name = current["stage"]

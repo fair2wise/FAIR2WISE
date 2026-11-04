@@ -111,7 +111,7 @@ def contained_regular_file(root: Path, path: Path) -> bool:
         candidate = root / candidate
     try:
         resolved = candidate.resolve(strict=True)
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError):  # an unresolvable path is not a contained file
         return False
     lexical = Path(os.path.abspath(candidate))  # noqa: PTH100 - lexical (symlink-blind) normalisation is the point
     if resolved != lexical:
@@ -124,7 +124,7 @@ def looks_like_pdf(path: Path) -> bool:
     try:
         with Path(path).open("rb") as handle:
             return handle.read(5) == PDF_MAGIC
-    except OSError:
+    except OSError:  # an unreadable file is not a PDF
         return False
 
 

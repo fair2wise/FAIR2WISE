@@ -32,7 +32,7 @@ def default_workers() -> int:
     value = config_value("extract_terms.max_workers", fallback=8, cast=int)
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # unparsable setting: default
         return 8
     return parsed if parsed > 0 else 8
 
@@ -60,7 +60,7 @@ def default_targeted_max_pages() -> int:
     value = config_value("f2w_agent.targeted_max_pages", fallback=6, cast=int)
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # unparsable setting: default
         return 6
     return parsed if parsed > 0 else 6
 

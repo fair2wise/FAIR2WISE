@@ -116,7 +116,8 @@ def _build_literature_index_locked(out: Path, base: Path, *, mode: str, limit: i
         path = Path(doc["path"])
         try:
             digest = sha256_file(path)
-        except OSError:
+        except OSError as exc:
+            logger.debug("document unreadable; not hashed: %s", type(exc).__name__)
             continue
         doc_id = str(doc["doc_id"])
         if incremental and known_sha.get(doc_id) == digest:
@@ -202,7 +203,8 @@ def build_ops_index(
         path = Path(doc["path"])
         try:
             digest = sha256_file(path)
-        except OSError:
+        except OSError as exc:
+            logger.debug("document unreadable; not hashed: %s", type(exc).__name__)
             continue
         doc_id = str(doc["doc_id"])
         if incremental and known_sha.get(doc_id) == digest:

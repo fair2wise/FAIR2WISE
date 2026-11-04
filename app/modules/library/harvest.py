@@ -274,9 +274,9 @@ def pdf_downloader(http: httpx.Client | None = None, policy: NetworkPolicy | Non
                         chunks.append(chunk)
                     data = b"".join(chunks)
                     return (data, "ok") if data.startswith(PDF_MAGIC) else (None, "refused:not_pdf")
-            except httpx.TimeoutException:
+            except httpx.TimeoutException:  # reported through the status string
                 return None, "failed:timeout"
-            except httpx.HTTPError:
+            except httpx.HTTPError:  # reported through the status string
                 return None, "failed:network"
         return None, "blocked:too_many_redirects"
 

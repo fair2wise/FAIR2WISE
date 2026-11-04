@@ -312,7 +312,8 @@ def _extraction_state(scope: PaperScope) -> str | None:
 
     try:
         value = _manifest_entry(Path(scope.manifest_path), scope.filename).get("extraction_state")
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        logger.debug("extraction manifest unreadable: %s", type(exc).__name__)
         return None
     return str(value) if value is not None else None
 

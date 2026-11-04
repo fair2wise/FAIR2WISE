@@ -14,12 +14,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+import logging
 from typing import Any
 
 from ..contracts.evidence import EvidenceRef, SourceLocator
 from ..literature.parsed_document import ParsedDocument, ParsedTable
 from .results import Box, Uncertainty, evidence, locator
 from .text_layer import open_pdf, page_geometry, to_topleft
+
+logger = logging.getLogger(__name__)
 
 MAX_CELLS = 400
 MAX_CELL_CHARS = 200
@@ -82,7 +85,8 @@ def _cells(table: ParsedTable, page_height: float) -> tuple[list[TableCell], int
             continue
         try:
             box = to_topleft(cell.bbox, page_height)
-        except ValueError:
+        except ValueError as exc:
+            logger.debug("table cell box could not be converted; cell skipped: %s", type(exc).__name__)
             continue
         cells.append(TableCell(cell.row, cell.col, cell.text, box))
     return cells, n_rows, n_cols

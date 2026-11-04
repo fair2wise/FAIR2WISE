@@ -345,7 +345,7 @@ class VisionToolset:
                               else ToolStatus.OK,
                               data={"doi": paper.work_id, "source_version": doc.file_sha256, "figures": rows},
                               provenance_id=f"vision:{uuid.uuid4().hex}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any extractor failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(tool, exc)
 
     def extract_tables(self, inv: Any) -> ToolResult:
@@ -364,7 +364,7 @@ class VisionToolset:
                 data={"doi": paper.work_id, "source_version": paper.document.file_sha256,
                       "tables": [t.as_dict() for t in tables]},
                 evidence=tuple(e for t in tables for e in t.evidence), provenance_id=f"vision:{uuid.uuid4().hex}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any extractor failure is returned as a failed ToolResult, never raised into the agent loop
             return _failure(tool, exc)
 
 

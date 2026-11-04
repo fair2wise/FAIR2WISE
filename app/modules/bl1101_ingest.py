@@ -792,7 +792,8 @@ def parse_bcs2sim_beam_path(root: Path | None) -> list[str]:
                 continue
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            except OSError as exc:
+                LOGGER.debug("unreadable file skipped while scanning for M103: %s", type(exc).__name__)
                 continue
             if "M103" not in text or not re.search(r"exit\s+slits?", text, re.I):
                 continue

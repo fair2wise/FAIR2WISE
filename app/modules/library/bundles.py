@@ -21,6 +21,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -29,6 +30,8 @@ import tempfile
 from typing import Any
 
 from ..contracts.errors import ContractError, ErrorCode
+
+logger = logging.getLogger(__name__)
 
 #: Environment variable naming the state volume (the profile sets it).
 WORKDIR_ENV = "F2W_WORKDIR"
@@ -193,7 +196,8 @@ class BundleStore:
                 continue
             try:
                 out.append(self.get(child.name))
-            except ContractError:
+            except ContractError as exc:
+                logger.debug("invalid bundle skipped in listing: %s", type(exc).__name__)
                 continue
         return out
 
@@ -397,7 +401,8 @@ def registered_graph_paths(workdir: Path | str | None = None) -> list[str]:
     try:
         return [virtual_graph_path(b.name) for b in BundleStore(root).list()
                 if (b.directory / KG_FILE).is_file() and (b.directory / KG_FILE).stat().st_size > 0]
-    except OSError:
+    except OSError as exc:
+        logger.debug("bundle listing failed: %s", type(exc).__name__)
         return []
 
 
@@ -424,7 +429,7 @@ def resolve_registered_graph(path: str, workdir: Path | str | None = None) -> Pa
     try:
         if not store.exists(name):
             return None
-    except ContractError:
+    except ContractError:  # an invalid name is no bundle
         return None
     target = store.directory(name) / KG_FILE
     if target.is_symlink() or not target.is_file():
@@ -445,7 +450,7 @@ def schema_path_for_registered_graph(path: str, workdir: Path | str | None = Non
         return None
     try:
         bundle = BundleStore(root).get(name)
-    except ContractError:
+    except ContractError:  # an invalid name is no bundle
         return None
     value = bundle.manifest["schema"].get("path")
     return str(value) if value else None

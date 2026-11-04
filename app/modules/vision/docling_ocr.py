@@ -50,7 +50,7 @@ def weights_available(path: str | Path | None = None) -> bool:
     folder = root / OCR_WEIGHTS_FOLDER
     try:
         names = [p.name.lower() for p in folder.iterdir() if p.is_file()]
-    except OSError:
+    except OSError:  # weights folder unreadable: not installed
         return False
     return all(any(part in n and n.endswith(".pth") for n in names) for part in ("det", "cls", "rec"))
 

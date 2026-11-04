@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -45,6 +46,8 @@ from typing import Any, BinaryIO, cast
 
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
+
+logger = logging.getLogger(__name__)
 
 #: Version of the on-disk layout and metadata record.
 STORE_SCHEMA_VERSION = 1
@@ -130,7 +133,8 @@ def sha256_of(path: Path) -> str:
         with Path(path).open("rb") as handle:
             for chunk in iter(lambda: handle.read(_CHUNK), b""):
                 digest.update(chunk)
-    except OSError:
+    except OSError as exc:
+        logger.debug("file unreadable while hashing: %s", type(exc).__name__)
         return ""
     return digest.hexdigest()
 
@@ -344,7 +348,8 @@ class FileDocumentStore:
     def _read_meta_record(self, hexdigest: str) -> dict[str, Any] | None:
         try:
             return cast(dict[str, Any], json.loads(self._meta_path(hexdigest).read_text(encoding="utf-8")))
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            logger.debug("stored metadata unreadable or not JSON: %s", type(exc).__name__)
             return None
 
     @staticmethod
@@ -378,7 +383,7 @@ class FileDocumentStore:
         self._check(ctx)
         try:
             hexdigest = parse_ref(ref)
-        except StoreError:
+        except StoreError:  # an invalid ref is not present
             return False
         return self._read_meta(hexdigest) is not None and self._bytes_path(hexdigest) is not None
 
@@ -410,7 +415,7 @@ class FileDocumentStore:
         try:
             for _ in self.open_verified(ctx, ref):
                 pass
-        except StoreError:
+        except StoreError:  # an unverifiable ref is not present
             return False
         return True
 

@@ -123,7 +123,7 @@ def ingest_folder(
         for path in files:  # the caller orders; it does not widen the boundary
             try:
                 resolved = policy.require_allowed(path)
-            except ValueError:
+            except ValueError:  # outside the allowed roots: skipped
                 continue
             if root in resolved.parents:
                 queue.append(resolved)

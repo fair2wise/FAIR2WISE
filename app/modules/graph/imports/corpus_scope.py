@@ -39,6 +39,7 @@ from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -73,6 +74,8 @@ from .tiled_json import (
     load_source,
     target_for,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ADAPTER_VERSION",
@@ -654,7 +657,7 @@ class ReleaseState:
         """Return the stored record (an empty ``none`` record before the first switch)."""
         try:
             return cast(dict[str, Any], json.loads(self.path.read_text(encoding="utf-8")))
-        except FileNotFoundError:
+        except FileNotFoundError:  # no switch recorded yet
             return {"pointer": "none", "live_receipt_id": None, "live_snapshot_id": None,
                     "live_plan_sha256": None, "switching": None}
 
@@ -722,7 +725,8 @@ class LedgerHistory:
         for line in self.path.read_text(encoding="utf-8").splitlines():
             try:
                 out.append(json.loads(line))
-            except ValueError:
+            except ValueError as exc:
+                logger.debug("corrupt journal line skipped: %s", type(exc).__name__)
                 continue
         return out
 

@@ -258,7 +258,7 @@ class SourceAccessAuthority:
         """Boolean form of :meth:`check`."""
         try:
             self.check(context, grant, kind=kind, corpus=corpus, work_id=work_id)
-        except SourceAccessDenied:
+        except SourceAccessDenied:  # a denial is the False answer
             return False
         return True
 

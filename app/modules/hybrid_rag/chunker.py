@@ -151,7 +151,8 @@ def chunk_text_document(
         return []
     try:
         raw = src.read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    except OSError as exc:
+        logger.debug("document unreadable; no chunks produced: %s", type(exc).__name__)
         return []
     suffix = src.suffix.lower()
     if suffix in {".html", ".htm"}:

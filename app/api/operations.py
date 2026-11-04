@@ -95,7 +95,7 @@ def _utcnow() -> datetime:
 def _base(target: str) -> str | None:
     try:
         return normalize_tiled_target(target.split("#", 1)[0])
-    except ValueError:
+    except ValueError:  # not a Tiled target
         return None
 
 

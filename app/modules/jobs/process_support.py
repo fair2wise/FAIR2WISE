@@ -53,11 +53,11 @@ def pid_alive(pid: object) -> bool:
         return False
     try:
         os.kill(pid, 0)
-    except ProcessLookupError:
+    except ProcessLookupError:  # no such process
         return False
     except PermissionError:
         return True
-    except OSError:
+    except OSError:  # cannot probe: treat as not running
         return False
     return True
 
@@ -68,7 +68,7 @@ def pid_command(pid: int) -> str:
         done = subprocess.run(
             ["ps", "-p", str(int(pid)), "-o", "command="], capture_output=True, text=True, timeout=5, check=False
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError):  # ps unavailable: identity unknown
         return ""
     return done.stdout.strip()
 
@@ -92,7 +92,7 @@ def tail_lines(
             stream.seek(0, os.SEEK_END)
             stream.seek(max(0, stream.tell() - max_bytes))
             data = stream.read()
-    except OSError:
+    except OSError:  # no log file
         return []
     lines = [line.rstrip() for line in data.decode("utf-8", "replace").splitlines()]
     return [scrub(line)[:max_chars] for line in lines if line][-n:]

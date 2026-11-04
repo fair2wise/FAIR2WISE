@@ -63,7 +63,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
         return {}
     try:
         value = json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # reply is not JSON: no object
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -426,7 +426,7 @@ class WorkflowOrchestratorAgent(Agent):
                 return None
             try:
                 index = int(proposed.get("candidate_index", approved.get("candidate_index")))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # non-integer model output is ignored
                 return None
             candidates = state.get("candidates") or []
             unavailable = {int(i) for i in state.get("unavailable_candidate_indices") or []}

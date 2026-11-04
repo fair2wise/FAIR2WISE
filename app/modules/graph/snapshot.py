@@ -221,7 +221,7 @@ def _git_head(repo: Path) -> str | None:
             for line in packed.read_text(encoding="utf-8").splitlines():
                 if line.endswith(" " + ref) and not line.startswith("#"):
                     return line.split(" ", 1)[0]
-    except (OSError, ValueError, IndexError):
+    except (OSError, ValueError, IndexError):  # no readable packed-refs: ref not found
         return None
     return None
 

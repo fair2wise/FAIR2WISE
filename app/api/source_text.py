@@ -148,7 +148,7 @@ class TurnSources:
             for value in pages:
                 try:
                     page = int(value)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError):  # a non-integer page is ignored
                     continue
                 if page >= 1:
                     self._pages[(name, page)] = str(pdf_path)
