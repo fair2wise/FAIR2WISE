@@ -82,12 +82,21 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .cborg_limiter import async_slot  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .cli_output import output  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .literature.pdf_reader import open_pdf  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from .project_config import config_value  # noqa: E402 - after the optional semantic imports
+from .cborg_http import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    openai_http_kwargs,
+    require_cborg_api_key,
+)
+from .cborg_limiter import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    async_slot,
+)
+from .cli_output import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    output,
+)
 from .json_types import JsonValue
+from .literature.pdf_reader import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    open_pdf,
+)
+from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -952,7 +961,9 @@ class NodeInfo:
 
 
 # ───────────────────── PDF cache ─────────────────────
-from functools import lru_cache  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from functools import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+    lru_cache,
+)
 
 
 @lru_cache(maxsize=MAX_PDF_CACHE)

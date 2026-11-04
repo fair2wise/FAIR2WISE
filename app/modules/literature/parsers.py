@@ -31,6 +31,7 @@ from pathlib import Path
 import time
 from typing import Any, Protocol, cast, runtime_checkable
 
+from ..json_types import Untyped
 from .parsed_document import (
     BoundingBox,
     PageInfo,
@@ -43,7 +44,6 @@ from .parsed_document import (
     without_embedded_images,
 )
 from .pdf_reader import open_pdf
-from ..json_types import Untyped
 
 logger = logging.getLogger(__name__)
 

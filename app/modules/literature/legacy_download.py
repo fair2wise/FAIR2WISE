@@ -27,9 +27,9 @@ from urllib.parse import urljoin
 import httpx
 
 from ..contracts.context import AuthorizationMode, DeploymentProfile, Principal, RequestContext
+from ..json_types import JsonValue
 from .safe_fetch import BlockedURL, NetworkPolicy, SafeFetcher
 from .store import FileDocumentStore, StoreError
-from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 

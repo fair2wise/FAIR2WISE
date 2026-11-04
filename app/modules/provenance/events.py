@@ -21,6 +21,7 @@ from typing import Any
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from ..json_types import JsonValue
 
 EVENT_VERSION = 1

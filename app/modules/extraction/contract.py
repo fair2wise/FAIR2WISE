@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..evidence.records import ReportedQuantity
-from ..literature.parsed_document import ParsedDocument
 from ..json_types import JsonValue
+from ..literature.parsed_document import ParsedDocument
 
 #: Version of this result contract.
 EXTRACTION_CONTRACT_VERSION = "t06-draft.1"

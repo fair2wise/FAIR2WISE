@@ -17,6 +17,7 @@ from typing import Any
 from linkml_runtime.utils.schemaview import SchemaView
 import yaml
 
+from ..json_types import JsonValue
 from .registry import (
     NORMALIZER_LEGACY,
     NORMALIZER_TERM_EXTRACTOR,
@@ -26,7 +27,6 @@ from .registry import (
     pre_s4_bytes,
     sha256_bytes,
 )
-from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 

@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import Any
+
 from ..json_types import Untyped
 
 #: ``fitz``-style metadata keys, in the order PyMuPDF reported them, mapped from PDF Info keys.

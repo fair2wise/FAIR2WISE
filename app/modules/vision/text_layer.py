@@ -21,11 +21,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..json_types import Untyped
 from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
 from .kernels.geometry import FigureFrame, spans_inside
 from .kernels.types import TextSpan
 from .results import Box, Uncertainty, VisionUnavailable, box4
-from ..json_types import Untyped
 
 DEFAULT_RENDER_SCALE = 2.0
 #: Minimum spans inside a figure for its text layer to count as usable.
