@@ -27,7 +27,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from datetime import timedelta
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from ..contracts.context import RequestContext
@@ -38,6 +38,9 @@ from .openalex import EXTERNAL_RESULT, OpenAlexClient, OpenAlexQuotaPaused, Prov
 from .parse_service import ParseFailed
 from .reading import PaperReader, SectionNotFound
 from .skill import LIT_TOOL_NAMES, LITERATURE_RESEARCH_SKILL
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +268,7 @@ def _failure(tool: str, exc: Exception) -> ToolResult:
     )
 
 
-def _papers(tool: str, papers: list[dict[str, Any]], **extra: Any) -> ToolResult:
+def _papers(tool: str, papers: list[dict[str, Any]], **extra: Any) -> ToolResult:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     if not papers:
         return ToolResult(tool=tool, status=ToolStatus.EMPTY, warnings=tuple(extra.pop("warnings", ())))
     warnings = tuple(extra.pop("warnings", ()))
@@ -314,7 +317,7 @@ class LiteratureToolset:
         )
         return tuple(zip(self.specs, fns))
 
-    def search_papers(self, inv: Any) -> ToolResult:
+    def search_papers(self, inv: ToolInvocation) -> ToolResult:
         """``lit_search_papers``."""
         a = inv.args
         try:
@@ -330,7 +333,7 @@ class LiteratureToolset:
             return _failure(LIT_SEARCH_PAPERS.name, exc)
         return _papers(LIT_SEARCH_PAPERS.name, found)
 
-    def get_papers_by_doi(self, inv: Any) -> ToolResult:
+    def get_papers_by_doi(self, inv: ToolInvocation) -> ToolResult:
         """``lit_get_papers_by_doi``: unknown DOIs are reported, unanswered ones flagged."""
         wanted = [d.strip() for d in inv.args["dois"].split(",") if d.strip()]
         try:
@@ -349,7 +352,7 @@ class LiteratureToolset:
             warnings=warnings,
         )
 
-    def find_citing_papers(self, inv: Any) -> ToolResult:
+    def find_citing_papers(self, inv: ToolInvocation) -> ToolResult:
         """``lit_find_citing_papers``."""
         try:
             found = self.client.find_citing_papers(
@@ -359,7 +362,7 @@ class LiteratureToolset:
             return _failure(LIT_FIND_CITING_PAPERS.name, exc)
         return _papers(LIT_FIND_CITING_PAPERS.name, found)
 
-    def find_related_papers(self, inv: Any) -> ToolResult:
+    def find_related_papers(self, inv: ToolInvocation) -> ToolResult:
         """``lit_find_related_papers``."""
         try:
             found = self.client.find_related_papers(
@@ -382,7 +385,7 @@ class LiteratureToolset:
             warnings=("paper reading is not configured",),
         )
 
-    def read_paper(self, inv: Any) -> ToolResult:
+    def read_paper(self, inv: ToolInvocation) -> ToolResult:
         """``lit_read_paper``: section names and counts, never text."""
         if self.reader is None:
             return self._unavailable_reader(LIT_READ_PAPER.name)
@@ -398,7 +401,7 @@ class LiteratureToolset:
             tool=LIT_READ_PAPER.name, status=ToolStatus.OK, data=data, provenance_id=f"lit:{uuid.uuid4().hex}"
         )
 
-    def read_paper_section(self, inv: Any) -> ToolResult:
+    def read_paper_section(self, inv: ToolInvocation) -> ToolResult:
         """``lit_read_paper_section``: one bounded section with page and source version."""
         if self.reader is None:
             return self._unavailable_reader(LIT_READ_PAPER_SECTION.name)

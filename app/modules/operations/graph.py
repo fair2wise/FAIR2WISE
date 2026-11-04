@@ -51,7 +51,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import logging
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 import uuid
 
 from ..agent_runtime.executor import is_control_flow
@@ -70,6 +70,9 @@ from .reports import (
     top_items,
     utcnow,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -740,7 +743,7 @@ class GraphOperationsTool:
         raise ContractError(ErrorCode.INVALID_INPUT, f"unknown graph operation {operation!r}")
 
     def _runner(self, name: str) -> Callable[[Any], ToolResult]:
-        def run(inv: Any) -> ToolResult:
+        def run(inv: ToolInvocation) -> ToolResult:
             provenance_id = f"f2w-op:{uuid.uuid4().hex}"
             try:
                 report = self.compute(inv.ctx, name, inv.args)

@@ -97,7 +97,7 @@ class GraphWriteEvent(BaseModel):
     at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
-    def build(cls, *, payload: Mapping[str, Any] | None = None, **fields: Any) -> GraphWriteEvent:
+    def build(cls, *, payload: Mapping[str, Any] | None = None, **fields: Any) -> GraphWriteEvent:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Construct with the payload redacted and digested."""
         body = dict(payload or {})
         safe = redact(body)

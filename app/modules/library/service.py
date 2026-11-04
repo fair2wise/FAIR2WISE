@@ -174,7 +174,7 @@ class LibraryService:
     # -- construction ---------------------------------------------------------------------------
 
     @classmethod
-    def from_startup(cls, startup: Mapping[str, str], workdir: Path, settings: Any, **kw: Any) -> LibraryService:
+    def from_startup(cls, startup: Mapping[str, str], workdir: Path, settings: Any, **kw: Any) -> LibraryService:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Build from the trusted startup mapping: ``F2W_LIBRARY_DIR``, ``HYBRID_RAG_LITERATURE_INDEX`` and the OpenAlex settings.
 
         The catalog and the OpenAlex response cache live under ``<workdir>/library/``.

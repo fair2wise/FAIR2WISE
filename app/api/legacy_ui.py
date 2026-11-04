@@ -126,7 +126,7 @@ class OpaquePaths:
         **roots: ``label=absolute_path``. Only these roots are resolvable.
     """
 
-    def __init__(self, **roots: Any) -> None:
+    def __init__(self, **roots: Any) -> None:  # noqa: ANN401  # Any: label=path pairs; values are str or Path
         """Register the roots; empty values are skipped and relative paths resolve against the cwd."""
         self._roots: dict[str, Path] = {}
         pairs: list[tuple[str, str]] = []

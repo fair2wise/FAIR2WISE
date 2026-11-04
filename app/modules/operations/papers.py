@@ -54,7 +54,7 @@ import logging
 from pathlib import Path
 import re
 import threading
-from typing import Any, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 import uuid
 
 from pydantic import BaseModel, ConfigDict
@@ -75,6 +75,9 @@ from ..contracts import (
     ToolStatus,
 )
 from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -514,7 +517,7 @@ class PaperSummaryTool:
             return pinned
         return self._resolver(ctx) if self._resolver is not None else None
 
-    def run(self, inv: Any) -> ToolResult:
+    def run(self, inv: ToolInvocation) -> ToolResult:
         """Executor entry point: ``fn(invocation)``; arguments are already schema-validated."""
         scope = self.resolve(inv.ctx)
         if scope is None:

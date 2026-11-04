@@ -282,7 +282,7 @@ class LocalIntakePolicy:
     allow_symlinks: bool = False
 
     @classmethod
-    def from_paths(cls, roots: Iterable[Any], **kw: Any) -> LocalIntakePolicy:
+    def from_paths(cls, roots: Iterable[Any], **kw: Any) -> LocalIntakePolicy:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Build from configured root paths (resolved once)."""
         resolved: list[Path] = []
         for root in roots:

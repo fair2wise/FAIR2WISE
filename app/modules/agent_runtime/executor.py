@@ -247,11 +247,11 @@ class ToolExecutor:
 
     # -- public API -------------------------------------------------------------
 
-    def execute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:
+    def execute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Run one call synchronously and return its :class:`ToolResult`."""
         return self.execute_call(ctx, name, args, **kw).result
 
-    async def aexecute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:
+    async def aexecute(self, ctx: RequestContext, name: str, args: Mapping[str, Any], **kw: Any) -> ToolResult:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Run one call asynchronously and return its :class:`ToolResult`."""
         return (await self.aexecute_call(ctx, name, args, **kw)).result
 
@@ -544,7 +544,7 @@ class _Audit:
         ))
 
     def best_effort(
-        self, kind: AuditKind, at: datetime, code: ErrorCode | None, detail: str, **kw: Any,
+        self, kind: AuditKind, at: datetime, code: ErrorCode | None, detail: str, **kw: Any,  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     ) -> None:
         try:
             self.emit(kind, at, code, detail, **kw)

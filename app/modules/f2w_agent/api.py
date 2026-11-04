@@ -4422,7 +4422,7 @@ class AgentPipelineService:
             publications_override=[],
         )
 
-    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    def _summarize_extracted_terms(self, *args: Any, **kwargs: Any) -> dict[str, Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``summarize_extracted_terms``, through the T19B Tool adapter in langgraph mode.
 
         Default mode, or a replaced module-level ``summarize_extracted_terms``: that name, as before.

@@ -108,7 +108,7 @@ class _Builder:
         self.edges: list[dict[str, Any]] = []
         self._edge_keys: set[tuple[str, str, str]] = set()
 
-    def node(self, node_id: str, category: str, name: str, **slots: Any) -> str:
+    def node(self, node_id: str, category: str, name: str, **slots: Any) -> str:  # noqa: ANN401  # Any: open-ended node slots, passed through unchanged
         if node_id not in self.things:
             body = {"id": node_id, "name": name, "category": category, "type": f"matkg:{category}",
                     "description": f"{category} {name}", "source_papers": [self.source_paper]}

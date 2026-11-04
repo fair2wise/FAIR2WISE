@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Sequence
 import hashlib
 import json
+import sqlite3
 import time
 from typing import Any
 import uuid
@@ -118,7 +119,7 @@ class CurationStore:
     # --- cases -------------------------------------------------------------------------
 
     @staticmethod
-    def _row(row: Any) -> dict[str, Any]:
+    def _row(row: sqlite3.Row) -> dict[str, Any]:
         out = dict(row)
         out["payload"] = json.loads(out["payload"])
         out["resolution"] = json.loads(out["resolution"]) if out["resolution"] else None
@@ -199,7 +200,7 @@ class CurationStore:
                 )
         return case_id, changed
 
-    def _event(self, con: Any, case_id: str, corpus: str, event_type: str, payload: dict[str, Any]) -> None:
+    def _event(self, con: sqlite3.Connection, case_id: str, corpus: str, event_type: str, payload: dict[str, Any]) -> None:
         con.execute(
             "INSERT INTO case_events VALUES (?, ?, ?, ?, ?, ?)",
             (uuid.uuid4().hex, case_id, corpus, event_type, _json(payload), self.clock()),
@@ -246,7 +247,7 @@ class CurationStore:
             leased = [con.execute("SELECT * FROM uncertainty_cases WHERE id=?", (i,)).fetchone() for i in ids]
         return [self._row(r) for r in leased]
 
-    def _owned(self, con: Any, case_id: str, token: str) -> Any:
+    def _owned(self, con: sqlite3.Connection, case_id: str, token: str) -> Any:
         row = con.execute("SELECT * FROM uncertainty_cases WHERE id=?", (case_id,)).fetchone()
         if (
             row is None

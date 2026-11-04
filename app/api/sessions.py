@@ -394,7 +394,7 @@ def install_session_routes(app: FastAPI, store: TiledSessionStore, settings: Dep
 
 
 def als_identity_wiring(settings: DeploymentSettings, http_client: httpx.Client | None = None, *, timeout: float = 5.0,
-                        **store_kwargs: Any) -> tuple[TiledWhoamiAdapter, TiledSessionStore]:
+                        **store_kwargs: Any) -> tuple[TiledWhoamiAdapter, TiledSessionStore]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Return the identity port and session store for an ALS deployment, both bound to its Tiled.
 
     Pass both to ``create_app(identity_port=..., credential_store=...)``. ``http_client``

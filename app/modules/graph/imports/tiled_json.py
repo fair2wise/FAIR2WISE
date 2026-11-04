@@ -401,7 +401,7 @@ def _plan_body(detail: Mapping[str, Any], *, snapshot_id: str, input_sha256: str
     }
 
 
-def build_change_plan(detail: Mapping[str, Any], **kw: Any) -> ChangePlan:
+def build_change_plan(detail: Mapping[str, Any], **kw: Any) -> ChangePlan:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Deterministic :class:`ChangePlan` for ``detail``; ``plan_sha256`` covers every field below."""
     body = _plan_body(detail, **kw)
     digest = _sha(body)

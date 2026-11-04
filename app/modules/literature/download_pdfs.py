@@ -507,7 +507,7 @@ def _json_headers() -> dict[str, str]:
     wait=wait_exponential(multiplier=1, min=1, max=45),
     retry=retry_if_exception_type((requests.RequestException,)),
 )
-def _oa_get(url: str, **kwargs: Any) -> requests.Response:
+def _oa_get(url: str, **kwargs: Any) -> requests.Response:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     _respect_rate_limit(url)
     timeout = kwargs.pop("timeout", 15.0)
     response = requests.get(url, timeout=timeout, **kwargs)
@@ -522,7 +522,7 @@ def _oa_get(url: str, **kwargs: Any) -> requests.Response:
     wait=wait_exponential(multiplier=1, min=1, max=45),
     retry=retry_if_exception_type((requests.RequestException,)),
 )
-def _oa_post(url: str, **kwargs: Any) -> requests.Response:
+def _oa_post(url: str, **kwargs: Any) -> requests.Response:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     _respect_rate_limit(url)
     timeout = kwargs.pop("timeout", 30.0)
     response = requests.post(url, timeout=timeout, **kwargs)

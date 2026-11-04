@@ -120,7 +120,7 @@ class PaperAcquirer:
             logger.warning("stored source for %s failed its checksum; treating as absent", doi_key(doi))
         return None
 
-    def _lookup(self, name: str, url: str, result: AcquireResult, **kw: Any) -> dict[str, Any] | None:
+    def _lookup(self, name: str, url: str, result: AcquireResult, **kw: Any) -> dict[str, Any] | None:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         try:
             response = self.http.get(url, timeout=15.0, **kw)
         except httpx.HTTPError as exc:

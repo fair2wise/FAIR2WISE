@@ -75,7 +75,7 @@ import logging
 import math
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import unicodedata
 import uuid
 
@@ -93,6 +93,9 @@ from .reports import (
     top_items,
     utcnow,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -1083,7 +1086,7 @@ class CorpusAuditTool:
         control = control or ScanControl(self._max, deadline=ctx.deadline)
         return audit_corpus(source, sections=tuple(args.get("sections") or CORPUS_SECTIONS), control=control)
 
-    def run(self, inv: Any) -> ToolResult:
+    def run(self, inv: ToolInvocation) -> ToolResult:
         """Executor entry point."""
         provenance_id = f"f2w-op:{uuid.uuid4().hex}"
         try:

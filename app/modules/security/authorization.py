@@ -215,7 +215,7 @@ class DeploymentSettings:
 
     @classmethod
     def for_disposable_test_target(cls, profile: DeploymentProfile | str, *, tiled_target: str,
-                                   writer_identity: str, **kwargs: Any) -> DeploymentSettings:
+                                   writer_identity: str, **kwargs: Any) -> DeploymentSettings:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Test-only ALS settings bound to an application-owned disposable Tiled (T25C).
 
         Every ALS rule runs unchanged (profile, mode, identity, approvals, route policy);
@@ -625,7 +625,7 @@ class RoutePolicy:
         return self.on_local if settings.is_local else self.on_als
 
 
-def _p(route_id: str, surface: str, method: str, path: str, *caps: str, **kw: Any) -> RoutePolicy:
+def _p(route_id: str, surface: str, method: str, path: str, *caps: str, **kw: Any) -> RoutePolicy:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """Build a :class:`RoutePolicy`, validating capability names."""
     return RoutePolicy(route_id, surface, method, path, _check_names(caps), **kw)
 

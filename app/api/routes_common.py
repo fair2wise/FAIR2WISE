@@ -35,15 +35,15 @@ class Prefixed:
         self.app = app
         self.prefix = prefix
 
-    def get(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+    def get(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``app.get(prefix + path)``."""
         return self.app.get(self.prefix + path, **kw)
 
-    def post(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+    def post(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``app.post(prefix + path)``."""
         return self.app.post(self.prefix + path, **kw)
 
-    def put(self, path: str, **kw: Any) -> Callable[[Any], Any]:
+    def put(self, path: str, **kw: Any) -> Callable[[Any], Any]:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """``app.put(prefix + path)``."""
         return self.app.put(self.prefix + path, **kw)
 

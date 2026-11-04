@@ -97,7 +97,7 @@ class SnapshotBuildError(SnapshotError):
 def build_graph_isolated(
     raw_terms: Iterable[dict[str, Any]],
     code_snippets: list[dict[str, Any]] | None = None,
-    **kwargs: Any,
+    **kwargs: Any,  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
 ) -> dict[str, list[dict[str, Any]]]:
     """``json2kg.build_graph`` on deep copies of the inputs.
 

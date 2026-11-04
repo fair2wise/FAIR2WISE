@@ -183,7 +183,7 @@ class LiteratureEvidenceBundle(BaseModel):
         """JSON-ready form."""
         return self.model_dump(mode="json")
 
-    def to_json(self, **kw: Any) -> str:
+    def to_json(self, **kw: Any) -> str:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
         """Stable JSON text (sorted keys)."""
         kw.setdefault("sort_keys", True)
         return json.dumps(self.to_dict(), **kw)

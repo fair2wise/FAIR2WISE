@@ -49,7 +49,7 @@ from dataclasses import dataclass
 import logging
 import re
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any
 import uuid
 
 from ..agent_runtime.executor import is_control_flow
@@ -65,6 +65,9 @@ from ..contracts import (
     ToolSpec,
     ToolStatus,
 )
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
 
@@ -388,7 +391,7 @@ def make_answer_tool(service: Any, ledger: LegacyResultLedger) -> Callable[[Any]
     slot here would double-count one call.
     """
 
-    async def answer_from_knowledge(inv: Any) -> ToolResult:
+    async def answer_from_knowledge(inv: ToolInvocation) -> ToolResult:
         args = inv.args
         provenance_id = ledger.new_id()
         try:

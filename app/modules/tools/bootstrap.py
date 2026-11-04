@@ -13,11 +13,14 @@ passed in by the caller. Real retrieval/QA tools arrive in T03.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..agent_runtime.registry import ToolRegistry, ToolRegistryError
 from ..agent_runtime.skills import Skill, SkillRegistry
 from ..contracts import CostClass, Effect, RequestContext, ToolResult, ToolSpec, ToolStatus
+
+if TYPE_CHECKING:
+    from ..agent_runtime.executor import ToolInvocation
 
 DEMO_LITERATURE = "demo_literature"
 KNOWN_GROUPS = frozenset({DEMO_LITERATURE})
@@ -60,7 +63,7 @@ DEMO_SKILL = Skill(
 def _demo_tools(corpus: Mapping[str, Mapping[str, str]]) -> Sequence[tuple[ToolSpec, Callable[..., Any]]]:
     papers = {str(k): dict(v) for k, v in corpus.items()}
 
-    def search(inv: Any) -> ToolResult:
+    def search(inv: ToolInvocation) -> ToolResult:
         needle = inv.args["query"].lower()
         hits = [{"paper_id": pid, "title": p.get("title", "")} for pid, p in sorted(papers.items())
                 if needle in p.get("title", "").lower()][: inv.args.get("limit", 10)]
@@ -68,7 +71,7 @@ def _demo_tools(corpus: Mapping[str, Mapping[str, str]]) -> Sequence[tuple[ToolS
             return ToolResult(tool=DEMO_SEARCH.name, status=ToolStatus.EMPTY)
         return ToolResult(tool=DEMO_SEARCH.name, status=ToolStatus.OK, data={"hits": hits})
 
-    def read(inv: Any) -> ToolResult:
+    def read(inv: ToolInvocation) -> ToolResult:
         paper = papers.get(inv.args["paper_id"])
         if paper is None:
             return ToolResult(tool=DEMO_READ.name, status=ToolStatus.EMPTY)

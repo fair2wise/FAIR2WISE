@@ -303,7 +303,7 @@ def _same_target(url: str, target: str | None) -> bool:
         (b.scheme.lower(), (b.hostname or "").lower(), b.port, b.path.rstrip("/"))
 
 
-def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBackendFactory:
+def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBackendFactory:  # noqa: ANN401  # Any: forwarded keyword arguments, passed through unchanged
     """A :data:`TiledBackendFactory` for the deployment's Tiled target (read-only adapter).
 
     * ``managed`` (``:local`` and test fixtures): :func:`~app.modules.deployment.tiled_lifecycle.find_managed`
