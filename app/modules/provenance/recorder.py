@@ -196,7 +196,7 @@ class AuditRecorder:
         while self._spill:
             try:
                 self.log.append(self._spill[0])
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - audit log append may raise anything; events stay queued and the failure is logged
                 logger.debug("audit spill flush stopped; events stay queued", exc_info=True)
                 return
             self._spill.pop(0)
@@ -217,7 +217,7 @@ class AuditRecorder:
                 raise AuditUnavailable(self._degraded_reason or "events are waiting to be persisted")
             try:
                 self.log.probe()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001 - audit log probe may raise anything; reported as AuditUnavailable
                 self._degraded_reason = f"{type(exc).__name__}: audit log not writable"
                 raise AuditUnavailable(self._degraded_reason) from exc
             self._degraded_reason = ""
@@ -227,7 +227,7 @@ class AuditRecorder:
         with self._lock:
             try:
                 pending, last = self.log.pending_projection(), self.log.last_seq()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - audit log read may raise anything; reported as unhealthy status and logged
                 logger.warning("audit log not readable", exc_info=True)
                 pending, last = -1, -1
                 self._degraded_reason = self._degraded_reason or "audit log not readable"

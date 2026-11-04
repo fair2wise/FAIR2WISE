@@ -188,7 +188,7 @@ class SafeFetcher:
             return True  # transport does not expose the peer (pre-connect check still applied)
         try:
             peer = stream.get_extra_info("server_addr")
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 - transport without a readable peer address: the pre-connect check already applied
             return True
         if not peer:
             return True

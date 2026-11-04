@@ -41,7 +41,7 @@ from flask import Flask, jsonify, redirect, render_template_string, request, url
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from . import harvest_rsoxs as hv  # noqa: E402
+from . import harvest_rsoxs as hv  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 
 LOGGER = logging.getLogger("paper_finder")
 

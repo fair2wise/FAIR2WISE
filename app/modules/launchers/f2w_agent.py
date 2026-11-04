@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     load_entrypoint_dotenv(__file__)
 
-from ..f2w_agent.cli import main  # noqa: E402
+from ..f2w_agent.cli import main  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 
 if __name__ == "__main__":
     sys.exit(main())

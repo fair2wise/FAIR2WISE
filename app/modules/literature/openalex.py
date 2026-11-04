@@ -284,7 +284,7 @@ def retry_after_seconds(resp: Any) -> float | None:
     """The integer ``Retry-After`` a response names, else ``None`` (dates are not parsed)."""
     try:
         raw = str(resp.headers.get("retry-after", "")).strip()
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - malformed response object: no Retry-After hint
         return None
     if not raw:
         return None
@@ -307,7 +307,7 @@ def quota_pause_seconds(resp: Any, now: float) -> float | None:
         if retry_after is None:
             try:
                 body = str(resp.text or "").lower()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - unreadable body: treated as empty, so no budget marker is detected
                 body = ""
             if any(marker in body for marker in _BUDGET_MARKERS):
                 return seconds_to_utc_midnight(now)

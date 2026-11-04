@@ -148,7 +148,7 @@ class StructuredTermResolver:
         self.input_tokens += tokens
         try:
             raw = self.judge(prompt)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - judge is an arbitrary callable; any failure becomes an abstain verdict
             logger.warning("judge call failed: %s", type(exc).__name__)
             return verdict("abstain", reason=f"{type(exc).__name__}: {exc}", errors=("judge_failed",))
         payload = parse_json_object(raw)

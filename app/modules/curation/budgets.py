@@ -86,7 +86,7 @@ class BudgetLedger:
             if cap_usd is not None:
                 spent = con.execute(
                     f"SELECT COALESCE(SUM(COALESCE(actual_usd, reserved_usd)), 0) FROM budget_ledger "
-                    f""  # noqa: S608
+                    f""  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
                     f"WHERE state IN {_CHARGED}"
                 ).fetchone()[0]
                 if float(spent) + amount_usd > cap_usd:
@@ -94,7 +94,7 @@ class BudgetLedger:
             if scope_cap_usd is not None:
                 scoped = con.execute(
                     f"SELECT COALESCE(SUM(COALESCE(actual_usd, reserved_usd)), 0) FROM budget_ledger "
-                    f""  # noqa: S608
+                    f""  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
                     f"WHERE scope=? AND state IN {_CHARGED}",
                     (scope,),
                 ).fetchone()[0]

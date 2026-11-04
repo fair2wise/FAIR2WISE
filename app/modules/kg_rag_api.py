@@ -82,10 +82,10 @@ else:
     SentenceTransformer = None  # type: ignore[assignment,misc]
     torch = None  # type: ignore[assignment]
 
-from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402
-from .cborg_limiter import async_slot  # noqa: E402
-from .cli_output import output  # noqa: E402
-from .literature.pdf_reader import open_pdf  # noqa: E402
+from .cborg_http import openai_http_kwargs, require_cborg_api_key  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from .cborg_limiter import async_slot  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from .cli_output import output  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from .literature.pdf_reader import open_pdf  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if TYPE_CHECKING:
@@ -951,7 +951,7 @@ class NodeInfo:
 
 
 # ───────────────────── PDF cache ─────────────────────
-from functools import lru_cache  # noqa: E402
+from functools import lru_cache  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 
 
 @lru_cache(maxsize=MAX_PDF_CACHE)
