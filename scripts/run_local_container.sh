@@ -47,7 +47,7 @@ docker run -d --name "$name" --stop-timeout 120 \
   -e CBORG_API_KEY \
   -e F2W_FOLDER_ROOTS=/data/papers \
   -e "F2W_KG_RELEASE_DIR=${F2W_KG_RELEASE_DIR:-/var/lib/fair2wise/state/kg_releases}" \
-  "${openalex_args[@]}" \
+  ${openalex_args[@]+"${openalex_args[@]}"} \
   -v "$papers":/data/papers:ro \
   -v "$library":/var/lib/fair2wise/library \
   -v f2w-local-state:/var/lib/fair2wise/state \
