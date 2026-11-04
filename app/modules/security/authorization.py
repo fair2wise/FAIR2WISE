@@ -564,13 +564,13 @@ def requires(*capabilities: str, ctx_arg: str = "ctx") -> Callable[[F], F]:
     def decorate(func: F) -> F:
         if inspect.iscoroutinefunction(func):
             @functools.wraps(func)
-            async def async_wrapper(*args: object, **kwargs: object) -> Any:
+            async def async_wrapper(*args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: decorator pass-through; returns whatever the wrapped coroutine returns
                 require(_find_context(args, kwargs, ctx_arg), *needed)
                 return await func(*args, **kwargs)
             wrapper: Any = async_wrapper
         else:
             @functools.wraps(func)
-            def sync_wrapper(*args: object, **kwargs: object) -> Any:
+            def sync_wrapper(*args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: decorator pass-through; returns whatever the wrapped function returns
                 require(_find_context(args, kwargs, ctx_arg), *needed)
                 return func(*args, **kwargs)
             wrapper = sync_wrapper

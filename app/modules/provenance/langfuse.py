@@ -33,6 +33,7 @@ from typing import Any
 
 from ..contracts.context import RequestContext
 from ..security.disclosure import DisclosureProjector, Viewer
+from ..json_types import Untyped
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class LangfuseSettings:
 ClientFactory = Callable[[LangfuseSettings], Any]
 
 
-def default_client_factory(settings: LangfuseSettings) -> Any:
+def default_client_factory(settings: LangfuseSettings) -> Untyped:
     """Build the real client; imports ``langfuse`` lazily (an optional dependency)."""
     try:
         from langfuse import Langfuse  # type: ignore[import-not-found,unused-ignore]

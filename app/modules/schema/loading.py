@@ -26,6 +26,7 @@ from .registry import (
     pre_s4_bytes,
     sha256_bytes,
 )
+from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ def load_helper(
     return SchemaHelper(str(entry.abs_path), fuzzy_cutoff=fuzzy_cutoff)
 
 
-def load_yaml_asset(entry: SchemaEntry) -> Any:
+def load_yaml_asset(entry: SchemaEntry) -> JsonValue:
     """Parse a non-LinkML asset (vocabulary, mapping, seed, example) with ``yaml.safe_load``."""
     if entry.is_linkml:
         raise RegistryError(f"{entry.path} is a LinkML schema; use load_schema_view")

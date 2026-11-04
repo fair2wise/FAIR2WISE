@@ -43,6 +43,7 @@ from .parsed_document import (
     without_embedded_images,
 )
 from .pdf_reader import open_pdf
+from ..json_types import Untyped
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +193,7 @@ class DoclingParser:
             "do_table_structure": self.do_table_structure,
         }
 
-    def _converter(self) -> Any:
+    def _converter(self) -> Untyped:
         if self._converter_instance is None:
             from docling.datamodel.base_models import InputFormat
             from docling.datamodel.pipeline_options import PdfPipelineOptions

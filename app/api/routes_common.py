@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.json_types import JsonValue
 from .auth import fresh_request_context, request_context
 from .operations import F2WOperations
 
@@ -69,7 +70,7 @@ def fresh_context(request: Request) -> RequestContext:
     return ctx
 
 
-def project(request: Request, payload: Any) -> Any:
+def project(request: Request, payload: Any) -> JsonValue:
     """Project a ``/v1`` body with the app's one disclosure projector (D19, AUD-06).
 
     :meth:`~app.modules.security.disclosure.DisclosureProjector.project_api_response`:
@@ -89,7 +90,7 @@ def project_dict(request: Request, payload: object) -> dict[str, Any]:
     return projected
 
 
-def dump(model: object) -> Any:
+def dump(model: object) -> JsonValue:
     """JSON-ready form of a Pydantic model (other values unchanged)."""
     return model.model_dump(mode="json") if hasattr(model, "model_dump") else model
 

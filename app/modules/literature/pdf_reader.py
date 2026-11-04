@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 from typing import Any
+from ..json_types import Untyped
 
 #: ``fitz``-style metadata keys, in the order PyMuPDF reported them, mapped from PDF Info keys.
 _METADATA_KEYS = {
@@ -145,7 +146,7 @@ class PdfPage:
             boxes.append((float(left), float(height - top), float(right), float(height - bottom)))
         return boxes
 
-    def render_gray(self, region: tuple[float, float, float, float] | None, scale: float) -> Any:
+    def render_gray(self, region: tuple[float, float, float, float] | None, scale: float) -> Untyped:
         """Render ``region`` (top-left points, ``(x0, y0, x1, y1)``) to a 2-D uint8 numpy array.
 
         Args:

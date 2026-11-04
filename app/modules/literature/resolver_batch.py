@@ -215,11 +215,11 @@ def _title_year_agree(ref: ReferenceLike, title: str, year: object) -> bool:
         return True
 
 
-def _crossref_year(item: dict[str, Any]) -> Any:
+def _crossref_year(item: dict[str, Any]) -> int | None:
     for name in ("issued", "published-print", "published-online"):
         parts = (item.get(name) or {}).get("date-parts") or [[None]]
         if parts and parts[0] and parts[0][0]:
-            return parts[0][0]
+            return cast(int, parts[0][0])
     return None
 
 

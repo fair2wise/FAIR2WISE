@@ -88,7 +88,7 @@ class _NumpyIPIndex:
         return sims.astype(np.float32), idx.astype(np.int64)
 
 
-def _open_faiss_index(dim: int) -> Any:  # Any: faiss.IndexFlatIP or the numpy fallback (faiss is untyped)
+def _open_faiss_index(dim: int) -> Any:  # noqa: ANN401  # Any: faiss.IndexFlatIP or the numpy fallback (faiss is untyped)
     """Return FAISS IndexFlatIP, or numpy inner-product if FAISS is unsafe/missing."""
     if os.environ.get("F2W_MERGE_FAISS", "1").strip().lower() in {"0", "false", "no", "off"}:
         logger.info("F2W_MERGE_FAISS disabled; using numpy inner-product search")
@@ -220,7 +220,7 @@ class TermMergeIndex:
         self._dim = int(vecs.shape[1])
         return np.ascontiguousarray(vecs, dtype=np.float32)
 
-    def _load_model_unlocked(self) -> Any:  # Any: SentenceTransformer (untyped)
+    def _load_model_unlocked(self) -> Any:  # noqa: ANN401  # Any: SentenceTransformer (untyped)
         if self._embed_model is not None:
             return self._embed_model
         from sentence_transformers import SentenceTransformer

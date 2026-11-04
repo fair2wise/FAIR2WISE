@@ -37,12 +37,16 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..modules.cli_output import output
 from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.json_types import JsonValue
 from .legacy_ui import deployment_settings_from
 from .operations import F2WOperations, build_operations
+
+if TYPE_CHECKING:
+    from ..modules.operations.knowledge import KnowledgeOperations
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -161,7 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _dump(value: object) -> Any:
+def _dump(value: object) -> JsonValue:
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
     if isinstance(value, list):
@@ -169,7 +173,7 @@ def _dump(value: object) -> Any:
     return value
 
 
-def run(ops: F2WOperations, args: argparse.Namespace) -> Any:
+def run(ops: F2WOperations, args: argparse.Namespace) -> JsonValue:
     """Run one parsed command against ``ops`` and return its JSON-ready result."""
     ctx = ops.cli_context()
     area, action = args.area, args.action
@@ -256,7 +260,7 @@ def _decisions(raw: str) -> list[dict[str, Any]]:
     return items
 
 
-def build_knowledge(project_root: str, graph_files: list[str] | None = None) -> Any:
+def build_knowledge(project_root: str, graph_files: list[str] | None = None) -> KnowledgeOperations:
     """Build the CLI's ``KnowledgeOperations``.
 
     Reads ``storage/kg`` or the explicit graph files, plus the ``storage/terminology`` corpora.

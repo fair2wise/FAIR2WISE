@@ -87,6 +87,7 @@ from .cborg_limiter import async_slot  # noqa: E402 - module-level import placed
 from .cli_output import output  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 from .literature.pdf_reader import open_pdf  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
+from .json_types import JsonValue
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -361,7 +362,7 @@ def create_fastapi_app(
     rag_c = Conversation(RAG_SYSTEM)
     gap_tracker = MissingNodeTracker(graph_file, out_dir=gaps_dir)  # disabled when the directory is read-only
 
-    def _project(ctx: RequestContext, payload: dict[str, Any], sources: ModelTurnSources) -> Any:
+    def _project(ctx: RequestContext, payload: dict[str, Any], sources: ModelTurnSources) -> JsonValue:
         """Project a chat body for ``ctx`` with the turn's PDF windows as verifiable source regions."""
         viewer = Viewer.from_context(ctx)
         refs = sources.refs()
@@ -409,7 +410,7 @@ def create_fastapi_app(
         return rag_resp
 
     @app.post("/api/chat", response_model=None)
-    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)) -> Any:
+    async def api_chat(req: Request, ctx: RequestContext = Depends(request_context)) -> JsonValue:
         """Handle incoming chat request: retrieve KG context, call LLM, return response."""
         body = await req.json()
         messages = body.get("messages", [])
@@ -426,7 +427,7 @@ def create_fastapi_app(
         }, ModelTurnSources(snippets))
 
     @app.post("/v1/chat/completions", response_model=None)
-    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)) -> Any:
+    async def openai_chat_completions(req: Request, ctx: RequestContext = Depends(request_context)) -> JsonValue:
         """Handle OpenAI-compatible chat completions for Open WebUI."""
         body = await req.json()
         messages = body.get("messages", [])

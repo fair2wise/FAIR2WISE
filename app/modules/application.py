@@ -42,15 +42,26 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 import uuid
 
 from .contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
+from .json_types import Untyped
 from .security.authorization import DeploymentSettings, local_operator_context, resolve_context
 
 if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
+
+    from .agent_runtime.admission import Admission
+    from .agent_runtime.chat_model import ChatModel
     from .agent_runtime.checkpointer import ManagedCheckpointer
-    from .security.tiled_identity import TiledCredential
+    from .agent_runtime.executor import RuntimeLimits
+    from .agent_runtime.policies import EventSink
+    from .evidence.bundle import EvidenceSource
+    from .operations.knowledge import KnowledgeOperations
+    from .runtime_bridge.bootstrap import ToolPack
+    from .runtime_bridge.qa_tool import ReadOutcome
+    from .security.tiled_identity import TiledCredential, TiledIdentityPort
 
 logger = logging.getLogger(__name__)
 
@@ -156,20 +167,20 @@ class F2WApplication:
         *,
         settings: DeploymentSettings,
         retrieval: object,
-        chat_model: object = None,
+        chat_model: ChatModel | None = None,
         checkpointer: object = None,
-        event_sink: Any = None,
-        admission: Any = None,
-        limits: Any = None,
+        event_sink: EventSink | None = None,
+        admission: Admission | None = None,
+        limits: RuntimeLimits | None = None,
         provider: str = "cborg",
         system_prompt: str | None = None,
-        identity_port: Any = None,
+        identity_port: TiledIdentityPort | None = None,
         clock: Callable[[], datetime] = _utcnow,
         name: str = "f2w",
         ledger_size: int = 256,
-        knowledge: Any = None,
-        literature: Any = None,
-        evidence: Any = None,
+        knowledge: KnowledgeOperations | None = None,
+        literature: ToolPack | None = None,
+        evidence: EvidenceSource | None = None,
     ) -> None:
         from .agent_runtime.executor import RuntimeLimits, ToolExecutor
         from .agent_runtime.policies import InMemoryEventSink
@@ -204,9 +215,9 @@ class F2WApplication:
                                      limits=self.limits, clock=clock)
         self._owned_checkpointer: ManagedCheckpointer | None = None
         self._managed: ManagedCheckpointer | None = None
-        self._saver = None
+        self._saver: BaseCheckpointSaver[Any] | None = None
         self.chat_model = chat_model
-        self.supervisor = None
+        self.supervisor: Untyped | None = None
         if chat_model is not None:
             self._saver = self._open_checkpointer(checkpointer)
             from .agent_runtime.supervisor import build_literature_supervisor
@@ -220,7 +231,7 @@ class F2WApplication:
 
     # -- lifecycle ----------------------------------------------------------------
 
-    def _open_checkpointer(self, checkpointer: object) -> Any:
+    def _open_checkpointer(self, checkpointer: object) -> BaseCheckpointSaver[Any]:
         from .agent_runtime.checkpointer import ManagedCheckpointer
 
         if checkpointer is None:
@@ -229,10 +240,10 @@ class F2WApplication:
         if isinstance(checkpointer, ManagedCheckpointer):
             self._managed = checkpointer
             return checkpointer.saver
-        return checkpointer
+        return cast(BaseCheckpointSaver[Any], checkpointer)
 
     @property
-    def checkpointer(self) -> Any:
+    def checkpointer(self) -> BaseCheckpointSaver[Any] | None:
         """The LangGraph saver used by delegated tasks (``None`` without a chat model)."""
         return self._saver
 
@@ -293,7 +304,7 @@ class F2WApplication:
         history: Sequence[Mapping[str, str]] | None = None,
         source_rag: bool | None = None,
         use_live_tiled: bool | None = None,
-    ) -> Any:
+    ) -> ReadOutcome:
         """Answer ``question`` with the existing F2W QA path, bypassing planning.
 
         Runs the ``answer_from_knowledge`` tool through this instance's executor
@@ -307,7 +318,8 @@ class F2WApplication:
             ctx, TOOL_NAME, self._read_args(question, history, source_rag, use_live_tiled))
         return outcome_from_ledger(outcome.result, self.ledger, pop=True)
 
-    def answer_from_knowledge_sync(self, ctx: RequestContext, question: str, **kw: Any) -> Any:
+    def answer_from_knowledge_sync(self, ctx: RequestContext, question: str,
+                                   **kw: Any) -> ReadOutcome:  # noqa: ANN401  # Any: forwarded verbatim to answer_from_knowledge
         """Synchronous :meth:`answer_from_knowledge` for CLI/worker callers without a running loop.
 
         Raises:
@@ -322,7 +334,7 @@ class F2WApplication:
 
     # -- delegated task (LangGraph supervisor) -----------------------------------------
 
-    def _require_supervisor(self) -> Any:
+    def _require_supervisor(self) -> Untyped:
         if self.supervisor is None:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
                                 "delegated tasks need a chat model; this application was built without one")

@@ -26,6 +26,7 @@ from typing import Any, Literal
 from ..literature.parsers import DOCLING_ARTIFACTS_ENV
 from .ocr import Detection
 from .results import VisionUnavailable
+from ..json_types import Untyped
 
 logger = logging.getLogger(__name__)
 
@@ -55,13 +56,13 @@ def weights_available(path: str | Path | None = None) -> bool:
     return all(any(part in n and n.endswith(".pth") for n in names) for part in ("det", "cls", "rec"))
 
 
-def _docling_stream(png: bytes) -> Any:
+def _docling_stream(png: bytes) -> Untyped:
     from docling.datamodel.base_models import DocumentStream
 
     return DocumentStream(name="figure.png", stream=BytesIO(png))
 
 
-def _build_converter(artifacts: Path) -> Any:
+def _build_converter(artifacts: Path) -> Untyped:
     """A Docling image converter with full-page RapidOCR, reading only from ``artifacts``."""
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import OcrMode, PdfPipelineOptions, RapidOcrOptions

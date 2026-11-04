@@ -57,10 +57,21 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult
+from .modules.json_types import JsonValue
 from .modules.security.authorization import DeploymentSettings
 
 if TYPE_CHECKING:  # the operations service is imported only by callers that pass one
+    from datetime import datetime
+
     from .api.operations import F2WOperations
+    from .modules.agent_runtime.chat_model import ChatModel
+    from .modules.agent_runtime.executor import ToolExecutor
+    from .modules.contracts.changes import ApprovalRecord, ChangePlan
+    from .modules.contracts.jobs import JobHandle
+    from .modules.evidence.bundle import EvidenceSource, LiteratureEvidenceBundle
+    from .modules.jobs.keys import OperationInputs
+    from .modules.operations.papers import PaperSummaryTool
+    from .modules.runtime_bridge.qa_tool import ReadOutcome
     from .modules.security.tiled_identity import TiledCredential
 
 __all__ = ("F2WClient", "LiteratureAgent", "create_literature_agent")
@@ -116,10 +127,10 @@ class F2WClient:
         settings: DeploymentSettings,
         *,
         retrieval: object,
-        chat_model: object = None,
+        chat_model: ChatModel | None = None,
         checkpointer: object = None,
         operations: F2WOperations | None = None,
-        **options: Any,
+        **options: Any,  # noqa: ANN401  # Any: forwarded verbatim to F2WApplication
     ) -> F2WClient:
         """Build a client from explicit settings (no ``.env`` or environment read).
 
@@ -170,21 +181,24 @@ class F2WClient:
 
     # -- request context ---------------------------------------------------------------
 
-    def context_for(self, credential: TiledCredential | str | None = None, **kw: Any) -> RequestContext:
+    def context_for(self, credential: TiledCredential | str | None = None, **kw: Any,  # noqa: ANN401  # Any: forwarded verbatim to F2WApplication.context
+                    ) -> RequestContext:
         """Resolve a request context with the profile rules (local-operator on ``:local``)."""
         return self._app.context(credential, **kw)
 
     # -- implemented methods ---------------------------------------------------------------
 
-    async def answer_from_knowledge(self, ctx: RequestContext, question: str, **kw: Any) -> Any:
+    async def answer_from_knowledge(self, ctx: RequestContext, question: str,
+                                    **kw: Any) -> ReadOutcome:  # noqa: ANN401  # Any: forwarded verbatim to F2WApplication.answer_from_knowledge
         """Existing F2W QA answer (``ReadOutcome``; ``.to_legacy()`` gives the legacy verdict)."""
         return await self._app.answer_from_knowledge(ctx, question, **kw)
 
-    def answer_from_knowledge_sync(self, ctx: RequestContext, question: str, **kw: object) -> Any:
+    def answer_from_knowledge_sync(self, ctx: RequestContext, question: str,
+                                   **kw: Any) -> ReadOutcome:  # noqa: ANN401  # Any: forwarded verbatim to F2WApplication.answer_from_knowledge_sync
         """Synchronous :meth:`answer_from_knowledge`; raises inside a running event loop."""
         return self._app.answer_from_knowledge_sync(ctx, question, **kw)
 
-    def _summary_executor(self) -> Any:
+    def _summary_executor(self) -> tuple[ToolExecutor, PaperSummaryTool]:
         if self._summary is None:
             from .modules.agent_runtime.executor import ToolExecutor
             from .modules.operations.papers import PaperSummaryTool
@@ -232,26 +246,26 @@ class F2WClient:
         with pinned_paper_scope(scope):
             result = await executor.aexecute(ctx, TOOL_NAME, args)
         tool.ledger.pop(result.provenance_id)  # the client returns the typed result only
-        return cast(ToolResult, result)
+        return result
 
     # -- jobs and publication: forwarded to the shared F2WOperations (same policy as /v1) -----
 
-    def submit_ingest(self, ctx: RequestContext, request: Any) -> Any:
+    def submit_ingest(self, ctx: RequestContext, request: OperationInputs | Mapping[str, Any]) -> JobHandle:
         """Submit an ``ingest`` job (``F2WOperations.submit_job``; ``POST /v1/jobs`` with kind ``ingest``).
 
         ``request`` is an ``OperationInputs`` or its dict form. Returns the ``JobHandle``.
         """
         return self._operations("submit_ingest").submit_job(ctx, "ingest", request)
 
-    def get_job(self, ctx: RequestContext, job_id: str) -> Any:
+    def get_job(self, ctx: RequestContext, job_id: str) -> JobHandle:
         """The job's ``JobHandle`` (``F2WOperations.get_job``; ``GET /v1/jobs/{id}``)."""
         return self._operations("get_job").get_job(ctx, job_id)
 
-    def cancel_job(self, ctx: RequestContext, job_id: str) -> Any:
+    def cancel_job(self, ctx: RequestContext, job_id: str) -> JobHandle:
         """Cancel the job (``F2WOperations.cancel_job``; ``POST /v1/jobs/{id}/cancel``)."""
         return self._operations("cancel_job").cancel_job(ctx, job_id)
 
-    def plan_publication(self, ctx: RequestContext, snapshot_id: str, target: Any) -> Any:
+    def plan_publication(self, ctx: RequestContext, snapshot_id: str, target: str) -> JobHandle:
         """Submit a publication job that plans ``snapshot_id`` for ``target`` (H5 gate applies).
 
         Forwards to ``F2WOperations.submit_publication`` (``POST /v1/publications``) and returns
@@ -260,8 +274,9 @@ class F2WClient:
         """
         return self._operations("plan_publication").submit_publication(ctx, snapshot_id, target)
 
-    def approve_plan(self, ctx: RequestContext, plan: Any | str, *, job_id: str,
-                     approver_credential: Any = None, expires_at: Any = None) -> Any:
+    def approve_plan(self, ctx: RequestContext, plan: ChangePlan | str, *, job_id: str,
+                     approver_credential: TiledCredential | None = None,
+                     expires_at: datetime | None = None) -> dict[str, Any]:
         """Approve the publication job's current plan (``F2WOperations.approve_publication``).
 
         ``plan`` is the ``ChangePlan`` the reviewer was shown, or its ``plan_sha256``; another
@@ -308,45 +323,46 @@ class F2WClient:
         return self._operations("audit_corpus").audit_corpus(ctx, corpus, sections=sections)
 
     def submit_knowledge_operation(self, ctx: RequestContext, operation: str, args: Mapping[str, Any], *,
-                                   corpus_scope: Sequence[str] | None = None) -> Any:
+                                   corpus_scope: Sequence[str] | None = None) -> JobHandle:
         """Submit a ``knowledge_operation`` job (``POST /v1/operations/jobs``; ``ops.run``). Returns the handle."""
         return self._operations("submit_knowledge_operation").submit_knowledge_operation(
             ctx, operation, args, corpus_scope=corpus_scope)
 
-    def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> Any:
+    def knowledge_job_result(self, ctx: RequestContext, job_id: str) -> dict[str, Any]:
         """Handle and bounded report of a ``knowledge_operation`` job (``GET /v1/operations/jobs/{id}``)."""
         return self._operations("knowledge_job_result").knowledge_job_result(ctx, job_id)
 
     # -- T31/T32: cost control, bulk review, vocabulary quality, figure scales, folders (same policy as /v1) --
 
-    def cost_control(self, ctx: RequestContext) -> Any:
+    def cost_control(self, ctx: RequestContext) -> dict[str, Any]:
         """The remote-cost switch and cap with the ledger spend (``GET /v1/curation/cost-control``)."""
         return self._operations("cost_control").cost_control(ctx)
 
-    def set_cost_control(self, ctx: RequestContext, *, enabled: bool, budget_cap_usd: float | None) -> Any:
+    def set_cost_control(self, ctx: RequestContext, *, enabled: bool, budget_cap_usd: float | None) -> dict[str, Any]:
         """Set the remote-cost switch and cap (``PUT /v1/curation/cost-control``; human, audited)."""
         return self._operations("set_cost_control").set_cost_control(ctx, enabled=enabled,
                                                                      budget_cap_usd=budget_cap_usd)
 
-    def bulk_review(self, ctx: RequestContext, decisions: Sequence[Mapping[str, Any]]) -> Any:
+    def bulk_review(self, ctx: RequestContext, decisions: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         """Review several cases at once (``POST /v1/curation/cases/bulk-review``); one result per case."""
         return self._operations("bulk_review").bulk_review(ctx, decisions)
 
-    def vocabulary_quality(self, ctx: RequestContext, *, limit: int = 30) -> Any:
+    def vocabulary_quality(self, ctx: RequestContext, *, limit: int = 30) -> dict[str, Any]:
         """Newest-first vocabulary-quality snapshots (``GET /v1/vocabulary/quality``)."""
         return self._operations("vocabulary_quality").vocabulary_quality(ctx, limit=limit)
 
     def figure_scales(self, ctx: RequestContext, *, corpus: str | None = None, work_id: str | None = None,
-                      figure_id: str | None = None, limit: int = 100) -> Any:
+                      figure_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         """Human-read figure-scale records in the caller's scope (``GET /v1/figures/scales``)."""
         return self._operations("figure_scales").list_figure_scales(ctx, corpus=corpus, work_id=work_id,
                                                                     figure_id=figure_id, limit=limit)
 
-    def figure_scale(self, ctx: RequestContext, record_id: str) -> Any:
+    def figure_scale(self, ctx: RequestContext, record_id: str) -> dict[str, Any]:
         """One figure-scale record (``GET /v1/figures/scales/{id}``)."""
         return self._operations("figure_scale").get_figure_scale(ctx, record_id)
 
-    def record_figure_scale(self, ctx: RequestContext, **fields: Any) -> Any:
+    def record_figure_scale(self, ctx: RequestContext, **fields: Any,  # noqa: ANN401  # Any: forwarded verbatim to F2WOperations.record_figure_scale
+                            ) -> dict[str, Any]:
         """Record a human-read scale (``POST /v1/figures/scales``; human, ``curation.approve``, audited).
 
         ``fields`` are those of ``F2WOperations.record_figure_scale``: ``corpus``, ``work_id``,
@@ -354,15 +370,15 @@ class F2WClient:
         """
         return self._operations("record_figure_scale").record_figure_scale(ctx, **fields)
 
-    def folder_roots(self, ctx: RequestContext) -> Any:
+    def folder_roots(self, ctx: RequestContext) -> dict[str, Any]:
         """The configured folder root labels (``GET /v1/folders/roots``; ``:local`` only)."""
         return self._operations("folder_roots").folder_roots(ctx)
 
-    def list_folder(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 1000) -> Any:
+    def list_folder(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 1000) -> dict[str, Any]:
         """Entries of one folder under a configured root (``GET /v1/folders/list``; ``:local`` only)."""
         return self._operations("list_folder").list_folder(ctx, root, path, limit=limit)
 
-    def folder_index(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 500) -> Any:
+    def folder_index(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 500) -> dict[str, Any]:
         """Bounded document inventory under one folder (``GET /v1/folders/index``; ``:local`` only)."""
         return self._operations("folder_index").folder_index(ctx, root, path, limit=limit)
 
@@ -453,7 +469,7 @@ class F2WClient:
 
     # -- evidence (T15 over the T06 candidate records) ------------------------------------------------
 
-    def _evidence_source(self, method: str) -> Any:
+    def _evidence_source(self, method: str) -> EvidenceSource:
         source = self._app.evidence
         if source is None or not hasattr(source, "evidence") or not hasattr(source, "quantities"):
             from .modules.contracts.errors import ContractError, ErrorCode
@@ -490,7 +506,7 @@ class F2WClient:
             warnings=tuple(f"unknown evidence id {e}" for e in missing),
         )
 
-    def evidence_bundle(self, ctx: RequestContext, work_id: str, *, include_quotes: bool = False) -> Any:
+    def evidence_bundle(self, ctx: RequestContext, work_id: str, *, include_quotes: bool = False) -> LiteratureEvidenceBundle:
         """The read-only literature-evidence bundle of one Work (T15).
 
         Returns a :class:`~app.modules.evidence.bundle.LiteratureEvidenceBundle` (JSON through
@@ -508,7 +524,7 @@ class F2WClient:
 
     # -- disclosure (D19) ------------------------------------------------------------------------------
 
-    def disclose(self, payload: object) -> Any:
+    def disclose(self, payload: object) -> JsonValue:
         """Project a result for a person the way the ``/v1`` routes do (``project_api_response``).
 
         ``payload`` may be a ``ToolResult``, a bundle or any JSON-ready value; Pydantic models are
@@ -525,7 +541,7 @@ class F2WClient:
 
     # -- publication: apply an existing approval -------------------------------------------------------
 
-    def publish_plan(self, ctx: RequestContext, plan: Any, approval: Any) -> Any:
+    def publish_plan(self, ctx: RequestContext, plan: ChangePlan, approval: ApprovalRecord) -> JobHandle:
         """Hand ``approval`` (a ``create_approval`` record naming the job) to the publication job.
 
         Forwards to ``F2WOperations.apply_approval``: ``approval.authorizes(plan)`` is checked, then the
@@ -575,7 +591,7 @@ class LiteratureAgent:
     def __enter__(self) -> LiteratureAgent:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.close()
 
     async def delegate(
@@ -590,11 +606,11 @@ def create_literature_agent(
     client: F2WClient | None = None,
     settings: DeploymentSettings | None = None,
     retrieval: object = None,
-    chat_model: object = None,
+    chat_model: ChatModel | None = None,
     checkpointer: object = None,
     sync_model: object = None,
     async_model: object = None,
-    **options: Any,  # Any: forwarded F2WApplication keyword arguments
+    **options: Any,  # noqa: ANN401  # Any: forwarded F2WApplication keyword arguments
 ) -> LiteratureAgent:
     """Return a :class:`LiteratureAgent` over ``client`` or over a new client.
 

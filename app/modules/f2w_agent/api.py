@@ -109,6 +109,7 @@ from .trace import (
     tracing_enabled,
 )
 from .workflow_state import WorkflowStateStore
+from ..json_types import Untyped
 
 logger = logging.getLogger(__name__)
 
@@ -3222,7 +3223,7 @@ class AgentPipelineService:
         self._rebuild_agents()
 
     @property
-    def _splash(self) -> Any:
+    def _splash(self) -> Untyped:
         """The Splash client module, or the no-op stand-in when Saves go to Tiled (T18D: no Splash call)."""
         return kg_update if self.tiled_save is None else _TILED_SAVE_NO_SPLASH
 

@@ -24,12 +24,12 @@ The T09 ``vision_*`` paper-figure tools (``app.modules.vision.tools.VisionToolse
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Iterable
+from typing import Any, Protocol
 
 from ..agent_runtime.registry import ToolRegistry
 from ..agent_runtime.skills import Skill, SkillRegistry
-from ..contracts.tools import ToolSpec
+from ..contracts.tools import ToolResult, ToolSpec
 from ..literature.skill import LITERATURE_RESEARCH_SKILL
 from ..operations.corpus import AUDIT_LITERATURE_CORPUS_SKILL
 from ..operations.graph import ANALYZE_KNOWLEDGE_GRAPH_SKILL
@@ -38,6 +38,23 @@ from ..operations.papers import TOOL_NAME as SUMMARY_TOOL_NAME
 from ..tools.bootstrap import build_registry, build_skill_registry
 from ..vision.skill import PAPER_FIGURES_SKILL
 from .qa_tool import ANSWER_FROM_KNOWLEDGE, TOOL_NAME, LegacyResultLedger, make_answer_tool
+
+
+class ToolPack(Protocol):
+    """A toolset that contributes several ``(spec, fn)`` pairs (literature, vision, knowledge)."""
+
+    def registrations(self) -> Iterable[tuple[ToolSpec, Callable[[Any], ToolResult]]]:
+        """Return the ``(spec, fn)`` pairs for ``build_registry(extra=...)``."""
+        ...
+
+
+class ToolPackOne(Protocol):
+    """A tool that contributes one ``(spec, fn)`` pair (the paper summary)."""
+
+    def registration(self) -> tuple[ToolSpec, Callable[[Any], ToolResult]]:
+        """Return the ``(spec, fn)`` pair for ``build_registry(extra=...)``."""
+        ...
+
 
 ANSWER_SKILL = Skill(
     name="answer_literature_question",
@@ -73,7 +90,8 @@ QA_DELEGATION_PROMPT = (
 
 def build_read_registry(
     service: object, ledger: LegacyResultLedger, *, name: str = "f2w", freeze: bool = True,
-    paper_summary: Any = None, literature: Any = None, vision: Any = None, knowledge: Any = None,
+    paper_summary: ToolPackOne | None = None, literature: ToolPack | None = None, vision: ToolPack | None = None,
+    knowledge: ToolPack | None = None,
 ) -> ToolRegistry:
     """Fresh registry holding ``answer_from_knowledge`` bound to ``service`` and ``ledger``.
 

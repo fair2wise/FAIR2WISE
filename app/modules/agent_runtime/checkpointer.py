@@ -25,9 +25,12 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import threading
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from ..contracts import RequestContext
+
+if TYPE_CHECKING:
+    from langgraph.checkpoint.base import BaseCheckpointSaver
 
 
 @dataclass(frozen=True)
@@ -59,12 +62,12 @@ class ManagedCheckpointer:
 
     def __init__(self, config: CheckpointerConfig | None = None) -> None:
         self.config = config or CheckpointerConfig()
-        self._saver: Any = None
+        self._saver: BaseCheckpointSaver[Any] | None = None
         self._cm: Any = None
         self._active: dict[str, int] = {}
         self._lock = threading.Lock()
 
-    def open(self) -> Any:
+    def open(self) -> BaseCheckpointSaver[Any]:
         """Construct the saver (idempotent) and return it."""
         with self._lock:
             if self._saver is not None:
@@ -90,7 +93,7 @@ class ManagedCheckpointer:
             return self._saver
 
     @property
-    def saver(self) -> Any:
+    def saver(self) -> BaseCheckpointSaver[Any]:
         """The open saver; opens it on first access."""
         return self._saver if self._saver is not None else self.open()
 

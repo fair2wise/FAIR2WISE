@@ -25,6 +25,7 @@ from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
 from .kernels.geometry import FigureFrame, spans_inside
 from .kernels.types import TextSpan
 from .results import Box, Uncertainty, VisionUnavailable, box4
+from ..json_types import Untyped
 
 DEFAULT_RENDER_SCALE = 2.0
 #: Minimum spans inside a figure for its text layer to count as usable.
@@ -98,7 +99,7 @@ def locate_figure_on_page(doc: Any, page_number: int) -> Box | None:
     return boxes[0]
 
 
-def render_gray(doc: Any, page_number: int, region: Box, scale: float) -> Any:
+def render_gray(doc: Any, page_number: int, region: Box, scale: float) -> Untyped:
     """Render ``region`` (top-left points) to a 2-D uint8 numpy array at ``scale`` px/pt.
 
     The array is the pipeline's internal working image; it is never returned or stored.

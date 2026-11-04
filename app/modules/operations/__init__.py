@@ -51,7 +51,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 __all__ = sorted(_EXPORTS)
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str) -> Any:  # noqa: ANN401  # Any: PEP 562 lazy-export hook; the attribute type depends on the name
     try:
         module, attr = _EXPORTS[name]
     except KeyError:

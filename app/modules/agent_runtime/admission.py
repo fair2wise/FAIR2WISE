@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AbstractAsyncContextManager, AbstractContextManager, asynccontextmanager, contextmanager
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 
 @runtime_checkable
@@ -45,7 +45,7 @@ class NoOpAdmission:
         yield
 
 
-def ensure_admission(admission: object) -> Any:
+def ensure_admission(admission: object) -> Admission:
     """Return ``admission`` or a :class:`NoOpAdmission`, rejecting objects without both slots.
 
     Raises:
@@ -55,4 +55,4 @@ def ensure_admission(admission: object) -> Any:
         return NoOpAdmission()
     if not (callable(getattr(admission, "slot", None)) and callable(getattr(admission, "aslot", None))):
         raise TypeError("admission must provide slot(provider) and aslot(provider) context managers")
-    return admission
+    return cast(Admission, admission)

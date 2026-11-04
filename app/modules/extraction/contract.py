@@ -26,6 +26,7 @@ from typing import Any
 
 from ..evidence.records import ReportedQuantity
 from ..literature.parsed_document import ParsedDocument
+from ..json_types import JsonValue
 
 #: Version of this result contract.
 EXTRACTION_CONTRACT_VERSION = "t06-draft.1"
@@ -154,7 +155,7 @@ class ExtractionResult:
         }
 
 
-def frozen_copy(value: object) -> Any:
+def frozen_copy(value: object) -> JsonValue:
     """Deep copy so a result never aliases a strategy's mutable state."""
     return copy.deepcopy(value)
 

@@ -25,6 +25,7 @@ from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
 from .keys import OperationInputs, changed_inputs, stage_key
 from .store import JobRecord, JobStore, Lease, LeaseLost
+from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +229,7 @@ class StageContext:
         if self.store.stop_requested(self.job.job_id):
             raise JobStopped("stop requested")
 
-    def require(self, *capabilities: str) -> Any:
+    def require(self, *capabilities: str) -> JsonValue:
         """Re-authorize the initiating subject before an effect (workers never keep stale authority).
 
         Raises:

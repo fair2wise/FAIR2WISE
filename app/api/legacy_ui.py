@@ -54,6 +54,7 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..modules.contracts.context import ADMIN_CAPABILITIES, DeploymentProfile, RequestContext
+from ..modules.json_types import JsonValue
 from ..modules.security.authorization import (
     DeploymentSettings,
     StartupConfigError,
@@ -148,7 +149,7 @@ class OpaquePaths:
         """Return whether ``value`` is an ``f2w://`` id."""
         return isinstance(value, str) and value.strip().startswith(OPAQUE_PREFIX)
 
-    def decode(self, value: Any) -> Any:
+    def decode(self, value: Any) -> JsonValue:
         """Return the server path for an ``f2w://`` id; other values are returned unchanged.
 
         Raises:
@@ -509,11 +510,11 @@ class LegacyUiGuard:
             out["exposure_warning"] = self.settings.exposure_warning
         return cast(dict[str, Any], out)
 
-    def project_paths(self, payload: object) -> Any:
+    def project_paths(self, payload: object) -> JsonValue:
         """Session reset/delete bodies: only local paths are internal."""
         return self.projector.project_paths_only(payload)
 
-    def project_route(self, ctx: RequestContext, method: str, path: str, payload: object) -> Any:
+    def project_route(self, ctx: RequestContext, method: str, path: str, payload: object) -> JsonValue:
         """Graph, search, upload and publication bodies through ``project_route_response``."""
         return self.projector.project_route_response(method, path, 200, payload, self.viewer(ctx))
 
@@ -554,7 +555,7 @@ class LegacyUiGuard:
         return projector, refs, grant
 
     def _with_turn(self, ctx: RequestContext, sources: TurnSources | None,
-                   project: Callable[[DisclosureProjector, list[SourceRef]], Any]) -> Any:
+                   project: Callable[[DisclosureProjector, list[SourceRef]], Any]) -> JsonValue:
         projector, refs, grant = self.turn_projector(ctx, sources)
         try:
             return project(projector, refs)
@@ -600,7 +601,7 @@ class LegacyUiGuard:
         return self._require_owner(request, ctx, owner,
                                    "trace.read_own", "trace.read_any")
 
-    def project_trace(self, ctx: RequestContext, record: object) -> Any:
+    def project_trace(self, ctx: RequestContext, record: object) -> JsonValue:
         """R17 body: raw for ``trace.read_any``, projected otherwise (``project_trace_for``)."""
         return self.projector.project_trace_for(record, ctx)
 

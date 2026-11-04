@@ -57,6 +57,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.errors import ContractError, ErrorCode
+from ..modules.json_types import Untyped
 from ..modules.security.authorization import CLOCK_SKEW_TOLERANCE, DeploymentSettings, StartupConfigError
 from ..modules.security.tiled_identity import (
     ABOUT_PATH,
@@ -142,7 +143,7 @@ class TiledSessionStore:
 
     # ------------------------------------------------------------------ Tiled calls
 
-    def _call(self, method: str, path: str, **kwargs: object) -> Any:
+    def _call(self, method: str, path: str, **kwargs: object) -> Untyped:
         """Call the bound Tiled; transport failures are ``UNAVAILABLE``."""
         try:
             return getattr(self._client, method)(self.tiled_target + path, timeout=self._timeout, **kwargs)

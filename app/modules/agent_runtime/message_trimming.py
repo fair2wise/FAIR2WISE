@@ -31,6 +31,8 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, RemoveMessage
 
+from ..json_types import JsonValue
+
 STALE_TOOL_RESULT_BUDGET_CHARS = 120_000
 ORPHAN_REPAIR_MARKER = "f2w_orphan_repair"
 _MIN_STUB_WORTH_IT = 400
@@ -60,7 +62,7 @@ def _is_media_block(block: object) -> bool:
     return "base64" in block or "url" in block
 
 
-def strip_media_from_content(content: object) -> Any:
+def strip_media_from_content(content: object) -> JsonValue:
     """Replace media blocks with placeholders; returns ``content`` itself when unchanged."""
     if not isinstance(content, list) or not any(_is_media_block(b) for b in content):
         return content

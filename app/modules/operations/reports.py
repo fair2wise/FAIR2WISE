@@ -39,11 +39,14 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 import json
 import re
-from typing import Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolStatus
+
+if TYPE_CHECKING:
+    from ..jobs.service import JobService, RegisteredKind
 
 REPORT_SCHEMA: Final = "f2w-operation-report/1"
 #: Bound on ``len(json.dumps(ToolResult.data))``; below the executor's 8000-character inline bound.
@@ -388,8 +391,9 @@ def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], 
                                required_capability=OPERATION_JOB_CAPABILITY)])
 
 
-def register_operation_jobs(job_service: Any, run: OperationFn, context_for_job: Callable[[Any], RequestContext],
-                            *, artifact_store: object = None, **kwargs: object) -> Any:
+def register_operation_jobs(job_service: JobService, run: OperationFn, context_for_job: Callable[[Any], RequestContext],
+                            *, artifact_store: object = None,
+                            **kwargs: Any) -> RegisteredKind:  # noqa: ANN401  # Any: forwarded verbatim to JobService.register
     """Register :data:`OPERATION_JOB_KIND` on ``job_service`` (trusted wiring only)."""
     pipeline = build_operation_pipeline(run, context_for_job, artifact_store=artifact_store)
     return job_service.register(OPERATION_JOB_KIND, pipeline, capability=OPERATION_JOB_CAPABILITY, **kwargs)

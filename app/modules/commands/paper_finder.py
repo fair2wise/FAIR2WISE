@@ -42,6 +42,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from . import harvest_rsoxs as hv  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from ..json_types import Untyped
 
 LOGGER = logging.getLogger("paper_finder")
 
@@ -619,7 +620,7 @@ def create_app(state: QueueState) -> Flask:
         )
 
     @app.get("/detected")
-    def detected() -> Any:
+    def detected() -> Untyped:
         """Local staging filenames only. No publisher URLs."""
         st = _state()
         with st.lock:
@@ -627,7 +628,7 @@ def create_app(state: QueueState) -> Flask:
         return jsonify({"detected": names})
 
     @app.post("/action")
-    def action() -> Any:
+    def action() -> Untyped:
         st = _state()
         manifest = st.load_manifest()
         paper, _, _ = st.current(manifest)

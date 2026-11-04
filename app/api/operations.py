@@ -56,6 +56,7 @@ from ..modules.contracts.tools import ToolResult
 from ..modules.jobs.keys import OperationInputs
 from ..modules.jobs.service import JobService
 from ..modules.jobs.store import JobLog
+from ..modules.json_types import JsonValue
 from ..modules.security.authorization import (
     DeploymentSettings,
     create_approval,
@@ -66,7 +67,14 @@ from ..modules.security.authorization import (
 from ..modules.security.tiled_identity import TiledCredential, TiledIdentityPort, normalize_tiled_target
 
 if TYPE_CHECKING:  # annotation only; the publication job is passed in by the caller
+    from ..modules.curation.approval import CostApproval
+    from ..modules.curation.scale_records import ScaleRecordStore
+    from ..modules.curation.store import CurationStore
     from ..modules.jobs.publication import Publication
+    from ..modules.jobs.service import RegisteredKind
+    from ..modules.operations.knowledge import KnowledgeOperations
+    from ..modules.provenance.recorder import AuditRecorder
+    from .folders import FolderRoots
 
 Clock = Callable[[], datetime]
 
@@ -135,7 +143,7 @@ class PublicationGate:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, H5_MESSAGE.format(target=target))
 
 
-def _json(model: object) -> Any:
+def _json(model: object) -> JsonValue:
     return model.model_dump(mode="json") if hasattr(model, "model_dump") else model
 
 
@@ -163,11 +171,11 @@ class F2WOperations:
     """
 
     def __init__(self, settings: DeploymentSettings, jobs: JobService, *, publication: Publication | None = None,
-                 curation: Any = None, audit: Any = None, identity_port: TiledIdentityPort | None = None,
+                 curation: CurationStore | None = None, audit: AuditRecorder | None = None, identity_port: TiledIdentityPort | None = None,
                  publication_gate: PublicationGate | None = None, clock: Clock = _utcnow,
-                 approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: Any = None,
-                 scales: Any = None, control_path: Path | None = None, quality_dir: Path | None = None,
-                 folders: object = None) -> None:
+                 approval_ttl: timedelta | None = PROFILE_APPROVAL_TTL, knowledge: KnowledgeOperations | None = None,
+                 scales: ScaleRecordStore | None = None, control_path: Path | None = None, quality_dir: Path | None = None,
+                 folders: FolderRoots | None = None) -> None:
         """Bind the services; see the class docstring for the arguments.
 
         Raises:
@@ -334,7 +342,7 @@ class F2WOperations:
 
     # --- curation review --------------------------------------------------------------------
 
-    def _curation(self) -> Any:
+    def _curation(self) -> CurationStore:
         if self.curation is None:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "curation review is not configured")
         return self.curation
@@ -356,7 +364,7 @@ class F2WOperations:
                    limit: int = 100) -> list[dict[str, Any]]:
         """Bounded case summaries within the caller's scope."""
         require(ctx, "curation.approve")
-        return cast(list[dict[str, Any]], self._curation().list_cases(self._case_scope(ctx), state=state, route=route, limit=limit))
+        return self._curation().list_cases(self._case_scope(ctx), state=state, route=route, limit=limit)
 
     def get_case(self, ctx: RequestContext, case_id: str) -> dict[str, Any]:
         """One case with its attempts and history (``revision`` is what a decision binds to)."""
@@ -374,7 +382,7 @@ class F2WOperations:
                            resolution=resolution, reason=reason, recorder=self.audit)
 
     def create_cost_approval(self, ctx: RequestContext, *, scope: Iterable[str], models: Iterable[str],
-                             cap_usd: float, expires_at: datetime) -> Any:
+                             cap_usd: float, expires_at: datetime) -> CostApproval:
         """Record a human's remote-cost approval (``create_cost_approval``)."""
         from ..modules.curation.approval import create_cost_approval
 
@@ -512,14 +520,14 @@ class F2WOperations:
         snapshots = snapshot_history(self.quality_dir, limit=bound) if self.quality_dir.is_dir() else []
         return {"snapshots": snapshots, "count": len(snapshots), "latest": snapshots[0] if snapshots else None}
 
-    def _scales(self) -> Any:
+    def _scales(self) -> ScaleRecordStore:
         if self.scales is None:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY, "figure-scale records are not configured")
         return self.scales
 
     def _scale_scope(self, ctx: RequestContext) -> list[str]:
         if ctx.principal.subject == LOCAL_OPERATOR and ctx.mode.value == "local_trusted":
-            return cast(list[str], self._scales().corpora())
+            return self._scales().corpora()
         return sorted(ctx.corpus_scope)
 
     def record_figure_scale(self, ctx: RequestContext, *, corpus: str, work_id: str, figure_id: str,
@@ -559,16 +567,16 @@ class F2WOperations:
             if ctx.principal.subject != LOCAL_OPERATOR and corpus not in scope:
                 raise ContractError(ErrorCode.DENIED, "corpus is outside the caller's scope")
             scope = [corpus]
-        return cast(list[dict[str, Any]], store.list_records(scope, work_id=work_id, figure_id=figure_id, limit=limit))
+        return store.list_records(scope, work_id=work_id, figure_id=figure_id, limit=limit)
 
     def get_figure_scale(self, ctx: RequestContext, record_id: str) -> dict[str, Any]:
         """One record within the caller's scope (``chat.read_support``; outside it is ``NOT_FOUND``)."""
         require(ctx, "chat.read_support")
-        return cast(dict[str, Any], self._scales().get(record_id, self._scale_scope(ctx)))
+        return self._scales().get(record_id, self._scale_scope(ctx))
 
     # --- T32: folder browse and index (:local only) -----------------------------------------------
 
-    def _folders(self, ctx: RequestContext) -> Any:
+    def _folders(self, ctx: RequestContext) -> FolderRoots:
         if not self.settings.is_local:
             raise ContractError(ErrorCode.DENIED, "folder browsing is a local-profile feature")
         require(ctx, "ingest.acquire")
@@ -583,16 +591,16 @@ class F2WOperations:
     def list_folder(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 1000
                     ) -> dict[str, Any]:
         """Entries of one folder under a configured root (``FolderRoots.list_folder``)."""
-        return cast(dict[str, Any], self._folders(ctx).list_folder(root, path, limit=limit))
+        return self._folders(ctx).list_folder(root, path, limit=limit)
 
     def folder_index(self, ctx: RequestContext, root: str, path: str | None = None, *, limit: int = 500
                      ) -> dict[str, Any]:
         """Bounded document inventory under one folder (``FolderRoots.index_folder``)."""
-        return cast(dict[str, Any], self._folders(ctx).index_folder(root, path, limit=limit))
+        return self._folders(ctx).index_folder(root, path, limit=limit)
 
     # --- publication -------------------------------------------------------------------------
 
-    def _publication(self) -> Any:
+    def _publication(self) -> Publication:
         if self.publication is None:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
                                 "publication is not configured on this deployment (H5)")
@@ -603,11 +611,11 @@ class F2WOperations:
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        return cast(JobHandle, pub.submit(ctx, snapshot_ref, target))
+        return pub.submit(ctx, snapshot_ref, target)
 
     def current_plan(self, ctx: RequestContext, job_id: str) -> ChangePlan:
         """The plan a reviewer is asked to approve."""
-        return cast(ChangePlan, self._publication().current_plan(ctx, job_id))
+        return self._publication().current_plan(ctx, job_id)
 
     def approve_publication(self, ctx: RequestContext, job_id: str, plan_sha256: str, *,
                             approver_credential: TiledCredential | None = None,
@@ -658,7 +666,7 @@ class F2WOperations:
         if not approval.authorizes(plan, self.clock()):
             raise ContractError(ErrorCode.STALE_APPROVAL, "the approval does not cover this plan (or has expired)")
         self.gate.check(plan.target, self.settings)
-        return cast(JobHandle, pub.submit_approval(ctx, approval.operation_id, approval))
+        return pub.submit_approval(ctx, approval.operation_id, approval)
 
     def publication_pointer(self, ctx: RequestContext, target: str) -> dict[str, Any] | None:
         """The active publication pointer of ``target`` (``None`` when nothing is active)."""
@@ -685,7 +693,7 @@ class F2WOperations:
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        return cast(JobHandle, pub.rollback_replacement(ctx, target, reason=reason))
+        return pub.rollback_replacement(ctx, target, reason=reason)
 
     def submit_corpus_retire(self, ctx: RequestContext, scope: str, target: str, *, confirm_scope: str,
                              resolutions: Sequence[Mapping[str, Any]] = ()) -> JobHandle:
@@ -693,8 +701,8 @@ class F2WOperations:
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        return cast(JobHandle, pub.submit_retire(ctx, scope, target, confirm_scope=confirm_scope,
-                                                 resolutions=resolutions))
+        return pub.submit_retire(ctx, scope, target, confirm_scope=confirm_scope,
+                                  resolutions=resolutions)
 
     def submit_corpus_purge(self, ctx: RequestContext, scope: str, target: str, *,
                             include_previous: bool = False) -> JobHandle:
@@ -702,11 +710,11 @@ class F2WOperations:
         require(ctx, "graph.publish")
         pub = self._publication()
         self.gate.check(target, self.settings)
-        return cast(JobHandle, pub.submit_purge(ctx, scope, target, include_previous=include_previous))
+        return pub.submit_purge(ctx, scope, target, include_previous=include_previous)
 
     # --- knowledge operations (T19E over the T19C suites) ------------------------------------------
 
-    def _knowledge(self) -> Any:
+    def _knowledge(self) -> KnowledgeOperations:
         if self.knowledge is None:
             raise ContractError(ErrorCode.UNSUPPORTED_CAPABILITY,
                                 "knowledge operations are not configured on this deployment")
@@ -719,7 +727,7 @@ class F2WOperations:
         request deadline stopped it (never ``OK``). Reads need ``chat.ask``; the scope rule is the
         T19C one (a graph outside a non-empty ``ctx.corpus_scope`` is ``DENIED``).
         """
-        return cast(ToolResult, self._knowledge().result(ctx, operation, args))
+        return self._knowledge().result(ctx, operation, args)
 
     def graph_statistics(self, ctx: RequestContext, graph_id: str) -> ToolResult:
         """``kg_compute_statistics`` of one graph."""
@@ -795,7 +803,8 @@ class F2WOperations:
         return {"job": _json(handle), "result": result, "artifact_refs": refs}
 
     def register_knowledge_jobs(self, context_for_job: Callable[[Any], RequestContext], *,
-                                artifact_store: object = None, **kwargs: object) -> Any:
+                                artifact_store: object = None,
+                                **kwargs: Any) -> RegisteredKind:  # noqa: ANN401  # Any: forwarded verbatim to JobService.register
         """Register the ``knowledge_operation`` job kind over this deployment's operations (trusted wiring)."""
         from ..modules.operations.reports import register_operation_jobs
 
@@ -841,7 +850,7 @@ def build_operations(settings: DeploymentSettings, root: str | Path, *,
                      clock: Clock = _utcnow, owner: str = "api",
                      publication_gate: PublicationGate | None = None,
                      credential_lookup: Callable[[str], Any] | None = None,
-                     knowledge: object = None) -> F2WOperations:
+                     knowledge: KnowledgeOperations | None = None) -> F2WOperations:
     """Build the default operations over SQLite stores under ``root`` (created if missing).
 
     Registers **no** job kind and no publication: real pipeline handlers need H3 and real

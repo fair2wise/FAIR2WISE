@@ -65,13 +65,17 @@ from typing import Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.config import get_config
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import get_runtime
 from langgraph.types import interrupt
 
 from ..contracts import ApprovalRecord, ChangePlan, ContractError, ErrorCode, RequestContext, ToolStatus
-from .admission import ensure_admission
+from ..contracts.ports import DocumentStore
+from ..json_types import Untyped
+from .admission import Admission, ensure_admission
+from .chat_model import ChatModel
 from .checkpointer import owner_key
 from .executor import RuntimeLimits, ToolExecutor, ToolOutcome, TurnLedger, _fail, call_key
 from .message_trimming import current_turn_start, is_orphan_repair, prepare_for_model
@@ -179,19 +183,19 @@ def _parse_approval(value: object) -> ApprovalRecord | None:
 def build_literature_supervisor(
     *,
     registry: ToolRegistry,
-    chat_model: Any,
-    checkpointer: Any = None,
+    chat_model: ChatModel,
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
     event_sink: EventSink | None = None,
     limits: RuntimeLimits | None = None,
     system_prompt: str = PLACEHOLDER_SYSTEM_PROMPT,
     skills: SkillRegistry | None = None,
-    admission: Any = None,
+    admission: Admission | None = None,
     provider: str = "default",
     approval_check: ApprovalCheck | None = None,
     plan_resolver: PlanResolver | None = None,
-    artifact_store: Any = None,
+    artifact_store: DocumentStore | None = None,
     clock: Callable[[], datetime] = utcnow,
-) -> Any:
+) -> Untyped:
     """Build the compiled literature supervisor graph.
 
     Args:

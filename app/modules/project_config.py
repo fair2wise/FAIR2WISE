@@ -17,6 +17,7 @@ from typing import Any
 import yaml
 
 from .resources import resource_root
+from .json_types import JsonValue
 
 # Checkout root. Installed wheels have no project root; config.yml is found
 # through FAIR2WISE_CONFIG or F2W_RESOURCE_ROOT (see resources.py).
@@ -41,7 +42,7 @@ def load_project_config() -> dict[str, Any]:
         return yaml.safe_load(handle) or {}
 
 
-def get_config(path: str, fallback: object = None) -> Any:
+def get_config(path: str, fallback: object = None) -> JsonValue:
     """Return a nested config value using a dotted path."""
     value: Any = load_project_config()
     for part in path.split("."):
@@ -62,7 +63,7 @@ def _env_names(entry: object) -> Iterable[str]:
     return ()
 
 
-def _default_value(entry: object, fallback: object = None) -> Any:
+def _default_value(entry: object, fallback: object = None) -> JsonValue:
     if isinstance(entry, dict):
         if "default" in entry:
             return entry["default"]
@@ -90,7 +91,7 @@ def config_value(
     fallback: object = None,
     *,
     cast: Callable[[Any], Any] | None = None,
-) -> Any:
+) -> JsonValue:
     """Resolve env override first, then config.yml default/value, then fallback."""
     entry = get_config(path)
     for name in _env_names(entry):

@@ -25,6 +25,7 @@ import threading
 import time
 from typing import Any, cast
 import uuid
+from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +173,7 @@ def bind_context(fn: Callable[..., Any]) -> Callable[..., Any]:
     """
     ctx = contextvars.copy_context()
 
-    def wrapped(*args: object, **kwargs: object) -> Any:
+    def wrapped(*args: object, **kwargs: object) -> Any:  # noqa: ANN401  # Any: decorator pass-through; returns whatever the wrapped callable returns
         return ctx.run(lambda: fn(*args, **kwargs))
 
     return wrapped
@@ -216,13 +217,13 @@ def _secret_values() -> list[str]:
     return found
 
 
-def redact(value: object) -> Any:
+def redact(value: object) -> JsonValue:
     """Remove API keys, tokens, and known secret values from ``value``."""
     secrets = _secret_values()
     return _redact(value, secrets)
 
 
-def _redact(value: object, secrets: Sequence[str]) -> Any:
+def _redact(value: object, secrets: Sequence[str]) -> JsonValue:
     if isinstance(value, Mapping):
         cleaned: dict[str, Any] = {}
         for key, item in value.items():
@@ -678,7 +679,7 @@ def _summary_line(payload: Mapping[str, Any], elapsed_s: float) -> dict[str, Any
     }
 
 
-def _final_sufficient(response: Mapping[str, Any], retrieval: Mapping[str, Any]) -> Any:
+def _final_sufficient(response: Mapping[str, Any], retrieval: Mapping[str, Any]) -> JsonValue:
     if "sufficient" in response and response.get("sufficient") is not None:
         return response.get("sufficient")
     return retrieval.get("sufficient")

@@ -19,6 +19,7 @@ import hashlib
 import json
 import re
 from typing import Any
+from ..json_types import JsonValue
 
 #: Input fields a stage may depend on.
 INPUT_FIELDS = (
@@ -58,7 +59,7 @@ def _scan(value: object, path: str) -> None:
 def canonical_json(value: object) -> str:
     """Deterministic JSON used for hashing."""
 
-    def default(item: object) -> Any:
+    def default(item: object) -> JsonValue:
         if isinstance(item, (set, frozenset)):
             return sorted(item)
         return str(item)

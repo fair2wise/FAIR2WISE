@@ -30,6 +30,7 @@ import tempfile
 from typing import Any
 
 from ..contracts.errors import ContractError, ErrorCode
+from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def _write_json(path: Path, data: object) -> None:
         raise
 
 
-def _read_json(path: Path) -> Any:
+def _read_json(path: Path) -> JsonValue:
     with path.open(encoding="utf-8") as handle:
         return json.load(handle)
 
