@@ -264,7 +264,7 @@ def _receipt_matches(path: Path) -> bool:
         return False
     try:
         return cast(bool, json.loads(receipt.read_text(encoding="utf-8")).get("package_sha256") == _file_sha(path))  # Any: JSON payload
-    except (OSError, ValueError):
+    except (OSError, ValueError):  # no readable receipt: not staged
         return False
 
 

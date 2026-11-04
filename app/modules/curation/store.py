@@ -230,7 +230,7 @@ class CurationStore:
             params.append(case_type)
         with self.db.tx() as con:
             rows = con.execute(
-                f"SELECT id FROM uncertainty_cases WHERE corpus IN ({marks}) "  # noqa: S608
+                f"SELECT id FROM uncertainty_cases WHERE corpus IN ({marks}) "  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
                 "AND ((state IN ('pending','retry_wait') AND retry_after<=?) OR (state='leased' AND "
                 "lease_until<?))" + extra + " ORDER BY priority DESC, created, id LIMIT ?",
                 (*scope, now, now, *params, limit),
@@ -426,7 +426,7 @@ class CurationStore:
             params.append(route)
         rows = self.db.query(
             "SELECT * FROM uncertainty_cases WHERE "
-            + " AND ".join(clauses)  # noqa: S608
+            + " AND ".join(clauses)  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
             + " ORDER BY updated DESC, id LIMIT ?",
             (*params, max(1, min(limit, 1000))),
         )
@@ -438,7 +438,7 @@ class CurationStore:
         if not scope:
             return []
         rows = self.db.query(
-            f"SELECT * FROM uncertainty_cases WHERE needs_validation=1 AND corpus IN "  # noqa: S608
+            f"SELECT * FROM uncertainty_cases WHERE needs_validation=1 AND corpus IN "  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
             f"({','.join('?' for _ in scope)})",
             scope,
         )
@@ -485,11 +485,11 @@ class CurationStore:
             for r in self.db.query(
                 f"SELECT state, COUNT(*) n FROM uncertainty_cases WHERE corpus IN ({marks}) GROUP BY state", scope
             )
-        }  # noqa: S608
+        }  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
         routes = {
             f"{r['route']}:{r['state']}": r["n"]
             for r in self.db.query(
-                f"SELECT route, state, COUNT(*) n FROM uncertainty_cases WHERE corpus IN ({marks}) "  # noqa: S608
+                f"SELECT route, state, COUNT(*) n FROM uncertainty_cases WHERE corpus IN ({marks}) "  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
                 "GROUP BY route, state",
                 scope,
             )

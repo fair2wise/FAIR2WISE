@@ -180,7 +180,7 @@ class TiledGraphBackend:
                     total += 1
                     if len(hits) < limit:
                         hits.append(self._record(row, graph_id, node_id))
-        except TruncatedGraphRead:
+        except TruncatedGraphRead:  # search limit reached: report partial hits
             return hits, False
         return hits, total <= limit
 

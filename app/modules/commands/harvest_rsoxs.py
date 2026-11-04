@@ -47,8 +47,8 @@ Classifier = Callable[[str, str], str]
 #: directory for an installed wheel without one.
 REPO_ROOT = resource_root() or Path.cwd()
 
-from ..literature import download_pdfs as dl  # noqa: E402
-from ..literature.legacy_download import hardened_download_pdf as download_pdf  # noqa: E402
+from ..literature import download_pdfs as dl  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
+from ..literature.legacy_download import hardened_download_pdf as download_pdf  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
 from ..literature.legacy_download import hardened_get_json
 
 # Same allowlist as download_pdfs / DownloadAgent — keep harvest free of Academy imports.

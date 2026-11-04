@@ -20,7 +20,7 @@ def _truthy(value: str | None) -> bool:
 def _is_global_ipv6(addr: str) -> bool:
     try:
         ip = ipaddress.IPv6Address(addr.split("%", 1)[0])
-    except ValueError:
+    except ValueError:  # not an IPv6 address
         return False
     return bool(ip.is_global)
 
@@ -54,7 +54,7 @@ def _ifconfig_global_ipv6() -> list[str]:
 
     try:
         out = subprocess.check_output(["ifconfig"], text=True, stderr=subprocess.DEVNULL)
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, subprocess.CalledProcessError):  # ifconfig unavailable
         return []
     found: list[str] = []
     for match in re.finditer(r"\binet6\s+([0-9a-fA-F:]+)", out):
@@ -71,13 +71,13 @@ def _ipv6_bind_assignable(addr: str) -> bool:
         return False
     try:
         ipaddress.IPv6Address(host)
-    except ValueError:
+    except ValueError:  # not an IPv6 address
         return False
     sock: socket.socket | None = None
     try:
         sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
         sock.bind((host, 0))
-    except OSError:
+    except OSError:  # address not assignable on this host
         return False
     finally:
         if sock is not None:

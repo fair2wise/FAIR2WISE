@@ -61,7 +61,7 @@ class ChemicalFormulaValidator:
             result["canonical"] = comp.formula
             status = "ok" if cleaned == comp.formula else "corrected"
             result["status"] = status
-        except Exception as exc:          # noqa: BLE001
+        except Exception as exc:          # noqa: BLE001 - formula parser may raise anything; reported as parse-error in the result
             result["error"] = f"parse‑error: {exc}"
             return result                 # short‑circuit
 
@@ -72,7 +72,7 @@ class ChemicalFormulaValidator:
                 if result["mp_hits"] == 0 and status == "ok":
                     # syntactically valid but not in MP → still suspicious
                     result["status"] = "invalid"
-            except Exception as exc:      # noqa: BLE001
+            except Exception as exc:      # noqa: BLE001 - Materials Project lookup is optional; failure disables it for this run and is logged
                 logger.warning("MP lookup failed; skipping Materials Project checks for this run: %s", exc)
                 self._mp_disabled = True
                 result["error"] = f"mp-error: {exc}"

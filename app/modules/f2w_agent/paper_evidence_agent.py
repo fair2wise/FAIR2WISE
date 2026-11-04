@@ -33,7 +33,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
         return {}
     try:
         value = json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # reply is not JSON: no object
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -73,7 +73,7 @@ def _eligible_pages(entry: dict[str, Any], page_count: int) -> tuple[str, list[i
     for value in selected or []:
         try:
             page = int(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # non-integer model output is ignored
             continue
         if 1 <= page <= page_count and page not in pages:
             pages.append(page)
@@ -393,7 +393,7 @@ class PaperEvidenceAgent(Agent):
         for value in requested_pages:
             try:
                 page = int(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # non-integer model output is ignored
                 continue
             if page in chosen_pages and page not in used_pages:
                 used_pages.append(page)
@@ -424,7 +424,7 @@ class PaperEvidenceAgent(Agent):
                 for value in requested_pages:
                     try:
                         page = int(value)
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError):  # non-integer model output is ignored
                         continue
                     if page in chosen_pages and page not in used_pages:
                         used_pages.append(page)

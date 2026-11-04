@@ -141,7 +141,7 @@ class ResolverCache:
         source, record, fetched_at, cost = row
         try:
             age = datetime.now(UTC) - datetime.fromisoformat(fetched_at)
-        except ValueError:
+        except ValueError:  # an unreadable timestamp is a miss
             return None
         if age > (self.negative_ttl if record is None else self.positive_ttl):
             return None
@@ -211,7 +211,7 @@ def _title_year_agree(ref: ReferenceLike, title: str, year: object) -> bool:
         return True
     try:
         return abs(int(ref.year) - int(cast(int | str, year))) <= 1
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # an unknown year does not exclude the match
         return True
 
 

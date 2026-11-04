@@ -273,7 +273,7 @@ def is_loopback_host(host: object) -> bool:
         return True
     try:
         return ipaddress.ip_address(name).is_loopback
-    except ValueError:
+    except ValueError:  # a hostname is not a loopback IP
         return False
 
 
@@ -490,7 +490,7 @@ def _safe_normalize(url: str) -> str | None:
     """Normalize ``url`` or return ``None`` when it is not a Tiled URL."""
     try:
         return normalize_tiled_target(url)
-    except ValueError:
+    except ValueError:  # not a Tiled URL
         return None
 
 
@@ -1049,7 +1049,7 @@ def target_in_deployment(target: str, settings: DeploymentSettings) -> bool:
     try:
         parts = target.split("#", 1)
         normalized = normalize_tiled_target(parts[0])
-    except ValueError:
+    except ValueError:  # not a Tiled URL
         return False
     return normalized == base or normalized.startswith(cast(str, base) + "/")
 

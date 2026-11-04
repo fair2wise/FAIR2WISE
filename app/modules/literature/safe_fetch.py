@@ -54,7 +54,7 @@ def is_public_address(address: str) -> bool:
     """Whether ``address`` is a globally routable unicast IP (IPv4-mapped IPv6 unwrapped)."""
     try:
         ip = ipaddress.ip_address(address.split("%", 1)[0])
-    except ValueError:
+    except ValueError:  # not an IP address: not public
         return False
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
@@ -188,7 +188,7 @@ class SafeFetcher:
             return True  # transport does not expose the peer (pre-connect check still applied)
         try:
             peer = stream.get_extra_info("server_addr")
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 - transport without a readable peer address: the pre-connect check already applied
             return True
         if not peer:
             return True
@@ -304,7 +304,7 @@ class LocalIntakePolicy:
             try:
                 if part.is_symlink() and self._contained(part.parent.resolve()):
                     return True
-            except OSError:
+            except OSError:  # unreadable path component: treat as a link (fail closed)
                 return True
         return False
 

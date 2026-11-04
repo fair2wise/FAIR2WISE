@@ -322,7 +322,7 @@ def apply_scoped_plan(
         for op in plan.ops:
             target.merge(op)
             done.append(op.term_key)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - a failed merge is reported with the ops already applied (ApplyFailed), not swallowed
         raise ApplyFailed(done, exc) from exc
     return ApplyResult(False, plan.plan_id, tuple(o.term_key for o in plan.ops), tuple(done))
 

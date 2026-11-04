@@ -110,7 +110,7 @@ def trim_stale_media(messages: Sequence[BaseMessage]) -> tuple[list[BaseMessage]
 def _kept_references(content: str) -> dict[str, list[str]]:
     try:
         payload = json.loads(content)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # non-JSON tool content has no references
         return {}
     if not isinstance(payload, dict):
         return {}

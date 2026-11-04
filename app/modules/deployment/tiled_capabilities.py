@@ -235,11 +235,11 @@ def check_health(base_url: str, *, session: object = None, timeout: float = 2.0)
     http = _Http(normalize_base_url(base_url), session=session, timeout=timeout)
     try:
         resp = http.request("GET", HEALTH_PATH)
-    except TiledTargetUnavailable:
+    except TiledTargetUnavailable:  # an unreachable target is the 'not ready' answer
         return False
     try:
         return cast(bool, resp.status_code == 200 and resp.json().get("status") == "ready")
-    except ValueError:
+    except ValueError:  # a non-JSON body is not 'ready'
         return False
 
 

@@ -115,7 +115,7 @@ def parse_references_tei(tei_xml: bytes | str) -> list[ParsedReference]:
     Raises:
         xml.etree.ElementTree.ParseError: The body is not XML (a service fault, not "no references").
     """
-    root = ET.fromstring(tei_xml)  # noqa: S314
+    root = ET.fromstring(tei_xml)  # noqa: S314 - TEI comes from the trusted local GROBID service, not user-supplied XML
     out: list[ParsedReference] = []
     for index, bibl in enumerate(root.iterfind(".//tei:listBibl/tei:biblStruct", TEI), 1):
         title = _first_text(bibl, "tei:analytic/tei:title[@type='main']", "tei:monogr/tei:title[@type='main']",

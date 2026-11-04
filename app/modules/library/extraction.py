@@ -263,7 +263,7 @@ class LibraryExtractor:
         root = self.service._require_root()  # noqa: SLF001 - one trusted package
         self.service.refresh(max_probe=0)  # hash new and changed files; no probe, no network
         rows = self.resolve_papers(args["papers"])
-        choice = resolve_schema(args["schema"], self.kg._registry())  # noqa: SLF001
+        choice = resolve_schema(args["schema"], self.kg._registry())  # noqa: SLF001 - same-package access to the registry of the KG owned by this service
         schema_block = manifest_block(choice)
         self.kg.check_confirmation(args["confirmation"], [r["id"] for r in rows], args["model"], args["schema"])
         try:

@@ -206,7 +206,7 @@ def _parse_json_object(raw: str) -> dict[str, Any]:
         return {}
     try:
         obj = json.loads(match.group(0))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # reply is not JSON: no object
         return {}
     return obj if isinstance(obj, dict) else {}
 

@@ -170,7 +170,7 @@ def call_key(tool_name: str, tool_input: object) -> str:
     """Stable identity for one tool call, for repeat detection (donor ``_call_key``)."""
     try:
         return f"{tool_name}({json.dumps(tool_input, sort_keys=True, default=str)})"
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # value is not JSON-serializable: fall back to repr
         return f"{tool_name}({tool_input!r})"
 
 

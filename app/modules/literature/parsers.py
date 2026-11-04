@@ -345,7 +345,7 @@ class DoclingParser:
         for ref in getattr(item, "captions", None) or []:
             try:
                 _, cap_box = _docling_page_of(ref.resolve(doc))
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - docling ref resolution may raise anything; the caption box is optional
                 logger.debug("caption box unresolved", exc_info=True)
                 continue
             if cap_box is not None:

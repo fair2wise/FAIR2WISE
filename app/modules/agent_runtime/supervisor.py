@@ -170,7 +170,8 @@ def _parse_approval(value: object) -> ApprovalRecord | None:
     if isinstance(value, Mapping):
         try:
             return ApprovalRecord.model_validate(dict(value))
-        except ValueError:
+        except ValueError as exc:
+            logger.warning("approval record failed validation: %s", type(exc).__name__)
             return None
     return None
 

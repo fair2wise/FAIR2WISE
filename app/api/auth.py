@@ -342,7 +342,7 @@ def current_subject(request: Request) -> str | None:
         ctx = resolve_context(runtime.settings, credential, request_id=uuid.uuid4().hex,
                               identity_port=runtime.identity_port, clock=runtime.clock,
                               role_cache=runtime.role_cache)
-    except (Unauthenticated, ContractError):
+    except (Unauthenticated, ContractError):  # a bad or expired token has no subject
         return None
     return ctx.principal.subject
 

@@ -114,7 +114,7 @@ def isolated_probe(path: str | Path, *, timeout: float = DEFAULT_TIMEOUT_SECONDS
     root = str(Path(__file__).resolve().parents[3])
     cmd = [sys.executable, "-I", str(Path(__file__).resolve()), root, str(path), str(int(timeout))]
     try:
-        done = subprocess.run(cmd, capture_output=True, timeout=timeout, env=_child_env(), cwd=root,  # noqa: S603
+        done = subprocess.run(cmd, capture_output=True, timeout=timeout, env=_child_env(), cwd=root,  # noqa: S603 - fixed argv list (own interpreter and script), no shell
                               stdin=subprocess.DEVNULL, check=False)
     except subprocess.TimeoutExpired:
         return ProbeResult(status="timeout")

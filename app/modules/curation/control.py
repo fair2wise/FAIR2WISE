@@ -15,11 +15,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import math
 from pathlib import Path
 from typing import Any
 
 from ..jobs.process_support import write_text_atomic
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -76,7 +79,8 @@ def read_control(path: Path, *, default_cap: float | None = None) -> dict[str, A
             if not math.isfinite(cap) or cap <= 0:
                 raise ValueError("invalid cap")
         return {"enabled": enabled, "budget_cap_usd": cap}
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        logger.debug("control file unreadable or invalid; using defaults: %s", type(exc).__name__)
         return defaults
 
 

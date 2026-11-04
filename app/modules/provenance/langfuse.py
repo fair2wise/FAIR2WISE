@@ -141,7 +141,7 @@ class LangfuseExporter:
             return None
 
     def _span(self, trace_id: str, name: str, kind: str, *, metadata: Mapping[str, Any] | None = None,
-              input: object = None, output: object = None, error: bool = False) -> None:  # noqa: A002
+              input: object = None, output: object = None, error: bool = False) -> None:  # noqa: A002 - parameter names mirror the Langfuse observation API (input/output)
         span = self._client.start_observation(
             trace_context={"trace_id": trace_id}, name=name, as_type=kind, input=input, output=output,
             metadata=dict(metadata or {}), level="ERROR" if error else None)
@@ -151,7 +151,7 @@ class LangfuseExporter:
         """Flush queued spans; failures are logged, not raised."""
         try:
             self._client.flush()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - telemetry flush must never break the caller; failure is logged
             logger.warning("Langfuse flush failed (%s)", type(exc).__name__)
 
 

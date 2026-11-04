@@ -23,6 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import json
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -48,6 +49,8 @@ from .tiled_config import (
     read_secret_file,
     write_private_file,
 )
+
+logger = logging.getLogger(__name__)
 
 ENTRY_SCRIPT = Path(__file__).with_name("_tiled_entry.py")
 MANIFEST_SCHEMA = "f2w.tiled.ownership/v1"
@@ -123,7 +126,8 @@ def _utc() -> str:
 def _read_manifest(path: Path) -> dict[str, Any] | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        logger.debug("tiled manifest unreadable or invalid: %s", type(exc).__name__)
         return None
     return data if isinstance(data, dict) and data.get("schema") == MANIFEST_SCHEMA else None
 
@@ -142,7 +146,7 @@ def _pid_alive(pid: int) -> bool:
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
-    except PermissionError:
+    except PermissionError:  # the process exists but belongs to another user
         return True
     return True
 
@@ -152,12 +156,12 @@ def _cmdline(pid: int) -> str:
     if proc.exists():
         try:
             return proc.read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
-        except OSError:
+        except OSError:  # process gone or cmdline unreadable
             return ""
     try:
         out = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
                              timeout=5, env={"PATH": "/usr/bin:/bin"})
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError):  # ps unavailable: identity unknown
         return ""
     return out.stdout.strip()
 
@@ -275,7 +279,7 @@ def authn_passwords(cfg: ManagedTiledConfig) -> dict[str, str]:
 def _log_tail(path: Path, limit: int = 4000) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")[-limit:]
-    except OSError:
+    except OSError:  # no log yet
         return ""
 
 

@@ -5,7 +5,7 @@ merges scored hit lists tagged with ``graph_id``.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence  # noqa: I001
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 import re

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,8 @@ from .registry import (
     pre_s4_bytes,
     sha256_bytes,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SchemaLoadError(RuntimeError):
@@ -166,7 +169,8 @@ def pre_s4_fingerprint(entry: SchemaEntry) -> str | None:
         return None
     try:
         return closure_fingerprint(entry, pre_s4=True)
-    except SchemaLoadError:
+    except SchemaLoadError as exc:
+        logger.debug("schema closure could not be fingerprinted: %s", type(exc).__name__)
         return None
 
 

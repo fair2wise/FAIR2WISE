@@ -1092,7 +1092,7 @@ class CorpusAuditTool:
             ref = store_report_artifact(store, inv.ctx, report)
         except ContractError as exc:
             return error_result(TOOL_AUDIT, exc, provenance_id=provenance_id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 - any audit failure becomes an INTERNAL error result (control flow re-raised)
             logger.warning("corpus audit failed", exc_info=True)
             if is_control_flow(exc):
                 raise

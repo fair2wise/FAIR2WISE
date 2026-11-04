@@ -80,7 +80,7 @@ _RXIV_CONTENT_RE = re.compile(
 def _host(url: str) -> str:
     try:
         return (urlparse(str(url).strip()).hostname or "").lower()
-    except ValueError:
+    except ValueError:  # malformed URL has no host
         return ""
 
 
@@ -151,7 +151,7 @@ def rewrite_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> str | None:
         return None
     try:
         parsed = urlparse(raw)
-    except ValueError:
+    except ValueError:  # malformed URL
         return None
     host = (parsed.hostname or "").lower()
     if not _host_allowed(host):
@@ -232,7 +232,7 @@ def listed_oa_pdf_url(url: str, *, osti_biblio_ok: bool = False) -> str | None:
         return rewritten
     try:
         parsed = urlparse(raw)
-    except ValueError:
+    except ValueError:  # malformed URL
         return None
     if parsed.scheme not in ("http", "https"):
         return None

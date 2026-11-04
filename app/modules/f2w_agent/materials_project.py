@@ -225,7 +225,7 @@ def _parse_ok(token: str) -> bool:
 
         Composition(token)
         return True
-    except Exception:
+    except Exception:  # not a parseable composition
         return False
 
 

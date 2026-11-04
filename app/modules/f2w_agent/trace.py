@@ -151,7 +151,7 @@ def current_turn_id() -> str | None:
     """Turn id for the active context, if a turn is open."""
     try:
         return _TURN_ID.get()
-    except Exception:
+    except Exception:  # no context value outside a turn
         return None
 
 
@@ -159,7 +159,7 @@ def current_trace() -> TurnTrace | None:
     """Active collector, if a turn is open in this context."""
     try:
         return _COLLECTOR.get()
-    except Exception:
+    except Exception:  # no context value outside a turn
         return None
 
 
@@ -721,7 +721,7 @@ def _reset_tokens(tokens: Sequence[contextvars.Token[Any]]) -> None:
             continue
         try:
             var.reset(token)
-        except ValueError:
+        except ValueError:  # token was created in another context: nothing to reset
             continue
 
 

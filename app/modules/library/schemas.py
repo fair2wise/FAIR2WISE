@@ -41,7 +41,7 @@ def _offered(registry: SchemaRegistry) -> list[SchemaEntry]:
         if entry.schema_set and entry.schema_set.startswith(OFFERED_SET_PREFIX):
             try:
                 registry.select(entry.schema_id, "extraction", allow_pending_review=True)
-            except RegistryError:
+            except RegistryError:  # not selectable for extraction: not offered
                 continue
             out.append(entry)
     return sorted(out, key=lambda e: (e.schema_id.split("@", 1)[0], str(e.schema_set)))

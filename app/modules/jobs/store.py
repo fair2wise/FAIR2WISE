@@ -342,7 +342,7 @@ class JobStore:
             allowed = sorted(set(within_scope))
             outside = "s.value NOT IN (" + ", ".join("?" * len(allowed)) + ")" if allowed else "1"
             clauses.append(
-                "NOT EXISTS (SELECT 1 FROM json_each(jobs.inputs, '$.corpus_scope') AS s "  # noqa: S608
+                "NOT EXISTS (SELECT 1 FROM json_each(jobs.inputs, '$.corpus_scope') AS s "  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
                 f"WHERE s.type != 'null' AND {outside})"
             )
             params.extend(allowed)
@@ -354,7 +354,7 @@ class JobStore:
             params.append(kind)
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = self.db.query(
-            f"SELECT * FROM jobs{where} ORDER BY updated_at DESC, job_id LIMIT ?",  # noqa: S608
+            f"SELECT * FROM jobs{where} ORDER BY updated_at DESC, job_id LIMIT ?",  # noqa: S608 - SQL text is built only from fixed fragments and ? placeholders; values are bound parameters
             (*params, max(1, min(limit, 1000))),
         )
         return [self._record(r) for r in rows]
