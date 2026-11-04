@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..vision.kernels.units import (
     INVERSE_UNIT_TO_NM_INV,

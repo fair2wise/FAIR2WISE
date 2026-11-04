@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from ..extraction import H3_GATES as _EXTRACTION_GATES

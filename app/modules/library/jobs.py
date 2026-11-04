@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.keys import OperationInputs

@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
 import threading
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode

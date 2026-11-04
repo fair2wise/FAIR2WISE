@@ -56,7 +56,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolSpec
@@ -75,8 +75,8 @@ from .reports import (
 
 if TYPE_CHECKING:
     from ..jobs.store import JobRecord
-    from ..security.tiled_identity import TiledIdentityPort
     from ..security.authorization import DeploymentSettings
+    from ..security.tiled_identity import TiledIdentityPort
 
 #: Capability every Knowledge Operation read needs (T19C contract).
 READ_CAPABILITY = "chat.ask"

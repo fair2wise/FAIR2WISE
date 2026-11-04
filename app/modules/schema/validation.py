@@ -17,7 +17,7 @@ import copy
 from dataclasses import dataclass, field
 import hashlib
 import json
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from .loading import closure_fingerprint, load_helper, pre_s4_fingerprint
 from .registry import (

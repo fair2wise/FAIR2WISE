@@ -23,7 +23,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .campaign.evidence import GraphRows, assemble, fold_terms
 from .campaign.models import Decision, TermEvidence

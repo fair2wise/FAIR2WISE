@@ -16,7 +16,7 @@ from pathlib import Path
 import sqlite3
 import threading
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
@@ -29,8 +29,9 @@ from .store import JobRecord, JobStore, Lease, LeaseLost
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
-    from ..agent_runtime.admission import Admission
     from threading import Event
+
+    from ..agent_runtime.admission import Admission
 
 logger = logging.getLogger(__name__)
 

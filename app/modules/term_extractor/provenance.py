@@ -17,7 +17,7 @@ import json
 import logging
 from pathlib import Path
 import re
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..literature.pdf_reader import PdfDocument
 

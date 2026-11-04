@@ -47,6 +47,7 @@ from .operations import F2WOperations, build_operations
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
     from ..modules.operations.knowledge import KnowledgeOperations
 
 

@@ -37,7 +37,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, cast, TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from ..contracts import (
     ApprovalRecord,

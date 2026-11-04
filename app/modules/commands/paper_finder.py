@@ -34,7 +34,7 @@ from pathlib import Path
 import shutil
 import threading
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import webbrowser
 
 from flask import Flask, jsonify, redirect, render_template_string, request, url_for

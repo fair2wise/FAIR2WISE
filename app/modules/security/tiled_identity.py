@@ -41,7 +41,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
 import logging
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from urllib.parse import urlsplit, urlunsplit
 
 if TYPE_CHECKING:

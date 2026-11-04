@@ -47,7 +47,7 @@ import logging
 import os
 from pathlib import Path
 import threading
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
@@ -85,8 +85,9 @@ from .auth import (
 from .source_text import TurnSources
 
 if TYPE_CHECKING:
-    from ..modules.f2w_agent.api import AgentSettingsUpdate
     from starlette.responses import Response
+
+    from ..modules.f2w_agent.api import AgentSettingsUpdate
 
 logger = logging.getLogger(__name__)
 

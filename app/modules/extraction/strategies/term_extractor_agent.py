@@ -24,7 +24,7 @@ Two input modes, both existing entry points:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..contract import ChunkCoverage, ExtractionResult, ExtractionSource, frozen_copy
 from .legacy_f2w import mentions_for_term

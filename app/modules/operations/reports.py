@@ -46,8 +46,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolStatus
 
 if TYPE_CHECKING:
-    from ..jobs.pipeline import StageContext
-    from ..jobs.pipeline import Pipeline
+    from ..jobs.pipeline import Pipeline, StageContext
     from ..jobs.service import JobService, RegisteredKind
 
 REPORT_SCHEMA: Final = "f2w-operation-report/1"

@@ -36,7 +36,7 @@ import re
 import sqlite3
 import threading
 import time
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 

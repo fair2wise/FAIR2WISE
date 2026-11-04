@@ -33,7 +33,7 @@ import hashlib
 import json
 import logging
 import threading
-from typing import Any, Protocol, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, cast
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode

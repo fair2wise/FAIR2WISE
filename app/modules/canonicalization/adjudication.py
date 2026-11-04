@@ -27,7 +27,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup

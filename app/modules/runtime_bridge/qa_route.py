@@ -35,7 +35,7 @@ from enum import StrEnum
 import json
 import os
 import time
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from .mode import RuntimeConfigError
 

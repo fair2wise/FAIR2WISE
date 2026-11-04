@@ -27,7 +27,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..json_types import JsonValue

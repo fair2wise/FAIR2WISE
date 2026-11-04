@@ -33,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Callable
 import logging
 import re
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 import uuid
 
 from ..contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolStatus
@@ -41,6 +41,7 @@ from .papers import MAX_TERMS_CAP, TOOL_NAME, PaperScope, PaperScopeResolver, Pa
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
     from ..agent_runtime.executor import ToolExecutor
 
 logger = logging.getLogger(__name__)

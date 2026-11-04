@@ -66,8 +66,8 @@ from .origin_gate import OriginGateMiddleware
 from .upload_limits import DEFAULT_MAX_BODY_BYTES, MaxBodySizeMiddleware
 
 if TYPE_CHECKING:
-    from ..modules.graph.legacy_save import SaveTarget
     from ..modules.f2w_agent.coordinator import CoordinatorConfig
+    from ..modules.graph.legacy_save import SaveTarget
     from ..modules.library.service import LibraryService
     from ..modules.operations.knowledge import KnowledgeOperations
     from ..modules.security.authorization import DeploymentSettings

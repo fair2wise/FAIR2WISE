@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..growth import ObservationLog
 from ..migration import PlanDraft, sha256_json

@@ -6,13 +6,12 @@ import ipaddress
 import logging
 import os
 import socket
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable
-    from collections.abc import Iterable
+    from collections.abc import AsyncIterable, Iterable
 
 logger = logging.getLogger(__name__)
 

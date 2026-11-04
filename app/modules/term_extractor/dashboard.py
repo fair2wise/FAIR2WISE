@@ -8,7 +8,7 @@ from pathlib import Path
 import queue
 import threading
 import time
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from flask import Flask, Response, request, send_from_directory
 

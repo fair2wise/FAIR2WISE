@@ -77,8 +77,8 @@ from ..contracts import (
 from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
 
 if TYPE_CHECKING:
-    from ..json_types import JsonValue
     from ..agent_runtime.executor import ToolInvocation
+    from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import re
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..evidence.records import EvidenceRecord, ReportedQuantity, TagDecision
 

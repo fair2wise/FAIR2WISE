@@ -61,7 +61,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timedelta
 import json
 import logging
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda

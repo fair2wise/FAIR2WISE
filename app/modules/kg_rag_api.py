@@ -99,8 +99,9 @@ from .literature.pdf_reader import (  # noqa: E402 - module-level import placed 
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if TYPE_CHECKING:
-    from .security.authorization import DeploymentSettings
     from openai.types.chat import ChatCompletionMessageParam
+
+    from .security.authorization import DeploymentSettings
 
 if __name__ == "__main__":
     # CLI entry only (`python3 app/modules/kg_rag_api.py`, `python -m app.modules.kg_rag_api`):

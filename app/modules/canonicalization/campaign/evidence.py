@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 import re
-from typing import Any, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..merge_safety import fold, is_acronym_of
 from ..migration import sha256_json

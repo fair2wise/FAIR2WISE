@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 import logging
 import os
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from . import bundles as B
 from ..contracts.errors import ContractError, ErrorCode

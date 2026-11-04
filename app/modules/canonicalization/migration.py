@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
-from typing import Any, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..contracts.changes import ApprovalRecord, ChangePlan
 from .campaign.models import Decision, TermEvidence
