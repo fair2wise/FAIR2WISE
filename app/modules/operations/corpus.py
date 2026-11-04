@@ -95,6 +95,7 @@ from .reports import (
 )
 
 if TYPE_CHECKING:
+    from ..json_types import JsonValue
     from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
@@ -238,7 +239,7 @@ def same_work(left: PaperRecord, right: PaperRecord, *, use_content_hash: bool =
     return True
 
 
-def _valid_year(value: Any) -> int | None:
+def _valid_year(value: JsonValue) -> int | None:
     try:
         year = int(value)
     except (TypeError, ValueError):

@@ -77,6 +77,7 @@ from ..contracts import (
 from ..runtime_bridge.qa_tool import CITATION_TOKEN_RE
 
 if TYPE_CHECKING:
+    from ..json_types import JsonValue
     from ..agent_runtime.executor import ToolInvocation
 
 logger = logging.getLogger(__name__)
@@ -284,7 +285,7 @@ class SummaryOutcome:
     legacy: dict[str, Any]
 
 
-def _int(value: Any) -> int:
+def _int(value: JsonValue) -> int:
     try:
         return max(0, int(value))
     except (TypeError, ValueError):

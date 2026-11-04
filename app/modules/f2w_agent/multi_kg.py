@@ -9,7 +9,10 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..json_types import JsonValue
 
 DEFAULT_JSON_GRAPH_PATHS: tuple[str, ...] = (
     "storage/kg/matkg_rsoxs_v1.json",
@@ -252,7 +255,7 @@ DEFAULT_KG_QUERY_HOPS = 20
 DEFAULT_KG_QUERY_MAX_NODES = 1000
 
 
-def clamp_kg_query_hops(value: Any, default: int = DEFAULT_KG_QUERY_HOPS) -> int:
+def clamp_kg_query_hops(value: JsonValue, default: int = DEFAULT_KG_QUERY_HOPS) -> int:
     """Clamp neighborhood hops to 1..MAX_KG_QUERY_HOPS."""
     try:
         hops = int(value)
@@ -261,7 +264,7 @@ def clamp_kg_query_hops(value: Any, default: int = DEFAULT_KG_QUERY_HOPS) -> int
     return max(1, min(MAX_KG_QUERY_HOPS, hops))
 
 
-def clamp_kg_query_max_nodes(value: Any, default: int = DEFAULT_KG_QUERY_MAX_NODES) -> int:
+def clamp_kg_query_max_nodes(value: JsonValue, default: int = DEFAULT_KG_QUERY_MAX_NODES) -> int:
     """Clamp retrieve node cap to 10..1000."""
     try:
         count = int(value)

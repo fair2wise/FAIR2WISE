@@ -149,7 +149,7 @@ class OpaquePaths:
         """Return whether ``value`` is an ``f2w://`` id."""
         return isinstance(value, str) and value.strip().startswith(OPAQUE_PREFIX)
 
-    def decode(self, value: Any) -> JsonValue:
+    def decode(self, value: JsonValue) -> JsonValue:
         """Return the server path for an ``f2w://`` id; other values are returned unchanged.
 
         Raises:

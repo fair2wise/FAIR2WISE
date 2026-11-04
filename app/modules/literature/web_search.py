@@ -18,12 +18,15 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 import xml.etree.ElementTree as ET
 
 import httpx
 
 from .openalex import EXTERNAL_RESULT
+
+if TYPE_CHECKING:
+    from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +81,7 @@ class DiscoveryReport:
                 "providers": {k: asdict(v) for k, v in self.providers.items()}}
 
 
-def _cap(value: Any) -> int:
+def _cap(value: JsonValue) -> int:
     try:
         return max(1, min(int(value or 5), _MAX))
     except (TypeError, ValueError):

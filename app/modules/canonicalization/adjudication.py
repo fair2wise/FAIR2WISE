@@ -27,11 +27,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from .candidate_search import Shortlist, estimate_tokens
 from .grouping import TermGroup
 from .merge_safety import check_merge
+
+if TYPE_CHECKING:
+    from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +175,7 @@ def _strings(value: object) -> list[str]:
     return [str(v).strip() for v in value if str(v).strip()] if isinstance(value, list) else []
 
 
-def clamp_confidence(value: Any) -> float:
+def clamp_confidence(value: JsonValue) -> float:
     """Confidence in [0, 1]; unreadable is 0.0 (it must not clear the apply floor)."""
     try:
         return max(0.0, min(1.0, float(value)))

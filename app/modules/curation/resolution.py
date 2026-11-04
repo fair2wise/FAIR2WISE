@@ -33,7 +33,7 @@ import hashlib
 import json
 import logging
 import threading
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, cast, TYPE_CHECKING
 import uuid
 
 from ..contracts.errors import ContractError, ErrorCode
@@ -46,6 +46,9 @@ from .model_port import ModelCallError, ModelPort, ModelRef, ModelReply
 from .models import CaseState, ResolutionAttempt, Route
 from .review_schema import ReviewParseError, parse_review_response, validate_resolution
 from .store import CurationStore
+
+if TYPE_CHECKING:
+    from ..agent_runtime.admission import Admission
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +142,7 @@ class ModelResolver:
         route: Route,
         ref: ModelRef,
         settings: ResolverSettings,
-        admission: Any,
+        admission: Admission,
         approval: CostApproval | None = None,
         outbound_policy: OutboundPolicy | None = None,
         recorder: AuditRecorder | None = None,

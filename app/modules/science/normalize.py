@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..vision.kernels.units import (
     INVERSE_UNIT_TO_NM_INV,
@@ -22,6 +22,9 @@ from ..vision.kernels.units import (
     fold_length,
     normalise_unit,
 )
+
+if TYPE_CHECKING:
+    from ..json_types import JsonValue
 
 TWO_PI = 2.0 * math.pi
 LENGTH = "length"
@@ -59,7 +62,7 @@ class NormalizedQuantity:
         }
 
 
-def _finite_positive(value: Any) -> float:
+def _finite_positive(value: JsonValue) -> float:
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -69,7 +72,7 @@ def _finite_positive(value: Any) -> float:
     return number
 
 
-def science_normalize_quantity(value: Any, unit: str, kind: str | None = None) -> NormalizedQuantity:
+def science_normalize_quantity(value: JsonValue, unit: str, kind: str | None = None) -> NormalizedQuantity:
     """Normalize a length to nm or an inverse length to nm^-1.
 
     Args:

@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -110,6 +110,12 @@ from .trace import (
     tracing_enabled,
 )
 from .workflow_state import WorkflowStateStore
+
+if TYPE_CHECKING:
+    from ...api.auth import CredentialStore
+    from ..json_types import JsonValue
+    from ..security.authorization import DeploymentSettings
+    from ..security.tiled_identity import TiledIdentityPort
 
 logger = logging.getLogger(__name__)
 
@@ -639,7 +645,7 @@ def _string_value(value: object, default: str = "") -> str:
     return text or default
 
 
-def _optional_int(value: Any) -> int | None:
+def _optional_int(value: JsonValue) -> int | None:
     """Parse a value as int, or return None if missing or invalid."""
     if value in (None, ""):
         return None
@@ -6662,10 +6668,10 @@ def create_app(
     cfg: CoordinatorConfig,
     *,
     cors_origins: list[str] | None = None,
-    deployment: Any | None = None,
+    deployment: DeploymentSettings | None = None,
     startup_config: dict[str, str] | None = None,
-    identity_port: Any | None = None,
-    credential_store: Any | None = None,
+    identity_port: TiledIdentityPort | None = None,
+    credential_store: CredentialStore | None = None,
     clock: Callable[[], Any] | None = None,
 ) -> FastAPI:
     """Build the FastAPI app with CORS and agent pipeline routes.
