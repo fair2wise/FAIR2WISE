@@ -77,3 +77,14 @@ def test_rsoxs_v4_is_rebuilt_from_the_repaired_terms_and_v3_is_untouched() -> No
     assert "nodes" in v3 and "things" not in v3  # history: the old nodes/edges layout stays as it was
     meta = _graph("matkg_rsoxs_v4.json")["metadata"]
     assert meta  # the source terms' metadata block is carried through by json2kg
+
+
+@pytest.mark.parametrize("name", ["matkg_bl1101_v8.json", "matkg_bl1101_v9.json"])
+def test_v8_and_v9_are_scrubbed_and_in_the_standard_serialization(name: str) -> None:
+    """Owner decision 2026-11-04: same scrub as v1..v7, re-serialized in place (no content change)."""
+    text = (KG / name).read_text(encoding="utf-8")
+    assert "/tmp/" not in text and "file://" not in text and not _KEY_LITERAL.search(text)
+    assert text.count("<REDACTED>") == 2 and text.count("<tmp>/") == 1
+    assert text == json.dumps(json.loads(text), indent=2, ensure_ascii=False)  # standard: no trailing newline
+    rules = Counter(f.rule for f in check_disclosure(_graph(name)).findings)
+    assert rules["R3"] == 0 and rules["R4"] == 0 and rules["R5"] == 0, dict(rules)
