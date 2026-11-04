@@ -152,7 +152,7 @@ def test_cborg_client_streams_through_admission_slot(monkeypatch, recorded):
     monkeypatch.setattr(clients.openai, "OpenAI", FakeOpenAI)
     monkeypatch.setattr(clients, "require_cborg_api_key", lambda key: key or "resolved")
     monkeypatch.setattr(clients, "openai_http_kwargs", lambda asynchronous: {"http_client": "H"})
-    monkeypatch.setattr(clients, "collect_stream_text", lambda resp: "".join(resp))
+    monkeypatch.setattr(clients, "collect_stream_text", lambda resp, **_kw: "".join(resp))
     c = clients.make_chat_client("cborg-openai", "gpt", cborg_base="https://base.example/v1/")
     assert created["base_url"] == "https://base.example/v1" and created["api_key"] == "resolved"
     assert created["http_client"] == "H"

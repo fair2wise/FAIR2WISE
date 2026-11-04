@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
 import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
@@ -91,6 +92,11 @@ class JobService:
         self.heartbeat_interval = heartbeat_interval
         #: Set at shutdown: running jobs return to ``queued`` at their next boundary.
         self.interrupt = threading.Event()
+        #: Seconds a job that went back to ``queued`` (busy resource) is left alone by this service's claims.
+        self.requeue_backoff = 5.0
+        self._claim_lock = threading.Lock()
+        self._running_jobs: set[str] = set()  # jobs this service is running right now (never re-claimed here)
+        self._backoff_until: dict[str, float] = {}  # job id -> time.monotonic() deadline
         self._kinds: dict[str, RegisteredKind] = {}
         self._scope_hooks: list[Callable[[Mapping[str, Any]], None]] = []
 
@@ -301,13 +307,24 @@ class JobService:
         ``state`` is ``None`` when the owner lost its lease mid-run (a newer owner took over);
         this worker then stops without applying anything further.
         """
-        claimed = self.store.claim_next(owner or self.owner, kinds=kinds or tuple(self._kinds))
-        if claimed is None:
-            return None
+        with self._claim_lock:
+            # A job this process still runs must not be claimed again when its lease merely lapsed (a stalled
+            # clock, a suspended machine): the heartbeat revives that lease, a second run would fight the first.
+            now = time.monotonic()
+            self._backoff_until = {j: t for j, t in self._backoff_until.items() if t > now}
+            claimed = self.store.claim_next(
+                owner or self.owner,
+                kinds=kinds or tuple(self._kinds),
+                exclude=self._running_jobs | self._backoff_until.keys(),
+            )
+            if claimed is None:
+                return None
+            self._running_jobs.add(claimed[1].job_id)
         lease, job = claimed
-        entry = self.kind(job.kind)
-        beat = self._start_heartbeat(lease)
+        beat = threading.Event()
         try:
+            entry = self.kind(job.kind)
+            beat = self._start_heartbeat(lease)
             state: JobState | None = entry.runner.run(lease, job)
         except LeaseLost:
             beat.set()
@@ -317,13 +334,28 @@ class JobService:
             beat.set()
             self.store.release_lease(lease)
             raise
+        finally:
+            self._finish_job(job.job_id)
         # A BaseException (a crash, a killed thread) skips this on purpose: the lease is left to expire.
         beat.set()
         self.store.release_lease(lease)
+        if state is JobState.QUEUED and not self.interrupt.is_set() and self.requeue_backoff > 0:
+            with self._claim_lock:
+                self._backoff_until[job.job_id] = time.monotonic() + self.requeue_backoff
         return job.job_id, state
 
+    def _finish_job(self, job_id: str) -> None:
+        with self._claim_lock:
+            self._running_jobs.discard(job_id)
+
     def _start_heartbeat(self, lease: Lease) -> threading.Event:
-        """Renew ``lease`` periodically while the job runs; returns the event that stops the renewals."""
+        """Renew ``lease`` periodically while the job runs; returns the event that stops the renewals.
+
+        The heartbeat is a thread of its own, independent of the handler: it renews even while a stage
+        blocks in a long LLM call. A lapsed but never taken-over lease is revived; a lease another owner
+        took stops the heartbeat. Every failure is logged at warning level, and a transient error (a
+        locked database) is retried at the next beat instead of ending the heartbeat for good.
+        """
         done = threading.Event()
         interval = self.heartbeat_interval
         if not interval:
@@ -332,12 +364,12 @@ class JobService:
         def beat() -> None:
             while not done.wait(interval):
                 try:
-                    self.store.renew_lease(lease)
-                except (
-                    Exception
-                ):  # noqa: BLE001 - a lost lease ends the heartbeat; the runner sees LeaseLost itself
-                    logger.debug("heartbeat stopped: lease renewal failed", exc_info=True)
+                    self.store.renew_lease(lease, allow_expired=True)
+                except LeaseLost:
+                    logger.warning("heartbeat stopped: lease on %s was taken over by another owner", lease.resource)
                     return
+                except Exception:  # noqa: BLE001 - a transient store error must not end the heartbeat
+                    logger.warning("heartbeat: lease renewal on %s failed; retrying", lease.resource, exc_info=True)
 
         threading.Thread(target=beat, name=f"heartbeat-{lease.resource}", daemon=True).start()
         return done

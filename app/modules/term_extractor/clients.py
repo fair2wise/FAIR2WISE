@@ -9,7 +9,12 @@ from typing import Any
 import openai
 import requests
 
-from ..cborg_http import collect_stream_text, openai_http_kwargs, require_cborg_api_key
+from ..cborg_http import (
+    LLM_MAX_RETRIES,
+    collect_stream_text,
+    openai_http_kwargs,
+    require_cborg_api_key,
+)
 from ..cborg_limiter import sync_slot
 from ..f2w_agent.trace import record_llm_call
 
@@ -140,6 +145,7 @@ class CBorgChatClient(ChatClient):
         logger.debug("CBorgClient.chat: model=%s prompt_len=%d", self.model, len(prompt))
 
         def call() -> str:
+            deadline = time.monotonic() + timeout * (LLM_MAX_RETRIES + 1)  # total bound: every retry included
             with sync_slot():
                 resp = self.client.chat.completions.create(
                     model=self.model,
@@ -148,7 +154,7 @@ class CBorgChatClient(ChatClient):
                     timeout=timeout,
                     stream=True,
                 )
-            result = collect_stream_text(resp)
+            result = collect_stream_text(resp, deadline=deadline)
             logger.debug("CBorgClient.chat: response_len=%d", len(result))
             return result
 

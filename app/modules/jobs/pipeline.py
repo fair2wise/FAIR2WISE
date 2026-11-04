@@ -60,6 +60,16 @@ class PauseProvider(StagePause):
     state = JobState.PAUSED_PROVIDER
 
 
+class StageBusy(StagePause):
+    """Another run of this very job still holds a resource (an earlier owner that lost its lease but is alive).
+
+    The job goes back to ``queued`` for a later claim instead of failing: the earlier run ends at its next
+    fenced write, after which the resource is free.
+    """
+
+    state = JobState.QUEUED
+
+
 class AwaitReview(StagePause):
     """A human decision is required: job -> ``awaiting_review``."""
 
@@ -608,6 +618,7 @@ __all__ = (
     "PipelineRunner",
     "QuarantineStage",
     "RestartStages",
+    "StageBusy",
     "StageContext",
     "StagePause",
     "StageResult",

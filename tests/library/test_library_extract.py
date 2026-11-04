@@ -407,3 +407,55 @@ def local_ctx(settings: Any):
     from app.modules.security.authorization import local_operator_context
 
     return local_operator_context(settings, request_id="r")
+
+
+def test_a_second_claim_while_the_first_run_holds_the_bundle_requeues_instead_of_failing(tmp_path):
+    world = World(tmp_path)
+    names = _three(world)
+    world.jobs.requeue_backoff = 0
+    handle = world.submit(world.params(names))
+    with bundle_lock(world.store, "run1", handle.job_id):  # the earlier run of this very job, still alive
+        job_id, state = world.jobs.work_one("w2")
+        assert (job_id, state) == (handle.job_id, JobState.QUEUED)
+        assert world.factory_calls == []
+    job_id, state = world.jobs.work_one("w2")
+    assert (job_id, state) == (handle.job_id, JobState.SUCCEEDED)
+
+
+def test_finished_papers_survive_a_crash_in_the_manifest(tmp_path):
+    clock = Clock()
+
+    def hook(orch: FakeOrchestrator, name: str) -> None:
+        if name == "c.pdf":
+            raise Crash
+
+    world = World(tmp_path, hook=hook, clock=clock)
+    names = _three(world)
+    world.submit(world.params(names))
+    with pytest.raises(Crash):
+        world.jobs.work_one("w")
+    # no finalize ran, yet the bundle already lists the two finished papers (paper_count is not 0)
+    assert [p["name"] for p in world.bundle().manifest["papers"]] == ["a.pdf", "b.pdf"]
+    assert world.store.list()[0].summary()["paper_count"] == 2
+
+
+def test_a_run_that_lost_its_lease_records_nothing_and_stops_calling_the_llm(tmp_path):
+    clock = Clock()
+    seen: list[bool] = []
+
+    def hook(orch: FakeOrchestrator, name: str) -> None:
+        if name == "b.pdf":
+            clock.advance(61)  # the lease (60 s) lapses while this run is alive
+            assert world.jobs.store.claim_next("w2") is not None  # and a second owner takes the job over
+            seen.append(orch.cancel_check())  # type: ignore[attr-defined]
+
+    world = World(tmp_path, hook=hook, clock=clock)
+    names = _three(world)
+    handle = world.submit(world.params(names))
+    job_id, state = world.jobs.work_one("w")
+    assert (job_id, state) == (handle.job_id, None)  # the stale owner stopped without applying anything
+    assert seen == [True]  # the orchestrator was told to stop
+    assert [p["name"] for p in world.bundle().manifest["papers"]] == ["a.pdf"]  # b.pdf was not recorded by the stale run
+    assert json.loads(world.bundle().file(B.PROCESSED_FILE).read_text()) == ["a.pdf"]
+    record = world.jobs.store.get(handle.job_id)
+    assert record.state is JobState.RUNNING  # still the new owner's: the stale one never marked it failed

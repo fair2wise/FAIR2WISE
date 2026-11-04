@@ -23,7 +23,15 @@ _ACTIVE_JOB: str | None = None
 
 
 class CaptureBusy(RuntimeError):
-    """A log capture is already active in this process (one active job per process)."""
+    """A log capture is already active in this process (one active job per process).
+
+    Attributes:
+        job_id: The job whose logs are being captured.
+    """
+
+    def __init__(self, job_id: str | None) -> None:
+        super().__init__(f"job logs of {job_id} are already being captured in this process")
+        self.job_id = job_id
 
 
 def _level_name(levelno: int) -> str:
@@ -90,7 +98,7 @@ def capture_job_logs(
     """
     global _ACTIVE_JOB  # noqa: PLW0603 - the one-active-job-per-process guard
     if not _ACTIVE_LOCK.acquire(blocking=False):
-        raise CaptureBusy(f"job logs of {_ACTIVE_JOB} are already being captured in this process")
+        raise CaptureBusy(_ACTIVE_JOB)
     handler = JobLogHandler(sc, level)
     attached: list[tuple[logging.Logger, int]] = []
     try:

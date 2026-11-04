@@ -1,6 +1,6 @@
 """Drive LLM term extraction over PDFs, page by page, into a ``TermStore``."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import logging
@@ -16,7 +16,13 @@ from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
 from . import provenance, source_repos
-from ..cborg_http import openai_http_kwargs, require_cborg_api_key
+from ..cborg_http import (
+    LLM_MAX_RETRIES,
+    call_with_deadline,
+    llm_timeout,
+    openai_http_kwargs,
+    require_cborg_api_key,
+)
 from ..cborg_limiter import sync_slot
 from ..literature.pdf_reader import open_pdf
 from ..llm_admission import shared_admission_enabled
@@ -161,6 +167,9 @@ class Orchestrator:
     processed on a thread pool of ``max_workers``.
     """
 
+    #: Polled before each page; ``True`` ends the work (the owning job stopped or lost its lease).
+    cancel_check: Callable[[], bool] | None = None
+
     def __init__(
         self,
         model: str,
@@ -222,7 +231,8 @@ class Orchestrator:
     def _build_tools(self, llm_base: ChatOpenAI) -> list[BaseTool]:
         def _llm_invoke(prompt: str) -> str:
             from langchain_core.messages import HumanMessage
-            content = llm_base.invoke([HumanMessage(content=prompt)]).content
+            # A hung transport must not pin the calling page thread for ever: bound the whole call.
+            content = call_with_deadline(lambda: llm_base.invoke([HumanMessage(content=prompt)])).content
             return content if isinstance(content, str) else str(content or "")
 
         self._tool_state = ToolState(
@@ -253,6 +263,8 @@ class Orchestrator:
                 base_url=self.ollama_url.rstrip("/") + "/v1",
                 api_key=SecretStr("ollama"),
                 temperature=self.temperature,
+                timeout=llm_timeout().read,
+                max_retries=LLM_MAX_RETRIES,
             )
         logger.debug("Building LLM: backend=cborg base=%s model=%s", self.cborg_base, self.model)
         return ChatOpenAI(
@@ -261,6 +273,8 @@ class Orchestrator:
             base_url=self.cborg_base,
             temperature=self.temperature,
             streaming=True,
+            timeout=llm_timeout().read,
+            max_retries=LLM_MAX_RETRIES,
             http_socket_options=(),
             **openai_http_kwargs(asynchronous=False),
         )
@@ -271,6 +285,8 @@ class Orchestrator:
 
     def process_page(self, text: str, filename: str, page_num: int) -> bool:
         """Invoke the agent graph on one page of text. Returns True if any terms were added/updated."""
+        if self.cancel_check is not None and self.cancel_check():
+            return False  # the owning job stopped or lost its lease: no more LLM calls for it
         if not text or len(text.split()) < 20:
             logger.info("Skipping page %d of %s (insufficient text).", page_num + 1, filename)
             return False

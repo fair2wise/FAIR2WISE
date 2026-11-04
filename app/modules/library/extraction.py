@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Any
 from . import bundles as B
 from ..contracts.errors import ContractError, ErrorCode
 from ..jobs.log_capture import CaptureBusy, capture_job_logs
-from ..jobs.pipeline import JobInterrupted, JobStopped, StageContext, StageResult
+from ..jobs.pipeline import JobInterrupted, JobStopped, StageBusy, StageContext, StageResult
 from ..jobs.stages import WorkUnit, chunked_stage
 from .catalog import sha256_file
 from .kg_service import KgLibrary
@@ -99,12 +99,26 @@ def _write_json(path: Path, data: object) -> None:
     B._write_json(path, data)  # noqa: SLF001 - the bundle package's atomic writer
 
 
+class BundleBusy(ContractError):
+    """``CONFLICT`` (retryable): another run holds the bundle; ``holder`` is its job id when it recorded one."""
+
+    def __init__(self, holder: str | None) -> None:
+        super().__init__(ErrorCode.CONFLICT, "another extraction is running for this KG bundle", retryable=True)
+        self.holder = holder
+
+
 @contextmanager
-def bundle_lock(store: B.BundleStore, name: str) -> Iterator[None]:
+def bundle_lock(store: B.BundleStore, name: str, holder: str | None = None) -> Iterator[None]:
     """One extraction per bundle: an advisory ``flock`` that dies with the process (a killed worker frees it).
 
+    Args:
+        store: The bundle store (the lock file lives under it).
+        name: Bundle name.
+        holder: Job id written into the lock file, so a refused claimant can tell an earlier run of its own
+            job (alive after losing its lease) from a different job.
+
     Raises:
-        ContractError: ``CONFLICT`` (retryable) while another run holds the bundle.
+        BundleBusy: ``CONFLICT`` (retryable) while another run holds the bundle.
     """
     import fcntl
 
@@ -116,9 +130,16 @@ def bundle_lock(store: B.BundleStore, name: str) -> Iterator[None]:
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            raise ContractError(ErrorCode.CONFLICT, "another extraction is running for this KG bundle",
-                                retryable=True) from None
+            try:
+                owner = Path(handle.name).read_text().strip() or None
+            except OSError:
+                owner = None
+            raise BundleBusy(owner) from None
         try:
+            handle.seek(0)
+            handle.truncate()
+            handle.write(holder or "")
+            handle.flush()
             yield
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
@@ -270,9 +291,15 @@ class LibraryExtractor:
         schema_block = manifest_block(choice)
         self.kg.check_confirmation(args["confirmation"], [r["id"] for r in rows], args["model"], args["schema"])
         try:
-            with bundle_lock(self.store, args["bundle"]):
+            with bundle_lock(self.store, args["bundle"], ctx.job.job_id):
                 return self._run_locked(ctx, args, backend, root, rows, choice, schema_block)
+        except BundleBusy as exc:
+            if exc.holder == ctx.job.job_id:  # an earlier run of this job lost its lease but is still winding down
+                raise StageBusy("an earlier run of this job still holds the KG bundle") from exc
+            raise
         except CaptureBusy as exc:
+            if exc.job_id == ctx.job.job_id:
+                raise StageBusy("an earlier run of this job is still capturing logs") from exc
             raise ContractError(ErrorCode.CONFLICT, str(exc), retryable=True) from exc
 
     def _run_locked(self, ctx: StageContext, args: Mapping[str, Any], backend: Mapping[str, str], root: Path,
@@ -291,6 +318,16 @@ class LibraryExtractor:
         skipped = len(rows) - len(todo)
         ctx.log(f"extracting {len(todo)} papers into bundle {bundle.name} with {model} ({skipped} already done)")
         orch = self.factory(model=model, output_file=str(terms_path), schema_path=schema_path, backend=backend)
+
+        def lost() -> bool:
+            """Whether this run no longer owns the job (lease lost, stop requested, shutdown): stop calling the LLM."""
+            try:
+                ctx.guard()
+            except Exception:  # noqa: BLE001 - any refusal means: stop now
+                return True
+            return False
+
+        orch.cancel_check = lost  # a stale or stopped run must not keep spending LLM calls on its pages
         by_id = {r["id"]: r for r in todo}
         counts = {"extracted": 0, "pages": 0, "pages_with_terms": 0}
 
@@ -307,9 +344,14 @@ class LibraryExtractor:
             logger.info("extracting %s", rel)  # a log line (captured); ctx.log here would turn a cancel into a failure
             with_terms = int(orch.process_pdf(str(path)) or 0)
             pages = int(orch.store.metadata.get("processed_pages_total", 0)) - int(before.get("processed_pages_total", 0))
+            _sc.store.check_lease(_sc.lease)  # a run that lost its lease while the PDF was in flight must not record it as done
             if pages <= 0:
                 raise RuntimeError("the PDF could not be read")
             self.record_pdf(bundle, Path(rel).name, sha, pages, with_terms)
+            # Per-PDF manifest entry now, not only at the end: a failed, hung or fenced-out run keeps its finished papers.
+            self.store.record_extraction(
+                bundle.name, schema_id=str(schema_block["id"]), model=model, backend=backend["name"],
+                papers=[B.PaperRef(Path(rel).name, str(row["sha256"]), pages)])
             counts["extracted"] += 1
             counts["pages"] += pages
             counts["pages_with_terms"] += with_terms
@@ -341,5 +383,5 @@ class LibraryExtractor:
                            incomplete=result.incomplete)
 
 
-__all__ = ("BACKEND_ENV", "CAPTURED_LOGGERS", "EXTRACTOR_REVISION", "LibraryExtractor", "bundle_lock",
+__all__ = ("BACKEND_ENV", "CAPTURED_LOGGERS", "BundleBusy", "EXTRACTOR_REVISION", "LibraryExtractor", "bundle_lock",
            "default_orchestrator_factory", "resolve_backend")
