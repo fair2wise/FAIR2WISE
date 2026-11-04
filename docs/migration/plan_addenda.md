@@ -759,3 +759,17 @@ Library and Extraction tabs and runs after the job and worker foundations (T10, 
   commands are listed in `tests/deployment/README.md`; they wait on D3.11. D3.14 applied:
   the CI Tiled job installs `--require-hashes` from `constraints.lock.txt` like the image.
   D3.15 applied: the two supervisor tests with fixed sleeps now wait on events.
+
+## Legacy modules retained for real ports (owner decision 2026-11-04)
+
+T17B (H8) found that five modules the audit proposed archiving are imported by
+`app/modules/f2w_agent/api.py`, which class (r) retains as the browser contract:
+`tiled_graph.py`, `orchestrator_agent.py` with `debate_agent.py`, `download_agent.py`,
+`kg_update.py` and `bl1101_ingest.py`. Owner decision, verbatim: "reclassify as retained, stay in
+place. add a note in the addendum we want real ports". They are class (r) and stay where they are.
+
+**Direction:** the owner wants real ports, not shims. Target homes from the T17B execution record
+(`docs/migration/reviews/H8/legacy_audit.md` section 8): `tiled_lookup` (the live lookup and probe in
+`tiled_graph.py`) under `graph/backends/`; routing and debate under `agent_runtime/` and `curation/`;
+`kg_update` under `graph/`; `bl1101` ingestion under `graph/imports/` (a multi-day task). Each port needs its
+own task, tests and owner scheduling before H8; none is started.
