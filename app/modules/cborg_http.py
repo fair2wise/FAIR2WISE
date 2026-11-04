@@ -6,12 +6,14 @@ import ipaddress
 import logging
 import os
 import socket
+import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable, Iterable
+    from collections.abc import AsyncIterable, Callable, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -135,9 +137,60 @@ def stream_chunk_text(chunk: object) -> str:
     return _stream_piece(getattr(message, "content", None))
 
 
-def collect_stream_text(chunks: Iterable[object]) -> str:
-    """Join a synchronous ``stream=True`` completion into one string."""
-    return "".join(stream_chunk_text(chunk) for chunk in chunks)
+#: Seconds to open a connection / wait for the next bytes (httpx limits are per phase, not total).
+LLM_CONNECT_TIMEOUT = 10.0
+LLM_READ_TIMEOUT = 120.0
+#: Seconds one LLM call may take in total, retries and a trickling stream included.
+LLM_TOTAL_DEADLINE = 300.0
+#: SDK-level retries per request (each already bounded by the timeouts above).
+LLM_MAX_RETRIES = 2
+
+
+def llm_timeout() -> httpx.Timeout:
+    """Per-phase HTTP limits for an LLM client (no phase may wait for ever)."""
+    return httpx.Timeout(LLM_READ_TIMEOUT, connect=LLM_CONNECT_TIMEOUT)
+
+
+def call_with_deadline[T](call: Callable[[], T], seconds: float = LLM_TOTAL_DEADLINE) -> T:
+    """Run ``call`` and return its result, or raise ``TimeoutError`` once ``seconds`` have passed.
+
+    The call runs on a daemon thread so a hung transport cannot block the caller (a worker that must keep
+    renewing its lease); the abandoned thread ends when its own socket timeout fires.
+    """
+    box: dict[str, Any] = {}  # Any: the result or exception of an arbitrary callable
+    finished = threading.Event()
+
+    def runner() -> None:
+        try:
+            box["value"] = call()
+        except BaseException as exc:  # noqa: BLE001 - re-raised in the caller's thread
+            box["error"] = exc
+        finally:
+            finished.set()
+
+    threading.Thread(target=runner, name="llm-call", daemon=True).start()
+    if not finished.wait(seconds):
+        raise TimeoutError(f"LLM call exceeded its {seconds:g}s deadline")
+    if "error" in box:
+        raise box["error"]
+    value: T = box["value"]
+    return value
+
+
+def collect_stream_text(chunks: Iterable[object], *, deadline: float | None = None) -> str:
+    """Join a synchronous ``stream=True`` completion into one string.
+
+    Args:
+        chunks: The streamed chunks.
+        deadline: ``time.monotonic()`` value after which the stream is abandoned with ``TimeoutError``
+            (checked between chunks, so a server that trickles bytes cannot hold the call open for ever).
+    """
+    parts: list[str] = []
+    for chunk in chunks:
+        if deadline is not None and time.monotonic() > deadline:
+            raise TimeoutError("LLM stream exceeded its total deadline")
+        parts.append(stream_chunk_text(chunk))
+    return "".join(parts)
 
 
 async def collect_stream_text_async(chunks: AsyncIterable[object]) -> str:
