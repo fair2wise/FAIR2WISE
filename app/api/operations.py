@@ -52,11 +52,11 @@ from ..modules.contracts.changes import ApprovalRecord, ChangePlan
 from ..modules.contracts.context import LOCAL_OPERATOR, ActorKind, RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
 from ..modules.contracts.jobs import JobEvent, JobHandle, JobState
+from ..modules.contracts.json_types import JsonValue
 from ..modules.contracts.tools import ToolResult
 from ..modules.jobs.keys import OperationInputs
 from ..modules.jobs.service import JobService
 from ..modules.jobs.store import JobLog
-from ..modules.json_types import JsonValue
 from ..modules.security.authorization import (
     DeploymentSettings,
     create_approval,

@@ -72,8 +72,8 @@ from langgraph.runtime import get_runtime
 from langgraph.types import interrupt
 
 from ..contracts import ApprovalRecord, ChangePlan, ContractError, ErrorCode, RequestContext, ToolStatus
+from ..contracts.json_types import Untyped
 from ..contracts.ports import DocumentStore
-from ..json_types import Untyped
 from .admission import Admission, ensure_admission
 from .chat_model import ChatModel
 from .checkpointer import owner_key

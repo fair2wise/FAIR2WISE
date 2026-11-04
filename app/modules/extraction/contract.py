@@ -24,8 +24,8 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..contracts.json_types import JsonValue
 from ..evidence.records import ReportedQuantity
-from ..json_types import JsonValue
 from ..literature.parsed_document import ParsedDocument
 
 #: Version of this result contract.

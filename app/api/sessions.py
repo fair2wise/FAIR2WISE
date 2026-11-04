@@ -57,7 +57,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..modules.contracts.errors import ContractError, ErrorCode
-from ..modules.json_types import Untyped
+from ..modules.contracts.json_types import Untyped
 from ..modules.security.authorization import CLOCK_SKEW_TOLERANCE, DeploymentSettings, StartupConfigError
 from ..modules.security.tiled_identity import (
     ABOUT_PATH,

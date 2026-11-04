@@ -96,7 +96,7 @@ from .reports import (
 
 if TYPE_CHECKING:
     from ..agent_runtime.executor import ToolInvocation
-    from ..json_types import JsonValue
+    from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 

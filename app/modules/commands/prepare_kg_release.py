@@ -38,9 +38,9 @@ import sys
 from typing import Any
 
 from ..cli_output import output
+from ..contracts.json_types import JsonValue
 from ..graph import releases
 from ..graph.releases import ReleaseRefused, ReleaseVerificationError
-from ..json_types import JsonValue
 
 EXIT_OK, EXIT_ERROR, EXIT_REFUSED = 0, 1, 2
 

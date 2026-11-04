@@ -26,7 +26,7 @@ import httpx
 from .openalex import EXTERNAL_RESULT
 
 if TYPE_CHECKING:
-    from ..json_types import JsonValue
+    from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 

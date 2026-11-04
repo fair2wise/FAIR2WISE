@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from .json_types import JsonValue
+from .contracts.json_types import JsonValue
 from .resources import resource_root
 
 # Checkout root. Installed wheels have no project root; config.yml is found

@@ -17,7 +17,7 @@ from typing import Any
 from linkml_runtime.utils.schemaview import SchemaView
 import yaml
 
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 from .registry import (
     NORMALIZER_LEGACY,
     NORMALIZER_TERM_EXTRACTOR,

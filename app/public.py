@@ -57,7 +57,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult
-from .modules.json_types import JsonValue
+from .modules.contracts.json_types import JsonValue
 from .modules.security.authorization import DeploymentSettings
 
 if TYPE_CHECKING:  # the operations service is imported only by callers that pass one

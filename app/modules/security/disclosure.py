@@ -48,7 +48,7 @@ import uuid
 from ..contracts.context import RequestContext
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.evidence import EvidenceRef, MatchType, SourceLocator
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 from .content_access import SourceAccessScope, SourceKind
 
 # --------------------------------------------------------------------------- configuration

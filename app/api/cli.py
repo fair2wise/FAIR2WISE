@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..modules.cli_output import output
 from ..modules.contracts.errors import ContractError, ErrorCode
-from ..modules.json_types import JsonValue
+from ..modules.contracts.json_types import JsonValue
 from .legacy_ui import deployment_settings_from
 from .operations import F2WOperations, build_operations
 

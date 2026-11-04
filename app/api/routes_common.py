@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 
 from ..modules.contracts.context import RequestContext
 from ..modules.contracts.errors import ContractError, ErrorCode
-from ..modules.json_types import JsonValue
+from ..modules.contracts.json_types import JsonValue
 from .auth import fresh_request_context, request_context
 from .operations import F2WOperations
 

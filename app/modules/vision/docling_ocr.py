@@ -23,10 +23,10 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+from ..contracts.json_types import Untyped
 from ..literature.parsers import DOCLING_ARTIFACTS_ENV
 from .ocr import Detection
 from .results import VisionUnavailable
-from ..json_types import Untyped
 
 logger = logging.getLogger(__name__)
 

@@ -26,7 +26,7 @@ import time
 from typing import Any, cast
 import uuid
 
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 

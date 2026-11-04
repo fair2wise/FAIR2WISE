@@ -24,7 +24,7 @@ from ..vocabulary import Vocabulary
 from .models import MenuEntry, Snippet, TermEvidence, term_key
 
 if TYPE_CHECKING:
-    from ...json_types import JsonValue
+    from ...contracts.json_types import JsonValue
 
 SNIPPET_WIDTH = 140
 MAX_SNIPPET_CHARS = 280

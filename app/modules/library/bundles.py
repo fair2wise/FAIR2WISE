@@ -30,7 +30,7 @@ import tempfile
 from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 
 if TYPE_CHECKING:
     from collections.abc import Callable

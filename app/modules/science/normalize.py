@@ -24,7 +24,7 @@ from ..vision.kernels.units import (
 )
 
 if TYPE_CHECKING:
-    from ..json_types import JsonValue
+    from ..contracts.json_types import JsonValue
 
 TWO_PI = 2.0 * math.pi
 LENGTH = "length"

@@ -12,7 +12,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..json_types import JsonValue
+    from ..contracts.json_types import JsonValue
 
 DEFAULT_JSON_GRAPH_PATHS: tuple[str, ...] = (
     "storage/kg/matkg_rsoxs_v1.json",

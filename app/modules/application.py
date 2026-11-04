@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Any, cast
 import uuid
 
 from .contracts import ActorKind, ContractError, ErrorCode, RequestContext, ToolResult
-from .json_types import Untyped
+from .contracts.json_types import Untyped
 from .security.authorization import DeploymentSettings, local_operator_context, resolve_context
 
 if TYPE_CHECKING:

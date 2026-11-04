@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 from .keys import OperationInputs, changed_inputs, stage_key
 from .store import JobRecord, JobStore, Lease, LeaseLost
 

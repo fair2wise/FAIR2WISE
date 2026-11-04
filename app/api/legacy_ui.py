@@ -54,7 +54,7 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..modules.contracts.context import ADMIN_CAPABILITIES, DeploymentProfile, RequestContext
-from ..modules.json_types import JsonValue
+from ..modules.contracts.json_types import JsonValue
 from ..modules.security.authorization import (
     DeploymentSettings,
     StartupConfigError,

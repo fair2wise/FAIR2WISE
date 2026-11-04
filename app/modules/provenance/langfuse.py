@@ -32,7 +32,7 @@ import logging
 from typing import Any
 
 from ..contracts.context import RequestContext
-from ..json_types import Untyped
+from ..contracts.json_types import Untyped
 from ..security.disclosure import DisclosureProjector, Viewer
 
 logger = logging.getLogger(__name__)

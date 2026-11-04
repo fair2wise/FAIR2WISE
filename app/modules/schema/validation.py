@@ -28,7 +28,7 @@ from .registry import (
 )
 
 if TYPE_CHECKING:
-    from ..json_types import JsonValue
+    from ..contracts.json_types import JsonValue
 
 CONTRACT_ERROR = "contract_error"
 LEGACY_WARNING = "legacy_warning"

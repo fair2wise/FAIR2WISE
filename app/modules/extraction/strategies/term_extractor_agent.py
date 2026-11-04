@@ -30,7 +30,7 @@ from ..contract import ChunkCoverage, ExtractionResult, ExtractionSource, frozen
 from .legacy_f2w import mentions_for_term
 
 if TYPE_CHECKING:
-    from ...json_types import JsonValue
+    from ...contracts.json_types import JsonValue
 
 STRATEGY_NAME = "f2w_term_extractor_agent"
 STRATEGY_VERSION = "term_extractor-orchestrator-2.1"

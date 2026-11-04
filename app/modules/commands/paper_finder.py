@@ -42,7 +42,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from . import harvest_rsoxs as hv  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
-from ..json_types import Untyped
+from ..contracts.json_types import Untyped
 
 if TYPE_CHECKING:
     from watchdog.events import FileSystemEvent

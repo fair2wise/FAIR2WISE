@@ -19,7 +19,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
-from ..json_types import Untyped
+from ..contracts.json_types import Untyped
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

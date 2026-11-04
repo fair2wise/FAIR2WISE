@@ -31,7 +31,7 @@ from pathlib import Path
 import time
 from typing import Any, Protocol, cast, runtime_checkable
 
-from ..json_types import Untyped
+from ..contracts.json_types import Untyped
 from .parsed_document import (
     BoundingBox,
     PageInfo,

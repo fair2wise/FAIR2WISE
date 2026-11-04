@@ -22,7 +22,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 
 EVENT_VERSION = 1
 MAX_STRING = 500

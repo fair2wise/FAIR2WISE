@@ -31,7 +31,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, RemoveMessage
 
-from ..json_types import JsonValue
+from ..contracts.json_types import JsonValue
 
 STALE_TOOL_RESULT_BUDGET_CHARS = 120_000
 ORPHAN_REPAIR_MARKER = "f2w_orphan_repair"

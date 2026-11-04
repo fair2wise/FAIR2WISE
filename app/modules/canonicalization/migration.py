@@ -34,7 +34,7 @@ from .merge_safety import check_merge
 from .vocabulary import Vocabulary
 
 if TYPE_CHECKING:
-    from ..json_types import JsonValue
+    from ..contracts.json_types import JsonValue
 
 PLAN_VERSION = "t07-plan-1"
 MAX_PLAN_OPS = 500

@@ -92,7 +92,7 @@ from .cborg_limiter import (  # noqa: E402 - module-level import placed after th
 from .cli_output import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
     output,
 )
-from .json_types import JsonValue
+from .contracts.json_types import JsonValue
 from .literature.pdf_reader import (  # noqa: E402 - module-level import placed after the optional-dependency / path setup above
     open_pdf,
 )

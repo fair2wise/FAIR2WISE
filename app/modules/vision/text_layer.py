@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..json_types import Untyped
+from ..contracts.json_types import Untyped
 from ..literature.parsed_document import BoundingBox, PageInfo, ParsedFigure
 from .kernels.geometry import FigureFrame, spans_inside
 from .kernels.types import TextSpan

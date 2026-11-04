@@ -34,8 +34,8 @@ from .grouping import TermGroup
 from .merge_safety import check_merge
 
 if TYPE_CHECKING:
+    from ..contracts.json_types import JsonValue
     from ..extraction.structured_output import SyncChatClient
-    from ..json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
