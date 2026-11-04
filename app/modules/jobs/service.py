@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
 import threading
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..contracts.context import LOCAL_OPERATOR, RequestContext
 from ..contracts.errors import ContractError, ErrorCode
@@ -22,6 +22,10 @@ from ..security.authorization import DeploymentSettings, JobAuthority, StartupCo
 from .keys import OperationInputs
 from .pipeline import Pipeline, PipelineRunner
 from .store import JobLog, JobRecord, JobStore, LeaseLost
+
+if TYPE_CHECKING:
+    from ..security.tiled_identity import TiledIdentityPort
+    from .store import Lease
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +73,7 @@ class JobService:
         admission: object = None,
         heartbeat_interval: float | None = None,
         settings: DeploymentSettings | None = None,
-        identity_port: Any | None = None,
+        identity_port: TiledIdentityPort | None = None,
         credential_lookup: Callable[[str], Any] | None = None,
         clock: Callable[[], Any] | None = None,
     ) -> None:
@@ -317,7 +321,7 @@ class JobService:
         self.store.release_lease(lease)
         return job.job_id, state
 
-    def _start_heartbeat(self, lease: Any) -> threading.Event:
+    def _start_heartbeat(self, lease: Lease) -> threading.Event:
         """Renew ``lease`` periodically while the job runs; returns the event that stops the renewals."""
         done = threading.Event()
         interval = self.heartbeat_interval

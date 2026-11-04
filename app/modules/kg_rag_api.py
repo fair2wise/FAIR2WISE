@@ -99,6 +99,7 @@ from .literature.pdf_reader import (  # noqa: E402 - module-level import placed 
 from .project_config import config_value  # noqa: E402 - after the optional semantic imports
 
 if TYPE_CHECKING:
+    from .security.authorization import DeploymentSettings
     from openai.types.chat import ChatCompletionMessageParam
 
 if __name__ == "__main__":
@@ -297,7 +298,7 @@ def create_fastapi_app(
     backend: str = LLM_BACKEND,
     model: str | None = None,
     *,
-    deployment: Any | None = None,
+    deployment: DeploymentSettings | None = None,
     startup_config: dict[str, str] | None = None,
     identity_port: object = None,
     credential_store: object = None,

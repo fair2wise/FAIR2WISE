@@ -174,7 +174,7 @@ def _auth_header(credential: str | None, scheme: str) -> dict[str, str]:
 class _Http:
     """Tiny wrapper so every request has a timeout and TLS setting, and errors map to codes."""
 
-    def __init__(self, base: str, *, session: Any = None, timeout: float = 10.0, verify: Any = True):
+    def __init__(self, base: str, *, session: Any = None, timeout: float = 10.0, verify: bool | str = True):
         if session is None:
             import requests
 
@@ -252,7 +252,7 @@ def check_capabilities(
     require_writer_role: str | None = None,
     session: object = None,
     timeout: float = 10.0,
-    verify: object = True,
+    verify: bool | str = True,
 ) -> CapabilityReport:
     """Run C1-C4 and C6 against ``base_url`` (read-only).
 

@@ -19,13 +19,16 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from ..contracts.errors import ContractError, ErrorCode
 from ..contracts.jobs import JobState, StageOutcome
 from ..json_types import JsonValue
 from .keys import OperationInputs, changed_inputs, stage_key
 from .store import JobRecord, JobStore, Lease, LeaseLost
+
+if TYPE_CHECKING:
+    from threading import Event
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +204,7 @@ class StageContext:
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
         admission: Any = None,
         extra: Mapping[str, Any] | None = None,
-        interrupt: Any | None = None,
+        interrupt: Event | None = None,
     ) -> None:
         self.store = store
         self.lease = lease
@@ -300,7 +303,7 @@ class PipelineRunner:
         admission: object = None,
         extra: Mapping[str, Any] | None = None,
         on_denied: Callable[[JobRecord, str], None] | None = None,
-        interrupt: Any | None = None,
+        interrupt: Event | None = None,
     ) -> None:
         self._interrupt = interrupt
         self.store = store

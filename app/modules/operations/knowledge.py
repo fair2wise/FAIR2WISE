@@ -56,7 +56,7 @@ import os
 from pathlib import Path
 import threading
 import time
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from ..contracts import ContractError, ErrorCode, RequestContext, ToolResult, ToolSpec
@@ -72,6 +72,9 @@ from .reports import (
     report_to_result,
     store_report_artifact,
 )
+
+if TYPE_CHECKING:
+    from ..security.authorization import DeploymentSettings
 
 #: Capability every Knowledge Operation read needs (T19C contract).
 READ_CAPABILITY = "chat.ask"
@@ -337,7 +340,7 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     return from_managed
 
 
-def resolve_tiled_settings(settings: object, environ: Any = None) -> tuple[Any | None, str | None]:
+def resolve_tiled_settings(settings: DeploymentSettings, environ: Any = None) -> tuple[Any | None, str | None]:
     """``(TiledSettings, None)`` for the deployment, or ``(None, reason)`` when Tiled is not usable.
 
     Args:
@@ -451,7 +454,7 @@ class KnowledgeOperations:
         return cls(graph, corpus, artifact_store=artifact_store)
 
     @classmethod
-    def from_deployment(cls, settings: object, environ: object = None, root: str | Path | None = None, *,
+    def from_deployment(cls, settings: DeploymentSettings, environ: object = None, root: str | Path | None = None, *,
                         artifact_store: object = None, graph_max_records: int = 500_000,
                         discovery_ttl: float = TILED_DISCOVERY_TTL) -> KnowledgeOperations:
         """Operations over ``<root>/storage/kg`` *and* the deployment's Tiled graphs (D3.17).
@@ -573,7 +576,7 @@ class KnowledgeOperations:
             raise ContractError(ErrorCode.INVALID_INPUT, f"invalid arguments for {operation}: {problem}")
 
 
-def knowledge_job_context(settings: Any, *, identity_port: Any = None,
+def knowledge_job_context(settings: DeploymentSettings, *, identity_port: Any = None,
                           credential_lookup: Callable[[str], Any] | None = None,
                           clock: Callable[[], Any] | None = None) -> Callable[[Any], RequestContext]:
     """``context_for_job`` for :func:`~.reports.register_operation_jobs` (trusted wiring).
