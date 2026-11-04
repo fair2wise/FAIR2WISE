@@ -74,7 +74,7 @@ class TiledGraphClient:
 
     def __init__(self, base_url: str, *, profile: str,
                  credential: object = None, scheme: str = "Apikey",
-                 timeout: float = 10.0, verify: bool | str = True, session: Any = None) -> None:  # noqa: ANN401  # Any: HTTP session
+                 timeout: float = 10.0, verify: bool | str = True, session: Any = None) -> None:  # noqa: ANN401  # Any: requests.Session or a test double (injected)
         try:
             self.base_url = validate_external_url(profile, base_url)
         except TiledConfigError as exc:

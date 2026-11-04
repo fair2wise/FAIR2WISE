@@ -327,7 +327,7 @@ class LocalIntakePolicy:
             raise ValueError(f"{candidate.name} exceeds the {self.max_bytes}-byte intake limit")
         return resolved
 
-    def require_allowed_folder(self, path: Any) -> Path:  # noqa: ANN401  # Any: path
+    def require_allowed_folder(self, path: Any) -> Path:  # noqa: ANN401  # Any: accepts str, Path or any os.PathLike from untyped callers
         """Return the resolved directory, or raise ``ValueError`` (donor ``require_allowed_folder``)."""
         resolved = self.require_allowed(path)
         if not resolved.is_dir():

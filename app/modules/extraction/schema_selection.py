@@ -70,14 +70,14 @@ def validation_from_quantities(
 
 def map_to_schema_set(
     validation: object,
-    document: Any,  # noqa: ANN401  # Any: document validation
+    document: Any,  # noqa: ANN401  # Any: validated document (duck-typed; callers pass the donor or the typed record)
     *,
     work_id: str,
     source_paper: str,
     schema_set: str,
     schema_id: str = DEFAULT_MAPPING_SCHEMA,
     allow_pending_review: bool = False,
-    registry: Any = None,  # noqa: ANN401  # Any: schema registry
+    registry: Any = None,  # noqa: ANN401  # Any: schema registry (duck-typed: donor object or typed record)
 ) -> dict[str, Any]:
     """Map accepted records onto ``schema_id@schema_set`` (explicit selection only).
 

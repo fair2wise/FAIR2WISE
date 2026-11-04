@@ -175,7 +175,7 @@ def _row_from_data(node_id: str, name: str, category: str, data: Mapping[str, An
                      publication_dois=tuple(pubs), created_at=created_at)
 
 
-def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl | None = None) -> GraphScan:  # noqa: ANN401  # Any: graph port
+def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl | None = None) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     """Read every entity and edge of ``graph_id`` through ``port`` within ``control``'s bounds.
 
     Raises:
@@ -200,7 +200,7 @@ def scan_graph(port: Any, ctx: RequestContext, graph_id: str, control: ScanContr
     raise CapabilityError("complete_listing", getattr(port.capabilities(), "backend", "unknown"))
 
 
-def _scan_json(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: graph port
+def _scan_json(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     snap = port.snapshot(ctx, graph_id)
     scan = GraphScan(graph_id=graph_id, backend="json", revision=f"sha256:{snap.sha256}", exactness="snapshot")
     for node_id, node in snap.nodes.items():
@@ -217,7 +217,7 @@ def _scan_json(port: Any, ctx: RequestContext, graph_id: str, control: ScanContr
     return scan
 
 
-def _scan_iterators(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: graph port
+def _scan_iterators(port: Any, ctx: RequestContext, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     caps = port.capabilities()
     scan = GraphScan(graph_id=graph_id, backend=caps.backend, revision=f"{caps.backend}-live",
                      exactness="snapshot" if caps.complete_listing else "live_unisolated")
@@ -257,7 +257,7 @@ def _pages(client: Any, query: str, field_name: str, page_size: int, control: Sc
         offset += len(rows)
 
 
-def _scan_tiled(port: Any, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: graph port
+def _scan_tiled(port: Any, graph_id: str, control: ScanControl) -> GraphScan:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
     from ..graph.identity_adapter import literature_entity_key, literature_link_key, strip_reserved
 
     started = utcnow().isoformat()
@@ -427,7 +427,7 @@ def _identity_warnings(scans: Sequence[GraphScan]) -> list[str]:
     return out
 
 
-def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,  # noqa: ANN401  # Any: graph port
+def compute_statistics(port: Any, ctx: RequestContext, graph_id: str,  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
                        control: ScanControl | None = None) -> OperationReport:
     """``kg_compute_statistics`` over one graph."""
     started = utcnow()

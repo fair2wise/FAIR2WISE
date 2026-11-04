@@ -144,7 +144,7 @@ class LibraryService:
         chunker: PDF reader and chunker of ``library_index`` (default ``hybrid_rag.chunker.chunk_pdf_detailed``).
     """
 
-    def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,  # noqa: ANN401  # Any: deployment settings
+    def __init__(self, library_dir: Path | None, catalog_path: Path, *, settings: Any = None, probe: Probe | None = None,  # noqa: ANN401  # Any: None for catalog-only construction; worker_context needs it
                  fetch_factory: Callable[[], Fetch] | None = None, breaker: QuotaBreaker | None = None,
                  max_upload_bytes: int = DEFAULT_MAX_BODY_BYTES, max_probe: int = DEFAULT_MAX_PROBE,
                  clock: Callable[[], float] = time.time, index_dir: Path | None = None,

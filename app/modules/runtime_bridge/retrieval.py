@@ -116,7 +116,7 @@ class LegacyRetrievalService:
         self.calls = 0
 
     @property
-    def agent(self) -> Any:  # noqa: ANN401  # Any: retrieval agent
+    def agent(self) -> Any:  # noqa: ANN401  # Any: provider-injected retrieval agent (tests pass fakes; the donor agent is untyped)
         """The retrieval agent the next query uses (built on first access from settings)."""
         if self._provider is not None:
             return self._provider()

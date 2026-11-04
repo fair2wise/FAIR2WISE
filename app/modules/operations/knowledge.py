@@ -110,7 +110,7 @@ class DynamicJsonGraphs:
         self._backend: Any = None
         self._lock = threading.Lock()
 
-    def _current(self) -> Any:  # noqa: ANN401  # Any: graph port
+    def _current(self) -> Any:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
         from ..graph.backends.json import JsonGraphBackend
 
         files = tuple(str(Path(p)) for p in self._provider() if p)
@@ -120,7 +120,7 @@ class DynamicJsonGraphs:
                 self._files = files
             return self._backend
 
-    def capabilities(self) -> Any:  # noqa: ANN401  # Any: capabilities
+    def capabilities(self) -> Any:  # noqa: ANN401  # Any: GraphCapabilities from whichever backend answers (see the backend-port note)
         """The JSON backend's capabilities (complete listing, snapshot-isolated)."""
         return self._current().capabilities()
 
@@ -128,7 +128,7 @@ class DynamicJsonGraphs:
         """Graph ids of the current selection."""
         return cast(list[str], self._current().graph_ids())  # Any: backend is created lazily
 
-    def snapshot(self, ctx: RequestContext, graph_id: str) -> Any:  # noqa: ANN401  # Any: graph snapshot (port-defined)
+    def snapshot(self, ctx: RequestContext, graph_id: str) -> Any:  # noqa: ANN401  # Any: snapshot type is defined by the backend (GraphSnapshot for JSON); no shared Protocol
         """The loaded snapshot of ``graph_id`` (scope-checked; ``NOT_FOUND`` outside the selection)."""
         return self._current().snapshot(ctx, graph_id)
 
@@ -157,7 +157,7 @@ class CompositeGraphPort:
     is shadowed by the JSON graph (warned once; see the module docstring).
     """
 
-    def __init__(self, json_port: Any, tiled: object = None, *,  # noqa: ANN401  # Any: graph port
+    def __init__(self, json_port: Any, tiled: object = None, *,  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
                  ttl: float = TILED_DISCOVERY_TTL, max_scan: int = TILED_DISCOVERY_MAX_SCAN,
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._json = json_port
@@ -185,7 +185,7 @@ class CompositeGraphPort:
         return tuple(self._warnings)
 
     @property
-    def json_port(self) -> Any:  # noqa: ANN401  # Any: graph port
+    def json_port(self) -> Any:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
         """The JSON GraphPort."""
         return self._json
 
@@ -199,7 +199,7 @@ class CompositeGraphPort:
 
     # -- Tiled side -------------------------------------------------------------------------------
 
-    def tiled_backend(self) -> Any | None:  # noqa: ANN401  # Any: graph port
+    def tiled_backend(self) -> Any | None:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
         """The Tiled GraphPort, resolving it through the factory when needed (``None`` if absent)."""
         with self._lock:
             if self._backend is not None or self._factory is None:
@@ -269,7 +269,7 @@ class CompositeGraphPort:
                                 "(JSON is read; the Tiled copy is not listed)")
         return json_ids + [g for g in tiled_ids if g not in json_ids]
 
-    def resolve(self, graph_id: str) -> Any:  # noqa: ANN401  # Any: graph port
+    def resolve(self, graph_id: str) -> Any:  # noqa: ANN401  # Any: backend port; the JSON and Tiled backends expose more than GraphPort (graph_ids, snapshot, client) and share no Protocol yet
         """The backend holding ``graph_id`` (JSON first).
 
         Raises:
@@ -283,7 +283,7 @@ class CompositeGraphPort:
                 return backend
         raise ContractError(ErrorCode.NOT_FOUND, f"graph {graph_id!r} is not configured")
 
-    def capabilities(self, graph_id: str | None = None) -> Any:  # noqa: ANN401  # Any: capabilities
+    def capabilities(self, graph_id: str | None = None) -> Any:  # noqa: ANN401  # Any: GraphCapabilities from whichever backend answers (see the backend-port note)
         """Capabilities of the backend serving ``graph_id`` (the JSON backend's when no id is given)."""
         if graph_id is None:
             return self._json.capabilities()
@@ -342,7 +342,7 @@ def tiled_backend_factory(tiled_settings: Any, **backend_kw: Any) -> TiledBacken
     return from_managed
 
 
-def resolve_tiled_settings(settings: DeploymentSettings, environ: Any = None) -> tuple[Any | None, str | None]:  # noqa: ANN401  # Any: environment mapping
+def resolve_tiled_settings(settings: DeploymentSettings, environ: Any = None) -> tuple[Any | None, str | None]:  # noqa: ANN401  # Any: environment mapping (os.environ or a dict)
     """``(TiledSettings, None)`` for the deployment, or ``(None, reason)`` when Tiled is not usable.
 
     Args:

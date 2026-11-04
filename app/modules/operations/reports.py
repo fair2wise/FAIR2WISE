@@ -264,7 +264,7 @@ def error_result(tool: str, exc: ContractError, *, provenance_id: str | None = N
 
 # -- artifacts -----------------------------------------------------------------------
 
-def store_report_artifact(store: Any, ctx: RequestContext, report: OperationReport) -> str | None:  # noqa: ANN401  # Any: document store
+def store_report_artifact(store: Any, ctx: RequestContext, report: OperationReport) -> str | None:  # noqa: ANN401  # Any: injected artifact store; callers pass any object with the DocumentStore methods (duck-typed)
     """Store the full report as a private JSON artifact and return its ``sha256:`` ref.
 
     ``store`` is the injected ``DocumentStore`` (``FileDocumentStore`` or the executor's
@@ -357,7 +357,7 @@ def operation_dispatch(*suites: Any) -> OperationFn:  # noqa: ANN401  # Any: ope
 
 
 def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], RequestContext], *,
-                             artifact_store: Any = None, max_records: int = 5_000_000) -> Pipeline:  # noqa: ANN401  # Any: document store
+                             artifact_store: Any = None, max_records: int = 5_000_000) -> Pipeline:  # noqa: ANN401  # Any: injected artifact store; callers pass any object with the DocumentStore methods (duck-typed)
     """One-stage pipeline that runs a registered operation as a durable, cancellable job.
 
     The job's ``inputs.params`` must be ``{"operation": <tool name>, "args": {...}}``.
@@ -369,7 +369,7 @@ def build_operation_pipeline(run: OperationFn, context_for_job: Callable[[Any], 
     """
     from ..jobs.pipeline import Pipeline, StageResult, StageSpec
 
-    def compute(stage_ctx: StageContext) -> Any:  # noqa: ANN401  # Any: stage result
+    def compute(stage_ctx: StageContext) -> Any:  # noqa: ANN401  # Any: StageSpec accepts any callable; this one returns a StageResult built from loosely typed records
         params = dict(stage_ctx.inputs.params or {})
         operation = str(params.get("operation") or "")
         args = dict(params.get("args") or {})

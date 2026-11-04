@@ -284,7 +284,7 @@ def _terms_ref(request: SnapshotRequest) -> str:
                         "is outside the repository; absolute local paths are not recorded")
 
 
-def _helper_for(entry: Any, fingerprint: str) -> Any:  # noqa: ANN401  # Any: schema entry (duck-typed)
+def _helper_for(entry: Any, fingerprint: str) -> Any:  # noqa: ANN401  # Any: schema entry (duck-typed: donor object or typed record)
     """Return the existing ``SchemaHelper`` for ``entry``, reused across builds.
 
     The closure fingerprint is the cache key, so any change to any imported file

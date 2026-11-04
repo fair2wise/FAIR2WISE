@@ -230,7 +230,7 @@ class Publication:
     def _effect_id(record: PlanRecord | None) -> str:
         return f"apply:{record.plan.plan_sha256}" if record is not None else "apply:none"
 
-    def _freshness(self, sc: StageContext, record: Any, *, check_target: bool) -> list[str]:  # noqa: ANN401  # Any: job record
+    def _freshness(self, sc: StageContext, record: Any, *, check_target: bool) -> list[str]:  # noqa: ANN401  # Any: plan record: a PlanRecord or None
         """Reasons the plan no longer matches the world (empty when fresh)."""
         plan, reasons = record.plan, []
         ref = str(self._params(sc)["snapshot_ref"])

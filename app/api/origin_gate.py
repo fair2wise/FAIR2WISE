@@ -34,7 +34,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from fastapi.responses import JSONResponse
