@@ -79,3 +79,12 @@ Interpretation notes (agent, for the owner to correct):
 | bl1101 v8/v9 | "Scrub and re-serialize in place (Recommended)" |
 | E3 spec errata | "i dont know what this means" (not decided; explained and asked again) |
 | Apply adapter for accepted proposals | "Not yet" |
+
+## Tenth set (2026-11-04)
+
+| Question | Owner answer |
+|---|---|
+| E3 spec errata (edit frozen docs / leave frozen with a note / keep draft) | "KGs can go in the image that is fine" (not one of the offered choices: read as a confirmation of the E3 exception only; no frozen document is edited and the draft stays unapplied until the owner picks an option) |
+| SaveTarget on :local | "Wire lazily after the first :local publication (Recommended)" |
+| Corpus scope default on the :local image | "Set none; name one per run (Recommended)" |
+| Library-to-publish route/button | "Not now; do the E2E with the existing steps (Recommended)" |
