@@ -24,6 +24,7 @@ from .pipeline import Pipeline, PipelineRunner
 from .store import JobLog, JobRecord, JobStore, LeaseLost
 
 if TYPE_CHECKING:
+    from ..agent_runtime.admission import Admission
     from ..security.tiled_identity import TiledIdentityPort
     from .store import Lease
 
@@ -70,7 +71,7 @@ class JobService:
         store: JobStore,
         *,
         owner: str = "worker",
-        admission: object = None,
+        admission: Admission | None = None,
         heartbeat_interval: float | None = None,
         settings: DeploymentSettings | None = None,
         identity_port: TiledIdentityPort | None = None,
@@ -102,7 +103,7 @@ class JobService:
         *,
         capability: str | None = None,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: object = None,
+        admission: Admission | None = None,
         extra: Mapping[str, Any] | None = None,
         on_denied: Callable[[JobRecord, str], None] | None = None,
     ) -> RegisteredKind:

@@ -28,6 +28,7 @@ from .keys import OperationInputs, changed_inputs, stage_key
 from .store import JobRecord, JobStore, Lease, LeaseLost
 
 if TYPE_CHECKING:
+    from ..agent_runtime.admission import Admission
     from threading import Event
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,7 @@ class StageContext:
         op_key: str,
         *,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: Any = None,
+        admission: Admission | None = None,
         extra: Mapping[str, Any] | None = None,
         interrupt: Event | None = None,
     ) -> None:
@@ -300,7 +301,7 @@ class PipelineRunner:
         pipeline: Pipeline,
         *,
         authority: Callable[[JobRecord, Sequence[str]], Any] | None = None,
-        admission: object = None,
+        admission: Admission | None = None,
         extra: Mapping[str, Any] | None = None,
         on_denied: Callable[[JobRecord, str], None] | None = None,
         interrupt: Event | None = None,

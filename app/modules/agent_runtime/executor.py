@@ -37,7 +37,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, cast
+from typing import Any, cast, TYPE_CHECKING
 
 from ..contracts import (
     ApprovalRecord,
@@ -63,6 +63,9 @@ from .policies import (
     utcnow,
 )
 from .registry import RegisteredTool, ToolRegistry, effective_capabilities
+
+if TYPE_CHECKING:
+    from .admission import Admission
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +139,7 @@ class ToolInvocation:
     ctx: RequestContext
     spec: ToolSpec
     args: dict[str, Any]
-    admission: Any
+    admission: Admission
     artifact_store: Any = None
     deadline: datetime | None = None
     attempt: int = 1
@@ -228,7 +231,7 @@ class ToolExecutor:
         *,
         approval_check: ApprovalCheck | None = None,
         event_sink: EventSink | None = None,
-        admission: object = None,
+        admission: Admission | None = None,
         limits: RuntimeLimits | None = None,
         artifact_store: Any = None,
         clock: Callable[[], datetime] = utcnow,
