@@ -44,13 +44,13 @@ from ..modules.jobs.service import JobService
 from ..modules.jobs.snapshot_source import DirectorySnapshotSource
 from ..modules.provenance.recorder import AuditLog, AuditRecorder
 from ..modules.schema.registry import SchemaRegistry
-from ..modules.security.tiled_identity import normalize_tiled_target
 from ..modules.security.authorization import (
     DeploymentSettings,
     local_operator_context,
     verify_approval,
     worker_context,
 )
+from ..modules.security.tiled_identity import normalize_tiled_target
 from .operations import F2WOperations, PublicationGate
 from .post_extraction import PostExtractionPublisher, snapshot_freezer
 

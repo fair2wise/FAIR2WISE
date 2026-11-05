@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import time
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 import uuid
 
 from ..modules.contracts.changes import ApprovalRecord, ChangePlan

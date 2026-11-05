@@ -82,8 +82,8 @@ def _build_converter(artifacts: Path) -> Untyped:
 
 
 def _png_bytes(image: object) -> bytes:
-    import numpy as np
     from PIL import Image
+    import numpy as np
 
     out = BytesIO()
     # dpi 72 makes Docling's page size (points) equal the pixel size; the mapping below does not rely on it.

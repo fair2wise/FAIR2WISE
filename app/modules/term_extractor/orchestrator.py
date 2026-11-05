@@ -231,6 +231,7 @@ class Orchestrator:
     def _build_tools(self, llm_base: ChatOpenAI) -> list[BaseTool]:
         def _llm_invoke(prompt: str) -> str:
             from langchain_core.messages import HumanMessage
+
             # A hung transport must not pin the calling page thread for ever: bound the whole call.
             content = call_with_deadline(lambda: llm_base.invoke([HumanMessage(content=prompt)])).content
             return content if isinstance(content, str) else str(content or "")

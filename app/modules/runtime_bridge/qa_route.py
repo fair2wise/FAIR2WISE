@@ -41,9 +41,8 @@ from .mode import RuntimeConfigError
 
 if TYPE_CHECKING:
     from langchain_core.messages import AIMessage
-    from ..agent_runtime.chat_model import BoundChatModel
-    from ..agent_runtime.chat_model import ChatModel
-    from collections.abc import Sequence
+
+    from ..agent_runtime.chat_model import BoundChatModel, ChatModel
 
 QA_ROUTE_ENV = "F2W_QA_ROUTE"
 PLANNING_LABEL = "supervisor-plan"

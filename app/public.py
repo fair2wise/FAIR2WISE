@@ -53,7 +53,7 @@ LangGraph code. Construction opens no network connection.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from .modules.application import DelegatedOutcome, F2WApplication
 from .modules.contracts import RequestContext, ToolResult

@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
 import math
-import sqlite3
 import time
 from typing import Any
 import uuid

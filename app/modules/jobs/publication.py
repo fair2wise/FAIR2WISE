@@ -28,7 +28,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ..contracts.changes import ApprovalRecord, ChangePlan, ImportReceipt
 from ..contracts.context import ActorKind, RequestContext
@@ -49,9 +49,6 @@ from .publish_ports import (
 from .publish_store import PlanRecord, Pointer, PublishStore
 from .service import JobService
 from .store import JobRecord
-
-if TYPE_CHECKING:
-    from .publish_store import PlanRecord
 
 logger = logging.getLogger(__name__)
 
