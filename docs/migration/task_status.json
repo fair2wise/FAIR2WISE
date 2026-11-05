@@ -177,7 +177,7 @@
       "gate": "H5",
       "status": "open",
       "merge_commit": null,
-      "note": "publication and rollback rehearsal; after H4"
+      "note": "publication and rollback rehearsal; after H4 | :local-only publication into the container's own Tiled merged at 50b0c4cef7265c64d16b298cfbd5e9ebc08361ef (T-localpub, owner decision 2026-11-04; reviews/H5/local_publication.md); stays open, rehearsal and H5 approval still owner-gated"
     },
     {
       "id": "T14",
@@ -729,7 +729,7 @@
       "gate": "H6",
       "status": "merged",
       "merge_commit": "963886da93ce47b13609241934bffb4a3aa75a4c",
-      "note": "implemented 2026-11-02: app/modules/library/extraction.py (LibraryExtractor, per-bundle flock, fail-closed backend, unit key = sha256 + extractor/schema/model), handlers.extract_handler, wiring in api/main.py and workers/factories.py, tests/library/test_library_extract.py; no route, no policy row; see docs/migration/api/README.md section 2.0.1 | landed on forge_merge 2026-11-03; owner review at H6"
+      "note": "implemented 2026-11-02: app/modules/library/extraction.py (LibraryExtractor, per-bundle flock, fail-closed backend, unit key = sha256 + extractor/schema/model), handlers.extract_handler, wiring in api/main.py and workers/factories.py, tests/library/test_library_extract.py; no route, no policy row; see docs/migration/api/README.md section 2.0.1 | landed on forge_merge 2026-11-03; owner review at H6 | hardened by T-leasefix merged at 6242380 (2026-11-04): no re-claim of a running job, lease heartbeat revival, per-PDF manifest and stale-run fencing, bounded LLM calls; owner review at H6"
     },
     {
       "id": "T40",
